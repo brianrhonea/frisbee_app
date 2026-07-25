@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ultimatefrisbeeapp/Features/home_screen.dart';
 
  main()  {
   runApp(const UltiCoachApp());
@@ -15,7 +16,7 @@ class UltiCoachApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2B6CB0)),
       ),
-      home:  Container(color: Colors.blue),
+      home:  HomeScreenWrapper()
     );
   }
 }
