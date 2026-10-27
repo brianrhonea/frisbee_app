@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "frisbee_app",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=secrets.local.json"]
+    },
+    {
+      "name": "frisbee_app (emulators)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define-from-file=secrets.local.json",
+        "--dart-define=USE_EMULATORS=true"
+      ]
+    }
+  ]
+}

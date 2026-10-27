@@ -1,0 +1,2362 @@
+
+<!doctype html> 
+<!--[if lt IE 7]>      <html class="html no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="html no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="html no-js lt-ie9"> <![endif]-->
+<!--[if IE 9 ]>        <html class="html no-js ie9"> <![endif]-->
+<!--[if gt IE 9]><!--> <html class="html no-js"> <!--<![endif]-->
+<head id="head"><meta name="description" content="SiteStartup Description" /><meta name="keywords" content="SiteStartup,Keywords" /><meta charset="utf-8" /><title>
+	Tournament Calendar | Play USA Ultimate
+</title><meta name="viewport" content="width=device-width" /><link rel="stylesheet" href="/cms/includes/style-new.v2.min.css" />
+	<script src="/cms/includes/modernizr-1.7.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.js"></script>
+	<script>!window.jQuery && document.write(unescape('%3Cscript src="/cms/includes/jquery/jquery-1.8.2.js"%3E%3C/script%3E'))</script>
+	<script src="/cms/includes/jquery-core-plugins.js"></script>
+	<script src="/cms/includes/jquery/jquery-functions.js"></script>
+ 	<script type="text/javascript" src="/cms/includes/functionsC.js"></script>
+
+    
+	<!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RXFMFVQS5"></script>
+	<script> window.dataLayer = window.dataLayer || []; function gtag() { dataLayer.push(arguments); } gtag('js', new Date()); gtag('config', 'G-3RXFMFVQS5'); </script> 
+    
+
+<script type="text/javascript">
+    var intrvl = 1000;
+    var sec = 60000;
+    var min = 3000 * sec;
+    //var min = 525600 * sec;
+    var warn = 3 * sec;
+    setInterval("checkSessionTime();", intrvl);
+	function checkSessionTime() {
+        min -= intrvl;
+        var rm = parseInt(min / sec);
+		var rs = parseInt((min - (rm * sec)) / 1000);
+
+        if (min <= 0) {
+            renewMemberSession(true);
+        } else {
+            var html = "Your session will expire in ";
+            if (rm > 3) {
+                rm += 1;
+                html += "<b>" + rm + "</b> minutes";
+            } else if (rm > 1) {
+                html += "<b>" + rm + "</b> minutes and <b>" + rs + "</b> seconds";
+            } else if (rm == 1) {
+                html += "<b>" + rm + "</b> minute and <b>" + rs + "</b> seconds";
+            } else {
+                html += "<b>" + rs + "</b> seconds";
+            }
+			
+            if (min % 10000 == 0) renewMemberSession(true); // every 10 seconds lets refresh the session, but don't reset the javascript timer
+        }
+    }
+	function renewMemberSession(skipRenew) {
+		if (!skipRenew) resetSession();
+    }
+    //function logout() { $("#expires").html("<b>Your session has expired. Logging off...</b>"); try {$("#SessionTimeout").jqmShow().center();} catch(ex){} setTimeout("window.location = '/admin/logout.aspx';", 5000); }
+    function resetSession() { min = 3000 * sec; }
+</script></head>
+<body class="body landing">
+<form method="post" action="/events/tournament/" onsubmit="javascript:return WebForm_OnSubmit();" id="main">
+<div class="aspNetHidden">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__LASTFOCUS" id="__LASTFOCUS" value="" />
+
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['main'];
+if (!theForm) {
+    theForm = document.main;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/WebResource.axd?d=pynGkmcFUV13He1Qd6_TZCuATqmKWvVIdumT-ns2J3B5K0zjWuAQ6KKspY5Gtz9ECvo92w2&amp;t=639190617332169432" type="text/javascript"></script>
+
+
+<script src="/cms/includes/DatePicker.js" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=1HpV3OVB0CaEXoaafcqmhmXqKryt8DwB2XQG8KhrjWChidTL9XsFA6WjFKqjjkmP8lWPAJiySWlN3Re4JKSrLmecUQKEZP-2rAd25rmNiIqAgQYr5S0Y8N_f2hdmzgYSN4E7UQ2&amp;t=ffffffffa5405632" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=uHIkleVeDJf4xS50Krz-yIrFGOTroGnmwbeNViD-E_RldjEuXJhAYUt9sm_qqKrCeARQ02Woh-HVBOQDqf2umpJRkgpTBbM7QxkFcazEmO9NqGjkbvkgTmUgkVaYCHMoAf1FsOub7i5kDttn-unsSKRcLyM1&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=Jw6tUGWnA15YEa3ai3FadLY0YYXQQpCbF1CEsuoTt9oDcVD9hMg0bxFeLR8dMKrluL7s-dM48nY2iB3ZSKw7iM_3gJERu7sy6NVCNUSzW8NwwQG0HcdkdcmNg6paFtSdiyo-iyIvCyi6prRmDP2-IVBkQb81&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script src="/cms/includes/jquery-core-plugins.js" type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+function WebForm_OnSubmit() {
+if(document.getElementById('CT_HP_Mid_0_fck_ccEditor')!=null && FCKeditorAPI.GetInstance('CT_HP_Mid_0_fck_ccEditor'))  FCKeditorAPI.GetInstance('CT_HP_Mid_0_fck_ccEditor').UpdateLinkedField();if (typeof(ValidatorOnSubmit) == "function" && ValidatorOnSubmit() == false) return false;
+return true;
+}
+//]]>
+</script>
+
+<script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('sm', 'main', ['tCT_HP_Mid_1$pnlEventSearch',''], [], [], 90, '');
+//]]>
+</script>
+
+	<div id="wrapper">
+		<header id="main_header">
+			
+
+<div id="logoArea">
+	<span class="logo"><a href="http://www.usaultimate.org" target="_blank"><img src="/cms/images/layout/logo.png" alt="USA Ultimate"/></a></span>
+	<span class="slogan"><img src="/cms/images/layout/slogan.png" alt="Account Management"/></span>
+	<!-- Needs to be switched to account_header.png -->
+</div>
+
+
+<nav class="mainNav">
+	<ul class="sf-menu clearfix">
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl00_liItem" class="firstnavitemli">
+             <a href="https://usaultimate.org/about/" id="CT_Header_CC_TopNav_rptNav_ctl00_lnkLink1" class="firstnavitema">About</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_lnk" style="">Contact Us</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/about/staff/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">USA Ultimate Staff</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl02_lnkInner" style="">Youth Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl03_lnkInner" style="">College Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl04_lnkInner" style="">Club Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl05_lnkInner" style="">Masters Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl06_lnkInner" style="">Beach Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#CurrentAffiliates" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl07_lnkInner" style="">USA Ultimate Affiliates</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/board-of-directors/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl08_lnkInner" style="">Board of Directors</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/local/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl02_lnk" style="">Where to Play</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/discover-ultimate/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl03_lnk" style="">About Ultimate</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/rules/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl01_lnkInner" style="">Rules of Ultimate</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/spirit-of-the-game/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl02_lnkInner" style="">Spirit of the Game</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/about/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl04_lnk" style="">About USA Ultimate</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/about/volunteer/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl01_lnkInner" style="">Volunteer Opportunities</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.archive.usaultimate.org/about/history/hall_of_fame/default.aspx" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl05_lnk" style="">Hall of Fame</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/about/governance/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_lnk" style="">Governance</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/wp-content/uploads/2020/03/USAUltimateBylaws_rev20171120.pdf" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_rptSubSubNav_ctl01_lnkInner" style="">Bylaws</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/suspensions/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_rptSubSubNav_ctl02_lnkInner" style="">Suspensions</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/strategic-plan/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_rptSubSubNav_ctl03_lnkInner" style="">Strategic Plan</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/equity-diversity-inclusion/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl07_lnk" style="">Equity and Diversity</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl00$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_hdn" value="6" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl01_liItem">
+             <a href="https://www.usaultimate.org/news/default.aspx" id="CT_Header_CC_TopNav_rptNav_ctl01_lnkLink1">News</a>
+             
+             
+<ul>
+
+<li>
+    <a id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl01_lnk" style="">USA Ultimate Mobile App</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://itunes.apple.com/us/app/usa-ultimate/id1032772331?mt=8" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">iOS</a>
+         </li>
+        
+         <li>
+            <a href="https://play.google.com/store/apps/details?id=org.usaultimate.usaultimate&hl=en" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl02_lnkInner" style="">Android</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://play.usaultimate.org/teams/events/rankings/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_lnk" style="">Rankings</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=College-Men" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl01_lnkInner" style="">College Men's</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=College-Women" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl02_lnkInner" style="">College Women's</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=Club-Men" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl03_lnkInner" style="">TCT Men's</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=Club-Mixed" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl04_lnkInner" style="">TCT Mixed</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=Club-Women" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl05_lnkInner" style="">TCT Women's</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/college/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl03_lnk" style="">College News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/club/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl04_lnk" style="">Triple Crown Tour News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/beach/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl05_lnk" style="">Beach News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/youth/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl06_lnk" style="">Youth News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/team-usa/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl07_lnk" style="">National Teams News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/watch/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl08_lnk" style="">Videos</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl01$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_hdn" value="25" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl02_liItem">
+             <a href="https://play.usaultimate.org/" id="CT_Header_CC_TopNav_rptNav_ctl02_lnkLink1">Events</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://play.usaultimate.org/events/tournament/" id="CT_Header_CC_TopNav_rptNav_ctl02_ccSubNav_rptSubNav_ctl01_lnk" style="">Tournament Calendar</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl02$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl02_ccSubNav_hdn" value="144" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl03_liItem">
+             <a id="CT_Header_CC_TopNav_rptNav_ctl03_lnkLink1">Competition</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://www.usaultimate.org/youth/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl01_lnk" style="">Youth Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/youth/guidelines-and-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">Youth Guidelines</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/college/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_lnk" style="">College Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/resources/college-eligibility-guidelines/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl01_lnkInner" style="">College Eligibility</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/college/guidelines-and-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl02_lnkInner" style="">College Guidelines</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/resources/?_resource_filters=college" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl03_lnkInner" style="">College Resources</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/club/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl03_lnk" style="">Club Division (Triple Crown Tour)</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/club/guidelines-and-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl01_lnkInner" style="">TCT Guidelines</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/events/2022-US-Open-Club-Championships/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl02_lnkInner" style="">U.S. Open Club Championships</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/masters-ultimate/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl04_lnk" style="">Masters Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/masters-ultimate/masters-guidelines-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl01_lnkInner" style="">Masters Guidelines</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/beach-ultimate/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl05_lnk" style="">Beach Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/wp-content/uploads/2022/01/2022-Beach-Guidelines-Final.pdf" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl01_lnkInner" style="">Beach Guidelines</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/team-usa/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl06_lnk" style="">USA Ultimate National Teams</a>
+    
+</li>
+
+<li>
+    <a href="https://ultimate.mobilecoach.org/page/5344/skills-challenge" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl07_lnk" style="">Skills Challenge App Program</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl03$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_hdn" value="26" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl04_liItem">
+             <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_lnkLink1">Programs</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://usaultimate.org/affiliate-program/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_lnk" style="">Affiliates</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#Benefits" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">Benefits</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#Grants" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl02_lnkInner" style="">Grants</a>
+         </li>
+        
+         <li>
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSfEeecOBhzwri2jJNWtH-iGlUjQJ_y69L5I7RJK-Zs0rIg_UQ/viewform?c=0&w=1" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl03_lnkInner" style="">Apply</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#FAQs" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl04_lnkInner" style="">FAQ</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/youth/camps-clinics/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl02_lnk" style="">Camps</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/wp-content/uploads/2020/11/Chaperone-Requirements.pdf" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl03_lnk" style="">Chaperones</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://www.usaultimate.org/youth_requirements/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl01_lnkInner" style="">Youth Safety</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/coaches/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl04_lnk" style="">Coaching</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/coaches/become-a-coach/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl01_lnkInner" style="">Coaching Development Program</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/athlete-safety/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl02_lnkInner" style="">Athlete Protection</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_lnk" style="">Event Sanctioning & Insurance</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/sanctioning/tournament-sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl01_lnkInner" style="">Tournament Sanctioning</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/sanctioning/league-sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl02_lnkInner" style="">League Sanctioning</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/sanctioning/development-event-sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl03_lnkInner" style="">Practice Insurance</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="http://gum.usaultimate.org/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl06_lnk" style="">Girls' Ultimate Movement (GUM)</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs-services/learn-to-play" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl07_lnk" style="">Learn to Play</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/coach-organizer-convention/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl08_lnk" style="">Coach & Organizer Convention</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs-services/new-start" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl09_lnk" style="">New Start Grant Kits</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_lnk" style="">Organizer Resources</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/host-a-championship-event/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl01_lnkInner" style="">Bid to Host USA Ultimate Events</a>
+         </li>
+        
+         <li>
+            <a href="https://www.usaultimate.org/tdcp/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl02_lnkInner" style="">Tournament Director's Certification Program</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl03_lnkInner" style="">Youth & Education Resources</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl04_lnkInner" style="">Women's Development</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl05_lnkInner" style="">College Development</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/youth/parents/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl11_lnk" style="">Parent Resources</a>
+    
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/officiating/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_lnk" style="">Rules & Officiating</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/rules/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_rptSubSubNav_ctl01_lnkInner" style="">Rules</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/observers/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_rptSubSubNav_ctl02_lnkInner" style="">Observer Certification Program</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/disc-standards" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_rptSubSubNav_ctl03_lnkInner" style="">Disc Standards</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl04$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_hdn" value="27" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl05_liItem" class="lastnavitemli">
+             <a href="https://www.usaultimate.org/membership/default.aspx" id="CT_Header_CC_TopNav_rptNav_ctl05_lnkLink1" class="lastnavitema">Membership</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://www.usaultimate.org/membervalue/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl01_lnk" style="">Benefits & Value</a>
+    
+</li>
+
+<li>
+    <a href="https://docs.google.com/forms/d/e/1FAIpQLSfmC4E50X2uP3IL70ZZgeku8TriWdsABdti-9eUNgAesoUXrA/viewform" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl02_lnk" style="">Gift Certificates</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/membership/levels/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl03_lnk" style="">Membership Levels</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/play-it-forward/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl04_lnk" style="">Play It Forward</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/membership/#resources" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl05_lnk" style="">Registration Forms: Waiver & Medical Authorization</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/signature-series/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl06_lnk" style="">Signature Series Disc</a>
+    
+</li>
+
+<li>
+    <a href="/members/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl07_lnk" style="">Login</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl05$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_hdn" value="28" />
+        </li>
+	
+	</ul>
+</nav>
+
+
+
+
+
+			
+<div class="login_area">
+    
+	<div id="CT_LoginBar_0_login_buttons" class="login_buttons">
+        <img src="/cms/images/icons/usoc_new_logo.png" width="160" />
+        <br/>
+		<a href="/members/login/" class="btn">Member Account</a>
+	</div>
+	
+</div>
+
+		</header>
+		<div id="container" class="landing">
+			<div id="main_col" class="clearfix">
+				<div class="hpTop">
+					
+
+					
+
+<style type="text/css">
+	.rotator-title { 
+		max-width: inherit; 
+		overflow-wrap: break-word; 
+		text-overflow: ellipsis; 
+	}
+</style>
+<script type="text/javascript">
+	jQuery(document).ready(function () {
+		var val = 5000,
+			loaded = false;
+
+		if ($(".hpSlides .slides .slide").length === 1) {
+			var $slide = $(".hpSlides .slides .slide");
+			$(".hpSlides .slidesNav").append('<li><a href="#"><span class="title rotator-title">' + $slide.find(".details .title a").text() + '</span><span class="date" style="margin-top:1px;padding-top:0px;">' + $slide.find(".details .date").text() + '</span></a></li>');
+		}
+
+		$(".hpSlides .slides").cycle({
+			fx: 'fade',
+			timeout: val,
+			pager: '.slidesNav',
+			next: '.hpSlides .next',
+			prev: '.hpSlides .prev',
+			cleartype: !$.support.opacity,
+			pagerAnchorBuilder: function (idx, slide) {
+				$slide = $(slide);
+				return '<li><a href="#"><span class="title rotator-title" >' + $slide.find(".details .title a").text() + '</span><span class="date">' + $slide.find(".details .date").text() + '</span></a></li>';
+			},
+			before: function (currSlideElement, nextSlideElement) {
+				var currIndex = $(currSlideElement).index(),
+					nextIndex = $(nextSlideElement).index();
+				if (loaded) {
+					$('.hpSlides .slidesNav').scrollTo('li:eq(' + nextIndex + ')', 300);
+					$('.recentGames .panels .panel:eq(' + currIndex + ')').fadeOut(300, function () {
+						$(".eventList .modContent").attr('style', '');
+						$(".recentGames .modContent").attr('style', '');
+						$(".recentGames .modHead .title").text("Recent Games - " + $(nextSlideElement).find(".title").text());
+
+						$(".recentGames .modHead .viewMore").attr("href", $(nextSlideElement).find(".viewMore").attr("href"))
+						$('.recentGames .panels .panel:eq(' + nextIndex + ')').fadeIn(300);
+						$(".landing .panel > .itemList > li").matchHeights();
+						$(".landing .modContent").matchHeights();
+					});
+				} else {
+					$(".recentGames .modHead .title").text("Recent Games - " + $(currSlideElement).find(".title").text());
+					$(".recentGames .modHead .viewMore").attr("href", $(currSlideElement).find(".viewMore").attr("href"))
+					loaded = true;
+				}
+			}
+		});
+	});
+</script>
+<div id="CT_Main_0_divSlideshow" class="slideshow hpSlides mod">
+	<div class="slides" style="width: 510px; height: 340px;">
+		
+				<div class="slide">
+					<div class="image">
+						<a href="https://play.usaultimate.org/events/2026-Halloween-Havoc" id="CT_Main_0_rptGallery_ctl00_imgLink">
+							<img id="CT_Main_0_rptGallery_ctl00_SlideImage" src="/assets/EventPictures/DEVYL.jpg" />
+						</a>
+					</div>
+					<div class="details">
+						<h2 class="title">
+							<a id="CT_Main_0_rptGallery_ctl00_lblTitle" class="rotator-title" href="https://play.usaultimate.org/events/2026-Halloween-Havoc">2026 Halloween Havoc</a>
+						</h2>
+						<div class="content">
+							<span class="date">
+								<span id="CT_Main_0_rptGallery_ctl00_lblDate">10/24/2026 - 10/24/2026</span>
+							</span>
+							<p style="overflow-wrap:anywhere;">
+								<br /><b>City: </b>Freehold<br /><b>State: </b>NJ
+							</p>
+							
+						</div>
+					</div>
+				</div>
+			
+				<div class="slide">
+					<div class="image">
+						<a href="https://play.usaultimate.org/events/NY-Minute-2026" id="CT_Main_0_rptGallery_ctl01_imgLink">
+							<img id="CT_Main_0_rptGallery_ctl01_SlideImage" src="/assets/EventPictures/new-york-minute.png" />
+						</a>
+					</div>
+					<div class="details">
+						<h2 class="title">
+							<a id="CT_Main_0_rptGallery_ctl01_lblTitle" class="rotator-title" href="https://play.usaultimate.org/events/NY-Minute-2026">NY Minute 2026</a>
+						</h2>
+						<div class="content">
+							<span class="date">
+								<span id="CT_Main_0_rptGallery_ctl01_lblDate">11/07/2026 - 11/08/2026</span>
+							</span>
+							<p style="overflow-wrap:anywhere;">
+								<br /><b>City: </b>New York<br /><b>State: </b>NY
+							</p>
+							
+						</div>
+					</div>
+				</div>
+			
+				<div class="slide">
+					<div class="image">
+						<a href="https://play.usaultimate.org/events/2026-Coconut-Classic" id="CT_Main_0_rptGallery_ctl02_imgLink">
+							<img id="CT_Main_0_rptGallery_ctl02_SlideImage" src="/assets/EventPictures/devyl_logo.jpeg" />
+						</a>
+					</div>
+					<div class="details">
+						<h2 class="title">
+							<a id="CT_Main_0_rptGallery_ctl02_lblTitle" class="rotator-title" href="https://play.usaultimate.org/events/2026-Coconut-Classic">2026 Coconut Classic</a>
+						</h2>
+						<div class="content">
+							<span class="date">
+								<span id="CT_Main_0_rptGallery_ctl02_lblDate">11/07/2026 - 11/08/2026</span>
+							</span>
+							<p style="overflow-wrap:anywhere;">
+								<br /><b>City: </b>Freehold and Lawrenceville<br /><b>State: </b>NJ
+							</p>
+							
+						</div>
+					</div>
+				</div>
+			
+				<div class="slide">
+					<div class="image">
+						<a href="https://play.usaultimate.org/events/Blue-Ridge-Finale-2026" id="CT_Main_0_rptGallery_ctl03_imgLink">
+							<img id="CT_Main_0_rptGallery_ctl03_SlideImage" src="/assets/EventPictures/WithoutLimits.jpeg" />
+						</a>
+					</div>
+					<div class="details">
+						<h2 class="title">
+							<a id="CT_Main_0_rptGallery_ctl03_lblTitle" class="rotator-title" href="https://play.usaultimate.org/events/Blue-Ridge-Finale-2026">Blue Ridge Finale 2026</a>
+						</h2>
+						<div class="content">
+							<span class="date">
+								<span id="CT_Main_0_rptGallery_ctl03_lblDate">11/07/2026 - 11/08/2026</span>
+							</span>
+							<p style="overflow-wrap:anywhere;">
+								<br /><b>City: </b>Axton<br /><b>State: </b>VA
+							</p>
+							
+						</div>
+					</div>
+				</div>
+			
+				<div class="slide">
+					<div class="image">
+						<a href="https://play.usaultimate.org/events/2026-Colorado-High-School-Mixed-State-Championships" id="CT_Main_0_rptGallery_ctl04_imgLink">
+							<img id="CT_Main_0_rptGallery_ctl04_SlideImage" src="/assets/EventPictures/USAU-HS-Championships-2026_disc3.jpg" />
+						</a>
+					</div>
+					<div class="details">
+						<h2 class="title">
+							<a id="CT_Main_0_rptGallery_ctl04_lblTitle" class="rotator-title" href="https://play.usaultimate.org/events/2026-Colorado-High-School-Mixed-State-Championships">2026 Colorado High School Mixed State Ch</a>
+						</h2>
+						<div class="content">
+							<span class="date">
+								<span id="CT_Main_0_rptGallery_ctl04_lblDate">11/07/2026 - 11/08/2026</span>
+							</span>
+							<p style="overflow-wrap:anywhere;">
+								2026 Colorado High School Mixed State Championships
+<Br /><Br...<a style='color: #fff;' href="https://play.usaultimate.org/events/2026-Colorado-High-School-Mixed-State-Championships">[more]</a><br /><b>City: </b>Longmont<br /><b>State: </b>CO
+							</p>
+							
+						</div>
+					</div>
+				</div>
+			
+				<div class="slide">
+					<div class="image">
+						<a href="https://play.usaultimate.org/events/2026-North-Carolina-High-School-State-Championships" id="CT_Main_0_rptGallery_ctl05_imgLink">
+							<img id="CT_Main_0_rptGallery_ctl05_SlideImage" src="/assets/EventPictures/USAU-HS-Championships-2026_disc4.jpg" />
+						</a>
+					</div>
+					<div class="details">
+						<h2 class="title">
+							<a id="CT_Main_0_rptGallery_ctl05_lblTitle" class="rotator-title" href="https://play.usaultimate.org/events/2026-North-Carolina-High-School-State-Championships">2026 North Carolina High School State Ch</a>
+						</h2>
+						<div class="content">
+							<span class="date">
+								<span id="CT_Main_0_rptGallery_ctl05_lblDate">11/07/2026 - 11/08/2026</span>
+							</span>
+							<p style="overflow-wrap:anywhere;">
+								2026 North Carolina High School State Championships
+<br /><br...<a style='color: #fff;' href="https://play.usaultimate.org/events/2026-North-Carolina-High-School-State-Championships">[more]</a><br /><b>City: </b>Bermuda Run<br /><b>State: </b>NC
+							</p>
+							
+						</div>
+					</div>
+				</div>
+			
+				<div class="slide">
+					<div class="image">
+						<a href="https://play.usaultimate.org/events/Hucksgiving-Showdown-2026" id="CT_Main_0_rptGallery_ctl06_imgLink">
+							<img id="CT_Main_0_rptGallery_ctl06_SlideImage" src="/assets/EventPictures/KCUDA.png" />
+						</a>
+					</div>
+					<div class="details">
+						<h2 class="title">
+							<a id="CT_Main_0_rptGallery_ctl06_lblTitle" class="rotator-title" href="https://play.usaultimate.org/events/Hucksgiving-Showdown-2026">Hucksgiving Showdown 2026</a>
+						</h2>
+						<div class="content">
+							<span class="date">
+								<span id="CT_Main_0_rptGallery_ctl06_lblDate">11/21/2026 - 11/21/2026</span>
+							</span>
+							<p style="overflow-wrap:anywhere;">
+								<br /><b>City: </b>Brooklyn<br /><b>State: </b>NY
+							</p>
+							
+						</div>
+					</div>
+				</div>
+			
+	</div>
+	<div class="controls">
+		<ul class="slidesNav">
+		</ul>
+		<a href="#" class="prev"><span>Previous</span></a>
+		<a href="#" class="next"><span>Next</span></a>
+	</div>
+</div>
+
+
+
+				</div>
+				<div class="hpMid">
+					<div class="mainContent">
+						<div class="block"><h2 id="page_header" style="font-size: 1.65em; color: rgb(0, 42, 92); font-weight: normal; font-family: verdana, arial, sans-serif;">Tournament Calendar</h2>
+<p style="color: rgb(34, 34, 34); font-family: arial, sans-serif; font-size: 11px;">Listings below include all USA Ultimate affiliated tournaments as well as unaffiliated events (not supported or controlled by USAU in any way). &nbsp;Tournaments <a href="https://www.usaultimate.org/sanctioning/">sanctioned</a> or operated by USA Ultimate feature a logo and have integration to the USAU event management system, featuring registration, score reporting and participant account history/tracking. &nbsp;Find a local organization or list your local organization on our <a href="https://www.usaultimate.org/local/">Where to Play</a> page.</p>
+<p style="color: rgb(34, 34, 34); font-family: arial, sans-serif; font-size: 11px;">Unaffiliated events do not display an event logo and are merely listed in the calendar with links to external sites for more information from the organizers. &nbsp;They can be requested by any USAU account holder from the <a href="https://play.usaultimate.org/events/unaffiliated/">Event Calendar</a> link. &nbsp;Send questions to <a href="mailto:info@usaultimate.org">info@hq.usaultimate.org</a><a name="listings">.</a></p></div>
+
+
+<style type="text/css">
+	.alt-tabs .tabs li .tab_btn {
+		background-color: #C2C2C2;
+		background-image: -webkit-gradient(linear,left top,left bottom,color-stop(0, #EDEDED),color-stop(1, #C2C2C2));
+		background-image: -webkit-linear-gradient(top, #EDEDED, #C2C2C2);
+		background-image: -moz-linear-gradient(top, #EDEDED, #C2C2C2);
+		background-image: -ms-linear-gradient(top, #EDEDED, #C2C2C2);
+		background-image: -o-linear-gradient(top, #EDEDED, #C2C2C2);
+		background-image: linear-gradient(top, #EDEDED, #C2C2C2);
+		filter: progid:DXImageTransform.Microsoft.gradient(startColorStr='#EDEDED', EndColorStr='#C2C2C2');
+		display: block;
+		border: none;
+		padding: 8px;
+		text-decoration: none;
+		font-weight: bold;
+		color: #666;
+		width: 99%;
+	}
+
+	.alt-tabs .tabs li:last-child .tab_btn {
+		width: 100%;
+	}
+
+	.alt-tabs .tabs li.active .tab_btn {
+		background-color: #2268a6;
+		background-image: -webkit-gradient(linear,left top,left bottom,color-stop(0, #2268a6),color-stop(1, #014380));
+		background-image: -webkit-linear-gradient(top, #2268a6, #014380);
+		background-image: -moz-linear-gradient(top, #2268a6, #014380);
+		background-image: -ms-linear-gradient(top, #2268a6, #014380);
+		background-image: -o-linear-gradient(top, #2268a6, #014380);
+		background-image: linear-gradient(top, #2268a6, #014380);
+		filter: progid:DXImageTransform.Microsoft.gradient(startColorStr='#2268a6', EndColorStr='#014380');
+		color: #fff;
+	}
+</style>
+<div id="CT_HP_Mid_1_pnlEventSearch">
+	
+		<div class="eventSchedule">
+			<div class="alt-tabs">
+				<ul id="CT_HP_Mid_1_tabEvents" class="tabs">
+					<li class='' style="width: 23%;">
+						<input type="submit" name="CT_HP_Mid_1$LinkLeagueEvents" value="Leagues" onclick="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;CT_HP_Mid_1$LinkLeagueEvents&quot;, &quot;&quot;, true, &quot;&quot;, &quot;&quot;, false, false))" id="CT_HP_Mid_1_LinkLeagueEvents" class="tab_btn" />
+					</li>
+					<li class='' style="width: 23%;">
+						<input type="submit" name="CT_HP_Mid_1$LinkClinic" value="Clinics" onclick="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;CT_HP_Mid_1$LinkClinic&quot;, &quot;&quot;, true, &quot;&quot;, &quot;&quot;, false, false))" id="CT_HP_Mid_1_LinkClinic" class="tab_btn" />
+					</li>
+					<li class='' style="width: 23%;">
+						<input type="submit" name="CT_HP_Mid_1$LinkPractices" value="Practices" onclick="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;CT_HP_Mid_1$LinkPractices&quot;, &quot;&quot;, true, &quot;&quot;, &quot;&quot;, false, false))" id="CT_HP_Mid_1_LinkPractices" class="tab_btn" />
+					</li>
+					<li class='active'>
+						<input type="submit" name="CT_HP_Mid_1$LinkNonLeagueEvents" value="Tournaments &amp; Other Events" onclick="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;CT_HP_Mid_1$LinkNonLeagueEvents&quot;, &quot;&quot;, true, &quot;&quot;, &quot;&quot;, false, false))" id="CT_HP_Mid_1_LinkNonLeagueEvents" class="tab_btn" />
+					</li>
+					
+				</ul>
+				
+
+				<div class="slides">
+					<div class="slide" style="display: block;">
+						<div id="CT_HP_Mid_1_pnlSearch" class="search-filter" onkeypress="javascript:return WebForm_FireDefaultButton(event, &#39;CT_HP_Mid_1_btnSubmit&#39;)">
+		
+							<div class="formee">
+								
+								<div class="grid-9-12" style="margin-right: 0; margin-left: 13px; padding-right: 0; padding-top: 3px">
+									<div class="grid-4-12">
+										<label id="CT_HP_Mid_1_lblCompetitionLevelId" for="drpCompetitionLevelId">Competition Level</label>
+										<select name="CT_HP_Mid_1$drpCompetitionLevelId" id="CT_HP_Mid_1_drpCompetitionLevelId">
+			<option selected="selected" value="">-- ALL --</option>
+			<option value="27">College - Men</option>
+			<option value="28">College - Women</option>
+			<option value="4">College - Mixed</option>
+			<option value="21">Club - Men</option>
+			<option value="22">Club - Women</option>
+			<option value="7">Club - Mixed</option>
+			<option value="19">Masters - Men</option>
+			<option value="20">Masters - Women</option>
+			<option value="8">Masters - Mixed</option>
+			<option value="17">Grand Masters - Men</option>
+			<option value="18">Grand Masters - Women</option>
+			<option value="50">Grand Masters - Mixed</option>
+			<option value="70">Great Grand Masters - Men</option>
+			<option value="77">Great Grand Masters - Women</option>
+			<option value="9">Convention - Mixed</option>
+			<option value="62">Youth Camp - Mixed</option>
+			<option value="61">Youth Clinic - Mixed</option>
+			<option value="68">Youth Clinic - Girls</option>
+			<option value="6">Youth Club U-20 - Mixed</option>
+			<option value="24">Youth Club U-20 - Girls</option>
+			<option value="23">Youth Club U-20 - Boys</option>
+			<option value="5">Youth Club U-17 - Mixed</option>
+			<option value="26">Youth Club U-17 - Girls</option>
+			<option value="25">Youth Club U-17 - Boys</option>
+			<option value="73">Youth Club U-15 - Mixed</option>
+			<option value="72">Youth Club U-15 - Girls</option>
+			<option value="71">Youth Club U-15 - Boys</option>
+			<option value="87">Youth Club U-12 - Mixed</option>
+			<option value="88">Youth Club U-12 - Boys</option>
+			<option value="89">Youth Club U-12 - Girls</option>
+			<option value="69">Volunteers - NA</option>
+			<option value="29">High School - Boys</option>
+			<option value="30">High School - Girls</option>
+			<option value="3">High School - Mixed</option>
+			<option value="2">Middle School - Mixed</option>
+			<option value="32">Middle School - Girls</option>
+			<option value="31">Middle School - Boys</option>
+			<option value="1">Elementary School - Mixed</option>
+			<option value="34">Elementary School - Girls</option>
+			<option value="33">Elementary School - Boys</option>
+			<option value="16">US National Team - Women</option>
+			<option value="10">US National Team - Mixed</option>
+			<option value="15">US National Team - Men</option>
+			<option value="75">US National Team U-20 - Boys</option>
+			<option value="76">US National Team U-20 - Girls</option>
+			<option value="86">US National Team U-20 - Mixed</option>
+			<option value="84">US National Team Masters - Mixed</option>
+			<option value="85">US National Team Grand Masters - Men</option>
+			<option value="52">Beach - Mixed</option>
+			<option value="54">Beach - Women</option>
+			<option value="102">Great Grand Masters - Mixed</option>
+			<option value="53">Beach - Men</option>
+			<option value="55">Beach Masters - Mixed</option>
+			<option value="57">Beach Masters - Women</option>
+			<option value="56">Beach Masters - Men</option>
+			<option value="58">Beach Grand Masters - Mixed</option>
+			<option value="60">Beach Grand Masters - Women</option>
+			<option value="59">Beach Grand Masters - Men</option>
+			<option value="74">Beach Great Grand Masters - Men</option>
+			<option value="104">Beach Great Grand Masters - Women</option>
+			<option value="103">Beach Great Grand Masters - Mixed</option>
+			<option value="106">Beach Legends - Mixed</option>
+			<option value="66">League - Mixed</option>
+			<option value="67">League - Women</option>
+			<option value="65">League - Men</option>
+			<option value="64">League Youth - Girls</option>
+			<option value="63">League Youth - Boys</option>
+			<option value="105">League Youth - Mixed</option>
+			<option value="78">Disc Golf U-19 - Boys</option>
+			<option value="79">Disc Golf U-19 - Girls</option>
+			<option value="80">Disc Golf Open - Men</option>
+			<option value="81">Disc Golf Women - Women</option>
+			<option value="82">Disc Golf 40+ Men - Men</option>
+			<option value="83">Disc Golf 40+ Women - Women</option>
+			<option value="90">US National Team Beach - Men</option>
+			<option value="91">US National Team Beach - Women</option>
+			<option value="92">US National Team Beach - Mixed</option>
+			<option value="93">US National Team Beach Masters - Men</option>
+			<option value="94">US National Team Beach Masters  - Women</option>
+			<option value="95">US National Team Beach Masters - Mixed</option>
+			<option value="96">US National Team Beach Grand Masters - Men</option>
+			<option value="97">US National Team Beach Grand Masters - Women</option>
+			<option value="98">US National Team Beach Grand Masters - Mixed</option>
+			<option value="99">US National Team Beach Great Grand Masters - Men</option>
+			<option value="100">US National Team Beach Great Grand Masters - Women</option>
+			<option value="101">US National Team Beach Great Grand Masters - Mixed</option>
+			<option value="107">US National Team U-24 - Mixed</option>
+			<option value="108">US National Team U-24 - Women</option>
+			<option value="109">US National Team U-24 - Men</option>
+
+		</select>
+									</div>
+									<div class="grid-4-12">
+										<label for="drpGenderDivisionId">
+											Gender Division</label>
+										<select name="CT_HP_Mid_1$drpGenderDivisionId" id="CT_HP_Mid_1_drpGenderDivisionId">
+			<option selected="selected" value="">-- ALL --</option>
+			<option value="1">Mixed</option>
+			<option value="2">Women</option>
+			<option value="17">Men</option>
+			<option value="19">Girls</option>
+			<option value="20">Boys</option>
+			<option value="33">NA</option>
+
+		</select>
+									</div>
+									<div class="grid-4-12" id="divCompetitionDivision">
+										
+										<label for="txtCompetitionDivision">
+											Competition Division</label>
+										<input name="CT_HP_Mid_1$txtCompetitionDivision" type="text" id="CT_HP_Mid_1_txtCompetitionDivision" />
+										
+									</div>
+									<div class="clear"></div>
+									<div class="grid-4-12">
+										<label for="drpEventTypeId">
+											Event Type</label>
+										<select name="CT_HP_Mid_1$drpEventTypeId" onchange="javascript:setTimeout(&#39;__doPostBack(\&#39;CT_HP_Mid_1$drpEventTypeId\&#39;,\&#39;\&#39;)&#39;, 0)" id="CT_HP_Mid_1_drpEventTypeId">
+			<option selected="selected" value="0">-- ALL --</option>
+			<option value="8">Championship Tournament</option>
+			<option value="21">Gathering (Non-Competition)</option>
+			<option value="19">International Competition</option>
+			<option value="16">Sanctioned Tournament</option>
+			<option value="78">Skills Challenge</option>
+			<option value="80">Ultimate Disc Golf</option>
+			<option value="41">Unaffiliated Event</option>
+			<option value="20">USAU Camp</option>
+
+		</select>
+									</div>
+									<div class="grid-4-12">
+										<label for="drpEventSubTypeId">
+											Event Subtype</label>
+										<select name="CT_HP_Mid_1$drpEventSubTypeId" id="CT_HP_Mid_1_drpEventSubTypeId">
+			<option selected="selected" value="0">-- ALL --</option>
+
+		</select>
+									</div>
+									<div class="grid-4-12">
+										<label for="txtEventName">
+											Event Name</label>
+										<input name="CT_HP_Mid_1$txtEventName" type="text" id="CT_HP_Mid_1_txtEventName" />
+									</div>
+									<div class="clear"></div>
+									<div class="grid-4-12">
+										<label for="drpSeasonId">
+											Season</label>
+										<select name="CT_HP_Mid_1$drpSeasonId" id="CT_HP_Mid_1_drpSeasonId">
+			<option selected="selected" value="0">-- ALL --</option>
+			<option value="22">2027</option>
+			<option value="21">2026</option>
+			<option value="20">2025</option>
+			<option value="19">2024</option>
+			<option value="18">2023</option>
+			<option value="17">2022</option>
+			<option value="16">2021</option>
+			<option value="15">2020</option>
+			<option value="14">2019</option>
+			<option value="8">2018</option>
+			<option value="7">2017</option>
+			<option value="6">2016</option>
+			<option value="5">2015</option>
+			<option value="4">2014</option>
+			<option value="3">2013</option>
+			<option value="2">2012</option>
+			<option value="1">2011</option>
+			<option value="9">2010</option>
+			<option value="10">2009</option>
+			<option value="11">2008</option>
+			<option value="12">2007</option>
+			<option value="13">2006</option>
+
+		</select>
+									</div>
+									<div id="CT_HP_Mid_1_divSurfaceTypeId" class="grid-4-12">
+										<label for="drpSurfaceTypeId">
+											Surface Type</label>
+										<select name="CT_HP_Mid_1$drpSurfaceTypeId" id="CT_HP_Mid_1_drpSurfaceTypeId">
+			<option selected="selected" value="">-- ALL --</option>
+			<option value="1">Grass</option>
+			<option value="2">Indoor</option>
+			<option value="3">Beach</option>
+
+		</select>
+									</div>
+									<div class="clear"></div>
+									<div class="grid-4-12">
+										<label for="dpDateFrom">
+											From Date
+										</label>
+										<span id="CT_HP_Mid_1_dpDateFrom"><table border=0 cellpadding=0 cellspacing=0><tr><td><input name="CT_HP_Mid_1$dpDateFrom$cal" type="text" id="CT_HP_Mid_1_dpDateFrom_cal" onclick="popUpCalendar(document.getElementById(&#39;CT_HP_Mid_1_dpDateFrom_cal&#39;),document.getElementById(&#39;CT_HP_Mid_1_dpDateFrom_cal&#39;), &#39;mm/dd/yyyy&#39;); return false;" style="width:80px;" /></td><td><img tabindex="-1" onclick="popUpCalendar(document.getElementById(&#39;CT_HP_Mid_1_dpDateFrom_cal&#39;),document.getElementById(&#39;CT_HP_Mid_1_dpDateFrom_cal&#39;), &#39;mm/dd/yyyy&#39;); return false;" src="/cms/images/calendar/picker.gif" style="cursor:pointer;" /></td></tr></table></span>
+										<span style="color: Red">
+											<span data-val-controltovalidate="CT_HP_Mid_1_dpDateFrom" data-val-errormessage="Invalid date format" id="CT_HP_Mid_1_vDateFrom" data-val="true" style="visibility:hidden;">Invalid date format</span>
+										</span>
+									</div>
+									<div class="grid-4-12">
+										<label for="dpDateTo">
+											To Date
+										</label>
+										<span id="CT_HP_Mid_1_dpDateTo"><table border=0 cellpadding=0 cellspacing=0><tr><td><input name="CT_HP_Mid_1$dpDateTo$cal" type="text" id="CT_HP_Mid_1_dpDateTo_cal" onclick="popUpCalendar(document.getElementById(&#39;CT_HP_Mid_1_dpDateTo_cal&#39;),document.getElementById(&#39;CT_HP_Mid_1_dpDateTo_cal&#39;), &#39;mm/dd/yyyy&#39;); return false;" style="width:80px;" /></td><td><img tabindex="-1" onclick="popUpCalendar(document.getElementById(&#39;CT_HP_Mid_1_dpDateTo_cal&#39;),document.getElementById(&#39;CT_HP_Mid_1_dpDateTo_cal&#39;), &#39;mm/dd/yyyy&#39;); return false;" src="/cms/images/calendar/picker.gif" style="cursor:pointer;" /></td></tr></table></span>
+										<span style="color: Red">
+											<span data-val-controltovalidate="CT_HP_Mid_1_dpDateTo" data-val-errormessage="Invalid date format" id="CT_HP_Mid_1_vDateTo" data-val="true" style="visibility:hidden;">Invalid date format</span>
+										</span>
+									</div>
+								</div>
+								<div class="grid-3-12">
+									<label for="lbStateCodes">
+										States</label>
+									<select size="4" name="CT_HP_Mid_1$lbStateCodes" multiple="multiple" onchange="javascript:setTimeout(&#39;__doPostBack(\&#39;CT_HP_Mid_1$lbStateCodes\&#39;,\&#39;\&#39;)&#39;, 0)" id="CT_HP_Mid_1_lbStateCodes" style="height:135px;">
+			<option value="">-- ALL --</option>
+			<option value="AL">Alabama</option>
+			<option value="AK">Alaska</option>
+			<option value="AS">American Samoa</option>
+			<option value="AZ">Arizona</option>
+			<option value="AR">Arkansas</option>
+			<option value="CA">California</option>
+			<option value="CO">Colorado</option>
+			<option value="CT">Connecticut</option>
+			<option value="DE">Delaware</option>
+			<option value="DC">District of Columbia</option>
+			<option value="FL">Florida</option>
+			<option value="GA">Georgia</option>
+			<option value="GU">Guam</option>
+			<option value="HI">Hawaii</option>
+			<option value="ID">Idaho</option>
+			<option value="IL">Illinois</option>
+			<option value="IN">Indiana</option>
+			<option value="IA">Iowa</option>
+			<option value="KS">Kansas</option>
+			<option value="KY">Kentucky</option>
+			<option value="LA">Louisiana</option>
+			<option value="ME">Maine</option>
+			<option value="MD">Maryland</option>
+			<option value="MA">Massachusetts</option>
+			<option value="MI">Michigan</option>
+			<option value="MN">Minnesota</option>
+			<option value="MS">Mississippi</option>
+			<option value="MO">Missouri</option>
+			<option value="MT">Montana</option>
+			<option value="NE">Nebraska</option>
+			<option value="NV">Nevada</option>
+			<option value="NH">New Hampshire</option>
+			<option value="NJ">New Jersey</option>
+			<option value="NM">New Mexico</option>
+			<option value="NY">New York</option>
+			<option value="NC">North Carolina</option>
+			<option value="ND">North Dakota</option>
+			<option value="MP">Northern Mariana Islands</option>
+			<option value="OH">Ohio</option>
+			<option value="OK">Oklahoma</option>
+			<option value="OR">Oregon</option>
+			<option value="PA">Pennsylvania</option>
+			<option value="PR">Puerto Rico</option>
+			<option value="RI">Rhode Island</option>
+			<option value="SC">South Carolina</option>
+			<option value="SD">South Dakota</option>
+			<option value="TN">Tennessee</option>
+			<option value="TX">Texas</option>
+			<option value="UM">United States Minor Outlying Islands</option>
+			<option value="UT">Utah</option>
+			<option value="VT">Vermont</option>
+			<option value="VI">Virgin Islands</option>
+			<option value="VA">Virginia</option>
+			<option value="WA">Washington</option>
+			<option value="WV">West Virginia</option>
+			<option value="WI">Wisconsin</option>
+			<option value="WY">Wyoming</option>
+
+		</select>
+								</div>
+								
+								<div class="grid-12-12 submit">
+									<input type="submit" name="CT_HP_Mid_1$btnSubmit" value="Search" onclick="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;CT_HP_Mid_1$btnSubmit&quot;, &quot;&quot;, true, &quot;&quot;, &quot;&quot;, false, false)); PleaseWait(this);" id="CT_HP_Mid_1_btnSubmit" class="btn" />
+								</div>
+							</div>
+						
+	</div>
+						<div>Each competition group has its number of teams in red, e.g. <span style="color: red; font-weight: bold;">[3]</span></div>
+						<div class="search-results">
+							<div id="CT_HP_Mid_1_pnlCurrent">
+		
+								<div class="section_header has-link alt-style">
+									<h3 class="title">Current/Upcoming Events</h3>
+								</div>
+								<div>
+			<span class="smaller"></span><table class="global_table left-align alt-style" cellspacing="0" cellpadding="5" id="CT_HP_Mid_1_gvCurrentUpcomingEvents" style="border-width:0px;border-collapse:collapse;">
+				<tr valign="top">
+					<th scope="col">Event Logo</th><th scope="col">Event Name</th><th scope="col">City</th><th scope="col">State</th><th scope="col">
+												Competition Groups
+											</th><th scope="col">Dates</th>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="48" src="/assets/1/15/devyl_logo.jpeg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Coconut-Classic' target='_blank'>2026 Coconut Classic</a>
+												
+												<br />
+												
+											</td><td>Freehold and Lawrenceville</td><td>NJ</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Girls  <span style='color: red; font-weight:bold'>[10]</span>
+															</li>
+														
+															<li>
+																High School - Boys  <span style='color: red; font-weight:bold'>[24]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 07, 2026 - Nov 08, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="64" src="/assets/1/15/USAU-HS-Championships-2026_disc.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Colorado-High-School-Mixed-State-Championships' target='_blank'>2026 Colorado High School Mixed State Championships</a>
+												
+												<br />
+												
+											</td><td>Longmont</td><td>CO</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Mixed DII <span style='color: red; font-weight:bold'>[3]</span>
+															</li>
+														
+															<li>
+																High School - Mixed DI <span style='color: red; font-weight:bold'>[6]</span>
+															</li>
+														
+															<li>
+																High School - Mixed Developmental <span style='color: red; font-weight:bold'>[9]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 07, 2026 - Nov 08, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="64" src="/assets/1/15/USAU-HS-Championships-2026_disc.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-North-Carolina-High-School-State-Championships' target='_blank'>2026 North Carolina High School State Championships</a>
+												
+												<br />
+												
+											</td><td>Bermuda Run</td><td>NC</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Girls  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																High School - Boys  <span style='color: red; font-weight:bold'>[4]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 07, 2026 - Nov 08, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="58" src="/assets/1/15/WithoutLimits2022SquarePromo_-_Without_Limits.jpeg" border="0" /></span>
+											</td><td>
+												<a href='/events/Blue-Ridge-Finale-2026' target='_blank'>Blue Ridge Finale 2026</a>
+												
+												<br />
+												
+											</td><td>Axton</td><td>VA</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																College - Women  <span style='color: red; font-weight:bold'>[14]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 07, 2026 - Nov 08, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="56" src="/assets/1/15/new-york-minute.png" border="0" /></span>
+											</td><td>
+												<a href='/events/NY-Minute-2026' target='_blank'>NY Minute 2026</a>
+												
+												<br />
+												
+											</td><td>New York</td><td>NY</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Club - Women  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Club - Men  <span style='color: red; font-weight:bold'>[1]</span>
+															</li>
+														
+															<li>
+																College - Men  <span style='color: red; font-weight:bold'>[4]</span>
+															</li>
+														
+															<li>
+																College - Women  <span style='color: red; font-weight:bold'>[11]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 07, 2026 - Nov 08, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="38" src="/assets/1/15/USAUltimateNationalTeam.png" border="0" /></span>
+											</td><td>
+												<a href='/events/U24-National-Teams-West-Coast-Tryout' target='_blank'>U24 National Teams West Coast Tryout</a>
+												
+												<br />
+												
+											</td><td>Salinas</td><td>CA</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																US National Team U-24 - Men <span style='color: red; font-weight:bold'>[1]</span>
+															</li>
+														
+															<li>
+																US National Team U-24 - Women <span style='color: red; font-weight:bold'>[1]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 07, 2026 - Nov 08, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="64" src="/assets/1/15/USAU-HS-Championships-2026_disc.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Oregon-High-School-Mixed-State-Championship' target='_blank'>2026 Oregon High School Mixed State Championship</a>
+												
+												<br />
+												
+											</td><td>Springfield</td><td>OR</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Mixed  <span style='color: red; font-weight:bold'>[3]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 14, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="64" src="/assets/1/15/USAU-HS-Championships-2026_disc.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Virginia-High-School-Mixed-State-Championship' target='_blank'>2026 Virginia High School Mixed State Championship</a>
+												
+												<br />
+												
+											</td><td>Reston</td><td>VA</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Mixed  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 14, 2026 - Nov 15, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												
+											</td><td>
+												<a href='http://ultimatecentral.com/en_us/e/backstreet-invitational-xx' target='_blank'>Backstreet Invitational</a>
+												<br />Contact: <a href='mailto:mbollinger89@gmail.com'>mbollinger89@gmail.com</a>
+												<br />
+												<i id="CT_HP_Mid_1_gvCurrentUpcomingEvents_ctl10_iUnaffiliatedEventNotice" style="font-size: x-small;">** This is not a USA Ultimate Sanctioned Event.</i>
+											</td><td>Beaufort</td><td>NC</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+												</ul>
+											</td><td style="width:150px;">
+												Nov 14, 2026 - Nov 15, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="28" src="/assets/1/15/KCUDA.png" border="0" /></span>
+											</td><td>
+												<a href='/events/Brooklyn-Disco-Tech-Support-Hat-Tournament-2026' target='_blank'>Brooklyn Disco Tech Support Hat Tournament 2026</a>
+												
+												<br />
+												
+											</td><td>Brooklyn</td><td>NY</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Mixed  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Middle School - Mixed  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 14, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="28" src="/assets/1/15/KCUDA.png" border="0" /></span>
+											</td><td>
+												<a href='/events/Hucksgiving-Showdown-2026' target='_blank'>Hucksgiving Showdown 2026</a>
+												
+												<br />
+												
+											</td><td>Brooklyn</td><td>NY</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Boys  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																High School - Girls  <span style='color: red; font-weight:bold'>[2]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 21, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="38" src="/assets/1/15/USAUltimateNationalTeam2.JPG" border="0" /></span>
+											</td><td>
+												<a href='/events/U24-National-Teams-East-Coast-Tryout' target='_blank'>U24 National Teams East Coast Tryout</a>
+												
+												<br />
+												
+											</td><td>Woodstock</td><td>GA</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																US National Team U-24 - Men <span style='color: red; font-weight:bold'>[1]</span>
+															</li>
+														
+															<li>
+																US National Team U-24 - Women <span style='color: red; font-weight:bold'>[1]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 21, 2026 - Nov 22, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="42" src="/assets/1/15/USAUNationalTeamLogo_602x3972.JPG" border="0" /></span>
+											</td><td>
+												<a href='/events/U24-National-Teams-Virtual-Tryout' target='_blank'>U24 National Teams Virtual Tryout</a>
+												
+												<br />
+												
+											</td><td>&nbsp;</td><td>TBD</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																US National Team U-24 - Men  <span style='color: red; font-weight:bold'>[1]</span>
+															</li>
+														
+															<li>
+																US National Team U-24 - Women  <span style='color: red; font-weight:bold'>[1]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Nov 21, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												
+											</td><td>
+												<a href='http://scorereport.net/2026/mixed/event22682' target='_blank'>GET HO HO HO! 2026</a>
+												<br />Contact: <a href='mailto:gethohoho@gmail.com'>gethohoho@gmail.com</a>
+												<br />
+												<i id="CT_HP_Mid_1_gvCurrentUpcomingEvents_ctl15_iUnaffiliatedEventNotice" style="font-size: x-small;">** This is not a USA Ultimate Sanctioned Event.</i>
+											</td><td>Falmouth</td><td>MA</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Club - Mixed Division 1 <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Club - Mixed Division 2 <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Club - Mixed Division 3 <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Club - Mixed Division 4 <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Club - Mixed Division 5 <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Club - Mixed Division 6 <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Club - Mixed Division 7 <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																College - Mixed Division 1 <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																College - Mixed Division 2 <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Dec 05, 2026 - Dec 06, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="64" src="/assets/1/15/caribbeanclassic2026_logo_-_Noah_Bane.png" border="0" /></span>
+											</td><td>
+												<a href='/events/Caribbean-Classic-2026' target='_blank'>Caribbean Classic 2026</a>
+												
+												<br />
+												
+											</td><td>Cancun Mexico</td><td>TBD</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Beach - Mixed  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Dec 12, 2026 - Dec 13, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="38" src="/assets/1/15/USAUltimate.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/Intergalactic-Championships' target='_blank'>Intergalactic Championships</a>
+												
+												<br />
+												
+											</td><td>Honolulu</td><td>HI</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Men <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Women <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Club - Mixed  <span style='color: red; font-weight:bold'>[3]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Dec 30, 2026 - Dec 31, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="27" Height="38" src="/assets/1/15/hwwggiqzitdf1_-_Wisconsin_Ultimate.jpeg" border="0" /></span>
+											</td><td>
+												<a href='/events/Lounge-of-Lizards-2027' target='_blank'>Lounge of Lizards 2027</a>
+												
+												<br />
+												
+											</td><td>Milwaukee</td><td>WI</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Women  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Jan 17, 2027
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="32" Height="38" src="/assets/1/15/2027_Organizer_Convention_Logo.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2027-USA-Ultimate-Organizer-Convention' target='_blank'>2027 USA Ultimate Organizer Convention</a>
+												
+												<br />
+												
+											</td><td>Colorado Springs</td><td>CO</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Convention - Mixed  <span style='color: red; font-weight:bold'>[1]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Jan 29, 2027 - Jan 31, 2027
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="12" src="/assets/1/15/d82e308bae9f42fd9d79f8a4eb81998d1.png" border="0" /></span>
+											</td><td>
+												<a href='/events/Queen-City-Tune-Up-2027' target='_blank'>Queen City Tune Up 2027</a>
+												
+												<br />
+												
+											</td><td>Rock Hill</td><td>SC</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																College - Men  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																College - Women  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Feb 13, 2027 - Feb 14, 2027
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="64" src="/assets/1/15/Mardi_Gras_XXXIX_Logo_10-13-2026_-_Marshall_LaMoyne.png" border="0" /></span>
+											</td><td>
+												<a href='/events/Mardi-Gras-XXXIX' target='_blank'>Mardi Gras XXXIX</a>
+												
+												<br />
+												
+											</td><td>Baton Rouge</td><td>LA</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																College - Men  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																College - Women  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Feb 27, 2027 - Feb 28, 2027
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="38" src="/assets/1/15/Trouble_with_Snake_background_-_Brian_Kilkenny.png" border="0" /></span>
+											</td><td>
+												<a href='/events/Trouble-in-Vegas-2027' target='_blank'>Trouble in Vegas 2027</a>
+												
+												<br />
+												
+											</td><td>Las Vegas, Henderson</td><td>NV</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																College - Men  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																College - Mixed  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																College - Women  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Feb 27, 2027 - Feb 28, 2027
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												
+											</td><td>
+												<a href='http://www.hightideultimate.com/e?page=' target='_blank'>High Tide Hat Tournament Week 1</a>
+												<br />Contact: <a href='mailto:cathy@hightideultimate.com'>cathy@hightideultimate.com</a>
+												<br />
+												<i id="CT_HP_Mid_1_gvCurrentUpcomingEvents_ctl23_iUnaffiliatedEventNotice" style="font-size: x-small;">** This is not a USA Ultimate Sanctioned Event.</i>
+											</td><td>North Myrtle Beach</td><td>SC</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+												</ul>
+											</td><td style="width:150px;">
+												Mar 01, 2027 - Mar 04, 2027
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												
+											</td><td>
+												<a href='http://www.hightideultimate.com/e?page=' target='_blank'>High Tide Hat Tournament Week 2</a>
+												<br />Contact: <a href='mailto:cathy@hightideultimate.com'>cathy@hightideultimate.com</a>
+												<br />
+												<i id="CT_HP_Mid_1_gvCurrentUpcomingEvents_ctl24_iUnaffiliatedEventNotice" style="font-size: x-small;">** This is not a USA Ultimate Sanctioned Event.</i>
+											</td><td>North Myrtle Beach</td><td>SC</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+												</ul>
+											</td><td style="width:150px;">
+												Mar 08, 2027 - Mar 11, 2027
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="51" src="/assets/1/15/ZigzagUltimate.png" border="0" /></span>
+											</td><td>
+												<a href='/events/Grand-Rapids-College-Invite-2027' target='_blank'>Grand Rapids College Invite 2027</a>
+												
+												<br />
+												
+											</td><td>Zeeland</td><td>MI</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																College - Men  <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Mar 13, 2027 - Mar 14, 2027
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												
+											</td><td>
+												<a href='http://www.hightideultimate.com/e?page=' target='_blank'>High Tide Hat Tournament Week 3</a>
+												<br />Contact: <a href='mailto:cathy@hightideultimate.com'>cathy@hightideultimate.com</a>
+												<br />
+												<i id="CT_HP_Mid_1_gvCurrentUpcomingEvents_ctl26_iUnaffiliatedEventNotice" style="font-size: x-small;">** This is not a USA Ultimate Sanctioned Event.</i>
+											</td><td>North Myrtle Beach</td><td>SC</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+												</ul>
+											</td><td style="width:150px;">
+												Mar 15, 2027 - Mar 18, 2027
+											</td>
+				</tr><tr>
+					<td colspan="6"><table width="100%" border=0 cellspacing=0 cellpadding=0><tr><td width="100%" align=left><nobr><b>Rows:</b> 1 - 25 of 30</nobr><p></P>&laquo; Previous 25 |  <b>1</b> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvCurrentUpcomingEvents$ctl28$ctl00$ctl00&#39;,&#39;&#39;)">2</a> | <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvCurrentUpcomingEvents$ctl28$ctl00$ctl01&#39;,&#39;&#39;)">Next 5 &raquo;</a></td><td valign=top align=right>&nbsp;&nbsp;&nbsp;<nobr><b>Page:</b> 1 of 2</nobr></td></tr></table></td>
+				</tr>
+			</table>
+		</div>
+							
+	</div>
+							<div id="CT_HP_Mid_1_pnlPast">
+		
+								<div class="section_header has-link alt-style-2">
+									<h3 class="title">Past Events</h3>
+								</div>
+								<div>
+			<span class="smaller"></span><table class="global_table left-align alt-style-2" cellspacing="0" cellpadding="5" id="CT_HP_Mid_1_gvPastEvents" style="border-width:0px;border-collapse:collapse;">
+				<tr valign="top">
+					<th scope="col">Event Logo</th><th scope="col">Event Name</th><th scope="col">City</th><th scope="col">State</th><th scope="col">
+												Competition Groups
+													</th><th scope="col">Dates</th>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="51" src="/assets/1/15/Haunted_Hucks.png" border="0" /></span>
+											</td><td>
+												<a href='/events/Centaurus-Haunted-Hucks-Halloween-Tournament' target='_blank'>Centaurus' Haunted Hucks Halloween Tournament</a>
+												
+												<br />
+												
+											</td><td>Lafayette</td><td>CO</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Mixed  <span style='color: red; font-weight:bold'>[13]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 25, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="25" src="/assets/1/15/neuqua.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/Okthrowberfest-2026' target='_blank'>Okthrowberfest 2026</a>
+												
+												<br />
+												
+											</td><td>Naperville</td><td>IL</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Mixed  <span style='color: red; font-weight:bold'>[3]</span>
+															</li>
+														
+															<li>
+																Middle School - Mixed  <span style='color: red; font-weight:bold'>[4]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 25, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="64" src="/assets/1/15/DEVYL_-_Anthony_Sapichino.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Halloween-Havoc' target='_blank'>2026 Halloween Havoc</a>
+												
+												<br />
+												
+											</td><td>Freehold</td><td>NJ</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Boys  <span style='color: red; font-weight:bold'>[12]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 24, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												
+											</td><td>
+												<a href='http://www.afdc.com/youth/middleschool/' target='_blank'>AFDC Middle School End of Season Tournament</a>
+												<br />Contact: <a href='mailto:josh.feng@afdc.com'>josh.feng@afdc.com</a>
+												<br />
+												<i id="CT_HP_Mid_1_gvPastEvents_ctl05_iUnaffiliatedEventNotice" style="font-size: x-small;">** This is not a USA Ultimate Sanctioned Event</i>
+											</td><td>Avondale Estates</td><td>GA</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Middle School - Boys Open/Boys A <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Middle School - Boys Open/Boys B <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Middle School - Girls Girls A <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+															<li>
+																Middle School - Girls Girls B <span style='color: red; font-weight:bold'>[0]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 24, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												
+											</td><td>
+												<a href='http://www.facebook.com/share/19GZfhjKYy/' target='_blank'>The 14th RoKa Ultimate Halloween Tournament</a>
+												<br />Contact: <a href='mailto:rokaultimate@gmail.com'>rokaultimate@gmail.com</a>
+												<br />
+												<i id="CT_HP_Mid_1_gvPastEvents_ctl06_iUnaffiliatedEventNotice" style="font-size: x-small;">** This is not a USA Ultimate Sanctioned Event</i>
+											</td><td>Blandon (near Reading/Kuztown University)</td><td>PA</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+												</ul>
+											</td><td style="width:150px;">
+												Oct 24, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="51" src="/assets/1/15/UMD_Youth_Invite.png" border="0" /></span>
+											</td><td>
+												<a href='/events/UMD-Youth-Invite' target='_blank'>UMD Youth Invite</a>
+												
+												<br />
+												
+											</td><td>College Park</td><td>MD</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Boys  <span style='color: red; font-weight:bold'>[13]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 24, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="64" src="/assets/1/15/Club_Championships_2026_F_Circle_Color.png" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-USA-Ultimate-Club-Nationals' target='_blank'>2026 USA Ultimate Club Nationals</a>
+												
+												<br />
+												
+											</td><td>San Diego</td><td>CA</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Club - Men  <span style='color: red; font-weight:bold'>[16]</span>
+															</li>
+														
+															<li>
+																Club - Mixed  <span style='color: red; font-weight:bold'>[16]</span>
+															</li>
+														
+															<li>
+																Club - Women  <span style='color: red; font-weight:bold'>[16]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 22, 2026 - Oct 25, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="29" src="/assets/1/15/IU_Logo_-_Alexis_Abelove.png" border="0" /></span>
+											</td><td>
+												<a href='/events/IU-Affiliate-Meeting' target='_blank'>IU Affiliate Meeting</a>
+												
+												<br />
+												
+											</td><td>Oak Park</td><td>IL</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Volunteers - NA  <span style='color: red; font-weight:bold'>[1]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 17, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="24" Height="38" src="/assets/1/15/Lobster_Pot_26.png" border="0" /></span>
+											</td><td>
+												<a href='/events/The-Lobster-Pot-2026' target='_blank'>The Lobster Pot 2026</a>
+												
+												<br />
+												
+											</td><td>South Portland</td><td>ME</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Mixed Division <span style='color: red; font-weight:bold'>[12]</span>
+															</li>
+														
+															<li>
+																Women Lower Division <span style='color: red; font-weight:bold'>[15]</span>
+															</li>
+														
+															<li>
+																Men Lower Division <span style='color: red; font-weight:bold'>[16]</span>
+															</li>
+														
+															<li>
+																Men Middle Division <span style='color: red; font-weight:bold'>[16]</span>
+															</li>
+														
+															<li>
+																Women Upper Division <span style='color: red; font-weight:bold'>[16]</span>
+															</li>
+														
+															<li>
+																Men Upper Division <span style='color: red; font-weight:bold'>[20]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 17, 2026 - Oct 18, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="64" src="/assets/1/15/USAU-HS-Championships-2026_disc.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Utah-Middle--High-School-Fall-State-Championships' target='_blank'>2026 Utah Middle & High School Fall State Championships</a>
+												
+												<br />
+												
+											</td><td>Farmington</td><td>UT</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Middle School - Boys  <span style='color: red; font-weight:bold'>[5]</span>
+															</li>
+														
+															<li>
+																High School - Mixed  <span style='color: red; font-weight:bold'>[7]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 16, 2026 - Oct 17, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												
+											</td><td>
+												<a href='http://scorereport.net/2026/mixed/event22677' target='_blank'>Lemony Fresh Fall Classic RI 2026</a>
+												<br />Contact: <a href='mailto:lemonyfall@gmail.com'>lemonyfall@gmail.com</a>
+												<br />
+												<i id="CT_HP_Mid_1_gvPastEvents_ctl12_iUnaffiliatedEventNotice" style="font-size: x-small;">** This is not a USA Ultimate Sanctioned Event</i>
+											</td><td>East Greenwich</td><td>RI</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+												</ul>
+											</td><td style="width:150px;">
+												Oct 11, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="41" src="/assets/1/15/Fall_Brawl.png" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Fall-Brawl' target='_blank'>2026 Fall Brawl</a>
+												
+												<br />
+												
+											</td><td>Raleigh</td><td>NC</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																High School - Girls  <span style='color: red; font-weight:bold'>[4]</span>
+															</li>
+														
+															<li>
+																U-15 Open <span style='color: red; font-weight:bold'>[6]</span>
+															</li>
+														
+															<li>
+																High School - Boys  <span style='color: red; font-weight:bold'>[10]</span>
+															</li>
+														
+															<li>
+																 High School - Boys Dev <span style='color: red; font-weight:bold'>[13]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 10, 2026 - Oct 11, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="64" src="/assets/1/15/1_-_Montclair_Ultimate.png" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Montclair-Fall-Flock' target='_blank'>2026 Montclair Fall Flock</a>
+												
+												<br />
+												
+											</td><td>Montclair</td><td>NJ</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																HIgh School - Girls <span style='color: red; font-weight:bold'>[2]</span>
+															</li>
+														
+															<li>
+																Middle School - Mixed <span style='color: red; font-weight:bold'>[2]</span>
+															</li>
+														
+															<li>
+																High School - Boys  <span style='color: red; font-weight:bold'>[11]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 10, 2026 - Oct 11, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												
+											</td><td>
+												<a href='http://docs.google.com/forms/d/1DuZnG7rqhZXuYAP-F96wTZw8cZbYzRQkXVCAEfYV-y8/viewform?edit_requested=true' target='_blank'>Vassar's Huck for Red October 2026</a>
+												<br />Contact: <a href='mailto:vassarultimate@gmail.com'>vassarultimate@gmail.com</a>
+												<br />
+												<i id="CT_HP_Mid_1_gvPastEvents_ctl15_iUnaffiliatedEventNotice" style="font-size: x-small;">** This is not a USA Ultimate Sanctioned Event</i>
+											</td><td>Poughkeepsie</td><td>NY</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+												</ul>
+											</td><td style="width:150px;">
+												Oct 10, 2026 - Oct 11, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="38" src="/assets/1/15/USAUltimate.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-North-Central-Mens-Club-Regional-Championship' target='_blank'>2026 North Central Mens Club Regional Championship</a>
+												
+												<br />
+												
+											</td><td>Delafield</td><td>WI</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Club - Men  <span style='color: red; font-weight:bold'>[10]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 03, 2026 - Oct 04, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="38" src="/assets/1/15/USAUltimate.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-North-Central-Mixed-Club-Regional-Championship' target='_blank'>2026 North Central Mixed Club Regional Championship</a>
+												
+												<br />
+												
+											</td><td>Delafield</td><td>WI</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Club - Mixed  <span style='color: red; font-weight:bold'>[12]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 03, 2026 - Oct 04, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="47" src="/assets/1/15/AYU-logo-usau.png" border="0" /></span>
+											</td><td>
+												<a href='/events/Monarch-Invite-2026' target='_blank'>Monarch Invite 2026</a>
+												
+												<br />
+												
+											</td><td>Louisville</td><td>CO</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Dev Division <span style='color: red; font-weight:bold'>[7]</span>
+															</li>
+														
+															<li>
+																High School - Mixed  <span style='color: red; font-weight:bold'>[12]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Oct 03, 2026 - Oct 04, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="38" src="/assets/1/15/USAUltimate.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Great-Lakes-Mens-Club-Regional-Championship' target='_blank'>2026 Great Lakes Mens Club Regional Championship</a>
+												
+												<br />
+												
+											</td><td>Lebanon</td><td>OH</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Club - Men  <span style='color: red; font-weight:bold'>[16]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Sep 26, 2026 - Sep 27, 2026
+											</td>
+				</tr><tr class="row" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="38" src="/assets/1/15/USAUltimate.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Great-Lakes-Mixed-Club-Regional-Championship' target='_blank'>2026 Great Lakes Mixed Club Regional Championship</a>
+												
+												<br />
+												
+											</td><td>Lebanon</td><td>OH</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Club - Mixed  <span style='color: red; font-weight:bold'>[16]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Sep 26, 2026 - Sep 27, 2026
+											</td>
+				</tr><tr class="alternate alt" valign="top">
+					<td class="image">
+												<span class="image"><img Width="64" Height="38" src="/assets/1/15/USAUltimate.jpg" border="0" /></span>
+											</td><td>
+												<a href='/events/2026-Great-Lakes-Womens-Club-Regional-Championship' target='_blank'>2026 Great Lakes Womens Club Regional Championship</a>
+												
+												<br />
+												
+											</td><td>Lebanon</td><td>OH</td><td>
+												<ul class="bulletless" style="font-size: x-small">
+													
+															<li>
+																Club - Women  <span style='color: red; font-weight:bold'>[8]</span>
+															</li>
+														
+												</ul>
+											</td><td style="width:150px;">
+												Sep 26, 2026 - Sep 27, 2026
+											</td>
+				</tr><tr>
+					<td colspan="6"><table width="100%" border=0 cellspacing=0 cellpadding=0><tr><td width="100%" align=left><nobr><b>Rows:</b> 1 - 20 of 7723</nobr><p></P>&laquo; Previous 20 |  <b>1</b> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl00&#39;,&#39;&#39;)">2</a> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl01&#39;,&#39;&#39;)">3</a> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl02&#39;,&#39;&#39;)">4</a> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl03&#39;,&#39;&#39;)">5</a> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl04&#39;,&#39;&#39;)">6</a> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl05&#39;,&#39;&#39;)">7</a> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl06&#39;,&#39;&#39;)">8</a> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl07&#39;,&#39;&#39;)">9</a> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl08&#39;,&#39;&#39;)">10</a> <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl09&#39;,&#39;&#39;)">11</a> | <a href="javascript:__doPostBack(&#39;CT_HP_Mid_1$gvPastEvents$ctl23$ctl00$ctl10&#39;,&#39;&#39;)">Next 20 &raquo;</a></td><td valign=top align=right>&nbsp;&nbsp;&nbsp;<nobr><b>Page:</b> 1 of 387</nobr></td></tr></table></td>
+				</tr>
+			</table>
+		</div>
+							
+	</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	
+</div>
+
+
+					</div>
+				</div>
+				<div class="hpLeft">
+					
+				</div>
+				<div class="hpRight">
+					
+				</div>
+			</div>
+		</div>
+	</div>
+	<div id="footer">
+		<div class="footer">
+			
+
+<div class="footer_info clearfix">
+	&copy; 2026 usaultimate.org All Rights Reserved.
+	<ul class="footer_links clearfix">
+		<li><a href="http://www.usaultimate.org/privacy_policy.aspx">Privacy Policy</a></li>
+		<li>|</li>
+		<li><a href="http://www.usaultimate.org/site_map.aspx">Site Map</a></li>
+		<li>|</li>
+		<li><a href="http://www.usaultimate.org/about/contacts/">Contact Us</a></li>
+	</ul>
+</div>
+
+<div class="vcard">
+	<a class="fn org url" href="http://www.usaultimate.org">USA Ultimate</a>
+	<div class="adr">
+		<div><span class="street-address">3630 Sinton Road</span> • <span class="extended-address">Suite 103</span></div> 
+		<span class="locality">Colorado Springs</span>,  
+		<abbr class="region" title="Colorado">CO</abbr>
+		<span class="postal-code">80907</span>
+		<div class="country-name">USA</div>
+	</div>
+	<div class="tel">719.219.8322 <span class="type">Work</span></div>
+</div>
+
+		</div>
+	</div>
+	
+	
+<script type="text/javascript">
+//<![CDATA[
+var CT_HP_Mid_1_vDateFrom = document.all ? document.all["CT_HP_Mid_1_vDateFrom"] : document.getElementById("CT_HP_Mid_1_vDateFrom");
+CT_HP_Mid_1_vDateFrom.evaluationfunction = "isValidDate";
+var CT_HP_Mid_1_vDateTo = document.all ? document.all["CT_HP_Mid_1_vDateTo"] : document.getElementById("CT_HP_Mid_1_vDateTo");
+CT_HP_Mid_1_vDateTo.evaluationfunction = "isValidDate";
+//]]>
+</script>
+
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="3989C74E" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="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" />
+</div><input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="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" /></form>  
+</body>
+</html>

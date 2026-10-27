@@ -1,0 +1,59 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "test",
+        "*.log"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ],
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "frisbee-app-brianrhonea",
+          "appId": "1:275864055352:android:d2f54d8441c8baf73280cd",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "frisbee-app-brianrhonea",
+          "configurations": {
+            "android": "1:275864055352:android:d2f54d8441c8baf73280cd",
+            "ios": "1:275864055352:ios:85854fd9229478513280cd",
+            "macos": "1:275864055352:ios:85854fd9229478513280cd",
+            "web": "1:275864055352:web:069ee3e0e5f181133280cd",
+            "windows": "1:275864055352:web:3333768309233c043280cd"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,184 @@
+rules_version = '2';
+
+// Team membership is managed client-side, so these rules are the trust
+// boundary: every membership change is validated here.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+
+    function teamPath(teamId) {
+      return /databases/$(database)/documents/teams/$(teamId);
+    }
+    function codePath(code) {
+      return /databases/$(database)/documents/inviteCodes/$(code);
+    }
+
+    function roleIn(team) { return team.members.get(uid(), ''); }
+    function isEditor(team) { return roleIn(team) in ['owner', 'coach']; }
+    function isMember(team) { return uid() in team.memberIds; }
+
+    function validString(v, max) { return v is string && v.size() <= max; }
+
+    function validTeamFields(t) {
+      return t.name is string && t.name.size() > 0 && t.name.size() <= 80
+        && t.division in ['mixed', 'open', 'women', 'masters']
+        && t.level in ['club', 'college', 'youth', 'league', 'pickup']
+        && validString(t.city, 80);
+    }
+
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // ---- Users ------------------------------------------------------------
+
+    match /users/{userId} {
+      allow read, write: if signedIn() && uid() == userId;
+    }
+
+    // ---- Teams ------------------------------------------------------------
+
+    match /teams/{teamId} {
+      allow read: if signedIn() && isMember(resource.data);
+
+      // Creator becomes sole owner and must create the matching invite code
+      // in the same batch.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'name', 'division', 'level', 'city', 'ownerId', 'members',
+             'memberIds', 'memberNames', 'inviteCode', 'createdAt'])
+        && validTeamFields(request.resource.data)
+        && request.resource.data.ownerId == uid()
+        && request.resource.data.members == {(uid()): 'owner'}
+        && request.resource.data.memberIds == [uid()]
+        && request.resource.data.memberNames.keys().hasOnly([uid()])
+        && request.resource.data.inviteCode is string
+        && getAfter(codePath(request.resource.data.inviteCode)).data.teamId == teamId;
+
+      allow update: if signedIn() && (
+        editDetails() || regenerateCode() || changeRole() ||
+        removeMember() || join()
+      );
+
+      allow delete: if signedIn() && resource.data.ownerId == uid();
+
+      function editDetails() {
+        return isEditor(resource.data)
+          && changed().hasOnly(['name', 'division', 'level', 'city'])
+          && validTeamFields(request.resource.data);
+      }
+
+      function regenerateCode() {
+        return isEditor(resource.data)
+          && changed().hasOnly(['inviteCode'])
+          && getAfter(codePath(request.resource.data.inviteCode)).data.teamId == teamId;
+      }
+
+      // Owner promotes/demotes another existing member.
+      function changeRole() {
+        let diff = request.resource.data.members.diff(resource.data.members);
+        let target = diff.changedKeys().toList()[0];
+        return roleIn(resource.data) == 'owner'
+          && changed().hasOnly(['members'])
+          && diff.addedKeys().size() == 0
+          && diff.removedKeys().size() == 0
+          && diff.changedKeys().size() == 1
+          && target != resource.data.ownerId
+          && request.resource.data.members[target] in ['coach', 'player'];
+      }
+
+      // Member leaves, owner removes anyone but themself, coach removes players.
+      function removeMember() {
+        let diff = request.resource.data.members.diff(resource.data.members);
+        let target = diff.removedKeys().toList()[0];
+        return changed().hasOnly(['members', 'memberIds', 'memberNames'])
+          && diff.removedKeys().size() == 1
+          && diff.addedKeys().size() == 0
+          && diff.changedKeys().size() == 0
+          && target != resource.data.ownerId
+          && request.resource.data.memberIds.toSet()
+               == resource.data.memberIds.toSet().difference([target].toSet())
+          && !(target in request.resource.data.memberNames)
+          && (target == uid()
+              || roleIn(resource.data) == 'owner'
+              || (roleIn(resource.data) == 'coach'
+                  && resource.data.members[target] == 'player'));
+      }
+
+      // Non-member joins as a player by proving they know the invite code.
+      function join() {
+        let diff = request.resource.data.members.diff(resource.data.members);
+        return !isMember(resource.data)
+          && changed().hasOnly(['members', 'memberIds', 'memberNames', 'joinCode'])
+          && request.resource.data.joinCode == resource.data.inviteCode
+          && diff.addedKeys() == [uid()].toSet()
+          && diff.changedKeys().size() == 0
+          && diff.removedKeys().size() == 0
+          && request.resource.data.members[uid()] == 'player'
+          && request.resource.data.memberIds.toSet()
+               == resource.data.memberIds.toSet().union([uid()].toSet())
+          && request.resource.data.memberNames.diff(resource.data.memberNames)
+               .affectedKeys().hasOnly([uid()])
+          && validString(request.resource.data.memberNames[uid()], 80);
+      }
+
+      match /roster/{playerId} {
+        allow read: if signedIn() && isMember(get(teamPath(teamId)).data);
+        allow delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
+        allow create, update: if signedIn()
+          && isEditor(get(teamPath(teamId)).data)
+          && request.resource.data.keys().hasOnly(['name', 'number', 'position', 'userId'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 80
+          && (request.resource.data.number == null || request.resource.data.number is int)
+          && request.resource.data.position in ['handler', 'cutter', 'hybrid'];
+      }
+
+      match /plays/{playId} {
+        allow read: if signedIn() && isMember(get(teamPath(teamId)).data);
+        allow delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
+        allow create, update: if signedIn()
+          && isEditor(get(teamPath(teamId)).data)
+          && request.resource.data.keys().hasOnly([
+               'name', 'category', 'notes', 'elements', 'arrows',
+               'updatedAt', 'updatedBy'])
+          && validString(request.resource.data.name, 100)
+          && request.resource.data.category in ['offense', 'defense', 'pull', 'endzone']
+          && validString(request.resource.data.notes, 5000)
+          && request.resource.data.elements is list
+          && request.resource.data.elements.size() <= 100
+          && request.resource.data.arrows is list
+          && request.resource.data.arrows.size() <= 100
+          && request.resource.data.updatedBy == uid();
+      }
+    }
+
+    // ---- Invite codes -----------------------------------------------------
+
+    match /inviteCodes/{code} {
+      // Single-document lookups only; codes can't be listed.
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['teamId'])
+        && getAfter(teamPath(request.resource.data.teamId)).data.inviteCode == code
+        && getAfter(teamPath(request.resource.data.teamId)).data.members
+             .get(uid(), '') in ['owner', 'coach'];
+      allow delete: if signedIn() && isEditor(get(teamPath(resource.data.teamId)).data);
+    }
+
+    // ---- USA Ultimate cache (written by Cloud Functions only) -------------
+
+    match /usau_tournaments/{id} {
+      allow read: if signedIn();
+    }
+    match /usau_rankings/{id} {
+      allow read: if signedIn();
+    }
+    match /meta/{id} {
+      allow read: if signedIn();
+    }
+  }
+}

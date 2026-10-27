@@ -1,0 +1,1436 @@
+
+<!doctype html> 
+<!--[if lt IE 7]>      <html class="html no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="html no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="html no-js lt-ie9"> <![endif]-->
+<!--[if IE 9 ]>        <html class="html no-js ie9"> <![endif]-->
+<!--[if gt IE 9]><!--> <html class="html no-js"> <!--<![endif]-->
+<head id="head"><meta name="description" content="SiteStartup Description" /><meta name="keywords" content="SiteStartup,Keywords" /><title>
+	Team Rankings | Play USA Ultimate
+</title><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" /><link rel="stylesheet" href="/cms/includes/style-new.v2.min.css" />
+	<script src="/cms/includes/modernizr-1.7.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.js"></script>
+	<script>!window.jQuery && document.write(unescape('%3Cscript src="/cms/includes/jquery/jquery-1.8.2.js"%3E%3C/script%3E'))</script>
+	<script src="/cms/includes/jquery-core-plugins.js"></script>
+	<script src="/cms/includes/jquery/jquery-functions.js"></script>
+ 	<script type="text/javascript" src="/cms/includes/functionsC.js"></script>
+
+
+
+
+    
+	<!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RXFMFVQS5"></script>
+	<script> window.dataLayer = window.dataLayer || []; function gtag() { dataLayer.push(arguments); } gtag('js', new Date()); gtag('config', 'G-3RXFMFVQS5'); </script> 
+    
+
+<script type="text/javascript">
+    var intrvl = 1000;
+    var sec = 60000;
+    var min = 3000 * sec;
+    //var min = 525600 * sec;
+    var warn = 3 * sec;
+    setInterval("checkSessionTime();", intrvl);
+	function checkSessionTime() {
+        min -= intrvl;
+        var rm = parseInt(min / sec);
+		var rs = parseInt((min - (rm * sec)) / 1000);
+
+        if (min <= 0) {
+            renewMemberSession(true);
+        } else {
+            var html = "Your session will expire in ";
+            if (rm > 3) {
+                rm += 1;
+                html += "<b>" + rm + "</b> minutes";
+            } else if (rm > 1) {
+                html += "<b>" + rm + "</b> minutes and <b>" + rs + "</b> seconds";
+            } else if (rm == 1) {
+                html += "<b>" + rm + "</b> minute and <b>" + rs + "</b> seconds";
+            } else {
+                html += "<b>" + rs + "</b> seconds";
+            }
+			
+            if (min % 10000 == 0) renewMemberSession(true); // every 10 seconds lets refresh the session, but don't reset the javascript timer
+        }
+    }
+	function renewMemberSession(skipRenew) {
+		if (!skipRenew) resetSession();
+    }
+    //function logout() { $("#expires").html("<b>Your session has expired. Logging off...</b>"); try {$("#SessionTimeout").jqmShow().center();} catch(ex){} setTimeout("window.location = '/admin/logout.aspx';", 5000); }
+    function resetSession() { min = 3000 * sec; }
+</script></head>
+<body class="body">
+<form method="post" action="/teams/events/rankings/" onsubmit="javascript:return WebForm_OnSubmit();" id="main">
+<div class="aspNetHidden">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['main'];
+if (!theForm) {
+    theForm = document.main;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/WebResource.axd?d=pynGkmcFUV13He1Qd6_TZCuATqmKWvVIdumT-ns2J3B5K0zjWuAQ6KKspY5Gtz9ECvo92w2&amp;t=639190617332169432" type="text/javascript"></script>
+
+
+<script src="/cms/includes/DatePicker.js" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=uHIkleVeDJf4xS50Krz-yIrFGOTroGnmwbeNViD-E_RldjEuXJhAYUt9sm_qqKrCeARQ02Woh-HVBOQDqf2umpJRkgpTBbM7QxkFcazEmO9NqGjkbvkgTmUgkVaYCHMoAf1FsOub7i5kDttn-unsSKRcLyM1&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=Jw6tUGWnA15YEa3ai3FadLY0YYXQQpCbF1CEsuoTt9oDcVD9hMg0bxFeLR8dMKrluL7s-dM48nY2iB3ZSKw7iM_3gJERu7sy6NVCNUSzW8NwwQG0HcdkdcmNg6paFtSdiyo-iyIvCyi6prRmDP2-IVBkQb81&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+function WebForm_OnSubmit() {
+if(document.getElementById('CT_Main_1_fck_ccEditor')!=null && FCKeditorAPI.GetInstance('CT_Main_1_fck_ccEditor'))  FCKeditorAPI.GetInstance('CT_Main_1_fck_ccEditor').UpdateLinkedField();
+return true;
+}
+//]]>
+</script>
+
+<script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('sm', 'main', [], [], [], 90, '');
+//]]>
+</script>
+
+	<div id="wrapper">
+		<header id="main_header">
+			
+
+<div id="logoArea">
+	<span class="logo"><a href="http://www.usaultimate.org" target="_blank"><img src="/cms/images/layout/logo.png" alt="USA Ultimate"/></a></span>
+	<span class="slogan"><img src="/cms/images/layout/slogan.png" alt="Account Management"/></span>
+	<!-- Needs to be switched to account_header.png -->
+</div>
+
+
+<nav class="mainNav">
+	<ul class="sf-menu clearfix">
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl00_liItem" class="firstnavitemli">
+             <a href="https://usaultimate.org/about/" id="CT_Header_CC_TopNav_rptNav_ctl00_lnkLink1" class="firstnavitema">About</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_lnk" style="">Contact Us</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/about/staff/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">USA Ultimate Staff</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl02_lnkInner" style="">Youth Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl03_lnkInner" style="">College Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl04_lnkInner" style="">Club Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl05_lnkInner" style="">Masters Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl06_lnkInner" style="">Beach Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#CurrentAffiliates" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl07_lnkInner" style="">USA Ultimate Affiliates</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/board-of-directors/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl08_lnkInner" style="">Board of Directors</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/local/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl02_lnk" style="">Where to Play</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/discover-ultimate/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl03_lnk" style="">About Ultimate</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/rules/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl01_lnkInner" style="">Rules of Ultimate</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/spirit-of-the-game/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl02_lnkInner" style="">Spirit of the Game</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/about/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl04_lnk" style="">About USA Ultimate</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/about/volunteer/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl01_lnkInner" style="">Volunteer Opportunities</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.archive.usaultimate.org/about/history/hall_of_fame/default.aspx" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl05_lnk" style="">Hall of Fame</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/about/governance/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_lnk" style="">Governance</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/wp-content/uploads/2020/03/USAUltimateBylaws_rev20171120.pdf" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_rptSubSubNav_ctl01_lnkInner" style="">Bylaws</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/suspensions/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_rptSubSubNav_ctl02_lnkInner" style="">Suspensions</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/strategic-plan/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_rptSubSubNav_ctl03_lnkInner" style="">Strategic Plan</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/equity-diversity-inclusion/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl07_lnk" style="">Equity and Diversity</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl00$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_hdn" value="6" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl01_liItem">
+             <a href="https://www.usaultimate.org/news/default.aspx" id="CT_Header_CC_TopNav_rptNav_ctl01_lnkLink1">News</a>
+             
+             
+<ul>
+
+<li>
+    <a id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl01_lnk" style="">USA Ultimate Mobile App</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://itunes.apple.com/us/app/usa-ultimate/id1032772331?mt=8" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">iOS</a>
+         </li>
+        
+         <li>
+            <a href="https://play.google.com/store/apps/details?id=org.usaultimate.usaultimate&hl=en" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl02_lnkInner" style="">Android</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://play.usaultimate.org/teams/events/rankings/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_lnk" style="">Rankings</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=College-Men" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl01_lnkInner" style="">College Men's</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=College-Women" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl02_lnkInner" style="">College Women's</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=Club-Men" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl03_lnkInner" style="">TCT Men's</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=Club-Mixed" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl04_lnkInner" style="">TCT Mixed</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=Club-Women" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl05_lnkInner" style="">TCT Women's</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/college/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl03_lnk" style="">College News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/club/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl04_lnk" style="">Triple Crown Tour News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/beach/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl05_lnk" style="">Beach News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/youth/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl06_lnk" style="">Youth News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/team-usa/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl07_lnk" style="">National Teams News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/watch/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl08_lnk" style="">Videos</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl01$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_hdn" value="25" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl02_liItem">
+             <a href="https://play.usaultimate.org/" id="CT_Header_CC_TopNav_rptNav_ctl02_lnkLink1">Events</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://play.usaultimate.org/events/tournament/" id="CT_Header_CC_TopNav_rptNav_ctl02_ccSubNav_rptSubNav_ctl01_lnk" style="">Tournament Calendar</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl02$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl02_ccSubNav_hdn" value="144" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl03_liItem">
+             <a id="CT_Header_CC_TopNav_rptNav_ctl03_lnkLink1">Competition</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://www.usaultimate.org/youth/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl01_lnk" style="">Youth Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/youth/guidelines-and-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">Youth Guidelines</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/college/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_lnk" style="">College Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/resources/college-eligibility-guidelines/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl01_lnkInner" style="">College Eligibility</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/college/guidelines-and-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl02_lnkInner" style="">College Guidelines</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/resources/?_resource_filters=college" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl03_lnkInner" style="">College Resources</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/club/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl03_lnk" style="">Club Division (Triple Crown Tour)</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/club/guidelines-and-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl01_lnkInner" style="">TCT Guidelines</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/events/2022-US-Open-Club-Championships/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl02_lnkInner" style="">U.S. Open Club Championships</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/masters-ultimate/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl04_lnk" style="">Masters Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/masters-ultimate/masters-guidelines-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl01_lnkInner" style="">Masters Guidelines</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/beach-ultimate/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl05_lnk" style="">Beach Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/wp-content/uploads/2022/01/2022-Beach-Guidelines-Final.pdf" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl01_lnkInner" style="">Beach Guidelines</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/team-usa/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl06_lnk" style="">USA Ultimate National Teams</a>
+    
+</li>
+
+<li>
+    <a href="https://ultimate.mobilecoach.org/page/5344/skills-challenge" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl07_lnk" style="">Skills Challenge App Program</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl03$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_hdn" value="26" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl04_liItem">
+             <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_lnkLink1">Programs</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://usaultimate.org/affiliate-program/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_lnk" style="">Affiliates</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#Benefits" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">Benefits</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#Grants" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl02_lnkInner" style="">Grants</a>
+         </li>
+        
+         <li>
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSfEeecOBhzwri2jJNWtH-iGlUjQJ_y69L5I7RJK-Zs0rIg_UQ/viewform?c=0&w=1" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl03_lnkInner" style="">Apply</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#FAQs" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl04_lnkInner" style="">FAQ</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/youth/camps-clinics/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl02_lnk" style="">Camps</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/wp-content/uploads/2020/11/Chaperone-Requirements.pdf" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl03_lnk" style="">Chaperones</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://www.usaultimate.org/youth_requirements/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl01_lnkInner" style="">Youth Safety</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/coaches/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl04_lnk" style="">Coaching</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/coaches/become-a-coach/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl01_lnkInner" style="">Coaching Development Program</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/athlete-safety/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl02_lnkInner" style="">Athlete Protection</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_lnk" style="">Event Sanctioning & Insurance</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/sanctioning/tournament-sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl01_lnkInner" style="">Tournament Sanctioning</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/sanctioning/league-sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl02_lnkInner" style="">League Sanctioning</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/sanctioning/development-event-sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl03_lnkInner" style="">Practice Insurance</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="http://gum.usaultimate.org/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl06_lnk" style="">Girls' Ultimate Movement (GUM)</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs-services/learn-to-play" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl07_lnk" style="">Learn to Play</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/coach-organizer-convention/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl08_lnk" style="">Coach & Organizer Convention</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs-services/new-start" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl09_lnk" style="">New Start Grant Kits</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_lnk" style="">Organizer Resources</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/host-a-championship-event/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl01_lnkInner" style="">Bid to Host USA Ultimate Events</a>
+         </li>
+        
+         <li>
+            <a href="https://www.usaultimate.org/tdcp/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl02_lnkInner" style="">Tournament Director's Certification Program</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl03_lnkInner" style="">Youth & Education Resources</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl04_lnkInner" style="">Women's Development</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl05_lnkInner" style="">College Development</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/youth/parents/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl11_lnk" style="">Parent Resources</a>
+    
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/officiating/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_lnk" style="">Rules & Officiating</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/rules/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_rptSubSubNav_ctl01_lnkInner" style="">Rules</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/observers/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_rptSubSubNav_ctl02_lnkInner" style="">Observer Certification Program</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/disc-standards" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_rptSubSubNav_ctl03_lnkInner" style="">Disc Standards</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl04$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_hdn" value="27" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl05_liItem" class="lastnavitemli">
+             <a href="https://www.usaultimate.org/membership/default.aspx" id="CT_Header_CC_TopNav_rptNav_ctl05_lnkLink1" class="lastnavitema">Membership</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://www.usaultimate.org/membervalue/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl01_lnk" style="">Benefits & Value</a>
+    
+</li>
+
+<li>
+    <a href="https://docs.google.com/forms/d/e/1FAIpQLSfmC4E50X2uP3IL70ZZgeku8TriWdsABdti-9eUNgAesoUXrA/viewform" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl02_lnk" style="">Gift Certificates</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/membership/levels/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl03_lnk" style="">Membership Levels</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/play-it-forward/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl04_lnk" style="">Play It Forward</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/membership/#resources" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl05_lnk" style="">Registration Forms: Waiver & Medical Authorization</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/signature-series/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl06_lnk" style="">Signature Series Disc</a>
+    
+</li>
+
+<li>
+    <a href="/members/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl07_lnk" style="">Login</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl05$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_hdn" value="28" />
+        </li>
+	
+	</ul>
+</nav>
+
+
+
+
+
+			
+<div class="login_area">
+    
+	<div id="CT_LoginBar_0_login_buttons" class="login_buttons">
+        <img src="/cms/images/icons/usoc_new_logo.png" width="160" />
+        <br/>
+		<a href="/members/login/" class="btn">Member Account</a>
+	</div>
+	
+</div>
+
+		</header>
+		<div id="container" class="oneCol">
+			<div id="main_col" class="column">
+				<div class="headingBox">
+					
+
+<div class="breadcrumbs_area">
+	<div id="CT_Heading_0_breadcrumb" class="breadcrumbs">
+		<span class="bread_links"><a href="/">Home</a><span class="default">&gt;</span></span><span class="bread_page">Team Event Rankings</span>
+	</div>
+</div>
+
+				</div>
+				
+
+				
+
+<h1 id="alt_page_header">Teams & Rankings</h1>
+<ul class="tabs dual-tabs">
+	<li id="CT_Main_0_TeamTab" class="active"><a href="#">TEAMS</a></li>
+	<li id="CT_Main_0_RankingTab"><a href="#">RANKINGS</a></li>
+</ul>
+<div class="slides">
+	<div class="slide">
+		<div class="search-filter">
+			<div class="formee">
+				<div class="grid-3-12">
+					<label for="levelID">Competition Level</label>
+					<select name="CT_Main_0$F_CompetitionLevelId" id="CT_Main_0_F_CompetitionLevelId">
+	<option selected="selected" value="">-- SELECT ONE --</option>
+	<option value="beach">Beach</option>
+	<option value="beach grand masters">Beach Grand Masters</option>
+	<option value="beach great grand masters">Beach Great Grand Masters</option>
+	<option value="beach legends">Beach Legends</option>
+	<option value="beach masters">Beach Masters</option>
+	<option value="club">Club</option>
+	<option value="college">College</option>
+	<option value="disc golf 40+ men">Disc Golf 40+ Men</option>
+	<option value="disc golf 40+ women">Disc Golf 40+ Women</option>
+	<option value="disc golf open">Disc Golf Open</option>
+	<option value="disc golf u-19">Disc Golf U-19</option>
+	<option value="disc golf women">Disc Golf Women</option>
+	<option value="elementary school">Elementary School</option>
+	<option value="grand masters">Grand Masters</option>
+	<option value="great grand masters">Great Grand Masters</option>
+	<option value="high school">High School</option>
+	<option value="league">League</option>
+	<option value="league youth">League Youth</option>
+	<option value="masters">Masters</option>
+	<option value="middle school">Middle School</option>
+	<option value="us national team">US National Team</option>
+	<option value="us national team beach">US National Team Beach</option>
+	<option value="us national team beach grand masters">US National Team Beach Grand Masters</option>
+	<option value="us national team beach great grand masters">US National Team Beach Great Grand Masters</option>
+	<option value="us national team beach masters">US National Team Beach Masters</option>
+	<option value="us national team grand masters">US National Team Grand Masters</option>
+	<option value="us national team masters">US National Team Masters</option>
+	<option value="us national team u-20">US National Team U-20</option>
+	<option value="us national team u-24">US National Team U-24</option>
+	<option value="volunteers">Volunteers</option>
+	<option value="youth camp">Youth Camp</option>
+	<option value="youth clinic">Youth Clinic</option>
+	<option value="youth club u-12">Youth Club U-12</option>
+	<option value="youth club u-15">Youth Club U-15</option>
+	<option value="youth club u-17">Youth Club U-17</option>
+	<option value="youth club u-20">Youth Club U-20</option>
+
+</select>
+				</div>
+				<div class="grid-3-12">
+					<label for="gdivID">Gender Division</label>
+					<select name="CT_Main_0$F_GenderDivisionId" id="CT_Main_0_F_GenderDivisionId">
+	<option selected="selected" value="">-- SELECT ONE --</option>
+	<option value="20#boys">Boys</option>
+	<option value="19#girls">Girls</option>
+	<option value="17#men">Men</option>
+	<option value="1#mixed">Mixed</option>
+	<option value="33#na">NA</option>
+	<option value="2#women">Women</option>
+
+</select>
+				</div>
+				<div class="grid-3-12">
+					<label for="cdivID">Competition Division</label>
+					<select name="CT_Main_0$F_CompetitionDivisionId" id="CT_Main_0_F_CompetitionDivisionId">
+	<option selected="selected" value="">-- SELECT ONE --</option>
+	<option value="10#classic">Classic</option>
+	<option value="4#developmental">Developmental</option>
+	<option value="1#division i">Division I</option>
+	<option value="2#division ii">Division II</option>
+	<option value="3#division iii">Division III</option>
+	<option value="8#elite">Elite</option>
+	<option value="7#pro">Pro</option>
+	<option value="11#recreational">Recreational</option>
+	<option value="9#select">Select</option>
+	<option value="12#top select">Top Select</option>
+
+</select>
+				</div>
+				<div class="grid-3-12">
+					<label for="stateID">State</label>
+					<select name="CT_Main_0$F_StateId" id="CT_Main_0_F_StateId">
+	<option selected="selected" value="">-- SELECT ONE --</option>
+	<option value="al">Alabama</option>
+	<option value="ak">Alaska</option>
+	<option value="as">American Samoa</option>
+	<option value="az">Arizona</option>
+	<option value="ar">Arkansas</option>
+	<option value="ca">California</option>
+	<option value="co">Colorado</option>
+	<option value="ct">Connecticut</option>
+	<option value="de">Delaware</option>
+	<option value="dc">District of Columbia</option>
+	<option value="fl">Florida</option>
+	<option value="ga">Georgia</option>
+	<option value="gu">Guam</option>
+	<option value="hi">Hawaii</option>
+	<option value="id">Idaho</option>
+	<option value="il">Illinois</option>
+	<option value="in">Indiana</option>
+	<option value="ia">Iowa</option>
+	<option value="ks">Kansas</option>
+	<option value="ky">Kentucky</option>
+	<option value="la">Louisiana</option>
+	<option value="me">Maine</option>
+	<option value="md">Maryland</option>
+	<option value="ma">Massachusetts</option>
+	<option value="mi">Michigan</option>
+	<option value="mn">Minnesota</option>
+	<option value="ms">Mississippi</option>
+	<option value="mo">Missouri</option>
+	<option value="mt">Montana</option>
+	<option value="ne">Nebraska</option>
+	<option value="nv">Nevada</option>
+	<option value="nh">New Hampshire</option>
+	<option value="nj">New Jersey</option>
+	<option value="nm">New Mexico</option>
+	<option value="ny">New York</option>
+	<option value="nc">North Carolina</option>
+	<option value="nd">North Dakota</option>
+	<option value="mp">Northern Mariana Islands</option>
+	<option value="oh">Ohio</option>
+	<option value="ok">Oklahoma</option>
+	<option value="or">Oregon</option>
+	<option value="pa">Pennsylvania</option>
+	<option value="pr">Puerto Rico</option>
+	<option value="ri">Rhode Island</option>
+	<option value="sc">South Carolina</option>
+	<option value="sd">South Dakota</option>
+	<option value="tn">Tennessee</option>
+	<option value="tx">Texas</option>
+	<option value="um">United States Minor Outlying Islands</option>
+	<option value="ut">Utah</option>
+	<option value="vt">Vermont</option>
+	<option value="vi">Virgin Islands</option>
+	<option value="va">Virginia</option>
+	<option value="wa">Washington</option>
+	<option value="wv">West Virginia</option>
+	<option value="wi">Wisconsin</option>
+	<option value="wy">Wyoming</option>
+
+</select>
+				</div>
+
+				<div class="grid-3-12">
+					<label for="levelID">Team Name</label>
+					<input name="CT_Main_0$F_TeamName" type="text" id="CT_Main_0_F_TeamName" />
+				</div>
+				<div class="grid-3-12">
+					<label for="gdivID">School Name</label>
+					<input name="CT_Main_0$F_SchoolName" type="text" id="CT_Main_0_F_SchoolName" />
+				</div>
+				<div class="grid-3-12">
+					<label for="cdivID">Team Designation</label>
+					<select name="CT_Main_0$F_Designation" id="CT_Main_0_F_Designation">
+	<option selected="selected" value="">-- SELECT ONE --</option>
+	<option value="13#a">A</option>
+	<option value="1#b">B</option>
+	<option value="2#c">C</option>
+	<option value="3#d">D</option>
+	<option value="15#dev">Dev</option>
+	<option value="5#freshman">Freshman</option>
+	<option value="9#junior">Junior</option>
+	<option value="4#jv">JV</option>
+	<option value="6#jv1">JV1</option>
+	<option value="7#jv2">JV2</option>
+	<option value="12#lower">Lower</option>
+	<option value="8#senior">Senior</option>
+	<option value="10#sophomore">Sophomore</option>
+	<option value="11#upper">Upper</option>
+	<option value="14#varsity">Varsity</option>
+
+</select>
+				</div>
+				<div class="grid-3-12">
+					<label for="cdivID">Season</label>
+					<select name="CT_Main_0$F_SeasonId" id="CT_Main_0_F_SeasonId">
+	<option selected="selected" value="">-- ALL --</option>
+	<option value="22#2027">2027</option>
+	<option value="21#2026">2026</option>
+	<option value="20#2025">2025</option>
+	<option value="19#2024">2024</option>
+	<option value="18#2023">2023</option>
+	<option value="17#2022">2022</option>
+	<option value="16#2021">2021</option>
+	<option value="15#2020">2020</option>
+	<option value="14#2019">2019</option>
+	<option value="8#2018">2018</option>
+	<option value="7#2017">2017</option>
+	<option value="6#2016">2016</option>
+	<option value="5#2015">2015</option>
+	<option value="4#2014">2014</option>
+	<option value="3#2013">2013</option>
+	<option value="2#2012">2012</option>
+	<option value="1#2011">2011</option>
+	<option value="9#2010">2010</option>
+	<option value="10#2009">2009</option>
+	<option value="11#2008">2008</option>
+	<option value="12#2007">2007</option>
+	<option value="13#2006">2006</option>
+
+</select>
+				</div>
+
+				<div class="grid-12-12 submit">
+					<input type="submit" name="CT_Main_0$btnSubmit" value="Submit" id="CT_Main_0_btnSubmit" class="btn" onclick="PleaseWait(this);"/>
+				</div>
+			</div>
+		</div>
+		<div class="search-results">
+			<div class="section_header">
+				<h3 class="title">Teams</h3>
+			</div>
+			<div>
+	<span class="smaller"></span><table class="global_table" cellspacing="0" cellpadding="5" id="CT_Main_0_gvList" style="border-width:0px;border-collapse:collapse;">
+		<tr valign="top">
+			<th scope="col">Team</th><th scope="col">Wins</th><th scope="col">Losses</th><th scope="col">Competition Level</th><th scope="col">Gender Division</th><th scope="col">City</th><th scope="col">State</th>
+		</tr><tr class="row" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl02_lnkTeam" href="/teams/events/Eventteam/?TeamId=hjE4RPv2uxErV3IJxdzVRNn7oCUMy33TMnkiHK3NYwo%3d"> Denver Boulder Summer Youth Ultimate League</a>
+						</td><td>0</td><td>0</td><td>League</td><td>Mixed</td><td>Denver</td><td>CO</td>
+		</tr><tr class="alt" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl03_lnkTeam" href="/teams/events/Eventteam/?TeamId=WamcKwBJWv9qAUGAJM7uLRzXRCwN%2ftD7xHIFU9v5UYQ%3d"> Gravy Transportation and Logistics LLC, A Washington Limited Liability Corporation</a>
+						</td><td>1</td><td>4</td><td>Club</td><td>Men</td><td>Seattle</td><td>WA</td>
+		</tr><tr class="row" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl04_lnkTeam" href="/teams/events/Eventteam/?TeamId=%2bJ1n7cYMLLX7Ml5OE0KyycMuqkmUSrylujGa%2bxqe3nc%3d">'Shine</a>
+						</td><td>18</td><td>12</td><td>Club</td><td>Mixed</td><td>Nashville</td><td>TN</td>
+		</tr><tr class="alt" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl05_lnkTeam" href="/teams/events/Eventteam/?TeamId=5vyWfEaq78p%2f9s5j71VchOOgkeoF%2b0spqBu4RIyZoOQ%3d">(washed)</a>
+						</td><td>11</td><td>11</td><td>Club</td><td>Men</td><td>Denver</td><td>CO</td>
+		</tr><tr class="row" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl06_lnkTeam" href="/teams/events/Eventteam/?TeamId=R%2bA%2b%2fEIoFfKI9XHBWNqcPvAuzhX0OqV65BcsJS1rW%2b8%3d">2.Old</a>
+						</td><td>2</td><td>3</td><td>Beach Grand Masters</td><td>Mixed</td><td>Burlington</td><td>VT</td>
+		</tr><tr class="alt" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl07_lnkTeam" href="/teams/events/Eventteam/?TeamId=JfJjBFaIoKt4J7GxidTCSq%2b70t5HlvSjZlvwE0kbBtE%3d">2025-2026 Middle School League</a>
+						</td><td>0</td><td>0</td><td>Middle School</td><td>Mixed</td><td>Triangle Area</td><td>NC</td>
+		</tr><tr class="row" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl08_lnkTeam" href="/teams/events/Eventteam/?TeamId=naVLn1JVzWgnEyXXOCFML6IiI7b25gyRdZz64rIsdcg%3d">2025-26 Outdoor Winter League</a>
+						</td><td>0</td><td>0</td><td>League</td><td>Mixed</td><td>Apex, Raleigh, Morrisville</td><td>NC</td>
+		</tr><tr class="alt" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl09_lnkTeam" href="/teams/events/Eventteam/?TeamId=t9kyoopUddrOd4Qw0mDx8l2%2bALeqFS6Be25yl%2bsRuqM%3d">2026 Albany Area Club Combine Tryout</a>
+						</td><td>0</td><td>0</td><td>Club</td><td>Mixed</td><td>Albany</td><td>NY</td>
+		</tr><tr class="row" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl10_lnkTeam" href="/teams/events/Eventteam/?TeamId=%2buaDj1yNAKIbge3ln13Fl0VIWcH678R7SEvWCoAy48M%3d">2026 Albany Mixed Winter League</a>
+						</td><td>0</td><td>0</td><td>League</td><td>Mixed</td><td>Colonie</td><td>NY</td>
+		</tr><tr class="alt" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl11_lnkTeam" href="/teams/events/Eventteam/?TeamId=muJ2%2f%2fhoSfPMHGbiu0yK%2bpneN8Rl%2fKyMEomfV4lzSx8%3d">2026 AUDA Summer Youth League</a>
+						</td><td>0</td><td>0</td><td>League Youth</td><td>Mixed</td><td>Albany</td><td>NY</td>
+		</tr><tr class="row" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl12_lnkTeam" href="/teams/events/Eventteam/?TeamId=gGjneKMAr9dozB9U7OjRQ5yzNjimeeem5AR5w2TOZ2U%3d">2026 AUDA Wom&ns Indoor League</a>
+						</td><td>0</td><td>0</td><td>League</td><td>Women</td><td>Albany</td><td>NY</td>
+		</tr><tr class="alt" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl13_lnkTeam" href="/teams/events/Eventteam/?TeamId=5NXv3wvYFNhZWmQZ5jWI2dKOQ2Aju1Tn0Pzir4ONXyc%3d">2026 Baton Rouge Summer League</a>
+						</td><td>0</td><td>0</td><td>League</td><td>Mixed</td><td>Baton Rouge</td><td>LA</td>
+		</tr><tr class="row" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl14_lnkTeam" href="/teams/events/Eventteam/?TeamId=uQ6MHVtlvzQ2Z7x4%2fIPEn4HNS4RzXvc%2blwd9jC62HI4%3d">2026 Bergen Winter League</a>
+						</td><td>0</td><td>0</td><td>League</td><td>Mixed</td><td>Carlstadt</td><td>NJ</td>
+		</tr><tr class="alt" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl15_lnkTeam" href="/teams/events/Eventteam/?TeamId=455Xji3AzO%2fRbMlNL47syQvWvo9rwYaW38RjapRKbgo%3d">2026 Carolina Ultimate Flight School</a>
+						</td><td>0</td><td>0</td><td>Youth Camp</td><td>Mixed</td><td>Raleigh</td><td>NC</td>
+		</tr><tr class="row" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl16_lnkTeam" href="/teams/events/Eventteam/?TeamId=%2bo6eNILoWkTP4VrwndzmX6zh2eAbT1E97wP%2bfFBJpuQ%3d">2026 CUDA Indoor Winter League</a>
+						</td><td>0</td><td>0</td><td>League</td><td>Mixed</td><td>Columbus</td><td>OH</td>
+		</tr><tr class="alt" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl17_lnkTeam" href="/teams/events/Eventteam/?TeamId=UenVsZ5ceVeFnq9t0HXoWuCqTOGRA2gP%2fBc3PGvfxqc%3d">2026 East Fishkill Summer League</a>
+						</td><td>0</td><td>0</td><td>League</td><td>Mixed</td><td>East Fishkill</td><td>NY</td>
+		</tr><tr class="row" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl18_lnkTeam" href="/teams/events/Eventteam/?TeamId=bLiFAAFCaXvgp%2bCocFNAZO3NdQftZJA%2b5FkkGK1CItM%3d">2026 East U24 Tryouts - MMP</a>
+						</td><td>0</td><td>0</td><td>US National Team U-24</td><td>Men</td><td>Woodstock</td><td>GA</td>
+		</tr><tr class="alt" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl19_lnkTeam" href="/teams/events/Eventteam/?TeamId=Zc23V9Ao7huwrL67dwCVCsvySwovZR2JP4sT8xJqRfI%3d">2026 East U24 Tryouts - WMP</a>
+						</td><td>0</td><td>0</td><td>US National Team U-24</td><td>Women</td><td>Woodstock</td><td>GA</td>
+		</tr><tr class="row" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl20_lnkTeam" href="/teams/events/Eventteam/?TeamId=UWz8U7LM1I2yJ6iYgEJhvt1eUu9elv%2fVAiVL1vw9qkA%3d">2026 Fall Elementary Frisbee Club</a>
+						</td><td>0</td><td>0</td><td>Elementary School</td><td>Mixed</td><td>Chapel Hill</td><td>NC</td>
+		</tr><tr class="alt" valign="top">
+			<td>
+							<a id="CT_Main_0_gvList_ctl21_lnkTeam" href="/teams/events/Eventteam/?TeamId=or4Hu09SFMu7e8mwXtZHJgr29Ur0b2uU1gFOMuCvQ3w%3d">2026 Fall GMP High School League</a>
+						</td><td>0</td><td>0</td><td>High School</td><td>Girls</td><td>Carrboro, Chapel Hill, Durham, Raleigh</td><td>NC</td>
+		</tr><tr>
+			<td colspan="7"><table width="100%" border=0 cellspacing=0 cellpadding=0><tr><td width="100%" align=left><nobr><b>Rows:</b> 1 - 20 of 2879</nobr><p></P>&laquo; Previous 20 |  <b>1</b> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl00&#39;,&#39;&#39;)">2</a> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl01&#39;,&#39;&#39;)">3</a> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl02&#39;,&#39;&#39;)">4</a> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl03&#39;,&#39;&#39;)">5</a> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl04&#39;,&#39;&#39;)">6</a> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl05&#39;,&#39;&#39;)">7</a> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl06&#39;,&#39;&#39;)">8</a> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl07&#39;,&#39;&#39;)">9</a> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl08&#39;,&#39;&#39;)">10</a> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl09&#39;,&#39;&#39;)">11</a> | <a href="javascript:__doPostBack(&#39;CT_Main_0$gvList$ctl23$ctl00$ctl10&#39;,&#39;&#39;)">Next 20 &raquo;</a></td><td valign=top align=right>&nbsp;&nbsp;&nbsp;<nobr><b>Page:</b> 1 of 144</nobr></td></tr></table></td>
+		</tr>
+	</table>
+</div>
+		</div>
+	</div>
+	<div class="slide">
+		<div class="search-filter">
+			<div class="formee">
+				<div class="grid-3-12">
+					<label for="CT_Main_0_F_RankSet">Rank Set</label>
+					<select name="CT_Main_0$F_RankSet" id="CT_Main_0_F_RankSet">
+	<option selected="selected" value="">-- SELECT ONE --</option>
+	<option value="5">College Men</option>
+	<option value="6">College Women</option>
+	<option value="7">High School Boys</option>
+	<option value="8">High School Girls</option>
+	<option value="9">High School Mixed</option>
+	<option value="10">Club Men</option>
+	<option value="11">Club Women</option>
+	<option value="12">Club Mixed</option>
+
+</select>
+				</div>
+				<div class="grid-3-12">
+					<label for="CT_Main_0_F_Name">Data Set Name</label>
+					<input name="CT_Main_0$F_Name" type="text" id="CT_Main_0_F_Name" />
+				</div>
+				<div class="grid-3-12">
+					<label for="CT_Main_0_F_Status">Status</label>
+					<select name="CT_Main_0$F_Status" id="CT_Main_0_F_Status">
+	<option value="">-- ANY --</option>
+	<option value="Archived">Archived</option>
+	<option selected="selected" value="Published">Published</option>
+
+</select>
+				</div>
+				<div class="grid-4-12">
+					<label for="CT_Main_0_F_RankSetDateLbound">Date Created <span class="smaller">(From - To)</span></label>
+					<span class="datePicker">
+						<span id="CT_Main_0_F_RankSetDateLbound"><table border=0 cellpadding=0 cellspacing=0><tr><td><input name="CT_Main_0$F_RankSetDateLbound$cal" type="text" id="CT_Main_0_F_RankSetDateLbound_cal" onclick="popUpCalendar(document.getElementById(&#39;CT_Main_0_F_RankSetDateLbound_cal&#39;),document.getElementById(&#39;CT_Main_0_F_RankSetDateLbound_cal&#39;), &#39;mm/dd/yyyy&#39;); return false;" style="width:80px;" /></td><td><img tabindex="-1" onclick="popUpCalendar(document.getElementById(&#39;CT_Main_0_F_RankSetDateLbound_cal&#39;),document.getElementById(&#39;CT_Main_0_F_RankSetDateLbound_cal&#39;), &#39;mm/dd/yyyy&#39;); return false;" src="/cms/images/calendar/picker.gif" style="cursor:pointer;" /></td></tr></table></span>
+					</span>
+					<span class="datePicker">
+						<span id="CT_Main_0_F_RankSetDateUbound"><table border=0 cellpadding=0 cellspacing=0><tr><td><input name="CT_Main_0$F_RankSetDateUbound$cal" type="text" id="CT_Main_0_F_RankSetDateUbound_cal" onclick="popUpCalendar(document.getElementById(&#39;CT_Main_0_F_RankSetDateUbound_cal&#39;),document.getElementById(&#39;CT_Main_0_F_RankSetDateUbound_cal&#39;), &#39;mm/dd/yyyy&#39;); return false;" style="width:80px;" /></td><td><img tabindex="-1" onclick="popUpCalendar(document.getElementById(&#39;CT_Main_0_F_RankSetDateUbound_cal&#39;),document.getElementById(&#39;CT_Main_0_F_RankSetDateUbound_cal&#39;), &#39;mm/dd/yyyy&#39;); return false;" src="/cms/images/calendar/picker.gif" style="cursor:pointer;" /></td></tr></table></span>
+					</span>
+				</div>
+				<div class="grid-12-12 submit">
+					<input type="submit" name="CT_Main_0$btnRankingSubmit" value="Submit" id="CT_Main_0_btnRankingSubmit" class="btn" onclick="PleaseWait(this);"/>
+				</div>
+			</div>
+			<div class="search-results" style="border: 1px solid #ddd;">
+				
+				<div id="CT_Main_0_DefaultMessage" class="center">
+					
+				</div>
+
+				<div>
+	<span class="smaller"></span><table class="global_table" cellspacing="0" cellpadding="5" id="CT_Main_0_gvRankSetList" style="border-width:0px;border-collapse:collapse;">
+		<tr valign="top">
+			<th scope="col">Name</th><th scope="col">Status</th><th scope="col">Rank Set</th><th scope="col">Create Date</th><th scope="col">Links</th>
+		</tr><tr class="row" valign="top">
+			<td>2025 Men&#39;s Final Rankings</td><td>
+								<span id="CT_Main_0_gvRankSetList_ctl02_lblStatus" style="color:Green;">Published</span>
+							</td><td>Club Men</td><td>
+								10/25/2026 7:01:52 PM
+							</td><td>
+								<a href='/teams/events/team_rankings/?RankSet=Club-Men' target='_blank'>Team Rankings</a>
+							</td>
+		</tr><tr class="alt" valign="top">
+			<td>2026 Women&#39;s Final Rankings</td><td>
+								<span id="CT_Main_0_gvRankSetList_ctl03_lblStatus" style="color:Green;">Published</span>
+							</td><td>Club Women</td><td>
+								10/25/2026 5:23:13 PM
+							</td><td>
+								<a href='/teams/events/team_rankings/?RankSet=Club-Women' target='_blank'>Team Rankings</a>
+							</td>
+		</tr><tr class="row" valign="top">
+			<td>2026 Mixed Final Rankings</td><td>
+								<span id="CT_Main_0_gvRankSetList_ctl04_lblStatus" style="color:Green;">Published</span>
+							</td><td>Club Mixed</td><td>
+								10/25/2026 5:22:42 PM
+							</td><td>
+								<a href='/teams/events/team_rankings/?RankSet=Club-Mixed' target='_blank'>Team Rankings</a>
+							</td>
+		</tr><tr class="alt" valign="top">
+			<td>2026 College Men&#39;s — final rankings (5/27)</td><td>
+								<span id="CT_Main_0_gvRankSetList_ctl05_lblStatus" style="color:Green;">Published</span>
+							</td><td>College Men</td><td>
+								5/27/2026 10:08:43 AM
+							</td><td>
+								<a href='/teams/events/team_rankings/?RankSet=College-Men' target='_blank'>Team Rankings</a>
+							</td>
+		</tr><tr class="row" valign="top">
+			<td>2026 College Women&#39;s — final rankings (5/27)</td><td>
+								<span id="CT_Main_0_gvRankSetList_ctl06_lblStatus" style="color:Green;">Published</span>
+							</td><td>College Women</td><td>
+								5/27/2026 9:54:34 AM
+							</td><td>
+								<a href='/teams/events/team_rankings/?RankSet=College-Women' target='_blank'>Team Rankings</a>
+							</td>
+		</tr><tr>
+			<td colspan="5"><table width="100%" border=0 cellspacing=0 cellpadding=0><tr><td width="100%" align=left><nobr><b>Rows:</b> 1 - 20 of 33</nobr><p></P>&laquo; Previous 20 |  <b>1</b> <a href="javascript:__doPostBack(&#39;CT_Main_0$gvRankSetList$ctl08$ctl00$ctl00&#39;,&#39;&#39;)">2</a> | <a href="javascript:__doPostBack(&#39;CT_Main_0$gvRankSetList$ctl08$ctl00$ctl01&#39;,&#39;&#39;)">Next 13 &raquo;</a></td><td valign=top align=right>&nbsp;&nbsp;&nbsp;<nobr><b>Page:</b> 1 of 2</nobr></td></tr></table></td>
+		</tr>
+	</table>
+</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+
+<div class="block"><div style="text-align: center;">&nbsp;</div>
+<div style="text-align: center;"><span style="color: rgb(34, 34, 34); font-family: Verdana, Helvetica, sans-serif; font-size: 17px; line-height: 22.09375px; text-align: center;">About the USA Ultimate Rankings Algorithm</span></div>
+<div>
+<div style="text-align: center;"><em>(<a href="https://www.usaultimate.org/news/usa-ultimate-makes-update-to-rankings-algorithm/">Last updated 1/12/2018</a>)</em></div>
+<div>&nbsp;</div>
+<div>The USA Ultimate Rankings (version 2.0) are used in the College and Club regular seasons to help determine strength wildcard bid allocation throughout the series. The algorithm becomes more accurate later in the season as more valid scores are provided by tournament directors and teams.</div>
+<div>&nbsp;</div>
+<div>The most basic explanation of this rating system is this: for each game a team plays, the team gets a game rating. These ratings are then averaged over all games played by a team.</div>
+<div>&nbsp;</div>
+<div>The next level of complexity is how to compute the points for a given game, and how to average them. &nbsp;The points for a given game is given by the opponent's rating plus or minus (in the case of a win or loss, respectively) some rating differential x.</div>
+<div>&nbsp;</div>
+<div>The number x is a function of the score. Here is the general formula for it:</div>
+</div>
+<div>&nbsp;</div>
+<div style="text-align: center;"><img width="443" height="50" src="/assets/1/7/Algo.PNG" alt="Algo" /></div>
+<div style="text-align: center;">&nbsp;<img width="207" height="30" src="/assets/1/7/Algo2.PNG" alt="Algo2" /></div>
+<div>
+<div>&nbsp;</div>
+<div>The function was chosen to have the following properties:</div>
+<ul>
+    <li>each additional goal is worth more when games are close than when they are not;</li>
+    <li>every game decided by one point gets the same differential of 125, no matter the game total;</li>
+    <li>the maximum x can be is 600;</li>
+    <li>a game earns the maximum differential if and only if the winning score is more than twice the losing score.</li>
+</ul>
+<div><span style="text-align: center;">Here is a partial table of differentials under this formula:</span></div>
+<div>&nbsp;</div>
+</div>
+<div style="text-align: center;"><img width="702" height="200" src="/assets/1/7/MainFCKEditorDimension/Algo3.PNG" alt="Algo3" /></div>
+<div style="text-align: center;"><img width="0" height="0" src="/assets/1/7/MainFCKEditorDimension/Algo3.PNG" alt="Algo3" /></div>
+<div>&nbsp;</div>
+<div>
+<div>As an example, suppose team A beats team B 15-11. For a 15-11 game, x = 381. Suppose, further, that team B has a rating of 1010. Then the game rating earned by team A is 1010 381, or 1391.</div>
+<div>&nbsp;</div>
+<div>So, suppose team A has played in 4 games, and each individual game rating is 1298, 913, 1410, and 1103. To determine A's overall rating, we take a weighted average of those numbers. The weight of any game is a product of the date weight and the score weight. The date weight depends upon how recently the game was played; games in the first week of the regular season will get a date weight of 0.5, while games in the last week of the season get a date weight of 1.0. Date weights of games in intermediate weeks are interpolated exponentially, so each week's date weight is a fixed multiple of the previous week's date weight. The score weight of a game will be 1.0 if the winning score is at least 13, or if the total score is at least 19. Games with a winning score below 13 <strong>and</strong> a total score below 19 will get lower score weights. Precisely, the score weight, where W and L denote the winning and losing scores, will be:</div>
+<div><img width="250" height="55" src="/assets/1/7/AlgorithmUpdate_ScoreWeight_2018.jpg" alt="AlgorithmUpdate_ScoreWeight_2018" /></div>
+<div>&nbsp;</div>
+<div style="text-align: center;"><img width="800" height="366" src="/assets/1/7/MainFCKEditorDimension/AlgorithmUpdate1.2018.JPG" alt="AlgorithmUpdate1.2018" /></div>
+<div>&nbsp;</div>
+<div>This averaging is done in an iterative process. First, we temporarily set every team's rating to 1000, and compute each individual game rating and take averages. This gives each team a new rating. Then, we re-compute the game ratings and averages, using this new set of ratings, to get yet another set of ratings. &nbsp;We do this thousands of times until the rating for each team has stabilized. If some team does really well, and, after the first iteration their rating goes up 250 points, then, on the second iteration, all teams that have played the first team will go up by a smaller amount, and on the third iteration, all the teams that have played the teams that played the first team will go up by a small amount, and so on.</div>
+<div>&nbsp;</div>
+<div>Finally, if a team is rated more than 600 points higher than its opponent, and wins with a score that is more than twice the losing score plus one, the game is ignored for ratings purposes. However, this is only done if the winning team has at least N other results that are not being ignored<strong>, </strong>where N=5.</div>
+<div>&nbsp;</div>
+<div>USA Ultimate continues to look to improve its rankings algorithm through consultation with volunteers on the Algorithm Taskforce. &nbsp;The review process is ongoing as we look to enhance the level of competition and goals of USA Ultimate. Any additional changes/alterations to the Algorithm will be communicated as they occur.</div>
+</div>
+<div>&nbsp;</div>
+<div><em style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; color: inherit; background-color: transparent;">Below is&nbsp;a description of a change to the rankings algorithm used in 2013:</em></div>
+<div>&nbsp;</div>
+<div style="margin-left: 40px;"><span style="font-family: Arial;"><em style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; color: inherit; background-color: transparent;">The modification to the algorithm removes the possibility that a team rated more than 600 points higher than its opponent will drop in rating when beating that team by a large enough point differential. The game is preserved to serve as a connection between teams but does not impact the actual rating of either of the respective teams involved. USA Ultimate continues to look to improve its rankings algorithm through consultation with Rodney Jacobson, Sholom Simon and other volunteers on the Algorithm Taskforce.</em></span></div>
+<hr />
+<div>&nbsp;</div>
+<table width="940" border="0" cellspacing="0" cellpadding="0">
+    <tbody>
+        <tr>
+            <td width="40" style="text-align: center;">&nbsp;</td>
+            <td width="450" style="text-align: center;"><span style="font-family: Verdana, Helvetica, sans-serif; font-size: 17px; line-height: 22.09375px; text-align: center;">College Rankings: 1987-2015</span></td>
+            <td width="40">&nbsp;</td>
+            <td width="450" style="text-align: center;"><span style="font-family: Verdana, Helvetica, sans-serif; font-size: 17px; line-height: 22.09375px; text-align: center;">Club Rankings: 2012-2015</span></td>
+        </tr>
+        <tr>
+            <td>&nbsp;</td>
+            <td>
+            <div>&nbsp;</div>
+            <table width="450" border="0" style="font-size: 11px; margin: 0px; padding: 0px; outline: 0px; font-family: Verdana, Helvetica, sans-serif;" cellspacing="0" cellpadding="0">
+                <tbody style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td width="75" style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><strong>2010s</strong></td>
+                        <td width="10" style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><strong>2000s</strong></td>
+                        <td width="10" style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><strong>1990s</strong></td>
+                        <td width="10" style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><strong>1980s</strong></td>
+                        <td width="75" style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/2009_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2009</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/1999_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1999</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/1989_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1989</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2008_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2008</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/1998_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1998</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2007_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2007</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/1998_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1997</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/1987_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1987</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2006_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2006</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/1996_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1996</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/2015_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2015</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2005_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2005</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/1995_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1995</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/2014_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2014</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2004_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2004</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/1994_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1994</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/2013_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2013</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2003_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2003</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/1993_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1993</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/2012_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2012</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2002_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2002</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/1992_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1992</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2011_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2011</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2001_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2001</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/1991_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1991</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2010_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2010</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/2000_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">2000</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><span style="vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;"><a href="https://www.usaultimate.org/archives/1990_college.aspx#rankings" style="color: rgb(182, 5, 57); vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px; font-style: inherit; background-color: transparent;">1990</a></span></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                </tbody>
+            </table>
+            </td>
+            <td>&nbsp;</td>
+            <td valign="top">
+            <div>&nbsp;</div>
+            <table width="450" border="0" style="font-size: 11px; margin: 0px; padding: 0px; outline: 0px; font-family: Verdana, Helvetica, sans-serif;" cellspacing="0" cellpadding="0">
+                <tbody style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td width="75" style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><strong>2010s</strong></td>
+                        <td width="10" style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td width="10" style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td width="10" style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td width="75" style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/2015_club.aspx#rankings" style="color: rgb(182, 5, 57); font-family: Verdana, Helvetica, sans-serif; font-style: inherit; background-color: transparent; vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;">2015</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/2014_club.aspx#rankings" style="color: rgb(182, 5, 57); font-family: Verdana, Helvetica, sans-serif; font-style: inherit; background-color: transparent; vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;">2014</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/2013_club.aspx#rankings" style="color: rgb(182, 5, 57); font-family: Verdana, Helvetica, sans-serif; font-style: inherit; background-color: transparent; vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;">2013</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;"><a href="https://www.usaultimate.org/archives/2012_club.aspx#rankings" style="color: rgb(182, 5, 57); font-family: Verdana, Helvetica, sans-serif; font-style: inherit; background-color: transparent; vertical-align: baseline; margin: 0px; padding: 0px; outline: 0px;">2012</a></td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                    <tr style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                        <td style="margin: 0px; padding: 0px; outline: 0px; font-style: inherit; color: inherit;">&nbsp;</td>
+                    </tr>
+                </tbody>
+            </table>
+            </td>
+        </tr>
+    </tbody>
+</table>
+<div>&nbsp;</div>
+<div>&nbsp;</div></div>
+
+
+<br />
+
+			</div>
+		</div>
+	</div>
+	<div id="footer">
+		<div class="footer">
+			
+
+<div class="footer_info clearfix">
+	&copy; 2026 usaultimate.org All Rights Reserved.
+	<ul class="footer_links clearfix">
+		<li><a href="http://www.usaultimate.org/privacy_policy.aspx">Privacy Policy</a></li>
+		<li>|</li>
+		<li><a href="http://www.usaultimate.org/site_map.aspx">Site Map</a></li>
+		<li>|</li>
+		<li><a href="http://www.usaultimate.org/about/contacts/">Contact Us</a></li>
+	</ul>
+</div>
+
+<div class="vcard">
+	<a class="fn org url" href="http://www.usaultimate.org">USA Ultimate</a>
+	<div class="adr">
+		<div><span class="street-address">3630 Sinton Road</span> • <span class="extended-address">Suite 103</span></div> 
+		<span class="locality">Colorado Springs</span>,  
+		<abbr class="region" title="Colorado">CO</abbr>
+		<span class="postal-code">80907</span>
+		<div class="country-name">USA</div>
+	</div>
+	<div class="tel">719.219.8322 <span class="type">Work</span></div>
+</div>
+
+		</div>
+	</div>
+	
+	
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="3989C74E" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="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" />
+</div><input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="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" /></form>  
+</body>
+</html>
