@@ -151,7 +151,7 @@ class TeamRepositoryFirebase implements TeamRepository {
   Future<Result<void>> deleteTeam(Team team) => guard(() async {
     final ref = _teams.doc(team.id);
     // Firestore doesn't cascade deletes; clear subcollections first.
-    for (final sub in ['roster', 'plays']) {
+    for (final sub in ['roster', 'plays', 'events']) {
       final docs = await ref.collection(sub).get();
       final batch = _db.batch();
       for (final d in docs.docs) {

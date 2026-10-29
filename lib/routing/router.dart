@@ -20,6 +20,10 @@ import '../ui/rankings/view_models/rankings_viewmodel.dart';
 import '../ui/rankings/view_models/usau_team_viewmodel.dart';
 import '../ui/rankings/widgets/rankings_screen.dart';
 import '../ui/rankings/widgets/usau_team_screen.dart';
+import '../ui/schedule/view_models/event_detail_viewmodel.dart';
+import '../ui/schedule/view_models/event_editor_viewmodel.dart';
+import '../ui/schedule/widgets/event_detail_screen.dart';
+import '../ui/schedule/widgets/event_editor_screen.dart';
 import '../ui/teams/view_models/create_team_viewmodel.dart';
 import '../ui/teams/view_models/team_detail_viewmodel.dart';
 import '../ui/teams/view_models/teams_viewmodel.dart';
@@ -110,6 +114,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                         teamId: teamId,
                         teamRepository: c.read(),
                         playRepository: c.read(),
+                        eventRepository: c.read(),
                         authRepository: c.read(),
                       ),
                       builder: (_, vm) => TeamDetailScreen(viewModel: vm),
@@ -134,6 +139,67 @@ GoRouter router(AuthRepository auth) => GoRouter(
                           builder: (_, vm) => PlayEditorScreen(viewModel: vm),
                         );
                       },
+                    ),
+                    GoRoute(
+                      path: 'events/new',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        final date = state.uri.queryParameters['date'];
+                        return ViewModelHost(
+                          key: ValueKey('new-event-$teamId-$date'),
+                          create: (c) => EventEditorViewModel(
+                            teamId: teamId,
+                            eventId: null,
+                            initialDay: date == null
+                                ? null
+                                : DateTime.tryParse(date),
+                            eventRepository: c.read(),
+                            authRepository: c.read(),
+                          ),
+                          builder: (_, vm) => EventEditorScreen(viewModel: vm),
+                        );
+                      },
+                    ),
+                    GoRoute(
+                      path: 'events/:eventId',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        final eventId = state.pathParameters['eventId']!;
+                        return ViewModelHost(
+                          key: ValueKey('event-$teamId-$eventId'),
+                          create: (c) => EventDetailViewModel(
+                            teamId: teamId,
+                            eventId: eventId,
+                            eventRepository: c.read(),
+                            teamRepository: c.read(),
+                            authRepository: c.read(),
+                          ),
+                          builder: (_, vm) => EventDetailScreen(viewModel: vm),
+                        );
+                      },
+                      routes: [
+                        GoRoute(
+                          path: 'edit',
+                          parentNavigatorKey: _rootKey,
+                          builder: (_, state) {
+                            final teamId = state.pathParameters['teamId']!;
+                            final eventId = state.pathParameters['eventId']!;
+                            return ViewModelHost(
+                              key: ValueKey('edit-event-$teamId-$eventId'),
+                              create: (c) => EventEditorViewModel(
+                                teamId: teamId,
+                                eventId: eventId,
+                                eventRepository: c.read(),
+                                authRepository: c.read(),
+                              ),
+                              builder: (_, vm) =>
+                                  EventEditorScreen(viewModel: vm),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),

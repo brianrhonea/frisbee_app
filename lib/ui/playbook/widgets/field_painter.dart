@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../../domain/models/play.dart';
 import '../../core/themes/theme.dart';
+import '../view_models/play_editor_viewmodel.dart' show Trail;
 import 'field_geometry.dart';
 
 /// Paints an ultimate field with a play diagram on top.
@@ -15,6 +16,8 @@ class FieldPainter extends CustomPainter {
     this.selectedId,
     this.draft = const [],
     this.draftKind,
+    this.trails = const [],
+    this.ghosts = const [],
   });
 
   final Play play;
@@ -25,10 +28,37 @@ class FieldPainter extends CustomPainter {
   final List<FieldPoint> draft;
   final ArrowKind? draftKind;
 
+  /// Movement paths of the current animation step.
+  final List<Trail> trails;
+
+  /// Faded elements marking where movers started the step.
+  final List<PlayElement> ghosts;
+
   @override
   void paint(Canvas canvas, Size size) {
     final g = FieldGeometry(size, horizontal: horizontal);
     _paintField(canvas, g);
+    if (ghosts.isNotEmpty) {
+      canvas.saveLayer(
+        Offset.zero & size,
+        Paint()..color = const Color.fromRGBO(0, 0, 0, 0.35),
+      );
+      for (final e in ghosts) {
+        _paintElement(canvas, g, e, selected: false);
+      }
+      canvas.restore();
+    }
+    for (final t in trails) {
+      if (t.points.length < 2) continue;
+      _paintArrow(
+        canvas,
+        g,
+        t.kind == ElementKind.disc ? ArrowKind.throw_ : ArrowKind.cut,
+        t.points,
+        selected: false,
+        color: _trailColor(t.kind),
+      );
+    }
     for (final a in play.arrows) {
       _paintArrow(canvas, g, a.kind, a.points, selected: a.id == selectedId);
     }
@@ -79,17 +109,23 @@ class FieldPainter extends CustomPainter {
     g.toCanvas(FieldPoint(1, y1)),
   );
 
+  static Color _trailColor(ElementKind kind) => switch (kind) {
+    ElementKind.offense => const Color(0xFF90CAF9),
+    ElementKind.defense => const Color(0xFFEF9A9A),
+    ElementKind.disc => FieldColors.throwLine,
+    ElementKind.cone => FieldColors.cone,
+  };
+
   void _paintArrow(
     Canvas canvas,
     FieldGeometry g,
     ArrowKind kind,
     List<FieldPoint> points, {
     required bool selected,
+    Color? color,
   }) {
     final pts = points.map(g.toCanvas).toList();
-    final color = kind == ArrowKind.cut
-        ? FieldColors.cut
-        : FieldColors.throwLine;
+    color ??= kind == ArrowKind.cut ? FieldColors.cut : FieldColors.throwLine;
     final width = math.max(2.0, g.shortSide * 0.008);
 
     final path = Path()..moveTo(pts.first.dx, pts.first.dy);
@@ -240,5 +276,7 @@ class FieldPainter extends CustomPainter {
       old.horizontal != horizontal ||
       old.selectedId != selectedId ||
       old.draft != draft ||
-      old.draftKind != draftKind;
+      old.draftKind != draftKind ||
+      old.trails != trails ||
+      old.ghosts != ghosts;
 }

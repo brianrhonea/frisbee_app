@@ -3,6 +3,8 @@ import 'package:provider/single_child_widget.dart';
 
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/auth/auth_repository_firebase.dart';
+import '../data/repositories/event/event_repository.dart';
+import '../data/repositories/event/event_repository_firebase.dart';
 import '../data/repositories/playbook/play_repository.dart';
 import '../data/repositories/playbook/play_repository_firebase.dart';
 import '../data/repositories/ranking/ranking_repository.dart';
@@ -25,6 +27,7 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<TeamRepository>(create: (_) => TeamRepositoryFirebase()),
   Provider<PlayRepository>(create: (_) => PlayRepositoryFirebase()),
+  Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),
   // USA Ultimate data is scraped by the app and held in memory until the
   // Cloud Functions in functions/src/usau are deployed. To switch back, use
   // TournamentRepositoryFirebase and RankingRepositoryFirebase here.

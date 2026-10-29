@@ -1,28 +1,35 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart' show DateUtils;
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/playbook/play_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../domain/models/play.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
+import '../../../domain/models/team_event.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
 typedef RoleChange = ({String uid, TeamRole role});
 
-/// Backs the team detail screen and its Roster / Members / Playbook tabs.
+/// Backs the team detail screen and its Schedule / Roster / Playbook /
+/// Members tabs.
 class TeamDetailViewModel extends ChangeNotifier {
   TeamDetailViewModel({
     required this.teamId,
     required TeamRepository teamRepository,
     required PlayRepository playRepository,
+    required EventRepository eventRepository,
     required AuthRepository authRepository,
+    DateTime Function()? clock,
   }) : _teams = teamRepository,
        _plays = playRepository,
-       _auth = authRepository {
+       _auth = authRepository,
+       _clock = clock ?? DateTime.now {
     updateTeam = Command1<void, Team>(_teams.updateTeam);
     savePlayer = Command1<void, RosterPlayer>(
       (p) => _teams.savePlayer(teamId, p),
@@ -55,6 +62,10 @@ class TeamDetailViewModel extends ChangeNotifier {
         _playList = p;
         notifyListeners();
       }, onError: _onError),
+      eventRepository.watchEvents(teamId).listen((e) {
+        _events = e;
+        notifyListeners();
+      }, onError: _onError),
     ];
   }
 
@@ -62,6 +73,7 @@ class TeamDetailViewModel extends ChangeNotifier {
   final TeamRepository _teams;
   final PlayRepository _plays;
   final AuthRepository _auth;
+  final DateTime Function() _clock;
   late final List<StreamSubscription<Object?>> _subs;
 
   Team? _team;
@@ -77,6 +89,29 @@ class TeamDetailViewModel extends ChangeNotifier {
 
   List<Play> _playList = const [];
   List<Play> get plays => _playList;
+
+  List<TeamEvent> _events = const [];
+
+  /// All events, sorted by start time.
+  List<TeamEvent> get events => _events;
+
+  /// Events that haven't finished yet, soonest first.
+  List<TeamEvent> get upcomingEvents {
+    final now = _clock();
+    return [
+      for (final e in _events)
+        if (!(e.endsAt ?? e.startsAt.add(const Duration(hours: 2))).isBefore(
+          now,
+        ))
+          e,
+    ];
+  }
+
+  /// Events starting on the calendar day of [day].
+  List<TeamEvent> eventsOn(DateTime day) => [
+    for (final e in _events)
+      if (DateUtils.isSameDay(e.startsAt, day)) e,
+  ];
 
   Object? _error;
   Object? get error => _error;
