@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../utils/command.dart';
+import '../../core/ui/brand.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -155,6 +156,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       vm.deleteAccount.execute();
                     }
                   },
+                ),
+                const SizedBox(height: 24),
+                Center(
+                  child: Text(
+                    '$appName v$appVersion',
+                    style: theme.textTheme.bodySmall,
+                  ),
                 ),
               ],
             ),

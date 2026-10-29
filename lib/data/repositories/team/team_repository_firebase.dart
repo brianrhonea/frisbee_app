@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:logging/logging.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/roster_player.dart';
@@ -17,7 +19,11 @@ class InviteCodeNotFoundException implements Exception {
 }
 
 /// Team data lives in `teams/{teamId}` with `roster` and `plays`
-/// subcollections. `inviteCodes/{code}` maps a code to its team.
+/// subcollections. Each roster entry's admin-only status (paid, on USA
+/// Ultimate) is in `rosterStatus/{playerId}`, which players can't read.
+/// The invite code is in `private/invite` (admins only) and
+/// `inviteCodes/{code}` maps it back to the team; joiners prove they know
+/// it via `joins/{uid}`.
 /// All writes are validated by `firestore.rules`.
 class TeamRepositoryFirebase implements TeamRepository {
   TeamRepositoryFirebase({FirebaseFirestore? firestore, Random? random})
@@ -26,6 +32,11 @@ class TeamRepositoryFirebase implements TeamRepository {
 
   final FirebaseFirestore _db;
   final Random _random;
+
+  static final _log = Logger('TeamRepository');
+
+  /// Teams whose legacy roster status is being moved, so it runs once.
+  final _migrating = <String>{};
 
   // No 0/O/1/I to keep codes easy to read aloud.
   static const _codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -39,6 +50,18 @@ class TeamRepositoryFirebase implements TeamRepository {
 
   CollectionReference<Map<String, dynamic>> _roster(String teamId) =>
       _teams.doc(teamId).collection('roster');
+
+  CollectionReference<Map<String, dynamic>> _status(String teamId) =>
+      _teams.doc(teamId).collection('rosterStatus');
+
+  DocumentReference<Map<String, dynamic>> _invite(String teamId) =>
+      _teams.doc(teamId).collection('private').doc('invite');
+
+  DocumentReference<Map<String, dynamic>> _join(String teamId, String uid) =>
+      _teams.doc(teamId).collection('joins').doc(uid);
+
+  /// Older roster entries kept paid/onUsau on the entry itself.
+  static const _legacyStatusKeys = ['onUsau', 'paid'];
 
   String _newCode() => String.fromCharCodes(
     List.generate(
@@ -85,9 +108,9 @@ class TeamRepositoryFirebase implements TeamRepository {
               'members': {owner.uid: TeamRole.owner.name},
               'memberIds': [owner.uid],
               'memberNames': {owner.uid: owner.label},
-              'inviteCode': code,
               'createdAt': FieldValue.serverTimestamp(),
             })
+            ..set(_invite(ref.id), {'code': code})
             ..set(_codes.doc(code), {'teamId': ref.id});
           try {
             await batch.commit();
@@ -106,14 +129,16 @@ class TeamRepositoryFirebase implements TeamRepository {
         final codeDoc = await _codes.doc(code).get();
         final teamId = codeDoc.data()?['teamId'] as String?;
         if (teamId == null) throw const InviteCodeNotFoundException();
-        // joinCode proves to the security rules that the caller knows the
-        // team's current invite code.
-        await _teams.doc(teamId).update({
-          'members.${user.uid}': TeamRole.player.name,
-          'memberNames.${user.uid}': user.label,
-          'memberIds': FieldValue.arrayUnion([user.uid]),
-          'joinCode': code,
-        });
+        // joins/{uid} proves to the security rules that the caller knows
+        // the team's current invite code, without putting it on the team.
+        await (_db.batch()
+              ..set(_join(teamId, user.uid), {'code': code})
+              ..update(_teams.doc(teamId), {
+                'members.${user.uid}': TeamRole.player.name,
+                'memberNames.${user.uid}': user.label,
+                'memberIds': FieldValue.arrayUnion([user.uid]),
+              }))
+            .commit();
         return teamId;
       });
 
@@ -122,12 +147,57 @@ class TeamRepositoryFirebase implements TeamRepository {
       guard(() => _teams.doc(team.id).update(team.toEditableMap()));
 
   @override
-  Future<Result<void>> regenerateInviteCode(Team team) => guard(() async {
+  Stream<String?> watchInviteCode(String teamId) =>
+      _invite(teamId).snapshots().asyncMap(
+        (d) async =>
+            d.data()?['code'] as String? ?? await _moveLegacyCode(teamId),
+      );
+
+  /// Older teams kept the code on the team doc, readable by every member.
+  /// Moves it to private/invite and clears it (and the old join proof).
+  /// Runs when an admin first watches the code.
+  Future<String?> _moveLegacyCode(String teamId) async {
+    final team = (await _teams.doc(teamId).get()).data() ?? const {};
+    final code = team['inviteCode'] as String?;
+    if (code == null) return null;
+    try {
+      await (_db.batch()
+            ..set(_invite(teamId), {'code': code})
+            ..update(_teams.doc(teamId), {
+              'inviteCode': FieldValue.delete(),
+              'joinCode': FieldValue.delete(),
+            }))
+          .commit();
+    } on FirebaseException catch (e) {
+      _log.warning('Invite code move failed', e);
+    }
+    return code;
+  }
+
+  /// The current code, from private/invite or an older team doc.
+  Future<String?> _currentCode(String teamId) async {
+    final invite = (await _invite(teamId).get()).data();
+    if (invite != null) return invite['code'] as String?;
+    return (await _teams.doc(teamId).get()).data()?['inviteCode'] as String?;
+  }
+
+  @override
+  Future<Result<void>> regenerateInviteCode(String teamId) => guard(() async {
+    final old = await _currentCode(teamId);
+    final legacy = (await _teams.doc(teamId).get()).data()?.containsKey(
+      'inviteCode',
+    );
     final code = _newCode();
     final batch = _db.batch()
-      ..update(_teams.doc(team.id), {'inviteCode': code})
-      ..set(_codes.doc(code), {'teamId': team.id});
-    if (team.inviteCode != null) batch.delete(_codes.doc(team.inviteCode));
+      ..set(_invite(teamId), {'code': code})
+      ..set(_codes.doc(code), {'teamId': teamId});
+    if (old != null) batch.delete(_codes.doc(old));
+    if (legacy ?? false) {
+      batch.update(_teams.doc(teamId), {
+        'inviteCode': FieldValue.delete(),
+        'joinCode': FieldValue.delete(),
+      });
+    }
     await batch.commit();
   });
 
@@ -177,13 +247,18 @@ class TeamRepositoryFirebase implements TeamRepository {
   @override
   Future<Result<void>> deleteTeam(Team team) => guard(() async {
     final ref = _teams.doc(team.id);
+    final code = await _currentCode(team.id);
     // Firestore doesn't cascade deletes; clear subcollections first.
+    // private (the invite code) goes last: code deletes check the owner.
     for (final sub in [
       'roster',
+      'rosterStatus',
+      'joins',
       'plays',
       'events',
       'statsTournaments',
       'statsGames',
+      'private',
     ]) {
       final docs = await ref.collection(sub).get();
       final batch = _db.batch();
@@ -193,23 +268,118 @@ class TeamRepositoryFirebase implements TeamRepository {
       await batch.commit();
     }
     final batch = _db.batch();
-    if (team.inviteCode != null) batch.delete(_codes.doc(team.inviteCode));
+    if (code != null) batch.delete(_codes.doc(code));
     batch.delete(ref);
     await batch.commit();
   });
 
   @override
-  Stream<List<RosterPlayer>> watchRoster(String teamId) =>
-      _roster(teamId).snapshots().map(
-        (snap) =>
-            snap.docs
-                .map((d) => RosterPlayer.fromMap(d.id, plainData(d.data())))
-                .toList()
-              ..sort((a, b) {
-                final byNumber = (a.number ?? 1000).compareTo(b.number ?? 1000);
-                return byNumber != 0 ? byNumber : a.name.compareTo(b.name);
-              }),
+  Stream<List<RosterPlayer>> watchRoster(
+    String teamId, {
+    bool withStatus = false,
+  }) {
+    final roster = _roster(teamId).snapshots();
+    if (!withStatus) {
+      return roster.map(
+        (snap) => _sorted([
+          for (final d in snap.docs)
+            RosterPlayer.fromMap(d.id, plainData(d.data())),
+        ]),
       );
+    }
+    return _combineLatest(roster, _status(teamId).snapshots(), (r, s) {
+      final status = {for (final d in s.docs) d.id: plainData(d.data())};
+      _moveLegacyStatus(teamId, r.docs, status.keys.toSet());
+      return _sorted([
+        for (final d in r.docs)
+          RosterPlayer.fromMap(
+            d.id,
+            plainData(d.data()),
+            status: status[d.id] ?? _legacyStatus(d.data()),
+          ),
+      ]);
+    });
+  }
+
+  static List<RosterPlayer> _sorted(List<RosterPlayer> players) =>
+      players..sort((a, b) {
+        final byNumber = (a.number ?? 1000).compareTo(b.number ?? 1000);
+        return byNumber != 0 ? byNumber : a.name.compareTo(b.name);
+      });
+
+  static Map<String, dynamic>? _legacyStatus(Map<String, dynamic> data) =>
+      _legacyStatusKeys.any(data.containsKey)
+      ? {for (final k in _legacyStatusKeys) k: data[k]}
+      : null;
+
+  /// Moves status still stored on roster entries (readable by every member)
+  /// into rosterStatus, then strips it from the entry. Runs when an admin
+  /// views the roster, since only admins may write either collection.
+  void _moveLegacyStatus(
+    String teamId,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> roster,
+    Set<String> hasStatus,
+  ) {
+    final legacy = [
+      for (final d in roster)
+        if (_legacyStatus(d.data()) != null) d,
+    ];
+    if (legacy.isEmpty || !_migrating.add(teamId)) return;
+    final batch = _db.batch();
+    for (final d in legacy) {
+      if (!hasStatus.contains(d.id)) {
+        batch.set(_status(teamId).doc(d.id), {
+          'onUsau': d.data()['onUsau'] as bool?,
+          'paid': d.data()['paid'] as bool? ?? false,
+        });
+      }
+      batch.update(d.reference, {
+        for (final k in _legacyStatusKeys) k: FieldValue.delete(),
+      });
+    }
+    batch
+        .commit()
+        .catchError((Object e) => _log.warning('Roster status move failed', e))
+        .whenComplete(() => _migrating.remove(teamId));
+  }
+
+  /// Emits [combine] of the latest value of each stream once both have one.
+  static Stream<T> _combineLatest<A, B, T>(
+    Stream<A> a,
+    Stream<B> b,
+    T Function(A, B) combine,
+  ) {
+    late final StreamController<T> controller;
+    StreamSubscription<A>? subA;
+    StreamSubscription<B>? subB;
+    late A lastA;
+    late B lastB;
+    var hasA = false;
+    var hasB = false;
+    void emit() {
+      if (hasA && hasB) controller.add(combine(lastA, lastB));
+    }
+
+    controller = StreamController<T>(
+      onListen: () {
+        subA = a.listen((v) {
+          lastA = v;
+          hasA = true;
+          emit();
+        }, onError: controller.addError);
+        subB = b.listen((v) {
+          lastB = v;
+          hasB = true;
+          emit();
+        }, onError: controller.addError);
+      },
+      onCancel: () => Future.wait([
+        if (subA != null) subA!.cancel(),
+        if (subB != null) subB!.cancel(),
+      ]),
+    );
+    return controller.stream;
+  }
 
   @override
   Future<Result<void>> linkUsauTeam(
@@ -236,7 +406,10 @@ class TeamRepositoryFirebase implements TeamRepository {
         'usauSyncedAt': FieldValue.serverTimestamp(),
       });
     for (final p in players) {
-      batch.set(p.id.isEmpty ? col.doc() : col.doc(p.id), p.toMap());
+      final ref = p.id.isEmpty ? col.doc() : col.doc(p.id);
+      batch
+        ..set(ref, p.toMap())
+        ..set(_status(teamId).doc(ref.id), p.toStatusMap());
     }
     await batch.commit();
   });
@@ -246,10 +419,18 @@ class TeamRepositoryFirebase implements TeamRepository {
       guard(() async {
         final col = _roster(teamId);
         final ref = player.id.isEmpty ? col.doc() : col.doc(player.id);
-        await ref.set(player.toMap());
+        await (_db.batch()
+              ..set(ref, player.toMap())
+              ..set(_status(teamId).doc(ref.id), player.toStatusMap()))
+            .commit();
       });
 
   @override
-  Future<Result<void>> deletePlayer(String teamId, String playerId) =>
-      guard(() => _roster(teamId).doc(playerId).delete());
+  Future<Result<void>> deletePlayer(String teamId, String playerId) => guard(
+    () =>
+        (_db.batch()
+              ..delete(_roster(teamId).doc(playerId))
+              ..delete(_status(teamId).doc(playerId)))
+            .commit(),
+  );
 }

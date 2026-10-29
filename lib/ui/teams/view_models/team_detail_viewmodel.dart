@@ -63,10 +63,8 @@ class TeamDetailViewModel extends ChangeNotifier {
       _teams.watchTeam(teamId).listen((t) {
         _team = t;
         _teamLoaded = true;
-        notifyListeners();
-      }, onError: _onError),
-      _teams.watchRoster(teamId).listen((r) {
-        _roster = r;
+        _watchRoster();
+        _watchInviteCode();
         notifyListeners();
       }, onError: _onError),
       _plays.watchPlays(teamId).listen((p) {
@@ -86,6 +84,43 @@ class TeamDetailViewModel extends ChangeNotifier {
   final AuthRepository _auth;
   final DateTime Function() _clock;
   late final List<StreamSubscription<Object?>> _subs;
+  StreamSubscription<List<RosterPlayer>>? _rosterSub;
+  StreamSubscription<String?>? _inviteSub;
+
+  String? _inviteCode;
+
+  /// Shown to owners, coaches and captains only; null for everyone else.
+  String? get inviteCode => _inviteCode;
+
+  /// Only admins may read the code, so watch it only while the role allows.
+  void _watchInviteCode() {
+    if (_team != null && canShareCode) {
+      _inviteSub ??= _teams.watchInviteCode(teamId).listen((c) {
+        _inviteCode = c;
+        notifyListeners();
+      }, onError: (Object _) => _inviteCode = null);
+    } else if (_inviteSub != null) {
+      _inviteSub?.cancel();
+      _inviteSub = null;
+      _inviteCode = null;
+    }
+  }
+
+  bool? _rosterWithStatus;
+
+  /// (Re)subscribes to the roster once the role is known, and when it
+  /// changes: only admins may read paid and USA Ultimate status.
+  void _watchRoster() {
+    if (_team == null) return;
+    final withStatus = canSeeRosterStatus;
+    if (_rosterSub != null && withStatus == _rosterWithStatus) return;
+    _rosterWithStatus = withStatus;
+    _rosterSub?.cancel();
+    _rosterSub = _teams.watchRoster(teamId, withStatus: withStatus).listen((r) {
+      _roster = r;
+      notifyListeners();
+    }, onError: _onError);
+  }
 
   Team? _team;
   Team? get team => _team;
@@ -108,7 +143,7 @@ class TeamDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<RosterPlayer> get visibleRoster => _unconfirmedOnly
+  List<RosterPlayer> get visibleRoster => _unconfirmedOnly && canSeeRosterStatus
       ? [
           for (final p in _roster)
             if (!p.confirmed) p,
@@ -155,6 +190,10 @@ class TeamDetailViewModel extends ChangeNotifier {
   String get uid => _auth.currentUser?.uid ?? '';
   TeamRole? get myRole => _team?.roleOf(uid);
   bool get canEdit => myRole?.canEdit ?? false;
+
+  /// Paid marks, USA Ultimate status and sync are for team admins; players
+  /// see only names, positions and numbers.
+  bool get canSeeRosterStatus => canEdit;
   bool get isOwner => myRole == TeamRole.owner;
   bool get canSetRoles => myRole?.canSetRoles ?? false;
   bool get canShareCode => myRole?.canShareCode ?? false;
@@ -198,11 +237,8 @@ class TeamDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Result<void>> _regenerateInviteCode() async {
-    final t = _team;
-    if (t == null) return Result.error(Exception('Team not loaded'));
-    return _teams.regenerateInviteCode(t);
-  }
+  Future<Result<void>> _regenerateInviteCode() =>
+      _teams.regenerateInviteCode(teamId);
 
   Future<Result<void>> _deleteTeam() async {
     final t = _team;
@@ -215,6 +251,8 @@ class TeamDetailViewModel extends ChangeNotifier {
     for (final s in _subs) {
       s.cancel();
     }
+    _rosterSub?.cancel();
+    _inviteSub?.cancel();
     super.dispose();
   }
 }

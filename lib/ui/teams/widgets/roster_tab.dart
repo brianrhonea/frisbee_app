@@ -38,8 +38,7 @@ class RosterTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final roster = viewModel.visibleRoster;
     final canEdit = viewModel.canEdit;
-    final team = viewModel.team!;
-    final showUsau = canEdit || team.usauUrl != null;
+    final showStatus = viewModel.canSeeRosterStatus;
     return Scaffold(
       floatingActionButton: canEdit
           ? FloatingActionButton.extended(
@@ -53,7 +52,7 @@ class RosterTab extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 96),
           children: [
-            if (showUsau) _UsauCard(viewModel: viewModel),
+            if (showStatus) _UsauCard(viewModel: viewModel),
             if (viewModel.roster.isEmpty)
               EmptyView(
                 icon: Icons.badge_outlined,
@@ -73,22 +72,26 @@ class RosterTab extends StatelessWidget {
               ListTile(
                 leading: CircleAvatar(child: Text(p.number?.toString() ?? '–')),
                 title: Text(p.name),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(p.position.label),
-                      if (p.onUsau != null) _UsauBadge(onUsau: p.onUsau!),
-                      _PaidBadge(
-                        paid: p.paid,
-                        onTap: canEdit ? () => viewModel.togglePaid(p) : null,
-                      ),
-                    ],
-                  ),
-                ),
+                subtitle: showStatus
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(p.position.label),
+                            if (p.onUsau != null) _UsauBadge(onUsau: p.onUsau!),
+                            _PaidBadge(
+                              paid: p.paid,
+                              onTap: canEdit
+                                  ? () => viewModel.togglePaid(p)
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      )
+                    : Text(p.position.label),
                 onTap: canEdit ? () => _edit(context, p) : null,
                 trailing: canEdit
                     ? IconButton(

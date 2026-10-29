@@ -15,6 +15,7 @@ import 'data/services/shared_preferences_service.dart';
 import 'firebase_options.dart';
 import 'routing/router.dart';
 import 'ui/core/themes/theme.dart';
+import 'ui/core/ui/brand.dart';
 
 /// Run with `--dart-define=USE_EMULATORS=true` to use local Firebase emulators.
 const _useEmulators = bool.fromEnvironment('USE_EMULATORS');
@@ -69,7 +70,7 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp.router(
-    title: 'Frisbee App',
+    title: appName,
     debugShowCheckedModeBanner: false,
     theme: AppTheme.light,
     darkTheme: AppTheme.dark,

@@ -6,6 +6,7 @@ abstract final class Routes {
   static const home = '/home';
   static const teams = '/teams';
   static const createTeam = '/teams/new';
+  static const searchUsauTeams = '/teams/search';
   static const schedule = '/schedule';
   static const tournaments = '/tournaments';
   static const rankings = '/rankings';
@@ -58,8 +59,16 @@ abstract final class Routes {
   static String usauRoster(String teamId) => '/teams/$teamId/usau-roster';
   static String tournament(String id) => '/tournaments/$id';
   static const usauTeamPath = '/rankings/team';
-  static String usauTeam(String url, {String name = ''}) => Uri(
-    path: usauTeamPath,
+  static String usauTeam(String url, {String name = ''}) =>
+      _usauTeam(usauTeamPath, url, name);
+
+  /// A USA Ultimate team page opened from Teams search, staying in the
+  /// Teams tab so back returns to the results.
+  static String searchedUsauTeam(String url, {String name = ''}) =>
+      _usauTeam('$searchUsauTeams/team', url, name);
+
+  static String _usauTeam(String path, String url, String name) => Uri(
+    path: path,
     queryParameters: {'url': url, if (name.isNotEmpty) 'name': name},
   ).toString();
 }

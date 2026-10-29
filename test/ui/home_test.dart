@@ -69,7 +69,6 @@ void main() {
     level: CompetitionLevel.club,
     ownerId: owner ?? testUser.uid,
     members: {owner ?? testUser.uid: TeamRole.owner},
-    inviteCode: 'CODE$id',
   );
 
   late FakeTeamRepository teams;

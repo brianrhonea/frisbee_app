@@ -94,6 +94,58 @@ void main() {
     expect(find.text('Casey Unsigned'), findsOneWidget);
   });
 
+  testWidgets('players see only names, positions and numbers', (tester) async {
+    teams.teams['t1'] = teams.teams['t1']!.copyWith(
+      members: {'boss': TeamRole.owner, testUser.uid: TeamRole.player},
+    );
+    teams.roster['t1'] = const [
+      RosterPlayer(
+        id: 'a',
+        name: 'Jordan Lee',
+        number: 7,
+        position: PlayerPosition.handler,
+        onUsau: true,
+        paid: true,
+      ),
+      RosterPlayer(id: 'b', name: 'Casey Unsigned', onUsau: false),
+    ];
+    final vm = TeamDetailViewModel(
+      teamId: 't1',
+      teamRepository: teams,
+      playRepository: FakePlayRepository(),
+      eventRepository: FakeEventRepository(),
+      authRepository: FakeAuthRepository(user: testUser),
+    );
+    await phone(
+      tester,
+      ListenableBuilder(
+        listenable: vm,
+        builder: (_, _) =>
+            vm.team == null ? const SizedBox() : RosterTab(viewModel: vm),
+      ),
+    );
+    expect(vm.canSeeRosterStatus, isFalse);
+    // The roster arrives without status, so it can't leak into the UI.
+    expect(vm.roster.every((p) => !p.paid && p.onUsau == null), isTrue);
+    expect(find.text('Jordan Lee'), findsOneWidget);
+    expect(find.text('Casey Unsigned'), findsOneWidget);
+    expect(find.text('7'), findsOneWidget);
+    expect(find.text('Handler'), findsOneWidget);
+    for (final hidden in [
+      'Paid',
+      'Unpaid',
+      'On USAU',
+      'Not on USAU',
+      'Sync',
+      'Ring of Fire',
+      'Unconfirmed only',
+      'Add player',
+    ]) {
+      expect(find.text(hidden), findsNothing, reason: hidden);
+    }
+    expect(find.textContaining('confirmed'), findsNothing);
+  });
+
   testWidgets('sync screen previews new, missing and applies', (tester) async {
     final vm = UsauRosterViewModel(
       teamId: 't1',

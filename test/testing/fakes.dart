@@ -93,6 +93,14 @@ class FakeTeamRepository implements TeamRepository {
   final _teamsController = StreamController<void>.broadcast();
   String? joinedCode;
 
+  /// teamId → invite code; unlisted teams use `CODE` plus the team id.
+  final codes = <String, String>{};
+
+  /// Teams whose invite code was watched, to check who may read it.
+  final inviteWatches = <String>[];
+
+  String _codeOf(String teamId) => codes[teamId] ?? 'CODE$teamId';
+
   void _emit() => _teamsController.add(null);
 
   @override
@@ -120,7 +128,6 @@ class FakeTeamRepository implements TeamRepository {
       city: team.city,
       ownerId: owner.uid,
       members: {owner.uid: TeamRole.owner},
-      inviteCode: 'CODE$id',
     );
     _emit();
     return Result.ok(id);
@@ -130,7 +137,7 @@ class FakeTeamRepository implements TeamRepository {
   Future<Result<String>> joinTeam(String inviteCode, AppUser user) async {
     joinedCode = inviteCode;
     final team = teams.values
-        .where((t) => t.inviteCode == inviteCode)
+        .where((t) => _codeOf(t.id) == inviteCode)
         .firstOrNull;
     if (team == null) return Result.error(Exception('No team'));
     teams[team.id] = Team(
@@ -139,7 +146,6 @@ class FakeTeamRepository implements TeamRepository {
       division: team.division,
       level: team.level,
       ownerId: team.ownerId,
-      inviteCode: team.inviteCode,
       members: {...team.members, user.uid: TeamRole.player},
     );
     _emit();
@@ -154,8 +160,18 @@ class FakeTeamRepository implements TeamRepository {
   }
 
   @override
-  Future<Result<void>> regenerateInviteCode(Team team) async =>
-      const Result.ok(null);
+  Stream<String?> watchInviteCode(String teamId) async* {
+    inviteWatches.add(teamId);
+    yield _codeOf(teamId);
+    yield* _teamsController.stream.map((_) => _codeOf(teamId));
+  }
+
+  @override
+  Future<Result<void>> regenerateInviteCode(String teamId) async {
+    codes[teamId] = 'NEW$teamId';
+    _emit();
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<void>> setMemberRole(
@@ -179,7 +195,6 @@ class FakeTeamRepository implements TeamRepository {
       level: t.level,
       city: t.city,
       ownerId: t.ownerId,
-      inviteCode: t.inviteCode,
       members: t.members,
       memberNames: t.memberNames,
       statKeepers: on
@@ -205,7 +220,6 @@ class FakeTeamRepository implements TeamRepository {
       level: t.level,
       city: t.city,
       ownerId: newOwnerUid,
-      inviteCode: t.inviteCode,
       members: {
         ...t.members,
         newOwnerUid: TeamRole.owner,
@@ -246,7 +260,6 @@ class FakeTeamRepository implements TeamRepository {
       level: t.level,
       city: t.city,
       ownerId: t.ownerId,
-      inviteCode: t.inviteCode,
       members: t.members,
       memberNames: t.memberNames,
       statKeepers: t.statKeepers,
@@ -267,8 +280,21 @@ class FakeTeamRepository implements TeamRepository {
   }
 
   @override
-  Stream<List<RosterPlayer>> watchRoster(String teamId) =>
-      Stream.value(roster[teamId] ?? const []);
+  Stream<List<RosterPlayer>> watchRoster(
+    String teamId, {
+    bool withStatus = false,
+  }) => Stream.value([
+    for (final p in roster[teamId] ?? const <RosterPlayer>[])
+      withStatus
+          ? p
+          : RosterPlayer(
+              id: p.id,
+              name: p.name,
+              number: p.number,
+              position: p.position,
+              userId: p.userId,
+            ),
+  ]);
 
   @override
   Future<Result<void>> savePlayer(String teamId, RosterPlayer player) async =>
@@ -332,7 +358,6 @@ Team teamWith(
   level: CompetitionLevel.club,
   ownerId: members.entries.firstWhere((e) => e.value == TeamRole.owner).key,
   members: members,
-  inviteCode: 'CODE$id',
 );
 
 class FakeRankingRepository implements RankingRepository {

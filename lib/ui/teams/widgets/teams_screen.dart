@@ -61,6 +61,11 @@ class _TeamsScreenState extends State<TeamsScreen> {
       appBar: AppBar(
         title: const Text('Teams'),
         actions: [
+          IconButton(
+            tooltip: 'Search USA Ultimate teams',
+            icon: const Icon(Icons.search),
+            onPressed: () => context.push(Routes.searchUsauTeams),
+          ),
           ListenableBuilder(
             listenable: vm.joinTeam,
             builder: (context, _) => TextButton.icon(

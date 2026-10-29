@@ -38,11 +38,13 @@ import '../ui/stats/widgets/tournament_screen.dart';
 import '../ui/teams/view_models/create_team_viewmodel.dart';
 import '../ui/teams/view_models/team_detail_viewmodel.dart';
 import '../ui/teams/view_models/teams_viewmodel.dart';
+import '../ui/teams/view_models/usau_team_search_viewmodel.dart';
 import '../ui/teams/widgets/create_team_screen.dart';
 import '../ui/teams/view_models/usau_roster_viewmodel.dart';
 import '../ui/teams/widgets/team_detail_screen.dart';
 import '../ui/teams/widgets/usau_roster_screen.dart';
 import '../ui/teams/widgets/teams_screen.dart';
+import '../ui/teams/widgets/usau_team_search_screen.dart';
 import '../ui/tournaments/view_models/tournaments_viewmodel.dart';
 import '../ui/tournaments/widgets/tournament_detail_screen.dart';
 import 'routes.dart';
@@ -259,6 +261,20 @@ GoRouter router(AuthRepository auth) => GoRouter(
                   ),
                 ),
                 GoRoute(
+                  path: 'search',
+                  builder: (_, _) => ViewModelHost(
+                    create: (c) =>
+                        UsauTeamSearchViewModel(rankingRepository: c.read()),
+                    builder: (_, vm) => UsauTeamSearchScreen(viewModel: vm),
+                  ),
+                  routes: [
+                    GoRoute(
+                      path: 'team',
+                      builder: (_, state) => _usauTeam(state),
+                    ),
+                  ],
+                ),
+                GoRoute(
                   path: ':teamId',
                   builder: (_, state) {
                     final teamId = state.pathParameters['teamId']!;
@@ -431,21 +447,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 builder: (_, vm) => RankingsScreen(viewModel: vm),
               ),
               routes: [
-                GoRoute(
-                  path: 'team',
-                  builder: (_, state) {
-                    final url = state.uri.queryParameters['url'] ?? '';
-                    return ViewModelHost(
-                      key: ValueKey('usau-team-$url'),
-                      create: (c) => UsauTeamViewModel(
-                        url: url,
-                        name: state.uri.queryParameters['name'] ?? '',
-                        usauTeamRepository: c.read(),
-                      ),
-                      builder: (_, vm) => UsauTeamScreen(viewModel: vm),
-                    );
-                  },
-                ),
+                GoRoute(path: 'team', builder: (_, state) => _usauTeam(state)),
               ],
             ),
           ],
@@ -480,4 +482,18 @@ String? authRedirect(AuthRepository auth, Uri uri) {
   }
   if (public || path == _splash) return from ?? Routes.home;
   return null;
+}
+
+/// A USA Ultimate team page, from Rankings or Teams search.
+Widget _usauTeam(GoRouterState state) {
+  final url = state.uri.queryParameters['url'] ?? '';
+  return ViewModelHost(
+    key: ValueKey('usau-team-$url'),
+    create: (c) => UsauTeamViewModel(
+      url: url,
+      name: state.uri.queryParameters['name'] ?? '',
+      usauTeamRepository: c.read(),
+    ),
+    builder: (_, vm) => UsauTeamScreen(viewModel: vm),
+  );
 }
