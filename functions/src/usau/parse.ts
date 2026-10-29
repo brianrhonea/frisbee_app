@@ -36,10 +36,10 @@ export interface RankingRecord {
   teamUrl: string;
 }
 
-const clean = (s: string | undefined): string =>
+export const clean = (s: string | undefined): string =>
   (s ?? "").replace(/\s+/g, " ").trim();
 
-const absolute = (href: string | undefined): string => {
+export const absolute = (href: string | undefined): string => {
   if (!href) return "";
   try {
     return new URL(href, USAU_BASE).toString();
@@ -201,19 +201,84 @@ const COLUMN_PATTERNS: [Column, RegExp][] = [
   ["region", /region|section|conference/i],
 ];
 
+/** The fields an ASP.NET WebForms postback sends, plus the form's action. */
+export interface PostBack {
+  action: string;
+  fields: Record<string, string>;
+}
+
+export interface RankingsPage {
+  entries: RankingRecord[];
+  /** The "Next" pager link's postback, or null on the last page. */
+  next: PostBack | null;
+}
+
+const POSTBACK_TARGET = /__doPostBack\(\s*['"]([^'"]+)['"]/;
+const SKIPPED_INPUTS = new Set(["submit", "button", "image", "reset", "file"]);
+
+/**
+ * Builds the form post that a `javascript:__doPostBack(...)` link inside
+ * `scope` whose text matches `linkText` would send.
+ */
+function postBack($: cheerio.CheerioAPI, scope: Element, linkText: RegExp): PostBack | null {
+  const link = $(scope)
+    .find("a[href*='__doPostBack']")
+    .filter((_, a) => linkText.test(clean($(a).text())))
+    .first();
+  return link.length > 0 ? postBackFor($, link[0]) : null;
+}
+
+/** Builds the form post that clicking the `__doPostBack` `link` would send. */
+export function postBackFor($: cheerio.CheerioAPI, linkEl: Element): PostBack | null {
+  const link = $(linkEl);
+  const target = POSTBACK_TARGET.exec(link.attr("href") ?? "");
+  const form = $("form").first();
+  if (!target || form.length === 0) return null;
+
+  const fields: Record<string, string> = {};
+  form.find("input").each((_, input) => {
+    const name = $(input).attr("name");
+    const type = ($(input).attr("type") ?? "text").toLowerCase();
+    if (!name || SKIPPED_INPUTS.has(type)) return;
+    if ((type === "checkbox" || type === "radio") && $(input).attr("checked") === undefined) return;
+    fields[name] = $(input).attr("value") ?? "";
+  });
+  form.find("select").each((_, select) => {
+    const name = $(select).attr("name");
+    if (!name) return;
+    const options = $(select).find("option");
+    const selected = options.filter("[selected]").first();
+    const option = selected.length > 0 ? selected : options.first();
+    if (option.length > 0) fields[name] = option.attr("value") ?? clean(option.text());
+  });
+  fields.__EVENTTARGET = target[1];
+  fields.__EVENTARGUMENT = "";
+  return { action: form.attr("action") ?? "", fields };
+}
+
 /**
  * Parses a team rankings page (team_rankings/?RankSet=...).
  *
  * The layout is matched by header names rather than positions so it keeps
  * working if columns are added or reordered. Rows without an explicit rank
- * column are ranked by order.
+ * column are ranked by order, starting after `rankOffset`.
  */
-export function parseRankings(html: string): RankingRecord[] {
+export function parseRankings(html: string, rankOffset = 0): RankingRecord[] {
+  return parseRankingsPage(html, rankOffset).entries;
+}
+
+/** Like `parseRankings`, plus the postback for the next page, if any. */
+export function parseRankingsPage(html: string, rankOffset = 0): RankingsPage {
   const $ = cheerio.load(html);
+  // Rows of `table` itself, not of tables nested in it (such as the pager).
+  const ownRows = (table: Element) =>
+    $(table)
+      .find("tr")
+      .filter((_, tr) => $(tr).closest("table")[0] === table);
 
   let best: { table: Element; columns: Map<Column, number> } | null = null;
   $("table").each((_, table) => {
-    const headerRow = $(table).find("tr").filter((_, tr) => $(tr).children("th").length > 0).first();
+    const headerRow = ownRows(table).filter((_, tr) => $(tr).children("th").length > 0).first();
     const columns = new Map<Column, number>();
     headerRow.children("th").each((i, th) => {
       const text = clean($(th).text());
@@ -228,16 +293,17 @@ export function parseRankings(html: string): RankingRecord[] {
       if (!best || columns.size > best.columns.size) best = { table, columns };
     }
   });
-  if (!best) return [];
+  if (!best) return { entries: [], next: null };
   const { table, columns } = best as { table: Element; columns: Map<Column, number> };
 
   const out: RankingRecord[] = [];
-  $(table)
-    .find("tr")
+  ownRows(table)
     .each((_, tr) => {
       const cells = $(tr).children("td");
       const teamIdx = columns.get("team")!;
       if (cells.length <= teamIdx) return;
+      // The pager row ("Rows: 1 - 20 of 80 ... 1 2 3 4") wraps a nested table.
+      if (cells.find("table").length > 0) return;
       const cell = (c: Column): string => {
         const i = columns.get(c);
         return i === undefined ? "" : clean(cells.eq(i).text());
@@ -255,7 +321,7 @@ export function parseRankings(html: string): RankingRecord[] {
       }
 
       out.push({
-        rank: toInt(cell("rank")) ?? out.length + 1,
+        rank: toInt(cell("rank")) ?? rankOffset + out.length + 1,
         teamName,
         rating: toFloat(cell("rating")),
         wins,
@@ -264,5 +330,5 @@ export function parseRankings(html: string): RankingRecord[] {
         teamUrl: absolute(teamCell.find("a").attr("href")),
       });
     });
-  return out;
+  return { entries: out, next: postBack($, table, /^next/i) };
 }

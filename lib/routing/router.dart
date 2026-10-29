@@ -17,7 +17,9 @@ import '../ui/playbook/widgets/play_editor_screen.dart';
 import '../ui/profile/view_models/profile_viewmodel.dart';
 import '../ui/profile/widgets/profile_screen.dart';
 import '../ui/rankings/view_models/rankings_viewmodel.dart';
+import '../ui/rankings/view_models/usau_team_viewmodel.dart';
 import '../ui/rankings/widgets/rankings_screen.dart';
+import '../ui/rankings/widgets/usau_team_screen.dart';
 import '../ui/teams/view_models/create_team_viewmodel.dart';
 import '../ui/teams/view_models/team_detail_viewmodel.dart';
 import '../ui/teams/view_models/teams_viewmodel.dart';
@@ -173,9 +175,29 @@ GoRouter router(AuthRepository auth) => GoRouter(
             GoRoute(
               path: Routes.rankings,
               builder: (_, _) => ViewModelHost(
-                create: (c) => RankingsViewModel(rankingRepository: c.read()),
+                create: (c) => RankingsViewModel(
+                  rankingRepository: c.read(),
+                  teamEloRepository: c.read(),
+                ),
                 builder: (_, vm) => RankingsScreen(viewModel: vm),
               ),
+              routes: [
+                GoRoute(
+                  path: 'team',
+                  builder: (_, state) {
+                    final url = state.uri.queryParameters['url'] ?? '';
+                    return ViewModelHost(
+                      key: ValueKey('usau-team-$url'),
+                      create: (c) => UsauTeamViewModel(
+                        url: url,
+                        name: state.uri.queryParameters['name'] ?? '',
+                        usauTeamRepository: c.read(),
+                      ),
+                      builder: (_, vm) => UsauTeamScreen(viewModel: vm),
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),

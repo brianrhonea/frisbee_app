@@ -2,24 +2,80 @@ import { Firestore, Timestamp } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 
 import {
+  RankingRecord,
   USAU_BASE,
   parseRankSets,
-  parseRankings,
+  parseRankingsPage,
   parseTournaments,
 } from "./parse";
 
 const USER_AGENT = "FrisbeeApp/1.0 (team management app; daily sync)";
-const REQUEST_DELAY_MS = 1500;
+export const REQUEST_DELAY_MS = 1500;
+/** Safety cap on pages per ranking list (20 teams each). */
+const MAX_RANKING_PAGES = 50;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function fetchHtml(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
+export async function fetchHtml(
+  url: string,
+  init: { form?: Record<string, string>; cookies?: Map<string, string> } = {},
+  fetchFn: typeof fetch = fetch,
+): Promise<string> {
+  const { form, cookies } = init;
+  const headers: Record<string, string> = { "User-Agent": USER_AGENT, Accept: "text/html" };
+  if (cookies && cookies.size > 0) {
+    headers.Cookie = [...cookies].map(([k, v]) => `${k}=${v}`).join("; ");
+  }
+  const res = await fetchFn(url, {
+    method: form ? "POST" : "GET",
+    headers,
+    body: form ? new URLSearchParams(form) : undefined,
     signal: AbortSignal.timeout(30_000),
   });
-  if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
+  if (!res.ok) throw new Error(`${form ? "POST" : "GET"} ${url} -> ${res.status}`);
+  if (cookies) {
+    // ASP.NET postbacks may depend on the session cookie.
+    for (const c of res.headers.getSetCookie()) {
+      const [pair] = c.split(";");
+      const eq = pair.indexOf("=");
+      if (eq > 0) cookies.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+    }
+  }
   return res.text();
+}
+
+/**
+ * Fetches every page of a rank set. The list is paged 20 teams at a time
+ * behind ASP.NET postbacks, so each "Next" link is replayed as a form post
+ * carrying the previous page's view state.
+ */
+export async function fetchAllRankings(
+  url: string,
+  { fetchFn = fetch, delayMs = REQUEST_DELAY_MS }: { fetchFn?: typeof fetch; delayMs?: number } = {},
+): Promise<RankingRecord[]> {
+  const cookies = new Map<string, string>();
+  const entries: RankingRecord[] = [];
+  const seen = new Set<string>();
+  let pageUrl = url;
+  let page = parseRankingsPage(await fetchHtml(pageUrl, { cookies }, fetchFn));
+  for (let n = 1; ; n++) {
+    const fresh = page.entries.filter((e) => {
+      const key = `${e.rank}|${e.teamName}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    entries.push(...fresh);
+    // Stop if the server ignored the postback and re-sent the same page.
+    if (!page.next || fresh.length === 0 || n >= MAX_RANKING_PAGES) break;
+    pageUrl = new URL(page.next.action, pageUrl).toString();
+    await sleep(delayMs);
+    page = parseRankingsPage(
+      await fetchHtml(pageUrl, { form: page.next.fields, cookies }, fetchFn),
+      entries.length,
+    );
+  }
+  return entries;
 }
 
 const ts = (d: Date | null) => (d ? Timestamp.fromDate(d) : null);
@@ -65,7 +121,7 @@ export async function syncRankings(db: Firestore): Promise<number> {
   for (const set of sets) {
     await sleep(REQUEST_DELAY_MS);
     try {
-      const entries = parseRankings(await fetchHtml(set.url));
+      const entries = await fetchAllRankings(set.url);
       if (entries.length === 0) {
         logger.warn(`No ranking rows parsed for ${set.key}`, { url: set.url });
         continue;

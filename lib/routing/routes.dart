@@ -13,4 +13,9 @@ abstract final class Routes {
   static String play(String teamId, String playId) =>
       '/teams/$teamId/plays/$playId';
   static String tournament(String id) => '/tournaments/$id';
+  static const usauTeamPath = '/rankings/team';
+  static String usauTeam(String url, {String name = ''}) => Uri(
+    path: usauTeamPath,
+    queryParameters: {'url': url, if (name.isNotEmpty) 'name': name},
+  ).toString();
 }

@@ -1,0 +1,71 @@
+# Codemagic CI: builds the iOS app on a cloud Mac and uploads it to
+# TestFlight. Setup steps are in docs/ios-release.md.
+#
+# Secrets never live in this file. They come from the Codemagic
+# environment group `frisbee_secrets` (base64-encoded, marked Secure):
+#   SECRETS_LOCAL_JSON         base64 of secrets.local.json
+#   GOOGLE_SERVICE_INFO_PLIST  base64 of ios/Runner/GoogleService-Info.plist
+# and from the App Store Connect API key integration named below.
+
+workflows:
+  ios-release:
+    name: iOS release (TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      # Codemagic > Team settings > Integrations > Developer Portal.
+      app_store_connect: Frisbee App Store Connect
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - frisbee_secrets
+      ios_signing:
+        # Codemagic creates/fetches the distribution certificate and
+        # App Store provisioning profile through the API key.
+        distribution_type: app_store
+        bundle_identifier: com.brianrhonea.frisbeeApp
+      vars:
+        # The app's numeric Apple ID from App Store Connect > App Information.
+        APP_STORE_APPLE_ID: "0000000000"
+    # Manual runs only, so pushes don't use build minutes.
+    scripts:
+      - name: Write secrets files
+        script: |
+          set -euo pipefail
+          echo "$SECRETS_LOCAL_JSON" | base64 --decode > secrets.local.json
+          echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
+      - name: Google Sign-In config (ios/Flutter/Secrets.xcconfig)
+        script: |
+          set -euo pipefail
+          PLIST=ios/Runner/GoogleService-Info.plist
+          {
+            echo "GOOGLE_REVERSED_CLIENT_ID = $(/usr/libexec/PlistBuddy -c 'Print :REVERSED_CLIENT_ID' "$PLIST")"
+            echo "GOOGLE_IOS_CLIENT_ID = $(/usr/libexec/PlistBuddy -c 'Print :CLIENT_ID' "$PLIST")"
+          } > ios/Flutter/Secrets.xcconfig
+      - name: Code signing
+        script: xcode-project use-profiles
+      - name: Flutter packages
+        script: flutter pub get
+      - name: Checks
+        script: |
+          flutter analyze
+          flutter test
+      - name: Build IPA
+        script: |
+          set -euo pipefail
+          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          TESTFLIGHT=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          BUILD_NUMBER=$(( (LATEST > TESTFLIGHT ? LATEST : TESTFLIGHT) + 1 ))
+          flutter build ipa --release \
+            --dart-define-from-file=secrets.local.json \
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

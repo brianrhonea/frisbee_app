@@ -15,6 +15,12 @@ gitignored local files and must never be committed or pushed to GitHub.
   `android/app/google-services.json`, `ios/Runner/GoogleService-Info.plist`,
   `macos/Runner/GoogleService-Info.plist`. Get them from the Firebase console
   or `flutterfire configure`.
+- iOS Google Sign-In IDs live in `ios/Flutter/Secrets.xcconfig` (gitignored;
+  template `ios/Flutter/Secrets.example.xcconfig`), filled from
+  `GoogleService-Info.plist`'s `REVERSED_CLIENT_ID` and `CLIENT_ID`.
+- Codemagic (`codemagic.yaml`) gets every secret from its `frisbee_secrets`
+  environment group and App Store Connect API key integration. Never put
+  secrets, `.p8` keys, certificates or provisioning profiles in the repo.
 - Never hardcode a secret in source, tests, docs, or commit messages. Never
   paste one into a published artifact or external service.
 - `flutterfire configure` rewrites `lib/firebase_options.dart` with hardcoded
@@ -37,6 +43,9 @@ flutter build web --dart-define-from-file=secrets.local.json
 ```
 
 VS Code launch configs in `.vscode/launch.json` already do this.
+
+iOS App Store builds run on Codemagic (no Mac needed); see
+`docs/ios-release.md`.
 
 ## Architecture
 

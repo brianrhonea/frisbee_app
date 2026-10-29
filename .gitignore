@@ -58,7 +58,12 @@ secrets.local.json
 .env.*
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+ios/Flutter/Secrets.xcconfig
 macos/Runner/GoogleService-Info.plist
+# App Store Connect API keys / signing material
+*.p8
+*.p12
+*.mobileprovision
 lib/firebase_options.generated.dart
 
 # Android Gradle build output

@@ -3,15 +3,21 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../utils/platform_support.dart';
+import 'google_desktop_oauth.dart';
 
 /// Thin wrapper around Firebase Auth that hides per-platform sign-in flows.
 class AuthService {
-  AuthService({FirebaseAuth? auth, GoogleSignIn? googleSignIn})
-    : _auth = auth ?? FirebaseAuth.instance,
-      _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
+  AuthService({
+    FirebaseAuth? auth,
+    GoogleSignIn? googleSignIn,
+    GoogleDesktopOAuth? googleDesktopOAuth,
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
+       _googleDesktopOAuth = googleDesktopOAuth ?? GoogleDesktopOAuth();
 
   final FirebaseAuth _auth;
   final GoogleSignIn _googleSignIn;
+  final GoogleDesktopOAuth _googleDesktopOAuth;
   bool _googleInitialized = false;
 
   Stream<User?> userChanges() => _auth.userChanges();
@@ -42,6 +48,16 @@ class AuthService {
   Future<void> signInWithGoogle() async {
     if (kIsWeb) {
       await _auth.signInWithPopup(GoogleAuthProvider());
+      return;
+    }
+    if (PlatformSupport.desktopGoogleSignIn) {
+      final tokens = await _googleDesktopOAuth.signIn();
+      await _auth.signInWithCredential(
+        GoogleAuthProvider.credential(
+          idToken: tokens.idToken,
+          accessToken: tokens.accessToken,
+        ),
+      );
       return;
     }
     if (!PlatformSupport.nativeGoogleSignIn) {
