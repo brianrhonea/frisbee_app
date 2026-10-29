@@ -8,6 +8,8 @@ extension EventTypeStyle on EventType {
     EventType.practice => Icons.sports_outlined,
     EventType.game => Icons.sports_score,
     EventType.tournament => Icons.emoji_events_outlined,
+    EventType.scrimmage => Icons.groups_2_outlined,
+    EventType.workout => Icons.fitness_center,
     EventType.social => Icons.celebration_outlined,
     EventType.other => Icons.event_outlined,
   };
@@ -16,6 +18,8 @@ extension EventTypeStyle on EventType {
     EventType.practice => scheme.primary,
     EventType.game => scheme.tertiary,
     EventType.tournament => Colors.amber.shade700,
+    EventType.scrimmage => Colors.teal.shade500,
+    EventType.workout => Colors.deepPurple.shade300,
     EventType.social => Colors.pink.shade400,
     EventType.other => scheme.outline,
   };

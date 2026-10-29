@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/ui/back_or.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/event_editor_viewmodel.dart';
@@ -41,7 +42,20 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
       case Ok<String>(:final value):
         cmd.clearResult();
         showSnackBar(context, vm.isNew ? 'Event created' : 'Event saved');
-        context.go(Routes.event(vm.teamId, value));
+        final teamId = vm.teamId;
+        final detail = teamId == null
+            ? Routes.myEvent(value)
+            : Routes.event(teamId, value);
+        if (!context.canPop()) {
+          context.go(detail);
+        } else if (vm.isNew) {
+          // Swap the editor for the new event, so back returns to where
+          // "New event" was tapped.
+          context.pushReplacement(detail);
+        } else {
+          // Back to the event page that opened the editor.
+          context.pop();
+        }
       case Error<String>():
         showErrorSnackBar(context, cmd.result);
         cmd.clearResult();
@@ -52,9 +66,12 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: Listenable.merge([vm.load, vm.save]),
+    listenable: Listenable.merge([vm, vm.load, vm.save]),
     builder: (context, _) => Scaffold(
-      appBar: AppBar(title: Text(vm.isNew ? 'New event' : 'Edit event')),
+      appBar: AppBar(
+        leading: backOr(context, Routes.home),
+        title: Text(vm.isNew ? 'New event' : 'Edit event'),
+      ),
       body: vm.load.running
           ? const LoadingView()
           : vm.load.error
@@ -67,6 +84,10 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
                   initial: vm.initial,
                   saving: vm.save.running,
                   submitLabel: vm.isNew ? 'Create event' : 'Save',
+                  allowPoll: !vm.isPersonal,
+                  schedulePicker: vm.canChooseSchedule
+                      ? _SchedulePicker(viewModel: vm)
+                      : null,
                   onSubmit: vm.save.execute,
                 ),
               ),
@@ -81,12 +102,20 @@ class _EventForm extends StatefulWidget {
     required this.saving,
     required this.submitLabel,
     required this.onSubmit,
+    this.allowPoll = true,
+    this.schedulePicker,
   });
 
   final TeamEvent initial;
   final bool saving;
   final String submitLabel;
   final ValueChanged<TeamEvent> onSubmit;
+
+  /// Polls are for team events only.
+  final bool allowPoll;
+
+  /// Shown above the title when the event can go on more than one schedule.
+  final Widget? schedulePicker;
 
   @override
   State<_EventForm> createState() => _EventFormState();
@@ -193,7 +222,7 @@ class _EventFormState extends State<_EventForm> {
         endsAt: () => endsAt,
         location: _location.text.trim(),
         notes: _notes.text.trim(),
-        poll: () => _hasPoll
+        poll: () => _hasPoll && widget.allowPoll
             ? EventPoll(
                 question: _question.text.trim(),
                 options: options,
@@ -213,6 +242,10 @@ class _EventFormState extends State<_EventForm> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (widget.schedulePicker case final picker?) ...[
+            picker,
+            const SizedBox(height: 16),
+          ],
           TextFormField(
             controller: _title,
             autofocus: widget.initial.isNew,
@@ -305,71 +338,73 @@ class _EventFormState extends State<_EventForm> {
               alignLabelWithHint: true,
             ),
           ),
-          const Divider(height: 32),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            secondary: const Icon(Icons.poll_outlined),
-            title: const Text('Add a poll'),
-            subtitle: const Text('e.g. "Who can drive?" or "Pick a jersey"'),
-            value: _hasPoll,
-            onChanged: _togglePoll,
-          ),
-          if (_hasPoll) ...[
-            TextFormField(
-              controller: _question,
-              maxLength: 200,
-              decoration: const InputDecoration(labelText: 'Question'),
-              validator: (v) => _hasPoll && (v == null || v.trim().isEmpty)
-                  ? 'Enter a question'
-                  : null,
-            ),
-            for (var i = 0; i < _options.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: TextFormField(
-                  key: ValueKey(_options[i].id),
-                  controller: _options[i].text,
-                  maxLength: 100,
-                  decoration: InputDecoration(
-                    labelText: 'Option ${i + 1}',
-                    counterText: '',
-                    suffixIcon: _options.length > 2
-                        ? IconButton(
-                            tooltip: 'Remove option',
-                            icon: const Icon(Icons.close),
-                            onPressed: () => _removeOption(i),
-                          )
-                        : null,
-                  ),
-                  validator: (_) {
-                    if (!_hasPoll || i > 0) return null;
-                    final filled = _options
-                        .where((o) => o.text.text.trim().isNotEmpty)
-                        .length;
-                    return filled < 2 ? 'Add at least two options' : null;
-                  },
-                ),
-              ),
-            if (_options.length < _maxOptions)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: _addOption,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add option'),
-                ),
-              ),
+          if (widget.allowPoll) ...[
+            const Divider(height: 32),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Allow multiple choices'),
-              value: _multiple,
-              onChanged: (v) => setState(() => _multiple = v),
+              secondary: const Icon(Icons.poll_outlined),
+              title: const Text('Add a poll'),
+              subtitle: const Text('e.g. "Who can drive?" or "Pick a jersey"'),
+              value: _hasPoll,
+              onChanged: _togglePoll,
             ),
-            if (!widget.initial.isNew && widget.initial.poll != null)
-              Text(
-                'Changing the options resets existing votes.',
-                style: theme.textTheme.bodySmall,
+            if (_hasPoll) ...[
+              TextFormField(
+                controller: _question,
+                maxLength: 200,
+                decoration: const InputDecoration(labelText: 'Question'),
+                validator: (v) => _hasPoll && (v == null || v.trim().isEmpty)
+                    ? 'Enter a question'
+                    : null,
               ),
+              for (var i = 0; i < _options.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: TextFormField(
+                    key: ValueKey(_options[i].id),
+                    controller: _options[i].text,
+                    maxLength: 100,
+                    decoration: InputDecoration(
+                      labelText: 'Option ${i + 1}',
+                      counterText: '',
+                      suffixIcon: _options.length > 2
+                          ? IconButton(
+                              tooltip: 'Remove option',
+                              icon: const Icon(Icons.close),
+                              onPressed: () => _removeOption(i),
+                            )
+                          : null,
+                    ),
+                    validator: (_) {
+                      if (!_hasPoll || i > 0) return null;
+                      final filled = _options
+                          .where((o) => o.text.text.trim().isNotEmpty)
+                          .length;
+                      return filled < 2 ? 'Add at least two options' : null;
+                    },
+                  ),
+                ),
+              if (_options.length < _maxOptions)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _addOption,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add option'),
+                  ),
+                ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Allow multiple choices'),
+                value: _multiple,
+                onChanged: (v) => setState(() => _multiple = v),
+              ),
+              if (!widget.initial.isNew && widget.initial.poll != null)
+                Text(
+                  'Changing the options resets existing votes.',
+                  style: theme.textTheme.bodySmall,
+                ),
+            ],
           ],
           const SizedBox(height: 24),
           FilledButton(
@@ -421,4 +456,50 @@ class _PickerField extends StatelessWidget {
       child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis),
     ),
   );
+}
+
+/// Which schedule a new event goes on: personal, or a team the user may
+/// edit.
+class _SchedulePicker extends StatelessWidget {
+  const _SchedulePicker({required this.viewModel});
+
+  final EventEditorViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Add to', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ChoiceChip(
+              avatar: const Icon(Icons.person_outline, size: 18),
+              label: const Text('My schedule'),
+              selected: vm.isPersonal,
+              onSelected: (_) => vm.setSchedule(null),
+            ),
+            for (final t in vm.editableTeams)
+              ChoiceChip(
+                avatar: const Icon(Icons.groups_outlined, size: 18),
+                label: Text(t.name),
+                selected: vm.teamId == t.id,
+                onSelected: (_) => vm.setSchedule(t.id),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          vm.isPersonal
+              ? 'Only you will see this event.'
+              : 'Everyone on the team will see this event and can RSVP.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
 }

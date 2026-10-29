@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
@@ -13,6 +14,7 @@ import '../data/repositories/stats/stats_repository_firebase.dart';
 import '../data/repositories/ranking/ranking_repository_usau.dart';
 import '../data/repositories/team/team_repository.dart';
 import '../data/repositories/team/team_repository_firebase.dart';
+import '../data/repositories/team/view_as_team_repository.dart';
 import '../data/repositories/tournament/tournament_repository.dart';
 import '../data/repositories/tournament/tournament_repository_usau.dart';
 import '../data/repositories/usau_team/usau_team_repository.dart';
@@ -27,7 +29,18 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) =>
         AuthRepositoryFirebase(authService: context.read<AuthService>()),
   ),
-  Provider<TeamRepository>(create: (_) => TeamRepositoryFirebase()),
+  // Debug builds can preview the app as any team role (Profile > Developer).
+  if (kDebugMode) ...[
+    ChangeNotifierProvider(create: (_) => ViewAsRole()),
+    Provider<TeamRepository>(
+      create: (context) => ViewAsTeamRepository(
+        inner: TeamRepositoryFirebase(),
+        authRepository: context.read<AuthRepository>(),
+        viewAs: context.read<ViewAsRole>(),
+      ),
+    ),
+  ] else
+    Provider<TeamRepository>(create: (_) => TeamRepositoryFirebase()),
   Provider<PlayRepository>(create: (_) => PlayRepositoryFirebase()),
   Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),
   Provider<StatsRepository>(

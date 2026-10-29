@@ -40,6 +40,17 @@ void main() {
       expect(e.voterCount, 2);
     });
 
+    test('parses workout and scrimmage types', () {
+      for (final type in [EventType.workout, EventType.scrimmage]) {
+        final e = TeamEvent.fromMap('e1', {
+          'title': type.label,
+          'type': type.name,
+          'startsAt': DateTime(2026, 11, 2, 7),
+        });
+        expect(e.type, type);
+      }
+    });
+
     test('toEditableMap round-trips details but not responses', () {
       final e = TeamEvent(
         id: 'e1',

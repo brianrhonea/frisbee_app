@@ -341,6 +341,13 @@ describe("events", () => {
     await assertFails(setDoc(doc(db(OUTSIDER), "teams", TEAM, "events", "e3"), event(OUTSIDER)));
   });
 
+  it("accepts every event type and rejects unknown ones", async () => {
+    for (const type of ["practice", "game", "tournament", "scrimmage", "workout", "social", "other"]) {
+      await assertSucceeds(setDoc(doc(db(COACH), "teams", TEAM, "events", `t-${type}`), event(COACH, { type })));
+    }
+    await assertFails(setDoc(doc(db(COACH), "teams", TEAM, "events", "t-bogus"), event(COACH, { type: "bogus" })));
+  });
+
   it("rejects events created with pre-filled responses", async () => {
     await assertFails(setDoc(ev(COACH), event(COACH, { rsvps: { [PLAYER]: "going" } })));
   });
@@ -396,6 +403,41 @@ describe("events", () => {
     await seed();
     await assertFails(deleteDoc(ev(PLAYER)));
     await assertSucceeds(deleteDoc(ev(COACH)));
+  });
+});
+
+describe("personal events", () => {
+  const mine = (extra: Record<string, unknown> = {}) => ({
+    title: "Track workout",
+    type: "workout",
+    startsAt: new Date("2026-11-02T07:00:00Z"),
+    endsAt: null,
+    location: "",
+    notes: "",
+    poll: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const ref = (as: string, owner = PLAYER) => doc(db(as), "users", owner, "events", "m1");
+
+  it("only the owner can create, read, edit and delete", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER), mine()));
+    await assertSucceeds(getDoc(ref(PLAYER)));
+    await assertSucceeds(updateDoc(ref(PLAYER), { title: "Pickup", type: "other" }));
+    await assertFails(getDoc(ref(COACH)));
+    await assertFails(updateDoc(ref(OWNER), { title: "Hijack" }));
+    await assertFails(deleteDoc(ref(OUTSIDER)));
+    await assertSucceeds(deleteDoc(ref(PLAYER)));
+  });
+
+  it("validates details and rejects polls and responses", async () => {
+    await assertFails(setDoc(ref(PLAYER), mine({ title: "" })));
+    await assertFails(setDoc(ref(PLAYER), mine({ type: "bogus" })));
+    await assertFails(setDoc(ref(PLAYER), mine({ rsvps: {} })));
+    await assertFails(
+      setDoc(ref(PLAYER), mine({ poll: { question: "?", options: [{ id: "a", text: "A" }, { id: "b", text: "B" }], multiple: false } })),
+    );
   });
 });
 

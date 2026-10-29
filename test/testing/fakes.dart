@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
+import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/play.dart';
+import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
@@ -276,11 +278,14 @@ class FakeTeamRepository implements TeamRepository {
 
 class FakePlayRepository implements PlayRepository {
   final plays = <String, Play>{};
+
+  /// Per-team plays; teams not listed here see [plays].
+  final byTeam = <String, List<Play>>{};
   int saves = 0;
 
   @override
   Stream<List<Play>> watchPlays(String teamId) =>
-      Stream.value(plays.values.toList());
+      Stream.value(byTeam[teamId] ?? plays.values.toList());
 
   @override
   Future<Result<Play>> getPlay(String teamId, String playId) async {
@@ -327,20 +332,34 @@ Team teamWith(
   inviteCode: 'CODE$id',
 );
 
+class FakeRankingRepository implements RankingRepository {
+  FakeRankingRepository(this.divisions);
+
+  final List<RankingDivision> divisions;
+
+  @override
+  Stream<List<RankingDivision>> watchDivisions() => Stream.value(divisions);
+}
+
 class FakeEventRepository implements EventRepository {
   final events = <String, TeamEvent>{};
+
+  /// Per-team events for multi-team tests; teams not listed here see
+  /// [events].
+  final byTeam = <String, Map<String, TeamEvent>>{};
   final _changes = StreamController<void>.broadcast();
   bool? lastClearVotes;
 
-  void _emit() => _changes.add(null);
+  void emit() => _changes.add(null);
 
-  List<TeamEvent> _sorted() =>
-      events.values.toList()..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+  List<TeamEvent> _sorted(String teamId) =>
+      (byTeam[teamId] ?? events).values.toList()
+        ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
   @override
   Stream<List<TeamEvent>> watchEvents(String teamId) async* {
-    yield _sorted();
-    yield* _changes.stream.map((_) => _sorted());
+    yield _sorted(teamId);
+    yield* _changes.stream.map((_) => _sorted(teamId));
   }
 
   @override
@@ -359,14 +378,14 @@ class FakeEventRepository implements EventRepository {
     lastClearVotes = clearVotes;
     final id = event.isNew ? 'e${events.length + 1}' : event.id;
     events[id] = event.copyWith(id: id);
-    _emit();
+    emit();
     return Result.ok(id);
   }
 
   @override
   Future<Result<void>> deleteEvent(String teamId, String eventId) async {
-    events.remove(eventId);
-    _emit();
+    (byTeam[teamId] ?? events).remove(eventId);
+    emit();
     return const Result.ok(null);
   }
 
@@ -410,7 +429,7 @@ class FakeEventRepository implements EventRepository {
       reactions: going ? null : ({...e.reactions}..remove(uid)),
       votes: going ? null : ({...e.votes}..remove(uid)),
     );
-    _emit();
+    emit();
     return const Result.ok(null);
   }
 
@@ -427,7 +446,7 @@ class FakeEventRepository implements EventRepository {
     on ? mine.add(reaction) : mine.remove(reaction);
     reactions[uid] = mine;
     events[eventId] = _with(eventId, reactions: reactions);
-    _emit();
+    emit();
     return const Result.ok(null);
   }
 
@@ -441,7 +460,42 @@ class FakeEventRepository implements EventRepository {
     final votes = {...events[eventId]!.votes};
     optionIds.isEmpty ? votes.remove(uid) : votes[uid] = optionIds;
     events[eventId] = _with(eventId, votes: votes);
-    _emit();
+    emit();
+    return const Result.ok(null);
+  }
+
+  /// Personal events, keyed by uid then event id.
+  final mine = <String, Map<String, TeamEvent>>{};
+
+  List<TeamEvent> _mineSorted(String uid) =>
+      (mine[uid] ?? const {}).values.toList()
+        ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+
+  @override
+  Stream<List<TeamEvent>> watchMyEvents(String uid) async* {
+    yield _mineSorted(uid);
+    yield* _changes.stream.map((_) => _mineSorted(uid));
+  }
+
+  @override
+  Stream<TeamEvent?> watchMyEvent(String uid, String eventId) async* {
+    yield mine[uid]?[eventId];
+    yield* _changes.stream.map((_) => mine[uid]?[eventId]);
+  }
+
+  @override
+  Future<Result<String>> saveMyEvent(String uid, TeamEvent event) async {
+    final events = mine[uid] ??= {};
+    final id = event.isNew ? 'm${events.length + 1}' : event.id;
+    events[id] = event.copyWith(id: id);
+    emit();
+    return Result.ok(id);
+  }
+
+  @override
+  Future<Result<void>> deleteMyEvent(String uid, String eventId) async {
+    mine[uid]?.remove(eventId);
+    emit();
     return const Result.ok(null);
   }
 }

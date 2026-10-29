@@ -44,10 +44,43 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
 
+    // Event details, shared by team and personal events.
+    function validEvent(e) {
+      return e.title is string && e.title.size() > 0 && e.title.size() <= 100
+        && e.type in ['practice', 'game', 'tournament', 'scrimmage', 'workout', 'social', 'other']
+        && e.startsAt is timestamp
+        && (e.endsAt == null || (e.endsAt is timestamp && e.endsAt >= e.startsAt))
+        && validString(e.location, 200)
+        && validString(e.notes, 5000)
+        && (e.poll == null || validPoll(e.poll));
+    }
+
+    function validPoll(p) {
+      return p.keys().hasOnly(['question', 'options', 'multiple'])
+        && p.question is string && p.question.size() > 0 && p.question.size() <= 200
+        && p.options is list && p.options.size() >= 2 && p.options.size() <= 10
+        && p.multiple is bool;
+    }
+
     // ---- Users ------------------------------------------------------------
 
     match /users/{userId} {
       allow read, write: if signedIn() && uid() == userId;
+
+      // Personal schedule: private to its owner, no polls or responses.
+      match /events/{eventId} {
+        function validMine() {
+          let d = request.resource.data;
+          return d.keys().hasOnly([
+                   'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
+                   'poll', 'createdAt', 'updatedAt'])
+            && d.get('poll', null) == null
+            && validEvent(d);
+        }
+
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create, update: if signedIn() && uid() == userId && validMine();
+      }
     }
 
     // ---- Teams ------------------------------------------------------------
@@ -225,23 +258,6 @@ service cloud.firestore {
       // vote, and leaving "going" must drop their reactions and votes.
       match /events/{eventId} {
         function team() { return get(teamPath(teamId)).data; }
-
-        function validEvent(e) {
-          return e.title is string && e.title.size() > 0 && e.title.size() <= 100
-            && e.type in ['practice', 'game', 'tournament', 'social', 'other']
-            && e.startsAt is timestamp
-            && (e.endsAt == null || (e.endsAt is timestamp && e.endsAt >= e.startsAt))
-            && validString(e.location, 200)
-            && validString(e.notes, 5000)
-            && (e.poll == null || validPoll(e.poll));
-        }
-
-        function validPoll(p) {
-          return p.keys().hasOnly(['question', 'options', 'multiple'])
-            && p.question is string && p.question.size() > 0 && p.question.size() <= 200
-            && p.options is list && p.options.size() >= 2 && p.options.size() <= 10
-            && p.multiple is bool;
-        }
 
         // Only `uid()`'s entry in map field `f` changed.
         function onlyMine(f) {

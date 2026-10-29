@@ -5,7 +5,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/usau_attribution.dart';
 import '../view_models/tournaments_viewmodel.dart';
-import 'tournaments_screen.dart';
+import 'tournament_widgets.dart';
 
 class TournamentDetailScreen extends StatelessWidget {
   const TournamentDetailScreen({

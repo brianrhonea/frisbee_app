@@ -120,7 +120,7 @@ class StatsViewModel extends ChangeNotifier {
       for (final e in _events)
         if (kind == EventType.tournament
             ? e.type == EventType.tournament
-            : e.type != EventType.social)
+            : e.type != EventType.social && e.type != EventType.workout)
           e,
     ]..sort((a, b) => away(a).compareTo(away(b)));
   }

@@ -100,7 +100,20 @@ class AuthRepositoryFirebase extends AuthRepository {
   @override
   Future<Result<void>> deleteAccount() => guard(() async {
     final uid = _currentUser?.uid;
-    if (uid != null) await _firestore.collection('users').doc(uid).delete();
+    if (uid != null) {
+      final user = _firestore.collection('users').doc(uid);
+      // Client SDKs don't delete subcollections with their parent. A batch
+      // holds at most 500 writes.
+      final events = (await user.collection('events').get()).docs;
+      for (var i = 0; i < events.length; i += 450) {
+        final batch = _firestore.batch();
+        for (final d in events.skip(i).take(450)) {
+          batch.delete(d.reference);
+        }
+        await batch.commit();
+      }
+      await user.delete();
+    }
     await _authService.deleteAccount();
   });
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../domain/models/team.dart';
 import '../../../utils/command.dart';
+import '../../core/ui/brand.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -149,10 +151,103 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     }
                   },
                 ),
+                if (vm.canViewAs) ...[
+                  const Divider(),
+                  _ViewAsRolePicker(viewModel: vm),
+                ],
+                const Divider(),
+                const _BrandPreview(),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Developer option: preview the app as each team role.
+class _ViewAsRolePicker extends StatelessWidget {
+  const _ViewAsRolePicker({required this.viewModel});
+
+  final ProfileViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final selected = viewModel.viewAsRole;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Developer · View as role', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            'Shows the app as if you had this role on every team. Display '
+            'only: the server still checks your real role.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                label: const Text('My roles'),
+                selected: selected == null,
+                onSelected: (_) => viewModel.setViewAsRole(null),
+              ),
+              for (final role in TeamRole.values)
+                ChoiceChip(
+                  label: Text(role.label),
+                  selected: selected == role,
+                  onSelected: (_) => viewModel.setViewAsRole(role),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Every logo variant side by side, to compare them on a real device.
+class _BrandPreview extends StatelessWidget {
+  const _BrandPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Brand preview', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [
+              for (final icon in brandIcons)
+                SizedBox(
+                  width: 88,
+                  child: Column(
+                    children: [
+                      UltiUpLogo(size: 72, asset: icon.path),
+                      const SizedBox(height: 6),
+                      Text(
+                        icon.label,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

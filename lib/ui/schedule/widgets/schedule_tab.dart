@@ -73,7 +73,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
         _EventTile(
           event: e,
           uid: vm.uid,
-          onTap: () => context.go(Routes.event(vm.teamId, e.id)),
+          onTap: () => context.push(Routes.event(vm.teamId, e.id)),
         ),
     ];
 
@@ -82,7 +82,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
           ? FloatingActionButton.extended(
               heroTag: 'new-event',
               onPressed: () =>
-                  context.go(Routes.newEvent(vm.teamId, day: selected)),
+                  context.push(Routes.newEvent(vm.teamId, day: selected)),
               icon: const Icon(Icons.add),
               label: const Text('New event'),
             )
