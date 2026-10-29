@@ -9,6 +9,7 @@ import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
+import 'package:frisbee_app/data/repositories/usau_schedule/usau_schedule_repository.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
@@ -16,6 +17,7 @@ import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/tournament.dart';
+import 'package:frisbee_app/domain/models/usau_schedule.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 const testUser = AppUser(uid: 'u1', email: 'a@b.com', displayName: 'Alex');
@@ -344,6 +346,33 @@ class FakeTournamentRepository implements TournamentRepository {
 
   @override
   Stream<List<Tournament>> watchTournaments() => Stream.value(tournaments);
+}
+
+class FakeUsauScheduleRepository implements UsauScheduleRepository {
+  FakeUsauScheduleRepository({this.schedules = const {}});
+
+  /// Each division's schedule; a division mapped to null fails to load.
+  final Map<UsauDivision, UsauDivisionSchedule?> schedules;
+  final requests = <(UsauDivision, bool)>[];
+
+  /// When set, schedule loads wait for it to complete.
+  Completer<void>? hold;
+
+  @override
+  Future<Result<List<UsauDivision>>> getDivisions(String eventUrl) async =>
+      Result.ok(schedules.keys.toList());
+
+  @override
+  Future<Result<UsauDivisionSchedule>> getSchedule(
+    String eventUrl,
+    UsauDivision division, {
+    bool refresh = false,
+  }) async {
+    requests.add((division, refresh));
+    await hold?.future;
+    final s = schedules[division];
+    return s == null ? Result.error(Exception('No schedule')) : Result.ok(s);
+  }
 }
 
 Team teamWith(

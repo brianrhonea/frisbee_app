@@ -5,6 +5,7 @@ import '../../../domain/models/usau_team.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/usau_attribution.dart';
+import '../../core/ui/win_colors.dart';
 import '../view_models/usau_team_viewmodel.dart';
 
 class UsauTeamScreen extends StatelessWidget {
@@ -104,12 +105,6 @@ class _RosterTab extends StatelessWidget {
   }
 }
 
-/// Fill and foreground colors for highlighting a win.
-({Color fill, Color onFill}) _winColors(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-    ? (fill: Colors.green.shade900, onFill: Colors.green.shade100)
-    : (fill: Colors.green.shade100, onFill: Colors.green.shade900);
-
 /// The team's events and games. Won games (and won past events) are filled
 /// green; losses and anything upcoming keep the default theme colors.
 class _ScheduleTab extends StatelessWidget {
@@ -130,7 +125,7 @@ class _ScheduleTab extends StatelessWidget {
     }
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final win = _winColors(context);
+    final win = winColors(context);
 
     Widget sectionHeader(String text, {String? detail}) => Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),

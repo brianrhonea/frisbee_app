@@ -45,6 +45,7 @@ import '../ui/teams/widgets/team_detail_screen.dart';
 import '../ui/teams/widgets/usau_roster_screen.dart';
 import '../ui/teams/widgets/teams_screen.dart';
 import '../ui/teams/widgets/usau_team_search_screen.dart';
+import '../ui/tournaments/view_models/tournament_detail_viewmodel.dart';
 import '../ui/tournaments/view_models/tournaments_viewmodel.dart';
 import '../ui/tournaments/widgets/tournament_detail_screen.dart';
 import 'routes.dart';
@@ -425,12 +426,12 @@ GoRouter router(AuthRepository auth) => GoRouter(
                     final id = state.pathParameters['id']!;
                     return ViewModelHost(
                       key: ValueKey('tournament-$id'),
-                      create: (c) =>
-                          TournamentsViewModel(tournamentRepository: c.read()),
-                      builder: (_, vm) => TournamentDetailScreen(
-                        viewModel: vm,
+                      create: (c) => TournamentDetailViewModel(
                         tournamentId: id,
+                        tournamentRepository: c.read(),
+                        usauScheduleRepository: c.read(),
                       ),
+                      builder: (_, vm) => TournamentDetailScreen(viewModel: vm),
                     );
                   },
                 ),

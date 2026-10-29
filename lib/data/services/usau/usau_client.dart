@@ -5,6 +5,7 @@ import 'package:logging/logging.dart';
 
 import '../../../domain/models/ranking.dart';
 import '../../../domain/models/tournament.dart';
+import '../../../domain/models/usau_schedule.dart';
 import '../../../domain/models/usau_team.dart';
 import 'usau_parser.dart';
 
@@ -31,19 +32,42 @@ class UsauClient {
   final http.Client _client;
   final Duration requestDelay;
 
-  Future<String> _get(String url, {Map<String, String>? cookies}) async =>
-      _send(http.Request('GET', Uri.parse(url)), cookies);
-
   Future<String> _post(
     String url,
     Map<String, String> fields, {
     Map<String, String>? cookies,
-  }) async =>
-      _send(http.Request('POST', Uri.parse(url))..bodyFields = fields, cookies);
+  }) async => (await _postFollowing(url, fields, cookies: cookies)).body;
 
-  /// Sends [req]. When [cookies] is given, it is sent and updated from the
-  /// response, since ASP.NET postbacks may depend on the session cookie.
-  Future<String> _send(http.Request req, Map<String, String>? cookies) async {
+  /// Posts [fields] to [url]. ASP.NET answers a button postback with a
+  /// redirect to the page it opens, which is then fetched with a GET; the
+  /// result includes that page's URL.
+  Future<({String url, String body})> _postFollowing(
+    String url,
+    Map<String, String> fields, {
+    Map<String, String>? cookies,
+  }) async {
+    final req = http.Request('POST', Uri.parse(url))
+      ..bodyFields = fields
+      ..followRedirects = false;
+    final res = await _send(req, cookies, allowRedirect: true);
+    final location = res.location;
+    if (location == null) return (url: url, body: res.body);
+    final target = Uri.parse(url).resolve(location).toString();
+    return (url: target, body: await _get(target, cookies: cookies));
+  }
+
+  Future<String> _get(String url, {Map<String, String>? cookies}) async =>
+      (await _send(http.Request('GET', Uri.parse(url)), cookies)).body;
+
+  /// Sends [req] and returns its body, or with [allowRedirect] the
+  /// `Location` of a 3xx response. When [cookies] is given, it is sent and
+  /// updated from the response, since ASP.NET postbacks may depend on the
+  /// session cookie.
+  Future<({String body, String? location})> _send(
+    http.Request req,
+    Map<String, String>? cookies, {
+    bool allowRedirect = false,
+  }) async {
     req.headers.addAll({'User-Agent': _userAgent, 'Accept': 'text/html'});
     if (cookies != null && cookies.isNotEmpty) {
       req.headers['Cookie'] = cookies.entries
@@ -53,7 +77,13 @@ class UsauClient {
     final res = await http.Response.fromStream(
       await _client.send(req).timeout(const Duration(seconds: 30)),
     );
-    if (res.statusCode != 200) {
+    final location = res.headers['location'];
+    final redirect =
+        allowRedirect &&
+        res.statusCode >= 300 &&
+        res.statusCode < 400 &&
+        location != null;
+    if (res.statusCode != 200 && !redirect) {
       throw Exception('USA Ultimate returned ${res.statusCode} for ${req.url}');
     }
     final setCookie = res.headers['set-cookie'];
@@ -67,7 +97,11 @@ class UsauClient {
     }
     // USAU pages are UTF-8; don't rely on the Content-Type charset, since
     // `res.body` falls back to Latin-1 without one.
-    return utf8.decode(res.bodyBytes, allowMalformed: true);
+    if (redirect) return (body: '', location: location);
+    return (
+      body: utf8.decode(res.bodyBytes, allowMalformed: true),
+      location: null,
+    );
   }
 
   Future<List<Tournament>> fetchTournaments() async {
@@ -147,4 +181,43 @@ class UsauClient {
       entries: entries,
     );
   }
+
+  /// The divisions with a schedule on the event page at [eventUrl]; empty
+  /// when the event has none posted.
+  Future<List<UsauDivision>> fetchEventDivisions(String eventUrl) async => [
+    for (final link in parseEventDivisions(
+      await _get(eventUrl),
+      pageUrl: eventUrl,
+    ))
+      link.division,
+  ];
+
+  /// Opens [division]'s schedule the way a browser does: loads the event
+  /// page, then replays its division button postback in the same session.
+  Future<UsauDivisionSchedule> fetchDivisionSchedule(
+    String eventUrl,
+    UsauDivision division,
+  ) async {
+    final cookies = <String, String>{};
+    final links = parseEventDivisions(
+      await _get(eventUrl, cookies: cookies),
+      pageUrl: eventUrl,
+    );
+    final link = links.where((l) => l.division == division).firstOrNull;
+    if (link == null) {
+      throw Exception('No ${division.title} schedule on $eventUrl');
+    }
+    await Future<void>.delayed(requestDelay);
+    final page = await _postFollowing(
+      link.request.url,
+      link.request.fields ?? const {},
+      cookies: cookies,
+    );
+    return parseDivisionSchedule(page.body, url: page.url);
+  }
+
+  /// Re-fetches a division schedule from its own URL (as returned by
+  /// [fetchDivisionSchedule]), e.g. to pick up new scores.
+  Future<UsauDivisionSchedule> fetchDivisionScheduleAt(String url) async =>
+      parseDivisionSchedule(await _get(url), url: url);
 }

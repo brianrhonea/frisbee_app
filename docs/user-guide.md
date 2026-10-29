@@ -101,6 +101,13 @@ Personal events are private: only you can see them.
 Upcoming USA Ultimate tournaments. Filter the list, and tap a tournament for
 its details and a link to USA Ultimate.
 
+If USA Ultimate has posted a schedule, the tournament page also shows
+**Schedule & brackets**. Pick a division (Men, Mixed, Women), then a stage
+tab: pool standings and games, crossovers, and the championship and
+placement brackets drawn as a tree (scroll sideways for earlier rounds).
+Winners are highlighted green. Tap refresh for the latest scores during an
+event.
+
 ### Rankings
 
 USA Ultimate rankings by division. Tap a team for its USA Ultimate page.
@@ -119,5 +126,6 @@ These rules are enforced by the server, not just hidden in the app.
 ## USA Ultimate data
 
 USA Ultimate has no public API. UltiUP reads tournaments, rankings and team
-pages from play.usaultimate.org and links back to it. Information may be out
-of date or incomplete; check USA Ultimate for anything official.
+pages (including event schedules and brackets) from play.usaultimate.org and
+links back to it. Information may be out of date or incomplete; check USA
+Ultimate for anything official.
