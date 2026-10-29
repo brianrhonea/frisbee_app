@@ -192,11 +192,4 @@ describe("usau cache", () => {
     await assertSucceeds(getDoc(doc(db(PLAYER), "usau_tournaments", "x")));
     await assertFails(setDoc(doc(db(PLAYER), "usau_tournaments", "x"), { name: "hack" }));
   });
-
-  it("team Elo is read-only; scraped team games are server-only", async () => {
-    await assertSucceeds(getDoc(doc(db(PLAYER), "usau_team_elo", "Club-Men")));
-    await assertFails(setDoc(doc(db(PLAYER), "usau_team_elo", "Club-Men"), { entries: [] }));
-    await assertFails(getDoc(doc(db(PLAYER), "usau_team_games", "x")));
-    await assertFails(setDoc(doc(db(PLAYER), "usau_team_games", "x"), { games: [] }));
-  });
 });

@@ -36,10 +36,10 @@ export interface RankingRecord {
   teamUrl: string;
 }
 
-export const clean = (s: string | undefined): string =>
+const clean = (s: string | undefined): string =>
   (s ?? "").replace(/\s+/g, " ").trim();
 
-export const absolute = (href: string | undefined): string => {
+const absolute = (href: string | undefined): string => {
   if (!href) return "";
   try {
     return new URL(href, USAU_BASE).toString();
@@ -225,12 +225,6 @@ function postBack($: cheerio.CheerioAPI, scope: Element, linkText: RegExp): Post
     .find("a[href*='__doPostBack']")
     .filter((_, a) => linkText.test(clean($(a).text())))
     .first();
-  return link.length > 0 ? postBackFor($, link[0]) : null;
-}
-
-/** Builds the form post that clicking the `__doPostBack` `link` would send. */
-export function postBackFor($: cheerio.CheerioAPI, linkEl: Element): PostBack | null {
-  const link = $(linkEl);
   const target = POSTBACK_TARGET.exec(link.attr("href") ?? "");
   const form = $("form").first();
   if (!target || form.length === 0) return null;

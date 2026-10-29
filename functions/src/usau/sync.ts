@@ -10,13 +10,13 @@ import {
 } from "./parse";
 
 const USER_AGENT = "FrisbeeApp/1.0 (team management app; daily sync)";
-export const REQUEST_DELAY_MS = 1500;
+const REQUEST_DELAY_MS = 1500;
 /** Safety cap on pages per ranking list (20 teams each). */
 const MAX_RANKING_PAGES = 50;
 
-export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function fetchHtml(
+async function fetchHtml(
   url: string,
   init: { form?: Record<string, string>; cookies?: Map<string, string> } = {},
   fetchFn: typeof fetch = fetch,

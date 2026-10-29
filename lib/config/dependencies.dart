@@ -11,8 +11,6 @@ import '../data/repositories/team/team_repository.dart';
 import '../data/repositories/team/team_repository_firebase.dart';
 import '../data/repositories/tournament/tournament_repository.dart';
 import '../data/repositories/tournament/tournament_repository_usau.dart';
-import '../data/repositories/team_elo/team_elo_repository.dart';
-import '../data/repositories/team_elo/team_elo_repository_firebase.dart';
 import '../data/repositories/usau_team/usau_team_repository.dart';
 import '../data/repositories/usau_team/usau_team_repository_usau.dart';
 import '../data/services/auth_service.dart';
@@ -39,8 +37,6 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) =>
         RankingRepositoryUsau(client: context.read<UsauClient>()),
   ),
-  // Our own team Elo, computed server-side from scraped game results.
-  Provider<TeamEloRepository>(create: (_) => TeamEloRepositoryFirebase()),
   Provider<UsauTeamRepository>(
     create: (context) =>
         UsauTeamRepositoryUsau(client: context.read<UsauClient>()),

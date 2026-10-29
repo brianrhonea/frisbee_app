@@ -177,10 +177,6 @@ service cloud.firestore {
     match /usau_rankings/{id} {
       allow read: if signedIn();
     }
-    match /usau_team_elo/{id} {
-      allow read: if signedIn();
-    }
-    // usau_team_games is the Elo pipeline's working data: no client access.
     match /meta/{id} {
       allow read: if signedIn();
     }

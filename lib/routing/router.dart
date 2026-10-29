@@ -175,10 +175,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
             GoRoute(
               path: Routes.rankings,
               builder: (_, _) => ViewModelHost(
-                create: (c) => RankingsViewModel(
-                  rankingRepository: c.read(),
-                  teamEloRepository: c.read(),
-                ),
+                create: (c) => RankingsViewModel(rankingRepository: c.read()),
                 builder: (_, vm) => RankingsScreen(viewModel: vm),
               ),
               routes: [
