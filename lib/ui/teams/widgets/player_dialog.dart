@@ -21,6 +21,7 @@ class _PlayerDialogState extends State<PlayerDialog> {
   );
   late PlayerPosition _position =
       widget.initial?.position ?? PlayerPosition.hybrid;
+  late bool _paid = widget.initial?.paid ?? false;
 
   @override
   void dispose() {
@@ -39,6 +40,8 @@ class _PlayerDialogState extends State<PlayerDialog> {
         number: int.tryParse(_number.text),
         position: _position,
         userId: widget.initial?.userId,
+        onUsau: widget.initial?.onUsau,
+        paid: _paid,
       ),
     );
   }
@@ -80,6 +83,14 @@ class _PlayerDialogState extends State<PlayerDialog> {
                 ],
                 selected: {_position},
                 onSelectionChanged: (s) => setState(() => _position = s.first),
+              ),
+              const SizedBox(height: 4),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _paid,
+                onChanged: (v) => setState(() => _paid = v ?? false),
+                title: const Text('Paid'),
+                subtitle: const Text('Dues or USA Ultimate fees received'),
               ),
             ],
           ),

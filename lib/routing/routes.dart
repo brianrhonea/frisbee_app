@@ -27,6 +27,7 @@ abstract final class Routes {
   static String statsGame(String teamId, String gameId) =>
       '/teams/$teamId/stats/games/$gameId';
   static String seasonStats(String teamId) => '/teams/$teamId/stats/season';
+  static String usauRoster(String teamId) => '/teams/$teamId/usau-roster';
   static String tournament(String id) => '/tournaments/$id';
   static const usauTeamPath = '/rankings/team';
   static String usauTeam(String url, {String name = ''}) => Uri(

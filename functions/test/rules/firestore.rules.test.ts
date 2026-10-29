@@ -13,6 +13,7 @@ import {
   deleteField,
   doc,
   getDoc,
+  serverTimestamp,
   setDoc,
   updateDoc,
   writeBatch,
@@ -281,6 +282,31 @@ describe("roster and plays", () => {
     const ref = doc(db(OWNER), "teams", TEAM, "roster", "r1");
     await assertSucceeds(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null }));
     await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "goalie", userId: null }));
+    await assertSucceeds(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, onUsau: true, paid: false }));
+    await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, paid: "yes" }));
+    await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, memberId: "123" }));
+  });
+});
+
+describe("USA Ultimate link", () => {
+  const url = "https://play.usaultimate.org/teams/events/Eventteam/?TeamId=abc%3d";
+
+  it("admins link the team page; players and other sites cannot", async () => {
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), { usauUrl: url, usauName: "Ring" }));
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { usauUrl: "https://evil.example/x" }));
+    await assertSucceeds(updateDoc(doc(db(CAPTAIN), "teams", TEAM), { usauUrl: url, usauName: "Ring" }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { usauUrl: null, usauName: null, usauSyncedAt: null }));
+  });
+
+  it("a sync stamps the server time with the roster writes", async () => {
+    const fs = db(COACH);
+    await assertSucceeds(
+      writeBatch(fs)
+        .update(doc(fs, "teams", TEAM), { usauSyncedAt: serverTimestamp() })
+        .set(doc(fs, "teams", TEAM, "roster", "r9"), { name: "New", number: 12, position: "hybrid", userId: null, onUsau: true, paid: false })
+        .commit(),
+    );
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { usauSyncedAt: new Date(2020, 1, 1) }));
   });
 });
 

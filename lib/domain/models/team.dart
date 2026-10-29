@@ -85,6 +85,9 @@ class Team {
     this.statKeepers = const {},
     this.city = '',
     this.inviteCode,
+    this.usauUrl,
+    this.usauName,
+    this.usauSyncedAt,
     this.createdAt,
   });
 
@@ -106,6 +109,15 @@ class Team {
 
   /// Players the owner gave stats access to.
   final Set<String> statKeepers;
+
+  /// Linked USA Ultimate team page, for roster imports.
+  final String? usauUrl;
+
+  /// Team name as USA Ultimate shows it.
+  final String? usauName;
+
+  /// When the roster was last synced with USA Ultimate.
+  final DateTime? usauSyncedAt;
   final DateTime? createdAt;
 
   TeamRole? roleOf(String uid) => members[uid];
@@ -158,6 +170,9 @@ class Team {
         for (final id in (map['statKeepers'] as List?) ?? const []) '$id',
         ...legacyStats,
       },
+      usauUrl: map['usauUrl'] as String?,
+      usauName: map['usauName'] as String?,
+      usauSyncedAt: parseDate(map['usauSyncedAt']),
       createdAt: parseDate(map['createdAt']),
     );
   }
@@ -189,6 +204,9 @@ class Team {
     members: members ?? this.members,
     memberNames: memberNames,
     statKeepers: statKeepers ?? this.statKeepers,
+    usauUrl: usauUrl,
+    usauName: usauName,
+    usauSyncedAt: usauSyncedAt,
     createdAt: createdAt,
   );
 }

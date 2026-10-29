@@ -98,6 +98,31 @@ class TeamDetailViewModel extends ChangeNotifier {
   List<RosterPlayer> _roster = const [];
   List<RosterPlayer> get roster => _roster;
 
+  bool _unconfirmedOnly = false;
+
+  /// Roster tab shows only players not yet on USA Ultimate or unpaid.
+  bool get unconfirmedOnly => _unconfirmedOnly;
+
+  void setUnconfirmedOnly(bool value) {
+    _unconfirmedOnly = value;
+    notifyListeners();
+  }
+
+  List<RosterPlayer> get visibleRoster => _unconfirmedOnly
+      ? [
+          for (final p in _roster)
+            if (!p.confirmed) p,
+        ]
+      : _roster;
+
+  int get onUsauCount => _roster.where((p) => p.onUsau ?? false).length;
+  int get paidCount => _roster.where((p) => p.paid).length;
+  int get confirmedCount => _roster.where((p) => p.confirmed).length;
+
+  /// Flips a player's Paid mark.
+  void togglePaid(RosterPlayer p) =>
+      savePlayer.execute(p.copyWith(paid: !p.paid));
+
   List<Play> _playList = const [];
   List<Play> get plays => _playList;
 

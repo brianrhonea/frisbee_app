@@ -224,6 +224,43 @@ class FakeTeamRepository implements TeamRepository {
     return const Result.ok(null);
   }
 
+  final syncs = <List<RosterPlayer>>[];
+
+  @override
+  Future<Result<void>> linkUsauTeam(
+    String teamId, {
+    String? url,
+    String? name,
+  }) async {
+    final t = teams[teamId];
+    if (t == null) return Result.error(Exception('No team'));
+    teams[teamId] = Team(
+      id: t.id,
+      name: t.name,
+      division: t.division,
+      level: t.level,
+      city: t.city,
+      ownerId: t.ownerId,
+      inviteCode: t.inviteCode,
+      members: t.members,
+      memberNames: t.memberNames,
+      statKeepers: t.statKeepers,
+      usauUrl: url,
+      usauName: url == null ? null : name,
+    );
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> applyRosterSync(
+    String teamId,
+    List<RosterPlayer> players,
+  ) async {
+    syncs.add(players);
+    return const Result.ok(null);
+  }
+
   @override
   Stream<List<RosterPlayer>> watchRoster(String teamId) =>
       Stream.value(roster[teamId] ?? const []);

@@ -42,6 +42,16 @@ abstract class TeamRepository {
 
   Future<Result<void>> deleteTeam(Team team);
 
+  /// Links the team to its USA Ultimate page, or unlinks it when [url] is
+  /// null.
+  Future<Result<void>> linkUsauTeam(String teamId, {String? url, String? name});
+
+  /// Writes a roster sync in one batch and stamps the sync time.
+  Future<Result<void>> applyRosterSync(
+    String teamId,
+    List<RosterPlayer> players,
+  );
+
   Stream<List<RosterPlayer>> watchRoster(String teamId);
 
   /// Creates the player when [RosterPlayer.id] is empty, otherwise updates it.

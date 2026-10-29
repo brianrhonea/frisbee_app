@@ -407,6 +407,12 @@ UsauTeam parseUsauTeam(String source, {required String url}) {
     }
   }
 
+  // Real pages put the city in a paragraph rather than a <dl>.
+  final city = _clean(doc.querySelector('.team_city')?.text);
+  if (city.isNotEmpty && !info.any((i) => i.label == 'City')) {
+    info.add((label: 'City', value: city));
+  }
+
   final roster = <UsauPlayer>[];
   for (final table in tables) {
     final cols = _matchHeaders(table, _rosterPatterns);
@@ -439,7 +445,15 @@ UsauTeam parseUsauTeam(String source, {required String url}) {
 
   final games = <UsauGame>[];
   for (final table in tables) {
-    final cols = _matchHeaders(table, _gamePatterns);
+    var cols = _matchHeaders(table, _gamePatterns);
+    // The real right-rail schedule has no header row: date, score, opponent.
+    if (cols.isEmpty && table.classes.contains('schedule_table')) {
+      cols = {
+        _GameColumn.date: 0,
+        _GameColumn.score: 1,
+        _GameColumn.opponent: 2,
+      };
+    }
     final opponentIdx = cols[_GameColumn.opponent];
     if (opponentIdx == null) continue;
     var tournament = _clean(table.querySelector('caption')?.text);
@@ -513,11 +527,14 @@ UsauTeam parseUsauTeam(String source, {required String url}) {
     }
   }
 
-  final heading = doc
-      .querySelectorAll('h1, h2, h3')
-      .map((h) => _clean(h.text))
-      .where((t) => t.isNotEmpty)
-      .firstOrNull;
+  final profileName = _clean(doc.querySelector('.profile_info h4')?.text);
+  final heading = profileName.isNotEmpty
+      ? profileName
+      : doc
+            .querySelectorAll('h1, h2, h3')
+            .map((h) => _clean(h.text))
+            .where((t) => t.isNotEmpty)
+            .firstOrNull;
   return UsauTeam(
     name: heading ?? '',
     url: url,

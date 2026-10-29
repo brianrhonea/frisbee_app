@@ -16,6 +16,8 @@ class RosterPlayer {
     this.number,
     this.position = PlayerPosition.hybrid,
     this.userId,
+    this.onUsau,
+    this.paid = false,
   });
 
   final String id;
@@ -25,6 +27,31 @@ class RosterPlayer {
 
   /// Linked app account, if this player has joined the team.
   final String? userId;
+
+  /// Whether the player is on the linked USA Ultimate roster as of the last
+  /// sync; null if never synced.
+  final bool? onUsau;
+
+  /// Marked by an admin; USA Ultimate doesn't publish payment status.
+  final bool paid;
+
+  /// On the USA Ultimate roster and paid.
+  bool get confirmed => (onUsau ?? false) && paid;
+
+  RosterPlayer copyWith({
+    int? number,
+    PlayerPosition? position,
+    bool? onUsau,
+    bool? paid,
+  }) => RosterPlayer(
+    id: id,
+    name: name,
+    number: number ?? this.number,
+    position: position ?? this.position,
+    userId: userId,
+    onUsau: onUsau ?? this.onUsau,
+    paid: paid ?? this.paid,
+  );
 
   factory RosterPlayer.fromMap(String id, Map<String, dynamic> map) =>
       RosterPlayer(
@@ -37,6 +64,8 @@ class RosterPlayer {
           PlayerPosition.hybrid,
         ),
         userId: map['userId'] as String?,
+        onUsau: map['onUsau'] as bool?,
+        paid: map['paid'] as bool? ?? false,
       );
 
   Map<String, dynamic> toMap() => {
@@ -44,5 +73,7 @@ class RosterPlayer {
     'number': number,
     'position': position.name,
     'userId': userId,
+    'onUsau': onUsau,
+    'paid': paid,
   };
 }
