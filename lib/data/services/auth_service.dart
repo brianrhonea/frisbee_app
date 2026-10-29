@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../utils/platform_support.dart';
@@ -46,10 +45,6 @@ class AuthService {
       _auth.sendPasswordResetEmail(email: email);
 
   Future<void> signInWithGoogle() async {
-    if (kIsWeb) {
-      await _auth.signInWithPopup(GoogleAuthProvider());
-      return;
-    }
     if (PlatformSupport.desktopGoogleSignIn) {
       final tokens = await _googleDesktopOAuth.signIn();
       await _auth.signInWithCredential(
@@ -78,11 +73,7 @@ class AuthService {
     final provider = AppleAuthProvider()
       ..addScope('email')
       ..addScope('name');
-    if (kIsWeb) {
-      await _auth.signInWithPopup(provider);
-    } else {
-      await _auth.signInWithProvider(provider);
-    }
+    await _auth.signInWithProvider(provider);
   }
 
   Future<void> updateDisplayName(String name) async {

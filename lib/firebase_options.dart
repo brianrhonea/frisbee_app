@@ -19,7 +19,6 @@ import 'package:flutter/foundation.dart'
 /// );
 /// ```
 class DefaultFirebaseOptions {
-  static const _webKey = String.fromEnvironment('FIREBASE_WEB_API_KEY');
   static const _androidKey = String.fromEnvironment('FIREBASE_ANDROID_API_KEY');
   static const _appleKey = String.fromEnvironment('FIREBASE_APPLE_API_KEY');
   static const _windowsKey = String.fromEnvironment('FIREBASE_WINDOWS_API_KEY');
@@ -39,7 +38,9 @@ class DefaultFirebaseOptions {
 
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'The app does not target web; the website is a separate project.',
+      );
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -61,15 +62,6 @@ class DefaultFirebaseOptions {
         );
     }
   }
-
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: _webKey,
-    appId: '1:275864055352:web:069ee3e0e5f181133280cd',
-    messagingSenderId: '275864055352',
-    projectId: 'frisbee-app-brianrhonea',
-    authDomain: 'frisbee-app-brianrhonea.firebaseapp.com',
-    storageBucket: 'frisbee-app-brianrhonea.firebasestorage.app',
-  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: _androidKey,

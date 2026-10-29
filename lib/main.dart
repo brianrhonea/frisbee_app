@@ -26,7 +26,7 @@ Future<void> main() async {
   DefaultFirebaseOptions.ensureConfigured();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   if (_useEmulators) {
-    final host = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+    final host = defaultTargetPlatform == TargetPlatform.android
         ? '10.0.2.2'
         : 'localhost';
     await FirebaseAuth.instance.useAuthEmulator(host, 9099);

@@ -39,7 +39,7 @@ Always pass the secrets file:
 
 ```
 flutter run -d windows --dart-define-from-file=secrets.local.json
-flutter build web --dart-define-from-file=secrets.local.json
+flutter build windows --dart-define-from-file=secrets.local.json
 ```
 
 VS Code launch configs in `.vscode/launch.json` already do this.

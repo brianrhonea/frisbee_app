@@ -1,6 +1,6 @@
 # Frisbee App
 
-An ultimate frisbee app built with Flutter + Firebase for Android, iOS, web, macOS and Windows.
+An ultimate frisbee app built with Flutter + Firebase for Android, iOS, macOS and Windows. The website is a separate project.
 
 **MVP features**
 - Sign in with email/password, Google and Apple (Google/Apple are hidden on Windows, which has no plugin support)

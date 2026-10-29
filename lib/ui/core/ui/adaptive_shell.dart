@@ -18,7 +18,7 @@ const _destinations = [
 ];
 
 /// App shell: bottom navigation bar on narrow screens, navigation rail on
-/// wide ones (tablet, desktop, web).
+/// wide ones (tablet, desktop).
 class AdaptiveShell extends StatelessWidget {
   const AdaptiveShell({super.key, required this.navigationShell});
 

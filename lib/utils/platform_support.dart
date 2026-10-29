@@ -8,8 +8,7 @@ import '../data/services/google_desktop_oauth.dart';
 /// goes through the browser ([GoogleDesktopOAuth]) and is shown only once its
 /// OAuth client is configured; Apple sign-in is not offered.
 abstract final class PlatformSupport {
-  static bool get _isWindows =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+  static bool get _isWindows => defaultTargetPlatform == TargetPlatform.windows;
 
   static bool get googleSignIn =>
       !_isWindows || GoogleDesktopOAuth.isConfigured;
@@ -19,10 +18,9 @@ abstract final class PlatformSupport {
   /// Google sign-in via the system browser and a loopback redirect.
   static bool get desktopGoogleSignIn => _isWindows;
 
-  /// Native Google sign-in via the google_sign_in plugin (vs. web popup).
+  /// Native Google sign-in via the google_sign_in plugin.
   static bool get nativeGoogleSignIn =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.macOS);
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS;
 }
