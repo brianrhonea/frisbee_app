@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
+
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
+import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/play.dart';
@@ -496,6 +499,20 @@ class FakeEventRepository implements EventRepository {
   Future<Result<void>> deleteMyEvent(String uid, String eventId) async {
     mine[uid]?.remove(eventId);
     emit();
+    return const Result.ok(null);
+  }
+}
+
+class FakeThemeRepository extends ThemeRepository {
+  ThemeMode _mode = ThemeMode.system;
+
+  @override
+  ThemeMode get themeMode => _mode;
+
+  @override
+  Future<Result<void>> setThemeMode(ThemeMode mode) async {
+    _mode = mode;
+    notifyListeners();
     return const Result.ok(null);
   }
 }

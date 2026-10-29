@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-
-import '../../../data/repositories/team/view_as_team_repository.dart';
 
 import 'brand.dart';
 
@@ -40,29 +37,19 @@ class AdaptiveShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= wideBreakpoint;
-    final viewAs = context.watch<ViewAsRole?>();
-    final viewingAs = viewAs == null || viewAs.role == null
-        ? null
-        : _ViewingAsBar(viewAs: viewAs);
     if (!wide) {
       return Scaffold(
         body: navigationShell,
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ?viewingAs,
-            NavigationBar(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: _onSelect,
-              destinations: [
-                for (final d in _destinations)
-                  NavigationDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.selectedIcon),
-                    label: d.label,
-                  ),
-              ],
-            ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: navigationShell.currentIndex,
+          onDestinationSelected: _onSelect,
+          destinations: [
+            for (final d in _destinations)
+              NavigationDestination(
+                icon: Icon(d.icon),
+                selectedIcon: Icon(d.selectedIcon),
+                label: d.label,
+              ),
           ],
         ),
       );
@@ -88,56 +75,8 @@ class AdaptiveShell extends StatelessWidget {
             ],
           ),
           const VerticalDivider(width: 1),
-          Expanded(
-            child: Column(
-              children: [
-                Expanded(child: navigationShell),
-                ?viewingAs,
-              ],
-            ),
-          ),
+          Expanded(child: navigationShell),
         ],
-      ),
-    );
-  }
-}
-
-/// Reminder that the developer "view as role" option is on.
-class _ViewingAsBar extends StatelessWidget {
-  const _ViewingAsBar({required this.viewAs});
-
-  final ViewAsRole viewAs;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 16),
-        child: Row(
-          children: [
-            Icon(
-              Icons.visibility_outlined,
-              size: 18,
-              color: scheme.onTertiaryContainer,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Viewing as ${viewAs.role?.label}',
-                style: TextStyle(
-                  color: scheme.onTertiaryContainer,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () => viewAs.role = null,
-              child: const Text('Reset'),
-            ),
-          ],
-        ),
       ),
     );
   }

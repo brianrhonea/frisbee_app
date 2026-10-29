@@ -7,6 +7,7 @@ import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
+import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
@@ -61,6 +62,9 @@ void main() {
         providers: [
           ChangeNotifierProvider<AuthRepository>.value(value: auth),
           Provider<TeamRepository>.value(value: teams),
+          ChangeNotifierProvider<ThemeRepository>.value(
+            value: FakeThemeRepository(),
+          ),
           Provider<PlayRepository>.value(value: FakePlayRepository()),
           Provider<EventRepository>.value(value: events),
           Provider<StatsRepository>.value(

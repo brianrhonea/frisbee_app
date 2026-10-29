@@ -9,6 +9,9 @@ import 'package:provider/provider.dart';
 
 import 'config/dependencies.dart';
 import 'data/repositories/auth/auth_repository.dart';
+import 'data/repositories/theme/theme_repository.dart';
+import 'data/repositories/theme/theme_repository_prefs.dart';
+import 'data/services/shared_preferences_service.dart';
 import 'firebase_options.dart';
 import 'routing/router.dart';
 import 'ui/core/themes/theme.dart';
@@ -33,8 +36,18 @@ Future<void> main() async {
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
   }
 
+  final themeRepository = await ThemeRepositoryPrefs.load(
+    SharedPreferencesService(),
+  );
+
   runApp(
-    MultiProvider(providers: firebaseProviders, child: const FrisbeeApp()),
+    MultiProvider(
+      providers: [
+        ...firebaseProviders,
+        ChangeNotifierProvider<ThemeRepository>.value(value: themeRepository),
+      ],
+      child: const FrisbeeApp(),
+    ),
   );
 }
 
@@ -60,6 +73,7 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
     debugShowCheckedModeBanner: false,
     theme: AppTheme.light,
     darkTheme: AppTheme.dark,
+    themeMode: context.watch<ThemeRepository>().themeMode,
     routerConfig: _router,
   );
 }

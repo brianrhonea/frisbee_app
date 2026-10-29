@@ -15,7 +15,6 @@ import '../ui/home/view_models/home_viewmodel.dart';
 import '../ui/home/widgets/home_screen.dart';
 import '../ui/playbook/view_models/play_editor_viewmodel.dart';
 import '../ui/playbook/widgets/play_editor_screen.dart';
-import '../data/repositories/team/view_as_team_repository.dart';
 import '../ui/profile/view_models/profile_viewmodel.dart';
 import '../ui/profile/widgets/profile_screen.dart';
 import '../ui/rankings/view_models/rankings_viewmodel.dart';
@@ -83,7 +82,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
       builder: (_, _) => ViewModelHost(
         create: (c) => ProfileViewModel(
           authRepository: c.read(),
-          viewAs: c.read<ViewAsRole?>(),
+          themeRepository: c.read(),
         ),
         builder: (_, vm) => ProfileScreen(viewModel: vm),
       ),

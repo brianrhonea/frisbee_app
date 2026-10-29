@@ -4,17 +4,6 @@ import '../themes/theme.dart';
 
 const appName = 'UltiUP';
 
-/// Icon variants in assets/brand: "1" is the disc U, "3" the U with an
-/// arrow; B, D and E are the blue, black and purple colorways.
-const brandIcons = [
-  (label: 'Disc U · Blue', path: 'assets/brand/ultiup_1b.png'),
-  (label: 'Disc U · Black', path: 'assets/brand/ultiup_1d.png'),
-  (label: 'Disc U · Purple', path: 'assets/brand/ultiup_1e.png'),
-  (label: 'Arrow U · Blue', path: 'assets/brand/ultiup_3b.png'),
-  (label: 'Arrow U · Black', path: 'assets/brand/ultiup_3d.png'),
-  (label: 'Arrow U · Purple', path: 'assets/brand/ultiup_3e.png'),
-];
-
 /// The app icon in use.
 const logoAsset = 'assets/brand/ultiup_1b.png';
 
