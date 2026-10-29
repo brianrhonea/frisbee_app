@@ -22,6 +22,11 @@ abstract final class Routes {
       '/teams/$teamId/events/$eventId';
   static String editEvent(String teamId, String eventId) =>
       '/teams/$teamId/events/$eventId/edit';
+  static String statsTournament(String teamId, String tournamentId) =>
+      '/teams/$teamId/stats/tournaments/$tournamentId';
+  static String statsGame(String teamId, String gameId) =>
+      '/teams/$teamId/stats/games/$gameId';
+  static String seasonStats(String teamId) => '/teams/$teamId/stats/season';
   static String tournament(String id) => '/tournaments/$id';
   static const usauTeamPath = '/rankings/team';
   static String usauTeam(String url, {String name = ''}) => Uri(

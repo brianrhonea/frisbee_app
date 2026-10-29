@@ -15,8 +15,20 @@ service cloud.firestore {
       return /databases/$(database)/documents/inviteCodes/$(code);
     }
 
+    // Roles (TeamRole in lib/domain/models/team.dart):
+    //   owner   everything: roles, ownership, new invite codes
+    //   coach   team admin + stats
+    //   captain team admin + stats
+    //   player  read only; the owner can add stats access (statKeepers)
+    // "stats" was briefly a role and still counts as a player with stats.
     function roleIn(team) { return team.members.get(uid(), ''); }
-    function isEditor(team) { return roleIn(team) in ['owner', 'coach']; }
+    function isOwner(team) { return roleIn(team) == 'owner'; }
+    function isEditor(team) { return roleIn(team) in ['owner', 'coach', 'captain']; }
+    function canKeepStats(team) {
+      return isEditor(team)
+        || roleIn(team) == 'stats'
+        || (isMember(team) && uid() in team.get('statKeepers', []));
+    }
     function isMember(team) { return uid() in team.memberIds; }
 
     function validString(v, max) { return v is string && v.size() <= max; }
@@ -59,7 +71,7 @@ service cloud.firestore {
 
       allow update: if signedIn() && (
         editDetails() || regenerateCode() || changeRole() ||
-        removeMember() || join()
+        setStatKeepers() || transferOwnership() || removeMember() || join()
       );
 
       allow delete: if signedIn() && resource.data.ownerId == uid();
@@ -71,30 +83,67 @@ service cloud.firestore {
       }
 
       function regenerateCode() {
-        return isEditor(resource.data)
+        return isOwner(resource.data)
           && changed().hasOnly(['inviteCode'])
           && getAfter(codePath(request.resource.data.inviteCode)).data.teamId == teamId;
       }
 
-      // Owner promotes/demotes another existing member.
+      // Owner changes another existing member's role. Rules can't pull the
+      // one changed key out of a set, so check the result instead: every
+      // role is valid, the owner is untouched and still the only owner.
       function changeRole() {
         let diff = request.resource.data.members.diff(resource.data.members);
-        let target = diff.changedKeys().toList()[0];
+        let roles = request.resource.data.members.values();
         return roleIn(resource.data) == 'owner'
           && changed().hasOnly(['members'])
           && diff.addedKeys().size() == 0
           && diff.removedKeys().size() == 0
           && diff.changedKeys().size() == 1
-          && target != resource.data.ownerId
-          && request.resource.data.members[target] in ['coach', 'player'];
+          && !(resource.data.ownerId in diff.changedKeys())
+          && roles.hasOnly(['owner', 'coach', 'captain', 'stats', 'player'])
+          && roles.removeAll(['coach', 'captain', 'stats', 'player']).size() == 1
+          // No new "stats" roles; that's statKeepers now.
+          && roles.removeAll(['stats']).size()
+               >= resource.data.members.values().removeAll(['stats']).size();
       }
 
-      // Member leaves, owner removes anyone but themself, coach removes players.
+      // Owner gives members stats access or takes it away.
+      function setStatKeepers() {
+        let keepers = request.resource.data.statKeepers;
+        return roleIn(resource.data) == 'owner'
+          && changed().hasOnly(['statKeepers'])
+          && keepers is list
+          && keepers.size() <= 200
+          && keepers.toSet().difference(resource.data.memberIds.toSet()).size() == 0;
+      }
+
+      // Owner hands the team to another member and becomes a player.
+      function transferOwnership() {
+        let next = request.resource.data.ownerId;
+        let diff = request.resource.data.members.diff(resource.data.members);
+        return roleIn(resource.data) == 'owner'
+          && resource.data.ownerId == uid()
+          && changed().hasOnly(['members', 'ownerId'])
+          && next != uid()
+          && next in resource.data.memberIds
+          && diff.addedKeys().size() == 0
+          && diff.removedKeys().size() == 0
+          && diff.changedKeys() == [next, uid()].toSet()
+          && request.resource.data.members[next] == 'owner'
+          && request.resource.data.members[uid()] == 'player';
+      }
+
+      // Member leaves, owner removes anyone but themself, coaches and
+      // captains remove players. Stats access goes with them.
       function removeMember() {
         let diff = request.resource.data.members.diff(resource.data.members);
-        let target = diff.removedKeys().toList()[0];
-        return changed().hasOnly(['members', 'memberIds', 'memberNames'])
-          && diff.removedKeys().size() == 1
+        // Lists (unlike sets) can be indexed, so find who left via memberIds.
+        let gone = resource.data.memberIds.removeAll(request.resource.data.memberIds);
+        let target = gone[0];
+        return changed().hasOnly(['members', 'memberIds', 'memberNames', 'statKeepers'])
+          && gone.size() == 1
+          && !(target in request.resource.data.get('statKeepers', []))
+          && diff.removedKeys() == [target].toSet()
           && diff.addedKeys().size() == 0
           && diff.changedKeys().size() == 0
           && target != resource.data.ownerId
@@ -103,8 +152,8 @@ service cloud.firestore {
           && !(target in request.resource.data.memberNames)
           && (target == uid()
               || roleIn(resource.data) == 'owner'
-              || (roleIn(resource.data) == 'coach'
-                  && resource.data.members[target] == 'player'));
+              || (roleIn(resource.data) in ['coach', 'captain']
+                  && resource.data.members[target] in ['player', 'stats']));
       }
 
       // Non-member joins as a player by proving they know the invite code.
@@ -230,6 +279,68 @@ service cloud.firestore {
           && validEvent(request.resource.data);
         allow update: if signedIn() && (respond() || editDetails());
       }
+
+      // Stats: owners, coaches, captains and players with stats access
+      // keep them; every member can view.
+      // A game holds its points, lines and timeouts in one document.
+      function validLines(lines) {
+        return lines is list && lines.size() <= 50;
+      }
+
+      match /statsTournaments/{tournamentId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        allow read: if signedIn() && isMember(team());
+        allow delete: if signedIn() && canKeepStats(team());
+        allow create, update: if signedIn()
+          && canKeepStats(team())
+          && request.resource.data.keys().hasOnly([
+               'name', 'startDate', 'location', 'eventId', 'roster', 'lines',
+               'updatedAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 100
+          && request.resource.data.startDate is timestamp
+          && validString(request.resource.data.location, 200)
+          && (request.resource.data.eventId == null
+              || validString(request.resource.data.eventId, 100))
+          && request.resource.data.roster is list
+          && request.resource.data.roster.size() <= 200
+          && validLines(request.resource.data.lines);
+      }
+
+      match /statsGames/{gameId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        allow read: if signedIn() && isMember(team());
+        allow delete: if signedIn() && canKeepStats(team());
+        allow create, update: if signedIn()
+          && canKeepStats(team())
+          && request.resource.data.keys().hasOnly([
+               'opponent', 'date', 'gameTo', 'tournamentId', 'eventId',
+               'points', 'finished', 'lines', 'timeoutsPerHalf', 'timeouts',
+               'updatedAt'])
+          && request.resource.data.opponent is string
+          && request.resource.data.opponent.size() > 0
+          && request.resource.data.opponent.size() <= 100
+          && request.resource.data.date is timestamp
+          && request.resource.data.gameTo is int
+          && request.resource.data.gameTo > 0
+          && request.resource.data.gameTo <= 50
+          && (request.resource.data.tournamentId == null
+              || validString(request.resource.data.tournamentId, 100))
+          && (request.resource.data.eventId == null
+              || validString(request.resource.data.eventId, 100))
+          && request.resource.data.points is list
+          && request.resource.data.points.size() <= 150
+          && request.resource.data.finished is bool
+          && validLines(request.resource.data.lines)
+          && request.resource.data.timeoutsPerHalf is int
+          && request.resource.data.timeoutsPerHalf >= 0
+          && request.resource.data.timeoutsPerHalf <= 10
+          && request.resource.data.timeouts is list
+          && request.resource.data.timeouts.size() <= 40;
+      }
     }
 
     // ---- Invite codes -----------------------------------------------------
@@ -241,8 +352,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['teamId'])
         && getAfter(teamPath(request.resource.data.teamId)).data.inviteCode == code
         && getAfter(teamPath(request.resource.data.teamId)).data.members
-             .get(uid(), '') in ['owner', 'coach'];
-      allow delete: if signedIn() && isEditor(get(teamPath(resource.data.teamId)).data);
+             .get(uid(), '') == 'owner';
+      allow delete: if signedIn() && isOwner(get(teamPath(resource.data.teamId)).data);
     }
 
     // ---- USA Ultimate cache (written by Cloud Functions only) -------------

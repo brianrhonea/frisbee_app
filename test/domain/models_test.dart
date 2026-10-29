@@ -6,6 +6,27 @@ import 'package:frisbee_app/domain/models/tournament.dart';
 
 void main() {
   group('Team', () {
+    test('stats access sits on top of player; old "stats" role maps to it', () {
+      final team = Team.fromMap('t1', {
+        'name': 'Ring',
+        'ownerId': 'a',
+        'members': {
+          'a': 'owner',
+          'k': 'captain',
+          'p': 'player',
+          's': 'player',
+          'old': 'stats',
+        },
+        'statKeepers': ['s'],
+      });
+      expect(team.canKeepStats('k'), isTrue);
+      expect(team.canKeepStats('p'), isFalse);
+      expect(team.canKeepStats('s'), isTrue);
+      expect(team.roleOf('old'), TeamRole.player);
+      expect(team.isStatKeeper('old'), isTrue);
+      expect(team.canEdit('s'), isFalse);
+    });
+
     test('fromMap parses roles and falls back on unknown values', () {
       final team = Team.fromMap('t1', {
         'name': 'Ring',

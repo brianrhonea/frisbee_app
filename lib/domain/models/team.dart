@@ -1,16 +1,54 @@
 import 'model_utils.dart';
 
+/// Member roles, most access first. A player can also be given stats
+/// access ([Team.statKeepers]). firestore.rules enforces the same
+/// permissions; keep the two in step.
 enum TeamRole {
+  /// Everything, including roles, ownership and new invite codes.
   owner,
+
+  /// Team admin and stats. Can share, not regenerate, the invite code.
   coach,
+
+  /// Same as coach.
+  captain,
+
+  /// Read only, unless given stats access.
   player;
 
-  bool get canEdit => this == owner || this == coach;
+  /// Team details, roster, schedule and playbook.
+  bool get canEdit => this == owner || this == coach || this == captain;
+
+  /// Stats come with every role but player.
+  bool get canKeepStats => canEdit;
+
+  bool get canSetRoles => this == owner;
+
+  bool get canRegenerateCode => this == owner;
+
+  bool get canShareCode => canEdit;
+
+  /// Whether this role may remove a member with role [target]. Anyone may
+  /// leave on their own; the owner can't be removed.
+  bool canRemove(TeamRole target) => switch (this) {
+    owner => target != owner,
+    coach || captain => target == player,
+    player => false,
+  };
 
   String get label => switch (this) {
     owner => 'Owner',
     coach => 'Coach',
+    captain => 'Captain',
     player => 'Player',
+  };
+
+  /// What the role can do, for the role picker.
+  String get summary => switch (this) {
+    owner => 'Everything, including roles and new invite codes',
+    coach => 'Manage the team and keep stats',
+    captain => 'Manage the team and keep stats',
+    player => 'View only, unless given stats access',
   };
 }
 
@@ -44,6 +82,7 @@ class Team {
     required this.ownerId,
     required this.members,
     this.memberNames = const {},
+    this.statKeepers = const {},
     this.city = '',
     this.inviteCode,
     this.createdAt,
@@ -64,17 +103,34 @@ class Team {
 
   /// uid → display name, denormalized at join time for member lists.
   final Map<String, String> memberNames;
+
+  /// Players the owner gave stats access to.
+  final Set<String> statKeepers;
   final DateTime? createdAt;
 
   TeamRole? roleOf(String uid) => members[uid];
 
   bool canEdit(String uid) => roleOf(uid)?.canEdit ?? false;
 
+  bool canKeepStats(String uid) => switch (roleOf(uid)) {
+    null => false,
+    final role => role.canKeepStats || statKeepers.contains(uid),
+  };
+
+  /// A player with stats access.
+  bool isStatKeeper(String uid) =>
+      roleOf(uid) == TeamRole.player && statKeepers.contains(uid);
+
   String nameOf(String uid) => memberNames[uid] ?? 'Member';
 
   factory Team.fromMap(String id, Map<String, dynamic> map) {
     final rawMembers = (map['members'] as Map?) ?? const {};
     final rawNames = (map['memberNames'] as Map?) ?? const {};
+    // "stats" was briefly a role; it now means a player with stats access.
+    final legacyStats = [
+      for (final e in rawMembers.entries)
+        if (e.value == 'stats') '${e.key}',
+    ];
     return Team(
       id: id,
       name: map['name'] as String? ?? '',
@@ -98,6 +154,10 @@ class Team {
       memberNames: {
         for (final e in rawNames.entries) e.key as String: '${e.value}',
       },
+      statKeepers: {
+        for (final id in (map['statKeepers'] as List?) ?? const []) '$id',
+        ...legacyStats,
+      },
       createdAt: parseDate(map['createdAt']),
     );
   }
@@ -116,6 +176,8 @@ class Team {
     Division? division,
     CompetitionLevel? level,
     String? city,
+    Map<String, TeamRole>? members,
+    Set<String>? statKeepers,
   }) => Team(
     id: id,
     name: name ?? this.name,
@@ -124,8 +186,9 @@ class Team {
     city: city ?? this.city,
     ownerId: ownerId,
     inviteCode: inviteCode,
-    members: members,
+    members: members ?? this.members,
     memberNames: memberNames,
+    statKeepers: statKeepers ?? this.statKeepers,
     createdAt: createdAt,
   );
 }

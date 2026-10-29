@@ -22,6 +22,21 @@ abstract class TeamRepository {
 
   Future<Result<void>> setMemberRole(String teamId, String uid, TeamRole role);
 
+  /// Gives a player stats access, or takes it away.
+  Future<Result<void>> setStatKeeper(
+    String teamId,
+    String uid, {
+    required bool on,
+  });
+
+  /// Makes [newOwnerUid] the owner; [ownerUid], the current owner, becomes
+  /// a player.
+  Future<Result<void>> transferOwnership(
+    String teamId, {
+    required String ownerUid,
+    required String newOwnerUid,
+  });
+
   /// Removes a member; also used by a member to leave the team.
   Future<Result<void>> removeMember(String teamId, String uid);
 

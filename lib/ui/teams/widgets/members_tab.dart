@@ -26,8 +26,11 @@ class MembersTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (team.inviteCode != null)
+          if (team.inviteCode != null && viewModel.canShareCode) ...[
             _InviteCard(viewModel: viewModel, code: team.inviteCode!),
+            const SizedBox(height: 16),
+          ],
+          const _RolesHelp(),
           const SizedBox(height: 16),
           Text(
             '${members.length} member${members.length == 1 ? '' : 's'}',
@@ -43,13 +46,18 @@ class MembersTab extends StatelessWidget {
               title: Text(
                 team.nameOf(m.key) + (m.key == viewModel.uid ? ' (you)' : ''),
               ),
-              subtitle: Text(m.value.label),
+              subtitle: Text(
+                team.isStatKeeper(m.key)
+                    ? '${m.value.label} · Stats'
+                    : m.value.label,
+              ),
               trailing: viewModel.canManage(m.key)
                   ? _MemberMenu(
                       viewModel: viewModel,
                       uid: m.key,
                       name: team.nameOf(m.key),
                       role: m.value,
+                      statKeeper: team.isStatKeeper(m.key),
                     )
                   : null,
             ),
@@ -103,7 +111,7 @@ class _InviteCard extends StatelessWidget {
                 }
               },
             ),
-            if (viewModel.canEdit)
+            if (viewModel.canRegenerateCode)
               IconButton(
                 tooltip: 'New code',
                 icon: const Icon(Icons.refresh),
@@ -131,22 +139,63 @@ class _MemberMenu extends StatelessWidget {
     required this.uid,
     required this.name,
     required this.role,
+    required this.statKeeper,
   });
 
   final TeamDetailViewModel viewModel;
   final String uid;
   final String name;
   final TeamRole role;
+  final bool statKeeper;
+
+  Future<void> _changeRole(BuildContext context) async {
+    final picked = await showDialog<TeamRole>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text('Role for $name'),
+        children: [
+          for (final r in TeamRole.values)
+            if (r != TeamRole.owner)
+              ListTile(
+                leading: Icon(
+                  r == role
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                ),
+                title: Text(r.label),
+                subtitle: Text(r.summary),
+                onTap: () => Navigator.pop(context, r),
+              ),
+        ],
+      ),
+    );
+    if (picked != null && picked != role) {
+      viewModel.setMemberRole.execute((uid: uid, role: picked));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final vm = viewModel;
     return PopupMenuButton<String>(
       onSelected: (action) async {
         switch (action) {
-          case 'coach':
-            viewModel.setMemberRole.execute((uid: uid, role: TeamRole.coach));
-          case 'player':
-            viewModel.setMemberRole.execute((uid: uid, role: TeamRole.player));
+          case 'role':
+            await _changeRole(context);
+          case 'stats':
+            vm.setStatKeeper.execute((uid: uid, on: !statKeeper));
+          case 'owner':
+            if (await confirmDialog(
+              context,
+              title: 'Make $name the owner?',
+              message:
+                  'They get full control of the team. You become a player '
+                  "and can't undo this yourself.",
+              confirmLabel: 'Transfer ownership',
+              destructive: true,
+            )) {
+              vm.transferOwnership.execute(uid);
+            }
           case 'remove':
             if (await confirmDialog(
               context,
@@ -155,17 +204,89 @@ class _MemberMenu extends StatelessWidget {
               confirmLabel: 'Remove',
               destructive: true,
             )) {
-              viewModel.removeMember.execute(uid);
+              vm.removeMember.execute(uid);
             }
         }
       },
       itemBuilder: (_) => [
-        if (viewModel.isOwner && role == TeamRole.player)
-          const PopupMenuItem(value: 'coach', child: Text('Make coach')),
-        if (viewModel.isOwner && role == TeamRole.coach)
-          const PopupMenuItem(value: 'player', child: Text('Make player')),
-        const PopupMenuItem(value: 'remove', child: Text('Remove from team')),
+        if (vm.canSetRoles) ...[
+          const PopupMenuItem(value: 'role', child: Text('Change role')),
+          // Every other role already keeps stats.
+          if (role == TeamRole.player)
+            PopupMenuItem(
+              value: 'stats',
+              child: Text(
+                statKeeper ? 'Remove stats access' : 'Give stats access',
+              ),
+            ),
+          const PopupMenuItem(value: 'owner', child: Text('Make owner')),
+        ],
+        if (vm.canRemove(uid))
+          const PopupMenuItem(value: 'remove', child: Text('Remove from team')),
       ],
+    );
+  }
+}
+
+/// What each role can do.
+class _RolesHelp extends StatelessWidget {
+  const _RolesHelp();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card.outlined(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: const Icon(Icons.admin_panel_settings_outlined),
+        title: const Text('Roles'),
+        subtitle: const Text('What each role can do'),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        children: [
+          for (final r in TeamRole.values)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 72,
+                    child: Text(
+                      r.label,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Text(r.summary)),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 72,
+                  child: Text(
+                    '+ Stats',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const Expanded(
+                  child: Text(
+                    'Added to a player by the owner: keep and manage stats',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

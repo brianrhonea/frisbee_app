@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
@@ -9,6 +10,9 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../playbook/widgets/playbook_tab.dart';
 import '../../schedule/widgets/schedule_tab.dart';
+import '../../core/ui/view_model_host.dart';
+import '../../stats/view_models/stats_viewmodel.dart';
+import '../../stats/widgets/stats_tab.dart';
 import '../view_models/team_detail_viewmodel.dart';
 import 'members_tab.dart';
 import 'roster_tab.dart';
@@ -34,6 +38,8 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     vm.deletePlayer,
     vm.regenerateInviteCode,
     vm.setMemberRole,
+    vm.transferOwnership,
+    vm.setStatKeeper,
     vm.removeMember,
     vm.leaveTeam,
     vm.deleteTeam,
@@ -151,7 +157,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
           );
         }
         return DefaultTabController(
-          length: 4,
+          length: 5,
           child: Scaffold(
             appBar: AppBar(
               title: Text(team.name),
@@ -178,10 +184,13 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                 ),
               ],
               bottom: const TabBar(
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
                 tabs: [
                   Tab(text: 'Schedule'),
                   Tab(text: 'Roster'),
                   Tab(text: 'Playbook'),
+                  Tab(text: 'Stats'),
                   Tab(text: 'Members'),
                 ],
               ),
@@ -191,6 +200,16 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                 ScheduleTab(viewModel: vm),
                 RosterTab(viewModel: vm),
                 PlaybookTab(viewModel: vm),
+                ViewModelHost(
+                  create: (c) => StatsViewModel(
+                    teamId: vm.teamId,
+                    statsRepository: c.read(),
+                    eventRepository: c.read(),
+                    teamRepository: c.read(),
+                    authRepository: c.read(),
+                  ),
+                  builder: (_, statsVm) => StatsTab(viewModel: statsVm),
+                ),
                 MembersTab(viewModel: vm),
               ],
             ),

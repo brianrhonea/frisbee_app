@@ -1,0 +1,92 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../../domain/models/roster_player.dart';
+import '../../../domain/models/stats.dart';
+import '../../../utils/result.dart';
+import '../../services/firestore_utils.dart';
+import '../team/team_repository.dart';
+import 'stats_repository.dart';
+
+/// Stats in Firestore under `teams/{teamId}/statsTournaments` and
+/// `teams/{teamId}/statsGames`. A game's points live in its document, so a
+/// live game is one document rewritten as stats are tracked; Firestore's
+/// offline cache keeps tracking working without signal.
+class StatsRepositoryFirebase implements StatsRepository {
+  StatsRepositoryFirebase({
+    required TeamRepository teamRepository,
+    FirebaseFirestore? firestore,
+  }) : _teams = teamRepository,
+       _db = firestore ?? FirebaseFirestore.instance;
+
+  final TeamRepository _teams;
+  final FirebaseFirestore _db;
+
+  DocumentReference<Map<String, dynamic>> _team(String teamId) =>
+      _db.collection('teams').doc(teamId);
+
+  CollectionReference<Map<String, dynamic>> _tournaments(String teamId) =>
+      _team(teamId).collection('statsTournaments');
+
+  CollectionReference<Map<String, dynamic>> _games(String teamId) =>
+      _team(teamId).collection('statsGames');
+
+  @override
+  Stream<List<RosterPlayer>> watchPlayers(String teamId) =>
+      _teams.watchRoster(teamId);
+
+  @override
+  Stream<List<StatsTournament>> watchTournaments(String teamId) =>
+      _tournaments(teamId)
+          .orderBy('startDate', descending: true)
+          .snapshots()
+          .map(
+            (snap) => [
+              for (final d in snap.docs)
+                StatsTournament.fromMap(d.id, plainData(d.data())),
+            ],
+          );
+
+  @override
+  Stream<List<StatsGame>> watchGames(String teamId) => _games(teamId)
+      .orderBy('date', descending: true)
+      .snapshots()
+      .map(
+        (snap) => [
+          for (final d in snap.docs)
+            StatsGame.fromMap(d.id, plainData(d.data())),
+        ],
+      );
+
+  @override
+  Future<Result<String>> saveTournament(String teamId, StatsTournament t) =>
+      guard(() async {
+        final col = _tournaments(teamId);
+        final ref = t.id.isEmpty ? col.doc() : col.doc(t.id);
+        await _write(ref, t.toMap());
+        return ref.id;
+      });
+
+  @override
+  Future<Result<String>> saveGame(String teamId, StatsGame game) =>
+      guard(() async {
+        final col = _games(teamId);
+        final ref = game.id.isEmpty ? col.doc() : col.doc(game.id);
+        await _write(ref, game.toMap());
+        return ref.id;
+      });
+
+  /// Writes [data]. The local cache updates at once; waits briefly for the
+  /// server so a rejected write is reported, but doesn't hang offline.
+  Future<void> _write(
+    DocumentReference<Map<String, dynamic>> ref,
+    Map<String, dynamic> data,
+  ) => ref
+      .set({...data, 'updatedAt': FieldValue.serverTimestamp()})
+      .timeout(_serverWait, onTimeout: () {});
+
+  static const _serverWait = Duration(seconds: 5);
+
+  @override
+  Future<Result<void>> deleteGame(String teamId, String gameId) =>
+      guard(() => _games(teamId).doc(gameId).delete());
+}

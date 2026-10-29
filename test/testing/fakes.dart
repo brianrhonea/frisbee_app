@@ -160,6 +160,60 @@ class FakeTeamRepository implements TeamRepository {
   ) async => const Result.ok(null);
 
   @override
+  Future<Result<void>> setStatKeeper(
+    String teamId,
+    String uid, {
+    required bool on,
+  }) async {
+    final t = teams[teamId];
+    if (t == null) return Result.error(Exception('No team'));
+    teams[teamId] = Team(
+      id: t.id,
+      name: t.name,
+      division: t.division,
+      level: t.level,
+      city: t.city,
+      ownerId: t.ownerId,
+      inviteCode: t.inviteCode,
+      members: t.members,
+      memberNames: t.memberNames,
+      statKeepers: on
+          ? {...t.statKeepers, uid}
+          : ({...t.statKeepers}..remove(uid)),
+    );
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> transferOwnership(
+    String teamId, {
+    required String ownerUid,
+    required String newOwnerUid,
+  }) async {
+    final t = teams[teamId];
+    if (t == null) return Result.error(Exception('No team'));
+    teams[teamId] = Team(
+      id: t.id,
+      name: t.name,
+      division: t.division,
+      level: t.level,
+      city: t.city,
+      ownerId: newOwnerUid,
+      inviteCode: t.inviteCode,
+      members: {
+        ...t.members,
+        newOwnerUid: TeamRole.owner,
+        ownerUid: TeamRole.player,
+      },
+      memberNames: t.memberNames,
+      statKeepers: t.statKeepers,
+    );
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
   Future<Result<void>> removeMember(String teamId, String uid) async =>
       const Result.ok(null);
 
@@ -221,8 +275,13 @@ class FakeTournamentRepository implements TournamentRepository {
   Stream<List<Tournament>> watchTournaments() => Stream.value(tournaments);
 }
 
-Team teamWith(Map<String, TeamRole> members, {String id = 't1'}) => Team(
+Team teamWith(
+  Map<String, TeamRole> members, {
+  String id = 't1',
+  Set<String> statKeepers = const {},
+}) => Team(
   id: id,
+  statKeepers: statKeepers,
   name: 'Team',
   division: Division.mixed,
   level: CompetitionLevel.club,

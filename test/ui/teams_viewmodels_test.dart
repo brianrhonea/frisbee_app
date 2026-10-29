@@ -48,19 +48,29 @@ void main() {
   });
 
   group('TeamDetailViewModel permissions', () {
-    TeamDetailViewModel detailFor(TeamRole role) {
-      teams.teams['t1'] = teamWith({
-        'owner': TeamRole.owner,
-        'coach': TeamRole.coach,
-        'player': TeamRole.player,
-        if (role != TeamRole.owner) 'u1': role,
-      });
-      if (role == TeamRole.owner) {
-        teams.teams['t1'] = teamWith({
-          'u1': TeamRole.owner,
+    TeamDetailViewModel detailFor(TeamRole role, {bool stats = false}) {
+      teams.teams['t1'] = teamWith(
+        {
+          'owner': TeamRole.owner,
           'coach': TeamRole.coach,
+          'captain': TeamRole.captain,
+          'stats': TeamRole.player,
           'player': TeamRole.player,
-        });
+          if (role != TeamRole.owner) 'u1': role,
+        },
+        statKeepers: {'stats', if (stats) 'u1'},
+      );
+      if (role == TeamRole.owner) {
+        teams.teams['t1'] = teamWith(
+          {
+            'u1': TeamRole.owner,
+            'coach': TeamRole.coach,
+            'captain': TeamRole.captain,
+            'stats': TeamRole.player,
+            'player': TeamRole.player,
+          },
+          statKeepers: {'stats'},
+        );
       }
       return TeamDetailViewModel(
         teamId: 't1',
@@ -89,11 +99,70 @@ void main() {
       expect(vm.canManage('coach'), isFalse);
     });
 
+    test('owner sets roles, regenerates codes and can transfer', () async {
+      final vm = detailFor(TeamRole.owner);
+      await pumpEventQueue();
+      expect(vm.canSetRoles, isTrue);
+      expect(vm.canRegenerateCode, isTrue);
+      expect(vm.canRemove('coach'), isTrue);
+      await vm.transferOwnership.execute('coach');
+      await pumpEventQueue();
+      expect(vm.team!.ownerId, 'coach');
+      expect(vm.myRole, TeamRole.player);
+      expect(vm.canSetRoles, isFalse);
+    });
+
+    test('owner gives and takes stats access', () async {
+      final vm = detailFor(TeamRole.owner);
+      await pumpEventQueue();
+      expect(vm.team!.canKeepStats('player'), isFalse);
+      await vm.setStatKeeper.execute((uid: 'player', on: true));
+      await pumpEventQueue();
+      expect(vm.team!.canKeepStats('player'), isTrue);
+      expect(vm.team!.isStatKeeper('player'), isTrue);
+      await vm.setStatKeeper.execute((uid: 'player', on: false));
+      await pumpEventQueue();
+      expect(vm.team!.canKeepStats('player'), isFalse);
+    });
+
+    test('captain manages the team and stats, not roles or codes', () async {
+      final vm = detailFor(TeamRole.captain);
+      await pumpEventQueue();
+      expect(vm.canEdit, isTrue);
+      expect(vm.canShareCode, isTrue);
+      expect(vm.canRegenerateCode, isFalse);
+      expect(vm.canSetRoles, isFalse);
+      expect(vm.team!.canKeepStats('u1'), isTrue);
+      expect(vm.canManage('player'), isTrue);
+      expect(vm.canManage('stats'), isTrue);
+      expect(vm.canManage('coach'), isFalse);
+    });
+
+    test('coach shares the code and keeps stats, but no new codes', () async {
+      final vm = detailFor(TeamRole.coach);
+      await pumpEventQueue();
+      expect(vm.canShareCode, isTrue);
+      expect(vm.canRegenerateCode, isFalse);
+      expect(vm.canSetRoles, isFalse);
+      expect(vm.team!.canKeepStats('u1'), isTrue);
+    });
+
+    test('player with stats access only keeps stats', () async {
+      final vm = detailFor(TeamRole.player, stats: true);
+      await pumpEventQueue();
+      expect(vm.canEdit, isFalse);
+      expect(vm.canShareCode, isFalse);
+      expect(vm.canManage('player'), isFalse);
+      expect(vm.team!.canKeepStats('u1'), isTrue);
+    });
+
     test('player manages nobody', () async {
       final vm = detailFor(TeamRole.player);
       await pumpEventQueue();
       expect(vm.canEdit, isFalse);
       expect(vm.canManage('player'), isFalse);
+      expect(vm.canShareCode, isFalse);
+      expect(vm.team!.canKeepStats('u1'), isFalse);
     });
   });
 
