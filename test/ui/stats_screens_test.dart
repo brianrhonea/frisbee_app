@@ -94,6 +94,8 @@ void main() {
     vm.setSide(Side.offense);
     await tester.pumpAndSettle();
     expect(find.text('Pick 7 more'), findsOneWidget);
+    await tester.ensureVisible(find.text('Last O line'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Last O line'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Start point'));
@@ -113,6 +115,8 @@ void main() {
     // After we score, the lineup card is back for a D point and starting
     // it opens the pull timer.
     expect(find.text('We scored! Now we pull.'), findsOneWidget);
+    await tester.ensureVisible(find.text('Last D line'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Last D line'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Start point & pull'));
@@ -249,5 +253,98 @@ void main() {
       const Offset(0, -300),
     );
     expect(find.textContaining('HALFTIME'), findsOneWidget);
+  });
+
+  testWidgets('Undo last takes back a wrong tap', (tester) async {
+    final games = await stats.watchGames('t1').first;
+    final live = games.firstWhere((g) => !g.finished);
+    final vm = GameTrackerViewModel(
+      teamId: 't1',
+      gameId: live.id,
+      statsRepository: stats,
+      teamRepository: teams,
+      authRepository: FakeAuthRepository(user: testUser),
+    );
+    await phone(tester, GameScreen(viewModel: vm));
+    vm.setSide(Side.offense);
+    vm.useLine(vm.available.take(7).map((p) => p.id).toList());
+    await tester.pumpAndSettle();
+    final line = vm.currentPoint!.line;
+    vm.tapPlayer(line[0]);
+    vm.tapPlayer(line[1]);
+    final before = vm.currentPoint!.actions;
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Throwaway'));
+    await tester.pumpAndSettle();
+    expect(vm.side, Side.defense);
+    expect(find.textContaining('Last: '), findsOneWidget);
+
+    await tester.tap(find.text('Undo last'));
+    await tester.pumpAndSettle();
+    expect(vm.currentPoint!.actions, before);
+    expect(vm.side, Side.offense);
+  });
+
+  testWidgets('admins delete games and tournaments from the Stats tab', (
+    tester,
+  ) async {
+    final vm = StatsViewModel(
+      teamId: 't1',
+      statsRepository: stats,
+      eventRepository: FakeEventRepository(),
+      teamRepository: teams,
+      authRepository: FakeAuthRepository(user: testUser),
+    );
+    await phone(tester, StatsTab(viewModel: vm));
+    final tournament = vm.tournaments.single;
+    expect(vm.gamesIn(tournament.id), isNotEmpty);
+
+    await tester.ensureVisible(find.text('vs Alumni scrimmage'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.widgetWithText(GameRow, 'vs Alumni scrimmage'),
+        matching: find.byTooltip('More'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete game'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete game vs Alumni scrimmage?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(find.text('vs Alumni scrimmage'), findsNothing);
+
+    await tester.ensureVisible(find.text('Fall Classic'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('More').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete tournament'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(find.text('Fall Classic'), findsNothing);
+    expect(await stats.watchTournaments('t1').first, isEmpty);
+    final left = await stats.watchGames('t1').first;
+    expect(left.where((g) => g.tournamentId == tournament.id), isEmpty);
+  });
+
+  testWidgets('stat keepers who are players see no delete menu', (
+    tester,
+  ) async {
+    teams.teams['t1'] = teamWith(
+      {'boss': TeamRole.owner, 'u1': TeamRole.player},
+      statKeepers: {'u1'},
+    );
+    final vm = StatsViewModel(
+      teamId: 't1',
+      statsRepository: stats,
+      eventRepository: FakeEventRepository(),
+      teamRepository: teams,
+      authRepository: FakeAuthRepository(user: testUser),
+    );
+    await phone(tester, StatsTab(viewModel: vm));
+    expect(vm.canEdit, isTrue);
+    expect(find.byTooltip('More'), findsNothing);
   });
 }

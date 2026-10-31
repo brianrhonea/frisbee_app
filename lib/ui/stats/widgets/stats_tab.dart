@@ -5,10 +5,13 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/stats.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
+import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/stats_viewmodel.dart';
+import 'game_screen.dart' show confirmDeleteGame;
 import 'game_to_field.dart';
 import 'stat_sheet.dart';
 import 'stats_glossary.dart';
@@ -136,6 +139,22 @@ class StatsTab extends StatelessWidget {
                       games: vm.gamesIn(t.id),
                       onOpen: () =>
                           context.push(Routes.statsTournament(vm.teamId, t.id)),
+                      onDelete: vm.canDelete
+                          ? () async {
+                              if (await confirmDeleteTournament(
+                                context,
+                                t,
+                                vm.gamesIn(t.id).length,
+                              )) {
+                                if (!context.mounted) return;
+                                await runDelete(
+                                  context,
+                                  vm.deleteTournament,
+                                  () => vm.deleteTournament.execute(t.id),
+                                );
+                              }
+                            }
+                          : null,
                     ),
                 const SizedBox(height: 20),
                 Text('Games', style: theme.textTheme.titleMedium),
@@ -152,6 +171,18 @@ class StatsTab extends StatelessWidget {
                             game: g,
                             onTap: () =>
                                 context.push(Routes.statsGame(vm.teamId, g.id)),
+                            onDelete: vm.canDelete
+                                ? () async {
+                                    if (await confirmDeleteGame(context, g)) {
+                                      if (!context.mounted) return;
+                                      await runDelete(
+                                        context,
+                                        vm.deleteGame,
+                                        () => vm.deleteGame.execute(g.id),
+                                      );
+                                    }
+                                  }
+                                : null,
                           ),
                       ],
                     ),
@@ -238,16 +269,74 @@ class _SeasonCard extends StatelessWidget {
   }
 }
 
+/// Asks before deleting tournament [t] and its [games] games.
+Future<bool> confirmDeleteTournament(
+  BuildContext context,
+  StatsTournament t,
+  int games,
+) => confirmDialog(
+  context,
+  title: 'Delete ${t.name}?',
+  message:
+      'This permanently deletes the tournament, its roster and lines, and '
+      '${games == 1 ? 'its game' : 'all $games of its games'} with every '
+      'stat in them.',
+  confirmLabel: 'Delete',
+  destructive: true,
+);
+
+/// Runs a delete [command] and reports a failure.
+Future<void> runDelete(
+  BuildContext context,
+  Command<void> command,
+  Future<void> Function() execute,
+) async {
+  await execute();
+  if (command.error && context.mounted) {
+    showErrorSnackBar(context, command.result);
+  }
+  command.clearResult();
+}
+
+/// The menu on a game or tournament row; for admins.
+class _DeleteMenu extends StatelessWidget {
+  const _DeleteMenu({required this.label, required this.onDelete});
+
+  final String label;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<bool>(
+    tooltip: 'More',
+    onSelected: (_) => onDelete(),
+    itemBuilder: (_) => [
+      PopupMenuItem<bool>(
+        value: true,
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            Icons.delete_outline,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          title: Text(label),
+        ),
+      ),
+    ],
+  );
+}
+
 class _TournamentFolder extends StatelessWidget {
   const _TournamentFolder({
     required this.tournament,
     required this.games,
     required this.onOpen,
+    this.onDelete,
   });
 
   final StatsTournament tournament;
   final List<StatsGame> games;
   final VoidCallback onOpen;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -267,18 +356,27 @@ class _TournamentFolder extends StatelessWidget {
             if (wins + losses > 0) '$wins–$losses',
           ].join(' · '),
         ),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: onDelete == null
+            ? const Icon(Icons.chevron_right)
+            : _DeleteMenu(label: 'Delete tournament', onDelete: onDelete!),
       ),
     );
   }
 }
 
-/// One game "file": opponent, date, score and result.
+/// One game "file": opponent, date, score and result. [onDelete] adds a
+/// menu to delete it.
 class GameRow extends StatelessWidget {
-  const GameRow({super.key, required this.game, required this.onTap});
+  const GameRow({
+    super.key,
+    required this.game,
+    required this.onTap,
+    this.onDelete,
+  });
 
   final StatsGame game;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -317,6 +415,8 @@ class GameRow extends StatelessWidget {
               ),
             ),
           ),
+          if (onDelete != null)
+            _DeleteMenu(label: 'Delete game', onDelete: onDelete!),
         ],
       ),
     );

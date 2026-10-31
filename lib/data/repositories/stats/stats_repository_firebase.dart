@@ -89,4 +89,25 @@ class StatsRepositoryFirebase implements StatsRepository {
   @override
   Future<Result<void>> deleteGame(String teamId, String gameId) =>
       guard(() => _games(teamId).doc(gameId).delete());
+
+  @override
+  Future<Result<void>> deleteTournament(String teamId, String tournamentId) =>
+      guard(() async {
+        final games = await _games(
+          teamId,
+        ).where('tournamentId', isEqualTo: tournamentId).get();
+        // Firestore batches cap at 500 writes; a tournament has far fewer
+        // games, but chunk anyway.
+        final refs = [
+          for (final d in games.docs) d.reference,
+          _tournaments(teamId).doc(tournamentId),
+        ];
+        for (var i = 0; i < refs.length; i += 450) {
+          final batch = _db.batch();
+          for (final r in refs.skip(i).take(450)) {
+            batch.delete(r);
+          }
+          await batch.commit();
+        }
+      });
 }

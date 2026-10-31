@@ -385,4 +385,134 @@ void main() {
     expect(vm.timeouts, isEmpty);
     expect(vm.savedLines, isEmpty);
   });
+
+  group('undo last', () {
+    test('names what it will take back, newest first', () async {
+      final vm = await tracker();
+      final ids = seven(vm);
+      expect(vm.undoLabel, isNull);
+      vm.useLine(ids);
+      expect(vm.undoLabel, 'Start of point 1');
+      vm.tapPlayer(ids[0]);
+      vm.tapPlayer(ids[1]);
+      expect(vm.undoLabel, '${vm.nameOf(ids[0])} → ${vm.nameOf(ids[1])}');
+      vm.arm(StatKind.goal);
+      expect(vm.undoLabel, 'Cancel Score');
+      vm.undo();
+      expect(vm.armed, isNull);
+      expect(vm.currentPoint!.actions, hasLength(2));
+      vm.arm(StatKind.goal);
+      vm.tapPlayer(ids[2]);
+      expect(vm.undoLabel, startsWith('Score: '));
+      expect(vm.game!.ourScore, 1);
+    });
+
+    test('a wrong tap is taken back exactly', () async {
+      final vm = await tracker();
+      final ids = seven(vm);
+      vm.useLine(ids);
+      vm.tapPlayer(ids[0]);
+      vm.tapPlayer(ids[1]);
+      final before = vm.currentPoint!;
+      vm.throwaway(); // meant to tap a receiver
+      expect(vm.side, Side.defense);
+      vm.undo();
+      expect(vm.side, Side.offense);
+      expect(vm.holder, ids[1]);
+      expect(vm.currentPoint!.actions, before.actions);
+      expect(vm.sheet.players[ids[1]]!.throwaways, 0);
+    });
+
+    test('steps back through a D, then the pull', () async {
+      final vm = await tracker();
+      final ids = seven(vm);
+      scorePoint(vm, ids);
+      vm.useLine(ids); // D point
+      vm.recordPull(
+        ids[6],
+        hangTime: const Duration(seconds: 5),
+        outOfBounds: false,
+      );
+      vm.arm(StatKind.breakup);
+      vm.tapPlayer(ids[3]);
+      vm.undo();
+      expect(vm.currentPoint!.actions.map((a) => a.kind), [StatKind.pull]);
+      expect(vm.undoLabel, contains('pull'));
+      vm.undo();
+      expect(vm.currentPoint!.actions, isEmpty);
+      expect(vm.canPull, isTrue);
+    });
+
+    test('takes back timeouts, they-scored and ending the game', () async {
+      final vm = await tracker();
+      final ids = seven(vm);
+      vm.useLine(ids);
+      vm.callTimeout(ours: true);
+      expect(vm.undoLabel, 'Our timeout');
+      vm.undo();
+      expect(vm.timeouts, isEmpty);
+
+      vm.theyScored();
+      expect(vm.game!.theirScore, 1);
+      vm.undo();
+      expect(vm.game!.theirScore, 0);
+      expect(vm.currentPoint, isNotNull);
+
+      vm.setFinished(true);
+      expect(vm.over, isTrue);
+      expect(vm.canUndo, isTrue);
+      vm.undo();
+      expect(vm.over, isFalse);
+    });
+
+    test('a wrong final score can be undone at game point', () async {
+      final vm = await tracker(gameTo: 1);
+      final ids = seven(vm);
+      scorePoint(vm, ids);
+      expect(vm.over, isTrue);
+      expect(vm.canUndo, isTrue);
+      vm.undo();
+      expect(vm.over, isFalse);
+      expect(vm.game!.ourScore, 0);
+      expect(vm.holder, ids[1]);
+    });
+
+    test('changes from before the screen opened still step back', () async {
+      final first = await tracker();
+      final ids = seven(first);
+      first.useLine(ids);
+      first.tapPlayer(ids[0]);
+      first.tapPlayer(ids[1]);
+      await pumpEventQueue();
+      final reopened = GameTrackerViewModel(
+        teamId: 't1',
+        gameId: first.gameId,
+        statsRepository: stats,
+        teamRepository: teams,
+        authRepository: FakeAuthRepository(user: testUser),
+      );
+      await pumpEventQueue();
+      expect(reopened.undoLabel, contains('→'));
+      reopened.undo();
+      expect(reopened.currentPoint!.actions, hasLength(1));
+    });
+  });
+
+  group('deleting a game', () {
+    test('admins can; players with stats access cannot', () async {
+      final vm = await tracker();
+      expect(vm.canDelete, isTrue);
+      await vm.deleteGame.execute();
+      final games = await stats.watchGames('t1').first;
+      expect(games.where((g) => g.id == vm.gameId), isEmpty);
+
+      teams.teams['t1'] = teamWith(
+        {'boss': TeamRole.owner, 'u1': TeamRole.player},
+        statKeepers: {'u1'},
+      );
+      final keeper = await tracker();
+      expect(keeper.canEdit, isTrue);
+      expect(keeper.canDelete, isFalse);
+    });
+  });
 }

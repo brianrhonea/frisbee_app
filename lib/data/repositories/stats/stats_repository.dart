@@ -19,4 +19,7 @@ abstract class StatsRepository {
   Future<Result<String>> saveGame(String teamId, StatsGame game);
 
   Future<Result<void>> deleteGame(String teamId, String gameId);
+
+  /// Deletes a tournament and every game in it.
+  Future<Result<void>> deleteTournament(String teamId, String tournamentId);
 }

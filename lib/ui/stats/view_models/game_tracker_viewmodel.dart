@@ -9,6 +9,7 @@ import '../../../data/repositories/team/team_repository.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/stats.dart';
 import '../../../domain/models/team.dart';
+import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
 /// Actions that wait for a player tap: "Score, then who caught it".
@@ -20,12 +21,17 @@ const armableKinds = {
   StatKind.beat,
 };
 
+/// A change that [GameTrackerViewModel.undo] can take back: the game as it
+/// was before, and what the change was, for the Undo button.
+typedef _UndoStep = ({StatsGame before, String label, Side? sideOverride});
+
 /// Live stat tracking for one game.
 ///
 /// On O, tapping a player records a catch from the current holder (or a
 /// pickup when nobody has it). Scores, drops and defensive plays are armed
 /// first, then credited to the next player tapped. Once someone reaches
-/// the game's target score, tracking stops.
+/// the game's target score, tracking stops. Every change to the game can
+/// be undone, newest first.
 class GameTrackerViewModel extends ChangeNotifier {
   GameTrackerViewModel({
     required this.teamId,
@@ -35,6 +41,7 @@ class GameTrackerViewModel extends ChangeNotifier {
     required AuthRepository authRepository,
   }) : _stats = statsRepository,
        _auth = authRepository {
+    deleteGame = Command0<void>(() => _stats.deleteGame(teamId, gameId));
     _subs = [
       teamRepository.watchTeam(teamId).listen((t) {
         _team = t;
@@ -76,6 +83,11 @@ class GameTrackerViewModel extends ChangeNotifier {
   bool get canEdit =>
       _team?.canKeepStats(_auth.currentUser?.uid ?? '') ?? false;
 
+  /// Owners, coaches and captains may delete the game.
+  bool get canDelete => _team?.canEdit(_auth.currentUser?.uid ?? '') ?? false;
+
+  late final Command0<void> deleteGame;
+
   Object? _saveError;
 
   /// The last save that failed, until a later one succeeds.
@@ -112,7 +124,7 @@ class GameTrackerViewModel extends ChangeNotifier {
     final g = _game;
     if (g == null || target < 1) return;
     _armed = null;
-    _commit(g.copyWith(gameTo: target));
+    _commit(g.copyWith(gameTo: target), undo: 'Game point change');
   }
 
   // ---- Timeouts --------------------------------------------------------------
@@ -136,14 +148,20 @@ class GameTrackerViewModel extends ChangeNotifier {
       point: currentPoint == null ? points.length : points.length - 1,
       action: currentPoint?.actions.length ?? 0,
     );
-    _commit(g.copyWith(timeouts: [...g.timeouts, t]));
+    _commit(
+      g.copyWith(timeouts: [...g.timeouts, t]),
+      undo: ours ? 'Our timeout' : 'Their timeout',
+    );
   }
 
   /// Takes back a timeout logged by mistake.
   void removeTimeout(GameTimeout t) {
     final g = _game;
     if (g == null) return;
-    _commit(g.copyWith(timeouts: [...g.timeouts]..remove(t)));
+    _commit(
+      g.copyWith(timeouts: [...g.timeouts]..remove(t)),
+      undo: 'Timeout removed',
+    );
   }
 
   void setTimeoutsPerHalf(int n) {
@@ -157,7 +175,10 @@ class GameTrackerViewModel extends ChangeNotifier {
     final g = _game;
     if (g == null) return;
     _armed = null;
-    _commit(g.copyWith(finished: value));
+    _commit(
+      g.copyWith(finished: value),
+      undo: value ? 'Game ended' : 'Game resumed',
+    );
   }
 
   // ---- Lines -----------------------------------------------------------------
@@ -276,9 +297,15 @@ class GameTrackerViewModel extends ChangeNotifier {
     }
     final current = currentPoint;
     if (current != null && current.actions.isEmpty) {
-      _replaceCurrent(StatPoint(line: players, startedOn: current.startedOn));
+      _replaceCurrent(
+        StatPoint(line: players, startedOn: current.startedOn),
+        undo: 'Line change',
+      );
     } else if (current == null) {
-      _setPoints([...points, StatPoint(line: players, startedOn: nextSide)]);
+      _setPoints([
+        ...points,
+        StatPoint(line: players, startedOn: nextSide),
+      ], undo: 'Start of point $pointNumber');
       _sideOverride = null;
     }
   }
@@ -369,7 +396,10 @@ class GameTrackerViewModel extends ChangeNotifier {
     if (!canSetSide) return;
     final current = currentPoint;
     if (current != null) {
-      _replaceCurrent(StatPoint(line: current.line, startedOn: s));
+      _replaceCurrent(
+        StatPoint(line: current.line, startedOn: s),
+        undo: 'Switch to ${s.short}',
+      );
     } else {
       _sideOverride = s;
       notifyListeners();
@@ -426,19 +456,16 @@ class GameTrackerViewModel extends ChangeNotifier {
   }) {
     if (!canPull || !onField.contains(playerId)) return;
     final point = currentPoint!;
+    final pull = StatAction(
+      StatKind.pull,
+      playerId: playerId,
+      hangTimeMs: hangTime.inMilliseconds,
+      outOfBounds: outOfBounds,
+    );
     // Keep the pull first even if a stat was logged before it.
     _replaceCurrent(
-      point.copyWith(
-        actions: [
-          StatAction(
-            StatKind.pull,
-            playerId: playerId,
-            hangTimeMs: hangTime.inMilliseconds,
-            outOfBounds: outOfBounds,
-          ),
-          ...point.actions,
-        ],
-      ),
+      point.copyWith(actions: [pull, ...point.actions]),
+      undo: describe(pull),
     );
   }
 
@@ -471,6 +498,7 @@ class GameTrackerViewModel extends ChangeNotifier {
             actions: [...point.actions, a],
             result: () => PointResult.weScored,
           ),
+          undo: 'Score: ${describe(a)}',
         );
       } else {
         _record(a);
@@ -516,25 +544,65 @@ class GameTrackerViewModel extends ChangeNotifier {
           startedOn: nextSide,
           result: PointResult.theyScored,
         ),
-      ]);
+      ], undo: 'They scored');
       _sideOverride = null;
     } else {
-      _replaceCurrent(point.copyWith(result: () => PointResult.theyScored));
+      _replaceCurrent(
+        point.copyWith(result: () => PointResult.theyScored),
+        undo: 'They scored',
+      );
     }
   }
 
-  /// Undo works even at game point, so a wrong final score can be fixed.
+  /// Changes made on this screen, oldest first, so each can be undone.
+  final List<_UndoStep> _history = [];
+  static const _maxHistory = 200;
+
+  /// Undo works even at game point or after ending the game, so a wrong
+  /// final score can be fixed. Changes from before this screen was opened
+  /// can still be stepped back one action at a time.
   bool get canUndo =>
       canEdit &&
-      !(_game?.finished ?? true) &&
-      (_armed != null || points.isNotEmpty);
+      (_armed != null ||
+          _history.isNotEmpty ||
+          (!(_game?.finished ?? true) && points.isNotEmpty));
 
-  /// Steps back one action, reopening the previous point when needed.
+  /// What [undo] will take back, e.g. "Alex → Sam", for the Undo button.
+  String? get undoLabel {
+    if (!canUndo) return null;
+    if (_armed case final kind?) return 'Cancel ${_armedLabel(kind)}';
+    if (_history.lastOrNull case final step?) return step.label;
+    final point = points.last;
+    if (point.result == PointResult.theyScored) return 'They scored';
+    if (point.actions.lastOrNull case final a?) {
+      return a.kind == StatKind.goal ? 'Score: ${describe(a)}' : describe(a);
+    }
+    return 'Start of point ${points.length}';
+  }
+
+  static String _armedLabel(StatKind kind) => switch (kind) {
+    StatKind.goal => 'Score',
+    StatKind.drop => 'Drop',
+    StatKind.handBlock => 'Hand block',
+    StatKind.breakup => 'D',
+    StatKind.beat => 'Got beat',
+    _ => kind.name,
+  };
+
+  /// Takes back the last change: an armed action first, then changes made
+  /// on this screen exactly as they were, then (for older changes) the last
+  /// action, reopening the previous point when needed.
   void undo() {
     if (!canUndo) return;
     if (_armed != null) {
       _armed = null;
       notifyListeners();
+      return;
+    }
+    if (_history.isNotEmpty) {
+      final step = _history.removeLast();
+      _sideOverride = step.sideOverride;
+      _commit(step.before);
       return;
     }
     final point = points.last;
@@ -544,10 +612,13 @@ class GameTrackerViewModel extends ChangeNotifier {
         _setPoints(points.take(points.length - 1).toList());
         return;
       }
-      // Reopen the point; a goal is taken back off, leaving the thrower
+      // Reopen the point; our goal is taken back off, leaving the thrower
       // holding the disc.
       final actions = [...point.actions];
-      if (actions.lastOrNull?.kind == StatKind.goal) actions.removeLast();
+      if (point.result == PointResult.weScored &&
+          actions.lastOrNull?.kind == StatKind.goal) {
+        actions.removeLast();
+      }
       _replaceCurrent(point.copyWith(actions: actions, result: () => null));
     } else if (point.actions.isNotEmpty) {
       _replaceCurrent(
@@ -594,20 +665,29 @@ class GameTrackerViewModel extends ChangeNotifier {
   void _record(StatAction a) {
     final point = currentPoint;
     if (point == null) return;
-    _replaceCurrent(point.copyWith(actions: [...point.actions, a]));
+    _replaceCurrent(
+      point.copyWith(actions: [...point.actions, a]),
+      undo: describe(a),
+    );
   }
 
-  void _replaceCurrent(StatPoint p) =>
-      _setPoints([...points.take(points.length - 1), p]);
+  void _replaceCurrent(StatPoint p, {String? undo}) =>
+      _setPoints([...points.take(points.length - 1), p], undo: undo);
 
-  void _setPoints(List<StatPoint> pts) {
+  void _setPoints(List<StatPoint> pts, {String? undo}) {
     final g = _game;
     if (g == null) return;
-    _commit(g.copyWith(points: pts));
+    _commit(g.copyWith(points: pts), undo: undo);
   }
 
-  void _commit(StatsGame g) {
+  /// Saves [g]. With an [undo] label, the game as it was goes on the undo
+  /// history.
+  void _commit(StatsGame g, {String? undo}) {
     if (!canEdit) return;
+    if (undo != null && _game != null) {
+      _history.add((before: _game!, label: undo, sideOverride: _sideOverride));
+      if (_history.length > _maxHistory) _history.removeAt(0);
+    }
     _game = g;
     notifyListeners();
     unawaited(_stats.saveGame(teamId, g).then(_saved));

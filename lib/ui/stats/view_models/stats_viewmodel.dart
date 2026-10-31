@@ -37,6 +37,10 @@ class StatsViewModel extends ChangeNotifier {
     createTournament = Command1<String, NewTournament>(_createTournament);
     createGame = Command1<String, NewGame>(_createGame);
     createEvent = Command1<TeamEvent, NewEvent>(_createEvent);
+    deleteGame = Command1<void, String>((id) => _stats.deleteGame(teamId, id));
+    deleteTournament = Command1<void, String>(
+      (id) => _stats.deleteTournament(teamId, id),
+    );
     _subs = [
       _stats.watchPlayers(teamId).listen((p) {
         _players = {for (final x in p) x.id: x};
@@ -88,6 +92,10 @@ class StatsViewModel extends ChangeNotifier {
   bool get canCreateEvents =>
       _team?.canEdit(_auth.currentUser?.uid ?? '') ?? false;
 
+  /// Deleting games and tournaments: owners, coaches and captains, not
+  /// players with stats access.
+  bool get canDelete => canCreateEvents;
+
   List<StatsTournament> get tournaments => _tournaments;
 
   List<StatsGame> gamesIn(String tournamentId) => [
@@ -134,6 +142,11 @@ class StatsViewModel extends ChangeNotifier {
 
   /// Adds an event to the schedule, e.g. a scrimmage started mid-practice.
   late final Command1<TeamEvent, NewEvent> createEvent;
+
+  late final Command1<void, String> deleteGame;
+
+  /// Deletes a tournament with all its games.
+  late final Command1<void, String> deleteTournament;
 
   Future<Result<TeamEvent>> _createEvent(NewEvent e) async {
     final event = TeamEvent(
