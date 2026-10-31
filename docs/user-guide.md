@@ -59,6 +59,36 @@ ownership first).
 - **Rankings**: the top 3 on a podium and ranks 4–10. Switch division with
   the chips, or tap **Full rankings**.
 
+### Notifications
+
+Tap the 🔔 at the top of Home to see your notifications. A badge shows how
+many are unread. Tap one to open it; **Mark all read** clears the badge.
+
+You're notified about:
+
+- **Team chat**: new messages in rooms you can read. Several messages in
+  one room fold into one notification.
+- **Direct messages**: new private messages.
+- **Event changes**: team events added, moved, changed or cancelled (not
+  RSVPs or reactions).
+- **Event reminders**: a reminder about a day before each team or personal
+  event, unless you've said you can't go.
+- **Team activity**: new and updated plays in the playbook.
+
+You aren't notified about things you did yourself.
+
+**Settings** (the ⋮ menu on the notifications page, or Profile →
+Notifications):
+
+- **This device**: tap **Turn on** to get push notifications on your phone,
+  tablet or Mac, even when UltiUP is closed. Windows has no push, but
+  everything still shows under the 🔔.
+- **Notify me about**: turn each kind on or off for all your teams. Your
+  choices apply on every device you use.
+- **Teams**: change any kind for one team, for example reminders only for
+  your club team. **Use my defaults** undoes that.
+- To mute one chat room, tap the 🔔 at the top of the room.
+
 ### Messages
 
 Tap the 💬 icon at the top of Home to open your private messages. A badge
@@ -148,6 +178,8 @@ USA Ultimate rankings by division. Tap a team for its USA Ultimate page.
   signed in can find you by name to message you; your email is never shown.
 - **Chat rooms**, their messages, photos and files are visible only to the
   people the room gives access to (and the team owner).
+- **Notifications** and your notification settings are visible only to
+  you.
 - **The invite code** is visible only to owners, coaches and captains.
   Anyone with the code can join as a player, so share it only with your team.
   The owner can make a new code at any time; the old one stops working.

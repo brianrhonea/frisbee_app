@@ -7,6 +7,7 @@ import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
+import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
@@ -17,6 +18,7 @@ import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
+import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
@@ -845,4 +847,158 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
   @override
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment a) async =>
       Result.error(Exception('missing'));
+}
+
+class FakeNotificationRepository implements NotificationRepository {
+  FakeNotificationRepository({
+    this.prefs = const NotificationPreferences(),
+    List<AppNotification> feed = const [],
+    this.status = PushStatus.notDetermined,
+    this.pushSupported = true,
+  }) : feed = [...feed];
+
+  NotificationPreferences prefs;
+  final List<AppNotification> feed;
+  PushStatus status;
+  @override
+  final bool pushSupported;
+  final synced = <String>[];
+  final unregistered = <String>[];
+  final opened = StreamController<String>.broadcast();
+  final _changes = StreamController<void>.broadcast();
+
+  void emit() => _changes.add(null);
+
+  Stream<T> _watch<T>(T Function() read) {
+    late StreamController<T> controller;
+    StreamSubscription<void>? sub;
+    controller = StreamController<T>(
+      onListen: () {
+        sub = _changes.stream.listen((_) => controller.add(read()));
+        controller.add(read());
+      },
+      onCancel: () => sub?.cancel(),
+    );
+    return controller.stream;
+  }
+
+  Future<Result<void>> _update(NotificationPreferences next) async {
+    prefs = next;
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<NotificationPreferences> watchPreferences(String uid) =>
+      _watch(() => prefs);
+
+  @override
+  Future<Result<void>> setCategory(
+    String uid,
+    NotificationCategory category, {
+    required bool on,
+  }) => _update(
+    NotificationPreferences(
+      categories: {...prefs.categories, category: on},
+      teams: prefs.teams,
+      mutedRooms: prefs.mutedRooms,
+    ),
+  );
+
+  @override
+  Future<Result<void>> setTeamCategory(
+    String uid,
+    String teamId,
+    NotificationCategory category, {
+    required bool on,
+  }) => _update(
+    NotificationPreferences(
+      categories: prefs.categories,
+      teams: {
+        ...prefs.teams,
+        teamId: {...?prefs.teams[teamId], category: on},
+      },
+      mutedRooms: prefs.mutedRooms,
+    ),
+  );
+
+  @override
+  Future<Result<void>> resetTeam(String uid, String teamId) => _update(
+    NotificationPreferences(
+      categories: prefs.categories,
+      teams: {...prefs.teams}..remove(teamId),
+      mutedRooms: prefs.mutedRooms,
+    ),
+  );
+
+  @override
+  Future<Result<void>> setRoomMuted(
+    String uid,
+    String teamId,
+    String roomId, {
+    required bool muted,
+  }) {
+    final key = NotificationPreferences.roomKey(teamId, roomId);
+    return _update(
+      NotificationPreferences(
+        categories: prefs.categories,
+        teams: prefs.teams,
+        mutedRooms: muted
+            ? {...prefs.mutedRooms, key}
+            : ({...prefs.mutedRooms}..remove(key)),
+      ),
+    );
+  }
+
+  @override
+  Stream<List<AppNotification>> watchFeed(String uid) =>
+      _watch(() => List.of(feed));
+
+  @override
+  Future<Result<void>> markRead(String uid, Iterable<String> ids) async {
+    final set = ids.toSet();
+    for (var i = 0; i < feed.length; i++) {
+      final n = feed[i];
+      if (!set.contains(n.id)) continue;
+      feed[i] = AppNotification(
+        id: n.id,
+        category: n.category,
+        title: n.title,
+        body: n.body,
+        route: n.route,
+        teamId: n.teamId,
+        createdAt: n.createdAt,
+        read: true,
+        count: n.count,
+      );
+    }
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> delete(String uid, Iterable<String> ids) async {
+    final set = ids.toSet();
+    feed.removeWhere((n) => set.contains(n.id));
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<PushStatus> pushStatus() async => status;
+
+  @override
+  Future<Result<PushStatus>> enablePush(String uid) async {
+    if (status == PushStatus.notDetermined) status = PushStatus.enabled;
+    return Result.ok(status);
+  }
+
+  @override
+  Future<void> syncDevice(String uid) async => synced.add(uid);
+
+  @override
+  Future<void> unregisterDevice(String uid) async => unregistered.add(uid);
+
+  @override
+  Stream<String> get openedRoutes => opened.stream;
 }

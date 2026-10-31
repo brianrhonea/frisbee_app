@@ -5,6 +5,8 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { syncRankings, syncTournaments } from "./usau/sync";
 
+export * as notifications from "./notifications/triggers";
+
 initializeApp();
 
 const schedule = {

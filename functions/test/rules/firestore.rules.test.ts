@@ -886,3 +886,75 @@ describe("direct messages", () => {
     });
   });
 });
+
+describe("notifications", () => {
+  const prefs = (uid: string) => doc(db(uid), "users", uid, "settings", "notifications");
+  const device = (uid: string, fid: string) => doc(db(uid), "users", uid, "devices", fid);
+  const entry = (uid: string, id: string) => doc(db(uid), "users", uid, "notifications", id);
+
+  beforeEach(() =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users", PLAYER, "notifications", "n1"), {
+        category: "chat",
+        title: "General · Team",
+        body: "C: hi",
+        route: "/teams/team1/chats/general",
+        createdAt: serverTimestamp(),
+        read: false,
+        count: 1,
+      });
+    }),
+  );
+
+  it("lets users keep their own preferences", async () => {
+    await assertSucceeds(
+      setDoc(prefs(PLAYER), {
+        categories: { chat: false },
+        teams: { [TEAM]: { eventReminders: true } },
+        mutedRooms: [`${TEAM}/general`],
+        utcOffsetMinutes: -360,
+        updatedAt: serverTimestamp(),
+      }, { merge: true }),
+    );
+    await assertSucceeds(getDoc(prefs(PLAYER)));
+    await assertFails(getDoc(doc(db(COACH), "users", PLAYER, "settings", "notifications")));
+    await assertFails(setDoc(doc(db(COACH), "users", PLAYER, "settings", "notifications"), {}));
+  });
+
+  it("rejects unknown preference fields and categories", async () => {
+    await assertFails(setDoc(prefs(PLAYER), { email: "x@y.z" }));
+    await assertFails(setDoc(prefs(PLAYER), { categories: { spam: true } }));
+    await assertFails(setDoc(prefs(PLAYER), { utcOffsetMinutes: 5000 }));
+  });
+
+  it("registers only your own devices", async () => {
+    await assertSucceeds(setDoc(device(PLAYER, "fid1"), { platform: "iOS", updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(device(PLAYER, "fid2"), { platform: "windows", updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(device(PLAYER, "fid3"), { platform: "android", token: "x" }));
+    await assertFails(getDoc(doc(db(COACH), "users", PLAYER, "devices", "fid1")));
+    await assertSucceeds(deleteDoc(device(PLAYER, "fid1")));
+  });
+
+  it("lets the owner of a feed read, mark read and clear it, but not write it", async () => {
+    await assertSucceeds(getDocs(collection(db(PLAYER), "users", PLAYER, "notifications")));
+    await assertFails(getDoc(doc(db(COACH), "users", PLAYER, "notifications", "n1")));
+    await assertFails(updateDoc(entry(PLAYER, "n1"), { title: "Forged" }));
+    await assertFails(updateDoc(entry(PLAYER, "n1"), { read: false, count: 9 }));
+    await assertSucceeds(updateDoc(entry(PLAYER, "n1"), { read: true }));
+    await assertFails(setDoc(entry(PLAYER, "n2"), { title: "Forged", read: false }));
+    await assertSucceeds(deleteDoc(entry(PLAYER, "n1")));
+  });
+
+  it("keeps reminder records server-only", async () => {
+    await assertFails(getDoc(doc(db(PLAYER), "sentReminders", "x")));
+    await assertFails(setDoc(doc(db(PLAYER), "sentReminders", "x"), {}));
+  });
+
+  it("lets only the owner mark a team as being deleted", async () => {
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { deletingAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { deletingAt: serverTimestamp(), name: "X" }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { deletingAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { deletingAt: new Date(2000, 0, 1) }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { deletingAt: deleteField() }));
+  });
+});

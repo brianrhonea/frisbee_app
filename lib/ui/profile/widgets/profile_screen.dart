@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../core/ui/brand.dart';
 import '../../core/ui/confirm_dialog.dart';
@@ -123,6 +125,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 _ThemePicker(viewModel: vm),
                 const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.notifications_outlined),
+                  title: const Text('Notifications'),
+                  subtitle: const Text('Push, categories and teams'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push(Routes.notificationSettings),
+                ),
                 ListTile(
                   leading: const Icon(Icons.edit_outlined),
                   title: const Text('Change display name'),

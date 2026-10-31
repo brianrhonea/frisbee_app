@@ -8,7 +8,11 @@ TestFlight. These are the one-time setup steps, in order.
 1. Enroll at <https://developer.apple.com/programs/enroll/> ($99/year).
    Approval can take a day or two.
 2. In **Certificates, Identifiers & Profiles → Identifiers**, register the
-   App ID `com.brianrhonea.frisbeeApp` and tick **Sign in with Apple**.
+   App ID `com.brianrhonea.frisbeeApp` and tick **Sign in with Apple** and
+   **Push Notifications**. If the App ID already exists, edit it to add Push
+   Notifications; `ios/Runner/Runner.entitlements` asks for it, so signing
+   fails until the App ID has it. Delete any old App Store provisioning
+   profile for the app so Codemagic makes a new one that includes push.
 3. In **App Store Connect → Apps → +**, create the app with that bundle ID.
    Copy its numeric **Apple ID** (App Information) into `APP_STORE_APPLE_ID`
    in `codemagic.yaml`. It's an identifier, not a secret.
@@ -21,6 +25,11 @@ TestFlight. These are the one-time setup steps, in order.
    Enable Google *before* downloading the plist, or it has no `CLIENT_ID`.
 3. Download `GoogleService-Info.plist`. Keep it out of git; it goes into
    Codemagic in step 3.
+4. **Push notifications**: in Apple Developer → **Keys → +**, create a key
+   with **Apple Push Notifications service (APNs)** and download the `.p8`
+   (you can only download it once). In Firebase → Project settings →
+   **Cloud Messaging → Apple app configuration**, upload it with its Key ID
+   and your Team ID. Keep the `.p8` out of git, like every other key.
 
 ## 3. Codemagic
 

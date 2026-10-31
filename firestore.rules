@@ -110,6 +110,48 @@ service cloud.firestore {
         allow read, delete: if signedIn() && uid() == userId;
         allow create, update: if signedIn() && uid() == userId && validMine();
       }
+
+      // Notification preferences (NotificationPreferences in
+      // lib/domain/models/notification.dart). Cloud Functions read them.
+      match /settings/notifications {
+        function validPrefs() {
+          let d = request.resource.data;
+          let categories = ['chat', 'directMessages', 'eventChanges',
+                            'eventReminders', 'teamActivity'];
+          return d.keys().hasOnly(['categories', 'teams', 'mutedRooms',
+                                   'utcOffsetMinutes', 'updatedAt'])
+            && (!('categories' in d)
+                || (d.categories is map
+                    && d.categories.keys().hasOnly(categories)))
+            && (!('teams' in d) || (d.teams is map && d.teams.size() <= 200))
+            && (!('mutedRooms' in d)
+                || (d.mutedRooms is list && d.mutedRooms.size() <= 500))
+            && (!('utcOffsetMinutes' in d)
+                || (d.utcOffsetMinutes is int
+                    && d.utcOffsetMinutes >= -840 && d.utcOffsetMinutes <= 840));
+        }
+
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create, update: if signedIn() && uid() == userId && validPrefs();
+      }
+
+      // Push targets, keyed by Firebase Installation ID.
+      match /devices/{fid} {
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create, update: if signedIn() && uid() == userId
+          && fid.size() <= 300
+          && request.resource.data.keys().hasOnly(['platform', 'updatedAt'])
+          && request.resource.data.platform in ['android', 'iOS', 'macOS'];
+      }
+
+      // The notification feed. Cloud Functions write it; the owner marks
+      // entries read and clears them.
+      match /notifications/{id} {
+        allow read, delete: if signedIn() && uid() == userId;
+        allow update: if signedIn() && uid() == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          && request.resource.data.read == true;
+      }
     }
 
     // ---- Teams ------------------------------------------------------------
@@ -133,7 +175,8 @@ service cloud.firestore {
 
       allow update: if signedIn() && (
         editDetails() || linkUsau() || dropLegacyCode() || changeRole() ||
-        setStatKeepers() || transferOwnership() || removeMember() || join()
+        setStatKeepers() || transferOwnership() || removeMember() || join() ||
+        markDeleting()
       );
 
       allow delete: if signedIn() && resource.data.ownerId == uid();
@@ -144,7 +187,16 @@ service cloud.firestore {
           && validTeamFields(request.resource.data);
       }
 
-      // Admins link the team's USA Ultimate page and stamp roster syncs.
+      // Owner stamps the team just before deleting it, so the notification
+      // functions skip the cascade of deletes that follows; the stamp is
+      // cleared again if the delete fails.
+      function markDeleting() {
+        return roleIn(resource.data) == 'owner'
+          && changed().hasOnly(['deletingAt'])
+          && request.resource.data.get('deletingAt', request.time) == request.time;
+      }
+
+            // Admins link the team's USA Ultimate page and stamp roster syncs.
       function linkUsau() {
         let t = request.resource.data;
         return isEditor(resource.data)

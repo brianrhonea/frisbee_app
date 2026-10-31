@@ -8,6 +8,7 @@ import '../../../domain/models/app_user.dart';
 import '../../../domain/models/direct_message.dart';
 import '../../../utils/result.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_utils.dart';
 import 'auth_repository.dart';
 
 class AuthRepositoryFirebase extends AuthRepository {
@@ -116,15 +117,10 @@ class AuthRepositoryFirebase extends AuthRepository {
     final uid = _currentUser?.uid;
     if (uid != null) {
       final user = _firestore.collection('users').doc(uid);
-      // Client SDKs don't delete subcollections with their parent. A batch
-      // holds at most 500 writes.
-      final events = (await user.collection('events').get()).docs;
-      for (var i = 0; i < events.length; i += 450) {
-        final batch = _firestore.batch();
-        for (final d in events.skip(i).take(450)) {
-          batch.delete(d.reference);
-        }
-        await batch.commit();
+      // Client SDKs don't delete subcollections with their parent.
+      for (final sub in ['events', 'devices', 'notifications', 'settings']) {
+        final docs = (await user.collection(sub).get()).docs;
+        await deleteDocs(_firestore, [for (final d in docs) d.reference]);
       }
       await user.delete();
       await _firestore.collection('profiles').doc(uid).delete();

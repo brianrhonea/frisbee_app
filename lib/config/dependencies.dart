@@ -9,6 +9,8 @@ import '../data/repositories/direct_message/direct_message_repository.dart';
 import '../data/repositories/direct_message/direct_message_repository_firebase.dart';
 import '../data/repositories/event/event_repository.dart';
 import '../data/repositories/event/event_repository_firebase.dart';
+import '../data/repositories/notification/notification_repository.dart';
+import '../data/repositories/notification/notification_repository_firebase.dart';
 import '../data/repositories/playbook/play_repository.dart';
 import '../data/repositories/playbook/play_repository_firebase.dart';
 import '../data/repositories/ranking/ranking_repository.dart';
@@ -26,6 +28,7 @@ import '../data/repositories/usau_team/usau_team_repository_usau.dart';
 import '../data/services/attachment_storage.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/file_picker_service.dart';
+import '../data/services/push_service.dart';
 import '../data/services/usau/usau_client.dart';
 
 /// Services and repositories backed by Firebase.
@@ -52,6 +55,11 @@ List<SingleChildWidget> get firebaseProviders => [
     ),
   ),
   Provider(create: (_) => FilePickerService()),
+  Provider(create: (_) => PushService()),
+  Provider<NotificationRepository>(
+    create: (context) =>
+        NotificationRepositoryFirebase(push: context.read<PushService>()),
+  ),
   Provider<StatsRepository>(
     create: (context) =>
         StatsRepositoryFirebase(teamRepository: context.read<TeamRepository>()),

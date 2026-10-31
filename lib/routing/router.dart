@@ -26,6 +26,10 @@ import '../ui/home/view_models/home_viewmodel.dart';
 import '../ui/home/widgets/home_screen.dart';
 import '../ui/playbook/view_models/play_editor_viewmodel.dart';
 import '../ui/playbook/widgets/play_editor_screen.dart';
+import '../ui/notifications/view_models/notification_settings_viewmodel.dart';
+import '../ui/notifications/view_models/notifications_viewmodel.dart';
+import '../ui/notifications/widgets/notification_settings_screen.dart';
+import '../ui/notifications/widgets/notifications_screen.dart';
 import '../ui/profile/view_models/profile_viewmodel.dart';
 import '../ui/profile/widgets/profile_screen.dart';
 import '../ui/rankings/view_models/rankings_viewmodel.dart';
@@ -97,9 +101,34 @@ GoRouter router(AuthRepository auth) => GoRouter(
         create: (c) => ProfileViewModel(
           authRepository: c.read(),
           themeRepository: c.read(),
+          notificationRepository: c.read(),
         ),
         builder: (_, vm) => ProfileScreen(viewModel: vm),
       ),
+    ),
+    // Opened from the bell on Home, over the shell.
+    GoRoute(
+      path: Routes.notifications,
+      builder: (_, _) => ViewModelHost(
+        create: (c) => NotificationsViewModel(
+          notificationRepository: c.read(),
+          authRepository: c.read(),
+        ),
+        builder: (_, vm) => NotificationsScreen(viewModel: vm),
+      ),
+      routes: [
+        GoRoute(
+          path: 'settings',
+          builder: (_, _) => ViewModelHost(
+            create: (c) => NotificationSettingsViewModel(
+              notificationRepository: c.read(),
+              teamRepository: c.read(),
+              authRepository: c.read(),
+            ),
+            builder: (_, vm) => NotificationSettingsScreen(viewModel: vm),
+          ),
+        ),
+      ],
     ),
     // Team events, full screen over the shell (see Routes.teamEventsPath).
     GoRoute(
@@ -282,6 +311,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 create: (c) => HomeViewModel(
                   authRepository: c.read(),
                   directMessageRepository: c.read(),
+                  notificationRepository: c.read(),
                   teamRepository: c.read(),
                   playRepository: c.read(),
                   eventRepository: c.read(),
@@ -370,6 +400,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                               roomId: roomId,
                               teamRepository: c.read(),
                               chatRepository: c.read(),
+                              notificationRepository: c.read(),
                               authRepository: c.read(),
                               filePicker: c.read(),
                             ),

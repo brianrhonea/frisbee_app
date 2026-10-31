@@ -262,27 +262,36 @@ class TeamRepositoryFirebase implements TeamRepository {
   Future<Result<void>> deleteTeam(Team team) => guard(() async {
     final ref = _teams.doc(team.id);
     final code = await _currentCode(team.id);
-    // Firestore doesn't cascade deletes; clear subcollections first.
-    // private (the invite code) goes last: code deletes check the owner.
-    for (final room in (await chatRooms(_db, team.id).get()).docs) {
-      await deleteChatRoom(_db, _files, room.reference);
-    }
-    for (final sub in [
-      'roster',
-      'rosterStatus',
-      'joins',
-      'plays',
-      'events',
-      'statsTournaments',
-      'statsGames',
-      'private',
-    ]) {
-      final docs = await ref.collection(sub).get();
-      final batch = _db.batch();
-      for (final d in docs.docs) {
-        batch.delete(d.reference);
+    // Tells the notification functions not to announce the cascade below
+    // (every event "cancelled", and so on).
+    await ref.update({'deletingAt': FieldValue.serverTimestamp()});
+    try {
+      // Firestore doesn't cascade deletes; clear subcollections first.
+      // private (the invite code) goes last: code deletes check the owner.
+      for (final room in (await chatRooms(_db, team.id).get()).docs) {
+        await deleteChatRoom(_db, _files, room.reference);
       }
-      await batch.commit();
+      for (final sub in [
+        'roster',
+        'rosterStatus',
+        'joins',
+        'plays',
+        'events',
+        'statsTournaments',
+        'statsGames',
+        'private',
+      ]) {
+        final docs = await ref.collection(sub).get();
+        final batch = _db.batch();
+        for (final d in docs.docs) {
+          batch.delete(d.reference);
+        }
+        await batch.commit();
+      }
+    } on Exception {
+      // Half-deleted, but still a team: let it notify again.
+      await ref.update({'deletingAt': FieldValue.delete()});
+      rethrow;
     }
     final batch = _db.batch();
     if (code != null) batch.delete(_codes.doc(code));
