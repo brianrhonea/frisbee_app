@@ -6,8 +6,10 @@ import 'package:logging/logging.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/model_utils.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
+import '../../../domain/models/team_post.dart';
 import '../../../utils/result.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
@@ -27,7 +29,8 @@ class InviteCodeNotFoundException implements Exception {
 /// The invite code is in `private/invite` (admins only) and
 /// `inviteCodes/{code}` maps it back to the team; joiners prove they know
 /// it via `joins/{uid}`. Chat rooms are in `chats` (see
-/// [ChatRepositoryFirebase]).
+/// [ChatRepositoryFirebase]). `teamDirectory/{teamId}` is the public
+/// listing anyone signed in can search; it mirrors the team's details.
 /// All writes are validated by `firestore.rules`.
 class TeamRepositoryFirebase implements TeamRepository {
   TeamRepositoryFirebase({
@@ -38,7 +41,7 @@ class TeamRepositoryFirebase implements TeamRepository {
        _db = firestore ?? FirebaseFirestore.instance,
        _random = random ?? Random.secure();
 
-  /// Chat attachments go with the team.
+  /// Chat attachments and post photos go with the team.
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
   final Random _random;
@@ -54,6 +57,11 @@ class TeamRepositoryFirebase implements TeamRepository {
 
   CollectionReference<Map<String, dynamic>> get _teams =>
       _db.collection('teams');
+
+  CollectionReference<Map<String, dynamic>> get _directory =>
+      _db.collection('teamDirectory');
+
+  static const _searchLimit = 25;
 
   CollectionReference<Map<String, dynamic>> get _codes =>
       _db.collection('inviteCodes');
@@ -120,6 +128,16 @@ class TeamRepositoryFirebase implements TeamRepository {
               'memberNames': {owner.uid: owner.label},
               'createdAt': FieldValue.serverTimestamp(),
             })
+            ..set(
+              _directory.doc(ref.id),
+              TeamListing(
+                id: ref.id,
+                name: team.name,
+                division: team.division,
+                level: team.level,
+                city: team.city,
+              ).toMap(),
+            )
             ..set(_invite(ref.id), {'code': code})
             ..set(_codes.doc(code), {'teamId': ref.id})
             ..set(
@@ -157,8 +175,47 @@ class TeamRepositoryFirebase implements TeamRepository {
       });
 
   @override
-  Future<Result<void>> updateTeam(Team team) =>
-      guard(() => _teams.doc(team.id).update(team.toEditableMap()));
+  Future<Result<void>> updateTeam(Team team) => guard(
+    () =>
+        (_db.batch()
+              ..update(_teams.doc(team.id), team.toEditableMap())
+              ..set(_directory.doc(team.id), TeamListing.of(team).toMap()))
+            .commit(),
+  );
+
+  @override
+  Future<Result<List<TeamListing>>> searchTeams(String query) => guard(
+    () async {
+      final words = searchWords(query);
+      if (words.isEmpty) return const [];
+      // Match the longest word in Firestore, then the rest here.
+      final key = (words.toList()..sort((a, b) => b.length - a.length)).first;
+      final snap = await _directory
+          .where(
+            'keywords',
+            arrayContains: key.length > 20 ? key.substring(0, 20) : key,
+          )
+          .limit(_searchLimit * 2)
+          .get();
+      return [
+          for (final d in snap.docs)
+            TeamListing.fromMap(d.id, plainData(d.data())),
+        ].where((t) => t.matches(query)).take(_searchLimit).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    },
+  );
+
+  @override
+  Stream<TeamListing?> watchListing(String teamId) => _directory
+      .doc(teamId)
+      .snapshots()
+      .map(
+        (d) => d.exists ? TeamListing.fromMap(d.id, plainData(d.data())) : null,
+      );
+
+  @override
+  Future<Result<void>> publishListing(Team team) =>
+      guard(() => _directory.doc(team.id).set(TeamListing.of(team).toMap()));
 
   @override
   Stream<String?> watchInviteCode(String teamId) =>
@@ -271,12 +328,23 @@ class TeamRepositoryFirebase implements TeamRepository {
       for (final room in (await chatRooms(_db, team.id).get()).docs) {
         await deleteChatRoom(_db, _files, room.reference);
       }
+      // Post photos go before their posts, which list them.
+      for (final post in (await ref.collection('posts').get()).docs) {
+        await _files.delete(
+          TeamPost.fromMap(
+            post.id,
+            plainData(post.data()),
+          ).images.map((i) => i.path),
+        );
+      }
       for (final sub in [
         'roster',
         'rosterStatus',
         'joins',
         'plays',
         'events',
+        'publicEvents',
+        'posts',
         'statsTournaments',
         'statsGames',
         'private',
@@ -295,7 +363,9 @@ class TeamRepositoryFirebase implements TeamRepository {
     }
     final batch = _db.batch();
     if (code != null) batch.delete(_codes.doc(code));
-    batch.delete(ref);
+    batch
+      ..delete(_directory.doc(team.id))
+      ..delete(ref);
     await batch.commit();
   });
 

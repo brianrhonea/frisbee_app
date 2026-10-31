@@ -565,6 +565,218 @@ describe("personal events", () => {
   });
 });
 
+describe("public events", () => {
+  const details = (extra: Record<string, unknown> = {}) => ({
+    title: "Open tryouts",
+    type: "other",
+    startsAt: new Date("2026-11-07T15:00:00Z"),
+    endsAt: null,
+    location: "Central Park",
+    notes: "",
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const pub = (uid: string) => doc(db(uid), "teams", TEAM, "publicEvents", "e1");
+
+  it("editors mark an event public and write its public copy", async () => {
+    const fs = db(COACH);
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, "teams", TEAM, "events", "e1"), {
+      ...details(),
+      poll: null,
+      public: true,
+      rsvps: {},
+      reactions: {},
+      votes: {},
+      createdBy: COACH,
+      createdAt: serverTimestamp(),
+    });
+    batch.set(doc(fs, "teams", TEAM, "publicEvents", "e1"), details());
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(updateDoc(doc(fs, "teams", TEAM, "events", "e1"), { public: false }));
+    await assertSucceeds(deleteDoc(pub(COACH)));
+  });
+
+  it("players and outsiders cannot write public copies", async () => {
+    await assertFails(setDoc(pub(PLAYER), details()));
+    await assertFails(setDoc(pub(OUTSIDER), details()));
+  });
+
+  it("public copies hold details only", async () => {
+    await assertFails(setDoc(pub(COACH), details({ rsvps: {} })));
+    await assertFails(setDoc(pub(COACH), details({ title: "" })));
+  });
+
+  it("anyone signed in can read public copies, not the events", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "publicEvents", "e1"), details()),
+    );
+    await assertSucceeds(getDoc(pub(OUTSIDER)));
+    await assertSucceeds(getDocs(collection(db(OUTSIDER), "teams", TEAM, "publicEvents")));
+    await assertFails(getDocs(collection(db(OUTSIDER), "teams", TEAM, "events")));
+    await assertFails(
+      getDoc(doc(env.unauthenticatedContext().firestore(), "teams", TEAM, "publicEvents", "e1")),
+    );
+  });
+
+  it("personal events cannot be public", async () => {
+    await assertFails(
+      setDoc(doc(db(PLAYER), "users", PLAYER, "events", "m1"), {
+        ...details(),
+        poll: null,
+        public: true,
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+});
+
+describe("posts", () => {
+  const post = (uid: string, extra: Record<string, unknown> = {}) => ({
+    title: "Tryouts",
+    body: "Saturday at 10.",
+    public: true,
+    authorId: uid,
+    authorName: "C",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const ref = (uid: string, id = "p1") => doc(db(uid), "teams", TEAM, "posts", id);
+  const seed = () =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", TEAM, "posts", "pub"), { ...post(COACH), createdAt: new Date() });
+      await setDoc(doc(fs, "teams", TEAM, "posts", "priv"), {
+        ...post(COACH),
+        public: false,
+        createdAt: new Date(),
+      });
+    });
+
+  it("owners, coaches and captains post; players and outsiders cannot", async () => {
+    await assertSucceeds(setDoc(ref(OWNER, "a"), post(OWNER)));
+    await assertSucceeds(setDoc(ref(COACH, "b"), post(COACH)));
+    await assertSucceeds(setDoc(ref(CAPTAIN, "c"), post(CAPTAIN, { public: false })));
+    await assertFails(setDoc(ref(PLAYER, "d"), post(PLAYER)));
+    await assertFails(setDoc(ref(OUTSIDER, "e"), post(OUTSIDER)));
+  });
+
+  it("validates posts and their author", async () => {
+    await assertFails(setDoc(ref(COACH), post(OWNER)));
+    await assertFails(setDoc(ref(COACH), post(COACH, { body: "" })));
+    await assertFails(setDoc(ref(COACH), post(COACH, { public: "yes" })));
+    await assertFails(setDoc(ref(COACH), post(COACH, { pinned: true })));
+    await assertFails(setDoc(ref(COACH), post(COACH, { createdAt: new Date("2020-01-01") })));
+  });
+
+  it("posts may have a place, up to 5 web links and 4 photos", async () => {
+    const image = { path: "p/0-a.png", name: "a.png", contentType: "image/png", size: 3 };
+    await assertSucceeds(
+      setDoc(ref(COACH, "f"), post(COACH, {
+        location: "Wash Park",
+        links: ["https://example.com", "http://x.org/a"],
+        images: [image],
+      })),
+    );
+    // A photo alone is enough.
+    await assertSucceeds(setDoc(ref(COACH, "g"), post(COACH, { body: "", images: [image] })));
+    await assertFails(setDoc(ref(COACH, "h"), post(COACH, { links: ["javascript:alert(1)"] })));
+    await assertFails(
+      setDoc(ref(COACH, "i"), post(COACH, { links: Array(6).fill("https://example.com") })),
+    );
+    await assertFails(setDoc(ref(COACH, "j"), post(COACH, { images: Array(5).fill(image) })));
+    await assertFails(setDoc(ref(COACH, "k"), post(COACH, { location: "x".repeat(201) })));
+  });
+
+  it("members read every post; others only public ones", async () => {
+    await seed();
+    await assertSucceeds(getDocs(collection(db(PLAYER), "teams", TEAM, "posts")));
+    await assertSucceeds(getDoc(ref(PLAYER, "priv")));
+    await assertSucceeds(getDoc(ref(OUTSIDER, "pub")));
+    await assertFails(getDoc(ref(OUTSIDER, "priv")));
+    await assertFails(getDocs(collection(db(OUTSIDER), "teams", TEAM, "posts")));
+    await assertSucceeds(
+      getDocs(query(collection(db(OUTSIDER), "teams", TEAM, "posts"), where("public", "==", true))),
+    );
+  });
+
+  it("editors edit content and visibility only, and delete", async () => {
+    await seed();
+    await assertSucceeds(
+      updateDoc(ref(CAPTAIN, "pub"), { body: "Moved to 11.", public: false, updatedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(ref(CAPTAIN, "pub"), { authorId: CAPTAIN }));
+    await assertFails(updateDoc(ref(PLAYER, "pub"), { body: "Hijack" }));
+    await assertFails(deleteDoc(ref(PLAYER, "pub")));
+    await assertSucceeds(deleteDoc(ref(OWNER, "pub")));
+  });
+});
+
+describe("team directory", () => {
+  const listing = (extra: Record<string, unknown> = {}) => ({
+    name: "Team",
+    division: "mixed",
+    level: "club",
+    city: "",
+    keywords: ["t", "te", "tea", "team"],
+    ...extra,
+  });
+  const ref = (uid: string, id = TEAM) => doc(db(uid), "teamDirectory", id);
+
+  it("anyone signed in can search listings", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teamDirectory", TEAM), listing()),
+    );
+    await assertSucceeds(getDoc(ref(OUTSIDER)));
+    await assertSucceeds(
+      getDocs(query(collection(db(OUTSIDER), "teamDirectory"), where("keywords", "array-contains", "tea"))),
+    );
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "teamDirectory", TEAM)));
+  });
+
+  it("editors list their team as it is; players and outsiders cannot", async () => {
+    await assertSucceeds(setDoc(ref(CAPTAIN), listing()));
+    await assertFails(setDoc(ref(PLAYER), listing()));
+    await assertFails(setDoc(ref(OUTSIDER), listing()));
+    await assertFails(setDoc(ref(COACH), listing({ name: "Better Team" })));
+    await assertFails(setDoc(ref(COACH), listing({ memberIds: [OWNER] })));
+  });
+
+  it("listing changes go with the team's edits", async () => {
+    const fs = db(COACH);
+    const batch = writeBatch(fs);
+    batch.update(doc(fs, "teams", TEAM), { name: "Renamed", city: "Austin" });
+    batch.set(doc(fs, "teamDirectory", TEAM), listing({ name: "Renamed", city: "Austin" }));
+    await assertSucceeds(batch.commit());
+  });
+
+  it("a new team lists itself in its create batch", async () => {
+    const fs = db(OUTSIDER);
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, "teams", "t2"), {
+      name: "New", division: "open", level: "college", city: "Denver",
+      ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" },
+      memberIds: [OUTSIDER], memberNames: { [OUTSIDER]: "Me" },
+    });
+    batch.set(doc(fs, "teams", "t2", "private", "invite"), { code: "ZZZ999" });
+    batch.set(doc(fs, "inviteCodes", "ZZZ999"), { teamId: "t2" });
+    batch.set(
+      doc(fs, "teamDirectory", "t2"),
+      listing({ name: "New", division: "open", level: "college", city: "Denver" }),
+    );
+    await assertSucceeds(batch.commit());
+  });
+
+  it("only the owner deletes a team's listing", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teamDirectory", TEAM), listing()),
+    );
+    await assertFails(deleteDoc(ref(COACH)));
+    await assertSucceeds(deleteDoc(ref(OWNER)));
+  });
+});
+
 describe("stats", () => {
   const game = (extra: Record<string, unknown> = {}) => ({
     opponent: "Rival",

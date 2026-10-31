@@ -8,7 +8,9 @@ An ultimate frisbee team app built with Flutter + Firebase for Android, iOS, mac
 - Sign in with email/password, Google and Apple (Google/Apple are hidden on Windows, which has no plugin support)
 - Team-first Home: this week's events, your team, a playbook preview, upcoming events and a rankings podium
 - Teams with roles (owner, coach, captain, player, plus stats access), invite codes and a roster that can be imported and synced from USA Ultimate
-- Team schedule with RSVPs, reactions and polls; a personal schedule; and a Schedule tab merging both, with swipe-to-delete by role
+- A home page for each team: summary, upcoming events and posts from owners, coaches and captains
+- Team search: anyone can find a team and see its public page (public events and posts only)
+- Team Events with RSVPs, reactions and polls; a personal schedule; and a Schedule tab merging both, with swipe-to-delete by role
 - Playbook with a drawable field editor and animated plays
 - Live game stats: lines, O/D, pull timer, stat sheets and season stats
 - USA Ultimate tournaments, rankings and team search, scraped live in the app

@@ -75,13 +75,19 @@ service cloud.firestore {
 
     // Event details, shared by team and personal events.
     function validEvent(e) {
+      return validEventDetails(e)
+        && (e.poll == null || validPoll(e.poll))
+        && e.get('public', false) is bool;
+    }
+
+    // What every event has, including public copies (no poll or responses).
+    function validEventDetails(e) {
       return e.title is string && e.title.size() > 0 && e.title.size() <= 100
         && e.type in ['practice', 'game', 'tournament', 'scrimmage', 'workout', 'social', 'other']
         && e.startsAt is timestamp
         && (e.endsAt == null || (e.endsAt is timestamp && e.endsAt >= e.startsAt))
         && validString(e.location, 200)
-        && validString(e.notes, 5000)
-        && (e.poll == null || validPoll(e.poll));
+        && validString(e.notes, 5000);
     }
 
     function validPoll(p) {
@@ -411,7 +417,7 @@ service cloud.firestore {
           return isEditor(team())
             && changed().hasOnly([
                  'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
-                 'poll', 'votes', 'updatedAt'])
+                 'poll', 'public', 'votes', 'updatedAt'])
             && (!('votes' in changed()) || request.resource.data.votes == {})
             && validEvent(request.resource.data);
         }
@@ -422,7 +428,7 @@ service cloud.firestore {
           && isEditor(team())
           && request.resource.data.keys().hasOnly([
                'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
-               'poll', 'rsvps', 'reactions', 'votes', 'createdBy',
+               'poll', 'public', 'rsvps', 'reactions', 'votes', 'createdBy',
                'createdAt', 'updatedAt'])
           && request.resource.data.createdBy == uid()
           && request.resource.data.rsvps == {}
@@ -430,6 +436,68 @@ service cloud.firestore {
           && request.resource.data.votes == {}
           && validEvent(request.resource.data);
         allow update: if signedIn() && (respond() || editDetails());
+      }
+
+      // Copies of events marked public, for the team's public home page:
+      // details only, so people outside the team never see responses.
+      // Editors write them alongside the event.
+      match /publicEvents/{eventId} {
+        allow read: if signedIn();
+        allow delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
+        allow create, update: if signedIn()
+          && isEditor(get(teamPath(teamId)).data)
+          && request.resource.data.keys().hasOnly([
+               'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
+               'updatedAt'])
+          && validEventDetails(request.resource.data);
+      }
+
+      // Home page posts (TeamPost in lib/domain/models/team_post.dart).
+      // Editors post; anyone signed in reads public posts, members the rest.
+      match /posts/{postId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        // Text, a photo, or both; up to 5 web links and 4 photos
+        // (TeamPost.maxLinks / maxImages). Photos are in Storage under
+        // teams/{teamId}/posts/{postId}/ (see storage.rules).
+        function validPost(p) {
+          let links = p.get('links', []);
+          let images = p.get('images', []);
+          return validString(p.title, 100)
+            && validString(p.body, 5000)
+            && validString(p.get('location', ''), 200)
+            && links is list && links.size() <= 5
+            && (links.size() < 1 || validLink(links[0]))
+            && (links.size() < 2 || validLink(links[1]))
+            && (links.size() < 3 || validLink(links[2]))
+            && (links.size() < 4 || validLink(links[3]))
+            && (links.size() < 5 || validLink(links[4]))
+            && images is list && images.size() <= 4
+            && (p.body.size() > 0 || images.size() > 0)
+            && p.public is bool;
+        }
+
+        function validLink(l) {
+          return l is string && l.size() <= 500 && l.matches('https?://.+');
+        }
+
+        allow read: if signedIn()
+          && (resource.data.public == true || isMember(team()));
+        allow delete: if signedIn() && isEditor(team());
+        allow create: if signedIn()
+          && isEditor(team())
+          && request.resource.data.keys().hasOnly([
+               'title', 'body', 'location', 'links', 'images', 'public',
+               'authorId', 'authorName', 'createdAt', 'updatedAt'])
+          && request.resource.data.authorId == uid()
+          && validString(request.resource.data.authorName, 80)
+          && request.resource.data.createdAt == request.time
+          && validPost(request.resource.data);
+        allow update: if signedIn() && isEditor(team())
+          && changed().hasOnly([
+               'title', 'body', 'location', 'links', 'images', 'public',
+               'updatedAt'])
+          && validPost(request.resource.data);
       }
 
       // Chat rooms (ChatRoom in lib/domain/models/chat.dart). Each room
@@ -556,6 +624,32 @@ service cloud.firestore {
           && request.resource.data.timeouts is list
           && request.resource.data.timeouts.size() <= 40;
       }
+    }
+
+    // ---- Team directory ---------------------------------------------------
+
+    // Public team listings for search (TeamListing in
+    // lib/domain/models/team.dart): name, division, level and city only,
+    // copied from the team. Editors write them with the team, so getAfter
+    // covers the create and edit batches.
+    match /teamDirectory/{teamId} {
+      function validListing(d, team) {
+        return d.keys().hasOnly(['name', 'division', 'level', 'city', 'keywords'])
+          && d.name == team.name
+          && d.division == team.division
+          && d.level == team.level
+          && d.city == team.get('city', '')
+          && d.keywords is list && d.keywords.size() <= 100;
+      }
+
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && isEditor(getAfter(teamPath(teamId)).data)
+        && validListing(request.resource.data, getAfter(teamPath(teamId)).data);
+      // The owner deletes it with the team; a listing left without a team
+      // is anyone's to clear.
+      allow delete: if signedIn()
+        && (!exists(teamPath(teamId)) || isOwner(get(teamPath(teamId)).data));
     }
 
     // ---- Direct messages --------------------------------------------------

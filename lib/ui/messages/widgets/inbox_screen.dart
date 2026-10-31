@@ -213,8 +213,10 @@ class PersonAvatar extends StatelessWidget {
     return CircleAvatar(
       backgroundColor: c.feature,
       foregroundColor: c.onFeature,
-      backgroundImage: photo == null ? null : NetworkImage(photo),
-      child: photo == null
+      backgroundImage: photo == null || photo.isEmpty
+          ? null
+          : NetworkImage(photo),
+      child: photo == null || photo.isEmpty
           ? Text(initials, style: const TextStyle(fontWeight: FontWeight.w700))
           : null,
     );

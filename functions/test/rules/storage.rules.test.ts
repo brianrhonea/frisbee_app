@@ -120,6 +120,53 @@ describe("chat attachments", () => {
   });
 });
 
+describe("post photos", () => {
+  const photo = (uid: string, post: string) =>
+    storage(uid).ref(`teams/${TEAM}/posts/${post}/1/0-photo.png`);
+  const seed = () =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", TEAM, "posts", "pub"), { public: true });
+      await setDoc(doc(fs, "teams", TEAM, "posts", "priv"), { public: false });
+      for (const post of ["pub", "priv"]) {
+        await ctx
+          .storage()
+          .ref(`teams/${TEAM}/posts/${post}/1/0-photo.png`)
+          .put(bytes(10), { contentType: "image/png" });
+      }
+    });
+
+  it("public post photos are for anyone signed in; others for members", async () => {
+    await seed();
+    await assertSucceeds(photo(OUTSIDER, "pub").getMetadata());
+    await assertSucceeds(photo(PLAYER, "priv").getMetadata());
+    await assertFails(photo(OUTSIDER, "priv").getMetadata());
+  });
+
+  it("owners, coaches and captains upload photos; players cannot", async () => {
+    for (const uid of [OWNER, COACH, CAPTAIN]) {
+      await assertSucceeds(
+        photo(uid, `new-${uid}`).put(bytes(10), { contentType: "image/png" }).then(),
+      );
+    }
+    await assertFails(photo(PLAYER, "new").put(bytes(10), { contentType: "image/png" }).then());
+    await assertFails(photo(OUTSIDER, "new").put(bytes(10), { contentType: "image/png" }).then());
+  });
+
+  it("only photos up to 10 MB", async () => {
+    await assertFails(photo(COACH, "new").put(bytes(10), { contentType: "application/pdf" }).then());
+    await assertFails(
+      photo(COACH, "new").put(bytes(10 * 1024 * 1024 + 1), { contentType: "image/png" }).then(),
+    );
+  });
+
+  it("admins delete photos; players cannot", async () => {
+    await seed();
+    await assertFails(photo(PLAYER, "pub").delete());
+    await assertSucceeds(photo(CAPTAIN, "pub").delete());
+  });
+});
+
 describe("direct message attachments", () => {
   const CONV = `${OWNER}_${PLAYER}`;
   const dm = (uid: string, author: string) =>

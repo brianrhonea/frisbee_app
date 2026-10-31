@@ -14,6 +14,11 @@ class EventRepositoryFirebase implements EventRepository {
   CollectionReference<Map<String, dynamic>> _events(String teamId) =>
       _db.collection('teams').doc(teamId).collection('events');
 
+  /// Public copies of events marked [TeamEvent.isPublic], keyed like
+  /// events, so people outside the team never read responses.
+  CollectionReference<Map<String, dynamic>> _publicEvents(String teamId) =>
+      _db.collection('teams').doc(teamId).collection('publicEvents');
+
   CollectionReference<Map<String, dynamic>> _myEvents(String uid) =>
       _db.collection('users').doc(uid).collection('events');
 
@@ -34,6 +39,15 @@ class EventRepositoryFirebase implements EventRepository {
       _events(teamId).doc(eventId).snapshots().map(_parseOne);
 
   @override
+  Stream<List<TeamEvent>> watchPublicEvents(String teamId) => _publicEvents(
+    teamId,
+  ).orderBy('startsAt').snapshots().map(_parse).map(_markPublic);
+
+  static List<TeamEvent> _markPublic(List<TeamEvent> events) => [
+    for (final e in events) e.copyWith(isPublic: true),
+  ];
+
+  @override
   Future<Result<String>> saveEvent(
     String teamId,
     TeamEvent event,
@@ -41,10 +55,13 @@ class EventRepositoryFirebase implements EventRepository {
     bool clearVotes = false,
   }) => guard(() async {
     final col = _events(teamId);
+    final ref = event.isNew ? col.doc() : col.doc(event.id);
+    final publicRef = _publicEvents(teamId).doc(ref.id);
+    final batch = _db.batch();
     if (event.isNew) {
-      final ref = col.doc();
-      await ref.set({
+      batch.set(ref, {
         ...event.toEditableMap(),
+        'public': event.isPublic,
         'rsvps': <String, Object>{},
         'reactions': <String, Object>{},
         'votes': <String, Object>{},
@@ -52,19 +69,35 @@ class EventRepositoryFirebase implements EventRepository {
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      return ref.id;
+    } else {
+      batch.update(ref, {
+        ...event.toEditableMap(),
+        'public': event.isPublic,
+        if (clearVotes) 'votes': <String, Object>{},
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     }
-    await col.doc(event.id).update({
-      ...event.toEditableMap(),
-      if (clearVotes) 'votes': <String, Object>{},
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    return event.id;
+    if (event.isPublic) {
+      batch.set(publicRef, {
+        ...event.toPublicMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } else if (!event.isNew) {
+      // Deleting a missing doc is fine, so no need to check it was public.
+      batch.delete(publicRef);
+    }
+    await batch.commit();
+    return ref.id;
   });
 
   @override
-  Future<Result<void>> deleteEvent(String teamId, String eventId) =>
-      guard(() => _events(teamId).doc(eventId).delete());
+  Future<Result<void>> deleteEvent(String teamId, String eventId) => guard(
+    () =>
+        (_db.batch()
+              ..delete(_events(teamId).doc(eventId))
+              ..delete(_publicEvents(teamId).doc(eventId)))
+            .commit(),
+  );
 
   // Responses use field-path updates so concurrent members never clobber
   // each other's entries.

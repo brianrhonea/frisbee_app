@@ -8,17 +8,17 @@ import '../../core/ui/status_views.dart';
 import '../../teams/view_models/team_detail_viewmodel.dart';
 import 'event_style.dart';
 
-/// Team calendar: a month grid plus the selected day's (or upcoming) events.
-class ScheduleTab extends StatefulWidget {
-  const ScheduleTab({super.key, required this.viewModel});
+/// Team Events: a month calendar plus the selected day's (or upcoming) events.
+class TeamEventsTab extends StatefulWidget {
+  const TeamEventsTab({super.key, required this.viewModel});
 
   final TeamDetailViewModel viewModel;
 
   @override
-  State<ScheduleTab> createState() => _ScheduleTabState();
+  State<TeamEventsTab> createState() => _TeamEventsTabState();
 }
 
-class _ScheduleTabState extends State<ScheduleTab> {
+class _TeamEventsTabState extends State<TeamEventsTab> {
   // Ephemeral view state: which month is shown and which day is picked.
   DateTime _month = _thisMonth();
   DateTime? _selected;
@@ -70,7 +70,7 @@ class _ScheduleTabState extends State<ScheduleTab> {
     );
     final tiles = [
       for (final e in events)
-        _EventTile(
+        TeamEventTile(
           event: e,
           uid: vm.uid,
           onTap: () => context.push(Routes.event(vm.teamId, e.id)),
@@ -337,16 +337,23 @@ class _DayCell extends StatelessWidget {
   }
 }
 
-class _EventTile extends StatelessWidget {
-  const _EventTile({
+/// A team event in a list: date badge, title, time and place, and the
+/// member's RSVP. Public events are marked with a globe.
+class TeamEventTile extends StatelessWidget {
+  const TeamEventTile({
+    super.key,
     required this.event,
     required this.uid,
     required this.onTap,
+    this.showResponses = true,
   });
 
   final TeamEvent event;
   final String uid;
   final VoidCallback onTap;
+
+  /// RSVP prompt and head count; off on the public page, which has none.
+  final bool showResponses;
 
   @override
   Widget build(BuildContext context) {
@@ -389,6 +396,11 @@ class _EventTile extends StatelessWidget {
           Expanded(
             child: Text(e.title, maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
+          if (e.isPublic && showResponses)
+            Tooltip(
+              message: 'Shown on the public team page',
+              child: Icon(Icons.public, size: 16, color: scheme.outline),
+            ),
         ],
       ),
       subtitle: Text(
@@ -400,23 +412,25 @@ class _EventTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (mine != null)
-            Icon(mine.icon, size: 20, color: mine.color(scheme))
-          else
-            Text(
-              'RSVP',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
+      trailing: !showResponses
+          ? null
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (mine != null)
+                  Icon(mine.icon, size: 20, color: mine.color(scheme))
+                else
+                  Text(
+                    'RSVP',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                Text('$going going', style: theme.textTheme.bodySmall),
+              ],
             ),
-          Text('$going going', style: theme.textTheme.bodySmall),
-        ],
-      ),
     );
   }
 }

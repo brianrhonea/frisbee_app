@@ -19,6 +19,8 @@ import '../data/repositories/stats/stats_repository_firebase.dart';
 import '../data/repositories/ranking/ranking_repository_usau.dart';
 import '../data/repositories/team/team_repository.dart';
 import '../data/repositories/team/team_repository_firebase.dart';
+import '../data/repositories/team_post/team_post_repository.dart';
+import '../data/repositories/team_post/team_post_repository_firebase.dart';
 import '../data/repositories/tournament/tournament_repository.dart';
 import '../data/repositories/tournament/tournament_repository_usau.dart';
 import '../data/repositories/usau_schedule/usau_schedule_repository.dart';
@@ -45,6 +47,11 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<PlayRepository>(create: (_) => PlayRepositoryFirebase()),
   Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),
+  Provider<TeamPostRepository>(
+    create: (context) => TeamPostRepositoryFirebase(
+      attachments: context.read<AttachmentStorage>(),
+    ),
+  ),
   Provider<ChatRepository>(
     create: (context) =>
         ChatRepositoryFirebase(attachments: context.read<AttachmentStorage>()),

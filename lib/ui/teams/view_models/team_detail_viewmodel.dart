@@ -17,8 +17,8 @@ import '../../../utils/result.dart';
 typedef RoleChange = ({String uid, TeamRole role});
 typedef StatsAccess = ({String uid, bool on});
 
-/// Backs the team detail screen and its Schedule / Roster / Playbook /
-/// Members tabs.
+/// Backs the team sections: Team Events, Roster, Playbook and Members.
+/// The team home page has its own `TeamHomeViewModel`.
 class TeamDetailViewModel extends ChangeNotifier {
   TeamDetailViewModel({
     required this.teamId,
@@ -31,7 +31,6 @@ class TeamDetailViewModel extends ChangeNotifier {
        _plays = playRepository,
        _auth = authRepository,
        _clock = clock ?? DateTime.now {
-    updateTeam = Command1<void, Team>(_teams.updateTeam);
     savePlayer = Command1<void, RosterPlayer>(
       (p) => _teams.savePlayer(teamId, p),
     );
@@ -55,8 +54,6 @@ class TeamDetailViewModel extends ChangeNotifier {
     removeMember = Command1<void, String>(
       (uid) => _teams.removeMember(teamId, uid),
     );
-    leaveTeam = Command0<void>(() => _teams.removeMember(teamId, uid));
-    deleteTeam = Command0<void>(_deleteTeam);
     deletePlay = Command1<void, String>((id) => _plays.deletePlay(teamId, id));
 
     _subs = [
@@ -216,7 +213,6 @@ class TeamDetailViewModel extends ChangeNotifier {
         (myRole?.canRemove(target) ?? false);
   }
 
-  late final Command1<void, Team> updateTeam;
   late final Command1<void, RosterPlayer> savePlayer;
   late final Command1<void, String> deletePlayer;
   late final Command0<void> regenerateInviteCode;
@@ -228,8 +224,6 @@ class TeamDetailViewModel extends ChangeNotifier {
   /// Hands the team to the given member; the owner becomes a player.
   late final Command1<void, String> transferOwnership;
   late final Command1<void, String> removeMember;
-  late final Command0<void> leaveTeam;
-  late final Command0<void> deleteTeam;
   late final Command1<void, String> deletePlay;
 
   void _onError(Object e) {
@@ -239,12 +233,6 @@ class TeamDetailViewModel extends ChangeNotifier {
 
   Future<Result<void>> _regenerateInviteCode() =>
       _teams.regenerateInviteCode(teamId);
-
-  Future<Result<void>> _deleteTeam() async {
-    final t = _team;
-    if (t == null) return Result.error(Exception('Team not loaded'));
-    return _teams.deleteTeam(t);
-  }
 
   @override
   void dispose() {

@@ -3,6 +3,8 @@ import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/domain/models/team_event.dart';
+import 'package:frisbee_app/domain/models/team_post.dart';
 import 'package:frisbee_app/domain/models/tournament.dart';
 
 void main() {
@@ -143,6 +145,104 @@ void main() {
       );
       expect(admin.paid, isTrue);
       expect(admin.onUsau, isTrue);
+    });
+  });
+
+  group('TeamListing', () {
+    test('searchable by name and city word prefixes', () {
+      const listing = TeamListing(
+        id: 't1',
+        name: 'Ring of Fire',
+        division: Division.open,
+        level: CompetitionLevel.club,
+        city: 'Raleigh',
+      );
+      final keywords = listing.toMap()['keywords'] as List<String>;
+      expect(keywords, containsAll(['r', 'ri', 'ring', 'fire', 'ral']));
+      expect(listing.matches('ring ral'), isTrue);
+      expect(listing.matches('ring denver'), isFalse);
+      expect(listing.subtitle, 'Open · Club · Raleigh');
+      expect(listing.toMap().keys, isNot(contains('members')));
+    });
+
+    test('round-trips and compares with its team', () {
+      final team = Team.fromMap('t1', {
+        'name': 'Ring',
+        'division': 'open',
+        'level': 'college',
+        'city': 'Raleigh',
+        'members': {'a': 'owner'},
+      });
+      final listing = TeamListing.fromMap('t1', TeamListing.of(team).toMap());
+      expect(listing.sameAs(team), isTrue);
+      expect(listing.sameAs(team.copyWith(city: 'Durham')), isFalse);
+    });
+  });
+
+  group('public events and posts', () {
+    test('public copy of an event has details only', () {
+      final event = TeamEvent.fromMap('e1', {
+        'title': 'Tryouts',
+        'type': 'other',
+        'startsAt': DateTime(2026, 11, 7, 10),
+        'public': true,
+        'rsvps': {'a': 'going'},
+      });
+      expect(event.isPublic, isTrue);
+      expect(event.toPublicMap().keys, [
+        'title',
+        'type',
+        'startsAt',
+        'endsAt',
+        'location',
+        'notes',
+      ]);
+      // Personal events share toEditableMap, whose rules don't allow it.
+      expect(event.toEditableMap().keys, isNot(contains('public')));
+      expect(TeamEvent.fromMap('e2', const {}).isPublic, isFalse);
+    });
+
+    test('post round-trips and sorts newest first', () {
+      final a = TeamPost.fromMap('a', {
+        'title': 'Hi',
+        'body': 'Welcome',
+        'public': true,
+        'createdAt': DateTime(2026, 10, 1),
+        'updatedAt': DateTime(2026, 10, 2),
+      });
+      final b = TeamPost.fromMap('b', {
+        'body': 'Later',
+        'createdAt': DateTime(2026, 10, 5),
+      });
+      expect(a.isPublic, isTrue);
+      expect(a.edited, isTrue);
+      expect(b.isPublic, isFalse);
+      expect(a.toEditableMap(), {
+        'title': 'Hi',
+        'body': 'Welcome',
+        'location': '',
+        'links': <String>[],
+        'images': <Map<String, dynamic>>[],
+        'public': true,
+      });
+      final full = TeamPost.fromMap('c', {
+        'location': 'Wash Park',
+        'links': ['https://example.com'],
+        'images': [
+          {
+            'path': 'p/0-a.png',
+            'name': 'a.png',
+            'contentType': 'image/png',
+            'size': 3,
+          },
+        ],
+      });
+      expect(full.location, 'Wash Park');
+      expect(full.links, ['https://example.com']);
+      expect(full.images.single.isImage, isTrue);
+      expect(full.hasContent, isTrue);
+      expect(const TeamPost(id: 'd').hasContent, isFalse);
+      expect(([a, b]..sort(TeamPost.newestFirst)).map((p) => p.id), ['b', 'a']);
     });
   });
 }

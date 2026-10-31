@@ -212,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
         action: team == null ? null : 'All plays',
         onTap: team == null
             ? null
-            : () => context.go(Routes.team(team.id, tab: 'playbook')),
+            : () => context.go(Routes.teamPlaybook(team.id)),
       ),
       children: [
         if (team != null && vm.plays.isNotEmpty)
@@ -305,8 +305,10 @@ class _Header extends StatelessWidget {
                 radius: 20,
                 backgroundColor: c.feature,
                 foregroundColor: c.onFeature,
-                backgroundImage: photo == null ? null : NetworkImage(photo),
-                child: photo == null
+                backgroundImage: photo == null || photo.isEmpty
+                    ? null
+                    : NetworkImage(photo),
+                child: photo == null || photo.isEmpty
                     ? Text(
                         vm.initials.toUpperCase(),
                         style: const TextStyle(fontWeight: FontWeight.w700),
@@ -747,7 +749,7 @@ class _PlayStrip extends StatelessWidget {
             _StripAction(
               icon: Icons.menu_book_outlined,
               label: '+$more more',
-              onTap: () => context.go(Routes.team(team.id, tab: 'playbook')),
+              onTap: () => context.go(Routes.teamPlaybook(team.id)),
             ),
           if (canEdit)
             _StripAction(
@@ -860,7 +862,7 @@ class _PlaybookHero extends StatelessWidget {
     final (label, route) = switch (team) {
       null => ('Create team', Routes.createTeam),
       _ when canEdit => ('Draw first play', Routes.newPlay(team.id)),
-      _ => ('Open playbook', Routes.team(team.id, tab: 'playbook')),
+      _ => ('Open playbook', Routes.teamPlaybook(team.id)),
     };
     // A landscape field is long side x short side.
     const fieldHeight = 100.0;

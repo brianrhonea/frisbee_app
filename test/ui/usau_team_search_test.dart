@@ -20,6 +20,7 @@ import 'package:frisbee_app/routing/router.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/rankings/widgets/usau_team_screen.dart';
 import 'package:frisbee_app/ui/teams/view_models/usau_team_search_viewmodel.dart';
+import 'package:frisbee_app/ui/teams/widgets/team_search_screen.dart';
 import 'package:frisbee_app/ui/teams/widgets/teams_screen.dart';
 import 'package:frisbee_app/ui/teams/widgets/usau_team_search_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
@@ -141,7 +142,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(TeamsScreen), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Search USA Ultimate teams'));
+    await tester.tap(find.byTooltip('Find a team'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TeamSearchScreen), findsOneWidget);
+
+    await tester.tap(find.text('Search USA Ultimate rankings'));
     await tester.pumpAndSettle();
     expect(find.byType(UsauTeamSearchScreen), findsOneWidget);
 
@@ -155,6 +160,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(UsauTeamSearchScreen), findsOneWidget);
     expect(find.text('Ring of Fire'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(TeamSearchScreen), findsOneWidget);
 
     await tester.pageBack();
     await tester.pumpAndSettle();

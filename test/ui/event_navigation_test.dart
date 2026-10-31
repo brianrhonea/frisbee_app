@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
@@ -10,6 +11,7 @@ import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
+import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
@@ -21,7 +23,8 @@ import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_detail_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_editor_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/my_event_detail_screen.dart';
-import 'package:frisbee_app/ui/teams/widgets/team_detail_screen.dart';
+import 'package:frisbee_app/ui/teams/widgets/team_home_screen.dart';
+import 'package:frisbee_app/ui/teams/widgets/team_section_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../testing/fakes.dart';
@@ -79,6 +82,7 @@ void main() {
           Provider<ChatRepository>.value(value: FakeChatRepository()),
           Provider<FilePickerService>.value(value: FakeFilePickerService()),
           Provider<EventRepository>.value(value: events),
+          Provider<TeamPostRepository>.value(value: FakeTeamPostRepository()),
           Provider<StatsRepository>.value(
             value: MockStatsRepository(teamRepository: teams),
           ),
@@ -115,7 +119,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
-    expect(find.byType(TeamDetailScreen), findsNothing);
+    expect(find.byType(TeamHomeScreen), findsNothing);
 
     await tapText(tester, 'Tempo run');
     expect(find.byType(MyEventDetailScreen), findsOneWidget);
@@ -154,14 +158,14 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
   });
 
-  testWidgets('a team left on its roster tab does not hijack event links', (
+  testWidgets('a team left on its roster does not hijack event links', (
     tester,
   ) async {
     await pumpApp(tester);
     await tapText(tester, 'Teams');
     await tapText(tester, 'Northside Flyers');
     await tapText(tester, 'Roster');
-    expect(find.byType(TeamDetailScreen), findsOneWidget);
+    expect(find.byType(TeamSectionScreen), findsOneWidget);
 
     await tapText(tester, 'Home');
     await tapText(tester, 'Team practice');
@@ -170,21 +174,49 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
 
-    // The Teams tab kept its place.
+    // The Teams tab kept its place, and back returns to the team home.
     await tapText(tester, 'Teams');
-    expect(find.byType(TeamDetailScreen), findsOneWidget);
+    expect(find.byType(TeamSectionScreen), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(TeamHomeScreen), findsOneWidget);
   });
 
-  testWidgets('events from the team schedule return to the team', (
-    tester,
-  ) async {
+  testWidgets('events from the team home page return to it', (tester) async {
     await pumpApp(tester);
     await tapText(tester, 'Teams');
     await tapText(tester, 'Northside Flyers');
+    expect(find.byType(TeamHomeScreen), findsOneWidget);
     await tapText(tester, 'Team practice');
     expect(find.byType(EventDetailScreen), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.byType(TeamDetailScreen), findsOneWidget);
+    expect(find.byType(TeamHomeScreen), findsOneWidget);
+  });
+
+  testWidgets('events from Team Events return to it', (tester) async {
+    await pumpApp(tester);
+    await tapText(tester, 'Teams');
+    await tapText(tester, 'Northside Flyers');
+    await tapText(tester, 'Team Events');
+    expect(find.byType(TeamSectionScreen), findsOneWidget);
+    await tapText(tester, 'Team practice');
+    expect(find.byType(EventDetailScreen), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(TeamSectionScreen), findsOneWidget);
+  });
+
+  testWidgets('old ?tab= team links open the matching section', (tester) async {
+    await pumpApp(tester);
+    GoRouter.of(
+      tester.element(find.byType(HomeScreen)),
+    ).go('/teams/t1?tab=schedule');
+    await tester.pumpAndSettle();
+    final section = tester.widget<TeamSectionScreen>(
+      find.byType(TeamSectionScreen),
+    );
+    expect(section.section, TeamSection.events);
+    expect(find.text('Team Events'), findsOneWidget);
   });
 }

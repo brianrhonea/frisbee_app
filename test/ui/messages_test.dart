@@ -6,6 +6,7 @@ import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:provider/provider.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
+import 'package:frisbee_app/domain/models/model_utils.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/messages/view_models/direct_chat_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/inbox_viewmodel.dart';
@@ -19,7 +20,7 @@ import '../testing/fakes.dart';
 void main() {
   group('UserProfile', () {
     test('indexes every word prefix, lowercased', () {
-      final k = UserProfile.searchKeywords('Jo Smith-Lee');
+      final k = searchKeywords('Jo Smith-Lee');
       expect(k, containsAll(['j', 'jo', 's', 'smi', 'smith', 'l', 'lee']));
       expect(k, isNot(contains('Jo')));
     });

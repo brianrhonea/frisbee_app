@@ -52,11 +52,15 @@ import '../ui/stats/widgets/stats_tab.dart';
 import '../ui/stats/widgets/tournament_screen.dart';
 import '../ui/teams/view_models/create_team_viewmodel.dart';
 import '../ui/teams/view_models/team_detail_viewmodel.dart';
+import '../ui/teams/view_models/team_home_viewmodel.dart';
+import '../ui/teams/view_models/team_search_viewmodel.dart';
 import '../ui/teams/view_models/teams_viewmodel.dart';
 import '../ui/teams/view_models/usau_team_search_viewmodel.dart';
 import '../ui/teams/widgets/create_team_screen.dart';
 import '../ui/teams/view_models/usau_roster_viewmodel.dart';
-import '../ui/teams/widgets/team_detail_screen.dart';
+import '../ui/teams/widgets/team_home_screen.dart';
+import '../ui/teams/widgets/team_search_screen.dart';
+import '../ui/teams/widgets/team_section_screen.dart';
 import '../ui/teams/widgets/usau_roster_screen.dart';
 import '../ui/teams/widgets/teams_screen.dart';
 import '../ui/teams/widgets/usau_team_search_screen.dart';
@@ -348,38 +352,63 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 GoRoute(
                   path: 'search',
                   builder: (_, _) => ViewModelHost(
-                    create: (c) =>
-                        UsauTeamSearchViewModel(rankingRepository: c.read()),
-                    builder: (_, vm) => UsauTeamSearchScreen(viewModel: vm),
+                    create: (c) => TeamSearchViewModel(
+                      teamRepository: c.read(),
+                      authRepository: c.read(),
+                    ),
+                    builder: (_, vm) => TeamSearchScreen(viewModel: vm),
                   ),
                   routes: [
                     GoRoute(
-                      path: 'team',
-                      builder: (_, state) => _usauTeam(state),
+                      path: 'usau',
+                      builder: (_, _) => ViewModelHost(
+                        create: (c) => UsauTeamSearchViewModel(
+                          rankingRepository: c.read(),
+                        ),
+                        builder: (_, vm) => UsauTeamSearchScreen(viewModel: vm),
+                      ),
+                      routes: [
+                        GoRoute(
+                          path: 'team',
+                          builder: (_, state) => _usauTeam(state),
+                        ),
+                      ],
                     ),
                   ],
                 ),
                 GoRoute(
                   path: ':teamId',
+                  // Teams had tabs before they had a home page; old links
+                  // (e.g. in the notification feed) name one with ?tab=.
+                  redirect: (_, state) {
+                    if (state.uri.pathSegments.length != 2) return null;
+                    final tab = state.uri.queryParameters['tab'];
+                    if (tab == null) return null;
+                    final teamId = state.pathParameters['teamId']!;
+                    return TeamSection.fromLegacyTab(tab)?.route(teamId) ??
+                        Routes.team(teamId);
+                  },
                   builder: (_, state) {
                     final teamId = state.pathParameters['teamId']!;
-                    final tab = state.uri.queryParameters['tab'];
                     return ViewModelHost(
-                      key: ValueKey('team-$teamId-$tab'),
-                      create: (c) => TeamDetailViewModel(
+                      key: ValueKey('team-$teamId'),
+                      create: (c) => TeamHomeViewModel(
                         teamId: teamId,
                         teamRepository: c.read(),
-                        playRepository: c.read(),
                         eventRepository: c.read(),
+                        teamPostRepository: c.read(),
                         authRepository: c.read(),
+                        filePicker: c.read(),
                       ),
-                      builder: (_, vm) => TeamDetailScreen(
-                        viewModel: vm,
-                        initialTab: TeamTab.byName(tab),
-                      ),
+                      builder: (_, vm) => TeamHomeScreen(viewModel: vm),
                     );
                   },
                   routes: [
+                    for (final section in TeamSection.values)
+                      GoRoute(
+                        path: section.path,
+                        builder: (_, state) => _teamSection(state, section),
+                      ),
                     GoRoute(
                       path: 'chats/new',
                       parentNavigatorKey: _rootKey,
@@ -609,6 +638,21 @@ String? authRedirect(AuthRepository auth, Uri uri) {
 }
 
 /// A USA Ultimate team page, from Rankings or Teams search.
+Widget _teamSection(GoRouterState state, TeamSection section) {
+  final teamId = state.pathParameters['teamId']!;
+  return ViewModelHost(
+    key: ValueKey('team-$teamId-${section.name}'),
+    create: (c) => TeamDetailViewModel(
+      teamId: teamId,
+      teamRepository: c.read(),
+      playRepository: c.read(),
+      eventRepository: c.read(),
+      authRepository: c.read(),
+    ),
+    builder: (_, vm) => TeamSectionScreen(viewModel: vm, section: section),
+  );
+}
+
 Widget _usauTeam(GoRouterState state) {
   final url = state.uri.queryParameters['url'] ?? '';
   return ViewModelHost(

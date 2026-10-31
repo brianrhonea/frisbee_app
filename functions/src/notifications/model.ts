@@ -251,7 +251,7 @@ export function eventChangeNotice(a: {
   const name = eventTitle(event);
   const route =
     a.change === "deleted"
-      ? `/teams/${a.teamId}?tab=schedule`
+      ? `/teams/${a.teamId}/events`
       : `/team-events/${a.teamId}/${a.eventId}`;
   return {
     category: "eventChanges",
