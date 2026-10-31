@@ -192,6 +192,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 eventRepository: c.read(),
                 teamRepository: c.read(),
                 authRepository: c.read(),
+                tournamentRepository: c.read(),
               ),
               builder: (_, vm) => EventDetailScreen(viewModel: vm),
             );

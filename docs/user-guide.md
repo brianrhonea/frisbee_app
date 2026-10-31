@@ -170,7 +170,11 @@ tournaments) and **Member**.
 **Running a tournament** (owners and organizers):
 
 1. Post a Tournament event so people can RSVP. On the event, tap **Set up
-   tournament** (or **New tournament** on the Tournaments page).
+   tournament** (or **New tournament** on the Tournaments page). Every
+   tournament shows on the group schedule: one set up without an event
+   gets a Tournament event when you save, and a linked event's title and
+   times follow the tournament's. The event then has a **View** button
+   for the tournament.
 2. Set the **dates**: the first and last day of play. Each day gets its
    own **start time**; tap a day to change it. Add an ideal end if you
    like.

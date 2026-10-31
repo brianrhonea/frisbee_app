@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/group_tournament/group_tournament_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../utils/command.dart';
@@ -20,8 +22,10 @@ class EventDetailViewModel extends ChangeNotifier {
     required EventRepository eventRepository,
     required TeamRepository teamRepository,
     required AuthRepository authRepository,
+    GroupTournamentRepository? tournamentRepository,
   }) : _events = eventRepository,
-       _auth = authRepository {
+       _auth = authRepository,
+       _tournaments = tournamentRepository {
     setRsvp = Command1<void, RsvpStatus?>(
       (s) => _events.setRsvp(teamId, eventId, uid, s),
     );
@@ -37,6 +41,7 @@ class EventDetailViewModel extends ChangeNotifier {
       }, onError: _onError),
       teamRepository.watchTeam(teamId).listen((t) {
         _team = t;
+        _watchTournament();
         notifyListeners();
       }, onError: _onError),
     ];
@@ -46,7 +51,29 @@ class EventDetailViewModel extends ChangeNotifier {
   final String eventId;
   final EventRepository _events;
   final AuthRepository _auth;
+  final GroupTournamentRepository? _tournaments;
   late final List<StreamSubscription<Object?>> _subs;
+  StreamSubscription<Object?>? _tournamentSub;
+
+  GroupTournament? _tournament;
+
+  /// The group tournament played at this event, if the user can see it.
+  GroupTournament? get tournament => _tournament;
+
+  /// Once the group is known, watches for a tournament linked to this
+  /// event (organizers see all; players the ones they're on).
+  void _watchTournament() {
+    final repo = _tournaments;
+    final team = _team;
+    if (repo == null || team == null || !team.isCommunity) return;
+    if (_tournamentSub != null) return;
+    _tournamentSub = repo
+        .watchTournaments(teamId, uid: uid, organizer: team.canEdit(uid))
+        .listen((list) {
+          _tournament = list.where((t) => t.eventId == eventId).firstOrNull;
+          notifyListeners();
+        }, onError: (Object _) {});
+  }
 
   TeamEvent? _event;
   TeamEvent? get event => _event;
@@ -64,6 +91,7 @@ class EventDetailViewModel extends ChangeNotifier {
 
   /// Group organizers turn a Tournament event into a bracket.
   bool get canSetUpTournament =>
+      _tournament == null &&
       canEdit &&
       (_team?.isCommunity ?? false) &&
       _event?.type == EventType.tournament;
@@ -162,6 +190,7 @@ class EventDetailViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _tournamentSub?.cancel();
     for (final s in _subs) {
       s.cancel();
     }

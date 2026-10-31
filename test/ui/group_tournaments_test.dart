@@ -12,6 +12,7 @@ import 'package:frisbee_app/ui/group_tournaments/view_models/group_tournament_vi
 import 'package:frisbee_app/ui/group_tournaments/view_models/group_tournaments_viewmodel.dart';
 import 'package:frisbee_app/ui/group_tournaments/view_models/tournament_editor_viewmodel.dart';
 import 'package:frisbee_app/ui/group_tournaments/widgets/group_tournament_screen.dart';
+import 'package:frisbee_app/ui/schedule/view_models/event_detail_viewmodel.dart';
 
 import '../testing/fakes.dart';
 import '../testing/group_tournament_fakes.dart';
@@ -262,6 +263,63 @@ void main() {
         expect(vm.teamsChanged, isFalse);
       },
     );
+
+    test('saving puts the tournament on the group schedule', () async {
+      final vm = await editorVm();
+      vm.setName('Winter Hat');
+      vm.setDates(DateTime(2026, 11, 14), DateTime(2026, 11, 15));
+      await vm.save.execute();
+      expect(vm.save.completed, isTrue);
+      final created = events.events.values.singleWhere(
+        (e) => e.title == 'Winter Hat',
+      );
+      expect(created.type, EventType.tournament);
+      expect(created.startsAt, DateTime(2026, 11, 14, 9));
+      // Ends when the last game on the second day should.
+      expect(created.endsAt!.day, 15);
+      expect(vm.eventId, created.id);
+      expect(repo.tournaments['g1']!.single.eventId, created.id);
+
+      // Saving again updates the same event.
+      vm.setName('Winter Classic');
+      await vm.publish.execute();
+      expect(vm.publish.completed, isTrue);
+      expect(events.events.values.where((e) => e.title.startsWith('Winter')), [
+        isA<TeamEvent>().having((e) => e.title, 'title', 'Winter Classic'),
+      ]);
+    });
+
+    test('a linked event keeps its RSVPs and follows the times', () async {
+      final vm = await editorVm(eventId: 'e1');
+      vm.setDayStart(0, hour: 8, minute: 30);
+      await vm.save.execute();
+      final e = events.events['e1']!;
+      expect(e.startsAt, DateTime(2026, 11, 7, 8, 30));
+      expect(e.rsvps['p1'], RsvpStatus.going);
+      expect(events.events, hasLength(1));
+    });
+
+    test('the event page links to its tournament', () async {
+      seed(fourTeams(TournamentFormat.roundRobin));
+      final t = repo.tournaments['g1']!.single;
+      repo.tournaments['g1']![0] = t.copyWith(eventId: () => 'e1');
+      EventDetailViewModel detail(String uid) => EventDetailViewModel(
+        teamId: 'g1',
+        eventId: 'e1',
+        eventRepository: events,
+        teamRepository: teams,
+        authRepository: as(uid),
+        tournamentRepository: repo,
+      );
+      final org = detail('owner');
+      final player = detail('p1');
+      final outsider = detail('stranger');
+      await pumpEventQueue();
+      expect(org.tournament?.id, 't1');
+      expect(org.canSetUpTournament, isFalse);
+      expect(player.tournament?.id, 't1');
+      expect(outsider.tournament, isNull);
+    });
 
     test('captains follow players; fewer teams bench their players', () async {
       final vm = await editorVm();

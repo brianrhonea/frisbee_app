@@ -440,9 +440,62 @@ class TournamentEditorViewModel extends ChangeNotifier {
     if (me == null) return Result.error(Exception('Not signed in'));
     final why = publishing ? problem : saveProblem;
     if (why != null) return Result.error(Exception(why));
+    final linked = await _syncEvent(me.uid);
+    if (linked case Error(:final error)) return Result.error(error);
     final result = await _tournaments.saveTournament(groupId, _draft(), me);
     if (result case Ok(:final value)) _id = value;
     return result;
+  }
+
+  /// Puts the tournament on the group's schedule: creates its Tournament
+  /// event, or keeps the linked one's title and times in step. RSVPs,
+  /// location and notes are left alone.
+  Future<Result<String>> _syncEvent(String uid) async {
+    final s = _settings;
+    DateTime? endsAt;
+    try {
+      endsAt = generateSchedule(_draft()).endsAt;
+    } on ScheduleException {
+      endsAt = null;
+    }
+    if (s.idealEndsAt case final ideal?
+        when endsAt == null || ideal.isAfter(endsAt)) {
+      endsAt = ideal;
+    }
+    final end = endsAt;
+    TeamEvent? existing = event;
+    if (existing == null && _eventId != null) {
+      try {
+        existing = await _events.watchEvent(groupId, _eventId!).first;
+      } on Exception {
+        existing = null;
+      }
+    }
+    final title = _name.trim();
+    final next =
+        existing?.copyWith(
+          title: title,
+          startsAt: s.startsAt,
+          endsAt: () => end,
+        ) ??
+        TeamEvent(
+          id: '',
+          title: title,
+          type: EventType.tournament,
+          startsAt: s.startsAt,
+          endsAt: end,
+        );
+    final saved = await _events.saveEvent(groupId, next, uid);
+    if (saved case Ok(:final value)) {
+      _eventId = value;
+      // So the event picker lists it.
+      _tournamentEvents = [
+        for (final e in _tournamentEvents)
+          if (e.id != value) e,
+        next.copyWith(id: value),
+      ]..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    }
+    return saved;
   }
 
   Future<Result<String>> _publish() async {
