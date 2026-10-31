@@ -22,7 +22,7 @@ String errorMessage(Object? error) {
     FirebaseAuthException(code: 'popup-closed-by-user' || 'canceled') =>
       'Sign-in was cancelled.',
     FirebaseAuthException(:final message?) => message,
-    FirebaseException(code: 'permission-denied') =>
+    FirebaseException(code: 'permission-denied' || 'unauthorized') =>
       "You don't have permission to do that.",
     FirebaseException(code: 'unavailable') =>
       'Network unavailable. Check your connection.',

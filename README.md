@@ -1,6 +1,6 @@
 # UltiUP
 
-**Version 0.0.4** · [User guide](docs/user-guide.md) · [Version log](docs/CHANGELOG.md) · [iOS release](docs/ios-release.md)
+**Version 0.0.4** · [User guide](docs/user-guide.md) · [Architecture](docs/ARCHITECTURE.md) · [Version log](docs/CHANGELOG.md) · [iOS release](docs/ios-release.md)
 
 An ultimate frisbee team app built with Flutter + Firebase for Android, iOS, macOS and Windows. The website is a separate project. (The Dart package is still named `frisbee_app`.)
 
@@ -35,7 +35,7 @@ lib/
   utils/                      Result, Command, platform support
 functions/                    Cloud Functions (TypeScript): USA Ultimate sync (not deployed yet)
 firestore.rules               security rules (the trust boundary for membership and privacy)
-docs/                         user guide, version log, iOS release steps
+docs/                         architecture, user guide, version log, iOS release steps
 ```
 
 Team membership changes are written by the client and validated by `firestore.rules`, so they work on every platform. (`cloud_functions` has no Windows plugin, which is why team actions are not callables.)
@@ -51,7 +51,7 @@ In the [Firebase console](https://console.firebase.google.com/project/frisbee-ap
    - Email/Password
    - Google
    - Apple (needs an Apple Developer Services ID + key; see Firebase docs)
-3. **Blaze plan**: only needed once the Cloud Functions are deployed (see [USA Ultimate data](#usa-ultimate-data)).
+3. **Blaze plan and Storage**: team chat and direct message photos and files use Cloud Storage, which needs the Blaze plan. Upgrade, then Build > Storage > Get started (default bucket). The free allowance covers small teams.
 4. **Android Google sign-in**: add your debug/release SHA-1 under Project settings > Android app, then re-run `flutterfire configure` to refresh `google-services.json`.
    ```
    cd android && ./gradlew signingReport
@@ -64,8 +64,11 @@ In the [Firebase console](https://console.firebase.google.com/project/frisbee-ap
 Then deploy the security rules:
 
 ```
-firebase deploy --only firestore:rules
+firebase deploy --only firestore:rules,storage
 ```
+
+The Storage rules read chat rooms from Firestore; accept the prompt to let
+them (or grant it under Storage > Rules).
 
 Don't deploy `functions` (or run a bare `firebase deploy`) until you're ready to move USA Ultimate collection to the cloud; see below.
 

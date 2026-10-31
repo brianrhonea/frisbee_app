@@ -43,6 +43,13 @@ enum TeamRole {
     player => 'Player',
   };
 
+  String get pluralLabel => switch (this) {
+    owner => 'Owners',
+    coach => 'Coaches',
+    captain => 'Captains',
+    player => 'Players',
+  };
+
   /// What the role can do, for the role picker.
   String get summary => switch (this) {
     owner => 'Everything, including roles and new invite codes',

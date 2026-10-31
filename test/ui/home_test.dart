@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/team.dart';
@@ -72,6 +73,7 @@ void main() {
   );
 
   late FakeTeamRepository teams;
+  late FakeDirectMessageRepository dms;
   late FakePlayRepository plays;
   late FakeEventRepository events;
 
@@ -82,6 +84,7 @@ void main() {
     bool withPersonal = false,
   }) async {
     teams = FakeTeamRepository();
+    dms = FakeDirectMessageRepository();
     plays = FakePlayRepository()..byTeam.addAll(teamPlays);
     events = FakeEventRepository();
     if (withPersonal) {
@@ -127,6 +130,7 @@ void main() {
     });
     final vm = HomeViewModel(
       authRepository: FakeAuthRepository(user: testUser),
+      directMessageRepository: dms,
       teamRepository: teams,
       playRepository: plays,
       eventRepository: events,
@@ -330,6 +334,60 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('home screen lays out as a dashboard at desktop width', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final vm = await tester.runAsync(
+      () => load(
+        withPersonal: true,
+        teamPlays: const {
+          't1': [Play(id: 'p1', name: 'Ho stack')],
+        },
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: HomeScreen(viewModel: vm!),
+      ),
+    );
+    await tester.pump();
+
+    // Team and rankings sit in a right-hand column beside the schedule.
+    final week = tester.getTopLeft(find.text('THIS WEEK'));
+    final team = tester.getTopLeft(find.text('MY TEAM'));
+    expect(team.dx, greaterThan(week.dx + 400));
+    expect(team.dy, week.dy);
+    expect(tester.getTopLeft(find.text('RANKINGS')).dx, team.dx);
+    expect(find.text('Ho stack'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('counts unread direct messages', () async {
+    final vm = await load();
+    expect(vm.unreadMessages, 0);
+    dms.conversations['a_u1'] = Conversation(
+      id: 'a_u1',
+      participants: const ['a', 'u1'],
+      lastMessage: 'hey',
+      lastMessageAt: DateTime(2026, 10, 30),
+      lastSenderId: 'a',
+    );
+    dms.conversations['b_u1'] = Conversation(
+      id: 'b_u1',
+      participants: const ['b', 'u1'],
+      lastMessage: 'mine',
+      lastMessageAt: DateTime(2026, 10, 30),
+      lastSenderId: 'u1',
+    );
+    dms.emit();
+    await pumpEventQueue();
+    expect(vm.unreadMessages, 1);
+  });
 
   testWidgets('home screen offers to join a team', (tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);

@@ -11,3 +11,18 @@ Object? _plain(Object? value) => switch (value) {
   List l => l.map(_plain).toList(),
   _ => value,
 };
+
+/// Deletes [refs] in batches (a batch holds at most 500 writes).
+Future<void> deleteDocs(
+  FirebaseFirestore db,
+  Iterable<DocumentReference<Object?>> refs,
+) async {
+  final all = refs.toList();
+  for (var i = 0; i < all.length; i += 450) {
+    final batch = db.batch();
+    for (final r in all.skip(i).take(450)) {
+      batch.delete(r);
+    }
+    await batch.commit();
+  }
+}

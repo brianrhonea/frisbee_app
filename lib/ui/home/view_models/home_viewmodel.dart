@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/direct_message/direct_message_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/playbook/play_repository.dart';
 import '../../../data/repositories/ranking/ranking_repository.dart';
@@ -24,6 +25,7 @@ import '../../schedule/view_models/my_schedule.dart';
 class HomeViewModel extends ChangeNotifier {
   HomeViewModel({
     required AuthRepository authRepository,
+    required DirectMessageRepository directMessageRepository,
     required TeamRepository teamRepository,
     required PlayRepository playRepository,
     required EventRepository eventRepository,
@@ -41,6 +43,17 @@ class HomeViewModel extends ChangeNotifier {
       uid: _auth.currentUser?.uid,
       clock: _clock,
     )..addListener(_onFeed);
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) {
+      _subs.add(
+        directMessageRepository.watchConversations(uid).listen((c) {
+          final unread = c.where((c) => c.isUnread(uid)).length;
+          if (unread == _unreadMessages) return;
+          _unreadMessages = unread;
+          notifyListeners();
+        }, onError: (_) {}),
+      );
+    }
     _subs.add(
       tournamentRepository.watchTournaments().listen((t) {
         _tournaments = t;
@@ -74,6 +87,11 @@ class HomeViewModel extends ChangeNotifier {
   static const otherEventsLimit = 3;
   static const upcomingLimit = 4;
   static const playsLimit = 6;
+
+  int _unreadMessages = 0;
+
+  /// Direct-message conversations with a message the user hasn't opened.
+  int get unreadMessages => _unreadMessages;
 
   /// Joins by invite code; result value is the team id.
   late final Command1<String, String> joinTeam;

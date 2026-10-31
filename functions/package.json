@@ -10,7 +10,7 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "test": "vitest run test/parse",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-frisbee \"vitest run test/rules\"",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-frisbee \"vitest run test/rules\"",
     "serve": "npm run build && firebase emulators:start --only functions,firestore,auth",
     "deploy": "firebase deploy --only functions"
   },

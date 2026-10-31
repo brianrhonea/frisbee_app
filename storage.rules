@@ -1,0 +1,64 @@
+rules_version = '2';
+
+// Chat attachments. Access follows the room's access in Firestore (see the
+// chats rules in firestore.rules); keep the two in step.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function team(teamId) {
+      return firestore.get(/databases/(default)/documents/teams/$(teamId)).data;
+    }
+    function room(teamId, roomId) {
+      return firestore.get(
+        /databases/(default)/documents/teams/$(teamId)/chats/$(roomId)).data;
+    }
+    function role(t) {
+      let r = t.members.get(request.auth.uid, '');
+      return r == 'stats' ? 'player' : r;
+    }
+    function isMember(t) { return request.auth.uid in t.memberIds; }
+
+    function canRead(teamId, roomId) {
+      let t = team(teamId);
+      return isMember(t) && (
+        role(t) == 'owner'
+        || role(t) in room(teamId, roomId).readRoles
+        || request.auth.uid in room(teamId, roomId).readUsers);
+    }
+    function canWrite(teamId, roomId) {
+      let t = team(teamId);
+      return isMember(t) && (
+        role(t) == 'owner'
+        || role(t) in room(teamId, roomId).writeRoles
+        || request.auth.uid in room(teamId, roomId).writeUsers);
+    }
+
+    // Photos and files up to 10 MB (maxAttachmentBytes in
+    // lib/domain/models/chat.dart), uploaded by their author into their
+    // own folder. Authors delete their own; the owner deletes any.
+    match /teams/{teamId}/chats/{roomId}/{userId}/{messageId}/{fileName} {
+      allow get: if request.auth != null && canRead(teamId, roomId);
+      // The desktop SDK uploads the bytes, then sets the content type as an
+      // update, so authors may update their own files too.
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size <= 10 * 1024 * 1024
+        && canWrite(teamId, roomId);
+      allow delete: if request.auth != null
+        && (request.auth.uid == userId || role(team(teamId)) == 'owner');
+    }
+
+    // Direct-message attachments: conversation ids are "{uidA}_{uidB}", so
+    // only those two can read, and each uploads into their own folder.
+    match /conversations/{convId}/{userId}/{messageId}/{fileName} {
+      function inConversation() {
+        return request.auth != null && request.auth.uid in convId.split('_');
+      }
+      allow get: if inConversation();
+      allow create, update: if inConversation()
+        && request.auth.uid == userId
+        && request.resource.size <= 10 * 1024 * 1024;
+      allow delete: if inConversation() && request.auth.uid == userId;
+    }
+  }
+}

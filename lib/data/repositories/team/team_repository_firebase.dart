@@ -5,10 +5,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:logging/logging.dart';
 
 import '../../../domain/models/app_user.dart';
+import '../../../domain/models/chat.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
+import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
+import '../chat/chat_repository_firebase.dart';
 import 'team_repository.dart';
 
 class InviteCodeNotFoundException implements Exception {
@@ -23,13 +26,20 @@ class InviteCodeNotFoundException implements Exception {
 /// Ultimate) is in `rosterStatus/{playerId}`, which players can't read.
 /// The invite code is in `private/invite` (admins only) and
 /// `inviteCodes/{code}` maps it back to the team; joiners prove they know
-/// it via `joins/{uid}`.
+/// it via `joins/{uid}`. Chat rooms are in `chats` (see
+/// [ChatRepositoryFirebase]).
 /// All writes are validated by `firestore.rules`.
 class TeamRepositoryFirebase implements TeamRepository {
-  TeamRepositoryFirebase({FirebaseFirestore? firestore, Random? random})
-    : _db = firestore ?? FirebaseFirestore.instance,
-      _random = random ?? Random.secure();
+  TeamRepositoryFirebase({
+    required AttachmentStorage attachments,
+    FirebaseFirestore? firestore,
+    Random? random,
+  }) : _files = attachments,
+       _db = firestore ?? FirebaseFirestore.instance,
+       _random = random ?? Random.secure();
 
+  /// Chat attachments go with the team.
+  final AttachmentStorage _files;
   final FirebaseFirestore _db;
   final Random _random;
 
@@ -111,7 +121,11 @@ class TeamRepositoryFirebase implements TeamRepository {
               'createdAt': FieldValue.serverTimestamp(),
             })
             ..set(_invite(ref.id), {'code': code})
-            ..set(_codes.doc(code), {'teamId': ref.id});
+            ..set(_codes.doc(code), {'teamId': ref.id})
+            ..set(
+              chatRooms(_db, ref.id).doc(ChatRoom.generalId),
+              newRoomData(ChatRoom.general(), owner.uid),
+            );
           try {
             await batch.commit();
             return ref.id;
@@ -250,6 +264,9 @@ class TeamRepositoryFirebase implements TeamRepository {
     final code = await _currentCode(team.id);
     // Firestore doesn't cascade deletes; clear subcollections first.
     // private (the invite code) goes last: code deletes check the owner.
+    for (final room in (await chatRooms(_db, team.id).get()).docs) {
+      await deleteChatRoom(_db, _files, room.reference);
+    }
     for (final sub in [
       'roster',
       'rosterStatus',

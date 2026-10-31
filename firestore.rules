@@ -45,6 +45,21 @@ service cloud.firestore {
     }
     function isMember(team) { return uid() in team.memberIds; }
 
+    // Chat rooms grant access by role; a legacy "stats" member is a player.
+    function chatRole(team) {
+      return roleIn(team) == 'stats' ? 'player' : roleIn(team);
+    }
+    function canReadRoom(team, room) {
+      return roleIn(team) == 'owner'
+        || chatRole(team) in room.readRoles
+        || uid() in room.readUsers;
+    }
+    function canWriteRoom(team, room) {
+      return roleIn(team) == 'owner'
+        || chatRole(team) in room.writeRoles
+        || uid() in room.writeUsers;
+    }
+
     function validString(v, max) { return v is string && v.size() <= max; }
 
     function validTeamFields(t) {
@@ -365,6 +380,69 @@ service cloud.firestore {
         allow update: if signedIn() && (respond() || editDetails());
       }
 
+      // Chat rooms (ChatRoom in lib/domain/models/chat.dart). Each room
+      // lists the roles and members who can read and who can write; write
+      // lists are subsets of read lists. The owner can read and post in
+      // every room. Owners, coaches and captains create rooms and set their
+      // access, so they can see every room's details; only the owner, who
+      // can read every message, deletes rooms. storage.rules guards
+      // attachments with the same checks.
+      match /chats/{roomId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        function validRoom(r) {
+          let roles = ['owner', 'coach', 'captain', 'player'];
+          return r.name is string && r.name.size() > 0 && r.name.size() <= 60
+            && r.readRoles is list && r.readRoles.hasOnly(roles)
+            && r.writeRoles is list && r.writeRoles.hasOnly(roles)
+            && r.readUsers is list && r.readUsers.size() <= 200
+            && r.writeUsers is list && r.writeUsers.size() <= 200
+            && r.writeRoles.toSet().difference(r.readRoles.toSet()).size() == 0
+            && r.writeUsers.toSet().difference(r.readUsers.toSet()).size() == 0;
+        }
+
+        allow read: if signedIn() && isMember(team())
+          && (isEditor(team()) || canReadRoom(team(), resource.data));
+        // getAfter: General is created in the same batch as its team.
+        allow create: if signedIn()
+          && isEditor(getAfter(teamPath(teamId)).data)
+          && request.resource.data.keys().hasOnly([
+               'name', 'readRoles', 'writeRoles', 'readUsers', 'writeUsers',
+               'createdBy', 'createdAt'])
+          && validRoom(request.resource.data)
+          && request.resource.data.createdBy == uid()
+          && request.resource.data.createdAt == request.time;
+        allow update: if signedIn() && isEditor(team())
+          && changed().hasOnly([
+               'name', 'readRoles', 'writeRoles', 'readUsers', 'writeUsers'])
+          && validRoom(request.resource.data);
+        allow delete: if signedIn() && isOwner(team());
+
+        match /messages/{messageId} {
+          function room() {
+            return get(/databases/$(database)/documents/teams/$(teamId)/chats/$(roomId)).data;
+          }
+
+          allow read: if signedIn() && isMember(team())
+            && canReadRoom(team(), room());
+          allow create: if signedIn() && isMember(team())
+            && canWriteRoom(team(), room())
+            && request.resource.data.keys().hasOnly([
+                 'authorId', 'authorName', 'text', 'attachments', 'createdAt'])
+            && request.resource.data.authorId == uid()
+            && validString(request.resource.data.authorName, 80)
+            && validString(request.resource.data.text, 4000)
+            && request.resource.data.attachments is list
+            && request.resource.data.attachments.size() <= 10
+            && (request.resource.data.text.size() > 0
+                || request.resource.data.attachments.size() > 0)
+            && request.resource.data.createdAt == request.time;
+          // Authors delete their own; the owner moderates.
+          allow delete: if signedIn()
+            && (resource.data.authorId == uid() || isOwner(team()));
+        }
+      }
+
       // Stats: owners, coaches, captains and players with stats access
       // keep them; every member can view.
       // A game holds its points, lines and timeouts in one document.
@@ -425,6 +503,94 @@ service cloud.firestore {
           && request.resource.data.timeoutsPerHalf <= 10
           && request.resource.data.timeouts is list
           && request.resource.data.timeouts.size() <= 40;
+      }
+    }
+
+    // ---- Direct messages --------------------------------------------------
+
+    // The people directory: name and photo only (never email), so any
+    // signed-in user can search for someone to message.
+    match /profiles/{userId} {
+      allow read: if signedIn();
+      allow delete: if signedIn() && uid() == userId;
+      allow create, update: if signedIn() && uid() == userId
+        && request.resource.data.keys().hasOnly(['name', 'keywords', 'photoUrl', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.keywords is list
+        && request.resource.data.keywords.size() <= 100
+        && (request.resource.data.photoUrl == null
+            || validString(request.resource.data.photoUrl, 2000));
+    }
+
+    // One conversation per pair of users, id "{uidA}_{uidB}" with the uids
+    // sorted. Only the two participants can read it or post. The id names
+    // them, so a participant can check whether it exists before creating it.
+    match /conversations/{convId} {
+      function inConversation() { return uid() in convId.split('_'); }
+      function convPath() {
+        return /databases/$(database)/documents/conversations/$(convId);
+      }
+      // Only their own read time and name may change, besides the preview.
+      function onlyMine(f) {
+        return request.resource.data[f].diff(resource.data[f]).affectedKeys()
+          .hasOnly([uid()]);
+      }
+
+      allow get: if signedIn() && inConversation();
+      allow list: if signedIn() && uid() in resource.data.participants;
+      allow create: if signedIn() && inConversation()
+        && request.resource.data.keys().hasOnly([
+             'participants', 'names', 'lastMessage', 'lastMessageAt',
+             'lastSenderId', 'readAt', 'createdAt'])
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.participants[0] < request.resource.data.participants[1]
+        && convId == request.resource.data.participants[0] + '_'
+             + request.resource.data.participants[1]
+        // The other person must be a listed user.
+        && exists(/databases/$(database)/documents/profiles/$(
+             request.resource.data.participants[0] == uid()
+               ? request.resource.data.participants[1]
+               : request.resource.data.participants[0]))
+        && request.resource.data.names.keys().toSet()
+             == request.resource.data.participants.toSet()
+        && validString(request.resource.data.names[request.resource.data.participants[0]], 80)
+        && validString(request.resource.data.names[request.resource.data.participants[1]], 80)
+        && request.resource.data.lastMessage == ''
+        && request.resource.data.lastMessageAt == null
+        && request.resource.data.lastSenderId == ''
+        && request.resource.data.readAt == {}
+        && request.resource.data.createdAt == request.time;
+      // Posting updates the preview; opening marks it read.
+      allow update: if signedIn() && inConversation() && (
+        (changed().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'readAt', 'names'])
+          && request.resource.data.lastSenderId == uid()
+          && request.resource.data.lastMessageAt == request.time
+          && validString(request.resource.data.lastMessage, 200)
+          && onlyMine('readAt') && onlyMine('names')
+          && validString(request.resource.data.names[uid()], 80))
+        || (changed().hasOnly(['readAt'])
+          && onlyMine('readAt')
+          && request.resource.data.readAt[uid()] == request.time)
+      );
+
+      match /messages/{messageId} {
+        allow read: if signedIn() && inConversation();
+        allow create: if signedIn() && inConversation()
+          && exists(convPath())
+          && request.resource.data.keys().hasOnly([
+               'authorId', 'authorName', 'text', 'attachments', 'createdAt'])
+          && request.resource.data.authorId == uid()
+          && validString(request.resource.data.authorName, 80)
+          && validString(request.resource.data.text, 4000)
+          && request.resource.data.attachments is list
+          && request.resource.data.attachments.size() <= 10
+          && (request.resource.data.text.size() > 0
+              || request.resource.data.attachments.size() > 0)
+          && request.resource.data.createdAt == request.time;
+        allow delete: if signedIn() && resource.data.authorId == uid();
       }
     }
 
