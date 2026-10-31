@@ -139,11 +139,38 @@ class TeamRepositoryFirebase implements TeamRepository {
   ) => guard(() => _teams.doc(teamId).update({'members.$uid': role.name}));
 
   @override
+  Future<Result<void>> setStatKeeper(
+    String teamId,
+    String uid, {
+    required bool on,
+  }) => guard(
+    () => _teams.doc(teamId).update({
+      'statKeepers': on
+          ? FieldValue.arrayUnion([uid])
+          : FieldValue.arrayRemove([uid]),
+    }),
+  );
+
+  @override
+  Future<Result<void>> transferOwnership(
+    String teamId, {
+    required String ownerUid,
+    required String newOwnerUid,
+  }) => guard(
+    () => _teams.doc(teamId).update({
+      'ownerId': newOwnerUid,
+      'members.$newOwnerUid': TeamRole.owner.name,
+      'members.$ownerUid': TeamRole.player.name,
+    }),
+  );
+
+  @override
   Future<Result<void>> removeMember(String teamId, String uid) => guard(
     () => _teams.doc(teamId).update({
       'members.$uid': FieldValue.delete(),
       'memberNames.$uid': FieldValue.delete(),
       'memberIds': FieldValue.arrayRemove([uid]),
+      'statKeepers': FieldValue.arrayRemove([uid]),
     }),
   );
 
@@ -151,7 +178,13 @@ class TeamRepositoryFirebase implements TeamRepository {
   Future<Result<void>> deleteTeam(Team team) => guard(() async {
     final ref = _teams.doc(team.id);
     // Firestore doesn't cascade deletes; clear subcollections first.
-    for (final sub in ['roster', 'plays', 'events']) {
+    for (final sub in [
+      'roster',
+      'plays',
+      'events',
+      'statsTournaments',
+      'statsGames',
+    ]) {
       final docs = await ref.collection(sub).get();
       final batch = _db.batch();
       for (final d in docs.docs) {

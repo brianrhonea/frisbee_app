@@ -24,6 +24,12 @@ import '../ui/schedule/view_models/event_detail_viewmodel.dart';
 import '../ui/schedule/view_models/event_editor_viewmodel.dart';
 import '../ui/schedule/widgets/event_detail_screen.dart';
 import '../ui/schedule/widgets/event_editor_screen.dart';
+import '../ui/stats/view_models/game_tracker_viewmodel.dart';
+import '../ui/stats/view_models/stats_viewmodel.dart';
+import '../ui/stats/view_models/tournament_viewmodel.dart';
+import '../ui/stats/widgets/game_screen.dart';
+import '../ui/stats/widgets/stats_tab.dart';
+import '../ui/stats/widgets/tournament_screen.dart';
 import '../ui/teams/view_models/create_team_viewmodel.dart';
 import '../ui/teams/view_models/team_detail_viewmodel.dart';
 import '../ui/teams/view_models/teams_viewmodel.dart';
@@ -137,6 +143,62 @@ GoRouter router(AuthRepository auth) => GoRouter(
                             authRepository: c.read(),
                           ),
                           builder: (_, vm) => PlayEditorScreen(viewModel: vm),
+                        );
+                      },
+                    ),
+                    GoRoute(
+                      path: 'stats/season',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        return ViewModelHost(
+                          key: ValueKey('season-stats-$teamId'),
+                          create: (c) => StatsViewModel(
+                            teamId: teamId,
+                            statsRepository: c.read(),
+                            eventRepository: c.read(),
+                            teamRepository: c.read(),
+                            authRepository: c.read(),
+                          ),
+                          builder: (_, vm) => SeasonStatsScreen(viewModel: vm),
+                        );
+                      },
+                    ),
+                    GoRoute(
+                      path: 'stats/tournaments/:tournamentId',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        final id = state.pathParameters['tournamentId']!;
+                        return ViewModelHost(
+                          key: ValueKey('stats-tournament-$teamId-$id'),
+                          create: (c) => TournamentViewModel(
+                            teamId: teamId,
+                            tournamentId: id,
+                            statsRepository: c.read(),
+                            teamRepository: c.read(),
+                            authRepository: c.read(),
+                          ),
+                          builder: (_, vm) => TournamentScreen(viewModel: vm),
+                        );
+                      },
+                    ),
+                    GoRoute(
+                      path: 'stats/games/:gameId',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        final id = state.pathParameters['gameId']!;
+                        return ViewModelHost(
+                          key: ValueKey('stats-game-$teamId-$id'),
+                          create: (c) => GameTrackerViewModel(
+                            teamId: teamId,
+                            gameId: id,
+                            statsRepository: c.read(),
+                            teamRepository: c.read(),
+                            authRepository: c.read(),
+                          ),
+                          builder: (_, vm) => GameScreen(viewModel: vm),
                         );
                       },
                     ),

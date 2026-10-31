@@ -15,6 +15,7 @@ import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
 typedef RoleChange = ({String uid, TeamRole role});
+typedef StatsAccess = ({String uid, bool on});
 
 /// Backs the team detail screen and its Schedule / Roster / Playbook /
 /// Members tabs.
@@ -40,6 +41,16 @@ class TeamDetailViewModel extends ChangeNotifier {
     regenerateInviteCode = Command0<void>(_regenerateInviteCode);
     setMemberRole = Command1<void, RoleChange>(
       (c) => _teams.setMemberRole(teamId, c.uid, c.role),
+    );
+    setStatKeeper = Command1<void, StatsAccess>(
+      (c) => _teams.setStatKeeper(teamId, c.uid, on: c.on),
+    );
+    transferOwnership = Command1<void, String>(
+      (newOwner) => _teams.transferOwnership(
+        teamId,
+        ownerUid: uid,
+        newOwnerUid: newOwner,
+      ),
     );
     removeMember = Command1<void, String>(
       (uid) => _teams.removeMember(teamId, uid),
@@ -120,13 +131,25 @@ class TeamDetailViewModel extends ChangeNotifier {
   TeamRole? get myRole => _team?.roleOf(uid);
   bool get canEdit => myRole?.canEdit ?? false;
   bool get isOwner => myRole == TeamRole.owner;
+  bool get canSetRoles => myRole?.canSetRoles ?? false;
+  bool get canShareCode => myRole?.canShareCode ?? false;
+  bool get canRegenerateCode => myRole?.canRegenerateCode ?? false;
 
-  /// Owners can manage anyone but themselves; coaches can remove players.
+  /// Whether the member menu applies to [memberUid]: the owner manages
+  /// anyone but themself; coaches and captains remove players.
   bool canManage(String memberUid) {
     if (memberUid == uid) return false;
     final target = _team?.roleOf(memberUid);
-    if (isOwner) return true;
-    return myRole == TeamRole.coach && target == TeamRole.player;
+    final me = myRole;
+    if (target == null || me == null) return false;
+    return me.canSetRoles || me.canRemove(target);
+  }
+
+  bool canRemove(String memberUid) {
+    final target = _team?.roleOf(memberUid);
+    return memberUid != uid &&
+        target != null &&
+        (myRole?.canRemove(target) ?? false);
   }
 
   late final Command1<void, Team> updateTeam;
@@ -134,6 +157,12 @@ class TeamDetailViewModel extends ChangeNotifier {
   late final Command1<void, String> deletePlayer;
   late final Command0<void> regenerateInviteCode;
   late final Command1<void, RoleChange> setMemberRole;
+
+  /// Gives a player stats access, or takes it away. Owner only.
+  late final Command1<void, StatsAccess> setStatKeeper;
+
+  /// Hands the team to the given member; the owner becomes a player.
+  late final Command1<void, String> transferOwnership;
   late final Command1<void, String> removeMember;
   late final Command0<void> leaveTeam;
   late final Command0<void> deleteTeam;

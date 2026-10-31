@@ -27,6 +27,8 @@ const TEAM = "team1";
 const CODE = "ABC234";
 const OWNER = "owner";
 const COACH = "coach";
+const CAPTAIN = "captain";
+const STATS = "stats";
 const PLAYER = "player";
 const OUTSIDER = "outsider";
 
@@ -53,9 +55,16 @@ beforeEach(async () => {
       level: "club",
       city: "",
       ownerId: OWNER,
-      members: { [OWNER]: "owner", [COACH]: "coach", [PLAYER]: "player" },
-      memberIds: [OWNER, COACH, PLAYER],
-      memberNames: { [OWNER]: "O", [COACH]: "C", [PLAYER]: "P" },
+      members: {
+        [OWNER]: "owner",
+        [COACH]: "coach",
+        [CAPTAIN]: "captain",
+        [STATS]: "player",
+        [PLAYER]: "player",
+      },
+      statKeepers: [STATS],
+      memberIds: [OWNER, COACH, CAPTAIN, STATS, PLAYER],
+      memberNames: { [OWNER]: "O", [COACH]: "C", [CAPTAIN]: "K", [STATS]: "S", [PLAYER]: "P" },
       inviteCode: CODE,
     });
     await setDoc(doc(fs, "inviteCodes", CODE), { teamId: TEAM });
@@ -142,6 +151,7 @@ describe("roles and removal", () => {
     [`members.${uid}`]: deleteField(),
     [`memberNames.${uid}`]: deleteField(),
     memberIds: arrayRemove(uid),
+    statKeepers: arrayRemove(uid),
   });
 
   it("player can leave", async () => {
@@ -155,6 +165,92 @@ describe("roles and removal", () => {
 
   it("player cannot remove others", async () => {
     await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), removal(COACH)));
+  });
+
+  it("only the owner sets roles, to any non-owner role", async () => {
+    for (const role of ["coach", "captain", "player"]) {
+      await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: role }));
+    }
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "owner" }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "stats" }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "admin" }));
+    await assertFails(updateDoc(doc(db(CAPTAIN), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));
+    await assertFails(updateDoc(doc(db(STATS), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));
+  });
+
+  it("only the owner gives stats access, and only to members", async () => {
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { statKeepers: arrayUnion(PLAYER) }));
+    await assertFails(updateDoc(doc(db(STATS), "teams", TEAM), { statKeepers: arrayUnion(PLAYER) }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { statKeepers: arrayUnion(OUTSIDER) }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { statKeepers: arrayUnion(PLAYER) }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { statKeepers: arrayRemove(STATS) }));
+  });
+
+  it("captains remove players (with their stats access), not coaches", async () => {
+    await assertSucceeds(updateDoc(doc(db(CAPTAIN), "teams", TEAM), removal(STATS)));
+    await assertFails(updateDoc(doc(db(CAPTAIN), "teams", TEAM), removal(COACH)));
+    await assertSucceeds(updateDoc(doc(db(COACH), "teams", TEAM), removal(PLAYER)));
+  });
+
+  it("removing a stats keeper must drop their stats access", async () => {
+    const { statKeepers: _, ...keepAccess } = removal(STATS);
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), keepAccess));
+  });
+
+  it("stats keepers cannot remove anyone", async () => {
+    await assertFails(updateDoc(doc(db(STATS), "teams", TEAM), removal(PLAYER)));
+  });
+
+  const transfer = (to: string) => ({
+    ownerId: to,
+    [`members.${to}`]: "owner",
+    [`members.${OWNER}`]: "player",
+  });
+
+  it("owner can transfer ownership and becomes a player", async () => {
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), {
+      ownerId: COACH,
+      [`members.${COACH}`]: "owner",
+      [`members.${OWNER}`]: "player",
+    }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), {
+      ...transfer(COACH),
+      [`members.${OWNER}`]: "coach",
+    }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), transfer(OUTSIDER)));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), transfer(COACH)));
+    // The new owner has full control; the old one doesn't.
+    await assertSucceeds(updateDoc(doc(db(COACH), "teams", TEAM), { [`members.${PLAYER}`]: "captain" }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));
+  });
+});
+
+describe("invite codes and admin", () => {
+  const regenerate = (uid: string) => {
+    const fs = db(uid);
+    return writeBatch(fs)
+      .update(doc(fs, "teams", TEAM), { inviteCode: "NEW777" })
+      .set(doc(fs, "inviteCodes", "NEW777"), { teamId: TEAM })
+      .delete(doc(fs, "inviteCodes", CODE))
+      .commit();
+  };
+
+  it("only the owner generates a new invite code", async () => {
+    await assertFails(regenerate(COACH));
+    await assertFails(regenerate(CAPTAIN));
+    await assertSucceeds(regenerate(OWNER));
+  });
+
+  it("captains and coaches manage the team; stats keepers and players cannot", async () => {
+    const edit = (uid: string) => updateDoc(doc(db(uid), "teams", TEAM), { city: "Seattle" });
+    await assertSucceeds(edit(COACH));
+    await assertSucceeds(edit(CAPTAIN));
+    await assertFails(edit(STATS));
+    await assertFails(edit(PLAYER));
+    const roster = (uid: string) =>
+      setDoc(doc(db(uid), "teams", TEAM, "roster", uid), { name: "Sam", number: 7, position: "handler", userId: null });
+    await assertSucceeds(roster(CAPTAIN));
+    await assertFails(roster(STATS));
   });
 });
 
@@ -274,6 +370,75 @@ describe("events", () => {
     await seed();
     await assertFails(deleteDoc(ev(PLAYER)));
     await assertSucceeds(deleteDoc(ev(COACH)));
+  });
+});
+
+describe("stats", () => {
+  const game = (extra: Record<string, unknown> = {}) => ({
+    opponent: "Rival",
+    date: new Date(2026, 9, 28),
+    gameTo: 15,
+    tournamentId: null,
+    eventId: null,
+    points: [
+      {
+        line: ["a", "b", "c", "d", "e", "f", "g"],
+        startedOn: "offense",
+        actions: [{ kind: "pickup", playerId: "a" }],
+        result: null,
+      },
+    ],
+    finished: false,
+    lines: [],
+    timeoutsPerHalf: 2,
+    timeouts: [],
+    ...extra,
+  });
+  const tournament = () => ({
+    name: "Regionals",
+    startDate: new Date(2026, 9, 28),
+    location: "",
+    eventId: null,
+    roster: ["a", "b"],
+    lines: [{ id: "l1", name: "O-line", players: ["a"], side: "offense" }],
+  });
+  const g = (uid: string) => doc(db(uid), "teams", TEAM, "statsGames", "g1");
+  const t = (uid: string) => doc(db(uid), "teams", TEAM, "statsTournaments", "t1");
+
+  it("owners, coaches, captains and stats keepers keep stats; others cannot", async () => {
+    await assertSucceeds(setDoc(g(COACH), game()));
+    await assertSucceeds(setDoc(g(OWNER), game({ finished: true })));
+    await assertSucceeds(setDoc(g(STATS), game()));
+    await assertSucceeds(setDoc(g(CAPTAIN), game()));
+    await assertFails(setDoc(g(PLAYER), game()));
+    await assertFails(setDoc(g(OUTSIDER), game()));
+    await assertSucceeds(setDoc(t(COACH), tournament()));
+    await assertSucceeds(setDoc(t(STATS), tournament()));
+    await assertSucceeds(setDoc(t(CAPTAIN), tournament()));
+    await assertFails(setDoc(t(PLAYER), tournament()));
+  });
+
+  it("members can view stats, outsiders cannot", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "statsGames", "g1"), game()),
+    );
+    await assertSucceeds(getDoc(g(PLAYER)));
+    await assertFails(getDoc(g(OUTSIDER)));
+  });
+
+  it("validates games", async () => {
+    await assertFails(setDoc(g(COACH), game({ opponent: "" })));
+    await assertFails(setDoc(g(COACH), game({ gameTo: "15" })));
+    await assertFails(setDoc(g(COACH), game({ hacked: true })));
+    await assertFails(setDoc(g(COACH), game({ timeoutsPerHalf: -1 })));
+  });
+
+  it("only editors delete stats", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "statsGames", "g1"), game()),
+    );
+    await assertFails(deleteDoc(g(PLAYER)));
+    await assertSucceeds(deleteDoc(g(COACH)));
   });
 });
 
