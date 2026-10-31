@@ -167,6 +167,41 @@ Your whole week in one place: personal events plus every team you're on.
 Event types: Practice, Game, Tournament, Scrimmage, Workout, Social, Other.
 Personal events are private: only you can see them.
 
+### Videos
+
+Videos shared with your team, like meeting recordings or game film. Open
+your team and tap **Videos**.
+
+- **Watch:** tap a video to play it in the app. For YouTube videos,
+  **Open on YouTube** plays it on YouTube instead.
+- **Add one** (owners, coaches and captains):
+  1. Upload the video to YouTube. Set it to **Unlisted** if it's just for
+     the team, and leave **Allow embedding** on.
+  2. In **Videos**, tap **Add video** and paste the link. UltiUP checks it
+     with YouTube, shows the thumbnail and fills in the title.
+  3. Change the title if you like, add a description, and tap
+     **Add video**.
+- **Or upload a video file:** tap **Add video**, choose **Upload file**,
+  then **Choose video file**. MP4, MOV, MKV, WebM, AVI, WMV, MPEG and 3GP
+  all work. Files can be up to 500 MB, and each team has 5 GB in
+  all; the bar above the videos shows how much is used. Keep the page
+  open until the upload finishes.
+- If UltiUP says YouTube won't play the video here, it's set to Private,
+  it was deleted, or embedding is turned off. Fix that on YouTube and
+  paste the link again.
+- **Folders:** tap a chip above the videos (**All**, a folder, or
+  **Unsorted**) to see just those. Owners, coaches and captains tap
+  **New folder** to make one (say Film review, Game film or Highlights),
+  and **⋮ → Move to folder** on a video to file it. With a folder open,
+  **Add video** puts new videos in it, and the **⋮** next to the chips
+  renames or deletes it. Deleting a folder doesn't delete its videos;
+  they move to Unsorted.
+- Use **⋮ → Edit** or **Remove** on a video to change or unlist it.
+  Removing a YouTube video here doesn't delete it from YouTube. Removing
+  an upload deletes the file and frees its space.
+- Unlisted videos aren't searchable on YouTube, but anyone who has the
+  link can watch, so only share film you're happy to have passed along.
+
 ### Meetings
 
 Video meetings for your team. They show on the schedule with a 🎥 icon,
@@ -194,6 +229,17 @@ but only to the people invited.
   chat, settings and **Leave**. Admins can also **End for everyone**.
 - **Chat** lets you type instead of unmuting. Only people in the call can
   read it.
+- **Watch a video together** (owners, coaches and captains): tap the
+  videos button along the bottom and pick one of the team's videos (filter
+  by folder). It fills the screen for everyone, with people in a strip
+  beside it. Use **Play**, **Pause** and the slider; everyone's video
+  follows yours. **Stop** goes back to the call. Another admin can tap
+  **Take control** to drive. Everyone hears the video through their own
+  device at full quality, so there's no need to share your screen. If it
+  says "Tap the video to start it", tap the video once.
+- **Recording:** UltiUP doesn't record meetings yet. Record with OBS (or
+  similar), upload the recording to YouTube, and add the link in
+  **Videos** once YouTube has finished processing it.
 - **Volume:** tap a person to make them louder or quieter (0–200%) or mute
   them, just for you. Settings (⚙) changes devices mid-call and the
   overall volume. UltiUP remembers these on this device.

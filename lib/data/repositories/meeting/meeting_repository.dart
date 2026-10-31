@@ -1,6 +1,7 @@
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/meeting.dart';
+import '../../../domain/models/meeting_playback.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
 
@@ -94,6 +95,21 @@ abstract class MeetingRepository {
     String meetingId,
     String messageId,
   );
+
+  /// The video being watched together in the meeting; null when none.
+  /// People in the call only.
+  Stream<MeetingPlayback?> watchPlayback(String teamId, String meetingId);
+
+  /// Starts, changes or takes over watch together. Admins only, while the
+  /// meeting is live.
+  Future<Result<void>> setPlayback(
+    String teamId,
+    String meetingId,
+    MeetingPlayback playback,
+  );
+
+  /// Ends watch together for everyone. Admins only.
+  Future<Result<void>> stopPlayback(String teamId, String meetingId);
 
   /// A token to connect to the meeting's call. Fails unless the meeting is
   /// live and [teamId]'s rules let the signed-in user in.

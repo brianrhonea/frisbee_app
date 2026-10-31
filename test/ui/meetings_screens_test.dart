@@ -7,6 +7,7 @@ import 'package:frisbee_app/data/services/meeting_presence.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/meeting.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/domain/models/team_video.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/meetings/view_models/meeting_detail_viewmodel.dart';
 import 'package:frisbee_app/ui/meetings/view_models/meeting_editor_viewmodel.dart';
@@ -17,6 +18,7 @@ import 'package:frisbee_app/ui/meetings/widgets/meeting_room_screen.dart';
 
 import '../testing/fakes.dart';
 import '../testing/meeting_fakes.dart';
+import '../testing/video_fakes.dart';
 
 const coach = AppUser(uid: 'c', displayName: 'Casey');
 const player = AppUser(uid: 'p1', displayName: 'Pat');
@@ -25,8 +27,10 @@ void main() {
   late FakeTeamRepository teams;
   late FakeMeetingRepository meetings;
   late FakeMeetingMediaService media;
+  late FakeVideoRepository videos;
 
   setUp(() {
+    videos = FakeVideoRepository();
     teams = FakeTeamRepository();
     meetings = FakeMeetingRepository();
     media = FakeMeetingMediaService();
@@ -64,6 +68,7 @@ void main() {
     ),
     filePicker: FakeFilePickerService(),
     presence: MeetingPresence(),
+    videoRepository: videos,
   );
 
   for (final size in const [Size(390, 844), Size(1280, 800)]) {
@@ -133,6 +138,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Robin is presenting'), findsOneWidget);
     expect(find.text('video:deck'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('admins put a team video up for everyone, then stop', (
+    tester,
+  ) async {
+    meetings.setStatus('m1', MeetingStatus.live);
+    videos.videos['t1'] = [
+      const TeamVideo(id: 'v1', youtubeId: 'dQw4w9WgXcQ', title: 'Zone O'),
+    ];
+    final vm = room(coach);
+    addTearDown(vm.dispose);
+    await pump(
+      tester,
+      MeetingRoomScreen(
+        viewModel: vm,
+        videoPlayer: (v, _, _) => Text('synced:${v.id}'),
+      ),
+      const Size(1280, 800),
+    );
+    await tester.tap(find.text('Join meeting'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Watch a video together'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zone O'));
+    await tester.pumpAndSettle();
+    expect(find.text('synced:v1'), findsOneWidget);
+    expect(find.text('You are presenting · Zone O'), findsOneWidget);
+    expect(find.byTooltip('Play for everyone'), findsOneWidget);
+    expect(meetings.playback['m1']?.presenterId, 'c');
+
+    await tester.tap(find.text('Stop'));
+    await tester.pumpAndSettle();
+    expect(find.text('synced:v1'), findsNothing);
+    expect(meetings.playback, isEmpty);
     expect(tester.takeException(), isNull);
   });
 

@@ -145,7 +145,8 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
 | Team chat: rooms with per-role and per-person read/write access, photos and files | `ui/chat` | `ChatListViewModel`, `ChatRoomViewModel`, `ChatRoomSettingsViewModel` | Chat, Team |
 | Direct messages: search people by name, 1:1 conversations, unread tracking | `ui/messages` | `InboxViewModel`, `PeopleSearchViewModel`, `DirectChatViewModel` | DirectMessage |
 | Schedule: team and personal events, RSVP, reactions, polls | `ui/schedule` | `ScheduleViewModel` (`MySchedule`), `EventEditorViewModel`, `EventDetailViewModel`, `MyEventDetailViewModel` | Event, Team |
-| Team meetings: invite roles or people, RSVP, lobby with admin approval, video calls (camera, screen share, chat, per-person volume) | `ui/meetings` | `MeetingEditorViewModel`, `MeetingDetailViewModel`, `MeetingRoomViewModel`, `MeetingChatViewModel`, `MeetingAlertsViewModel` | Meeting, MeetingSettings, Team |
+| Team meetings: invite roles or people, RSVP, lobby with admin approval, video calls (camera, screen share, chat, per-person volume, watch team videos together) | `ui/meetings` | `MeetingEditorViewModel`, `MeetingDetailViewModel`, `MeetingRoomViewModel`, `MeetingChatViewModel`, `WatchTogetherViewModel`, `MeetingAlertsViewModel` | Meeting, MeetingSettings, Team, Video |
+| Videos: YouTube links or uploaded video files shared with the team, in folders, thumbnails, embedded player (WebView2 on Windows), media_kit for uploads | `ui/videos` | `TeamVideosViewModel`, `VideoViewModel`, `VideoEditorViewModel` | Video, Team (`YouTubeInfoService` for link checks) |
 | Playbook: draw plays, animate steps, play back | `ui/playbook` | `PlayEditorViewModel` | Play, Team |
 | Stats: tournaments, live game tracking (lines, pull timer, timeouts), stat sheets, season stats | `ui/stats` | `StatsViewModel`, `TournamentViewModel`, `GameTrackerViewModel` | Stats, Event, Team |
 | Events: USA Ultimate tournaments, schedules and brackets | `ui/tournaments`, `ui/events` | `TournamentsViewModel`, `TournamentDetailViewModel` | Tournament, UsauSchedule |
@@ -290,6 +291,10 @@ teams/{teamId}                  name, division, level, city, ownerId,
   events/{eventId}              team event, plus rsvps {uid}, reactions {uid}, votes {uid}, poll, public
   publicEvents/{eventId}        details of events marked public, no responses (anyone signed in reads)
   posts/{postId}                title, body, public, authorId, authorName (public ones: anyone reads)
+  videos/{videoId}              youtubeId (11 chars, never a URL; '' for uploads), file? {path, name,
+                                size, contentType}, folderId ('' = unsorted), title, description,
+                                authorId, authorName, createdAt, updatedAt
+  videoFolders/{folderId}       name (1–40), createdAt
   statsTournaments/{id}         tournament with roster and lines
   statsGames/{id}               one game: points, lines, timeouts, all in one doc
   chats/{roomId}                name, readRoles, writeRoles, readUsers, writeUsers
@@ -298,6 +303,8 @@ teams/{teamId}                  name, division, level, city, ownerId,
                                 startedAt, endedAt, rsvps {uid}, createdBy
     requests/{uid}              join request: status (pending/admitted/denied), decidedBy
     messages/{messageId}        in-call chat: authorId, authorName, text, createdAt
+    playback/current            watch together: videoId, playing, positionMs, presenterId,
+                                presenterName, updatedAt
     messages/{messageId}        authorId, authorName, text, attachments [], createdAt
 conversations/{uidA_uidB}       participants [a,b] (sorted), names {}, lastMessage,
                                 lastMessageAt, lastSenderId, readAt {}
@@ -318,7 +325,7 @@ sentReminders/{key}             one per event and start time, so reminders go on
   `TeamRepositoryFirebase.deleteTeam` clears every subcollection first:
   chat rooms (attachments, then messages, then the room), meetings
   (messages and requests, then the meeting), roster, plays,
-  events, stats, joins and the invite code. `AuthRepositoryFirebase
+  events, videos, stats, joins and the invite code. `AuthRepositoryFirebase
   .deleteAccount` removes personal events, notification settings, devices
   and feed, `users/{uid}` and `profiles/{uid}`. Conversations stay for the
   other person. `deleteTeam` first stamps `deletingAt` on the team, so the
@@ -371,6 +378,10 @@ take, but the server enforces every one.
 | Meetings | Admins, plus invited roles and people | Create, edit, delete: admins. Start: admins (scheduled → live). End: admins. Invitees write only their own RSVP |
 | Meeting join requests | The requester and admins | The invitee creates or renews their own pending request (approval meetings, not ended); admins admit or deny |
 | Meeting chat | Admins and invitees allowed in the call (admitted, if approval is on) | Same people, while live, text only (4000 chars). Delete: author or admins |
+| Meeting playback (watch together) | Same people as the chat | Admins, while live, as themselves (`presenterId`), and only a video on the team. Delete: admins |
+| Team videos | Members | Owners, coaches and captains; `youtubeId` or a video `file` (MP4, MOV, MKV, WebM, AVI, WMV, MPEG or 3GP; ≤ 500 MB, under the video's own Storage path, fixed once created), `title` (1–100) and `description` (≤ 2000). Delete: same |
+| Video folders | Members | Owners, coaches and captains; only `name` (1–40). Delete: same |
+| Uploaded video files (Storage `teams/{id}/videos/{videoId}/{name}`) | Members | Owners, coaches and captains; `video/*`, ≤ 500 MB. Delete: same |
 | Chat room details | Editors (to manage access); others only rooms they can read | Create and update: editors. Delete: owner |
 | Chat messages | The owner, plus roles and people the room lets read | Create: the owner, plus roles and people the room lets write, posting as themselves. Delete: author or owner. No edits |
 | Chat attachments | Same as messages (Storage rules read the room from Firestore) | Room writers, into their own folder, 10 MB max. Delete: author or owner |
@@ -394,6 +405,9 @@ Service Agent** role on the project.
 | Cloud Firestore | All app data, real-time listeners | Firebase repositories |
 | Cloud Storage | Chat and DM attachments | `AttachmentStorage` |
 | LiveKit Cloud (WebRTC SFU) | Meeting audio, video and screen share | `LiveKitMeetingCall` (`livekit_client`); tokens from the `meetings-joinToken` function via `MeetingTokenService` |
+| YouTube oEmbed (`youtube.com/oembed`, no key) | Video title and whether it can be embedded, when a link is pasted | `YouTubeInfoService` |
+| YouTube embedded player | Playing team videos (`youtube_player_iframe`; on Windows the embed in WebView2 via `webview_windows`) | `youTubePlayer()` |
+| Cloud Storage + media_kit | Uploaded team video files | `VideoRepositoryFirebase`, `fileVideoPlayer()` |
 | play.usaultimate.org (HTML scraping, ASP.NET postbacks) | Tournaments, rankings, team pages and rosters, event schedules and brackets | `UsauClient` + `UsauParser` |
 
 Notes on USA Ultimate data:
@@ -467,11 +481,98 @@ page.
 - **Per-user settings** (`MeetingSettings`, in SharedPreferences): chosen
   mic, speaker and camera, mic and camera on at join, meeting volume, and
   each person's volume (0–200%, applied with `Helper.setVolume`).
+- **Watch together** replaces screen-sharing a video: an admin picks a
+  team video and everyone plays it on their own device, in sync, at full
+  quality. See [Watch together](#watch-together).
 - **Started alerts:** the `teamMeeting` trigger notifies invitees who said
   they're attending, except whoever started it and anyone already waiting
   or let in. The feed entry id starts `meetingStarted_`, and
   `MeetingAlertsViewModel` turns a fresh unread one into an in-app banner
   with **Join**, unless `MeetingPresence` says that room is already open.
+
+### Watch together
+
+`WatchTogetherViewModel` (created with the call, like the chat) follows
+one doc, `meetings/{id}/playback/current` (`MeetingPlayback`): which video,
+playing or paused, the position at `updatedAt` (server time), and who's
+presenting.
+
+- **Players** sit behind `SyncedVideoController`
+  (`data/services/synced_video.dart`): play, pause, seek, volume, status.
+  `syncedVideoPlayer()` (`ui/videos/widgets/synced_video_player.dart`)
+  builds one with no controls of its own: media_kit for uploads,
+  `youtube_player_iframe` on Android, iOS and macOS, and on Windows a
+  WebView2 page (`synced.html`) using YouTube's IFrame Player API, driven
+  with `executeScript`. WebView2 starts with
+  `--autoplay-policy=no-user-gesture-required` (`ensureWebViewEnvironment`)
+  so videos start from code.
+- **Sync:** while a video is up, each player is checked once a second.
+  Viewers play or pause to match and seek when more than 1.5 s off the
+  expected position (`position` plus the time since `updatedAt` while
+  playing; device clocks are trusted). The presenter's player is the
+  truth: its play, pause and seek are written straight away, and while it
+  plays it rewrites its real position every 10 s (a heartbeat) and writes
+  paused at the end. If a viewer's player won't start after three tries,
+  it shows "Tap the video to start it".
+- **Control:** only admins write (`presenterId` must be them), so another
+  admin can **Take control**. **Stop** deletes the doc; ending or deleting
+  the meeting does too.
+- **Layout:** the video takes the stage, ahead of any shared screen, with
+  the tiles in a strip. Its audio follows the meeting volume and mute.
+
+## Videos
+
+A team video is either a YouTube link or an uploaded video file: MP4,
+M4V, MOV, MKV, WebM, AVI, WMV, MPEG or 3GP (`VideoFile.types`, matched
+by `validFile` in `firestore.rules`). media_kit (libmpv) plays them all.
+
+For links, you upload to YouTube (Unlisted works) and paste the link.
+`TeamVideo.youtubeIdFrom` reads the 11-character id from any common link
+shape; only that id is saved, and the rules accept nothing else, so a
+stored video can't point off YouTube.
+
+For uploads, `VideoRepositoryFirebase.uploadVideo` puts the file in Cloud
+Storage at `teams/{teamId}/videos/{videoId}/{name}` and then writes the
+video doc with `file {path, name, size, contentType}`. If the doc write
+fails, the file is deleted. The download URL isn't stored; the video page
+asks Storage for it each time (`fileUrl`).
+
+- **Limits:** 500 MB per file (`TeamVideo.maxFileBytes`), enforced by the
+  app, `firestore.rules` and `storage.rules`. 5 GB per team
+  (`TeamVideo.teamQuotaBytes`) is checked by the app only, from the sum
+  of the team's file sizes, since rules can't add files up. Admins see
+  **Uploads: X of 5 GB used** above the grid.
+- **Removing** an upload deletes its file; deleting a team deletes them
+  all.
+- **Folders** (`VideoFolder`, `teams/{id}/videoFolders`) are just names.
+  A video points at one with `folderId`; empty, or a folder that's gone,
+  means unsorted. Deleting a folder first sets `folderId: ''` on its
+  videos (batched), then deletes it, so no video is lost.
+  `TeamVideosViewModel.filter` is All, one folder, or Unsorted; a new
+  video starts in the folder being viewed (`?folder=` on the new-video
+  route).
+
+- **Checking links:** `YouTubeInfoService` asks YouTube's public oEmbed
+  endpoint for the title and channel. It answers for public and unlisted
+  videos that allow embedding, so the editor warns about private videos
+  or ones with embedding turned off before they're shared.
+- **Thumbnails** come from `i.ytimg.com/vi/<id>/hqdefault.jpg`.
+- **Playback** uses YouTube's own embedded player (`youtubePlayer()` in
+  `ui/videos/widgets/youtube_player_view.dart`):
+  - Android, iOS, macOS: `youtube_player_iframe`.
+  - Windows: the same embed in an Edge WebView2 (`webview_windows`). YouTube's
+    embed won't play from a page with no origin, so a small player page is
+    written to a temp folder and served from the virtual host
+    `https://player.ultiup.app`. If WebView2 is missing or fails, the
+    page falls back to the thumbnail with **Watch on YouTube**.
+  - Building on Windows needs NuGet; the plugin downloads it if it isn't
+    on the PATH.
+- Uploads play in `media_kit` (`fileVideoPlayer()` in
+  `ui/videos/widgets/file_video_player.dart`); `MediaKit.ensureInitialized()`
+  runs in `main`.
+- Screens take the players as parameters, so widget tests swap in
+  stand-ins (`fakePlayer` and `fakeFilePlayer` in
+  `test/testing/video_fakes.dart`).
 
 ## Secrets and configuration
 

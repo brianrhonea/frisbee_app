@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/meeting.dart';
+import '../../../domain/models/meeting_playback.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
@@ -150,6 +151,7 @@ class MeetingRepositoryFirebase implements MeetingRepository {
         await deleteDocs(_db, [
           for (final d in messages.docs) d.reference,
           for (final d in requests.docs) d.reference,
+          _playback(teamId, meetingId),
         ]);
         await _meetings(teamId).doc(meetingId).delete();
       });
@@ -180,12 +182,42 @@ class MeetingRepositoryFirebase implements MeetingRepository {
   );
 
   @override
-  Future<Result<void>> endMeeting(String teamId, String meetingId) => guard(
-    () => _meetings(teamId).doc(meetingId).update({
-      'status': MeetingStatus.ended.name,
-      'endedAt': FieldValue.serverTimestamp(),
-    }),
+  Future<Result<void>> endMeeting(String teamId, String meetingId) =>
+      guard(() async {
+        await _meetings(teamId).doc(meetingId).update({
+          'status': MeetingStatus.ended.name,
+          'endedAt': FieldValue.serverTimestamp(),
+        });
+        // Nobody can watch an ended meeting; tidy up, but it's not fatal.
+        await _playback(teamId, meetingId).delete().catchError((_) {});
+      });
+
+  DocumentReference<Map<String, dynamic>> _playback(
+    String teamId,
+    String meetingId,
+  ) => _meetings(teamId).doc(meetingId).collection('playback').doc('current');
+
+  @override
+  Stream<MeetingPlayback?> watchPlayback(String teamId, String meetingId) =>
+      _playback(teamId, meetingId).snapshots().map(
+        (d) => d.exists ? MeetingPlayback.fromMap(plainData(d.data())) : null,
+      );
+
+  @override
+  Future<Result<void>> setPlayback(
+    String teamId,
+    String meetingId,
+    MeetingPlayback playback,
+  ) => guard(
+    () => _playback(
+      teamId,
+      meetingId,
+    ).set({...playback.toMap(), 'updatedAt': FieldValue.serverTimestamp()}),
   );
+
+  @override
+  Future<Result<void>> stopPlayback(String teamId, String meetingId) =>
+      guard(() => _playback(teamId, meetingId).delete());
 
   @override
   Stream<List<JoinRequest>> watchJoinRequests(

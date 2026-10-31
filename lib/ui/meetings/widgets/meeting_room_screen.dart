@@ -7,6 +7,7 @@ import '../../../utils/command.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
+import '../../videos/widgets/synced_video_player.dart';
 import '../view_models/meeting_room_viewmodel.dart';
 import 'meeting_call_view.dart';
 import 'meeting_detail_screen.dart' show MeetingStatusBadge;
@@ -14,9 +15,16 @@ import 'meeting_room_widgets.dart';
 
 /// The meeting room: a lobby to pick devices and get in, then the call.
 class MeetingRoomScreen extends StatefulWidget {
-  const MeetingRoomScreen({super.key, required this.viewModel});
+  const MeetingRoomScreen({
+    super.key,
+    required this.viewModel,
+    this.videoPlayer = syncedVideoPlayer,
+  });
 
   final MeetingRoomViewModel viewModel;
+
+  /// Watch together's player; tests swap in a stand-in.
+  final SyncedPlayerBuilder videoPlayer;
 
   @override
   State<MeetingRoomScreen> createState() => _MeetingRoomScreenState();
@@ -71,7 +79,10 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: vm,
     builder: (context, _) => switch (vm.stage) {
-      RoomStage.inCall => MeetingCallView(viewModel: vm),
+      RoomStage.inCall => MeetingCallView(
+        viewModel: vm,
+        videoPlayer: widget.videoPlayer,
+      ),
       RoomStage.left => _LeftView(viewModel: vm, onExit: _exit),
       RoomStage.lobby || RoomStage.joining => _Lobby(viewModel: vm),
     },

@@ -8,6 +8,7 @@ class PickedFile {
     required this.name,
     required this.size,
     required this.read,
+    this.path,
   });
 
   final String name;
@@ -16,6 +17,10 @@ class PickedFile {
   final int? size;
 
   final Future<Uint8List> Function() read;
+
+  /// On-disk path, for uploads too big to read into memory; null where the
+  /// platform gives none (web).
+  final String? path;
 }
 
 /// Wraps the platform file dialogs.
@@ -28,8 +33,30 @@ class FilePickerService {
     );
     return [
       for (final f in files)
-        PickedFile(name: f.name, size: f.lengthSync(), read: f.readAsBytes),
+        PickedFile(
+          name: f.name,
+          size: f.lengthSync() ?? await f.length(),
+          read: f.readAsBytes,
+          path: f.path,
+        ),
     ];
+  }
+
+  /// Lets the user pick one video file with one of the [extensions];
+  /// null when cancelled.
+  Future<PickedFile?> pickVideo(List<String> extensions) async {
+    final files = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: extensions,
+    );
+    final f = files.firstOrNull;
+    if (f == null) return null;
+    return PickedFile(
+      name: f.name,
+      size: f.lengthSync() ?? await f.length(),
+      read: f.readAsBytes,
+      path: f.path,
+    );
   }
 
   /// Asks where to save [bytes] as [fileName]. False when cancelled.

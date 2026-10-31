@@ -713,6 +713,149 @@ describe("posts", () => {
   });
 });
 
+describe("videos", () => {
+  const video = (uid: string, extra: Record<string, unknown> = {}) => ({
+    youtubeId: "dQw4w9WgXcQ",
+    title: "Film review",
+    description: "",
+    authorId: uid,
+    authorName: "C",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const ref = (uid: string, id = "v1") => doc(db(uid), "teams", TEAM, "videos", id);
+  const seed = () =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "videos", "v1"), {
+        ...video(COACH),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+
+  it("owners, coaches and captains share videos; players and outsiders cannot", async () => {
+    await assertSucceeds(setDoc(ref(OWNER, "a"), video(OWNER)));
+    await assertSucceeds(setDoc(ref(COACH, "b"), video(COACH)));
+    await assertSucceeds(setDoc(ref(CAPTAIN, "c"), video(CAPTAIN)));
+    await assertFails(setDoc(ref(PLAYER, "d"), video(PLAYER)));
+    await assertFails(setDoc(ref(OUTSIDER, "e"), video(OUTSIDER)));
+  });
+
+  it("stores only a YouTube video id, a title and a description", async () => {
+    await assertFails(setDoc(ref(COACH), video(OWNER)));
+    await assertFails(setDoc(ref(COACH), video(COACH, { youtubeId: "https://evil.example/x" })));
+    await assertFails(setDoc(ref(COACH), video(COACH, { youtubeId: "short" })));
+    await assertFails(setDoc(ref(COACH), video(COACH, { title: "" })));
+    await assertFails(setDoc(ref(COACH), video(COACH, { title: "x".repeat(101) })));
+    await assertFails(setDoc(ref(COACH), video(COACH, { description: "x".repeat(2001) })));
+    await assertFails(setDoc(ref(COACH), video(COACH, { url: "https://youtu.be/dQw4w9WgXcQ" })));
+    await assertFails(setDoc(ref(COACH), video(COACH, { createdAt: new Date("2020-01-01") })));
+  });
+
+  it("uploads record an MP4 under the video's own path, up to 500 MB", async () => {
+    const file = (extra: Record<string, unknown> = {}) => ({
+      path: `teams/${TEAM}/videos/f1/tryouts.mp4`,
+      name: "tryouts.mp4",
+      size: 120 * 1024 * 1024,
+      contentType: "video/mp4",
+      ...extra,
+    });
+    const upload = (f: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+      video(COACH, { youtubeId: "", file: f, ...extra });
+    await assertSucceeds(setDoc(ref(COACH, "f1"), upload(file())));
+    await assertFails(setDoc(ref(COACH, "f2"), upload(file())));
+    await assertFails(setDoc(ref(COACH, "f1"), upload(file({ size: 501 * 1024 * 1024 }))));
+    await assertFails(setDoc(ref(COACH, "f1"), upload(file({ contentType: "application/pdf" }))));
+    await assertSucceeds(
+      setDoc(ref(COACH, "f3"), upload(file({ name: "s.mkv", path: `teams/${TEAM}/videos/f3/s.mkv`, contentType: "video/x-matroska" }))),
+    );
+    await assertFails(setDoc(ref(COACH, "f1"), upload(file({ url: "https://x" }))));
+    await assertFails(setDoc(ref(COACH, "f1"), upload(file(), { youtubeId: "dQw4w9WgXcQ" })));
+    await assertFails(setDoc(ref(PLAYER, "f1"), video(PLAYER, { youtubeId: "", file: file() })));
+  });
+
+  it("an upload's file can't be swapped after it's shared", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "videos", "f1"), {
+        ...video(COACH, {
+          youtubeId: "",
+          file: { path: `teams/${TEAM}/videos/f1/a.mp4`, name: "a.mp4", size: 10, contentType: "video/mp4" },
+        }),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+    await assertSucceeds(updateDoc(ref(COACH, "f1"), { title: "Renamed", updatedAt: serverTimestamp() }));
+    await assertFails(
+      updateDoc(ref(COACH, "f1"), { "file.size": 1, updatedAt: serverTimestamp() }),
+    );
+  });
+
+  it("members watch; outsiders see nothing", async () => {
+    await seed();
+    await assertSucceeds(getDocs(collection(db(PLAYER), "teams", TEAM, "videos")));
+    await assertSucceeds(getDoc(ref(PLAYER)));
+    await assertFails(getDoc(ref(OUTSIDER)));
+    await assertFails(getDocs(collection(db(OUTSIDER), "teams", TEAM, "videos")));
+  });
+
+  it("editors change the link, title and description, and remove videos", async () => {
+    await seed();
+    await assertSucceeds(
+      updateDoc(ref(CAPTAIN), { title: "Film review, week 2", youtubeId: "abcdefghijk", updatedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(ref(CAPTAIN), { authorId: CAPTAIN, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref(PLAYER), { title: "Hijack", updatedAt: serverTimestamp() }));
+    await assertFails(deleteDoc(ref(PLAYER)));
+    await assertSucceeds(deleteDoc(ref(CAPTAIN)));
+  });
+});
+
+describe("video folders", () => {
+  const ref = (uid: string, id = "f1") => doc(db(uid), "teams", TEAM, "videoFolders", id);
+  const folder = (name = "Game film") => ({ name, createdAt: serverTimestamp() });
+  const video = (ctx: string, extra: Record<string, unknown> = {}) => ({
+    youtubeId: "dQw4w9WgXcQ",
+    title: "Film review",
+    description: "",
+    authorId: ctx,
+    authorName: "C",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+
+  it("owners, coaches and captains make folders; members see them", async () => {
+    await assertSucceeds(setDoc(ref(COACH), folder()));
+    await assertSucceeds(setDoc(ref(CAPTAIN, "f2"), folder("Highlights")));
+    await assertFails(setDoc(ref(PLAYER, "f3"), folder()));
+    await assertFails(setDoc(ref(COACH, "f4"), folder("")));
+    await assertFails(setDoc(ref(COACH, "f5"), folder("x".repeat(41))));
+    await assertFails(setDoc(ref(COACH, "f6"), { ...folder(), color: "red" }));
+    await assertSucceeds(getDoc(ref(PLAYER)));
+    await assertFails(getDoc(ref(OUTSIDER)));
+  });
+
+  it("editors rename and delete folders", async () => {
+    await assertSucceeds(setDoc(ref(COACH), folder()));
+    await assertSucceeds(updateDoc(ref(CAPTAIN), { name: "Games" }));
+    await assertFails(updateDoc(ref(PLAYER), { name: "Mine" }));
+    await assertFails(updateDoc(ref(CAPTAIN), { createdAt: new Date("2020-01-01") }));
+    await assertFails(deleteDoc(ref(PLAYER)));
+    await assertSucceeds(deleteDoc(ref(OWNER)));
+  });
+
+  it("videos are filed by folder id", async () => {
+    const v = (uid: string) => doc(db(uid), "teams", TEAM, "videos", "v1");
+    await assertSucceeds(setDoc(v(COACH), video(COACH, { folderId: "f1" })));
+    await assertSucceeds(updateDoc(v(CAPTAIN), { folderId: "", updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(v(PLAYER), { folderId: "f1", updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(v(CAPTAIN), { folderId: 7, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(v(CAPTAIN), { folderId: "x".repeat(41), updatedAt: serverTimestamp() }));
+  });
+});
+
 describe("team directory", () => {
   const listing = (extra: Record<string, unknown> = {}) => ({
     name: "Team",
@@ -1328,6 +1471,49 @@ describe("meetings", () => {
       await assertSucceeds(setDoc(doc(messages(STATS), "a"), say(STATS)));
       await assertSucceeds(getDocs(messages(STATS)));
       await assertSucceeds(setDoc(doc(messages(CAPTAIN), "b"), say(CAPTAIN)));
+    });
+  });
+
+  describe("watch together", () => {
+    const playback = (uid: string, id = "current") =>
+      doc(db(uid), "teams", TEAM, "meetings", "m1", "playback", id);
+    const state = (uid: string, extra: Record<string, unknown> = {}) => ({
+      videoId: "v1",
+      playing: true,
+      positionMs: 1500,
+      presenterId: uid,
+      presenterName: "P",
+      updatedAt: serverTimestamp(),
+      ...extra,
+    });
+    const seedVideo = () =>
+      env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "teams", TEAM, "videos", "v1"), { youtubeId: "dQw4w9WgXcQ", title: "Film" }),
+      );
+
+    it("admins play team videos for a live call; people in it follow", async () => {
+      await seed({ status: "live" });
+      await seedVideo();
+      await assertSucceeds(setDoc(playback(COACH), state(COACH)));
+      await assertSucceeds(getDoc(playback(STATS)));
+      await assertFails(getDoc(playback(PLAYER)));
+      await assertFails(setDoc(playback(STATS), state(STATS)));
+      // Another admin takes over; nobody plays as someone else.
+      await assertSucceeds(setDoc(playback(CAPTAIN), state(CAPTAIN, { playing: false })));
+      await assertFails(setDoc(playback(CAPTAIN), state(COACH)));
+      await assertFails(deleteDoc(playback(STATS)));
+      await assertSucceeds(deleteDoc(playback(CAPTAIN)));
+    });
+
+    it("only a team video, only while live, only the one doc", async () => {
+      await seed({ status: "live" });
+      await seedVideo();
+      await assertFails(setDoc(playback(COACH), state(COACH, { videoId: "nope" })));
+      await assertFails(setDoc(playback(COACH), state(COACH, { positionMs: -1 })));
+      await assertFails(setDoc(playback(COACH), state(COACH, { url: "https://x" })));
+      await assertFails(setDoc(playback(COACH, "other"), state(COACH)));
+      await seed({ status: "ended" });
+      await assertFails(setDoc(playback(COACH), state(COACH)));
     });
   });
 });

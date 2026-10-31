@@ -71,6 +71,10 @@ import '../ui/teams/widgets/team_section_screen.dart';
 import '../ui/teams/widgets/usau_roster_screen.dart';
 import '../ui/teams/widgets/teams_screen.dart';
 import '../ui/teams/widgets/usau_team_search_screen.dart';
+import '../ui/videos/view_models/video_editor_viewmodel.dart';
+import '../ui/videos/view_models/video_viewmodel.dart';
+import '../ui/videos/widgets/video_editor_screen.dart';
+import '../ui/videos/widgets/video_screen.dart';
 import '../ui/tournaments/view_models/tournament_detail_viewmodel.dart';
 import '../ui/tournaments/view_models/tournaments_viewmodel.dart';
 import '../ui/tournaments/widgets/tournament_detail_screen.dart';
@@ -209,6 +213,43 @@ GoRouter router(AuthRepository auth) => GoRouter(
         ),
       ],
     ),
+    // Team videos, full screen over the shell (see Routes.teamVideosPath).
+    GoRoute(
+      path: '${Routes.teamVideosPath}/:teamId',
+      redirect: (_, state) {
+        final teamId = state.pathParameters['teamId']!;
+        final base = '${Routes.teamVideosPath}/$teamId';
+        return state.uri.path == base ? Routes.teamVideos(teamId) : null;
+      },
+      routes: [
+        GoRoute(path: 'new', builder: (_, state) => _videoEditor(state, null)),
+        GoRoute(
+          path: ':videoId',
+          builder: (_, state) {
+            final teamId = state.pathParameters['teamId']!;
+            final videoId = state.pathParameters['videoId']!;
+            return ViewModelHost(
+              key: ValueKey('video-$teamId-$videoId'),
+              create: (c) => VideoViewModel(
+                teamId: teamId,
+                videoId: videoId,
+                videoRepository: c.read(),
+                teamRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, vm) => VideoScreen(viewModel: vm),
+            );
+          },
+          routes: [
+            GoRoute(
+              path: 'edit',
+              builder: (_, state) =>
+                  _videoEditor(state, state.pathParameters['videoId']),
+            ),
+          ],
+        ),
+      ],
+    ),
     // Team meetings, full screen over the shell (see
     // Routes.teamMeetingsPath).
     GoRoute(
@@ -291,6 +332,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                     settingsRepository: c.read(),
                     filePicker: c.read(),
                     presence: c.read(),
+                    videoRepository: c.read(),
                   ),
                   builder: (_, vm) => MeetingRoomScreen(viewModel: vm),
                 );
@@ -735,6 +777,27 @@ String? authRedirect(AuthRepository auth, Uri uri) {
   }
   if (public || path == _splash) return from ?? Routes.home;
   return null;
+}
+
+/// Adds a video to a team, or edits [videoId].
+Widget _videoEditor(GoRouterState state, String? videoId) {
+  final teamId = state.pathParameters['teamId']!;
+  return ViewModelHost(
+    key: ValueKey('video-editor-$teamId-$videoId'),
+    create: (c) => VideoEditorViewModel(
+      teamId: teamId,
+      videoId: videoId,
+      videoRepository: c.read(),
+      teamRepository: c.read(),
+      authRepository: c.read(),
+      youTubeInfo: c.read(),
+      filePicker: c.read(),
+      initialFolderId: videoId == null
+          ? state.uri.queryParameters['folder']
+          : null,
+    ),
+    builder: (_, vm) => VideoEditorScreen(viewModel: vm),
+  );
 }
 
 /// A USA Ultimate team page, from Rankings or Teams search.

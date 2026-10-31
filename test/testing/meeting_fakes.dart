@@ -8,6 +8,7 @@ import 'package:frisbee_app/data/services/meeting_call.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/meeting.dart';
+import 'package:frisbee_app/domain/models/meeting_playback.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -27,6 +28,46 @@ class FakeMeetingRepository implements MeetingRepository {
   );
   int tokenRequests = 0;
   final ended = <String>[];
+
+  /// meetingId → what's being watched together.
+  final playback = <String, MeetingPlayback>{};
+
+  /// Every [setPlayback], in order.
+  final playbackWrites = <MeetingPlayback>[];
+
+  /// Stamped on each [setPlayback], as the server would.
+  DateTime Function() serverNow = DateTime.now;
+
+  @override
+  Stream<MeetingPlayback?> watchPlayback(String teamId, String meetingId) =>
+      _watch(() => playback[meetingId]);
+
+  @override
+  Future<Result<void>> setPlayback(
+    String teamId,
+    String meetingId,
+    MeetingPlayback p,
+  ) async {
+    final saved = MeetingPlayback(
+      videoId: p.videoId,
+      playing: p.playing,
+      position: p.position,
+      presenterId: p.presenterId,
+      presenterName: p.presenterName,
+      updatedAt: serverNow(),
+    );
+    playback[meetingId] = saved;
+    playbackWrites.add(saved);
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> stopPlayback(String teamId, String meetingId) async {
+    playback.remove(meetingId);
+    emit();
+    return const Result.ok(null);
+  }
 
   void emit() => _changes.add(null);
 

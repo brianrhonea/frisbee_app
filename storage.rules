@@ -71,6 +71,24 @@ service firebase.storage {
       allow delete: if request.auth != null && isEditor(team(teamId));
     }
 
+    // Uploaded team videos (TeamVideo.file in firestore.rules): video
+    // files up to 500 MB, uploaded by owners, coaches and captains; members
+    // watch. The desktop SDK sets the content type as a second write, so
+    // it may be missing on create.
+    match /teams/{teamId}/videos/{videoId}/{fileName} {
+      function isEditor(t) {
+        return role(t) in ['owner', 'coach', 'captain'];
+      }
+
+      allow get: if request.auth != null && isMember(team(teamId));
+      allow create, update: if request.auth != null
+        && isEditor(team(teamId))
+        && request.resource.size <= 500 * 1024 * 1024
+        && (request.resource.contentType == null
+            || request.resource.contentType.matches('video/.*'));
+      allow delete: if request.auth != null && isEditor(team(teamId));
+    }
+
     // Direct-message attachments: conversation ids are "{uidA}_{uidB}", so
     // only those two can read, and each uploads into their own folder.
     match /conversations/{convId}/{userId}/{messageId}/{fileName} {

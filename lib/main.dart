@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logging/logging.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
 
 import 'config/dependencies.dart';
@@ -35,6 +36,8 @@ const _memoryCache = bool.fromEnvironment('FIRESTORE_MEMORY_CACHE');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Plays uploaded team videos.
+  MediaKit.ensureInitialized();
   Logger.root.level = kDebugMode ? Level.ALL : Level.WARNING;
   Logger.root.onRecord.listen(
     (r) => debugPrint('${r.level.name} ${r.loggerName}: ${r.message}'),

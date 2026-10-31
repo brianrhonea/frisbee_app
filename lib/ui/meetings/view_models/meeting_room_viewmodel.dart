@@ -6,6 +6,7 @@ import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/meeting/meeting_settings_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../data/repositories/video/video_repository.dart';
 import '../../../data/services/file_picker_service.dart';
 import '../../../data/services/meeting_call.dart';
 import '../../../data/services/meeting_presence.dart';
@@ -14,6 +15,7 @@ import '../../../domain/models/team.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import 'meeting_chat_viewmodel.dart';
+import 'watch_together_viewmodel.dart';
 
 enum RoomStage {
   /// Picking devices and waiting to get in.
@@ -63,7 +65,9 @@ class MeetingRoomViewModel extends ChangeNotifier {
     required MeetingSettingsRepository settingsRepository,
     required FilePickerService filePicker,
     required MeetingPresence presence,
+    required VideoRepository videoRepository,
   }) : _meetings = meetingRepository,
+       _videos = videoRepository,
        _auth = authRepository,
        _media = media,
        _settingsRepo = settingsRepository,
@@ -111,6 +115,7 @@ class MeetingRoomViewModel extends ChangeNotifier {
   final String teamId;
   final String meetingId;
   final MeetingRepository _meetings;
+  final VideoRepository _videos;
   final AuthRepository _auth;
   final MeetingMediaService _media;
   final MeetingSettingsRepository _settingsRepo;
@@ -453,6 +458,7 @@ class MeetingRoomViewModel extends ChangeNotifier {
   void saveVolumes() => unawaited(_settingsRepo.save(_settings));
 
   void _applyVolumes() {
+    _watch?.setVolume(_audioMuted ? 0 : _settings.outputVolume);
     final call = _call;
     if (call == null) return;
     for (final p in call.participants) {
@@ -478,6 +484,11 @@ class MeetingRoomViewModel extends ChangeNotifier {
 
   /// The meeting chat, while in the call.
   MeetingChatViewModel? get chat => _chat;
+
+  WatchTogetherViewModel? _watch;
+
+  /// Watch together, while in the call.
+  WatchTogetherViewModel? get watch => _watch;
 
   List<CallParticipant> get participants => _call?.participants ?? const [];
 
@@ -551,6 +562,16 @@ class MeetingRoomViewModel extends ChangeNotifier {
           authRepository: _auth,
           filePicker: _filePicker,
         );
+        if (_auth.currentUser case final user?) {
+          _watch = WatchTogetherViewModel(
+            teamId: teamId,
+            meetingId: meetingId,
+            meetingRepository: _meetings,
+            videoRepository: _videos,
+            user: user,
+            canControl: isAdmin,
+          );
+        }
         _stage = RoomStage.inCall;
         _applyVolumes();
         notifyListeners();
@@ -608,6 +629,8 @@ class MeetingRoomViewModel extends ChangeNotifier {
     _call = null;
     _chat?.dispose();
     _chat = null;
+    _watch?.dispose();
+    _watch = null;
   }
 
   /// Back to the lobby after leaving, e.g. to rejoin.

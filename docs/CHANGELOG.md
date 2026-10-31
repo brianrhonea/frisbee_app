@@ -10,12 +10,57 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.6   | 2026-10-30 | `feature/team-videos`                   | (this branch)       |
 | 0.0.5   | 2026-10-30 | `feature/team-meetings`                 | `1b2e424` and later |
 | 0.0.4   | 2026-10-29 | `feature/ultiup-schedule`               | `06830cc` and later |
 | 0.0.3   | 2026-10-29 | `feature/roster-import`                 | `5620a1d`           |
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.6 — Team videos
+
+Branch `feature/team-videos`.
+
+**Added**
+- A **Videos** section on each team for YouTube videos: meeting
+  recordings, game film, anything uploaded to YouTube (Unlisted works).
+  Thumbnails in a grid, newest first; tap one to play it in the app.
+- Owners, coaches and captains add videos by pasting a link. UltiUP checks
+  it with YouTube, shows the thumbnail, fills in the title, and warns if
+  the video is private or doesn't allow embedding. They can edit the
+  title and description, or remove a video (it stays on YouTube).
+- YouTube's embedded player on Android, iOS and macOS, and on Windows in
+  an Edge WebView2.
+- **Upload a video file** (MP4, MOV, MKV, WebM, AVI, WMV, MPEG or 3GP)
+  instead of a link: up to 500 MB per file and 5 GB per
+  team, with an upload progress bar. Admins see how much of the team's
+  space is used. Uploads play in the app with media_kit; removing one
+  deletes the file.
+- **Watch together** in meetings: an admin picks a team video (by folder)
+  and it plays for everyone in the call, in sync, on their own device at
+  full quality, instead of a screen share. Play, pause and seek follow the
+  presenter; another admin can take control; Stop returns to the call.
+  YouTube links and uploads both work, on Windows too (YouTube's IFrame
+  API in WebView2).
+- **Folders** to organize videos, like Film review, Game film and
+  Highlights. Filter with chips (All, a folder, Unsorted); owners, coaches
+  and captains create, rename and delete folders and move videos with
+  **⋮ → Move to folder**. Deleting a folder moves its videos to Unsorted.
+
+**Infrastructure**
+- Firestore rules for `teams/{id}/videos`: members read; owners, coaches
+  and captains write; only an 11-character YouTube id is stored, never a
+  URL, or a video file record (deployed). Deleting a team removes its
+  videos and their files.
+- Storage rules for `teams/{id}/videos/{videoId}/{name}`: members read;
+  owners, coaches and captains upload `video/*` files up to 500 MB (deployed).
+- Firestore rules for `meetings/{id}/playback/current`: people in the
+  call read; admins write as themselves, while live, for a team video
+  (deployed). Ending or deleting a meeting clears it.
+- Firestore rules for `teams/{id}/videoFolders` and a video's
+  `folderId` (deployed). Deleting a team removes its folders.
+- New packages: `media_kit`, `media_kit_video`, `media_kit_libs_video`.
 
 ## 0.0.5 — Team meetings
 

@@ -570,6 +570,35 @@ service cloud.firestore {
           allow delete: if signedIn() && (uid() == userId || isEditor(team()));
         }
 
+        // Watch together (MeetingPlayback in
+        // lib/domain/models/meeting_playback.dart): one doc, 'current',
+        // with the team video everyone in the call is watching and where
+        // it is. People in the call read it; admins drive it while the
+        // meeting is live, and stop it (delete) any time.
+        match /playback/{docId} {
+          function meeting() { return get(meetingPath()).data; }
+
+          function validPlayback(d) {
+            return d.keys().hasOnly([
+                 'videoId', 'playing', 'positionMs', 'presenterId',
+                 'presenterName', 'updatedAt'])
+              && d.videoId is string
+              && exists(/databases/$(database)/documents/teams/$(teamId)/videos/$(d.videoId))
+              && d.playing is bool
+              && d.positionMs is int && d.positionMs >= 0
+              && d.presenterId == uid()
+              && validString(d.presenterName, 80)
+              && d.updatedAt == request.time;
+          }
+
+          allow read: if signedIn() && isMember(team()) && inCall(meeting());
+          allow create, update: if signedIn() && docId == 'current'
+            && isEditor(team())
+            && meeting().status == 'live'
+            && validPlayback(request.resource.data);
+          allow delete: if signedIn() && isEditor(team());
+        }
+
         // The chat inside the call: text only, for people in the call.
         // Authors delete their own; admins moderate and clear it when the
         // meeting is deleted.
@@ -639,6 +668,80 @@ service cloud.firestore {
                'title', 'body', 'location', 'links', 'images', 'public',
                'updatedAt'])
           && validPost(request.resource.data);
+      }
+
+      // Videos section (TeamVideo in lib/domain/models/team_video.dart):
+      // a YouTube video, stored as its 11-character id (never a URL, so
+      // links can't point anywhere else), or a video file uploaded to Storage
+      // under teams/{teamId}/videos/{videoId}/ (see storage.rules), up to
+      // 500 MB. Members watch; owners, coaches and captains post, edit and
+      // remove. The 5 GB per-team cap is the app's, since rules can't add
+      // files up.
+      match /videos/{videoId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        function validFile(f) {
+          return f is map
+            && f.keys().hasOnly(['path', 'name', 'size', 'contentType'])
+            && f.path is string
+            && f.path.matches('teams/' + teamId + '/videos/' + videoId + '/[^/]+')
+            && validString(f.name, 200) && f.name.size() > 0
+            && f.size is int && f.size > 0 && f.size <= 500 * 1024 * 1024
+            && f.contentType in ['video/mp4', 'video/x-m4v', 'video/quicktime',
+                'video/x-matroska', 'video/webm', 'video/x-msvideo',
+                'video/x-ms-wmv', 'video/mpeg', 'video/3gpp'];
+        }
+
+        function validVideo(v) {
+          let file = v.get('file', null);
+          let folder = v.get('folderId', '');
+          return folder is string && folder.size() <= 40
+            && v.title is string && v.title.size() > 0 && v.title.size() <= 100
+            && validString(v.description, 2000)
+            && v.youtubeId is string
+            && ((file == null && v.youtubeId.matches('^[A-Za-z0-9_-]{11}$'))
+                || (v.youtubeId == '' && validFile(file)));
+        }
+
+        allow read: if signedIn() && isMember(team());
+        allow delete: if signedIn() && isEditor(team());
+        allow create: if signedIn()
+          && isEditor(team())
+          && request.resource.data.keys().hasOnly([
+               'youtubeId', 'file', 'folderId', 'title', 'description',
+               'authorId', 'authorName', 'createdAt', 'updatedAt'])
+          && request.resource.data.authorId == uid()
+          && validString(request.resource.data.authorName, 80)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && validVideo(request.resource.data);
+        allow update: if signedIn() && isEditor(team())
+          && changed().hasOnly([
+               'youtubeId', 'folderId', 'title', 'description', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && validVideo(request.resource.data);
+      }
+
+      // Folders in the Videos section (VideoFolder in
+      // lib/domain/models/video_folder.dart): just a name. Videos point at
+      // one by folderId; deleting a folder unsorts its videos first.
+      // Members see them; owners, coaches and captains manage them.
+      match /videoFolders/{folderId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        function validFolder(f) {
+          return f.name is string && f.name.size() > 0 && f.name.size() <= 40;
+        }
+
+        allow read: if signedIn() && isMember(team());
+        allow delete: if signedIn() && isEditor(team());
+        allow create: if signedIn() && isEditor(team())
+          && request.resource.data.keys().hasOnly(['name', 'createdAt'])
+          && request.resource.data.createdAt == request.time
+          && validFolder(request.resource.data);
+        allow update: if signedIn() && isEditor(team())
+          && changed().hasOnly(['name'])
+          && validFolder(request.resource.data);
       }
 
       // Chat rooms (ChatRoom in lib/domain/models/chat.dart). Each room

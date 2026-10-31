@@ -5,15 +5,24 @@ import 'package:flutter/material.dart';
 import '../../../data/services/meeting_call.dart';
 import '../../chat/widgets/message_thread_view.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/error_message.dart';
+import '../../videos/widgets/synced_video_player.dart';
 import '../view_models/meeting_room_viewmodel.dart';
+import '../view_models/watch_together_viewmodel.dart';
 import 'meeting_room_widgets.dart';
+import 'watch_together_view.dart';
 
-/// The call: everyone's camera or photo, a shared screen when there is one,
-/// the controls, and the meeting chat.
+/// The call: everyone's camera or photo, a video watched together or a
+/// shared screen when there is one, the controls, and the meeting chat.
 class MeetingCallView extends StatefulWidget {
-  const MeetingCallView({super.key, required this.viewModel});
+  const MeetingCallView({
+    super.key,
+    required this.viewModel,
+    this.videoPlayer = syncedVideoPlayer,
+  });
 
   final MeetingRoomViewModel viewModel;
+  final SyncedPlayerBuilder videoPlayer;
 
   @override
   State<MeetingCallView> createState() => _MeetingCallViewState();
@@ -26,6 +35,50 @@ class _MeetingCallViewState extends State<MeetingCallView> {
   bool _chatOpen = false;
 
   static const _wide = 900.0;
+
+  /// Watch together lives as long as the call, and so does this view.
+  late final WatchTogetherViewModel? _watch = vm.watch;
+
+  late final _watchCommands = [
+    ?_watch?.show,
+    ?_watch?.play,
+    ?_watch?.pause,
+    ?_watch?.seek,
+    ?_watch?.stop,
+    ?_watch?.takeControl,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    for (final c in _watchCommands) {
+      c.addListener(_onWatchCommand);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _watchCommands) {
+      c.removeListener(_onWatchCommand);
+    }
+    super.dispose();
+  }
+
+  void _onWatchCommand() {
+    for (final c in _watchCommands) {
+      if (c.error) {
+        showErrorSnackBar(context, c.result);
+        c.clearResult();
+      }
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    final watch = _watch;
+    if (watch == null) return;
+    final id = await showVideoPicker(context, watch);
+    if (id != null) watch.show.execute(id);
+  }
 
   void _setChat(bool open) {
     setState(() => _chatOpen = open);
@@ -143,7 +196,7 @@ class _MeetingCallViewState extends State<MeetingCallView> {
       return Theme(
         data: theme,
         child: ListenableBuilder(
-          listenable: Listenable.merge([vm, ?vm.chat]),
+          listenable: Listenable.merge([vm, ?vm.chat, ?_watch]),
           builder: (context, _) => Scaffold(
             backgroundColor: const Color(0xFF111316),
             body: SafeArea(
@@ -154,7 +207,11 @@ class _MeetingCallViewState extends State<MeetingCallView> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: _Stage(viewModel: vm, onTap: _showVolume),
+                          child: _Stage(
+                            viewModel: vm,
+                            onTap: _showVolume,
+                            videoPlayer: widget.videoPlayer,
+                          ),
                         ),
                         if (wide && _chatOpen)
                           SizedBox(
@@ -175,6 +232,7 @@ class _MeetingCallViewState extends State<MeetingCallView> {
                     chatOpen: _chatOpen,
                     onChat: () => _toggleChat(wide),
                     onScreenShare: _toggleScreenShare,
+                    onWatch: _pickVideo,
                     onSettings: _showSettings,
                     onLeave: _leave,
                   ),
@@ -230,80 +288,100 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// Everyone's tiles, or the shared screen with tiles beside it.
+/// Everyone's tiles; or the video watched together, or a shared screen,
+/// with the tiles in a strip beside it.
 class _Stage extends StatelessWidget {
-  const _Stage({required this.viewModel, required this.onTap});
+  const _Stage({
+    required this.viewModel,
+    required this.onTap,
+    required this.videoPlayer,
+  });
 
   final MeetingRoomViewModel viewModel;
   final ValueChanged<CallParticipant> onTap;
+  final SyncedPlayerBuilder videoPlayer;
 
   @override
   Widget build(BuildContext context) {
     final people = viewModel.participants;
     final presenter = viewModel.presenter;
+    final watch = viewModel.watch;
     Widget tile(CallParticipant p) => ParticipantTile(
       participant: p,
       onTap: p.isLocal ? null : () => onTap(p),
     );
 
-    if (presenter != null) {
-      return LayoutBuilder(
-        builder: (context, c) {
-          final side = c.maxWidth >= 700;
-          final screen = Padding(
-            padding: const EdgeInsets.all(8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: ColoredBox(
-                color: Colors.black,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    presenter.screen!.view(cover: false),
-                    Positioned(
-                      left: 8,
-                      top: 8,
-                      child: _NameTag(
-                        text: presenter.isLocal
-                            ? 'You are presenting'
-                            : '${presenter.name} is presenting',
-                        icon: Icons.screen_share_outlined,
-                      ),
-                    ),
-                  ],
+    Widget featured(Widget main) => LayoutBuilder(
+      builder: (context, c) {
+        final side = c.maxWidth >= 700;
+        final strip = ListView(
+          scrollDirection: side ? Axis.vertical : Axis.horizontal,
+          padding: const EdgeInsets.all(8),
+          children: [
+            for (final p in people)
+              Padding(
+                padding: const EdgeInsets.all(4),
+                child: SizedBox(
+                  width: side ? null : 160,
+                  height: side ? 120 : null,
+                  child: tile(p),
                 ),
               ),
-            ),
-          );
-          final strip = ListView(
-            scrollDirection: side ? Axis.vertical : Axis.horizontal,
-            padding: const EdgeInsets.all(8),
-            children: [
-              for (final p in people)
-                Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: SizedBox(
-                    width: side ? null : 160,
-                    height: side ? 120 : null,
-                    child: tile(p),
+          ],
+        );
+        return side
+            ? Row(
+                children: [
+                  Expanded(child: main),
+                  SizedBox(width: 220, child: strip),
+                ],
+              )
+            : Column(
+                children: [
+                  Expanded(child: main),
+                  SizedBox(height: 110, child: strip),
+                ],
+              );
+      },
+    );
+
+    // Watching together beats a shared screen: it's what the room is for.
+    if (watch != null && watch.active) {
+      return featured(
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: WatchTogetherStage(viewModel: watch, player: videoPlayer),
+        ),
+      );
+    }
+
+    if (presenter != null) {
+      return featured(
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: ColoredBox(
+              color: Colors.black,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  presenter.screen!.view(cover: false),
+                  Positioned(
+                    left: 8,
+                    top: 8,
+                    child: _NameTag(
+                      text: presenter.isLocal
+                          ? 'You are presenting'
+                          : '${presenter.name} is presenting',
+                      icon: Icons.screen_share_outlined,
+                    ),
                   ),
-                ),
-            ],
-          );
-          return side
-              ? Row(
-                  children: [
-                    Expanded(child: screen),
-                    SizedBox(width: 220, child: strip),
-                  ],
-                )
-              : Column(
-                  children: [
-                    Expanded(child: screen),
-                    SizedBox(height: 110, child: strip),
-                  ],
-                );
-        },
+                ],
+              ),
+            ),
+          ),
+        ),
       );
     }
 
@@ -449,6 +527,7 @@ class _Controls extends StatelessWidget {
     required this.chatOpen,
     required this.onChat,
     required this.onScreenShare,
+    required this.onWatch,
     required this.onSettings,
     required this.onLeave,
   });
@@ -457,6 +536,7 @@ class _Controls extends StatelessWidget {
   final bool chatOpen;
   final VoidCallback onChat;
   final VoidCallback onScreenShare;
+  final VoidCallback onWatch;
   final VoidCallback onSettings;
   final VoidCallback onLeave;
 
@@ -499,6 +579,17 @@ class _Controls extends StatelessWidget {
               offIcon: Icons.screen_share_outlined,
               tooltip: vm.screenSharing ? 'Stop sharing' : 'Share screen',
               onPressed: vm.setScreenSharing.running ? null : onScreenShare,
+            ),
+          if (vm.isAdmin && vm.watch != null)
+            CallToggle(
+              on: vm.watch!.active,
+              highlightOn: true,
+              onIcon: Icons.video_library,
+              offIcon: Icons.video_library_outlined,
+              tooltip: vm.watch!.active
+                  ? 'Watch a different video'
+                  : 'Watch a video together',
+              onPressed: onWatch,
             ),
           CallToggle(
             on: chatOpen,
