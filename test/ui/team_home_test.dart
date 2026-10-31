@@ -226,6 +226,10 @@ void main() {
 
   group('TeamHomeScreen', () {
     Future<void> pump(WidgetTester tester, TeamHomeViewModel vm) async {
+      // Tall enough that the posts below the section links are built.
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light,

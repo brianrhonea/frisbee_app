@@ -10,12 +10,33 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.6   | 2026-10-30 | `feature/team-videos`                   | (this branch)       |
 | 0.0.5   | 2026-10-30 | `feature/team-meetings`                 | `1b2e424` and later |
 | 0.0.4   | 2026-10-29 | `feature/ultiup-schedule`               | `06830cc` and later |
 | 0.0.3   | 2026-10-29 | `feature/roster-import`                 | `5620a1d`           |
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.6 — Team videos
+
+Branch `feature/team-videos`.
+
+**Added**
+- A **Videos** section on each team for YouTube videos: meeting
+  recordings, game film, anything uploaded to YouTube (Unlisted works).
+  Thumbnails in a grid, newest first; tap one to play it in the app.
+- Owners, coaches and captains add videos by pasting a link. UltiUP checks
+  it with YouTube, shows the thumbnail, fills in the title, and warns if
+  the video is private or doesn't allow embedding. They can edit the
+  title and description, or remove a video (it stays on YouTube).
+- YouTube's embedded player on Android, iOS and macOS, and on Windows in
+  an Edge WebView2.
+
+**Infrastructure**
+- Firestore rules for `teams/{id}/videos`: members read; owners, coaches
+  and captains write; only an 11-character YouTube id is stored, never a
+  URL (deployed). Deleting a team removes its videos.
 
 ## 0.0.5 — Team meetings
 

@@ -6,7 +6,7 @@ const appName = 'UltiUP';
 
 /// Matches `version:` in pubspec.yaml (checked by test/version_test.dart).
 /// The log of versions is in docs/CHANGELOG.md.
-const appVersion = '0.0.5';
+const appVersion = '0.0.6';
 
 /// The app icon in use.
 const logoAsset = 'assets/brand/ultiup_1b.png';

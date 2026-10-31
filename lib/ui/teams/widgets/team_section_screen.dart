@@ -13,6 +13,8 @@ import '../../playbook/widgets/playbook_tab.dart';
 import '../../schedule/widgets/team_events_tab.dart';
 import '../../stats/view_models/stats_viewmodel.dart';
 import '../../stats/widgets/stats_tab.dart';
+import '../../videos/view_models/team_videos_viewmodel.dart';
+import '../../videos/widgets/videos_tab.dart';
 import '../view_models/team_detail_viewmodel.dart';
 import 'members_tab.dart';
 import 'roster_tab.dart';
@@ -23,6 +25,7 @@ enum TeamSection {
   chat('Chat', Icons.chat_bubble_outline, 'chat'),
   roster('Roster', Icons.badge_outlined, 'roster'),
   playbook('Playbook', Icons.draw_outlined, 'playbook'),
+  videos('Videos', Icons.video_library_outlined, 'videos'),
   stats('Stats', Icons.insights_outlined, 'stats'),
   members('Members', Icons.groups_outlined, 'members');
 
@@ -38,6 +41,7 @@ enum TeamSection {
     chat => Routes.teamChat(teamId),
     roster => Routes.teamRoster(teamId),
     playbook => Routes.teamPlaybook(teamId),
+    videos => Routes.teamVideos(teamId),
     stats => Routes.teamStats(teamId),
     members => Routes.teamMembers(teamId),
   };
@@ -116,6 +120,15 @@ class _TeamSectionScreenState extends State<TeamSectionScreen> {
     ),
     TeamSection.roster => RosterTab(viewModel: vm),
     TeamSection.playbook => PlaybookTab(viewModel: vm),
+    TeamSection.videos => ViewModelHost(
+      create: (c) => TeamVideosViewModel(
+        teamId: vm.teamId,
+        videoRepository: c.read(),
+        teamRepository: c.read(),
+        authRepository: c.read(),
+      ),
+      builder: (_, videosVm) => VideosTab(viewModel: videosVm),
+    ),
     TeamSection.stats => ViewModelHost(
       create: (c) => StatsViewModel(
         teamId: vm.teamId,

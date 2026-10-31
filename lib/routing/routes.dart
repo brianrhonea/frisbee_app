@@ -34,6 +34,7 @@ abstract final class Routes {
   static String teamPlaybook(String teamId) => '/teams/$teamId/playbook';
   static String teamStats(String teamId) => '/teams/$teamId/stats';
   static String teamMembers(String teamId) => '/teams/$teamId/members';
+  static String teamVideos(String teamId) => '/teams/$teamId/videos';
   static String newPlay(String teamId) => '/teams/$teamId/plays/new';
   // Chat pages open over the team; use `context.push` so back returns to
   // the chat room list.
@@ -58,6 +59,14 @@ abstract final class Routes {
       '$teamEventsPath/$teamId/$eventId';
   static String editEvent(String teamId, String eventId) =>
       '$teamEventsPath/$teamId/$eventId/edit';
+
+  // Video pages open over the tabs, like event pages; use `context.push`.
+  static const teamVideosPath = '/team-videos';
+  static String newVideo(String teamId) => '$teamVideosPath/$teamId/new';
+  static String video(String teamId, String videoId) =>
+      '$teamVideosPath/$teamId/$videoId';
+  static String editVideo(String teamId, String videoId) =>
+      '$teamVideosPath/$teamId/$videoId/edit';
 
   // Team meetings, over the shell like events; use `context.push`.
   static const teamMeetingsPath = '/team-meetings';

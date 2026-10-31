@@ -167,6 +167,28 @@ Your whole week in one place: personal events plus every team you're on.
 Event types: Practice, Game, Tournament, Scrimmage, Workout, Social, Other.
 Personal events are private: only you can see them.
 
+### Videos
+
+Videos shared with your team, like meeting recordings or game film. Open
+your team and tap **Videos**.
+
+- **Watch:** tap a video to play it in the app. **Open on YouTube** plays
+  it on YouTube instead.
+- **Add one** (owners, coaches and captains):
+  1. Upload the video to YouTube. Set it to **Unlisted** if it's just for
+     the team, and leave **Allow embedding** on.
+  2. In **Videos**, tap **Add video** and paste the link. UltiUP checks it
+     with YouTube, shows the thumbnail and fills in the title.
+  3. Change the title if you like, add a description, and tap
+     **Add video**.
+- If UltiUP says YouTube won't play the video here, it's set to Private,
+  it was deleted, or embedding is turned off. Fix that on YouTube and
+  paste the link again.
+- Use **⋮ → Edit** or **Remove** on a video to change or unlist it.
+  Removing it here doesn't delete it from YouTube.
+- Unlisted videos aren't searchable on YouTube, but anyone who has the
+  link can watch, so only share film you're happy to have passed along.
+
 ### Meetings
 
 Video meetings for your team. They show on the schedule with a 🎥 icon,

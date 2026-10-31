@@ -146,6 +146,7 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
 | Direct messages: search people by name, 1:1 conversations, unread tracking | `ui/messages` | `InboxViewModel`, `PeopleSearchViewModel`, `DirectChatViewModel` | DirectMessage |
 | Schedule: team and personal events, RSVP, reactions, polls | `ui/schedule` | `ScheduleViewModel` (`MySchedule`), `EventEditorViewModel`, `EventDetailViewModel`, `MyEventDetailViewModel` | Event, Team |
 | Team meetings: invite roles or people, RSVP, lobby with admin approval, video calls (camera, screen share, chat, per-person volume) | `ui/meetings` | `MeetingEditorViewModel`, `MeetingDetailViewModel`, `MeetingRoomViewModel`, `MeetingChatViewModel`, `MeetingAlertsViewModel` | Meeting, MeetingSettings, Team |
+| Videos: YouTube links shared with the team, thumbnails, embedded player (WebView2 on Windows) | `ui/videos` | `TeamVideosViewModel`, `VideoViewModel`, `VideoEditorViewModel` | Video, Team (`YouTubeInfoService` for link checks) |
 | Playbook: draw plays, animate steps, play back | `ui/playbook` | `PlayEditorViewModel` | Play, Team |
 | Stats: tournaments, live game tracking (lines, pull timer, timeouts), stat sheets, season stats | `ui/stats` | `StatsViewModel`, `TournamentViewModel`, `GameTrackerViewModel` | Stats, Event, Team |
 | Events: USA Ultimate tournaments, schedules and brackets | `ui/tournaments`, `ui/events` | `TournamentsViewModel`, `TournamentDetailViewModel` | Tournament, UsauSchedule |
@@ -290,6 +291,8 @@ teams/{teamId}                  name, division, level, city, ownerId,
   events/{eventId}              team event, plus rsvps {uid}, reactions {uid}, votes {uid}, poll, public
   publicEvents/{eventId}        details of events marked public, no responses (anyone signed in reads)
   posts/{postId}                title, body, public, authorId, authorName (public ones: anyone reads)
+  videos/{videoId}              youtubeId (11 chars, never a URL), title, description, authorId,
+                                authorName, createdAt, updatedAt
   statsTournaments/{id}         tournament with roster and lines
   statsGames/{id}               one game: points, lines, timeouts, all in one doc
   chats/{roomId}                name, readRoles, writeRoles, readUsers, writeUsers
@@ -318,7 +321,7 @@ sentReminders/{key}             one per event and start time, so reminders go on
   `TeamRepositoryFirebase.deleteTeam` clears every subcollection first:
   chat rooms (attachments, then messages, then the room), meetings
   (messages and requests, then the meeting), roster, plays,
-  events, stats, joins and the invite code. `AuthRepositoryFirebase
+  events, videos, stats, joins and the invite code. `AuthRepositoryFirebase
   .deleteAccount` removes personal events, notification settings, devices
   and feed, `users/{uid}` and `profiles/{uid}`. Conversations stay for the
   other person. `deleteTeam` first stamps `deletingAt` on the team, so the
@@ -371,6 +374,7 @@ take, but the server enforces every one.
 | Meetings | Admins, plus invited roles and people | Create, edit, delete: admins. Start: admins (scheduled → live). End: admins. Invitees write only their own RSVP |
 | Meeting join requests | The requester and admins | The invitee creates or renews their own pending request (approval meetings, not ended); admins admit or deny |
 | Meeting chat | Admins and invitees allowed in the call (admitted, if approval is on) | Same people, while live, text only (4000 chars). Delete: author or admins |
+| Team videos | Members | Owners, coaches and captains; only `youtubeId`, `title` (1–100) and `description` (≤ 2000). Delete: same |
 | Chat room details | Editors (to manage access); others only rooms they can read | Create and update: editors. Delete: owner |
 | Chat messages | The owner, plus roles and people the room lets read | Create: the owner, plus roles and people the room lets write, posting as themselves. Delete: author or owner. No edits |
 | Chat attachments | Same as messages (Storage rules read the room from Firestore) | Room writers, into their own folder, 10 MB max. Delete: author or owner |
@@ -394,6 +398,8 @@ Service Agent** role on the project.
 | Cloud Firestore | All app data, real-time listeners | Firebase repositories |
 | Cloud Storage | Chat and DM attachments | `AttachmentStorage` |
 | LiveKit Cloud (WebRTC SFU) | Meeting audio, video and screen share | `LiveKitMeetingCall` (`livekit_client`); tokens from the `meetings-joinToken` function via `MeetingTokenService` |
+| YouTube oEmbed (`youtube.com/oembed`, no key) | Video title and whether it can be embedded, when a link is pasted | `YouTubeInfoService` |
+| YouTube embedded player | Playing team videos (`youtube_player_iframe`; on Windows the embed in WebView2 via `webview_windows`) | `youTubePlayer()` |
 | play.usaultimate.org (HTML scraping, ASP.NET postbacks) | Tournaments, rankings, team pages and rosters, event schedules and brackets | `UsauClient` + `UsauParser` |
 
 Notes on USA Ultimate data:
@@ -472,6 +478,31 @@ page.
   or let in. The feed entry id starts `meetingStarted_`, and
   `MeetingAlertsViewModel` turns a fresh unread one into an in-app banner
   with **Join**, unless `MeetingPresence` says that room is already open.
+
+## Videos
+
+The Videos section stores links, never video files: you upload to YouTube
+(Unlisted works) and paste the link. `TeamVideo.youtubeIdFrom` reads the
+11-character id from any common link shape; only that id is saved, and
+the rules accept nothing else, so a stored video can't point off YouTube.
+
+- **Checking links:** `YouTubeInfoService` asks YouTube's public oEmbed
+  endpoint for the title and channel. It answers for public and unlisted
+  videos that allow embedding, so the editor warns about private videos
+  or ones with embedding turned off before they're shared.
+- **Thumbnails** come from `i.ytimg.com/vi/<id>/hqdefault.jpg`.
+- **Playback** uses YouTube's own embedded player (`youtubePlayer()` in
+  `ui/videos/widgets/youtube_player_view.dart`):
+  - Android, iOS, macOS: `youtube_player_iframe`.
+  - Windows: the same embed in an Edge WebView2 (`webview_windows`). YouTube's
+    embed won't play from a page with no origin, so a small player page is
+    written to a temp folder and served from the virtual host
+    `https://player.ultiup.app`. If WebView2 is missing or fails, the
+    page falls back to the thumbnail with **Watch on YouTube**.
+  - Building on Windows needs NuGet; the plugin downloads it if it isn't
+    on the PATH.
+- Screens take the player as a parameter, so widget tests swap in a
+  stand-in (`fakePlayer` in `test/testing/video_fakes.dart`).
 
 ## Secrets and configuration
 

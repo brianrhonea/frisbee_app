@@ -24,6 +24,8 @@ import '../data/repositories/team/team_repository.dart';
 import '../data/repositories/team/team_repository_firebase.dart';
 import '../data/repositories/team_post/team_post_repository.dart';
 import '../data/repositories/team_post/team_post_repository_firebase.dart';
+import '../data/repositories/video/video_repository.dart';
+import '../data/repositories/video/video_repository_firebase.dart';
 import '../data/repositories/tournament/tournament_repository.dart';
 import '../data/repositories/tournament/tournament_repository_usau.dart';
 import '../data/repositories/usau_schedule/usau_schedule_repository.dart';
@@ -40,6 +42,7 @@ import '../data/services/meeting_token_service.dart';
 import '../data/services/push_service.dart';
 import '../data/services/shared_preferences_service.dart';
 import '../data/services/usau/usau_client.dart';
+import '../data/services/youtube_info_service.dart';
 import '../firebase_options.dart';
 
 /// Services and repositories backed by Firebase.
@@ -61,6 +64,8 @@ List<SingleChildWidget> get firebaseProviders => [
       attachments: context.read<AttachmentStorage>(),
     ),
   ),
+  Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),
+  Provider<YouTubeInfoService>(create: (_) => YouTubeInfoService()),
   Provider<ChatRepository>(
     create: (context) =>
         ChatRepositoryFirebase(attachments: context.read<AttachmentStorage>()),

@@ -355,6 +355,7 @@ class TeamRepositoryFirebase implements TeamRepository {
         'events',
         'publicEvents',
         'posts',
+        'videos',
         'statsTournaments',
         'statsGames',
         'private',

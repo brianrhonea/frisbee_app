@@ -641,6 +641,38 @@ service cloud.firestore {
           && validPost(request.resource.data);
       }
 
+      // Videos section (TeamVideo in lib/domain/models/team_video.dart):
+      // YouTube videos shared with the team. Only the 11-character video id
+      // is stored, never a URL, so links can't point anywhere else. Members
+      // watch; owners, coaches and captains post, edit and remove.
+      match /videos/{videoId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        function validVideo(v) {
+          return v.youtubeId is string
+            && v.youtubeId.matches('^[A-Za-z0-9_-]{11}$')
+            && v.title is string && v.title.size() > 0 && v.title.size() <= 100
+            && validString(v.description, 2000);
+        }
+
+        allow read: if signedIn() && isMember(team());
+        allow delete: if signedIn() && isEditor(team());
+        allow create: if signedIn()
+          && isEditor(team())
+          && request.resource.data.keys().hasOnly([
+               'youtubeId', 'title', 'description',
+               'authorId', 'authorName', 'createdAt', 'updatedAt'])
+          && request.resource.data.authorId == uid()
+          && validString(request.resource.data.authorName, 80)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && validVideo(request.resource.data);
+        allow update: if signedIn() && isEditor(team())
+          && changed().hasOnly(['youtubeId', 'title', 'description', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && validVideo(request.resource.data);
+      }
+
       // Chat rooms (ChatRoom in lib/domain/models/chat.dart). Each room
       // lists the roles and members who can read and who can write; write
       // lists are subsets of read lists. The owner can read and post in
