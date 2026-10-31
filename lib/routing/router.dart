@@ -849,6 +849,8 @@ Widget _tournamentEditor(GoRouterState state, String? tournamentId) {
       eventRepository: c.read(),
       tournamentRepository: c.read(),
       authRepository: c.read(),
+      postRepository: c.read(),
+      filePicker: c.read(),
       eventId: eventId,
     ),
     builder: (_, vm) => TournamentEditorScreen(viewModel: vm),

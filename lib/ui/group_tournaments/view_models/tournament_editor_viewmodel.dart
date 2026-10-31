@@ -1,18 +1,24 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/group_tournament/group_tournament_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../data/repositories/team_post/team_post_repository.dart';
+import '../../../data/services/file_picker_service.dart';
+import '../../../domain/models/chat.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
+import '../../../domain/models/team_post.dart';
 import '../../../domain/tournament_engine/generator.dart';
 import '../../../domain/tournament_engine/team_builder.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../teams/view_models/team_home_viewmodel.dart' show pickPostImages;
 
 /// Sets a tournament up: details, rules and how many teams, then the
 /// schedule to publish, and players on teams (before or after
@@ -25,6 +31,8 @@ class TournamentEditorViewModel extends ChangeNotifier {
     required EventRepository eventRepository,
     required GroupTournamentRepository tournamentRepository,
     required AuthRepository authRepository,
+    TeamPostRepository? postRepository,
+    FilePickerService? filePicker,
     String? eventId,
     DateTime Function()? clock,
     Random? random,
@@ -32,12 +40,15 @@ class TournamentEditorViewModel extends ChangeNotifier {
        _events = eventRepository,
        _tournaments = tournamentRepository,
        _auth = authRepository,
+       _posts = postRepository,
+       _picker = filePicker,
        _initialEventId = eventId,
        _clock = clock ?? DateTime.now,
        _random = random {
     load = Command0<void>(_load);
     save = Command0<String>(_save);
     publish = Command0<String>(_publish);
+    announce = Command1<void, PostDraft>(_announce);
     load.execute();
   }
 
@@ -49,6 +60,8 @@ class TournamentEditorViewModel extends ChangeNotifier {
   final EventRepository _events;
   final GroupTournamentRepository _tournaments;
   final AuthRepository _auth;
+  final TeamPostRepository? _posts;
+  final FilePickerService? _picker;
   final String? _initialEventId;
   final DateTime Function() _clock;
   final Random? _random;
@@ -61,6 +74,12 @@ class TournamentEditorViewModel extends ChangeNotifier {
   /// Saves, then generates and publishes the schedule. Replaces any games
   /// (and results) already published.
   late final Command0<String> publish;
+
+  /// Posts [announcement] (as edited) to the group's feed.
+  late final Command1<void, PostDraft> announce;
+
+  /// Organizers can post to the feed from here.
+  bool get canAnnounce => _posts != null;
 
   Team? _group;
   List<TeamEvent> _tournamentEvents = const [];
@@ -496,6 +515,51 @@ class TournamentEditorViewModel extends ChangeNotifier {
       ]..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     }
     return saved;
+  }
+
+  /// A post telling the group about the tournament so people sign up:
+  /// public, so people who haven't joined the group see it too.
+  TeamPost get announcement {
+    final s = _settings;
+    final e = event;
+    final fmt = DateFormat.jm();
+    final day = DateFormat('EEEE, MMM d');
+    final name = _name.trim();
+    final title = '$name: sign up to play!';
+    return TeamPost(
+      id: '',
+      // Posts take 100 characters.
+      title: title.length <= 100 ? title : name,
+      body: [
+        s.laterDays.isEmpty
+            ? '${day.format(s.startsAt)}, starting at ${fmt.format(s.startsAt)}.'
+            : '${day.format(s.startsAt)} to ${day.format(s.days.last)}, '
+                  'starting at ${fmt.format(s.startsAt)}.',
+        '${s.format.label} · ${_teamList.length} teams · '
+            '${s.playersOnField}v${s.playersOnField} · games to ${s.scoreCap}.',
+        if (e != null)
+          'Want to play? Join the group, then RSVP Attending on '
+              '"${e.title}" in Events. Teams are picked from who signs up.'
+        else
+          'Want to play? Join the group and watch Events for sign-up.',
+      ].join('\n\n'),
+      location: _group?.location?.address ?? '',
+      isPublic: true,
+    );
+  }
+
+  Future<Result<List<NewAttachment>>> pickImages() async {
+    final picker = _picker;
+    if (picker == null) return const Result.ok([]);
+    return pickPostImages(picker);
+  }
+
+  Future<Result<void>> _announce(PostDraft draft) async {
+    final me = _auth.currentUser;
+    final posts = _posts;
+    if (me == null) return Result.error(Exception('Not signed in'));
+    if (posts == null) return Result.error(Exception("Can't post here"));
+    return posts.savePost(groupId, draft, me);
   }
 
   Future<Result<String>> _publish() async {

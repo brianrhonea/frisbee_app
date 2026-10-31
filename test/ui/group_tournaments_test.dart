@@ -2,16 +2,19 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/group_tournament.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
+import 'package:frisbee_app/domain/models/team_post.dart';
 import 'package:frisbee_app/domain/tournament_engine/generator.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/group_tournaments/view_models/group_tournament_viewmodel.dart';
 import 'package:frisbee_app/ui/group_tournaments/view_models/group_tournaments_viewmodel.dart';
 import 'package:frisbee_app/ui/group_tournaments/view_models/tournament_editor_viewmodel.dart';
 import 'package:frisbee_app/ui/group_tournaments/widgets/group_tournament_screen.dart';
+import 'package:frisbee_app/ui/group_tournaments/widgets/tournament_editor_screen.dart';
 import 'package:frisbee_app/ui/schedule/view_models/event_detail_viewmodel.dart';
 
 import '../testing/fakes.dart';
@@ -21,6 +24,7 @@ void main() {
   late FakeTeamRepository teams;
   late FakeEventRepository events;
   late FakeGroupTournamentRepository repo;
+  late FakeTeamPostRepository posts;
 
   /// Owner "owner" organizes; p1..p8 are members.
   final players = [for (var i = 1; i <= 8; i++) 'p$i'];
@@ -29,6 +33,7 @@ void main() {
     teams = FakeTeamRepository();
     events = FakeEventRepository();
     repo = FakeGroupTournamentRepository();
+    posts = FakeTeamPostRepository();
     final members = {
       'owner': TeamRole.owner,
       for (final p in players) p: TeamRole.player,
@@ -101,6 +106,8 @@ void main() {
         eventRepository: events,
         tournamentRepository: repo,
         authRepository: as('owner'),
+        postRepository: posts,
+        filePicker: FakeFilePickerService(),
         eventId: eventId,
         clock: () => DateTime(2026, 11, 1),
         random: Random(1),
@@ -321,6 +328,30 @@ void main() {
       expect(outsider.tournament, isNull);
     });
 
+    test('suggests a public sign-up post and posts it', () async {
+      teams.teams['g1'] = teams.teams['g1']!.copyWith(
+        location: () => const GroupLocation(
+          address: 'City Park, Denver',
+          latitude: 39.75,
+          longitude: -104.95,
+        ),
+      );
+      final vm = await editorVm(eventId: 'e1');
+      expect(vm.canAnnounce, isTrue);
+      final post = vm.announcement;
+      expect(post.isNew, isTrue);
+      expect(post.isPublic, isTrue);
+      expect(post.title, 'Fall Hat: sign up to play!');
+      expect(post.body, contains('Saturday, Nov 7, starting at 9:00'));
+      expect(post.body, contains('4 teams'));
+      expect(post.body, contains('RSVP Attending on "Fall Hat"'));
+      expect(post.location, 'City Park, Denver');
+
+      await vm.announce.execute(PostDraft(post: post));
+      expect(vm.announce.completed, isTrue);
+      expect(posts.posts['g1']!.single.title, 'Fall Hat: sign up to play!');
+    });
+
     test('captains follow players; fewer teams bench their players', () async {
       final vm = await editorVm();
       vm.setName('Hat');
@@ -527,6 +558,60 @@ void main() {
 
     expect(repo.log, ['report ${first.id}']);
     expect(find.text('Waiting for the other captain to confirm.'), findsOne);
+    vm.dispose();
+  });
+
+  testWidgets('the first publish offers a sign-up post', (tester) async {
+    final vm = TournamentEditorViewModel(
+      groupId: 'g1',
+      tournamentId: null,
+      teamRepository: teams,
+      eventRepository: events,
+      tournamentRepository: repo,
+      authRepository: as('owner'),
+      postRepository: posts,
+      filePicker: FakeFilePickerService(),
+      clock: () => DateTime(2026, 11, 1),
+    );
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, _) => TournamentEditorScreen(viewModel: vm),
+        ),
+        GoRoute(
+          path: '/group-tournaments/:g/:t',
+          builder: (_, _) => const Scaffold(body: Text('tournament page')),
+        ),
+      ],
+    );
+    tester.view.physicalSize = const Size(1200, 2400);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Name'),
+      'Spring Hat',
+    );
+    await tester.pump();
+    await tester.tap(find.text('Publish schedule'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tell the group?'), findsOneWidget);
+    await tester.tap(find.text('Write post'));
+    await tester.pumpAndSettle();
+    expect(find.text('New post'), findsOneWidget);
+    expect(find.text('Spring Hat: sign up to play!'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Post'));
+    await tester.pumpAndSettle();
+
+    final post = posts.posts['g1']!.single;
+    expect(post.title, 'Spring Hat: sign up to play!');
+    expect(post.isPublic, isTrue);
+    expect(find.text('tournament page'), findsOneWidget);
+    router.dispose();
     vm.dispose();
   });
 }

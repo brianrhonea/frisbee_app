@@ -184,7 +184,10 @@ tournaments) and **Member**.
    field (3v3 to 7v7), game length, breaks, score cap, timeouts and fields.
 4. Check the **schedule preview**. Games are split evenly over the days,
    in bracket order. It warns if games run past the ideal end. Tap
-   **Publish schedule**. Teams can still be empty at this point.
+   **Publish schedule**. Teams can still be empty at this point. The first
+   time you publish, UltiUP offers to **post it to the group feed** with
+   the dates, format and how to sign up filled in. The post is public, so
+   people who haven't joined yet see it too; edit it before posting.
 5. Add players, now or any time before play: **Import RSVPs** brings in
    everyone attending or planning to attend, **Add member** adds anyone
    else, and **Assign teams** deals them all evenly into the teams at

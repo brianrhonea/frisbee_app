@@ -311,10 +311,14 @@ class PostEditorDialog extends StatefulWidget {
     required this.pickImages,
     required this.loadImage,
     this.initial,
+    this.suggested = false,
   });
 
   /// The post being edited; null for a new one.
   final TeamPost? initial;
+
+  /// [initial] is a suggested new post, not one being edited.
+  final bool suggested;
   final Future<Result<List<NewAttachment>>> Function() pickImages;
   final ImageLoader loadImage;
 
@@ -323,6 +327,7 @@ class PostEditorDialog extends StatefulWidget {
 }
 
 class _PostEditorDialogState extends State<PostEditorDialog> {
+  late final bool _isNew = widget.initial == null || widget.suggested;
   final _formKey = GlobalKey<FormState>();
   late final _title = TextEditingController(text: widget.initial?.title);
   late final _body = TextEditingController(text: widget.initial?.body);
@@ -403,7 +408,7 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AlertDialog(
-      title: Text(widget.initial == null ? 'New post' : 'Edit post'),
+      title: Text(_isNew ? 'New post' : 'Edit post'),
       content: SizedBox(
         width: 520,
         child: Form(
@@ -423,7 +428,7 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
                 ),
                 TextFormField(
                   controller: _body,
-                  autofocus: widget.initial == null,
+                  autofocus: _isNew,
                   minLines: 4,
                   maxLines: 10,
                   maxLength: 5000,
@@ -487,14 +492,22 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
                 Row(
                   children: [
                     Text('Photos', style: theme.textTheme.titleSmall),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: _picking || _imageCount >= TeamPost.maxImages
-                          ? null
-                          : _addPhotos,
-                      icon: const Icon(Icons.add_photo_alternate_outlined),
-                      label: Text(
-                        'Add photos ($_imageCount/${TeamPost.maxImages})',
+                    const SizedBox(width: 8),
+                    // Shrinks on narrow phones instead of overflowing.
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed:
+                              _picking || _imageCount >= TeamPost.maxImages
+                              ? null
+                              : _addPhotos,
+                          icon: const Icon(Icons.add_photo_alternate_outlined),
+                          label: Text(
+                            'Add photos ($_imageCount/${TeamPost.maxImages})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -551,10 +564,7 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: Text(widget.initial == null ? 'Post' : 'Save'),
-        ),
+        FilledButton(onPressed: _submit, child: Text(_isNew ? 'Post' : 'Save')),
       ],
     );
   }

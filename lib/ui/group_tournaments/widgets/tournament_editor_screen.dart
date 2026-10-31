@@ -4,12 +4,14 @@ import 'package:intl/intl.dart';
 
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/team_event.dart';
+import '../../../domain/models/team_post.dart';
 import '../../../domain/tournament_engine/team_builder.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
+import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/tournament_editor_viewmodel.dart';
 import 'tournament_widgets.dart';
 
@@ -69,12 +71,17 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
     }
   }
 
-  void _onPublish() {
+  /// The schedule was never published before this publish.
+  bool _firstPublish = false;
+
+  Future<void> _onPublish() async {
     final cmd = vm.publish;
     switch (cmd.result) {
       case Ok<String>(:final value):
         cmd.clearResult();
         vm.save.clearResult();
+        if (_firstPublish && vm.canAnnounce) await _offerPost();
+        if (!mounted) return;
         context.pushReplacement(Routes.groupTournament(vm.groupId, value));
       case Error<String>():
         showErrorSnackBar(context, cmd.result);
@@ -82,6 +89,37 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
       case null:
         break;
     }
+  }
+
+  /// Suggests a feed post so people see the tournament and sign up.
+  Future<void> _offerPost() async {
+    final post = await confirmDialog(
+      context,
+      title: 'Tell the group?',
+      message:
+          'Post ${vm.name.trim()} to the group feed so people see it and '
+          'sign up. You can edit the post first.',
+      confirmLabel: 'Write post',
+    );
+    if (!post || !mounted) return;
+    final draft = await showDialog<PostDraft>(
+      context: context,
+      builder: (_) => PostEditorDialog(
+        initial: vm.announcement,
+        suggested: true,
+        pickImages: vm.pickImages,
+        loadImage: (_) async => Result.error(Exception('No photo')),
+      ),
+    );
+    if (draft == null) return;
+    await vm.announce.execute(draft);
+    if (!mounted) return;
+    if (vm.announce.error) {
+      showErrorSnackBar(context, vm.announce.result);
+    } else {
+      showSnackBar(context, 'Posted to the group feed');
+    }
+    vm.announce.clearResult();
   }
 
   Future<void> _publish() async {
@@ -97,6 +135,7 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
         )) {
       return;
     }
+    _firstPublish = !vm.wasPublished;
     vm.publish.execute();
   }
 

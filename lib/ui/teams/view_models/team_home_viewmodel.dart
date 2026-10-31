@@ -274,32 +274,7 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   /// Lets an admin pick photos for a post; empty when cancelled. Photos
   /// over [maxAttachmentBytes] are left out and reported as an error.
-  Future<Result<List<NewAttachment>>> pickImages() async {
-    final List<PickedFile> picked;
-    try {
-      picked = await _picker.pick(imagesOnly: true);
-    } on Exception catch (e) {
-      return Result.error(e);
-    }
-    final images = <NewAttachment>[];
-    final tooLarge = <String>[];
-    for (final f in picked) {
-      if ((f.size ?? 0) > maxAttachmentBytes) {
-        tooLarge.add(f.name);
-        continue;
-      }
-      final a = NewAttachment(name: f.name, bytes: await f.read());
-      if (a.tooLarge || !a.isImage) {
-        tooLarge.add(f.name);
-      } else {
-        images.add(a);
-      }
-    }
-    if (tooLarge.isNotEmpty && images.isEmpty) {
-      return Result.error(AttachmentTooLargeException(tooLarge.join(', ')));
-    }
-    return Result.ok(images);
-  }
+  Future<Result<List<NewAttachment>>> pickImages() => pickPostImages(_picker);
 
   /// A post photo's bytes, fetched once per photo.
   Future<Result<Uint8List>> imageData(ChatAttachment image) =>
@@ -325,4 +300,35 @@ class TeamHomeViewModel extends ChangeNotifier {
     _postsSub?.cancel();
     super.dispose();
   }
+}
+
+/// Picks photos for a post; empty when cancelled. Photos over
+/// [maxAttachmentBytes] are left out and reported as an error.
+Future<Result<List<NewAttachment>>> pickPostImages(
+  FilePickerService picker,
+) async {
+  final List<PickedFile> picked;
+  try {
+    picked = await picker.pick(imagesOnly: true);
+  } on Exception catch (e) {
+    return Result.error(e);
+  }
+  final images = <NewAttachment>[];
+  final tooLarge = <String>[];
+  for (final f in picked) {
+    if ((f.size ?? 0) > maxAttachmentBytes) {
+      tooLarge.add(f.name);
+      continue;
+    }
+    final a = NewAttachment(name: f.name, bytes: await f.read());
+    if (a.tooLarge || !a.isImage) {
+      tooLarge.add(f.name);
+    } else {
+      images.add(a);
+    }
+  }
+  if (tooLarge.isNotEmpty && images.isEmpty) {
+    return Result.error(AttachmentTooLargeException(tooLarge.join(', ')));
+  }
+  return Result.ok(images);
 }
