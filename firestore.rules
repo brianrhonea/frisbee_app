@@ -123,7 +123,7 @@ service cloud.firestore {
         function validPrefs() {
           let d = request.resource.data;
           let categories = ['chat', 'directMessages', 'eventChanges',
-                            'eventReminders', 'teamActivity'];
+                            'eventReminders', 'teamActivity', 'meetings'];
           return d.keys().hasOnly(['categories', 'teams', 'mutedRooms',
                                    'utcOffsetMinutes', 'updatedAt'])
             && (!('categories' in d)
@@ -450,6 +450,147 @@ service cloud.firestore {
                'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
                'updatedAt'])
           && validEventDetails(request.resource.data);
+      }
+
+      // Team meetings (TeamMeeting in lib/domain/models/meeting.dart).
+      // Admins (owners, coaches, captains) see and manage every meeting;
+      // other members see one only when their role is in inviteRoles or
+      // their uid in inviteUsers. Admins start it (status 'live') and end
+      // it; invitees only answer their own RSVP. The meetings-joinToken
+      // Cloud Function makes the same checks before handing out a token
+      // for the call; keep the two in step.
+      match /meetings/{meetingId} {
+        function team() { return get(teamPath(teamId)).data; }
+        function meetingPath() {
+          return /databases/$(database)/documents/teams/$(teamId)/meetings/$(meetingId);
+        }
+        function requestPath(userId) {
+          return /databases/$(database)/documents/teams/$(teamId)/meetings/$(meetingId)/requests/$(userId);
+        }
+
+        function invited(m) {
+          return isEditor(team())
+            || chatRole(team()) in m.inviteRoles
+            || uid() in m.inviteUsers;
+        }
+
+        // In the call, or allowed to be: admins, and invitees who were let
+        // in when the meeting needs approval.
+        function inCall(m) {
+          return isEditor(team())
+            || (invited(m)
+                && (m.requireApproval != true
+                    || (exists(requestPath(uid()))
+                        && get(requestPath(uid())).data.status == 'admitted')));
+        }
+
+        function validMeeting(m) {
+          let roles = ['owner', 'coach', 'captain', 'player'];
+          return m.title is string && m.title.size() > 0 && m.title.size() <= 100
+            && m.startsAt is timestamp
+            && (m.endsAt == null || (m.endsAt is timestamp && m.endsAt >= m.startsAt))
+            && validString(m.notes, 5000)
+            && m.inviteRoles is list && m.inviteRoles.hasOnly(roles)
+            && m.inviteUsers is list && m.inviteUsers.size() <= 200
+            && m.requireApproval is bool;
+        }
+
+        function respond() {
+          let d = request.resource.data;
+          return invited(resource.data)
+            && changed().hasOnly(['rsvps'])
+            && d.rsvps.diff(resource.data.rsvps).affectedKeys().hasOnly([uid()])
+            && (!(uid() in d.rsvps) || d.rsvps[uid()] in ['attending', 'notAttending']);
+        }
+
+        function editDetails() {
+          return isEditor(team())
+            && changed().hasOnly([
+                 'title', 'startsAt', 'endsAt', 'notes', 'inviteRoles',
+                 'inviteUsers', 'requireApproval', 'updatedAt'])
+            && validMeeting(request.resource.data);
+        }
+
+        function start() {
+          let d = request.resource.data;
+          return isEditor(team())
+            && resource.data.status == 'scheduled'
+            && changed().hasOnly(['status', 'startedAt', 'startedBy'])
+            && d.status == 'live'
+            && d.startedAt == request.time
+            && d.startedBy == uid();
+        }
+
+        function end() {
+          let d = request.resource.data;
+          return isEditor(team())
+            && resource.data.status != 'ended'
+            && changed().hasOnly(['status', 'endedAt'])
+            && d.status == 'ended'
+            && d.endedAt == request.time;
+        }
+
+        allow read: if signedIn() && isMember(team()) && invited(resource.data);
+        allow create: if signedIn()
+          && isEditor(team())
+          && request.resource.data.keys().hasOnly([
+               'title', 'startsAt', 'endsAt', 'notes', 'inviteRoles',
+               'inviteUsers', 'requireApproval', 'status', 'rsvps',
+               'createdBy', 'createdAt', 'updatedAt'])
+          && request.resource.data.status == 'scheduled'
+          && request.resource.data.rsvps == {}
+          && request.resource.data.createdBy == uid()
+          && validMeeting(request.resource.data);
+        allow update: if signedIn() && isMember(team())
+          && (respond() || editDetails() || start() || end());
+        allow delete: if signedIn() && isEditor(team());
+
+        // Asking to join a meeting that needs approval, keyed by uid.
+        // Invitees ask (or ask again) for themselves; admins let them in
+        // or turn them away.
+        match /requests/{userId} {
+          function meeting() { return get(meetingPath()).data; }
+
+          allow read: if signedIn() && (uid() == userId || isEditor(team()));
+          allow create, update: if signedIn() && uid() == userId
+            && isMember(team())
+            && invited(meeting())
+            && meeting().requireApproval == true
+            && meeting().status != 'ended'
+            && request.resource.data.keys().hasOnly(['name', 'status', 'requestedAt'])
+            && request.resource.data.status == 'pending'
+            && validString(request.resource.data.name, 80)
+            && request.resource.data.requestedAt == request.time;
+          allow update: if signedIn() && isEditor(team())
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['status', 'decidedBy', 'decidedAt'])
+            && request.resource.data.status in ['admitted', 'denied']
+            && request.resource.data.decidedBy == uid()
+            && request.resource.data.decidedAt == request.time;
+          allow delete: if signedIn() && (uid() == userId || isEditor(team()));
+        }
+
+        // The chat inside the call: text only, for people in the call.
+        // Authors delete their own; admins moderate and clear it when the
+        // meeting is deleted.
+        match /messages/{messageId} {
+          function meeting() { return get(meetingPath()).data; }
+
+          allow read: if signedIn() && isMember(team()) && inCall(meeting());
+          allow create: if signedIn() && isMember(team())
+            && meeting().status == 'live'
+            && inCall(meeting())
+            && request.resource.data.keys().hasOnly([
+                 'authorId', 'authorName', 'text', 'createdAt'])
+            && request.resource.data.authorId == uid()
+            && validString(request.resource.data.authorName, 80)
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 4000
+            && request.resource.data.createdAt == request.time;
+          allow delete: if signedIn()
+            && (resource.data.authorId == uid() || isEditor(team()));
+        }
       }
 
       // Home page posts (TeamPost in lib/domain/models/team_post.dart).

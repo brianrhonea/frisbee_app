@@ -576,29 +576,30 @@ class _Composer extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  PopupMenuButton<_AttachKind>(
-                    tooltip: 'Attach',
-                    enabled: !sending && !vm.pickFiles.running,
-                    icon: const Icon(Icons.attach_file),
-                    onSelected: (k) =>
-                        vm.pickFiles.execute(k == _AttachKind.photo),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
-                        value: _AttachKind.photo,
-                        child: ListTile(
-                          leading: Icon(Icons.photo_outlined),
-                          title: Text('Photo'),
+                  if (vm.canAttach)
+                    PopupMenuButton<_AttachKind>(
+                      tooltip: 'Attach',
+                      enabled: !sending && !vm.pickFiles.running,
+                      icon: const Icon(Icons.attach_file),
+                      onSelected: (k) =>
+                          vm.pickFiles.execute(k == _AttachKind.photo),
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: _AttachKind.photo,
+                          child: ListTile(
+                            leading: Icon(Icons.photo_outlined),
+                            title: Text('Photo'),
+                          ),
                         ),
-                      ),
-                      PopupMenuItem(
-                        value: _AttachKind.file,
-                        child: ListTile(
-                          leading: Icon(Icons.insert_drive_file_outlined),
-                          title: Text('File'),
+                        PopupMenuItem(
+                          value: _AttachKind.file,
+                          child: ListTile(
+                            leading: Icon(Icons.insert_drive_file_outlined),
+                            title: Text('File'),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   Expanded(
                     child: Focus(
                       // Enter sends; Shift+Enter adds a line.

@@ -328,6 +328,16 @@ class TeamRepositoryFirebase implements TeamRepository {
       for (final room in (await chatRooms(_db, team.id).get()).docs) {
         await deleteChatRoom(_db, _files, room.reference);
       }
+      for (final meeting in (await ref.collection('meetings').get()).docs) {
+        final m = meeting.reference;
+        final messages = await m.collection('messages').get();
+        final requests = await m.collection('requests').get();
+        await deleteDocs(_db, [
+          for (final d in messages.docs) d.reference,
+          for (final d in requests.docs) d.reference,
+          m,
+        ]);
+      }
       // Post photos go before their posts, which list them.
       for (final post in (await ref.collection('posts').get()).docs) {
         await _files.delete(

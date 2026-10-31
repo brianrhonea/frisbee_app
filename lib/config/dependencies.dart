@@ -9,6 +9,9 @@ import '../data/repositories/direct_message/direct_message_repository.dart';
 import '../data/repositories/direct_message/direct_message_repository_firebase.dart';
 import '../data/repositories/event/event_repository.dart';
 import '../data/repositories/event/event_repository_firebase.dart';
+import '../data/repositories/meeting/meeting_repository.dart';
+import '../data/repositories/meeting/meeting_repository_firebase.dart';
+import '../data/repositories/meeting/meeting_settings_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/notification/notification_repository_firebase.dart';
 import '../data/repositories/playbook/play_repository.dart';
@@ -30,8 +33,14 @@ import '../data/repositories/usau_team/usau_team_repository_usau.dart';
 import '../data/services/attachment_storage.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/file_picker_service.dart';
+import '../data/services/meeting_call.dart';
+import '../data/services/meeting_call_livekit.dart';
+import '../data/services/meeting_presence.dart';
+import '../data/services/meeting_token_service.dart';
 import '../data/services/push_service.dart';
+import '../data/services/shared_preferences_service.dart';
 import '../data/services/usau/usau_client.dart';
+import '../firebase_options.dart';
 
 /// Services and repositories backed by Firebase.
 List<SingleChildWidget> get firebaseProviders => [
@@ -62,6 +71,20 @@ List<SingleChildWidget> get firebaseProviders => [
     ),
   ),
   Provider(create: (_) => FilePickerService()),
+  Provider(
+    create: (_) => MeetingTokenService(
+      projectId: DefaultFirebaseOptions.currentPlatform.projectId,
+    ),
+  ),
+  Provider<MeetingRepository>(
+    create: (context) =>
+        MeetingRepositoryFirebase(tokens: context.read<MeetingTokenService>()),
+  ),
+  Provider<MeetingMediaService>(create: (_) => LiveKitMediaService()),
+  Provider(create: (_) => MeetingPresence()),
+  Provider<MeetingSettingsRepository>(
+    create: (_) => MeetingSettingsRepositoryPrefs(SharedPreferencesService()),
+  ),
   Provider(create: (_) => PushService()),
   Provider<NotificationRepository>(
     create: (context) =>

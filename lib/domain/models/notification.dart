@@ -27,6 +27,11 @@ enum NotificationCategory {
     'Team activity',
     'New and updated plays in the playbook',
     perTeam: true,
+  ),
+  meetings(
+    'Meetings',
+    "Meeting invites, and when a meeting you're attending starts",
+    perTeam: true,
   );
 
   const NotificationCategory(

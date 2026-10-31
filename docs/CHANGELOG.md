@@ -10,11 +10,56 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.5   | 2026-10-30 | `feature/team-meetings`                 | `1b2e424` and later |
 | 0.0.4   | 2026-10-29 | `feature/ultiup-schedule`               | `06830cc` and later |
 | 0.0.3   | 2026-10-29 | `feature/roster-import`                 | `5620a1d`           |
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.5 — Team meetings
+
+Branch `feature/team-meetings`.
+
+**Added**
+- Team meetings: owners, coaches and captains schedule a meeting for
+  chosen roles and/or people, with an optional "Require admin approval to
+  join". Meetings show on the schedule only for invitees.
+- Meeting page with Attending / Not attending RSVP and a link to the
+  meeting room.
+- Meeting room lobby: pick microphone, speaker and camera, camera preview,
+  meeting volume. Admins start the meeting (early if they like) and admit
+  or deny people waiting to join.
+- Video calls on LiveKit Cloud: camera or profile photo per person, a
+  speaking highlight, screen share (Windows, macOS, Android), in-call
+  chat, and mic / camera / sound / leave controls. Admins can end the
+  meeting for everyone.
+- Tap a person to set their volume (0–200%) or mute them, just for you.
+  Devices and volumes are remembered on the device.
+- Notifications for meeting invites, cancellations and starts; an in-app
+  banner with **Join** when a meeting you're attending starts.
+
+**Fixed**
+- Opening notifications one after another (for example a play, then a
+  team's events) could break navigation with a red screen.
+- Leaving the play editor could throw an error while the page closed.
+- Deleting a team now deletes its meetings too.
+
+**Infrastructure**
+- Firestore rules for meetings, join requests and meeting chat (deployed).
+- `meetings` Cloud Functions group (`joinToken`, `closeRoom`), using the
+  `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` secrets
+  (deployed, with the updated `notifications` group).
+- `--dart-define=FIRESTORE_MEMORY_CACHE=true` lets a second copy of the
+  desktop app run on the same computer, for testing two accounts.
+
+**Also since 0.0.4** (branches that didn't bump the version)
+- USA Ultimate event schedules and brackets on tournament pages (`6f9e179`).
+- Team chat rooms and direct messages (`bb69f04`).
+- Notifications: push, in-app feed and settings (`106087f`).
+- Team home pages, posts and team search (`d10353c`).
+- Stat undo history, game and tournament delete, bigger player tiles
+  (`96cc7b4`).
 
 ## 0.0.4 — UltiUP home, personal schedule, privacy by role
 

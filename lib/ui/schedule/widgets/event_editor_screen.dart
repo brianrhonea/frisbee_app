@@ -262,7 +262,7 @@ class _EventFormState extends State<_EventForm> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final t in EventType.values)
+              for (final t in EventType.editable)
                 ChoiceChip(
                   avatar: Icon(t.icon, size: 18),
                   label: Text(t.label),
@@ -274,7 +274,7 @@ class _EventFormState extends State<_EventForm> {
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, c) {
-              final date = _PickerField(
+              final date = PickerField(
                 label: 'Date',
                 icon: Icons.calendar_today_outlined,
                 value: DateFormat.yMMMEd().format(_day),
@@ -283,7 +283,7 @@ class _EventFormState extends State<_EventForm> {
               final times = Row(
                 children: [
                   Expanded(
-                    child: _PickerField(
+                    child: PickerField(
                       label: 'Starts',
                       icon: Icons.schedule,
                       value: loc.formatTimeOfDay(_start),
@@ -292,7 +292,7 @@ class _EventFormState extends State<_EventForm> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _PickerField(
+                    child: PickerField(
                       label: 'Ends',
                       icon: Icons.schedule_outlined,
                       value: _end == null
@@ -438,8 +438,10 @@ class _EventFormState extends State<_EventForm> {
   }
 }
 
-class _PickerField extends StatelessWidget {
-  const _PickerField({
+/// A form field that opens a date or time picker when tapped.
+class PickerField extends StatelessWidget {
+  const PickerField({
+    super.key,
     required this.label,
     required this.icon,
     required this.value,

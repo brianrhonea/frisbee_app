@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Show your camera in team meetings.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Talk in team meetings.</string>
 </dict>
 </plist>

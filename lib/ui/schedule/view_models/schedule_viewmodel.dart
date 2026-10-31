@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/team.dart';
@@ -28,6 +29,7 @@ class ScheduleViewModel extends ChangeNotifier {
     required AuthRepository authRepository,
     required TeamRepository teamRepository,
     required EventRepository eventRepository,
+    MeetingRepository? meetingRepository,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now,
        _events = eventRepository,
@@ -36,6 +38,7 @@ class ScheduleViewModel extends ChangeNotifier {
     _feed = MySchedule(
       teamRepository: teamRepository,
       eventRepository: eventRepository,
+      meetingRepository: meetingRepository,
       uid: _uid,
       clock: _clock,
     )..addListener(notifyListeners);
@@ -60,7 +63,9 @@ class ScheduleViewModel extends ChangeNotifier {
 
   /// Personal events are always the user's to delete; team events need an
   /// editing role (owner, coach or captain), as in firestore.rules.
+  /// Meetings are deleted from their own page.
   bool canDelete(ScheduleEntry entry) {
+    if (entry.isMeeting) return false;
     final team = entry.team;
     if (team == null) return _uid != null;
     return _uid != null && team.canEdit(_uid);
