@@ -185,6 +185,35 @@ void main() {
     });
   });
 
+  group('parseUsauTeam (real page snapshot)', () {
+    final team = parseUsauTeam(fixture('team_real.html'), url: 'u');
+
+    test('reads name, city and coaches from the profile', () {
+      expect(team.name, 'Sample Ultimate');
+      expect(team.info, contains((label: 'City', value: 'Dallas, TX')));
+      expect(
+        team.info,
+        contains((label: 'Coaches', value: 'Head Coach Name (Head Coach)')),
+      );
+    });
+
+    test('reads every roster row', () {
+      expect(team.roster, hasLength(32));
+      expect(team.roster.first.name, 'Player 01');
+      expect(team.roster.map((p) => p.position), contains('Cutter'));
+    });
+
+    test('reads the headerless right-rail schedule', () {
+      expect(team.games, isNotEmpty);
+      final first = team.games.first;
+      expect(first.tournament, 'Texas 2 Finger 2026');
+      expect(first.date, 'June 27');
+      expect(first.score, '13 - 2');
+      expect(first.opponent, 'San Antonio Warhawks');
+      expect(first.opponentUrl, startsWith('https://play.usaultimate.org/'));
+    });
+  });
+
   group('parseUsauTeam (synthetic fixture)', () {
     const url =
         'https://play.usaultimate.org/teams/events/Eventteam/?TeamId=abc';

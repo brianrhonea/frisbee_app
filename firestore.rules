@@ -70,7 +70,7 @@ service cloud.firestore {
         && getAfter(codePath(request.resource.data.inviteCode)).data.teamId == teamId;
 
       allow update: if signedIn() && (
-        editDetails() || regenerateCode() || changeRole() ||
+        editDetails() || linkUsau() || regenerateCode() || changeRole() ||
         setStatKeepers() || transferOwnership() || removeMember() || join()
       );
 
@@ -80,6 +80,18 @@ service cloud.firestore {
         return isEditor(resource.data)
           && changed().hasOnly(['name', 'division', 'level', 'city'])
           && validTeamFields(request.resource.data);
+      }
+
+      // Admins link the team's USA Ultimate page and stamp roster syncs.
+      function linkUsau() {
+        let t = request.resource.data;
+        return isEditor(resource.data)
+          && changed().hasOnly(['usauUrl', 'usauName', 'usauSyncedAt'])
+          && (t.get('usauUrl', null) == null
+              || (t.usauUrl is string && t.usauUrl.size() <= 300
+                  && t.usauUrl.matches('https://play[.]usaultimate[.]org/teams/events/Eventteam/[?]TeamId=.+')))
+          && (t.get('usauName', null) == null || validString(t.usauName, 120))
+          && (t.get('usauSyncedAt', null) == null || t.usauSyncedAt == request.time);
       }
 
       function regenerateCode() {
@@ -178,7 +190,9 @@ service cloud.firestore {
         allow delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
         allow create, update: if signedIn()
           && isEditor(get(teamPath(teamId)).data)
-          && request.resource.data.keys().hasOnly(['name', 'number', 'position', 'userId'])
+          && request.resource.data.keys().hasOnly(['name', 'number', 'position', 'userId', 'onUsau', 'paid'])
+          && (request.resource.data.get('onUsau', null) == null || request.resource.data.onUsau is bool)
+          && (request.resource.data.get('paid', false) is bool)
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.name.size() <= 80

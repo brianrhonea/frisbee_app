@@ -212,6 +212,36 @@ class TeamRepositoryFirebase implements TeamRepository {
       );
 
   @override
+  Future<Result<void>> linkUsauTeam(
+    String teamId, {
+    String? url,
+    String? name,
+  }) => guard(
+    () => _teams.doc(teamId).update({
+      'usauUrl': url,
+      'usauName': url == null ? null : name,
+      if (url == null) 'usauSyncedAt': null,
+    }),
+  );
+
+  @override
+  Future<Result<void>> applyRosterSync(
+    String teamId,
+    List<RosterPlayer> players,
+  ) => guard(() async {
+    final col = _roster(teamId);
+    // Firestore batches cap at 500 writes; rosters are far smaller.
+    final batch = _db.batch()
+      ..update(_teams.doc(teamId), {
+        'usauSyncedAt': FieldValue.serverTimestamp(),
+      });
+    for (final p in players) {
+      batch.set(p.id.isEmpty ? col.doc() : col.doc(p.id), p.toMap());
+    }
+    await batch.commit();
+  });
+
+  @override
   Future<Result<void>> savePlayer(String teamId, RosterPlayer player) =>
       guard(() async {
         final col = _roster(teamId);

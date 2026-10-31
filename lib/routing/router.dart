@@ -34,7 +34,9 @@ import '../ui/teams/view_models/create_team_viewmodel.dart';
 import '../ui/teams/view_models/team_detail_viewmodel.dart';
 import '../ui/teams/view_models/teams_viewmodel.dart';
 import '../ui/teams/widgets/create_team_screen.dart';
+import '../ui/teams/view_models/usau_roster_viewmodel.dart';
 import '../ui/teams/widgets/team_detail_screen.dart';
+import '../ui/teams/widgets/usau_roster_screen.dart';
 import '../ui/teams/widgets/teams_screen.dart';
 import '../ui/tournaments/view_models/tournaments_viewmodel.dart';
 import '../ui/tournaments/widgets/tournament_detail_screen.dart';
@@ -143,6 +145,24 @@ GoRouter router(AuthRepository auth) => GoRouter(
                             authRepository: c.read(),
                           ),
                           builder: (_, vm) => PlayEditorScreen(viewModel: vm),
+                        );
+                      },
+                    ),
+                    GoRoute(
+                      path: 'usau-roster',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        return ViewModelHost(
+                          key: ValueKey('usau-roster-$teamId'),
+                          create: (c) => UsauRosterViewModel(
+                            teamId: teamId,
+                            teamRepository: c.read(),
+                            usauTeamRepository: c.read(),
+                            rankingRepository: c.read(),
+                            authRepository: c.read(),
+                          ),
+                          builder: (_, vm) => UsauRosterScreen(viewModel: vm),
                         );
                       },
                     ),
