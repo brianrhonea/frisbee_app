@@ -62,6 +62,12 @@ class EventDetailViewModel extends ChangeNotifier {
   String get uid => _auth.currentUser?.uid ?? '';
   bool get canEdit => _team?.canEdit(uid) ?? false;
 
+  /// Group organizers turn a Tournament event into a bracket.
+  bool get canSetUpTournament =>
+      canEdit &&
+      (_team?.isCommunity ?? false) &&
+      _event?.type == EventType.tournament;
+
   late final Command1<void, RsvpStatus?> setRsvp;
   late final Command1<void, Reaction> toggleReaction;
 

@@ -7,7 +7,14 @@ typedef SlotFill = ({String gameId, String? teamA, String? teamB});
 /// Teams that move on once [finished] is final: winners and losers into
 /// the games waiting on them. The if-needed final only gets its teams
 /// when the losers' bracket team (team B) won the first final.
-List<SlotFill> fillsAfter(GroupGame finished, List<GroupGame> games) {
+///
+/// With [overwrite] (an organizer correcting a score), slots already
+/// filled are replaced too; callers should first check [laterGamesPlayed].
+List<SlotFill> fillsAfter(
+  GroupGame finished,
+  List<GroupGame> games, {
+  bool overwrite = false,
+}) {
   final winner = finished.winner;
   final loser = finished.loser;
   if (winner == null || loser == null) return const [];
@@ -16,20 +23,46 @@ List<SlotFill> fillsAfter(GroupGame finished, List<GroupGame> games) {
     LoserOf(:final gameId) when gameId == finished.id => loser,
     _ => null,
   };
+  String? fill(String? current, SlotSource? source) {
+    final team = resolve(source);
+    if (team == null || team == current) return null;
+    return current == null || overwrite ? team : null;
+  }
+
   return [
     for (final g in games)
-      if (g.id != finished.id)
-        if ((
-              g.teamA == null ? resolve(g.sourceA) : null,
-              g.teamB == null ? resolve(g.sourceB) : null,
-            )
-            case (final a, final b) when a != null || b != null)
+      if (g.id != finished.id && !g.isDone)
+        if ((fill(g.teamA, g.sourceA), fill(g.teamB, g.sourceB)) case (
+          final a,
+          final b,
+        ) when a != null || b != null)
           if (!(g.stage == GameStage.reset &&
               finished.stage == GameStage.grandFinal &&
               winner != finished.teamB))
             (gameId: g.id, teamA: a, teamB: b),
   ];
 }
+
+/// Whether a game fed by [game]'s result has already been played (or
+/// reported), so its result can't change without undoing them.
+bool laterGamesPlayed(GroupGame game, List<GroupGame> games) => games.any(
+  (g) =>
+      g.status != GameStatus.scheduled &&
+      [g.sourceA, g.sourceB].any(
+        (s) => switch (s) {
+          WinnerOf(:final gameId) ||
+          LoserOf(:final gameId) => gameId == game.id,
+          _ => false,
+        },
+      ),
+);
+
+/// Fills that should already have been written for finished games (e.g.
+/// a confirm whose bracket update failed); safe to apply again.
+List<SlotFill> pendingFills(List<GroupGame> games) => [
+  for (final g in games)
+    if (g.isDone) ...fillsAfter(g, games),
+];
 
 /// Seeds bracket games from pool standings once every pool is complete.
 /// Empty until then, or if there's nothing left to seed.

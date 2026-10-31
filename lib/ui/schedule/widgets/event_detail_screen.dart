@@ -126,6 +126,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 children: [
                   EventHeader(event: e),
+                  if (vm.canSetUpTournament) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => context.push(
+                        Routes.newGroupTournament(
+                          vm.teamId,
+                          eventId: vm.eventId,
+                        ),
+                      ),
+                      icon: const Icon(Icons.emoji_events_outlined),
+                      label: const Text('Set up tournament'),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   _RsvpSection(viewModel: vm),
                   const SizedBox(height: 16),

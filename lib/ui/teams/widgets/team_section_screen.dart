@@ -10,6 +10,8 @@ import '../../core/ui/back_or.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
+import '../../group_tournaments/view_models/group_tournaments_viewmodel.dart';
+import '../../group_tournaments/widgets/group_tournaments_tab.dart';
 import '../../playbook/widgets/playbook_tab.dart';
 import '../../schedule/widgets/team_events_tab.dart';
 import '../../stats/view_models/stats_viewmodel.dart';
@@ -28,6 +30,7 @@ enum TeamSection {
   playbook('Playbook', Icons.draw_outlined, 'playbook'),
   videos('Videos', Icons.video_library_outlined, 'videos'),
   stats('Stats', Icons.insights_outlined, 'stats'),
+  tournaments('Tournaments', Icons.emoji_events_outlined, 'tournaments'),
   members('Members', Icons.groups_outlined, 'members');
 
   const TeamSection(this.label, this.icon, this.path);
@@ -44,14 +47,16 @@ enum TeamSection {
     playbook => Routes.teamPlaybook(teamId),
     videos => Routes.teamVideos(teamId),
     stats => Routes.teamStats(teamId),
+    tournaments => Routes.teamTournaments(teamId),
     members => Routes.teamMembers(teamId),
   };
 
   /// Sections a team or community group has, in display order. Groups
-  /// don't keep a roster, plays, videos or stats.
+  /// don't keep a roster, plays, videos or stats; only they run
+  /// tournaments.
   static List<TeamSection> forKind(TeamKind kind) => switch (kind) {
-    TeamKind.team => values,
-    TeamKind.community => const [events, chat, members],
+    TeamKind.team => values.where((s) => s != tournaments).toList(),
+    TeamKind.community => const [events, chat, tournaments, members],
   };
 
   /// "Team Events" is just "Events" in a group.
@@ -152,6 +157,15 @@ class _TeamSectionScreenState extends State<TeamSectionScreen> {
         authRepository: c.read(),
       ),
       builder: (_, statsVm) => StatsTab(viewModel: statsVm),
+    ),
+    TeamSection.tournaments => ViewModelHost(
+      create: (c) => GroupTournamentsViewModel(
+        groupId: vm.teamId,
+        teamRepository: c.read(),
+        tournamentRepository: c.read(),
+        authRepository: c.read(),
+      ),
+      builder: (_, tvm) => GroupTournamentsTab(viewModel: tvm),
     ),
     TeamSection.members => MembersTab(viewModel: vm),
   };

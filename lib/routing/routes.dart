@@ -61,6 +61,21 @@ abstract final class Routes {
   static String editEvent(String teamId, String eventId) =>
       '$teamEventsPath/$teamId/$eventId/edit';
 
+  static String teamTournaments(String teamId) => '/teams/$teamId/tournaments';
+
+  // Community group tournament pages open over the tabs, like video pages;
+  // use `context.push`.
+  static const groupTournamentsPath = '/group-tournaments';
+
+  /// [eventId] links the new tournament to that Tournament event.
+  static String newGroupTournament(String groupId, {String? eventId}) =>
+      '$groupTournamentsPath/$groupId/new'
+      '${eventId == null ? '' : '?event=${Uri.encodeQueryComponent(eventId)}'}';
+  static String groupTournament(String groupId, String tournamentId) =>
+      '$groupTournamentsPath/$groupId/$tournamentId';
+  static String editGroupTournament(String groupId, String tournamentId) =>
+      '$groupTournamentsPath/$groupId/$tournamentId/edit';
+
   // Video pages open over the tabs, like event pages; use `context.push`.
   static const teamVideosPath = '/team-videos';
 

@@ -285,6 +285,7 @@ void main() {
       expect(find.text('Events'), findsOneWidget);
       expect(find.text('Chat'), findsOneWidget);
       expect(find.text('Members'), findsOneWidget);
+      expect(find.text('Tournaments'), findsOneWidget);
       for (final s in [
         TeamSection.roster,
         TeamSection.playbook,

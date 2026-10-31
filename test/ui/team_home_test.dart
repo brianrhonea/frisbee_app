@@ -243,7 +243,7 @@ void main() {
       addTeam({testUser.uid: TeamRole.coach, 'owner': TeamRole.owner});
       await pump(tester, homeVm());
 
-      for (final s in TeamSection.values) {
+      for (final s in TeamSection.forKind(TeamKind.team)) {
         expect(find.text(s.label), findsOneWidget);
       }
       expect(find.text('Schedule'), findsNothing);

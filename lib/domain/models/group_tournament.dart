@@ -234,8 +234,7 @@ class GroupTournament {
 
   /// teamId → captain uid, for the rules that check score reports.
   Map<String, String> get captains => {
-    for (final t in teams)
-      t.id: ?t.captainId,
+    for (final t in teams) t.id: ?t.captainId,
   };
 
   TournamentTeam? team(String? id) =>

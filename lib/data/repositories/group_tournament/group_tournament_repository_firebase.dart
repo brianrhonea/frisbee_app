@@ -38,14 +38,10 @@ class GroupTournamentRepositoryFirebase implements GroupTournamentRepository {
         ? col
         : col.where('participantIds', arrayContains: uid);
     return query.snapshots().map(
-      (snap) =>
-          [
-            for (final d in snap.docs)
-              GroupTournament.fromMap(d.id, plainData(d.data())),
-          ]..sort(
-            (a, b) =>
-                b.settings.startsAt.compareTo(a.settings.startsAt),
-          ),
+      (snap) => [
+        for (final d in snap.docs)
+          GroupTournament.fromMap(d.id, plainData(d.data())),
+      ]..sort((a, b) => b.settings.startsAt.compareTo(a.settings.startsAt)),
     );
   }
 
@@ -152,7 +148,7 @@ class GroupTournamentRepositoryFirebase implements GroupTournamentRepository {
     List<SlotFill> fills,
   ) => guard(() async {
     final report = game.report;
-    if (report == null) throw StateError('No score to confirm');
+    if (report == null) throw Exception('No score to confirm');
     final batch = _db.batch()
       ..update(_games(groupId, tournamentId).doc(game.id), {
         'status': GameStatus.done.name,
@@ -202,9 +198,8 @@ class GroupTournamentRepositoryFirebase implements GroupTournamentRepository {
     String tournamentId,
     TournamentStatus status,
   ) => guard(
-    () => _tournaments(
-      groupId,
-    ).doc(tournamentId).update({'status': status.name}),
+    () =>
+        _tournaments(groupId).doc(tournamentId).update({'status': status.name}),
   );
 
   @override

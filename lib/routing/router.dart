@@ -73,6 +73,10 @@ import '../ui/teams/widgets/team_section_screen.dart';
 import '../ui/teams/widgets/usau_roster_screen.dart';
 import '../ui/teams/widgets/teams_screen.dart';
 import '../ui/teams/widgets/usau_team_search_screen.dart';
+import '../ui/group_tournaments/view_models/tournament_editor_viewmodel.dart';
+import '../ui/group_tournaments/view_models/group_tournament_viewmodel.dart';
+import '../ui/group_tournaments/widgets/tournament_editor_screen.dart';
+import '../ui/group_tournaments/widgets/group_tournament_screen.dart';
 import '../ui/videos/view_models/video_editor_viewmodel.dart';
 import '../ui/videos/view_models/video_viewmodel.dart';
 import '../ui/videos/widgets/video_editor_screen.dart';
@@ -247,6 +251,49 @@ GoRouter router(AuthRepository auth) => GoRouter(
               path: 'edit',
               builder: (_, state) =>
                   _videoEditor(state, state.pathParameters['videoId']),
+            ),
+          ],
+        ),
+      ],
+    ),
+    // Community group tournaments, full screen over the shell (see
+    // Routes.groupTournamentsPath).
+    GoRoute(
+      path: '${Routes.groupTournamentsPath}/:groupId',
+      redirect: (_, state) {
+        final groupId = state.pathParameters['groupId']!;
+        final base = '${Routes.groupTournamentsPath}/$groupId';
+        return state.uri.path == base ? Routes.teamTournaments(groupId) : null;
+      },
+      routes: [
+        GoRoute(
+          path: 'new',
+          builder: (_, state) => _tournamentEditor(state, null),
+        ),
+        GoRoute(
+          path: ':tournamentId',
+          builder: (_, state) {
+            final groupId = state.pathParameters['groupId']!;
+            final tournamentId = state.pathParameters['tournamentId']!;
+            return ViewModelHost(
+              key: ValueKey('group-tournament-$groupId-$tournamentId'),
+              create: (c) => GroupTournamentViewModel(
+                groupId: groupId,
+                tournamentId: tournamentId,
+                teamRepository: c.read(),
+                tournamentRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, vm) => GroupTournamentScreen(viewModel: vm),
+            );
+          },
+          routes: [
+            GoRoute(
+              path: 'edit',
+              builder: (_, state) => _tournamentEditor(
+                state,
+                state.pathParameters['tournamentId'],
+              ),
             ),
           ],
         ),
@@ -786,6 +833,25 @@ String? authRedirect(AuthRepository auth, Uri uri) {
   }
   if (public || path == _splash) return from ?? Routes.home;
   return null;
+}
+
+/// Sets up a new group tournament, or edits [tournamentId].
+Widget _tournamentEditor(GoRouterState state, String? tournamentId) {
+  final groupId = state.pathParameters['groupId']!;
+  final eventId = state.uri.queryParameters['event'];
+  return ViewModelHost(
+    key: ValueKey('tournament-editor-$groupId-$tournamentId-$eventId'),
+    create: (c) => TournamentEditorViewModel(
+      groupId: groupId,
+      tournamentId: tournamentId,
+      teamRepository: c.read(),
+      eventRepository: c.read(),
+      tournamentRepository: c.read(),
+      authRepository: c.read(),
+      eventId: eventId,
+    ),
+    builder: (_, vm) => TournamentEditorScreen(viewModel: vm),
+  );
 }
 
 /// Adds a video to a team, or edits [videoId].
