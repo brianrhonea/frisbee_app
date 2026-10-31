@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
+import '../../chat/view_models/chat_list_viewmodel.dart';
+import '../../chat/widgets/chat_tab.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -23,6 +25,7 @@ enum _MenuAction { edit, leave, delete }
 /// Team detail tabs, in display order. Linkable via `Routes.team(tab:)`.
 enum TeamTab {
   schedule('Schedule'),
+  chat('Chat'),
   roster('Roster'),
   playbook('Playbook'),
   stats('Stats'),
@@ -213,6 +216,15 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
             body: TabBarView(
               children: [
                 ScheduleTab(viewModel: vm),
+                ViewModelHost(
+                  create: (c) => ChatListViewModel(
+                    teamId: vm.teamId,
+                    teamRepository: c.read(),
+                    chatRepository: c.read(),
+                    authRepository: c.read(),
+                  ),
+                  builder: (_, chatVm) => ChatTab(viewModel: chatVm),
+                ),
                 RosterTab(viewModel: vm),
                 PlaybookTab(viewModel: vm),
                 ViewModelHost(

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logging/logging.dart';
 
 import '../../../domain/models/app_user.dart';
+import '../../../domain/models/direct_message.dart';
 import '../../../utils/result.dart';
 import '../../services/auth_service.dart';
 import 'auth_repository.dart';
@@ -56,6 +57,19 @@ class AuthRepositoryFirebase extends AuthRepository {
         'photoUrl': user.photoUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      // The public directory listing for direct messages: name and photo,
+      // never the email. Users without a display name aren't listed.
+      final name = user.displayName?.trim() ?? '';
+      if (name.isNotEmpty) {
+        await _firestore.collection('profiles').doc(user.uid).set({
+          ...UserProfile(
+            uid: user.uid,
+            name: name,
+            photoUrl: user.photoUrl,
+          ).toMap(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
     } on Exception catch (e) {
       _log.warning('Failed to save user profile', e);
     }
@@ -113,6 +127,7 @@ class AuthRepositoryFirebase extends AuthRepository {
         await batch.commit();
       }
       await user.delete();
+      await _firestore.collection('profiles').doc(uid).delete();
     }
     await _authService.deleteAccount();
   });

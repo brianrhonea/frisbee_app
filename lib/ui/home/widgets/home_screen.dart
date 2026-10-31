@@ -30,6 +30,9 @@ class HomeScreen extends StatefulWidget {
 
   final HomeViewModel viewModel;
 
+  /// Content width at which home switches from one column to a dashboard.
+  static const dashboardBreakpoint = 960.0;
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -78,94 +81,188 @@ class _HomeScreenState extends State<HomeScreen> {
         bottom: false,
         child: ListenableBuilder(
           listenable: vm,
-          builder: (context, _) {
-            final team = vm.selectedTeam;
-            return ConstrainedContent(
-              maxWidth: 640,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                children: [
-                  _Header(viewModel: vm),
-                  const SizedBox(height: 20),
-                  _SectionHeader(
-                    title: 'This week',
-                    action: 'Full schedule',
-                    onTap: () => context.go(Routes.schedule),
-                  ),
-                  _WeekOutlook(viewModel: vm),
-                  const SizedBox(height: 28),
-                  _SectionHeader(
-                    title: vm.teams.length > 1 ? 'My teams' : 'My team',
-                    action: 'Team hub',
-                    onTap: () => context.go(Routes.teams),
-                  ),
-                  if (!vm.teamsLoaded)
-                    const _MutedCard(text: 'Loading your teams…')
-                  else if (team == null)
-                    ListenableBuilder(
-                      listenable: vm.joinTeam,
-                      builder: (context, _) => _JoinTeamCard(
-                        joining: vm.joinTeam.running,
-                        onJoin: _join,
-                        onCreate: () => context.go(Routes.createTeam),
-                      ),
-                    )
-                  else ...[
-                    if (vm.teams.length > 1) ...[
-                      _TeamChips(viewModel: vm),
-                      const SizedBox(height: 10),
-                    ],
-                    _TeamCard(
-                      team: team,
-                      next: vm.nextEventFor(team),
-                      onTap: () => context.go(Routes.team(team.id)),
-                    ),
-                  ],
-                  const SizedBox(height: 28),
-                  _SectionHeader(
-                    title: 'Playbook',
-                    action: team == null ? null : 'All plays',
-                    onTap: team == null
-                        ? null
-                        : () =>
-                              context.go(Routes.team(team.id, tab: 'playbook')),
-                  ),
-                  if (team != null && vm.plays.isNotEmpty)
-                    _PlayStrip(
-                      team: team,
-                      plays: vm.plays,
-                      total: vm.playCount,
-                      canEdit: vm.canEdit(team),
-                    )
-                  else
-                    _PlaybookHero(
-                      team: team,
-                      canEdit: team != null && vm.canEdit(team),
-                    ),
-                  const SizedBox(height: 28),
-                  _SectionHeader(
-                    title: 'Coming up',
-                    action: 'Schedule',
-                    onTap: () => context.go(Routes.schedule),
-                  ),
-                  _EventsSection(viewModel: vm),
-                  const SizedBox(height: 28),
-                  _SectionHeader(
-                    title: 'Rankings',
-                    action: 'Full rankings',
-                    onTap: () => context.go(Routes.rankings),
-                  ),
-                  _RankingsSection(viewModel: vm),
-                  const SizedBox(height: 8),
-                  const UsauAttribution(),
-                ],
-              ),
-            );
-          },
+          builder: (context, _) => LayoutBuilder(
+            builder: (context, constraints) =>
+                constraints.maxWidth >= HomeScreen.dashboardBreakpoint
+                ? _dashboard(context)
+                : _column(context),
+          ),
         ),
       ),
     );
   }
+
+  /// Phone and narrow-window layout: every section in one scrolling column.
+  Widget _column(BuildContext context) {
+    return ConstrainedContent(
+      maxWidth: 640,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          _Header(viewModel: vm),
+          const SizedBox(height: 20),
+          _weekSection(context),
+          const SizedBox(height: 28),
+          _teamSection(context),
+          const SizedBox(height: 28),
+          _playbookSection(context),
+          const SizedBox(height: 28),
+          _eventsSection(context),
+          const SizedBox(height: 28),
+          _rankingsSection(context),
+        ],
+      ),
+    );
+  }
+
+  /// Desktop layout: the header across the top, then a wide column for the
+  /// schedule and playbook beside a narrower one for team and rankings.
+  Widget _dashboard(BuildContext context) {
+    return ConstrainedContent(
+      maxWidth: 1320,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
+        children: [
+          _Header(viewModel: vm),
+          const SizedBox(height: 28),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _weekSection(context),
+                    const SizedBox(height: 28),
+                    _playbookSection(context),
+                    const SizedBox(height: 28),
+                    _eventsSection(context),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 28),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _teamSection(context),
+                    const SizedBox(height: 28),
+                    _rankingsSection(context),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _weekSection(BuildContext context) => _Section(
+    header: _SectionHeader(
+      title: 'This week',
+      action: 'Full schedule',
+      onTap: () => context.go(Routes.schedule),
+    ),
+    children: [_WeekOutlook(viewModel: vm)],
+  );
+
+  Widget _teamSection(BuildContext context) {
+    final team = vm.selectedTeam;
+    return _Section(
+      header: _SectionHeader(
+        title: vm.teams.length > 1 ? 'My teams' : 'My team',
+        action: 'Team hub',
+        onTap: () => context.go(Routes.teams),
+      ),
+      children: [
+        if (!vm.teamsLoaded)
+          const _MutedCard(text: 'Loading your teams…')
+        else if (team == null)
+          ListenableBuilder(
+            listenable: vm.joinTeam,
+            builder: (context, _) => _JoinTeamCard(
+              joining: vm.joinTeam.running,
+              onJoin: _join,
+              onCreate: () => context.go(Routes.createTeam),
+            ),
+          )
+        else ...[
+          if (vm.teams.length > 1) ...[
+            _TeamChips(viewModel: vm),
+            const SizedBox(height: 10),
+          ],
+          _TeamCard(
+            team: team,
+            next: vm.nextEventFor(team),
+            onTap: () => context.go(Routes.team(team.id)),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _playbookSection(BuildContext context) {
+    final team = vm.selectedTeam;
+    return _Section(
+      header: _SectionHeader(
+        title: 'Playbook',
+        action: team == null ? null : 'All plays',
+        onTap: team == null
+            ? null
+            : () => context.go(Routes.team(team.id, tab: 'playbook')),
+      ),
+      children: [
+        if (team != null && vm.plays.isNotEmpty)
+          _PlayStrip(
+            team: team,
+            plays: vm.plays,
+            total: vm.playCount,
+            canEdit: vm.canEdit(team),
+          )
+        else
+          _PlaybookHero(team: team, canEdit: team != null && vm.canEdit(team)),
+      ],
+    );
+  }
+
+  Widget _eventsSection(BuildContext context) => _Section(
+    header: _SectionHeader(
+      title: 'Coming up',
+      action: 'Schedule',
+      onTap: () => context.go(Routes.schedule),
+    ),
+    children: [_EventsSection(viewModel: vm)],
+  );
+
+  Widget _rankingsSection(BuildContext context) => _Section(
+    header: _SectionHeader(
+      title: 'Rankings',
+      action: 'Full rankings',
+      onTap: () => context.go(Routes.rankings),
+    ),
+    children: [
+      _RankingsSection(viewModel: vm),
+      const SizedBox(height: 8),
+      const UsauAttribution(),
+    ],
+  );
+}
+
+/// A titled home section: header above its content.
+class _Section extends StatelessWidget {
+  const _Section({required this.header, required this.children});
+
+  final Widget header;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [header, ...children],
+  );
 }
 
 TextStyle _heading(BuildContext context, double size, {Color? color}) =>
@@ -218,7 +315,18 @@ class _Header extends StatelessWidget {
               ),
             ),
             const Expanded(child: Center(child: UltiUpWordmark())),
-            const SizedBox(width: 40),
+            IconButton(
+              tooltip: vm.unreadMessages == 0
+                  ? 'Messages'
+                  : 'Messages, ${vm.unreadMessages} unread',
+              onPressed: () => context.push(Routes.messages),
+              icon: Badge(
+                isLabelVisible: vm.unreadMessages > 0,
+                label: Text('${vm.unreadMessages}'),
+                backgroundColor: c.accent,
+                child: const Icon(Icons.chat_bubble_outline),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 20),

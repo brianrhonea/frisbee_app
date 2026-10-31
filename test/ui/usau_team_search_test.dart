@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
+import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
+import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
@@ -10,6 +12,7 @@ import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/data/repositories/usau_team/usau_team_repository.dart';
+import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/usau_team.dart';
 import 'package:frisbee_app/routing/router.dart';
@@ -105,6 +108,11 @@ void main() {
             value: FakeThemeRepository(),
           ),
           Provider<PlayRepository>.value(value: FakePlayRepository()),
+          Provider<DirectMessageRepository>.value(
+            value: FakeDirectMessageRepository(),
+          ),
+          Provider<ChatRepository>.value(value: FakeChatRepository()),
+          Provider<FilePickerService>.value(value: FakeFilePickerService()),
           Provider<EventRepository>.value(value: FakeEventRepository()),
           Provider<StatsRepository>.value(
             value: MockStatsRepository(teamRepository: teams),

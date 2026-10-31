@@ -30,6 +30,9 @@ team card in the Teams tab.
 | Edit the roster and team details                | ✓     | ✓               |        |
 | See paid and USA Ultimate status, sync roster   | ✓     | ✓               |        |
 | Draw and edit plays                             | ✓     | ✓               |        |
+| Chat in rooms you've been given access to       | ✓     | ✓               | ✓      |
+| Create chat rooms and set who can read/write    | ✓     | ✓               |        |
+| Read every chat room, delete any message or room | ✓    |                 |        |
 | Keep stats                                      | ✓     | ✓               | with stats access |
 | See and share the invite code                   | ✓     | ✓               |        |
 | Remove players                                  | ✓     | ✓               |        |
@@ -56,13 +59,37 @@ ownership first).
 - **Rankings**: the top 3 on a podium and ranks 4–10. Switch division with
   the chips, or tap **Full rankings**.
 
+### Messages
+
+Tap the 💬 icon at the top of Home to open your private messages. A badge
+shows how many conversations have something new.
+
+- **New message**: search for anyone on UltiUP by name, then tap them to
+  start a conversation. You don't need to share a team.
+- Only the two of you can see a conversation. Attach photos or files up to
+  10 MB, the same as team chat. You can delete your own messages.
+- On a computer, conversations are listed on the left with the open one
+  on the right. On a phone, a conversation opens full screen; use the 💬
+  button at the top left to switch between conversations.
+- You show up in search once you've set a name in your Profile. Search
+  shows names and photos only, never email addresses.
+
 ### Teams
 
-Your teams. Tap one to open its page, which has five tabs:
+Your teams. Tap one to open its page, which has six tabs:
 
 - **Schedule**: the team calendar. Open an event to RSVP **Going**,
   **Maybe** or **Can't go**. Once you're going, you can react and vote in
   the event's poll.
+- **Chat**: the team's chat rooms. Every team has a **General** room for
+  everyone. Owners, coaches and captains add rooms (say, Captains or
+  Carpool) and choose, per role and per person, who can read and who can
+  post. Attach photos or files up to 10 MB; tap a photo to enlarge or save
+  it, tap a file to save it. You can delete your own messages; the owner can
+  delete any.
+  On a computer, rooms are listed on the left and the open room is on the
+  right. On a phone, tap a room to slide it open; the 💬 button at the top
+  left opens your room list, and tapping the open room takes you back.
 - **Roster**: players with number and position. Admins also see paid and
   USA Ultimate status, and can import or sync the roster from USA Ultimate.
 - **Playbook**: the team's plays. Admins draw plays on the field and add
@@ -117,6 +144,10 @@ USA Ultimate rankings by division. Tap a team for its USA Ultimate page.
 - **Personal events** are visible only to you.
 - **Paid status and USA Ultimate status** on the roster are visible only to
   owners, coaches and captains.
+- **Direct messages** are visible only to the two people in them. Anyone
+  signed in can find you by name to message you; your email is never shown.
+- **Chat rooms**, their messages, photos and files are visible only to the
+  people the room gives access to (and the team owner).
 - **The invite code** is visible only to owners, coaches and captains.
   Anyone with the code can join as a player, so share it only with your team.
   The owner can make a new code at any time; the old one stops working.

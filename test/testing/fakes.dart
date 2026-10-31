@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
+import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
+import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
@@ -10,7 +13,10 @@ import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/data/repositories/usau_schedule/usau_schedule_repository.dart';
+import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
+import 'package:frisbee_app/domain/models/chat.dart';
+import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
@@ -569,4 +575,274 @@ class FakeThemeRepository extends ThemeRepository {
     notifyListeners();
     return const Result.ok(null);
   }
+}
+
+class FakeChatRepository implements ChatRepository {
+  final rooms = <String, ChatRoom>{};
+  final messages = <String, List<ChatMessage>>{};
+  final files = <String, Uint8List>{};
+  int generalEnsured = 0;
+  Exception? sendError;
+  final _changes = StreamController<void>.broadcast();
+
+  void emit() => _changes.add(null);
+
+  /// Subscribes to changes before the first value, so changes made by a
+  /// listener reacting to that value aren't lost.
+  Stream<T> _watch<T>(T Function() read) {
+    late StreamController<T> controller;
+    StreamSubscription<void>? sub;
+    controller = StreamController<T>(
+      onListen: () {
+        sub = _changes.stream.listen((_) => controller.add(read()));
+        controller.add(read());
+      },
+      onCancel: () => sub?.cancel(),
+    );
+    return controller.stream;
+  }
+
+  @override
+  Stream<List<ChatRoom>> watchRooms(Team team, String uid) => _watch(
+    () =>
+        rooms.values
+            .where((r) => team.canEdit(uid) || r.accessFor(team, uid).canRead)
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name)),
+  );
+
+  @override
+  Stream<ChatRoom?> watchRoom(String teamId, String roomId) =>
+      _watch(() => rooms[roomId]);
+
+  @override
+  Future<Result<String>> saveRoom(
+    String teamId,
+    ChatRoom room,
+    String uid,
+  ) async {
+    final id = room.isNew ? 'room${rooms.length + 1}' : room.id;
+    rooms[id] = ChatRoom.fromMap(id, {...room.toMap(), 'createdBy': uid});
+    emit();
+    return Result.ok(id);
+  }
+
+  @override
+  Future<Result<void>> deleteRoom(String teamId, String roomId) async {
+    rooms.remove(roomId);
+    messages.remove(roomId);
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> ensureGeneralRoom(String teamId, String uid) async {
+    generalEnsured++;
+    rooms.putIfAbsent(ChatRoom.generalId, ChatRoom.general);
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<List<ChatMessage>> watchMessages(
+    String teamId,
+    String roomId, {
+    required int limit,
+  }) => _watch(() {
+    final all = messages[roomId] ?? const <ChatMessage>[];
+    return all.skip(all.length > limit ? all.length - limit : 0).toList();
+  });
+
+  @override
+  Future<Result<void>> sendMessage(
+    String teamId,
+    String roomId, {
+    required AppUser author,
+    required String text,
+    List<NewAttachment> attachments = const [],
+  }) async {
+    if (sendError case final e?) return Result.error(e);
+    final list = messages.putIfAbsent(roomId, () => []);
+    final id = 'm${list.length + 1}';
+    list.add(
+      ChatMessage(
+        id: id,
+        authorId: author.uid,
+        authorName: author.label,
+        text: text.trim(),
+        createdAt: DateTime(2026, 10, 30, 12, list.length),
+        attachments: [
+          for (final (i, a) in attachments.indexed)
+            ChatAttachment(
+              path: '$roomId/$id/$i',
+              name: a.name,
+              contentType: a.contentType,
+              size: a.size,
+            ),
+        ],
+      ),
+    );
+    for (final (i, a) in attachments.indexed) {
+      files['$roomId/$id/$i'] = a.bytes;
+    }
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> deleteMessage(
+    String teamId,
+    String roomId,
+    ChatMessage message,
+  ) async {
+    messages[roomId]?.removeWhere((m) => m.id == message.id);
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<Uint8List>> downloadAttachment(ChatAttachment a) async {
+    final f = files[a.path];
+    return f == null ? Result.error(Exception('missing')) : Result.ok(f);
+  }
+}
+
+class FakeFilePickerService implements FilePickerService {
+  /// Returned by the next [pick].
+  List<PickedFile> next = const [];
+  final saved = <String>[];
+
+  static PickedFile file(String name, int size) =>
+      PickedFile(name: name, size: size, read: () async => Uint8List(size));
+
+  @override
+  Future<List<PickedFile>> pick({bool imagesOnly = false}) async => next;
+
+  @override
+  Future<bool> save(String fileName, Uint8List bytes, String mimeType) async {
+    saved.add(fileName);
+    return true;
+  }
+}
+
+class FakeDirectMessageRepository implements DirectMessageRepository {
+  final profiles = <UserProfile>[];
+  final conversations = <String, Conversation>{};
+  final messages = <String, List<ChatMessage>>{};
+  final reads = <String>[];
+  final _changes = StreamController<void>.broadcast();
+
+  void emit() => _changes.add(null);
+
+  Stream<T> _watch<T>(T Function() read) {
+    late StreamController<T> controller;
+    StreamSubscription<void>? sub;
+    controller = StreamController<T>(
+      onListen: () {
+        sub = _changes.stream.listen((_) => controller.add(read()));
+        controller.add(read());
+      },
+      onCancel: () => sub?.cancel(),
+    );
+    return controller.stream;
+  }
+
+  @override
+  Future<Result<List<UserProfile>>> searchPeople(
+    String query, {
+    required String excludeUid,
+  }) async => Result.ok([
+    for (final p in profiles)
+      if (p.uid != excludeUid && p.matches(query)) p,
+  ]);
+
+  @override
+  Stream<List<Conversation>> watchConversations(String uid) => _watch(
+    () => conversations.values
+        .where((c) => c.participants.contains(uid) && c.hasMessages)
+        .toList(),
+  );
+
+  @override
+  Stream<Conversation?> watchConversation(String id) =>
+      _watch(() => conversations[id]);
+
+  @override
+  Future<Result<String>> openConversation(AppUser me, UserProfile other) async {
+    final id = Conversation.idFor(me.uid, other.uid);
+    conversations.putIfAbsent(
+      id,
+      () => Conversation(
+        id: id,
+        participants: id.split('_'),
+        names: {me.uid: me.label, other.uid: other.name},
+      ),
+    );
+    emit();
+    return Result.ok(id);
+  }
+
+  @override
+  Stream<List<ChatMessage>> watchMessages(String id, {required int limit}) =>
+      _watch(() => List.of(messages[id] ?? const <ChatMessage>[]));
+
+  @override
+  Future<Result<void>> sendMessage(
+    String id, {
+    required AppUser author,
+    required String text,
+    List<NewAttachment> attachments = const [],
+  }) async {
+    final list = messages.putIfAbsent(id, () => []);
+    final at = DateTime(2026, 10, 30, 12, list.length);
+    list.add(
+      ChatMessage(
+        id: 'm${list.length + 1}',
+        authorId: author.uid,
+        authorName: author.label,
+        text: text.trim(),
+        createdAt: at,
+      ),
+    );
+    final c = conversations[id]!;
+    conversations[id] = Conversation(
+      id: id,
+      participants: c.participants,
+      names: c.names,
+      lastMessage: messagePreview(text, attachments.length),
+      lastMessageAt: at,
+      lastSenderId: author.uid,
+      readAt: {...c.readAt, author.uid: at},
+    );
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> deleteMessage(String id, ChatMessage message) async {
+    messages[id]?.removeWhere((m) => m.id == message.id);
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> markRead(String id, String uid) async {
+    reads.add(id);
+    final c = conversations[id]!;
+    conversations[id] = Conversation(
+      id: id,
+      participants: c.participants,
+      names: c.names,
+      lastMessage: c.lastMessage,
+      lastMessageAt: c.lastMessageAt,
+      lastSenderId: c.lastSenderId,
+      readAt: {...c.readAt, uid: DateTime(2100)},
+    );
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<Uint8List>> downloadAttachment(ChatAttachment a) async =>
+      Result.error(Exception('missing'));
 }

@@ -15,9 +15,11 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
@@ -636,5 +638,251 @@ describe("usau cache", () => {
   it("is read-only for clients", async () => {
     await assertSucceeds(getDoc(doc(db(PLAYER), "usau_tournaments", "x")));
     await assertFails(setDoc(doc(db(PLAYER), "usau_tournaments", "x"), { name: "hack" }));
+  });
+});
+
+describe("chat", () => {
+  const room = (overrides: Record<string, unknown> = {}) => ({
+    name: "Captains",
+    readRoles: ["owner", "coach", "captain"],
+    writeRoles: ["owner", "captain"],
+    readUsers: [STATS],
+    writeUsers: [],
+    createdBy: COACH,
+    createdAt: serverTimestamp(),
+    ...overrides,
+  });
+  const roomRef = (uid: string, id = "r1") => doc(db(uid), "teams", TEAM, "chats", id);
+  const messages = (uid: string, id = "r1") =>
+    collection(db(uid), "teams", TEAM, "chats", id, "messages");
+  const message = (uid: string, overrides: Record<string, unknown> = {}) => ({
+    authorId: uid,
+    authorName: "Name",
+    text: "Hi",
+    attachments: [],
+    createdAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  beforeEach(() =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", TEAM, "chats", "r1"), { ...room(), createdAt: new Date() });
+      await setDoc(doc(fs, "teams", TEAM, "chats", "r1", "messages", "m1"), {
+        ...message(CAPTAIN),
+        createdAt: new Date(),
+      });
+    }),
+  );
+
+  it("owners, coaches and captains create rooms; players cannot", async () => {
+    await assertSucceeds(setDoc(roomRef(COACH, "r2"), room()));
+    await assertSucceeds(setDoc(roomRef(CAPTAIN, "r3"), room({ createdBy: CAPTAIN })));
+    await assertFails(setDoc(roomRef(PLAYER, "r4"), room({ createdBy: PLAYER })));
+    await assertFails(setDoc(roomRef(OUTSIDER, "r5"), room({ createdBy: OUTSIDER })));
+  });
+
+  it("validates rooms: writers must be readers, roles are known", async () => {
+    await assertFails(setDoc(roomRef(COACH, "r2"), room({ writeRoles: ["player"] })));
+    await assertFails(setDoc(roomRef(COACH, "r2"), room({ writeUsers: [PLAYER] })));
+    await assertFails(setDoc(roomRef(COACH, "r2"), room({ readRoles: ["admin"] })));
+    await assertFails(setDoc(roomRef(COACH, "r2"), room({ name: "" })));
+    await assertFails(setDoc(roomRef(COACH, "r2"), room({ createdBy: OWNER })));
+  });
+
+  it("General can be created with its team in one batch", async () => {
+    const fs = db(OUTSIDER);
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, "teams", "t2"), {
+      name: "New", division: "mixed", level: "club", city: "",
+      ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" }, memberIds: [OUTSIDER],
+      memberNames: { [OUTSIDER]: "X" }, createdAt: serverTimestamp(),
+    });
+    batch.set(doc(fs, "teams", "t2", "private", "invite"), { code: "NEW234" });
+    batch.set(doc(fs, "inviteCodes", "NEW234"), { teamId: "t2" });
+    batch.set(doc(fs, "teams", "t2", "chats", "general"), {
+      name: "General",
+      readRoles: ["owner", "coach", "captain", "player"],
+      writeRoles: ["owner", "coach", "captain", "player"],
+      readUsers: [], writeUsers: [], createdBy: OUTSIDER, createdAt: serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it("room details: admins see every room, others only rooms they can read", async () => {
+    for (const uid of [OWNER, COACH, CAPTAIN, STATS]) {
+      await assertSucceeds(getDoc(roomRef(uid)));
+    }
+    await assertFails(getDoc(roomRef(PLAYER)));
+    await assertFails(getDoc(roomRef(OUTSIDER)));
+  });
+
+  it("players list rooms by role or by their uid, not all rooms", async () => {
+    const chats = (uid: string) => collection(db(uid), "teams", TEAM, "chats");
+    await assertFails(getDocs(chats(PLAYER)));
+    await assertSucceeds(getDocs(query(chats(PLAYER), where("readRoles", "array-contains", "player"))));
+    await assertSucceeds(getDocs(query(chats(PLAYER), where("readUsers", "array-contains", PLAYER))));
+    await assertFails(getDocs(query(chats(PLAYER), where("readUsers", "array-contains", STATS))));
+    await assertSucceeds(getDocs(chats(COACH)));
+  });
+
+  it("messages: readers by role or name read; the owner reads every room", async () => {
+    await assertSucceeds(getDocs(messages(OWNER)));
+    await assertSucceeds(getDocs(messages(CAPTAIN)));
+    await assertSucceeds(getDocs(messages(STATS)));
+    await assertFails(getDocs(messages(PLAYER)));
+    await assertFails(getDocs(messages(OUTSIDER)));
+  });
+
+  it("only writers post, as themselves", async () => {
+    await assertSucceeds(setDoc(doc(messages(CAPTAIN)), message(CAPTAIN)));
+    await assertSucceeds(setDoc(doc(messages(OWNER)), message(OWNER)));
+    // Coaches and named readers can read but not post here.
+    await assertFails(setDoc(doc(messages(COACH)), message(COACH)));
+    await assertFails(setDoc(doc(messages(STATS)), message(STATS)));
+    await assertFails(setDoc(doc(messages(PLAYER)), message(PLAYER)));
+    await assertFails(setDoc(doc(messages(CAPTAIN)), message(OWNER)));
+  });
+
+  it("validates messages", async () => {
+    const m = (o: Record<string, unknown>) => setDoc(doc(messages(CAPTAIN)), message(CAPTAIN, o));
+    await assertFails(m({ text: "", attachments: [] }));
+    await assertFails(m({ text: "x".repeat(4001) }));
+    await assertFails(m({ attachments: new Array(11).fill({ path: "p" }) }));
+    await assertFails(m({ createdAt: new Date(0) }));
+    await assertFails(m({ pinned: true }));
+    await assertSucceeds(m({ text: "", attachments: [{ path: "p", name: "a.png", contentType: "image/png", size: 1 }] }));
+  });
+
+  it("messages can't be edited", async () => {
+    await assertFails(
+      updateDoc(doc(db(CAPTAIN), "teams", TEAM, "chats", "r1", "messages", "m1"), { text: "edited" }),
+    );
+  });
+
+  it("authors delete their own messages; the owner deletes any", async () => {
+    const m1 = (uid: string) => doc(db(uid), "teams", TEAM, "chats", "r1", "messages", "m1");
+    await assertFails(deleteDoc(m1(COACH)));
+    await assertSucceeds(deleteDoc(m1(CAPTAIN)));
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "chats", "r1", "messages", "m1"), {
+        ...message(CAPTAIN),
+        createdAt: new Date(),
+      }),
+    );
+    await assertSucceeds(deleteDoc(m1(OWNER)));
+  });
+
+  it("admins change access; only the owner deletes rooms", async () => {
+    await assertSucceeds(updateDoc(roomRef(COACH), { readUsers: [STATS, PLAYER] }));
+    await assertFails(updateDoc(roomRef(PLAYER), { readUsers: [PLAYER] }));
+    await assertFails(updateDoc(roomRef(COACH), { createdBy: COACH }));
+    await assertFails(deleteDoc(roomRef(COACH)));
+    await assertSucceeds(deleteDoc(roomRef(OWNER)));
+  });
+});
+
+describe("direct messages", () => {
+  // OWNER < PLAYER alphabetically, so their conversation id is "owner_player".
+  const CONV = `${OWNER}_${PLAYER}`;
+  const profile = (name = "Pat Player") => ({ name, keywords: ["pat"], photoUrl: null, updatedAt: serverTimestamp() });
+  const newConv = (overrides: Record<string, unknown> = {}) => ({
+    participants: [OWNER, PLAYER],
+    names: { [OWNER]: "O", [PLAYER]: "P" },
+    lastMessage: "",
+    lastMessageAt: null,
+    lastSenderId: "",
+    readAt: {},
+    createdAt: serverTimestamp(),
+    ...overrides,
+  });
+  const conv = (uid: string, id = CONV) => doc(db(uid), "conversations", id);
+  const msgs = (uid: string, id = CONV) => collection(db(uid), "conversations", id, "messages");
+  const msg = (uid: string) => ({
+    authorId: uid, authorName: "N", text: "Hi", attachments: [], createdAt: serverTimestamp(),
+  });
+
+  beforeEach(() =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "profiles", OWNER), { name: "Olive Owner", keywords: ["olive"], photoUrl: null });
+      await setDoc(doc(fs, "profiles", PLAYER), { name: "Pat Player", keywords: ["pat"], photoUrl: null });
+    }),
+  );
+
+  it("profiles: anyone signed in reads; only you write yours, without email", async () => {
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "profiles", PLAYER)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "profiles", PLAYER)));
+    await assertSucceeds(setDoc(doc(db(PLAYER), "profiles", PLAYER), profile()));
+    await assertFails(setDoc(doc(db(OUTSIDER), "profiles", PLAYER), profile()));
+    await assertFails(setDoc(doc(db(PLAYER), "profiles", PLAYER), { ...profile(), email: "a@b.c" }));
+    await assertFails(setDoc(doc(db(PLAYER), "profiles", PLAYER), profile("")));
+  });
+
+  it("participants start a conversation with a listed user", async () => {
+    await assertSucceeds(getDoc(conv(PLAYER))); // checking it exists
+    await assertSucceeds(setDoc(conv(PLAYER), newConv()));
+  });
+
+  it("rejects bad conversations", async () => {
+    await assertFails(setDoc(conv(OUTSIDER), newConv()));
+    await assertFails(setDoc(conv(OWNER, `${PLAYER}_${OWNER}`), newConv({ participants: [PLAYER, OWNER] })));
+    await assertFails(setDoc(conv(OWNER, `${OWNER}_zed`), newConv({
+      participants: [OWNER, "zed"], names: { [OWNER]: "O", zed: "Z" },
+    })));
+    await assertFails(setDoc(conv(OWNER), newConv({ lastMessage: "forged" })));
+  });
+
+  describe("an existing conversation", () => {
+    beforeEach(() =>
+      env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "conversations", CONV), { ...newConv(), createdAt: new Date() }),
+      ),
+    );
+
+    it("only the two participants read it and its messages", async () => {
+      await assertSucceeds(getDoc(conv(OWNER)));
+      await assertFails(getDoc(conv(COACH)));
+      await assertSucceeds(getDocs(query(collection(db(PLAYER), "conversations"), where("participants", "array-contains", PLAYER))));
+      await assertFails(getDocs(collection(db(PLAYER), "conversations")));
+      await assertSucceeds(getDocs(msgs(PLAYER)));
+      await assertFails(getDocs(msgs(COACH)));
+    });
+
+    it("participants post as themselves and update the preview", async () => {
+      const fs = db(PLAYER);
+      const batch = writeBatch(fs);
+      batch.set(doc(collection(fs, "conversations", CONV, "messages")), msg(PLAYER));
+      batch.update(doc(fs, "conversations", CONV), {
+        lastMessage: "Hi", lastMessageAt: serverTimestamp(), lastSenderId: PLAYER,
+        [`readAt.${PLAYER}`]: serverTimestamp(), [`names.${PLAYER}`]: "Pat",
+      });
+      await assertSucceeds(batch.commit());
+      await assertFails(setDoc(doc(msgs(COACH)), msg(COACH)));
+      await assertFails(setDoc(doc(msgs(PLAYER)), msg(OWNER)));
+    });
+
+    it("nobody forges the other's read time, name or preview", async () => {
+      await assertFails(updateDoc(conv(PLAYER), { [`readAt.${OWNER}`]: serverTimestamp() }));
+      await assertFails(updateDoc(conv(PLAYER), {
+        lastMessage: "x", lastMessageAt: serverTimestamp(), lastSenderId: OWNER,
+      }));
+      await assertFails(updateDoc(conv(PLAYER), {
+        lastMessage: "x", lastMessageAt: serverTimestamp(), lastSenderId: PLAYER, [`names.${OWNER}`]: "Mallory",
+      }));
+      await assertSucceeds(updateDoc(conv(PLAYER), { [`readAt.${PLAYER}`]: serverTimestamp() }));
+    });
+
+    it("authors delete only their own messages", async () => {
+      await env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "conversations", CONV, "messages", "m1"), { ...msg(OWNER), createdAt: new Date() }),
+      );
+      await assertFails(deleteDoc(doc(db(PLAYER), "conversations", CONV, "messages", "m1")));
+      await assertSucceeds(deleteDoc(doc(db(OWNER), "conversations", CONV, "messages", "m1")));
+    });
+
+    it("conversations can't be deleted", async () => {
+      await assertFails(deleteDoc(conv(OWNER)));
+    });
   });
 });

@@ -7,7 +7,18 @@ import '../ui/auth/view_models/sign_in_viewmodel.dart';
 import '../ui/auth/view_models/sign_up_viewmodel.dart';
 import '../ui/auth/widgets/sign_in_screen.dart';
 import '../ui/auth/widgets/sign_up_screen.dart';
+import '../ui/chat/view_models/chat_room_settings_viewmodel.dart';
+import '../ui/chat/view_models/chat_room_viewmodel.dart';
+import '../ui/chat/widgets/chat_layout.dart';
+import '../ui/chat/widgets/chat_room_screen.dart';
+import '../ui/chat/widgets/chat_room_settings_screen.dart';
 import '../ui/core/ui/adaptive_shell.dart';
+import '../ui/messages/view_models/direct_chat_viewmodel.dart';
+import '../ui/messages/view_models/inbox_viewmodel.dart';
+import '../ui/messages/view_models/people_search_viewmodel.dart';
+import '../ui/messages/widgets/direct_chat_screen.dart';
+import '../ui/messages/widgets/inbox_screen.dart';
+import '../ui/messages/widgets/people_search_screen.dart';
 import '../ui/core/ui/status_views.dart';
 import '../ui/core/ui/view_model_host.dart';
 import '../ui/events/widgets/events_screen.dart';
@@ -158,6 +169,48 @@ GoRouter router(AuthRepository auth) => GoRouter(
         ),
       ],
     ),
+    // Direct messages, full screen over the shell (opened with push).
+    GoRoute(
+      path: Routes.messages,
+      builder: (_, _) => ViewModelHost(
+        create: (c) => InboxViewModel(
+          directMessageRepository: c.read(),
+          authRepository: c.read(),
+        ),
+        builder: (_, vm) => InboxScreen(viewModel: vm),
+      ),
+      routes: [
+        GoRoute(
+          path: 'new',
+          builder: (_, _) => ViewModelHost(
+            create: (c) => PeopleSearchViewModel(
+              directMessageRepository: c.read(),
+              authRepository: c.read(),
+            ),
+            builder: (_, vm) => PeopleSearchScreen(viewModel: vm),
+          ),
+        ),
+        GoRoute(
+          path: ':conversationId',
+          pageBuilder: (_, state) {
+            final id = state.pathParameters['conversationId']!;
+            return chatPage(
+              state.pageKey,
+              ViewModelHost(
+                key: ValueKey('dm-$id'),
+                create: (c) => DirectChatViewModel(
+                  conversationId: id,
+                  directMessageRepository: c.read(),
+                  authRepository: c.read(),
+                  filePicker: c.read(),
+                ),
+                builder: (_, vm) => DirectChatScreen(viewModel: vm),
+              ),
+            );
+          },
+        ),
+      ],
+    ),
     // Personal schedule, full screen over the shell.
     GoRoute(
       path: Routes.myEventsPath,
@@ -228,6 +281,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
               builder: (_, _) => ViewModelHost(
                 create: (c) => HomeViewModel(
                   authRepository: c.read(),
+                  directMessageRepository: c.read(),
                   teamRepository: c.read(),
                   playRepository: c.read(),
                   eventRepository: c.read(),
@@ -296,6 +350,44 @@ GoRouter router(AuthRepository auth) => GoRouter(
                     );
                   },
                   routes: [
+                    GoRoute(
+                      path: 'chats/new',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) => _chatRoomSettings(state, null),
+                    ),
+                    GoRoute(
+                      path: 'chats/:roomId',
+                      parentNavigatorKey: _rootKey,
+                      pageBuilder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        final roomId = state.pathParameters['roomId']!;
+                        return chatPage(
+                          state.pageKey,
+                          ViewModelHost(
+                            key: ValueKey('chat-$teamId-$roomId'),
+                            create: (c) => ChatRoomViewModel(
+                              teamId: teamId,
+                              roomId: roomId,
+                              teamRepository: c.read(),
+                              chatRepository: c.read(),
+                              authRepository: c.read(),
+                              filePicker: c.read(),
+                            ),
+                            builder: (_, vm) => ChatRoomScreen(viewModel: vm),
+                          ),
+                        );
+                      },
+                      routes: [
+                        GoRoute(
+                          path: 'settings',
+                          parentNavigatorKey: _rootKey,
+                          builder: (_, state) => _chatRoomSettings(
+                            state,
+                            state.pathParameters['roomId'],
+                          ),
+                        ),
+                      ],
+                    ),
                     GoRoute(
                       path: 'plays/:playId',
                       parentNavigatorKey: _rootKey,
@@ -496,5 +588,21 @@ Widget _usauTeam(GoRouterState state) {
       usauTeamRepository: c.read(),
     ),
     builder: (_, vm) => UsauTeamScreen(viewModel: vm),
+  );
+}
+
+/// Creates a chat room ([roomId] null) or edits one.
+Widget _chatRoomSettings(GoRouterState state, String? roomId) {
+  final teamId = state.pathParameters['teamId']!;
+  return ViewModelHost(
+    key: ValueKey('chat-settings-$teamId-$roomId'),
+    create: (c) => ChatRoomSettingsViewModel(
+      teamId: teamId,
+      roomId: roomId,
+      teamRepository: c.read(),
+      chatRepository: c.read(),
+      authRepository: c.read(),
+    ),
+    builder: (_, vm) => ChatRoomSettingsScreen(viewModel: vm),
   );
 }

@@ -12,12 +12,24 @@ abstract final class Routes {
   static const rankings = '/rankings';
   static const profile = '/profile';
 
+  // Direct messages open over the shell; use `context.push`.
+  static const messages = '/messages';
+  static const newMessage = '/messages/new';
+  static String conversation(String id) => '/messages/$id';
+
   /// [tab] opens a team tab by name, e.g. 'playbook' ([TeamTab]).
   static String team(String teamId, {String? tab}) => Uri(
     path: '/teams/$teamId',
     queryParameters: tab == null ? null : {'tab': tab},
   ).toString();
   static String newPlay(String teamId) => '/teams/$teamId/plays/new';
+  // Chat pages open over the team; use `context.push` so back returns to
+  // the Chat tab.
+  static String chatRoom(String teamId, String roomId) =>
+      '/teams/$teamId/chats/$roomId';
+  static String newChatRoom(String teamId) => '/teams/$teamId/chats/new';
+  static String chatRoomSettings(String teamId, String roomId) =>
+      '/teams/$teamId/chats/$roomId/settings';
   static String play(String teamId, String playId) =>
       '/teams/$teamId/plays/$playId';
   // Event pages sit outside the tab shell so they open over whatever tab
