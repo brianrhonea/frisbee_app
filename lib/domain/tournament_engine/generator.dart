@@ -5,17 +5,39 @@ import 'standings.dart';
 
 /// A generated schedule: every game with a field and start time.
 class SchedulePlan {
-  const SchedulePlan({required this.games, required this.endsAt});
+  const SchedulePlan({required this.games, required this.days});
 
   final List<GroupGame> games;
 
+  /// Each day of play, in order.
+  final List<ScheduleDay> days;
+
   /// When the last game should finish (including an if-needed final).
-  final DateTime endsAt;
+  DateTime get endsAt => days.last.endsAt;
 
   /// Minutes the plan runs past [idealEndsAt]; 0 if it fits or has none.
   int overrunMinutes(DateTime? idealEndsAt) => idealEndsAt == null
       ? 0
       : max(0, endsAt.difference(idealEndsAt).inMinutes);
+}
+
+/// One day of a [SchedulePlan].
+class ScheduleDay {
+  const ScheduleDay({
+    required this.startsAt,
+    required this.endsAt,
+    required this.games,
+  });
+
+  final DateTime startsAt;
+
+  /// When the day's last game should finish; [startsAt] if it has none.
+  final DateTime endsAt;
+  final int games;
+
+  /// Minutes this day runs into [next]'s start; 0 if it doesn't.
+  int overlapMinutes(DateTime? next) =>
+      next == null ? 0 : max(0, endsAt.difference(next).inMinutes);
 }
 
 class ScheduleException implements Exception {
@@ -348,47 +370,73 @@ Map<String, Set<String>> _dependencies(List<GroupGame> games) {
   };
 }
 
-/// Puts games into time slots, [TournamentSettings.fields] at a time, in
-/// order, once the games they wait for are over and no team plays twice
-/// in a slot.
+/// How many of [total] games each of [days] days gets: as even as
+/// possible, earlier days taking the extra ones.
+List<int> gamesPerDay(int total, int days) => [
+  for (var d = 0; d < days; d++) total ~/ days + (d < total % days ? 1 : 0),
+];
+
+/// Splits the games evenly over the days (in order, so a game never
+/// lands on a day before the games it waits for), then puts each day's
+/// games into time slots from that day's start, [TournamentSettings.fields]
+/// at a time, once the games they wait for are over and no team plays
+/// twice in a slot.
 SchedulePlan _schedule(List<GroupGame> games, TournamentSettings s) {
   final fields = max(1, s.fields);
   final slotLength = Duration(minutes: s.gameMinutes + s.breakMinutes);
   final deps = _dependencies(games);
-  final slotOf = <String, int>{};
-  final pending = [...games];
+  final starts = s.days;
+  final quotas = gamesPerDay(games.length, starts.length);
   final scheduled = <GroupGame>[];
-  var slot = 0;
-  while (pending.isNotEmpty) {
-    final busy = <String>{};
-    var used = 0;
-    for (final g in [...pending]) {
-      if (used == fields) break;
-      final ready = deps[g.id]!.every((d) => (slotOf[d] ?? slot) < slot);
-      final teams = [?g.teamA, ?g.teamB];
-      if (!ready || teams.any(busy.contains)) continue;
-      busy.addAll(teams);
-      slotOf[g.id] = slot;
-      pending.remove(g);
-      used++;
-      scheduled.add(
-        g.copyWith(
-          order: scheduled.length,
-          field: used,
-          startsAt: s.startsAt.add(slotLength * slot),
-        ),
-      );
+  final days = <ScheduleDay>[];
+  final earlier = <String>{};
+  var next = 0;
+  for (var d = 0; d < starts.length; d++) {
+    final pending = games.sublist(next, next + quotas[d]);
+    next += quotas[d];
+    final slotOf = <String, int>{};
+    var slot = 0;
+    var last = -1;
+    while (pending.isNotEmpty) {
+      final busy = <String>{};
+      var used = 0;
+      for (final g in [...pending]) {
+        if (used == fields) break;
+        final ready = deps[g.id]!.every(
+          (dep) => earlier.contains(dep) || (slotOf[dep] ?? slot) < slot,
+        );
+        final teams = [?g.teamA, ?g.teamB];
+        if (!ready || teams.any(busy.contains)) continue;
+        busy.addAll(teams);
+        slotOf[g.id] = slot;
+        pending.remove(g);
+        used++;
+        last = slot;
+        scheduled.add(
+          g.copyWith(
+            order: scheduled.length,
+            field: used,
+            startsAt: starts[d].add(slotLength * slot),
+          ),
+        );
+      }
+      slot++;
+      if (slot > games.length * 2 + 2) {
+        throw const ScheduleException("These games can't be scheduled.");
+      }
     }
-    slot++;
-    if (slot > games.length * 2 + 2) {
-      throw const ScheduleException("These games can't be scheduled.");
-    }
+    earlier.addAll(slotOf.keys);
+    days.add(
+      ScheduleDay(
+        startsAt: starts[d],
+        endsAt: last < 0
+            ? starts[d]
+            : starts[d].add(
+                slotLength * last + Duration(minutes: s.gameMinutes),
+              ),
+        games: quotas[d],
+      ),
+    );
   }
-  final last = scheduled.map((g) => g.startsAt!).fold(s.startsAt, _later);
-  return SchedulePlan(
-    games: scheduled,
-    endsAt: last.add(Duration(minutes: s.gameMinutes)),
-  );
+  return SchedulePlan(games: scheduled, days: days);
 }
-
-DateTime _later(DateTime a, DateTime b) => a.isAfter(b) ? a : b;

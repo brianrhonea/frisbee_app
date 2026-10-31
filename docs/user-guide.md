@@ -171,16 +171,22 @@ tournaments) and **Member**.
 
 1. Post a Tournament event so people can RSVP. On the event, tap **Set up
    tournament** (or **New tournament** on the Tournaments page).
-2. Pick the format (round robin, pool play + single elimination, single
-   elimination, double elimination), players on the field (3v3 to 7v7),
-   game length, score cap, timeouts, fields, start and ideal end time.
-3. **Import RSVPs** brings in everyone attending or planning to attend.
-   **Add member** adds anyone else. Tap **Assign teams** and choose a team
-   size to deal them into teams, or **Add team** and place players
-   yourself. Tap a player to move them or make them captain, and rename
-   teams as you like.
-4. Check the **schedule preview** (it warns if games run past the ideal
-   end) and tap **Publish**.
+2. Set the **dates**: the first and last day of play. Each day gets its
+   own **start time**; tap a day to change it. Add an ideal end if you
+   like.
+3. Pick the format (round robin, pool play + single elimination, single
+   elimination, double elimination) and the number of **teams** (they
+   start as Team 1, Team 2… and you can rename them), plus players on the
+   field (3v3 to 7v7), game length, breaks, score cap, timeouts and fields.
+4. Check the **schedule preview**. Games are split evenly over the days,
+   in bracket order. It warns if games run past the ideal end. Tap
+   **Publish schedule**. Teams can still be empty at this point.
+5. Add players, now or any time before play: **Import RSVPs** brings in
+   everyone attending or planning to attend, **Add member** adds anyone
+   else, and **Assign teams** deals them all evenly into the teams at
+   random, each with a random captain. Tap a player to move them or make
+   them captain. Tap **Save**; the schedule stays as it is. Changing the
+   number of teams means publishing the schedule again.
 
 **Playing**: the tournament shows up for everyone on a team. Open it for
 the schedule, standings, bracket and teams; your games are highlighted.

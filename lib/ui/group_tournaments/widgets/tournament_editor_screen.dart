@@ -112,7 +112,9 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
             actions: [
               if (vm.load.completed)
                 TextButton(
-                  onPressed: busy ? null : vm.save.execute,
+                  onPressed: busy || vm.saveProblem != null
+                      ? null
+                      : vm.save.execute,
                   child: const Text('Save'),
                 ),
             ],
@@ -126,12 +128,12 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
                 children: [
                   _Heading('Details'),
                   _Details(viewModel: vm, name: _name),
-                  _Heading('Format and rules'),
+                  _Heading('Format, teams and rules'),
                   _Rules(viewModel: vm),
-                  _Heading('Players and teams'),
-                  _Teams(viewModel: vm),
                   _Heading('Schedule'),
                   _SchedulePreview(viewModel: vm),
+                  _Heading('Players'),
+                  _Teams(viewModel: vm),
                 ],
               ),
             ),
@@ -144,7 +146,12 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            vm.problem ?? 'Ready to publish.',
+                            vm.problem ??
+                                (vm.teamsChanged ? vm.saveProblem : null) ??
+                                (vm.todo == null
+                                    ? 'Ready to publish.'
+                                    : '${vm.todo}. You can still publish '
+                                          'and add players later.'),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ),
@@ -261,14 +268,47 @@ class _Details extends StatelessWidget {
         const SizedBox(height: 8),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.play_circle_outline),
-          title: const Text('Starts'),
-          subtitle: Text(tournamentWhen(s.startsAt)),
+          leading: const Icon(Icons.date_range_outlined),
+          title: const Text('Dates'),
+          subtitle: Text(tournamentDates(s)),
           onTap: () async {
-            final d = await _pickDateTime(context, s.startsAt);
-            if (d != null) vm.updateSettings(s.copyWith(startsAt: d));
+            final range = await showDateRangePicker(
+              context: context,
+              initialDateRange: DateTimeRange(
+                start: DateUtils.dateOnly(s.startsAt),
+                end: DateUtils.dateOnly(s.days.last),
+              ),
+              firstDate: DateTime(s.startsAt.year - 1),
+              lastDate: DateTime(s.startsAt.year + 2),
+              helpText: 'First and last day of play',
+            );
+            if (range != null) vm.setDates(range.start, range.end);
           },
         ),
+        for (final (i, day) in s.days.indexed)
+          ListTile(
+            contentPadding: const EdgeInsets.only(left: 40),
+            dense: true,
+            leading: const Icon(Icons.schedule, size: 20),
+            title: Text(
+              s.days.length == 1
+                  ? 'Start time'
+                  : 'Day ${i + 1} · ${DateFormat('EEE, MMM d').format(day)}',
+            ),
+            trailing: Text(DateFormat.jm().format(day)),
+            onTap: () async {
+              final t = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.fromDateTime(day),
+                helpText: s.days.length == 1
+                    ? 'Start time'
+                    : 'Day ${i + 1} starts',
+              );
+              if (t != null) {
+                vm.setDayStart(i, hour: t.hour, minute: t.minute);
+              }
+            },
+          ),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.flag_outlined),
@@ -287,7 +327,7 @@ class _Details extends StatelessWidget {
           onTap: () async {
             final d = await _pickDateTime(
               context,
-              s.idealEndsAt ?? s.startsAt.add(const Duration(hours: 6)),
+              s.idealEndsAt ?? s.days.last.add(const Duration(hours: 6)),
             );
             if (d != null) vm.updateSettings(s.copyWith(idealEndsAt: () => d));
           },
@@ -343,12 +383,19 @@ class _Rules extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
+        _Stepper(
+          label: 'Teams',
+          value: vm.teams.length,
+          min: 2,
+          max: TournamentSettings.maxTeams,
+          onChanged: vm.setTeamCount,
+        ),
         if (s.format == TournamentFormat.poolsSingleElim)
           _Stepper(
             label: 'Pools',
             value: s.poolCount,
             min: 1,
-            max: 8,
+            max: (vm.teams.length ~/ 2).clamp(1, 8),
             onChanged: (v) => set(s.copyWith(poolCount: v)),
           ),
         _Stepper(
@@ -451,33 +498,22 @@ class _Teams extends StatelessWidget {
 
   Future<void> _assign(BuildContext context) async {
     final vm = viewModel;
-    final size = await showDialog<int>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Players per team'),
-        children: [
-          for (final n in TournamentSettings.teamSizes)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, n),
-              child: Text(
-                '$n per team → '
-                '${(vm.allPlayers.length / n).ceil().clamp(2, 999)} teams',
-              ),
-            ),
-        ],
-      ),
-    );
-    if (size == null || !context.mounted) return;
-    if (vm.teams.isNotEmpty &&
-        !await confirmDialog(
-          context,
-          title: 'Replace the teams?',
-          message: 'Everyone brought in is dealt into new random teams.',
-          confirmLabel: 'Assign teams',
-        )) {
+    final players = vm.allPlayers.length;
+    final teams = vm.teams.length;
+    final each = players ~/ teams;
+    final sizes = players % teams == 0 ? '$each' : '$each–${each + 1}';
+    if (!await confirmDialog(
+      context,
+      title: 'Assign teams?',
+      message:
+          'All $players players are dealt at random into the $teams teams '
+          '($sizes each), replacing who is on them now. Each team gets a '
+          'random captain.',
+      confirmLabel: 'Assign teams',
+    )) {
       return;
     }
-    vm.assignTeams(size);
+    vm.assignTeams();
   }
 
   Future<void> _addMember(BuildContext context) async {
@@ -578,18 +614,21 @@ class _Teams extends StatelessWidget {
               label: const Text('Add member'),
             ),
             FilledButton.icon(
-              onPressed: vm.allPlayers.length < 2
+              onPressed: vm.allPlayers.isEmpty || vm.teams.length < 2
                   ? null
                   : () => _assign(context),
               icon: const Icon(Icons.shuffle),
               label: const Text('Assign teams'),
             ),
-            OutlinedButton.icon(
-              onPressed: () => vm.addTeams(1),
-              icon: const Icon(Icons.add),
-              label: const Text('Add team'),
-            ),
           ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Players can be added before or after the schedule is published. '
+          'Tap a player to move them or make them captain.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
         if (vm.bench.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -608,14 +647,6 @@ class _Teams extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 16),
-        if (vm.teams.isEmpty)
-          Text(
-            'Import who is coming (or add members), then Assign teams to '
-            'deal them into random teams, or Add team to pick by hand.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
         for (final t in vm.teams)
           Card(
             margin: const EdgeInsets.only(bottom: 8),
@@ -640,7 +671,9 @@ class _Teams extends StatelessWidget {
                       IconButton(
                         tooltip: 'Remove team',
                         icon: const Icon(Icons.delete_outline),
-                        onPressed: () => vm.removeTeam(t.id),
+                        onPressed: vm.teams.length <= 2
+                            ? null
+                            : () => vm.removeTeam(t.id),
                       ),
                     ],
                   ),
@@ -759,8 +792,10 @@ class _SchedulePreview extends StatelessWidget {
         if (plan != null) ...[
           const SizedBox(height: 8),
           Text(
-            '${plan.games.length} games · ends about '
-            '${DateFormat.jm().format(plan.endsAt)}',
+            plan.days.length == 1
+                ? '${plan.games.length} games · ends about '
+                      '${DateFormat.jm().format(plan.endsAt)}'
+                : '${plan.games.length} games over ${plan.days.length} days',
             style: theme.textTheme.bodyMedium,
           ),
           if (vm.overrunMinutes > 0)
@@ -781,7 +816,25 @@ class _SchedulePreview extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 8),
-          for (final g in plan.games)
+          for (final g in plan.games) ...[
+            if (plan.days.length > 1)
+              for (final (i, day) in plan.days.indexed)
+                if (day.games > 0 &&
+                    g.order ==
+                        plan.days
+                            .take(i)
+                            .fold<int>(0, (sum, d) => sum + d.games))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12, bottom: 4),
+                    child: Text(
+                      'Day ${i + 1} · '
+                      '${DateFormat('EEE, MMM d').format(day.startsAt)} · '
+                      '${day.games} games, '
+                      '${DateFormat.jm().format(day.startsAt)}–'
+                      '${DateFormat.jm().format(day.endsAt)}',
+                      style: theme.textTheme.labelLarge,
+                    ),
+                  ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Text(
@@ -791,6 +844,7 @@ class _SchedulePreview extends StatelessWidget {
                 style: theme.textTheme.bodySmall,
               ),
             ),
+          ],
         ],
       ],
     );

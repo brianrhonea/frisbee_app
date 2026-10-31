@@ -129,31 +129,73 @@ void main() {
       final vm = await editorVm(eventId: 'e1');
       expect(vm.name, 'Fall Hat');
       expect(vm.settings.startsAt, DateTime(2026, 11, 7, 9));
+      expect(vm.settings.laterDays, isEmpty);
       expect(vm.settings.idealEndsAt, DateTime(2026, 11, 7, 15));
     });
 
-    test('imports attending and planning players, once', () async {
-      final vm = await editorVm(eventId: 'e1');
-      expect(vm.importRsvps(), 6);
-      expect(vm.bench.map((p) => p.uid), [...players.take(6)]);
-      expect(vm.bench.first.name, 'Name p1');
-      expect(vm.importRsvps(), 0);
-      expect(vm.otherMembers.map((p) => p.uid), ['owner', 'p7', 'p8']);
+    test('a multi-day event makes a multi-day tournament', () async {
+      events.events['e2'] = TeamEvent(
+        id: 'e2',
+        title: 'Big Weekend',
+        type: EventType.tournament,
+        startsAt: DateTime(2026, 11, 7, 9),
+        endsAt: DateTime(2026, 11, 8, 16),
+      );
+      final vm = await editorVm(eventId: 'e2');
+      expect(vm.settings.days, [
+        DateTime(2026, 11, 7, 9),
+        DateTime(2026, 11, 8, 9),
+      ]);
     });
 
-    test('assigns teams with a captain each, then publishes', () async {
-      final vm = await editorVm(eventId: 'e1');
-      vm.importRsvps();
-      vm.addToBench((uid: 'p7', name: 'Name p7'));
-      vm.assignTeams(3);
-      expect(vm.teams, hasLength(3));
-      expect(vm.bench, isEmpty);
-      for (final t in vm.teams) {
-        expect(t.playerIds, hasLength(inInclusiveRange(2, 3)));
-        expect(t.playerIds, contains(t.captainId));
-      }
-      expect(vm.teams.expand((t) => t.playerIds).toSet(), hasLength(7));
+    test('dates and per-day start times', () async {
+      final vm = await editorVm();
+      vm.setDates(DateTime(2026, 11, 7), DateTime(2026, 11, 9));
+      expect(vm.settings.days, [
+        DateTime(2026, 11, 7, 9),
+        DateTime(2026, 11, 8, 9),
+        DateTime(2026, 11, 9, 9),
+      ]);
+      vm.setDayStart(1, hour: 10, minute: 30);
+      vm.setDayStart(0, hour: 8, minute: 0);
+      expect(vm.settings.days, [
+        DateTime(2026, 11, 7, 8),
+        DateTime(2026, 11, 8, 10, 30),
+        DateTime(2026, 11, 9, 9),
+      ]);
+      // Shortening keeps the start times already set.
+      vm.setDates(DateTime(2026, 11, 7), DateTime(2026, 11, 8));
+      expect(vm.settings.days, [
+        DateTime(2026, 11, 7, 8),
+        DateTime(2026, 11, 8, 10, 30),
+      ]);
+
+      vm.setName('Weekend');
+      vm.previewSchedule();
+      final plan = vm.plan!;
+      expect(plan.days, hasLength(2));
+      expect(plan.days.map((d) => d.games), [
+        (plan.games.length + 1) ~/ 2,
+        plan.games.length ~/ 2,
+      ]);
+      expect(plan.days.last.startsAt, DateTime(2026, 11, 8, 10, 30));
+    });
+
+    test('starts with four empty teams and publishes before players', () async {
+      final vm = await editorVm();
+      expect(vm.teams.map((t) => t.name), [
+        'Team 1',
+        'Team 2',
+        'Team 3',
+        'Team 4',
+      ]);
+      expect(vm.problem, 'Give the tournament a name.');
+      vm.setName('Fall Hat');
+      vm.setTeamCount(6);
+      expect(vm.teams, hasLength(6));
+      expect(vm.teams.last.name, 'Team 6');
       expect(vm.problem, isNull);
+      expect(vm.todo, '6 teams without players');
 
       vm.updateSettings(
         vm.settings.copyWith(format: TournamentFormat.roundRobin),
@@ -162,53 +204,88 @@ void main() {
       expect(vm.publish.completed, isTrue);
       final saved = repo.tournaments['g1']!.single;
       expect(saved.status, TournamentStatus.scheduled);
-      expect(saved.eventId, 'e1');
       expect(saved.createdBy, 'owner');
-      // Three teams, each pair once.
-      expect(repo.games[saved.id], hasLength(3));
-      expect(vm.wasPublished, isTrue);
+      // Six teams, each pair once.
+      expect(repo.games[saved.id], hasLength(15));
     });
 
-    test("won't publish without two teams that each have a captain", () async {
+    test(
+      'players added after publishing are saved without a new schedule',
+      () async {
+        final first = await editorVm(eventId: 'e1');
+        await first.publish.execute();
+        final id = repo.tournaments['g1']!.single.id;
+        final gamesBefore = repo.games[id];
+
+        final vm = TournamentEditorViewModel(
+          groupId: 'g1',
+          tournamentId: id,
+          teamRepository: teams,
+          eventRepository: events,
+          tournamentRepository: repo,
+          authRepository: as('owner'),
+          random: Random(2),
+        );
+        await pumpEventQueue();
+        expect(vm.wasPublished, isTrue);
+        vm.importRsvps();
+        vm.addToBench((uid: 'p7', name: 'Name p7'));
+        vm.assignTeams();
+        expect(vm.bench, isEmpty);
+        expect(vm.teams.map((t) => t.name), [
+          'Team 1',
+          'Team 2',
+          'Team 3',
+          'Team 4',
+        ]);
+        for (final t in vm.teams) {
+          expect(t.playerIds, hasLength(inInclusiveRange(1, 2)));
+          expect(t.playerIds, contains(t.captainId));
+        }
+        expect(vm.teams.expand((t) => t.playerIds).toSet(), hasLength(7));
+        expect(vm.todo, isNull);
+        await vm.save.execute();
+        expect(vm.save.completed, isTrue);
+        expect(repo.games[id], same(gamesBefore));
+        final saved = repo.tournaments['g1']!.single;
+        expect(saved.status, TournamentStatus.scheduled);
+        expect(saved.participantIds, hasLength(7));
+
+        // A different number of teams needs a new schedule.
+        vm.setTeamCount(5);
+        expect(vm.teamsChanged, isTrue);
+        expect(vm.saveProblem, contains('publish'));
+        await vm.save.execute();
+        expect(vm.save.error, isTrue);
+        await vm.publish.execute();
+        expect(vm.publish.completed, isTrue);
+        expect(vm.teamsChanged, isFalse);
+      },
+    );
+
+    test('captains follow players; fewer teams bench their players', () async {
       final vm = await editorVm();
       vm.setName('Hat');
-      expect(vm.problem, 'Add at least two teams.');
-      vm.addTeams(2);
-      expect(vm.teams.map((t) => t.name), ['Team 1', 'Team 2']);
-      expect(vm.problem, 'Team 1 has no players.');
       final a = vm.teams[0].id;
       final b = vm.teams[1].id;
-      await vm.publish.execute();
-      expect(vm.publish.error, isTrue);
-      expect(repo.log, isEmpty);
-
       // The first player on a team captains it until someone else is set.
       vm.movePlayerTo((uid: 'p1', name: 'Name p1'), a);
       vm.movePlayerTo((uid: 'p3', name: 'Name p3'), a);
       expect(vm.teams[0].captainId, 'p1');
-      expect(vm.problem, 'Team 2 has no players.');
-      vm.movePlayerTo((uid: 'p2', name: 'Name p2'), b);
       vm.setCaptain(a, 'p3');
       expect(vm.teams[0].captainId, 'p3');
       // Moving the captain away hands it to a teammate.
       vm.movePlayerTo((uid: 'p3', name: 'Name p3'), b);
       expect(vm.teams[0].captainId, 'p1');
-      expect(vm.problem, isNull);
-
       vm.renameTeam(a, '  Discs ');
       expect(vm.teams.first.name, 'Discs');
-      await vm.publish.execute();
-      expect(vm.publish.completed, isTrue);
-    });
 
-    test('removing a team puts its players back on the bench', () async {
-      final vm = await editorVm(eventId: 'e1');
-      vm.importRsvps();
-      vm.assignTeams(3);
-      final gone = vm.teams.first;
-      vm.removeTeam(gone.id);
-      expect(vm.teams, hasLength(1));
-      expect(vm.bench.map((p) => p.uid), unorderedEquals(gone.playerIds));
+      vm.movePlayerTo((uid: 'p4', name: 'Name p4'), vm.teams[3].id);
+      vm.setTeamCount(3);
+      expect(vm.teams, hasLength(3));
+      expect(vm.bench.map((p) => p.uid), ['p4']);
+      vm.setTeamCount(1);
+      expect(vm.teams, hasLength(2));
     });
   });
 

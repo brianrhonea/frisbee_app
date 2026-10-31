@@ -14,9 +14,9 @@ import '../../../domain/tournament_engine/team_builder.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
-/// Sets a tournament up: details and rules, players and teams, then a
-/// schedule to publish. Organizers only. The draft lives here until it's
-/// saved.
+/// Sets a tournament up: details, rules and how many teams, then the
+/// schedule to publish, and players on teams (before or after
+/// publishing). Organizers only. The draft lives here until it's saved.
 class TournamentEditorViewModel extends ChangeNotifier {
   TournamentEditorViewModel({
     required this.groupId,
@@ -66,6 +66,12 @@ class TournamentEditorViewModel extends ChangeNotifier {
   List<TeamEvent> _tournamentEvents = const [];
   bool _published = false;
   String? _id;
+
+  /// Team ids in the published schedule.
+  Set<String> _publishedTeams = const {};
+
+  /// Teams a new tournament starts with.
+  static const defaultTeams = 4;
 
   String _name = '';
   String? _eventId;
@@ -133,8 +139,10 @@ class TournamentEditorViewModel extends ChangeNotifier {
         _settings = t.settings;
         _teamList = t.teams;
         _published = t.status != TournamentStatus.setup;
-      } else if (_initialEventId case final e?) {
-        setEvent(e);
+        if (_published) _publishedTeams = _teamIds;
+      } else {
+        _teamList = blankTeams(defaultTeams);
+        if (_initialEventId case final e?) setEvent(e);
       }
       notifyListeners();
       return const Result.ok(null);
@@ -149,17 +157,73 @@ class TournamentEditorViewModel extends ChangeNotifier {
   }
 
   /// Links the tournament to a Tournament event; a new tournament takes
-  /// its name and times.
+  /// its name, days and times.
   void setEvent(String? eventId) {
     _eventId = eventId;
     final e = event;
     if (e != null && isNew) {
       if (_name.trim().isEmpty) _name = e.title;
+      final end = e.endsAt;
       _settings = _settings.copyWith(
         startsAt: e.startsAt,
-        idealEndsAt: () => e.endsAt,
+        laterDays: _laterDays(e.startsAt, end ?? e.startsAt),
+        idealEndsAt: () => end,
       );
     }
+    _plan = null;
+    notifyListeners();
+  }
+
+  /// Days after [first] up to [last]'s date, each at [first]'s time
+  /// unless [keep] already has a start on that date.
+  List<DateTime> _laterDays(
+    DateTime first,
+    DateTime last, {
+    List<DateTime> keep = const [],
+  }) {
+    final byDate = {for (final d in keep) _dateOf(d): d};
+    final lastDate = _dateOf(last);
+    final days = <DateTime>[];
+    var day = DateTime(first.year, first.month, first.day + 1);
+    while (!day.isAfter(lastDate)) {
+      days.add(
+        byDate[day] ??
+            DateTime(day.year, day.month, day.day, first.hour, first.minute),
+      );
+      day = DateTime(day.year, day.month, day.day + 1);
+    }
+    return days;
+  }
+
+  static DateTime _dateOf(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// The first and last days of play. Day starts already set are kept.
+  void setDates(DateTime first, DateTime last) {
+    final s = _settings;
+    final start = DateTime(
+      first.year,
+      first.month,
+      first.day,
+      s.startsAt.hour,
+      s.startsAt.minute,
+    );
+    _settings = s.copyWith(
+      startsAt: start,
+      laterDays: _laterDays(start, last, keep: s.laterDays),
+    );
+    _plan = null;
+    notifyListeners();
+  }
+
+  /// When day [index] (0 is the first) starts.
+  void setDayStart(int index, {required int hour, required int minute}) {
+    final days = _settings.days;
+    if (index < 0 || index >= days.length) return;
+    final d = days[index];
+    final at = DateTime(d.year, d.month, d.day, hour, minute);
+    _settings = index == 0
+        ? _settings.copyWith(startsAt: at)
+        : _settings.copyWith(laterDays: [...days.skip(1)]..[index - 1] = at);
     _plan = null;
     notifyListeners();
   }
@@ -232,12 +296,28 @@ class TournamentEditorViewModel extends ChangeNotifier {
     ..._bench,
   ];
 
-  /// Deals every player brought in into random teams of [teamSize],
-  /// replacing the current teams.
-  void assignTeams(int teamSize) {
-    _settings = _settings.copyWith(teamSize: teamSize);
-    _teamList = buildTeams(allPlayers, teamSize: teamSize, random: _random);
+  /// Deals every player brought in at random into the teams, evenly,
+  /// replacing their rosters. Team names stay.
+  void assignTeams() {
+    _teamList = dealPlayers(allPlayers, _teamList, random: _random);
     _bench = const [];
+    notifyListeners();
+  }
+
+  /// Sets how many teams there are. New ones are named "Team n"; removed
+  /// ones come off the end, their players back on the bench.
+  void setTeamCount(int count) {
+    final n = count.clamp(2, TournamentSettings.maxTeams);
+    if (n > _teamList.length) {
+      _teamList = [
+        ..._teamList,
+        ...blankTeams(n - _teamList.length, existing: _teamList),
+      ];
+    } else {
+      for (final t in _teamList.sublist(n).reversed) {
+        removeTeam(t.id);
+      }
+    }
     _plan = null;
     notifyListeners();
   }
@@ -295,15 +375,41 @@ class TournamentEditorViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Why the draft can't be scheduled yet, or null.
+  Set<String> get _teamIds => {for (final t in _teamList) t.id};
+
+  /// Teams were added or removed since the schedule was published, so it
+  /// has to be published again.
+  bool get teamsChanged => _published && !setEquals(_teamIds, _publishedTeams);
+
+  /// Why the draft can't be scheduled yet, or null. Players can come
+  /// later.
   String? get problem {
     if (_name.trim().isEmpty) return 'Give the tournament a name.';
     if (_teamList.length < 2) return 'Add at least two teams.';
-    final empty = _teamList.where((t) => t.playerIds.isEmpty);
-    if (empty.isNotEmpty) return '${empty.first.name} has no players.';
-    final noCaptain = _teamList.where((t) => t.captainId == null);
-    if (noCaptain.isNotEmpty) return '${noCaptain.first.name} needs a captain.';
     return null;
+  }
+
+  /// Why the draft can't be saved without publishing, or null.
+  String? get saveProblem {
+    if (_name.trim().isEmpty) return 'Give the tournament a name.';
+    if (teamsChanged) {
+      return 'The number of teams changed: publish the schedule again.';
+    }
+    return null;
+  }
+
+  /// What's left before play, e.g. "2 teams without players", or null.
+  String? get todo {
+    final empty = _teamList.where((t) => t.playerIds.isEmpty).length;
+    final noCaptain = _teamList
+        .where((t) => t.playerIds.isNotEmpty && t.captainId == null)
+        .length;
+    final parts = [
+      if (empty > 0) '$empty team${empty == 1 ? '' : 's'} without players',
+      if (noCaptain > 0)
+        '$noCaptain team${noCaptain == 1 ? '' : 's'} without a captain',
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
   }
 
   GroupTournament _draft() => GroupTournament(
@@ -327,12 +433,13 @@ class TournamentEditorViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Result<String>> _save() async {
+  Future<Result<String>> _save() => _write(publishing: false);
+
+  Future<Result<String>> _write({required bool publishing}) async {
     final me = _auth.currentUser;
     if (me == null) return Result.error(Exception('Not signed in'));
-    if (_name.trim().isEmpty) {
-      return Result.error(Exception('Give the tournament a name.'));
-    }
+    final why = publishing ? problem : saveProblem;
+    if (why != null) return Result.error(Exception(why));
     final result = await _tournaments.saveTournament(groupId, _draft(), me);
     if (result case Ok(:final value)) _id = value;
     return result;
@@ -347,7 +454,7 @@ class TournamentEditorViewModel extends ChangeNotifier {
     } on ScheduleException catch (e) {
       return Result.error(e);
     }
-    final saved = await _save();
+    final saved = await _write(publishing: true);
     if (saved case Ok(:final value)) {
       final published = await _tournaments.publishSchedule(
         groupId,
@@ -356,6 +463,7 @@ class TournamentEditorViewModel extends ChangeNotifier {
       );
       if (published case Error(:final error)) return Result.error(error);
       _published = true;
+      _publishedTeams = _teamIds;
       _plan = plan;
       notifyListeners();
     }

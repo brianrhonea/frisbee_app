@@ -231,7 +231,20 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
                   : 'The schedule will appear here once organizers publish it.',
               style: theme.textTheme.bodyMedium,
             ),
-          for (final g in vm.games) _gameTile(g),
+          for (final (i, g) in vm.games.indexed) ...[
+            if (t.settings.laterDays.isNotEmpty &&
+                g.startsAt != null &&
+                (i == 0 ||
+                    !DateUtils.isSameDay(vm.games[i - 1].startsAt, g.startsAt)))
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Text(
+                  gameDay(g.startsAt!),
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+            _gameTile(g),
+          ],
         ],
       ),
     );

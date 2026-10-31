@@ -85,9 +85,11 @@ Map<String, int> losses(List<GroupGame> games) {
 
 void main() {
   group('team builder', () {
-    test('deals everyone into teams that differ by at most one', () {
+    test('deals everyone into the teams, differing by at most one', () {
       final players = [for (var i = 0; i < 23; i++) (uid: 'u$i', name: 'P$i')];
-      final teams = buildTeams(players, teamSize: 7, random: Random(1));
+      final named = blankTeams(4)
+        ..[0] = blankTeams(4)[0].copyWith(name: 'Discs');
+      final teams = dealPlayers(players, named, random: Random(1));
       expect(teams.length, 4);
       final sizes = teams.map((t) => t.playerIds.length).toList();
       expect(sizes.reduce(max) - sizes.reduce(min), lessThanOrEqualTo(1));
@@ -95,22 +97,25 @@ void main() {
       for (final t in teams) {
         expect(t.playerIds, contains(t.captainId));
       }
-      expect(teams.map((t) => t.name), [
-        'Team 1',
-        'Team 2',
-        'Team 3',
-        'Team 4',
-      ]);
+      // Names and ids stay.
+      expect(teams.map((t) => t.name), ['Discs', 'Team 2', 'Team 3', 'Team 4']);
+      expect(teams.map((t) => t.id), ['team1', 'team2', 'team3', 'team4']);
     });
 
-    test('makes at least two teams and ignores duplicates', () {
-      final teams = buildTeams([
+    test('replaces rosters, ignores duplicates, leaves extra teams empty', () {
+      final old = movePlayer(blankTeams(3), (
+        uid: 'z',
+        name: 'Z',
+      ), teamId: 'team3');
+      final teams = dealPlayers([
         (uid: 'a', name: 'A'),
         (uid: 'a', name: 'A'),
         (uid: 'b', name: 'B'),
-      ], teamSize: 9);
-      expect(teams.length, 2);
+      ], old);
+      expect(teams.length, 3);
       expect(teams.expand((t) => t.playerIds).toList()..sort(), ['a', 'b']);
+      expect(teams.last.playerIds, isEmpty);
+      expect(teams.last.captainId, isNull);
     });
 
     test('moving players keeps one team each and a captain', () {
@@ -320,6 +325,59 @@ void main() {
       expect(plan.endsAt, start.add(const Duration(minutes: 110)));
       expect(plan.overrunMinutes(t.settings.idealEndsAt), 50);
       expect(plan.overrunMinutes(null), 0);
+    });
+
+    test('splits games evenly over the days', () {
+      expect(gamesPerDay(10, 3), [4, 3, 3]);
+      expect(gamesPerDay(6, 2), [3, 3]);
+      expect(gamesPerDay(1, 2), [1, 0]);
+    });
+
+    test('each day starts at its own time; nothing waits on a later day', () {
+      for (final format in TournamentFormat.values) {
+        final base = tournamentOf(8, format);
+        final day2 = DateTime(2026, 11, 8, 10, 30);
+        final day3 = DateTime(2026, 11, 9, 8);
+        final t = GroupTournament(
+          id: 't',
+          name: base.name,
+          teams: base.teams,
+          settings: base.settings.copyWith(laterDays: [day2, day3]),
+        );
+        final plan = generateSchedule(t);
+        expect(plan.days, hasLength(3), reason: format.name);
+        expect(plan.days.map((d) => d.startsAt), [start, day2, day3]);
+        final quotas = gamesPerDay(plan.games.length, 3);
+        expect(plan.days.map((d) => d.games), quotas);
+        final starts = [start, day2, day3];
+        var at = 0;
+        for (var d = 0; d < 3; d++) {
+          final games = plan.games.sublist(at, at + quotas[d]);
+          at += quotas[d];
+          for (final g in games) {
+            expect(g.startsAt!.day, starts[d].day);
+            expect(g.startsAt!.isBefore(starts[d]), isFalse);
+          }
+          if (games.isNotEmpty) {
+            expect(games.first.startsAt, starts[d], reason: format.name);
+          }
+        }
+        // Played out, every game still comes after the ones it waits for.
+        final played = playOut(plan.games);
+        final byId = {for (final g in played) g.id: g};
+        for (final g in played) {
+          for (final s in [g.sourceA, g.sourceB]) {
+            if (s case WinnerOf(:final gameId) || LoserOf(:final gameId)) {
+              expect(
+                byId[gameId]!.startsAt!.isBefore(g.startsAt!),
+                isTrue,
+                reason: format.name,
+              );
+            }
+          }
+        }
+        expect(plan.endsAt, plan.days.last.endsAt);
+      }
     });
 
     test('needs two teams', () {

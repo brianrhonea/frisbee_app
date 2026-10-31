@@ -91,7 +91,6 @@ class TournamentSettings {
     required this.startsAt,
     this.format = TournamentFormat.poolsSingleElim,
     this.playersOnField = 5,
-    this.teamSize = 7,
     this.poolCount = 2,
     this.gameMinutes = 40,
     this.breakMinutes = 10,
@@ -99,18 +98,18 @@ class TournamentSettings {
     this.timeoutsPerHalf = 1,
     this.fields = 1,
     this.idealEndsAt,
+    this.laterDays = const [],
   });
 
   static const fieldSizes = [3, 4, 5, 6, 7];
-  static const teamSizes = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  /// Most teams a tournament can have (the rules allow 64).
+  static const maxTeams = 64;
 
   final TournamentFormat format;
 
   /// 3 for 3v3 up to 7 for 7v7.
   final int playersOnField;
-
-  /// Players per team when teams are assigned automatically.
-  final int teamSize;
 
   /// For pool play; round robin is always one pool.
   final int poolCount;
@@ -123,7 +122,16 @@ class TournamentSettings {
 
   /// Games played at the same time.
   final int fields;
+
+  /// When the first day starts.
   final DateTime startsAt;
+
+  /// When each later day starts, in order, for tournaments over several
+  /// days.
+  final List<DateTime> laterDays;
+
+  /// When each day starts.
+  List<DateTime> get days => [startsAt, ...laterDays];
 
   /// When the organizer would like to finish; the schedule warns if it
   /// runs past it.
@@ -132,8 +140,9 @@ class TournamentSettings {
   /// Pools actually used: round robin has one.
   int get pools => format == TournamentFormat.roundRobin ? 1 : poolCount;
 
-  /// "5v5 · to 11 · 40 min · 1 timeout per half".
+  /// "5v5 · to 11 · 40 min · 1 timeout per half", plus the days.
   String get summary => [
+    if (laterDays.isNotEmpty) '${days.length} days',
     '${playersOnField}v$playersOnField',
     'to $scoreCap',
     '$gameMinutes min',
@@ -143,7 +152,6 @@ class TournamentSettings {
   TournamentSettings copyWith({
     TournamentFormat? format,
     int? playersOnField,
-    int? teamSize,
     int? poolCount,
     int? gameMinutes,
     int? breakMinutes,
@@ -152,10 +160,10 @@ class TournamentSettings {
     int? fields,
     DateTime? startsAt,
     DateTime? Function()? idealEndsAt,
+    List<DateTime>? laterDays,
   }) => TournamentSettings(
     format: format ?? this.format,
     playersOnField: playersOnField ?? this.playersOnField,
-    teamSize: teamSize ?? this.teamSize,
     poolCount: poolCount ?? this.poolCount,
     gameMinutes: gameMinutes ?? this.gameMinutes,
     breakMinutes: breakMinutes ?? this.breakMinutes,
@@ -164,6 +172,7 @@ class TournamentSettings {
     fields: fields ?? this.fields,
     startsAt: startsAt ?? this.startsAt,
     idealEndsAt: idealEndsAt != null ? idealEndsAt() : this.idealEndsAt,
+    laterDays: laterDays ?? this.laterDays,
   );
 
   factory TournamentSettings.fromMap(Map<String, dynamic> map) =>
@@ -174,7 +183,6 @@ class TournamentSettings {
           TournamentFormat.poolsSingleElim,
         ),
         playersOnField: _int(map['playersOnField'], 5),
-        teamSize: _int(map['teamSize'], 7),
         poolCount: _int(map['poolCount'], 2),
         gameMinutes: _int(map['gameMinutes'], 40),
         breakMinutes: _int(map['breakMinutes'], 10),
@@ -183,12 +191,15 @@ class TournamentSettings {
         fields: _int(map['fields'], 1),
         startsAt: parseDate(map['startsAt']) ?? DateTime(1970),
         idealEndsAt: parseDate(map['idealEndsAt']),
+        laterDays: [
+          for (final d in (map['laterDays'] as List?) ?? const [])
+            ?parseDate(d),
+        ],
       );
 
   Map<String, dynamic> toMap() => {
     'format': format.name,
     'playersOnField': playersOnField,
-    'teamSize': teamSize,
     'poolCount': poolCount,
     'gameMinutes': gameMinutes,
     'breakMinutes': breakMinutes,
@@ -197,6 +208,7 @@ class TournamentSettings {
     'fields': fields,
     'startsAt': startsAt,
     'idealEndsAt': idealEndsAt,
+    'laterDays': laterDays,
   };
 }
 

@@ -5,29 +5,26 @@ import '../models/group_tournament.dart';
 /// Someone who can be put on a team.
 typedef TournamentPlayer = ({String uid, String name});
 
-/// Deals [players] at random into teams of about [teamSize]: as many
-/// teams as it takes to fit everyone, with sizes differing by at most one.
-/// Each team gets a random captain and the name "Team n".
-List<TournamentTeam> buildTeams(
-  List<TournamentPlayer> players, {
-  required int teamSize,
+/// Deals [players] at random into [teams], replacing their rosters, so
+/// team sizes differ by at most one. Names and ids stay; each team with
+/// players gets a random captain.
+List<TournamentTeam> dealPlayers(
+  List<TournamentPlayer> players,
+  List<TournamentTeam> teams, {
   Random? random,
 }) {
+  if (teams.isEmpty) return const [];
   final unique = {for (final p in players) p.uid: p}.values.toList()
     ..shuffle(random);
-  if (unique.isEmpty || teamSize < 1) return const [];
-  final count = max(2, (unique.length / teamSize).ceil());
-  final rosters = List.generate(count, (_) => <TournamentPlayer>[]);
+  final rosters = List.generate(teams.length, (_) => <TournamentPlayer>[]);
   for (var i = 0; i < unique.length; i++) {
-    rosters[i % count].add(unique[i]);
+    rosters[i % teams.length].add(unique[i]);
   }
   return [
-    for (var i = 0; i < count; i++)
-      TournamentTeam(
-        id: 'team${i + 1}',
-        name: 'Team ${i + 1}',
+    for (var i = 0; i < teams.length; i++)
+      teams[i].copyWith(
         // Players were shuffled, so the first is a random pick.
-        captainId: rosters[i].firstOrNull?.uid,
+        captainId: () => rosters[i].firstOrNull?.uid,
         playerIds: [for (final p in rosters[i]) p.uid],
         playerNames: {for (final p in rosters[i]) p.uid: p.name},
       ),

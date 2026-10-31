@@ -35,15 +35,18 @@ Branch `feature/community-groups`.
   shows the map with a **Directions** button.
 - **Pickup** events. Tournament events in groups take **Attending**,
   **Planning to attend** and **Not able to make it :(** RSVPs.
-- **Tournaments** for groups: from a Tournament event, organizers import
-  who's attending or planning to, then **Assign teams** at a chosen team
-  size (3–12), or add teams ("Team 1"…) and pick players by hand. Rename
-  teams and pick each team's captain.
+- **Tournaments** for groups: organizers set the format, rules and number
+  of teams (Team 1, Team 2…, renamable) first, publish the schedule, and
+  add players before or after. Players come from a Tournament event's
+  attending and planning-to-attend RSVPs, or by hand; **Assign teams**
+  deals them evenly into the teams with a random captain each.
 - Formats: round robin, pool play + single elimination, single
   elimination and double elimination (with an if-needed final). Settings
   for 3v3 to 7v7, game length, breaks, score cap, timeouts per half,
-  fields, start time and ideal end time. The schedule is generated
-  automatically, with a warning if it runs past the ideal end.
+  fields and an ideal end time.
+- **Multi-day tournaments**: first and last date, with a start time for
+  each day. The generated schedule splits games evenly over the days, in
+  bracket order, and warns if it runs past the ideal end.
 - The tournament page: schedule, pool standings, bracket and teams, plus
   "You're on…" with your captain and next game. Teams are private to the
   tournament's players and organizers.

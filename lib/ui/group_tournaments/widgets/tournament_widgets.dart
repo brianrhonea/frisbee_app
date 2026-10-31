@@ -11,6 +11,18 @@ String tournamentWhen(DateTime d) =>
 
 String gameTime(DateTime? d) => d == null ? '' : DateFormat.jm().format(d);
 
+/// "Sat, Nov 7", or "Sat, Nov 7 – Sun, Nov 8" over several days.
+String tournamentDates(TournamentSettings s) {
+  final f = DateFormat('EEE, MMM d');
+  return s.laterDays.isEmpty
+      ? f.format(s.startsAt)
+      : '${f.format(s.startsAt)} – ${f.format(s.days.last)} '
+            '(${s.days.length} days)';
+}
+
+/// "Saturday, Nov 7", a heading for a day of games.
+String gameDay(DateTime d) => DateFormat('EEEE, MMM d').format(d);
+
 /// One game: time and field, the two sides and the score.
 class GameTile extends StatelessWidget {
   const GameTile({
