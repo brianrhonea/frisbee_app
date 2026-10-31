@@ -31,7 +31,11 @@ class MembersTab extends StatelessWidget {
             _InviteCard(viewModel: viewModel, code: code),
             const SizedBox(height: 16),
           ],
-          const _RolesHelp(),
+          if (team.isCommunity && viewModel.joinRequests.isNotEmpty) ...[
+            _JoinRequests(viewModel: viewModel),
+            const SizedBox(height: 16),
+          ],
+          _RolesHelp(kind: team.kind),
           const SizedBox(height: 16),
           Text(
             '${members.length} member${members.length == 1 ? '' : 's'}',
@@ -49,8 +53,8 @@ class MembersTab extends StatelessWidget {
               ),
               subtitle: Text(
                 team.isStatKeeper(m.key)
-                    ? '${m.value.label} · Stats'
-                    : m.value.label,
+                    ? '${team.roleLabel(m.value)} · Stats'
+                    : team.roleLabel(m.value),
               ),
               trailing: viewModel.canManage(m.key)
                   ? _MemberMenu(
@@ -58,11 +62,69 @@ class MembersTab extends StatelessWidget {
                       uid: m.key,
                       name: team.nameOf(m.key),
                       role: m.value,
+                      kind: team.kind,
                       statKeeper: team.isStatKeeper(m.key),
                     )
                   : null,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// People waiting to join a group that requires approval.
+class _JoinRequests extends StatelessWidget {
+  const _JoinRequests({required this.viewModel});
+
+  final TeamDetailViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final requests = viewModel.joinRequests;
+    return Card(
+      color: theme.colorScheme.secondaryContainer,
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${requests.length} '
+              '${requests.length == 1 ? 'person wants' : 'people want'} '
+              'to join',
+              style: theme.textTheme.titleSmall,
+            ),
+            for (final r in requests)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  child: Text(r.name.isEmpty ? '?' : r.name[0].toUpperCase()),
+                ),
+                title: Text(r.name.isEmpty ? 'Someone' : r.name),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Decline',
+                      icon: const Icon(Icons.close),
+                      onPressed: viewModel.declineJoinRequest.running
+                          ? null
+                          : () => viewModel.declineJoinRequest.execute(r.uid),
+                    ),
+                    FilledButton.tonal(
+                      onPressed: viewModel.approveJoinRequest.running
+                          ? null
+                          : () => viewModel.approveJoinRequest.execute(r),
+                      child: const Text('Approve'),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -140,6 +202,7 @@ class _MemberMenu extends StatelessWidget {
     required this.uid,
     required this.name,
     required this.role,
+    required this.kind,
     required this.statKeeper,
   });
 
@@ -147,7 +210,10 @@ class _MemberMenu extends StatelessWidget {
   final String uid;
   final String name;
   final TeamRole role;
+  final TeamKind kind;
   final bool statKeeper;
+
+  bool get _isGroup => kind == TeamKind.community;
 
   Future<void> _changeRole(BuildContext context) async {
     final picked = await showDialog<TeamRole>(
@@ -155,7 +221,7 @@ class _MemberMenu extends StatelessWidget {
       builder: (context) => SimpleDialog(
         title: Text('Role for $name'),
         children: [
-          for (final r in TeamRole.values)
+          for (final r in TeamRole.rolesFor(kind))
             if (r != TeamRole.owner)
               ListTile(
                 leading: Icon(
@@ -163,8 +229,8 @@ class _MemberMenu extends StatelessWidget {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
                 ),
-                title: Text(r.label),
-                subtitle: Text(r.summary),
+                title: Text(r.labelFor(kind)),
+                subtitle: Text(r.summaryFor(kind)),
                 onTap: () => Navigator.pop(context, r),
               ),
         ],
@@ -189,9 +255,11 @@ class _MemberMenu extends StatelessWidget {
             if (await confirmDialog(
               context,
               title: 'Make $name the owner?',
-              message:
-                  'They get full control of the team. You become a player '
-                  "and can't undo this yourself.",
+              message: _isGroup
+                  ? 'They get full control of the group. You become a '
+                        "member and can't undo this yourself."
+                  : 'They get full control of the team. You become a '
+                        "player and can't undo this yourself.",
               confirmLabel: 'Transfer ownership',
               destructive: true,
             )) {
@@ -201,7 +269,8 @@ class _MemberMenu extends StatelessWidget {
             if (await confirmDialog(
               context,
               title: 'Remove $name?',
-              message: 'They will lose access to this team.',
+              message:
+                  'They will lose access to this ${_isGroup ? 'group' : 'team'}.',
               confirmLabel: 'Remove',
               destructive: true,
             )) {
@@ -212,8 +281,8 @@ class _MemberMenu extends StatelessWidget {
       itemBuilder: (_) => [
         if (vm.canSetRoles) ...[
           const PopupMenuItem(value: 'role', child: Text('Change role')),
-          // Every other role already keeps stats.
-          if (role == TeamRole.player)
+          // Every other role already keeps stats; groups don't keep any.
+          if (role == TeamRole.player && !_isGroup)
             PopupMenuItem(
               value: 'stats',
               child: Text(
@@ -223,7 +292,10 @@ class _MemberMenu extends StatelessWidget {
           const PopupMenuItem(value: 'owner', child: Text('Make owner')),
         ],
         if (vm.canRemove(uid))
-          const PopupMenuItem(value: 'remove', child: Text('Remove from team')),
+          PopupMenuItem(
+            value: 'remove',
+            child: Text('Remove from ${_isGroup ? 'group' : 'team'}'),
+          ),
       ],
     );
   }
@@ -231,7 +303,9 @@ class _MemberMenu extends StatelessWidget {
 
 /// What each role can do.
 class _RolesHelp extends StatelessWidget {
-  const _RolesHelp();
+  const _RolesHelp({required this.kind});
+
+  final TeamKind kind;
 
   @override
   Widget build(BuildContext context) {
@@ -245,7 +319,26 @@ class _RolesHelp extends StatelessWidget {
         subtitle: const Text('What each role can do'),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         children: [
-          for (final r in TeamRole.values)
+          for (final r in TeamRole.rolesFor(kind))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 84,
+                    child: Text(
+                      r.labelFor(kind),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Text(r.summaryFor(kind))),
+                ],
+              ),
+            ),
+          if (kind == TeamKind.team)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
@@ -254,38 +347,20 @@ class _RolesHelp extends StatelessWidget {
                   SizedBox(
                     width: 72,
                     child: Text(
-                      r.label,
+                      '+ Stats',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                  Expanded(child: Text(r.summary)),
+                  const Expanded(
+                    child: Text(
+                      'Added to a player by the owner: keep and manage stats',
+                    ),
+                  ),
                 ],
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 72,
-                  child: Text(
-                    '+ Stats',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const Expanded(
-                  child: Text(
-                    'Added to a player by the owner: keep and manage stats',
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

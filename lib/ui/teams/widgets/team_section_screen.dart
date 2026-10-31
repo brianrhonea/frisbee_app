@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../chat/view_models/chat_list_viewmodel.dart';
@@ -46,6 +47,17 @@ enum TeamSection {
     members => Routes.teamMembers(teamId),
   };
 
+  /// Sections a team or community group has, in display order. Groups
+  /// don't keep a roster, plays, videos or stats.
+  static List<TeamSection> forKind(TeamKind kind) => switch (kind) {
+    TeamKind.team => values,
+    TeamKind.community => const [events, chat, members],
+  };
+
+  /// "Team Events" is just "Events" in a group.
+  String labelFor(TeamKind kind) =>
+      this == events && kind == TeamKind.community ? 'Events' : label;
+
   /// The section an old `?tab=` link meant, when teams had tabs; the
   /// Schedule tab is now Team Events.
   static TeamSection? fromLegacyTab(String? tab) => tab == 'schedule'
@@ -80,6 +92,8 @@ class _TeamSectionScreenState extends State<TeamSectionScreen> {
     vm.setStatKeeper,
     vm.removeMember,
     vm.deletePlay,
+    vm.approveJoinRequest,
+    vm.declineJoinRequest,
   ];
 
   @override
@@ -167,6 +181,18 @@ class _TeamSectionScreenState extends State<TeamSectionScreen> {
                   ),
           );
         }
+        if (!TeamSection.forKind(team.kind).contains(widget.section)) {
+          return Scaffold(
+            appBar: AppBar(leading: leading),
+            body: EmptyView(
+              icon: widget.section.icon,
+              title: 'Not in community groups',
+              message:
+                  'Groups have events, chat, tournaments and members. '
+                  '${widget.section.label} is for teams.',
+            ),
+          );
+        }
         final theme = Theme.of(context);
         return Scaffold(
           appBar: AppBar(
@@ -174,7 +200,7 @@ class _TeamSectionScreenState extends State<TeamSectionScreen> {
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.section.label),
+                Text(widget.section.labelFor(team.kind)),
                 Text(
                   team.name,
                   style: theme.textTheme.bodySmall?.copyWith(

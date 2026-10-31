@@ -7,6 +7,7 @@ abstract final class Routes {
   static const home = '/home';
   static const teams = '/teams';
   static const createTeam = '/teams/new';
+  static const createGroup = '/teams/new?kind=community';
   static const searchTeams = '/teams/search';
   static const searchUsauTeams = '/teams/search/usau';
   static const schedule = '/schedule';

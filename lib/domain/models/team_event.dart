@@ -9,6 +9,9 @@ enum EventType {
   social('Social'),
   other('Other'),
 
+  /// Community group pickup games.
+  pickup('Pickup'),
+
   /// A [TeamMeeting] shown on the schedule. Meetings are stored apart from
   /// events, so this is never saved on an event.
   meeting('Meeting');
@@ -19,6 +22,12 @@ enum EventType {
   /// Types an event can be given in the editor.
   static List<EventType> get editable =>
       values.where((t) => t != meeting).toList();
+
+  /// Types a team or community group can schedule. Groups play pickup and
+  /// run tournaments rather than practices and games.
+  static List<EventType> editableFor({required bool community}) => community
+      ? const [pickup, tournament, social, other]
+      : editable.where((t) => t != pickup).toList();
 }
 
 enum RsvpStatus {
@@ -28,6 +37,14 @@ enum RsvpStatus {
 
   const RsvpStatus(this.label);
   final String label;
+
+  /// Tournaments ask who's attending, who's planning to, and who can't.
+  String labelFor(EventType type) => switch ((type, this)) {
+    (EventType.tournament, going) => 'Attending',
+    (EventType.tournament, maybe) => 'Planning to attend',
+    (EventType.tournament, notGoing) => 'Not able to make it :(',
+    _ => label,
+  };
 }
 
 /// Fixed reaction palette. Stored by name so security rules can validate it.

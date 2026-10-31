@@ -140,9 +140,82 @@ class FakeTeamRepository implements TeamRepository {
       city: team.city,
       ownerId: owner.uid,
       members: {owner.uid: TeamRole.owner},
+      kind: team.kind,
+      description: team.description,
+      requiresApproval: team.requiresApproval,
+      location: team.location,
     );
+    if (team.kind == TeamKind.community) {
+      listings[id] = team.listing(id);
+    }
     _emit();
     return Result.ok(id);
+  }
+
+  /// teamId → pending join requests.
+  final joinRequests = <String, List<GroupJoinRequest>>{};
+
+  void _addMember(String teamId, String uid, String name) {
+    final t = teams[teamId]!;
+    teams[teamId] = t.copyWith(
+      members: {...t.members, uid: TeamRole.player},
+      memberNames: {...t.memberNames, uid: name},
+    );
+  }
+
+  @override
+  Future<Result<void>> joinGroup(String teamId, AppUser user) async {
+    final t = teams[teamId];
+    if (t == null || !t.isCommunity || t.requiresApproval) {
+      return Result.error(Exception('permission-denied'));
+    }
+    _addMember(teamId, user.uid, user.label);
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> requestToJoin(String teamId, AppUser user) async {
+    (joinRequests[teamId] ??= []).add(
+      GroupJoinRequest(uid: user.uid, name: user.label),
+    );
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> cancelJoinRequest(String teamId, String uid) =>
+      declineJoinRequest(teamId, uid);
+
+  @override
+  Stream<bool> watchMyJoinRequest(String teamId, String uid) async* {
+    bool mine() => (joinRequests[teamId] ?? []).any((r) => r.uid == uid);
+    yield mine();
+    yield* _teamsController.stream.map((_) => mine());
+  }
+
+  @override
+  Stream<List<GroupJoinRequest>> watchJoinRequests(String teamId) async* {
+    yield [...?joinRequests[teamId]];
+    yield* _teamsController.stream.map((_) => [...?joinRequests[teamId]]);
+  }
+
+  @override
+  Future<Result<void>> approveJoinRequest(
+    String teamId,
+    GroupJoinRequest request,
+  ) async {
+    _addMember(teamId, request.uid, request.name);
+    joinRequests[teamId]?.removeWhere((r) => r.uid == request.uid);
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> declineJoinRequest(String teamId, String uid) async {
+    joinRequests[teamId]?.removeWhere((r) => r.uid == uid);
+    _emit();
+    return const Result.ok(null);
   }
 
   @override

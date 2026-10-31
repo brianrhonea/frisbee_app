@@ -62,6 +62,16 @@ class EventEditorViewModel extends ChangeNotifier {
 
   bool get canChooseSchedule => isNew && _editableTeams.isNotEmpty;
 
+  /// The event is on a community group's schedule.
+  bool get isCommunity =>
+      _editableTeams.where((t) => t.id == _teamId).firstOrNull?.isCommunity ??
+      false;
+
+  /// Event types the chosen schedule offers.
+  List<EventType> get types => isPersonal
+      ? EventType.editableFor(community: false)
+      : EventType.editableFor(community: isCommunity);
+
   /// Moves a new event to [teamId]'s schedule, or the personal one if null.
   void setSchedule(String? teamId) {
     if (!isNew) return;

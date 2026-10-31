@@ -50,6 +50,33 @@ enum TeamRole {
     player => 'Players',
   };
 
+  /// Community groups call captains organizers and players members.
+  String labelFor(TeamKind kind) => switch ((kind, this)) {
+    (TeamKind.community, captain) => 'Organizer',
+    (TeamKind.community, player) => 'Member',
+    _ => label,
+  };
+
+  String pluralLabelFor(TeamKind kind) => switch ((kind, this)) {
+    (TeamKind.community, captain) => 'Organizers',
+    (TeamKind.community, player) => 'Members',
+    _ => pluralLabel,
+  };
+
+  String summaryFor(TeamKind kind) => switch ((kind, this)) {
+    (TeamKind.community, owner) => 'Everything, including roles',
+    (TeamKind.community, captain) =>
+      'Manage events, tournaments and join requests',
+    (TeamKind.community, player) => 'Join events and tournaments',
+    _ => summary,
+  };
+
+  /// Roles a member can be given; groups have no coaches.
+  static List<TeamRole> rolesFor(TeamKind kind) => switch (kind) {
+    TeamKind.team => values,
+    TeamKind.community => const [owner, captain, player],
+  };
+
   /// What the role can do, for the role picker.
   String get summary => switch (this) {
     owner => 'Everything, including roles and new invite codes',
@@ -58,6 +85,73 @@ enum TeamRole {
     player => 'View only, unless given stats access',
   };
 }
+
+/// A closed team (invite code, roster, stats) or an open community group
+/// anyone can join, with pickup events and tournaments instead.
+enum TeamKind {
+  team('Team'),
+  community('Community group');
+
+  const TeamKind(this.label);
+  final String label;
+}
+
+/// Where a community group plays, shown on a map on its home page.
+class GroupLocation {
+  const GroupLocation({
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final String address;
+  final double latitude;
+  final double longitude;
+
+  static GroupLocation? fromMap(Object? raw) {
+    if (raw is! Map) return null;
+    final lat = raw['lat'];
+    final lng = raw['lng'];
+    if (lat is! num || lng is! num) return null;
+    return GroupLocation(
+      address: '${raw['address'] ?? ''}',
+      latitude: lat.toDouble(),
+      longitude: lng.toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'address': address,
+    'lat': latitude,
+    'lng': longitude,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is GroupLocation &&
+      other.address == address &&
+      other.latitude == latitude &&
+      other.longitude == longitude;
+
+  @override
+  int get hashCode => Object.hash(address, latitude, longitude);
+}
+
+/// The extra details a community group stores on its team doc and
+/// directory listing. Teams store none of them, so their docs don't change.
+Map<String, dynamic> communityFields({
+  required TeamKind kind,
+  required String description,
+  required bool requiresApproval,
+  required GroupLocation? location,
+}) => kind == TeamKind.community
+    ? {
+        'kind': kind.name,
+        'description': description,
+        'requiresApproval': requiresApproval,
+        'location': location?.toMap(),
+      }
+    : {};
 
 enum Division {
   mixed('Mixed'),
@@ -95,6 +189,10 @@ class Team {
     this.usauName,
     this.usauSyncedAt,
     this.createdAt,
+    this.kind = TeamKind.team,
+    this.description = '',
+    this.requiresApproval = false,
+    this.location,
   });
 
   final String id;
@@ -103,6 +201,19 @@ class Team {
   final CompetitionLevel level;
   final String city;
   final String ownerId;
+  final TeamKind kind;
+
+  /// What the group is about, on its home page. Groups only.
+  final String description;
+
+  /// Whether organizers approve each join request. Groups only; teams are
+  /// joined by invite code.
+  final bool requiresApproval;
+
+  /// Where the group plays. Groups only.
+  final GroupLocation? location;
+
+  bool get isCommunity => kind == TeamKind.community;
 
   /// uid → role.
   final Map<String, TeamRole> members;
@@ -137,6 +248,9 @@ class Team {
       roleOf(uid) == TeamRole.player && statKeepers.contains(uid);
 
   String nameOf(String uid) => memberNames[uid] ?? 'Member';
+
+  /// [role]'s label here, e.g. "Organizer" in a group.
+  String roleLabel(TeamRole role) => role.labelFor(kind);
 
   factory Team.fromMap(String id, Map<String, dynamic> map) {
     final rawMembers = (map['members'] as Map?) ?? const {};
@@ -176,16 +290,27 @@ class Team {
       usauName: map['usauName'] as String?,
       usauSyncedAt: parseDate(map['usauSyncedAt']),
       createdAt: parseDate(map['createdAt']),
+      kind: enumByName(TeamKind.values, map['kind'], TeamKind.team),
+      description: map['description'] as String? ?? '',
+      requiresApproval: map['requiresApproval'] as bool? ?? false,
+      location: GroupLocation.fromMap(map['location']),
     );
   }
 
   /// Editable fields only; membership changes go through dedicated
-  /// repository methods so security rules can validate them.
+  /// repository methods so security rules can validate them. The kind is
+  /// set at creation and never changes.
   Map<String, dynamic> toEditableMap() => {
     'name': name,
     'division': division.name,
     'level': level.name,
     'city': city,
+    ...communityFields(
+      kind: kind,
+      description: description,
+      requiresApproval: requiresApproval,
+      location: location,
+    )..remove('kind'),
   };
 
   Team copyWith({
@@ -194,7 +319,11 @@ class Team {
     CompetitionLevel? level,
     String? city,
     Map<String, TeamRole>? members,
+    Map<String, String>? memberNames,
     Set<String>? statKeepers,
+    String? description,
+    bool? requiresApproval,
+    GroupLocation? Function()? location,
   }) => Team(
     id: id,
     name: name ?? this.name,
@@ -203,35 +332,66 @@ class Team {
     city: city ?? this.city,
     ownerId: ownerId,
     members: members ?? this.members,
-    memberNames: memberNames,
+    memberNames: memberNames ?? this.memberNames,
     statKeepers: statKeepers ?? this.statKeepers,
     usauUrl: usauUrl,
     usauName: usauName,
     usauSyncedAt: usauSyncedAt,
     createdAt: createdAt,
+    kind: kind,
+    description: description ?? this.description,
+    requiresApproval: requiresApproval ?? this.requiresApproval,
+    location: location != null ? location() : this.location,
   );
 }
 
-/// Input for creating a team.
+/// Input for creating a team or community group.
 class NewTeam {
   const NewTeam({
     required this.name,
     required this.division,
     required this.level,
     this.city = '',
+    this.kind = TeamKind.team,
+    this.description = '',
+    this.requiresApproval = false,
+    this.location,
   });
 
   final String name;
   final Division division;
   final CompetitionLevel level;
   final String city;
+  final TeamKind kind;
+  final String description;
+  final bool requiresApproval;
+  final GroupLocation? location;
 
   Map<String, dynamic> toMap() => {
     'name': name,
     'division': division.name,
     'level': level.name,
     'city': city,
+    ...communityFields(
+      kind: kind,
+      description: description,
+      requiresApproval: requiresApproval,
+      location: location,
+    ),
   };
+
+  /// The directory listing for the new team, once it has [id].
+  TeamListing listing(String id) => TeamListing(
+    id: id,
+    name: name,
+    division: division,
+    level: level,
+    city: city,
+    kind: kind,
+    description: description,
+    requiresApproval: requiresApproval,
+    location: location,
+  );
 }
 
 /// A team's entry in the public team directory (`teamDirectory/{teamId}`):
@@ -244,6 +404,10 @@ class TeamListing {
     required this.division,
     required this.level,
     this.city = '',
+    this.kind = TeamKind.team,
+    this.description = '',
+    this.requiresApproval = false,
+    this.location,
   });
 
   factory TeamListing.of(Team team) => TeamListing(
@@ -252,6 +416,10 @@ class TeamListing {
     division: team.division,
     level: team.level,
     city: team.city,
+    kind: team.kind,
+    description: team.description,
+    requiresApproval: team.requiresApproval,
+    location: team.location,
   );
 
   final String id;
@@ -259,10 +427,18 @@ class TeamListing {
   final Division division;
   final CompetitionLevel level;
   final String city;
+  final TeamKind kind;
+  final String description;
+  final bool requiresApproval;
+  final GroupLocation? location;
 
-  /// "Mixed · Club · Denver".
-  String get subtitle =>
-      [division.label, level.label, if (city.isNotEmpty) city].join(' · ');
+  bool get isCommunity => kind == TeamKind.community;
+
+  /// "Mixed · Club · Denver", or "Community group · Denver".
+  String get subtitle => [
+    if (isCommunity) kind.label else ...[division.label, level.label],
+    if (city.isNotEmpty) city,
+  ].join(' · ');
 
   /// Whether every word of [query] starts a word of the name or city.
   bool matches(String query) => matchesSearch('$name $city', query);
@@ -273,7 +449,11 @@ class TeamListing {
       name == team.name &&
       division == team.division &&
       level == team.level &&
-      city == team.city;
+      city == team.city &&
+      kind == team.kind &&
+      description == team.description &&
+      requiresApproval == team.requiresApproval &&
+      location == team.location;
 
   factory TeamListing.fromMap(String id, Map<String, dynamic> map) =>
       TeamListing(
@@ -286,6 +466,10 @@ class TeamListing {
           CompetitionLevel.club,
         ),
         city: map['city'] as String? ?? '',
+        kind: enumByName(TeamKind.values, map['kind'], TeamKind.team),
+        description: map['description'] as String? ?? '',
+        requiresApproval: map['requiresApproval'] as bool? ?? false,
+        location: GroupLocation.fromMap(map['location']),
       );
 
   Map<String, dynamic> toMap() => {
@@ -293,6 +477,33 @@ class TeamListing {
     'division': division.name,
     'level': level.name,
     'city': city,
+    ...communityFields(
+      kind: kind,
+      description: description,
+      requiresApproval: requiresApproval,
+      location: location,
+    ),
     'keywords': searchKeywords('$name $city'),
   };
+}
+
+/// Someone asking to join a group that requires approval
+/// (`teams/{id}/joinRequests/{uid}`). Organizers approve or decline it.
+class GroupJoinRequest {
+  const GroupJoinRequest({
+    required this.uid,
+    required this.name,
+    this.createdAt,
+  });
+
+  final String uid;
+  final String name;
+  final DateTime? createdAt;
+
+  factory GroupJoinRequest.fromMap(String uid, Map<String, dynamic> map) =>
+      GroupJoinRequest(
+        uid: uid,
+        name: map['name'] as String? ?? '',
+        createdAt: parseDate(map['createdAt']),
+      );
 }

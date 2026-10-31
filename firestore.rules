@@ -18,6 +18,10 @@ service cloud.firestore {
     function invitePath(teamId) {
       return /databases/$(database)/documents/teams/$(teamId)/private/invite;
     }
+    // A request to join a group that requires approval.
+    function requestPath(teamId, userId) {
+      return /databases/$(database)/documents/teams/$(teamId)/joinRequests/$(userId);
+    }
     // Code a user entered to join; the join() proof.
     function joinPath(teamId, userId) {
       return /databases/$(database)/documents/teams/$(teamId)/joins/$(userId);
@@ -66,7 +70,25 @@ service cloud.firestore {
       return t.name is string && t.name.size() > 0 && t.name.size() <= 80
         && t.division in ['mixed', 'open', 'women', 'masters']
         && t.level in ['club', 'college', 'youth', 'league', 'pickup']
-        && validString(t.city, 80);
+        && validString(t.city, 80)
+        && (!isGroup(t) || validGroupFields(t));
+    }
+
+    // Community groups (kind 'community'): open to anyone, no invite code,
+    // no roster or stats. Teams have no kind field.
+    function isGroup(t) { return t.get('kind', 'team') == 'community'; }
+
+    function validGroupFields(t) {
+      return validString(t.description, 1000)
+        && t.requiresApproval is bool
+        && (t.location == null || validLocation(t.location));
+    }
+
+    function validLocation(l) {
+      return l.keys().hasOnly(['address', 'lat', 'lng'])
+        && validString(l.address, 200)
+        && l.lat is number && l.lat >= -90 && l.lat <= 90
+        && l.lng is number && l.lng >= -180 && l.lng <= 180;
     }
 
     function changed() {
@@ -83,7 +105,7 @@ service cloud.firestore {
     // What every event has, including public copies (no poll or responses).
     function validEventDetails(e) {
       return e.title is string && e.title.size() > 0 && e.title.size() <= 100
-        && e.type in ['practice', 'game', 'tournament', 'scrimmage', 'workout', 'social', 'other']
+        && e.type in ['practice', 'game', 'tournament', 'scrimmage', 'workout', 'social', 'other', 'pickup']
         && e.startsAt is timestamp
         && (e.endsAt == null || (e.endsAt is timestamp && e.endsAt >= e.startsAt))
         && validString(e.location, 200)
@@ -179,18 +201,72 @@ service cloud.firestore {
         && request.resource.data.memberNames.keys().hasOnly([uid()])
         && getAfter(codePath(getAfter(invitePath(teamId)).data.code)).data.teamId == teamId;
 
+      // A community group: same owner checks, plus its group fields, and
+      // no invite code since anyone can find and join it.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'name', 'division', 'level', 'city', 'ownerId', 'members',
+             'memberIds', 'memberNames', 'createdAt', 'kind', 'description',
+             'requiresApproval', 'location'])
+        && request.resource.data.kind == 'community'
+        && validTeamFields(request.resource.data)
+        && request.resource.data.ownerId == uid()
+        && request.resource.data.members == {(uid()): 'owner'}
+        && request.resource.data.memberIds == [uid()]
+        && request.resource.data.memberNames.keys().hasOnly([uid()]);
+
       allow update: if signedIn() && (
         editDetails() || linkUsau() || dropLegacyCode() || changeRole() ||
         setStatKeepers() || transferOwnership() || removeMember() || join() ||
-        markDeleting()
+        joinOpenGroup() || approveRequest() || markDeleting()
       );
 
       allow delete: if signedIn() && resource.data.ownerId == uid();
 
+      // The kind never changes, and only groups have group fields.
       function editDetails() {
         return isEditor(resource.data)
-          && changed().hasOnly(['name', 'division', 'level', 'city'])
+          && changed().hasOnly(isGroup(resource.data)
+               ? ['name', 'division', 'level', 'city', 'description',
+                  'requiresApproval', 'location']
+               : ['name', 'division', 'level', 'city'])
           && validTeamFields(request.resource.data);
+      }
+
+      // `uid` (and only them) is added as a player, with a display name.
+      function addsOnly(userId) {
+        let diff = request.resource.data.members.diff(resource.data.members);
+        return changed().hasOnly(['members', 'memberIds', 'memberNames'])
+          && !(userId in resource.data.memberIds)
+          && diff.addedKeys() == [userId].toSet()
+          && diff.changedKeys().size() == 0
+          && diff.removedKeys().size() == 0
+          && request.resource.data.members[userId] == 'player'
+          && request.resource.data.memberIds.toSet()
+               == resource.data.memberIds.toSet().union([userId].toSet())
+          && request.resource.data.memberNames.diff(resource.data.memberNames)
+               .affectedKeys().hasOnly([userId])
+          && validString(request.resource.data.memberNames[userId], 80);
+      }
+
+      // Anyone joins an open group by adding themself.
+      function joinOpenGroup() {
+        return isGroup(resource.data)
+          && !resource.data.requiresApproval
+          && addsOnly(uid());
+      }
+
+      // Owners and organizers add someone who asked to join, deleting the
+      // request in the same batch.
+      function approveRequest() {
+        let added = request.resource.data.memberIds
+          .removeAll(resource.data.memberIds);
+        return isGroup(resource.data)
+          && isEditor(resource.data)
+          && added.size() == 1
+          && addsOnly(added[0])
+          && exists(requestPath(teamId, added[0]))
+          && !existsAfter(requestPath(teamId, added[0]));
       }
 
       // Owner stamps the team just before deleting it, so the notification
@@ -236,6 +312,8 @@ service cloud.firestore {
           && diff.changedKeys().size() == 1
           && !(resource.data.ownerId in diff.changedKeys())
           && roles.hasOnly(['owner', 'coach', 'captain', 'stats', 'player'])
+          // Groups have organizers (captain) and members, no coaches.
+          && (!isGroup(resource.data) || !('coach' in roles))
           && roles.removeAll(['coach', 'captain', 'stats', 'player']).size() == 1
           // No new "stats" roles; that's statKeepers now.
           && roles.removeAll(['stats']).size()
@@ -333,6 +411,23 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['code'])
           && validString(request.resource.data.code, 12);
         allow delete: if signedIn() && isOwner(get(teamPath(teamId)).data);
+      }
+
+      // Requests to join a group that requires approval. Each user writes
+      // only their own; owners and organizers read them and approve
+      // (approveRequest) or decline (delete) them.
+      match /joinRequests/{userId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        allow read: if signedIn() && (uid() == userId || isEditor(team()));
+        allow create: if signedIn() && uid() == userId
+          && isGroup(team())
+          && team().requiresApproval
+          && !isMember(team())
+          && request.resource.data.keys().hasOnly(['name', 'createdAt'])
+          && validString(request.resource.data.name, 80)
+          && request.resource.data.createdAt == request.time;
+        allow delete: if signedIn() && (uid() == userId || isEditor(team()));
       }
 
       // What every member sees: name, number, position. Payment and USA
@@ -878,11 +973,17 @@ service cloud.firestore {
     // covers the create and edit batches.
     match /teamDirectory/{teamId} {
       function validListing(d, team) {
-        return d.keys().hasOnly(['name', 'division', 'level', 'city', 'keywords'])
+        return d.keys().hasOnly([
+                 'name', 'division', 'level', 'city', 'keywords', 'kind',
+                 'description', 'requiresApproval', 'location'])
           && d.name == team.name
           && d.division == team.division
           && d.level == team.level
           && d.city == team.get('city', '')
+          && d.get('kind', 'team') == team.get('kind', 'team')
+          && d.get('description', '') == team.get('description', '')
+          && d.get('requiresApproval', false) == team.get('requiresApproval', false)
+          && d.get('location', null) == team.get('location', null)
           && d.keywords is list && d.keywords.size() <= 100;
       }
 

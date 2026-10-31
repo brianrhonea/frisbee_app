@@ -85,6 +85,7 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
                   saving: vm.save.running,
                   submitLabel: vm.isNew ? 'Create event' : 'Save',
                   allowPoll: !vm.isPersonal,
+                  types: vm.types,
                   schedulePicker: vm.canChooseSchedule
                       ? _SchedulePicker(viewModel: vm)
                       : null,
@@ -102,9 +103,13 @@ class _EventForm extends StatefulWidget {
     required this.saving,
     required this.submitLabel,
     required this.onSubmit,
+    required this.types,
     this.allowPoll = true,
     this.schedulePicker,
   });
+
+  /// Types to choose from; groups and teams offer different ones.
+  final List<EventType> types;
 
   final TeamEvent initial;
   final bool saving;
@@ -132,7 +137,12 @@ class _EventFormState extends State<_EventForm> {
   late final _title = TextEditingController(text: widget.initial.title);
   late final _location = TextEditingController(text: widget.initial.location);
   late final _notes = TextEditingController(text: widget.initial.notes);
-  late EventType _type = widget.initial.type;
+  late EventType _picked = widget.initial.type;
+
+  /// The picked type, or the schedule's first one when the picked type
+  /// isn't offered there (e.g. Practice after switching to a group).
+  EventType get _type =>
+      widget.types.contains(_picked) ? _picked : widget.types.first;
   late DateTime _day = DateUtils.dateOnly(widget.initial.startsAt);
   late TimeOfDay _start = TimeOfDay.fromDateTime(widget.initial.startsAt);
   late TimeOfDay? _end = widget.initial.endsAt == null
@@ -262,12 +272,12 @@ class _EventFormState extends State<_EventForm> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final t in EventType.editable)
+              for (final t in widget.types)
                 ChoiceChip(
                   avatar: Icon(t.icon, size: 18),
                   label: Text(t.label),
                   selected: _type == t,
-                  onSelected: (_) => setState(() => _type = t),
+                  onSelected: (_) => setState(() => _picked = t),
                 ),
             ],
           ),
@@ -514,6 +524,8 @@ class _SchedulePicker extends StatelessWidget {
         Text(
           vm.isPersonal
               ? 'Only you will see this event.'
+              : vm.isCommunity
+              ? 'Everyone in the group will see this event and can RSVP.'
               : 'Everyone on the team will see this event and can RSVP.',
           style: Theme.of(context).textTheme.bodySmall,
         ),

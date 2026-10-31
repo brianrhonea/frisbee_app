@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
+import '../domain/models/model_utils.dart';
+import '../domain/models/team.dart';
 import '../ui/auth/view_models/sign_in_viewmodel.dart';
 import '../ui/auth/view_models/sign_up_viewmodel.dart';
 import '../ui/auth/widgets/sign_in_screen.dart';
@@ -482,12 +484,19 @@ GoRouter router(AuthRepository auth) => GoRouter(
               routes: [
                 GoRoute(
                   path: 'new',
-                  builder: (_, _) => ViewModelHost(
+                  builder: (_, state) => ViewModelHost(
                     create: (c) => CreateTeamViewModel(
                       teamRepository: c.read(),
                       authRepository: c.read(),
                     ),
-                    builder: (_, vm) => CreateTeamScreen(viewModel: vm),
+                    builder: (_, vm) => CreateTeamScreen(
+                      viewModel: vm,
+                      kind: enumByName(
+                        TeamKind.values,
+                        state.uri.queryParameters['kind'],
+                        TeamKind.team,
+                      ),
+                    ),
                   ),
                 ),
                 GoRoute(

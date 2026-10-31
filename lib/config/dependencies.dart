@@ -35,6 +35,7 @@ import '../data/repositories/usau_team/usau_team_repository_usau.dart';
 import '../data/services/attachment_storage.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/file_picker_service.dart';
+import '../data/services/geocoding_service.dart';
 import '../data/services/meeting_call.dart';
 import '../data/services/meeting_call_livekit.dart';
 import '../data/services/meeting_presence.dart';
@@ -66,6 +67,7 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),
   Provider<YouTubeInfoService>(create: (_) => YouTubeInfoService()),
+  Provider<GeocodingService>(create: (_) => GeocodingService()),
   Provider<ChatRepository>(
     create: (context) =>
         ChatRepositoryFirebase(attachments: context.read<AttachmentStorage>()),

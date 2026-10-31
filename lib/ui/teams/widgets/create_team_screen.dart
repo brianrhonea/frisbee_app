@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
@@ -8,9 +9,14 @@ import '../view_models/create_team_viewmodel.dart';
 import 'team_form.dart';
 
 class CreateTeamScreen extends StatefulWidget {
-  const CreateTeamScreen({super.key, required this.viewModel});
+  const CreateTeamScreen({
+    super.key,
+    required this.viewModel,
+    this.kind = TeamKind.team,
+  });
 
   final CreateTeamViewModel viewModel;
+  final TeamKind kind;
 
   @override
   State<CreateTeamScreen> createState() => _CreateTeamScreenState();
@@ -46,7 +52,13 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('New team')),
+      appBar: AppBar(
+        title: Text(
+          widget.kind == TeamKind.community
+              ? 'New community group'
+              : 'New team',
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Center(
@@ -55,7 +67,10 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
             child: ListenableBuilder(
               listenable: widget.viewModel.create,
               builder: (context, _) => TeamForm(
-                submitLabel: 'Create team',
+                kind: widget.kind,
+                submitLabel: widget.kind == TeamKind.community
+                    ? 'Create group'
+                    : 'Create team',
                 busy: widget.viewModel.create.running,
                 onSubmit: widget.viewModel.create.execute,
               ),

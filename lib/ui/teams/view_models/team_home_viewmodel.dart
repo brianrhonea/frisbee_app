@@ -38,6 +38,10 @@ class TeamHomeViewModel extends ChangeNotifier {
     savePost = Command1<void, PostDraft>(_savePost);
     deletePost = Command1<void, String>((id) => _posts.deletePost(teamId, id));
     joinTeam = Command1<String, String>(_joinTeam);
+    joinGroup = Command0<void>(_joinGroup);
+    cancelJoinRequest = Command0<void>(
+      () => _teams.cancelJoinRequest(teamId, uid),
+    );
 
     _listingSub = _teams
         .watchListing(teamId)
@@ -104,8 +108,31 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   void _onChange() {
     _watchContent();
+    _watchRequest();
     _publishListing();
     notifyListeners();
+  }
+
+  StreamSubscription<bool>? _requestSub;
+  bool _requestPending = false;
+
+  /// Watches the user's own join request while they're outside a group
+  /// that needs approval.
+  void _watchRequest() {
+    final want =
+        loaded &&
+        !isMember &&
+        (summary?.isCommunity ?? false) &&
+        (summary?.requiresApproval ?? false);
+    if (want == (_requestSub != null)) return;
+    _requestSub?.cancel();
+    _requestSub = null;
+    _requestPending = false;
+    if (!want) return;
+    _requestSub = _teams.watchMyJoinRequest(teamId, uid).listen((pending) {
+      _requestPending = pending;
+      notifyListeners();
+    }, onError: (Object _) {});
   }
 
   /// (Re)subscribes to events and posts once membership is known, and
@@ -159,6 +186,12 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   bool get isMember => _team != null;
 
+  /// A community group rather than a team.
+  bool get isGroup => summary?.isCommunity ?? false;
+
+  /// The user asked to join this group and is waiting for approval.
+  bool get requestPending => _requestPending;
+
   /// Name, division, level and city: from the team for members, else the
   /// public listing. Null if the team doesn't exist (or isn't listed).
   TeamListing? get summary => switch (_team) {
@@ -209,6 +242,23 @@ class TeamHomeViewModel extends ChangeNotifier {
   /// Joins with an invite code; the result is the joined team's id, which
   /// may be another team if the code is for one.
   late final Command1<String, String> joinTeam;
+
+  /// Joins an open group, or asks to join one that needs approval.
+  late final Command0<void> joinGroup;
+
+  /// Withdraws a pending join request.
+  late final Command0<void> cancelJoinRequest;
+
+  Future<Result<void>> _joinGroup() async {
+    final me = _auth.currentUser;
+    final listing = summary;
+    if (me == null) return Result.error(Exception('Not signed in'));
+    if (listing == null) return Result.error(Exception('Group not found'));
+    if (listing.requiresApproval) return _teams.requestToJoin(teamId, me);
+    final result = await _teams.joinGroup(teamId, me);
+    if (result is Ok) _watchTeam();
+    return result;
+  }
 
   Future<Result<void>> _deleteTeam() async {
     final t = _team;
@@ -269,6 +319,7 @@ class TeamHomeViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _listingSub.cancel();
+    _requestSub?.cancel();
     _teamSub?.cancel();
     _eventsSub?.cancel();
     _postsSub?.cancel();

@@ -112,8 +112,40 @@ class TeamRepositoryFirebase implements TeamRepository {
       .snapshots()
       .map((d) => d.exists ? Team.fromMap(d.id, plainData(d.data())) : null);
 
+  CollectionReference<Map<String, dynamic>> _requests(String teamId) =>
+      _teams.doc(teamId).collection('joinRequests');
+
+  Map<String, dynamic> _teamDoc(NewTeam team, AppUser owner) => {
+    ...team.toMap(),
+    'ownerId': owner.uid,
+    'members': {owner.uid: TeamRole.owner.name},
+    'memberIds': [owner.uid],
+    'memberNames': {owner.uid: owner.label},
+    'createdAt': FieldValue.serverTimestamp(),
+  };
+
   @override
   Future<Result<String>> createTeam(NewTeam team, AppUser owner) =>
+      team.kind == TeamKind.community
+      ? _createGroup(team, owner)
+      : _createTeam(team, owner);
+
+  /// Groups are joined from the directory, so they get no invite code.
+  Future<Result<String>> _createGroup(NewTeam team, AppUser owner) =>
+      guard(() async {
+        final ref = _teams.doc();
+        await (_db.batch()
+              ..set(ref, _teamDoc(team, owner))
+              ..set(_directory.doc(ref.id), team.listing(ref.id).toMap())
+              ..set(
+                chatRooms(_db, ref.id).doc(ChatRoom.generalId),
+                newRoomData(ChatRoom.general(), owner.uid),
+              ))
+            .commit();
+        return ref.id;
+      });
+
+  Future<Result<String>> _createTeam(NewTeam team, AppUser owner) =>
       guard(() async {
         // Retry on the (unlikely) event of an invite code collision, which
         // surfaces as permission-denied because codes can't be overwritten.
@@ -121,24 +153,8 @@ class TeamRepositoryFirebase implements TeamRepository {
           final ref = _teams.doc();
           final code = _newCode();
           final batch = _db.batch()
-            ..set(ref, {
-              ...team.toMap(),
-              'ownerId': owner.uid,
-              'members': {owner.uid: TeamRole.owner.name},
-              'memberIds': [owner.uid],
-              'memberNames': {owner.uid: owner.label},
-              'createdAt': FieldValue.serverTimestamp(),
-            })
-            ..set(
-              _directory.doc(ref.id),
-              TeamListing(
-                id: ref.id,
-                name: team.name,
-                division: team.division,
-                level: team.level,
-                city: team.city,
-              ).toMap(),
-            )
+            ..set(ref, _teamDoc(team, owner))
+            ..set(_directory.doc(ref.id), team.listing(ref.id).toMap())
             ..set(_invite(ref.id), {'code': code})
             ..set(_codes.doc(code), {'teamId': ref.id})
             ..set(
@@ -166,14 +182,70 @@ class TeamRepositoryFirebase implements TeamRepository {
         // the team's current invite code, without putting it on the team.
         await (_db.batch()
               ..set(_join(teamId, user.uid), {'code': code})
-              ..update(_teams.doc(teamId), {
-                'members.${user.uid}': TeamRole.player.name,
-                'memberNames.${user.uid}': user.label,
-                'memberIds': FieldValue.arrayUnion([user.uid]),
-              }))
+              ..update(_teams.doc(teamId), _newMember(user)))
             .commit();
         return teamId;
       });
+
+  Map<String, dynamic> _newMember(AppUser user) => {
+    'members.${user.uid}': TeamRole.player.name,
+    'memberNames.${user.uid}': user.label,
+    'memberIds': FieldValue.arrayUnion([user.uid]),
+  };
+
+  @override
+  Future<Result<void>> joinGroup(String teamId, AppUser user) =>
+      guard(() => _teams.doc(teamId).update(_newMember(user)));
+
+  @override
+  Future<Result<void>> requestToJoin(String teamId, AppUser user) => guard(
+    () => _requests(teamId).doc(user.uid).set({
+      'name': user.label,
+      'createdAt': FieldValue.serverTimestamp(),
+    }),
+  );
+
+  @override
+  Future<Result<void>> cancelJoinRequest(String teamId, String uid) =>
+      guard(() => _requests(teamId).doc(uid).delete());
+
+  @override
+  Stream<bool> watchMyJoinRequest(String teamId, String uid) =>
+      _requests(teamId).doc(uid).snapshots().map((d) => d.exists);
+
+  @override
+  Stream<List<GroupJoinRequest>> watchJoinRequests(String teamId) =>
+      _requests(teamId)
+          .orderBy('createdAt')
+          .snapshots()
+          .map(
+            (snap) => [
+              for (final d in snap.docs)
+                GroupJoinRequest.fromMap(d.id, plainData(d.data())),
+            ],
+          );
+
+  @override
+  Future<Result<void>> approveJoinRequest(
+    String teamId,
+    GroupJoinRequest request,
+  ) => guard(
+    () =>
+        (_db.batch()
+              ..update(_teams.doc(teamId), {
+                'members.${request.uid}': TeamRole.player.name,
+                'memberNames.${request.uid}': request.name.isEmpty
+                    ? 'Member'
+                    : request.name,
+                'memberIds': FieldValue.arrayUnion([request.uid]),
+              })
+              ..delete(_requests(teamId).doc(request.uid)))
+            .commit(),
+  );
+
+  @override
+  Future<Result<void>> declineJoinRequest(String teamId, String uid) =>
+      guard(() => _requests(teamId).doc(uid).delete());
 
   @override
   Future<Result<void>> updateTeam(Team team) => guard(
@@ -368,6 +440,7 @@ class TeamRepositoryFirebase implements TeamRepository {
         'videoFolders',
         'statsTournaments',
         'statsGames',
+        'joinRequests',
         'private',
       ]) {
         final docs = await ref.collection(sub).get();

@@ -16,6 +16,29 @@ abstract class TeamRepository {
   /// Joins the team with [inviteCode] as a player. Returns the team id.
   Future<Result<String>> joinTeam(String inviteCode, AppUser user);
 
+  /// Joins an open community group as a member, no code needed.
+  Future<Result<void>> joinGroup(String teamId, AppUser user);
+
+  /// Asks to join a group that requires approval.
+  Future<Result<void>> requestToJoin(String teamId, AppUser user);
+
+  /// Withdraws the user's own join request.
+  Future<Result<void>> cancelJoinRequest(String teamId, String uid);
+
+  /// Whether [uid] has a pending request to join [teamId].
+  Stream<bool> watchMyJoinRequest(String teamId, String uid);
+
+  /// Pending join requests, oldest first. Owners and organizers only.
+  Stream<List<GroupJoinRequest>> watchJoinRequests(String teamId);
+
+  /// Adds the requester as a member and clears the request.
+  Future<Result<void>> approveJoinRequest(
+    String teamId,
+    GroupJoinRequest request,
+  );
+
+  Future<Result<void>> declineJoinRequest(String teamId, String uid);
+
   /// Saves the team's details and its public directory listing.
   Future<Result<void>> updateTeam(Team team);
 

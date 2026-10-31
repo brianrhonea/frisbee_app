@@ -182,6 +182,7 @@ const eventTypes: Record<string, string> = {
   workout: "Workout",
   social: "Social",
   other: "Event",
+  pickup: "Pickup",
 };
 const typeLabel = (e: Data) => eventTypes[String(e.type)] ?? "Event";
 const eventTitle = (e: Data) => String(e.title ?? "") || typeLabel(e);

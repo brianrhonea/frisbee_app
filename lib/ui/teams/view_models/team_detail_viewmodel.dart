@@ -59,6 +59,12 @@ class TeamDetailViewModel extends ChangeNotifier {
       (uid) => _teams.removeMember(teamId, uid),
     );
     deletePlay = Command1<void, String>((id) => _plays.deletePlay(teamId, id));
+    approveJoinRequest = Command1<void, GroupJoinRequest>(
+      (r) => _teams.approveJoinRequest(teamId, r),
+    );
+    declineJoinRequest = Command1<void, String>(
+      (uid) => _teams.declineJoinRequest(teamId, uid),
+    );
 
     _subs = [
       _teams.watchTeam(teamId).listen((t) {
@@ -66,6 +72,7 @@ class TeamDetailViewModel extends ChangeNotifier {
         _teamLoaded = true;
         _watchRoster();
         _watchInviteCode();
+        _watchJoinRequests();
         _watchMeetings();
         notifyListeners();
       }, onError: _onError),
@@ -99,7 +106,8 @@ class TeamDetailViewModel extends ChangeNotifier {
 
   /// Only admins may read the code, so watch it only while the role allows.
   void _watchInviteCode() {
-    if (_team != null && canShareCode) {
+    // Groups are joined from the directory; they have no code.
+    if (_team != null && canShareCode && !_team!.isCommunity) {
       _inviteSub ??= _teams.watchInviteCode(teamId).listen((c) {
         _inviteCode = c;
         notifyListeners();
@@ -108,6 +116,30 @@ class TeamDetailViewModel extends ChangeNotifier {
       _inviteSub?.cancel();
       _inviteSub = null;
       _inviteCode = null;
+    }
+  }
+
+  StreamSubscription<List<GroupJoinRequest>>? _requestSub;
+  List<GroupJoinRequest> _joinRequests = const [];
+
+  /// People asking to join the group, for owners and organizers.
+  List<GroupJoinRequest> get joinRequests => _joinRequests;
+
+  late final Command1<void, GroupJoinRequest> approveJoinRequest;
+  late final Command1<void, String> declineJoinRequest;
+
+  /// Only owners and organizers may read join requests.
+  void _watchJoinRequests() {
+    final team = _team;
+    if (team != null && team.isCommunity && canEdit) {
+      _requestSub ??= _teams.watchJoinRequests(teamId).listen((r) {
+        _joinRequests = r;
+        notifyListeners();
+      }, onError: (Object _) => _joinRequests = const []);
+    } else if (_requestSub != null) {
+      _requestSub?.cancel();
+      _requestSub = null;
+      _joinRequests = const [];
     }
   }
 
@@ -274,6 +306,7 @@ class TeamDetailViewModel extends ChangeNotifier {
     }
     _rosterSub?.cancel();
     _inviteSub?.cancel();
+    _requestSub?.cancel();
     _meetingSub?.cancel();
     super.dispose();
   }

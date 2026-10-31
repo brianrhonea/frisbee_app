@@ -12,6 +12,7 @@ import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
+import '../../groups/widgets/group_map.dart';
 import '../../schedule/widgets/event_style.dart';
 import '../../schedule/widgets/team_events_tab.dart';
 import '../view_models/team_home_viewmodel.dart';
@@ -42,6 +43,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     vm.deleteTeam,
     vm.savePost,
     vm.deletePost,
+    vm.joinGroup,
+    vm.cancelJoinRequest,
   ];
 
   @override
@@ -106,7 +109,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         final updated = await showDialog<NewTeam>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Edit team'),
+            title: Text(team.isCommunity ? 'Edit group' : 'Edit team'),
             content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
@@ -117,6 +120,10 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                     division: team.division,
                     level: team.level,
                     city: team.city,
+                    kind: team.kind,
+                    description: team.description,
+                    requiresApproval: team.requiresApproval,
+                    location: team.location,
                   ),
                   onSubmit: (t) => Navigator.pop(context, t),
                 ),
@@ -131,6 +138,9 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
               division: updated.division,
               level: updated.level,
               city: updated.city,
+              description: updated.description,
+              requiresApproval: updated.requiresApproval,
+              location: () => updated.location,
             ),
           );
         }
@@ -138,7 +148,11 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         if (await confirmDialog(
           context,
           title: 'Leave ${team.name}?',
-          message: 'You will need a new invite code to rejoin.',
+          message: switch ((team.isCommunity, team.requiresApproval)) {
+            (false, _) => 'You will need a new invite code to rejoin.',
+            (true, true) => 'To rejoin, you will need to ask again.',
+            (true, false) => 'You can rejoin from the group page any time.',
+          },
           confirmLabel: 'Leave',
           destructive: true,
         )) {
@@ -148,9 +162,11 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         if (await confirmDialog(
           context,
           title: 'Delete ${team.name}?',
-          message:
-              'This permanently deletes the team, its roster, events, '
-              'posts and playbook.',
+          message: team.isCommunity
+              ? 'This permanently deletes the group, its events, '
+                    'tournaments, chat and posts.'
+              : 'This permanently deletes the team, its roster, events, '
+                    'posts and playbook.',
           confirmLabel: 'Delete',
           destructive: true,
         )) {
@@ -198,7 +214,13 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([vm, vm.joinTeam, vm.savePost]),
+      listenable: Listenable.merge([
+        vm,
+        vm.joinTeam,
+        vm.joinGroup,
+        vm.cancelJoinRequest,
+        vm.savePost,
+      ]),
       builder: (context, _) {
         final leading = backOr(context, Routes.teams);
         final summary = vm.summary;
@@ -219,6 +241,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           );
         }
         final team = vm.team;
+        final noun = summary.isCommunity ? 'group' : 'team';
+        final location = summary.location;
         return Scaffold(
           appBar: AppBar(
             leading: leading,
@@ -229,19 +253,19 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                   onSelected: (a) => _onMenu(a, team),
                   itemBuilder: (_) => [
                     if (vm.canEdit)
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: _MenuAction.edit,
-                        child: Text('Edit team'),
+                        child: Text('Edit $noun'),
                       ),
                     if (!vm.isOwner)
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: _MenuAction.leave,
-                        child: Text('Leave team'),
+                        child: Text('Leave $noun'),
                       ),
                     if (vm.isOwner)
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: _MenuAction.delete,
-                        child: Text('Delete team'),
+                        child: Text('Delete $noun'),
                       ),
                   ],
                 ),
@@ -264,15 +288,32 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                     child: LinearProgressIndicator(),
                   ),
                 _Header(viewModel: vm, summary: summary),
+                if (summary.description.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(summary.description),
+                ],
                 const SizedBox(height: 16),
                 if (vm.isMember)
                   _SectionGrid(
                     teamId: vm.teamId,
+                    kind: summary.kind,
                     upcomingCount: vm.upcomingEvents.length,
                     memberCount: vm.memberCount,
                   )
+                else if (summary.isCommunity)
+                  _GroupJoinCard(
+                    requiresApproval: summary.requiresApproval,
+                    pending: vm.requestPending,
+                    busy: vm.joinGroup.running || vm.cancelJoinRequest.running,
+                    onJoin: vm.joinGroup.execute,
+                    onCancel: vm.cancelJoinRequest.execute,
+                  )
                 else
                   _JoinCard(joining: vm.joinTeam.running, onJoin: _join),
+                if (location != null) ...[
+                  const SizedBox(height: 16),
+                  GroupMapCard(location: location),
+                ],
                 if (vm.contentError != null) ...[
                   const SizedBox(height: 16),
                   Text(
@@ -331,9 +372,12 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     final posts = vm.posts;
     if (posts.isEmpty && !vm.isMember) {
       return vm.upcomingEvents.isEmpty
-          ? const [
-              SizedBox(height: 24),
-              _Note("This team hasn't shared anything publicly yet."),
+          ? [
+              const SizedBox(height: 24),
+              _Note(
+                "This ${vm.isGroup ? 'group' : 'team'} hasn't shared "
+                'anything publicly yet.',
+              ),
             ]
           : const [];
     }
@@ -377,10 +421,12 @@ class _Header extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 32,
-          child: Text(
-            summary.name.isEmpty ? '?' : summary.name[0].toUpperCase(),
-            style: theme.textTheme.headlineSmall,
-          ),
+          child: summary.isCommunity
+              ? const Icon(Icons.diversity_3_outlined, size: 32)
+              : Text(
+                  summary.name.isEmpty ? '?' : summary.name[0].toUpperCase(),
+                  style: theme.textTheme.headlineSmall,
+                ),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -399,7 +445,7 @@ class _Header extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   [
-                    'You: ${role.label}',
+                    'You: ${role.labelFor(summary.kind)}',
                     '$count ${count == 1 ? 'member' : 'members'}',
                   ].join(' · '),
                   style: theme.textTheme.bodySmall,
@@ -417,11 +463,13 @@ class _Header extends StatelessWidget {
 class _SectionGrid extends StatelessWidget {
   const _SectionGrid({
     required this.teamId,
+    required this.kind,
     required this.upcomingCount,
     required this.memberCount,
   });
 
   final String teamId;
+  final TeamKind kind;
   final int upcomingCount;
   final int memberCount;
 
@@ -443,11 +491,12 @@ class _SectionGrid extends StatelessWidget {
           spacing: spacing,
           runSpacing: spacing,
           children: [
-            for (final s in TeamSection.values)
+            for (final s in TeamSection.forKind(kind))
               SizedBox(
                 width: width,
                 child: _SectionTile(
                   section: s,
+                  label: s.labelFor(kind),
                   caption: _caption(s),
                   onTap: () => context.go(s.route(teamId)),
                 ),
@@ -462,11 +511,13 @@ class _SectionGrid extends StatelessWidget {
 class _SectionTile extends StatelessWidget {
   const _SectionTile({
     required this.section,
+    required this.label,
     required this.onTap,
     this.caption,
   });
 
   final TeamSection section;
+  final String label;
   final String? caption;
   final VoidCallback onTap;
 
@@ -486,7 +537,7 @@ class _SectionTile extends StatelessWidget {
               Icon(section.icon, color: scheme.primary),
               const SizedBox(height: 6),
               Text(
-                section.label,
+                label,
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -531,6 +582,64 @@ class _JoinCard extends StatelessWidget {
             onPressed: joining ? null : onJoin,
             child: const Text('Join'),
           ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Join (or ask to join) a community group.
+class _GroupJoinCard extends StatelessWidget {
+  const _GroupJoinCard({
+    required this.requiresApproval,
+    required this.pending,
+    required this.busy,
+    required this.onJoin,
+    required this.onCancel,
+  });
+
+  final bool requiresApproval;
+  final bool pending;
+  final bool busy;
+  final VoidCallback onJoin;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Icon(
+            pending
+                ? Icons.hourglass_top
+                : (requiresApproval
+                      ? Icons.how_to_reg_outlined
+                      : Icons.group_add_outlined),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(switch ((pending, requiresApproval)) {
+              (true, _) => 'Request sent. An organizer will let you in soon.',
+              (false, true) =>
+                'Organizers approve new members. Ask to join to see '
+                    'members, events and tournaments.',
+              (false, false) =>
+                'Join to see members, chat, and sign up for pickup and '
+                    'tournaments.',
+            }),
+          ),
+          const SizedBox(width: 12),
+          if (pending)
+            OutlinedButton(
+              onPressed: busy ? null : onCancel,
+              child: const Text('Cancel request'),
+            )
+          else
+            FilledButton(
+              onPressed: busy ? null : onJoin,
+              child: Text(requiresApproval ? 'Ask to join' : 'Join'),
+            ),
         ],
       ),
     ),

@@ -23,7 +23,13 @@ class TeamsViewModel extends ChangeNotifier {
   StreamSubscription<List<Team>>? _sub;
 
   List<Team> _items = const [];
-  List<Team> get teams => _items;
+
+  /// Everything the user is on, teams and groups.
+  List<Team> get all => _items;
+
+  List<Team> get teams => _items.where((t) => !t.isCommunity).toList();
+
+  List<Team> get groups => _items.where((t) => t.isCommunity).toList();
 
   bool _loading = true;
   bool get loading => _loading;

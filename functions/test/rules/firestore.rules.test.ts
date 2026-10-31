@@ -179,6 +179,173 @@ describe("join", () => {
   });
 });
 
+describe("community groups", () => {
+  const GROUP = "group1";
+  const ORGANIZER = "organizer";
+  const MEMBER = "member";
+
+  const setGroup = (requiresApproval: boolean) =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "teams", GROUP), {
+        name: "Pickup Crew",
+        division: "mixed",
+        level: "pickup",
+        city: "Denver",
+        kind: "community",
+        description: "Sunday pickup",
+        requiresApproval,
+        location: { address: "City Park", lat: 39.75, lng: -104.95 },
+        ownerId: OWNER,
+        members: { [OWNER]: "owner", [ORGANIZER]: "captain", [MEMBER]: "player" },
+        memberIds: [OWNER, ORGANIZER, MEMBER],
+        memberNames: { [OWNER]: "O", [ORGANIZER]: "G", [MEMBER]: "M" },
+      });
+    });
+
+  const joinUpdate = (uid = OUTSIDER, role = "player") => ({
+    [`members.${uid}`]: role,
+    [`memberNames.${uid}`]: "Newbie",
+    memberIds: arrayUnion(uid),
+  });
+
+  const groupDoc = (extra: Record<string, unknown> = {}) => ({
+    name: "New Group",
+    division: "mixed",
+    level: "pickup",
+    city: "",
+    kind: "community",
+    description: "",
+    requiresApproval: false,
+    location: null,
+    ownerId: OUTSIDER,
+    members: { [OUTSIDER]: "owner" },
+    memberIds: [OUTSIDER],
+    memberNames: { [OUTSIDER]: "Me" },
+    ...extra,
+  });
+
+  it("anyone creates a group without an invite code", async () => {
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "g2"), groupDoc()));
+    // A team still needs one.
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t2"), groupDoc({ kind: "team" })));
+  });
+
+  it("validates group fields", async () => {
+    const fs = db(OUTSIDER);
+    await assertFails(setDoc(doc(fs, "teams", "g2"), groupDoc({ description: "x".repeat(1001) })));
+    await assertFails(setDoc(doc(fs, "teams", "g2"), groupDoc({ requiresApproval: "no" })));
+    await assertFails(setDoc(doc(fs, "teams", "g2"), groupDoc({ location: { address: "", lat: 91, lng: 0 } })));
+    await assertFails(setDoc(doc(fs, "teams", "g2"), groupDoc({ members: { [OUTSIDER]: "owner", x: "player" } })));
+    await assertSucceeds(
+      setDoc(doc(fs, "teams", "g2"), groupDoc({ location: { address: "Park", lat: 40, lng: -105 } })),
+    );
+  });
+
+  it("anyone joins an open group as a member, only themself", async () => {
+    await setGroup(false);
+    await assertFails(updateDoc(doc(db(OUTSIDER), "teams", GROUP), joinUpdate(OUTSIDER, "captain")));
+    await assertFails(updateDoc(doc(db(OUTSIDER), "teams", GROUP), joinUpdate("someoneElse")));
+    await assertSucceeds(updateDoc(doc(db(OUTSIDER), "teams", GROUP), joinUpdate()));
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "teams", GROUP)));
+  });
+
+  it("an open join doesn't work on a team", async () => {
+    await assertFails(updateDoc(doc(db(OUTSIDER), "teams", TEAM), joinUpdate()));
+  });
+
+  it("approval groups need a request an organizer approves", async () => {
+    await setGroup(true);
+    await assertFails(updateDoc(doc(db(OUTSIDER), "teams", GROUP), joinUpdate()));
+
+    const request = doc(db(OUTSIDER), "teams", GROUP, "joinRequests", OUTSIDER);
+    await assertFails(setDoc(request, { name: "x".repeat(81), createdAt: serverTimestamp() }));
+    await assertSucceeds(setDoc(request, { name: "Newbie", createdAt: serverTimestamp() }));
+    await assertFails(
+      setDoc(doc(db(OUTSIDER), "teams", GROUP, "joinRequests", "someoneElse"), {
+        name: "Fake", createdAt: serverTimestamp(),
+      }),
+    );
+
+    // Requests are private to the requester and organizers.
+    await assertSucceeds(getDoc(request));
+    await assertFails(getDoc(doc(db(MEMBER), "teams", GROUP, "joinRequests", OUTSIDER)));
+    await assertSucceeds(getDocs(collection(db(ORGANIZER), "teams", GROUP, "joinRequests")));
+
+    const approve = (uid: string, clearRequest = true) => {
+      const fs = db(uid);
+      const batch = writeBatch(fs).update(doc(fs, "teams", GROUP), joinUpdate());
+      if (clearRequest) batch.delete(doc(fs, "teams", GROUP, "joinRequests", OUTSIDER));
+      return batch.commit();
+    };
+    await assertFails(approve(MEMBER));
+    await assertFails(approve(ORGANIZER, false));
+    await assertSucceeds(approve(ORGANIZER));
+  });
+
+  it("approval needs a pending request", async () => {
+    await setGroup(true);
+    const fs = db(ORGANIZER);
+    await assertFails(
+      writeBatch(fs)
+        .update(doc(fs, "teams", GROUP), joinUpdate())
+        .delete(doc(fs, "teams", GROUP, "joinRequests", OUTSIDER))
+        .commit(),
+    );
+  });
+
+  it("members can't request, and open groups take no requests", async () => {
+    await setGroup(true);
+    await assertFails(
+      setDoc(doc(db(MEMBER), "teams", GROUP, "joinRequests", MEMBER), { name: "M", createdAt: serverTimestamp() }),
+    );
+    await setGroup(false);
+    await assertFails(
+      setDoc(doc(db(OUTSIDER), "teams", GROUP, "joinRequests", OUTSIDER), { name: "N", createdAt: serverTimestamp() }),
+    );
+  });
+
+  it("requesters withdraw and organizers decline", async () => {
+    await setGroup(true);
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", GROUP, "joinRequests", OUTSIDER), { name: "N" }),
+    );
+    await assertFails(deleteDoc(doc(db(MEMBER), "teams", GROUP, "joinRequests", OUTSIDER)));
+    await assertSucceeds(deleteDoc(doc(db(ORGANIZER), "teams", GROUP, "joinRequests", OUTSIDER)));
+  });
+
+  it("organizers edit group details but never the kind", async () => {
+    await setGroup(false);
+    const ref = doc(db(ORGANIZER), "teams", GROUP);
+    await assertSucceeds(updateDoc(ref, { description: "Weeknights", requiresApproval: true }));
+    await assertSucceeds(updateDoc(ref, { location: null }));
+    await assertFails(updateDoc(ref, { kind: "team" }));
+    await assertFails(updateDoc(doc(db(MEMBER), "teams", GROUP), { description: "Hi" }));
+    // Teams don't take group fields.
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { description: "Hi" }));
+  });
+
+  it("groups have organizers, not coaches", async () => {
+    await setGroup(false);
+    const ref = doc(db(OWNER), "teams", GROUP);
+    await assertFails(updateDoc(ref, { [`members.${MEMBER}`]: "coach" }));
+    await assertSucceeds(updateDoc(ref, { [`members.${MEMBER}`]: "captain" }));
+  });
+
+  it("the directory listing mirrors the group fields", async () => {
+    await setGroup(false);
+    const listing = {
+      name: "Pickup Crew", division: "mixed", level: "pickup", city: "Denver",
+      kind: "community", description: "Sunday pickup", requiresApproval: false,
+      location: { address: "City Park", lat: 39.75, lng: -104.95 },
+      keywords: ["pickup"],
+    };
+    const ref = doc(db(ORGANIZER), "teamDirectory", GROUP);
+    await assertFails(setDoc(ref, { ...listing, requiresApproval: true }));
+    await assertFails(setDoc(ref, { ...listing, kind: "team" }));
+    await assertSucceeds(setDoc(ref, listing));
+  });
+});
+
 describe("roles and removal", () => {
   it("owner can promote a player; coach cannot", async () => {
     await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));
@@ -466,7 +633,7 @@ describe("events", () => {
   });
 
   it("accepts every event type and rejects unknown ones", async () => {
-    for (const type of ["practice", "game", "tournament", "scrimmage", "workout", "social", "other"]) {
+    for (const type of ["practice", "game", "tournament", "scrimmage", "workout", "social", "other", "pickup"]) {
       await assertSucceeds(setDoc(doc(db(COACH), "teams", TEAM, "events", `t-${type}`), event(COACH, { type })));
     }
     await assertFails(setDoc(doc(db(COACH), "teams", TEAM, "events", "t-bogus"), event(COACH, { type: "bogus" })));

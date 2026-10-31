@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/back_or.dart';
@@ -45,7 +46,7 @@ class _TeamSearchScreenState extends State<TeamSearchScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: backOr(context, Routes.teams),
-        title: const Text('Find a team'),
+        title: const Text('Find a team or group'),
       ),
       body: ConstrainedContent(
         child: Column(
@@ -57,10 +58,31 @@ class _TeamSearchScreenState extends State<TeamSearchScreen> {
                 textInputAction: TextInputAction.search,
                 decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.search),
-                  hintText: 'Team name or city',
+                  hintText: 'Team or group name, or city',
                 ),
                 onChanged: _onChanged,
                 onSubmitted: vm.search.execute,
+              ),
+            ),
+            ListenableBuilder(
+              listenable: vm,
+              builder: (context, _) => Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final (label, kind) in const [
+                      ('All', null),
+                      ('Teams', TeamKind.team),
+                      ('Groups', TeamKind.community),
+                    ])
+                      ChoiceChip(
+                        label: Text(label),
+                        selected: vm.kind == kind,
+                        onSelected: (_) => vm.setKind(kind),
+                      ),
+                  ],
+                ),
               ),
             ),
             Expanded(
@@ -86,10 +108,9 @@ class _TeamSearchScreenState extends State<TeamSearchScreen> {
                       if (vm.noMatches)
                         const EmptyView(
                           icon: Icons.search_off,
-                          title: 'No teams found',
+                          title: 'Nothing found',
                           message:
-                              'Try another word from the team name or '
-                              'its city.',
+                              'Try another word from the name or its city.',
                         )
                       else if (results.isEmpty)
                         Padding(
@@ -97,7 +118,7 @@ class _TeamSearchScreenState extends State<TeamSearchScreen> {
                           child: Text(
                             'Type at least '
                             '${TeamSearchViewModel.minQueryLength} letters '
-                            'of a team name or city.',
+                            'of a team or group name, or a city.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: c.muted),
                           ),
@@ -105,14 +126,27 @@ class _TeamSearchScreenState extends State<TeamSearchScreen> {
                       for (final t in results)
                         ListTile(
                           leading: CircleAvatar(
-                            child: Text(
-                              t.name.isEmpty ? '?' : t.name[0].toUpperCase(),
-                            ),
+                            child: t.isCommunity
+                                ? const Icon(Icons.diversity_3_outlined)
+                                : Text(
+                                    t.name.isEmpty
+                                        ? '?'
+                                        : t.name[0].toUpperCase(),
+                                  ),
                           ),
                           title: Text(t.name),
-                          subtitle: Text(t.subtitle),
+                          subtitle: Text(
+                            t.isCommunity
+                                ? '${t.subtitle} · '
+                                      '${t.requiresApproval ? 'Approval required' : 'Open to join'}'
+                                : t.subtitle,
+                          ),
                           trailing: vm.isMine(t.id)
-                              ? const Chip(label: Text('Your team'))
+                              ? Chip(
+                                  label: Text(
+                                    t.isCommunity ? 'Your group' : 'Your team',
+                                  ),
+                                )
                               : const Icon(Icons.chevron_right),
                           onTap: () => context.push(Routes.team(t.id)),
                         ),

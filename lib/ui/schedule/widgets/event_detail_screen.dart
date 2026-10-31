@@ -216,6 +216,7 @@ class _RsvpSection extends StatelessWidget {
     final theme = Theme.of(context);
     final mine = vm.myRsvp;
     final r = vm.responses;
+    final type = vm.event?.type ?? EventType.other;
     return Card.filled(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -229,7 +230,7 @@ class _RsvpSection extends StatelessWidget {
                 for (final s in RsvpStatus.values)
                   ButtonSegment(
                     value: s,
-                    label: Text(s.label),
+                    label: Text(s.labelFor(type)),
                     icon: Icon(s.icon),
                   ),
               ],
@@ -244,7 +245,7 @@ class _RsvpSection extends StatelessWidget {
             Text(
               [
                 for (final s in RsvpStatus.values)
-                  '${r[s]!.length} ${s.label.toLowerCase()}',
+                  '${r[s]!.length} ${s.labelFor(type).toLowerCase()}',
                 '${vm.noResponse.length} no reply',
               ].join(' · '),
               style: theme.textTheme.bodySmall,
@@ -417,9 +418,10 @@ class _Responses extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final r = viewModel.responses;
+    final type = viewModel.event?.type ?? EventType.other;
     final groups = [
       for (final s in RsvpStatus.values)
-        (s.label, s.icon, s.color(scheme), r[s]!),
+        (s.labelFor(type), s.icon, s.color(scheme), r[s]!),
       ('No reply', Icons.hourglass_empty, scheme.outline, viewModel.noResponse),
     ];
     return Column(
@@ -431,7 +433,7 @@ class _Responses extends StatelessWidget {
             tilePadding: EdgeInsets.zero,
             leading: Icon(icon, color: color),
             title: Text('$label (${names.length})'),
-            initiallyExpanded: label == RsvpStatus.going.label,
+            initiallyExpanded: label == RsvpStatus.going.labelFor(type),
             expandedAlignment: Alignment.centerLeft,
             childrenPadding: const EdgeInsets.only(bottom: 8),
             children: [

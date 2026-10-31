@@ -77,9 +77,9 @@ class _TeamsScreenState extends State<TeamsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go(Routes.createTeam),
+        onPressed: _create,
         icon: const Icon(Icons.add),
-        label: const Text('New team'),
+        label: const Text('New'),
       ),
       body: ListenableBuilder(
         listenable: vm,
@@ -88,32 +88,101 @@ class _TeamsScreenState extends State<TeamsScreen> {
           if (vm.error != null) {
             return ErrorView(error: vm.error, onRetry: vm.retry);
           }
-          if (vm.teams.isEmpty) {
+          if (vm.all.isEmpty) {
             return EmptyView(
               icon: Icons.groups_outlined,
-              title: 'No teams yet',
+              title: 'No teams or groups yet',
               message:
-                  'Create a team, join one with an invite code, or search '
-                  'for teams near you.',
-              action: OutlinedButton(
-                onPressed: _join,
-                child: const Text('Join with code'),
+                  'Create a team or community group, join a team with an '
+                  'invite code, or search for teams and groups near you.',
+              action: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  OutlinedButton(
+                    onPressed: _join,
+                    child: const Text('Join with code'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => context.push(Routes.searchTeams),
+                    icon: const Icon(Icons.search),
+                    label: const Text('Find a group'),
+                  ),
+                ],
               ),
             );
           }
+          final teams = vm.teams;
+          final groups = vm.groups;
           return ConstrainedContent(
-            child: ListView.separated(
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-              itemCount: vm.teams.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, i) =>
-                  _TeamCard(team: vm.teams[i], role: vm.roleIn(vm.teams[i])),
+              children: [
+                if (teams.isNotEmpty) ...[
+                  if (groups.isNotEmpty) const _Heading('My teams'),
+                  for (final t in teams) _TeamCard(team: t, role: vm.roleIn(t)),
+                ],
+                if (groups.isNotEmpty) ...[
+                  if (teams.isNotEmpty) const SizedBox(height: 8),
+                  const _Heading('My groups'),
+                  for (final g in groups)
+                    _TeamCard(team: g, role: vm.roleIn(g)),
+                ],
+              ],
             ),
           );
         },
       ),
     );
   }
+
+  Future<void> _create() async {
+    final kind = await showModalBottomSheet<TeamKind>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.shield_outlined),
+              title: const Text('Team'),
+              subtitle: const Text(
+                'Invite-only, with roster, playbook, videos and stats',
+              ),
+              onTap: () => Navigator.pop(context, TeamKind.team),
+            ),
+            ListTile(
+              leading: const Icon(Icons.diversity_3_outlined),
+              title: const Text('Community group'),
+              subtitle: const Text(
+                'Open to anyone, with pickup events and tournaments',
+              ),
+              onTap: () => Navigator.pop(context, TeamKind.community),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || kind == null) return;
+    context.go(
+      kind == TeamKind.community ? Routes.createGroup : Routes.createTeam,
+    );
+  }
+}
+
+class _Heading extends StatelessWidget {
+  const _Heading(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+    child: Text(text, style: Theme.of(context).textTheme.titleSmall),
+  );
 }
 
 class _TeamCard extends StatelessWidget {
@@ -124,20 +193,23 @@ class _TeamCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = [
-      team.division.label,
-      team.level.label,
-      if (team.city.isNotEmpty) team.city,
-    ].join(' · ');
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          child: Text(team.name.isEmpty ? '?' : team.name[0].toUpperCase()),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: ListTile(
+          leading: CircleAvatar(
+            child: team.isCommunity
+                ? const Icon(Icons.diversity_3_outlined)
+                : Text(team.name.isEmpty ? '?' : team.name[0].toUpperCase()),
+          ),
+          title: Text(team.name),
+          subtitle: Text(TeamListing.of(team).subtitle),
+          trailing: role == null
+              ? null
+              : Chip(label: Text(role!.labelFor(team.kind))),
+          onTap: () => context.go(Routes.team(team.id)),
         ),
-        title: Text(team.name),
-        subtitle: Text(subtitle),
-        trailing: role == null ? null : Chip(label: Text(role!.label)),
-        onTap: () => context.go(Routes.team(team.id)),
       ),
     );
   }
