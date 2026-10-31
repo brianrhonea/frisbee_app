@@ -66,6 +66,7 @@ void main() {
         teamId: 't1',
         teamRepository: teams,
         playRepository: FakePlayRepository(),
+        eventRepository: FakeEventRepository(),
         authRepository: auth,
       );
     }

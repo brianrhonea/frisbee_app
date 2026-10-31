@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
+import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
@@ -8,6 +9,7 @@ import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/tournament.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -228,3 +230,122 @@ Team teamWith(Map<String, TeamRole> members, {String id = 't1'}) => Team(
   members: members,
   inviteCode: 'CODE$id',
 );
+
+class FakeEventRepository implements EventRepository {
+  final events = <String, TeamEvent>{};
+  final _changes = StreamController<void>.broadcast();
+  bool? lastClearVotes;
+
+  void _emit() => _changes.add(null);
+
+  List<TeamEvent> _sorted() =>
+      events.values.toList()..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+
+  @override
+  Stream<List<TeamEvent>> watchEvents(String teamId) async* {
+    yield _sorted();
+    yield* _changes.stream.map((_) => _sorted());
+  }
+
+  @override
+  Stream<TeamEvent?> watchEvent(String teamId, String eventId) async* {
+    yield events[eventId];
+    yield* _changes.stream.map((_) => events[eventId]);
+  }
+
+  @override
+  Future<Result<String>> saveEvent(
+    String teamId,
+    TeamEvent event,
+    String uid, {
+    bool clearVotes = false,
+  }) async {
+    lastClearVotes = clearVotes;
+    final id = event.isNew ? 'e${events.length + 1}' : event.id;
+    events[id] = event.copyWith(id: id);
+    _emit();
+    return Result.ok(id);
+  }
+
+  @override
+  Future<Result<void>> deleteEvent(String teamId, String eventId) async {
+    events.remove(eventId);
+    _emit();
+    return const Result.ok(null);
+  }
+
+  TeamEvent _with(
+    String eventId, {
+    Map<String, RsvpStatus>? rsvps,
+    Map<String, Set<Reaction>>? reactions,
+    Map<String, List<String>>? votes,
+  }) {
+    final e = events[eventId]!;
+    return TeamEvent(
+      id: e.id,
+      title: e.title,
+      type: e.type,
+      startsAt: e.startsAt,
+      endsAt: e.endsAt,
+      location: e.location,
+      notes: e.notes,
+      poll: e.poll,
+      rsvps: rsvps ?? e.rsvps,
+      reactions: reactions ?? e.reactions,
+      votes: votes ?? e.votes,
+      createdBy: e.createdBy,
+    );
+  }
+
+  @override
+  Future<Result<void>> setRsvp(
+    String teamId,
+    String eventId,
+    String uid,
+    RsvpStatus? status,
+  ) async {
+    final e = events[eventId]!;
+    final rsvps = {...e.rsvps};
+    status == null ? rsvps.remove(uid) : rsvps[uid] = status;
+    final going = status == RsvpStatus.going;
+    events[eventId] = _with(
+      eventId,
+      rsvps: rsvps,
+      reactions: going ? null : ({...e.reactions}..remove(uid)),
+      votes: going ? null : ({...e.votes}..remove(uid)),
+    );
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> setReaction(
+    String teamId,
+    String eventId,
+    String uid,
+    Reaction reaction, {
+    required bool on,
+  }) async {
+    final reactions = {...events[eventId]!.reactions};
+    final mine = {...?reactions[uid]};
+    on ? mine.add(reaction) : mine.remove(reaction);
+    reactions[uid] = mine;
+    events[eventId] = _with(eventId, reactions: reactions);
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> setVotes(
+    String teamId,
+    String eventId,
+    String uid,
+    List<String> optionIds,
+  ) async {
+    final votes = {...events[eventId]!.votes};
+    optionIds.isEmpty ? votes.remove(uid) : votes[uid] = optionIds;
+    events[eventId] = _with(eventId, votes: votes);
+    _emit();
+    return const Result.ok(null);
+  }
+}

@@ -33,11 +33,18 @@ class _FieldFrame extends StatelessWidget {
   );
 }
 
-/// Read-only diagram, used for thumbnails and player view.
+/// Read-only diagram, used for thumbnails, playback and player view.
 class PlayDiagram extends StatelessWidget {
-  const PlayDiagram({super.key, required this.play});
+  const PlayDiagram({
+    super.key,
+    required this.play,
+    this.trails = const [],
+    this.ghosts = const [],
+  });
 
   final Play play;
+  final List<Trail> trails;
+  final List<PlayElement> ghosts;
 
   @override
   Widget build(BuildContext context) => _FieldFrame(
@@ -45,7 +52,12 @@ class PlayDiagram extends StatelessWidget {
       borderRadius: BorderRadius.circular(6),
       child: CustomPaint(
         size: size,
-        painter: FieldPainter(play: play, horizontal: horizontal),
+        painter: FieldPainter(
+          play: play,
+          horizontal: horizontal,
+          trails: trails,
+          ghosts: ghosts,
+        ),
       ),
     ),
   );
@@ -72,7 +84,7 @@ class _PlayCanvasState extends State<PlayCanvas> {
       vm.tool == EditorTool.cut || vm.tool == EditorTool.throw_;
 
   void _onTap(FieldGeometry g, Offset local) {
-    final hit = g.hitTest(vm.play, local);
+    final hit = g.hitTest(vm.displayed, local);
     switch (vm.tool) {
       case EditorTool.select:
         vm.select(hit);
@@ -91,10 +103,11 @@ class _PlayCanvasState extends State<PlayCanvas> {
       return;
     }
     if (vm.tool == EditorTool.erase) return;
-    final hit = g.hitTest(vm.play, local);
-    if (hit != null && vm.play.elements.any((e) => e.id == hit)) {
+    final shown = vm.displayed;
+    final hit = g.hitTest(shown, local);
+    if (hit != null && shown.elements.any((e) => e.id == hit)) {
       _dragging = hit;
-      vm.beginMove();
+      vm.beginMove(hit);
       if (vm.tool == EditorTool.select) vm.select(hit);
     }
   }
@@ -140,9 +153,11 @@ class _PlayCanvasState extends State<PlayCanvas> {
                 child: CustomPaint(
                   size: size,
                   painter: FieldPainter(
-                    play: vm.play,
+                    play: vm.displayed,
                     horizontal: horizontal,
                     selectedId: vm.selectedId,
+                    trails: vm.trails,
+                    ghosts: vm.ghosts,
                     draft: _draft,
                     draftKind: switch (vm.tool) {
                       EditorTool.cut => ArrowKind.cut,

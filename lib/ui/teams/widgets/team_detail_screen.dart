@@ -8,6 +8,7 @@ import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../playbook/widgets/playbook_tab.dart';
+import '../../schedule/widgets/schedule_tab.dart';
 import '../view_models/team_detail_viewmodel.dart';
 import 'members_tab.dart';
 import 'roster_tab.dart';
@@ -119,7 +120,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
           context,
           title: 'Delete ${team.name}?',
           message:
-              'This permanently deletes the team, its roster and playbook.',
+              'This permanently deletes the team, its roster, schedule and playbook.',
           confirmLabel: 'Delete',
           destructive: true,
         )) {
@@ -150,7 +151,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
           );
         }
         return DefaultTabController(
-          length: 3,
+          length: 4,
           child: Scaffold(
             appBar: AppBar(
               title: Text(team.name),
@@ -178,6 +179,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
               ],
               bottom: const TabBar(
                 tabs: [
+                  Tab(text: 'Schedule'),
                   Tab(text: 'Roster'),
                   Tab(text: 'Playbook'),
                   Tab(text: 'Members'),
@@ -186,6 +188,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
             ),
             body: TabBarView(
               children: [
+                ScheduleTab(viewModel: vm),
                 RosterTab(viewModel: vm),
                 PlaybookTab(viewModel: vm),
                 MembersTab(viewModel: vm),

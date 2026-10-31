@@ -9,6 +9,7 @@ import {
 import {
   arrayRemove,
   arrayUnion,
+  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -184,6 +185,95 @@ describe("roster and plays", () => {
     const ref = doc(db(OWNER), "teams", TEAM, "roster", "r1");
     await assertSucceeds(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null }));
     await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "goalie", userId: null }));
+  });
+});
+
+describe("events", () => {
+  const event = (uid: string, extra: Record<string, unknown> = {}) => ({
+    title: "Practice",
+    type: "practice",
+    startsAt: new Date("2026-11-02T18:00:00Z"),
+    endsAt: null,
+    location: "",
+    notes: "",
+    poll: {
+      question: "Jerseys?",
+      options: [{ id: "a", text: "Dark" }, { id: "b", text: "Light" }],
+      multiple: false,
+    },
+    rsvps: {},
+    reactions: {},
+    votes: {},
+    createdBy: uid,
+    ...extra,
+  });
+  const ev = (uid: string) => doc(db(uid), "teams", TEAM, "events", "e1");
+  const seed = () =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "events", "e1"), event(COACH)),
+    );
+
+  it("coach can create events, player and outsider cannot", async () => {
+    await assertSucceeds(setDoc(ev(COACH), event(COACH)));
+    await assertFails(setDoc(doc(db(PLAYER), "teams", TEAM, "events", "e2"), event(PLAYER)));
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", TEAM, "events", "e3"), event(OUTSIDER)));
+  });
+
+  it("rejects events created with pre-filled responses", async () => {
+    await assertFails(setDoc(ev(COACH), event(COACH, { rsvps: { [PLAYER]: "going" } })));
+  });
+
+  it("members can RSVP, react and vote for themselves only", async () => {
+    await seed();
+    await assertSucceeds(updateDoc(ev(PLAYER), { [`rsvps.${PLAYER}`]: "going" }));
+    await assertSucceeds(updateDoc(ev(PLAYER), { [`reactions.${PLAYER}`]: arrayUnion("fire") }));
+    await assertSucceeds(updateDoc(ev(PLAYER), { [`votes.${PLAYER}`]: ["a"] }));
+    await assertFails(updateDoc(ev(PLAYER), { [`rsvps.${COACH}`]: "notGoing" }));
+    await assertFails(updateDoc(ev(OUTSIDER), { [`rsvps.${OUTSIDER}`]: "going" }));
+  });
+
+  it("only attendees can react or vote", async () => {
+    await seed();
+    await assertFails(updateDoc(ev(PLAYER), { [`reactions.${PLAYER}`]: arrayUnion("fire") }));
+    await assertSucceeds(updateDoc(ev(PLAYER), { [`rsvps.${PLAYER}`]: "maybe" }));
+    await assertFails(updateDoc(ev(PLAYER), { [`votes.${PLAYER}`]: ["a"] }));
+  });
+
+  it("leaving 'going' must drop reactions and votes", async () => {
+    await seed();
+    await updateDoc(ev(PLAYER), { [`rsvps.${PLAYER}`]: "going" });
+    await updateDoc(ev(PLAYER), { [`reactions.${PLAYER}`]: arrayUnion("fire") });
+    await assertFails(updateDoc(ev(PLAYER), { [`rsvps.${PLAYER}`]: "notGoing" }));
+    await assertSucceeds(
+      updateDoc(ev(PLAYER), {
+        [`rsvps.${PLAYER}`]: "notGoing",
+        [`reactions.${PLAYER}`]: deleteField(),
+        [`votes.${PLAYER}`]: deleteField(),
+      }),
+    );
+  });
+
+  it("validates response values", async () => {
+    await seed();
+    await updateDoc(ev(PLAYER), { [`rsvps.${PLAYER}`]: "going" });
+    await assertFails(updateDoc(ev(PLAYER), { [`rsvps.${PLAYER}`]: "yes" }));
+    await assertFails(updateDoc(ev(PLAYER), { [`reactions.${PLAYER}`]: ["skull"] }));
+    // Single-choice poll.
+    await assertFails(updateDoc(ev(PLAYER), { [`votes.${PLAYER}`]: ["a", "b"] }));
+  });
+
+  it("players cannot edit details; coaches can but cannot forge votes", async () => {
+    await seed();
+    await assertFails(updateDoc(ev(PLAYER), { title: "Cancelled" }));
+    await assertSucceeds(updateDoc(ev(COACH), { title: "Track workout" }));
+    await assertSucceeds(updateDoc(ev(COACH), { poll: null, votes: {} }));
+    await assertFails(updateDoc(ev(COACH), { votes: { [PLAYER]: ["a"] } }));
+  });
+
+  it("players cannot delete events", async () => {
+    await seed();
+    await assertFails(deleteDoc(ev(PLAYER)));
+    await assertSucceeds(deleteDoc(ev(COACH)));
   });
 });
 

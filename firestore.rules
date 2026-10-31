@@ -143,7 +143,7 @@ service cloud.firestore {
         allow create, update: if signedIn()
           && isEditor(get(teamPath(teamId)).data)
           && request.resource.data.keys().hasOnly([
-               'name', 'category', 'notes', 'elements', 'arrows',
+               'name', 'category', 'notes', 'elements', 'arrows', 'steps',
                'updatedAt', 'updatedBy'])
           && validString(request.resource.data.name, 100)
           && request.resource.data.category in ['offense', 'defense', 'pull', 'endzone']
@@ -152,7 +152,83 @@ service cloud.firestore {
           && request.resource.data.elements.size() <= 100
           && request.resource.data.arrows is list
           && request.resource.data.arrows.size() <= 100
+          && request.resource.data.get('steps', []) is list
+          && request.resource.data.get('steps', []).size() <= 30
           && request.resource.data.updatedBy == uid();
+      }
+
+      // Editors manage events; every member may write only their own
+      // RSVP, reactions and poll votes. Only members going may react or
+      // vote, and leaving "going" must drop their reactions and votes.
+      match /events/{eventId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        function validEvent(e) {
+          return e.title is string && e.title.size() > 0 && e.title.size() <= 100
+            && e.type in ['practice', 'game', 'tournament', 'social', 'other']
+            && e.startsAt is timestamp
+            && (e.endsAt == null || (e.endsAt is timestamp && e.endsAt >= e.startsAt))
+            && validString(e.location, 200)
+            && validString(e.notes, 5000)
+            && (e.poll == null || validPoll(e.poll));
+        }
+
+        function validPoll(p) {
+          return p.keys().hasOnly(['question', 'options', 'multiple'])
+            && p.question is string && p.question.size() > 0 && p.question.size() <= 200
+            && p.options is list && p.options.size() >= 2 && p.options.size() <= 10
+            && p.multiple is bool;
+        }
+
+        // Only `uid()`'s entry in map field `f` changed.
+        function onlyMine(f) {
+          return request.resource.data[f].diff(resource.data[f]).affectedKeys()
+            .hasOnly([uid()]);
+        }
+
+        function respond() {
+          let d = request.resource.data;
+          return isMember(team())
+            && changed().hasOnly(['rsvps', 'reactions', 'votes'])
+            && onlyMine('rsvps') && onlyMine('reactions') && onlyMine('votes')
+            && (d.rsvps.get(uid(), '') == 'going'
+                || (!(uid() in d.reactions) && !(uid() in d.votes)))
+            && (!(uid() in d.rsvps) || d.rsvps[uid()] in ['going', 'maybe', 'notGoing'])
+            && (!(uid() in d.reactions)
+                || (d.reactions[uid()] is list
+                    && d.reactions[uid()].hasOnly(
+                         ['thumbsUp', 'fire', 'disc', 'clap', 'laugh', 'grimace'])))
+            && (!(uid() in d.votes)
+                || (resource.data.poll != null
+                    && d.votes[uid()] is list
+                    && d.votes[uid()].size()
+                         <= (resource.data.poll.multiple ? resource.data.poll.options.size() : 1)));
+        }
+
+        // Editors change details; they may only reset votes, never forge them.
+        function editDetails() {
+          return isEditor(team())
+            && changed().hasOnly([
+                 'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
+                 'poll', 'votes', 'updatedAt'])
+            && (!('votes' in changed()) || request.resource.data.votes == {})
+            && validEvent(request.resource.data);
+        }
+
+        allow read: if signedIn() && isMember(team());
+        allow delete: if signedIn() && isEditor(team());
+        allow create: if signedIn()
+          && isEditor(team())
+          && request.resource.data.keys().hasOnly([
+               'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
+               'poll', 'rsvps', 'reactions', 'votes', 'createdBy',
+               'createdAt', 'updatedAt'])
+          && request.resource.data.createdBy == uid()
+          && request.resource.data.rsvps == {}
+          && request.resource.data.reactions == {}
+          && request.resource.data.votes == {}
+          && validEvent(request.resource.data);
+        allow update: if signedIn() && (respond() || editDetails());
       }
     }
 
