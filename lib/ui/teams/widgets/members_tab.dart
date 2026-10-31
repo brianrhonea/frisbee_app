@@ -26,8 +26,9 @@ class MembersTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (team.inviteCode != null && viewModel.canShareCode) ...[
-            _InviteCard(viewModel: viewModel, code: team.inviteCode!),
+          if (viewModel.inviteCode case final code?
+              when viewModel.canShareCode) ...[
+            _InviteCard(viewModel: viewModel, code: code),
             const SizedBox(height: 16),
           ],
           const _RolesHelp(),

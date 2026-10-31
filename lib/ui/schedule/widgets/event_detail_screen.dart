@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
+import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -50,7 +51,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   void _onCommand() {
     if (vm.deleteEvent.completed) {
       vm.deleteEvent.clearResult();
-      context.go(Routes.team(vm.teamId));
+      context.canPop() ? context.pop() : context.go(Routes.team(vm.teamId));
       return;
     }
     for (final c in _commands) {
@@ -80,11 +81,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       builder: (context, _) {
         final e = vm.event;
         if (!vm.loaded) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(
+            appBar: AppBar(leading: backOr(context, Routes.team(vm.teamId))),
+            body: const LoadingView(),
+          );
         }
         if (e == null) {
           return Scaffold(
-            appBar: AppBar(),
+            appBar: AppBar(leading: backOr(context, Routes.team(vm.teamId))),
             body: vm.error != null
                 ? ErrorView(error: vm.error)
                 : const EmptyView(
@@ -96,6 +100,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         }
         return Scaffold(
           appBar: AppBar(
+            leading: backOr(context, Routes.team(vm.teamId)),
             title: Text(e.type.label),
             actions: [
               if (vm.canEdit) ...[
@@ -103,7 +108,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   tooltip: 'Edit',
                   icon: const Icon(Icons.edit_outlined),
                   onPressed: () =>
-                      context.go(Routes.editEvent(vm.teamId, vm.eventId)),
+                      context.push(Routes.editEvent(vm.teamId, vm.eventId)),
                 ),
                 IconButton(
                   tooltip: 'Delete',
@@ -120,7 +125,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 children: [
-                  _Header(event: e),
+                  EventHeader(event: e),
                   const SizedBox(height: 20),
                   _RsvpSection(viewModel: vm),
                   const SizedBox(height: 16),
@@ -141,8 +146,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.event});
+/// Icon, title, time, location and notes of an event.
+class EventHeader extends StatelessWidget {
+  const EventHeader({super.key, required this.event});
 
   final TeamEvent event;
 

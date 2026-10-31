@@ -15,6 +15,8 @@ import '../data/repositories/team/team_repository.dart';
 import '../data/repositories/team/team_repository_firebase.dart';
 import '../data/repositories/tournament/tournament_repository.dart';
 import '../data/repositories/tournament/tournament_repository_usau.dart';
+import '../data/repositories/usau_schedule/usau_schedule_repository.dart';
+import '../data/repositories/usau_schedule/usau_schedule_repository_usau.dart';
 import '../data/repositories/usau_team/usau_team_repository.dart';
 import '../data/repositories/usau_team/usau_team_repository_usau.dart';
 import '../data/services/auth_service.dart';
@@ -49,5 +51,9 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<UsauTeamRepository>(
     create: (context) =>
         UsauTeamRepositoryUsau(client: context.read<UsauClient>()),
+  ),
+  Provider<UsauScheduleRepository>(
+    create: (context) =>
+        UsauScheduleRepositoryUsau(client: context.read<UsauClient>()),
   ),
 ];

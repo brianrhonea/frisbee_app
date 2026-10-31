@@ -4,6 +4,8 @@ enum EventType {
   practice('Practice'),
   game('Game'),
   tournament('Tournament'),
+  scrimmage('Scrimmage'),
+  workout('Workout'),
   social('Social'),
   other('Other');
 

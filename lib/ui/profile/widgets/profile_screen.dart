@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../utils/command.dart';
+import '../../core/ui/brand.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -22,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     vm.updateDisplayName,
     vm.signOut,
     vm.deleteAccount,
+    vm.setThemeMode,
   ];
 
   @override
@@ -115,6 +117,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 if (user?.email != null) Center(child: Text(user!.email!)),
                 const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Text('Appearance', style: theme.textTheme.titleSmall),
+                ),
+                _ThemePicker(viewModel: vm),
+                const Divider(),
                 ListTile(
                   leading: const Icon(Icons.edit_outlined),
                   title: const Text('Change display name'),
@@ -149,10 +157,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     }
                   },
                 ),
+                const SizedBox(height: 24),
+                Center(
+                  child: Text(
+                    '$appName v$appVersion',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Light / dark / system theme picker.
+class _ThemePicker extends StatelessWidget {
+  const _ThemePicker({required this.viewModel});
+
+  final ProfileViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: SegmentedButton<ThemeMode>(
+        segments: const [
+          ButtonSegment(
+            value: ThemeMode.system,
+            icon: Icon(Icons.brightness_auto_outlined),
+            label: Text('System'),
+          ),
+          ButtonSegment(
+            value: ThemeMode.light,
+            icon: Icon(Icons.light_mode_outlined),
+            label: Text('Light'),
+          ),
+          ButtonSegment(
+            value: ThemeMode.dark,
+            icon: Icon(Icons.dark_mode_outlined),
+            label: Text('Dark'),
+          ),
+        ],
+        selected: {viewModel.themeMode},
+        showSelectedIcon: false,
+        onSelectionChanged: (s) => viewModel.setThemeMode.execute(s.first),
       ),
     );
   }

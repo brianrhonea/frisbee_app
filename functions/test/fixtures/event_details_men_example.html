@@ -1,0 +1,2979 @@
+
+<!doctype html> 
+<!--[if lt IE 7]>      <html class="html no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="html no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="html no-js lt-ie9"> <![endif]-->
+<!--[if IE 9 ]>        <html class="html no-js ie9"> <![endif]-->
+<!--[if gt IE 9]><!--> <html class="html no-js"> <!--<![endif]-->
+<head id="head"><meta name="description" content="SiteStartup Description" /><meta name="keywords" content="SiteStartup,Keywords" /><title>
+	Competition Schedules and Results | Play USA Ultimate
+</title><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" /><link rel="stylesheet" href="/cms/includes/style-new.v2.min.css" />
+	<script src="/cms/includes/modernizr-1.7.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.js"></script>
+	<script>!window.jQuery && document.write(unescape('%3Cscript src="/cms/includes/jquery/jquery-1.8.2.js"%3E%3C/script%3E'))</script>
+	<script src="/cms/includes/jquery-core-plugins.js"></script>
+	<script src="/cms/includes/jquery/jquery-functions.js"></script>
+ 	<script type="text/javascript" src="/cms/includes/functionsC.js"></script>
+
+
+
+
+    
+	<!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RXFMFVQS5"></script>
+	<script> window.dataLayer = window.dataLayer || []; function gtag() { dataLayer.push(arguments); } gtag('js', new Date()); gtag('config', 'G-3RXFMFVQS5'); </script> 
+    
+
+<script type="text/javascript">
+    var intrvl = 1000;
+    var sec = 60000;
+    var min = 3000 * sec;
+    //var min = 525600 * sec;
+    var warn = 3 * sec;
+    setInterval("checkSessionTime();", intrvl);
+	function checkSessionTime() {
+        min -= intrvl;
+        var rm = parseInt(min / sec);
+		var rs = parseInt((min - (rm * sec)) / 1000);
+
+        if (min <= 0) {
+            renewMemberSession(true);
+        } else {
+            var html = "Your session will expire in ";
+            if (rm > 3) {
+                rm += 1;
+                html += "<b>" + rm + "</b> minutes";
+            } else if (rm > 1) {
+                html += "<b>" + rm + "</b> minutes and <b>" + rs + "</b> seconds";
+            } else if (rm == 1) {
+                html += "<b>" + rm + "</b> minute and <b>" + rs + "</b> seconds";
+            } else {
+                html += "<b>" + rs + "</b> seconds";
+            }
+			
+            if (min % 10000 == 0) renewMemberSession(true); // every 10 seconds lets refresh the session, but don't reset the javascript timer
+        }
+    }
+	function renewMemberSession(skipRenew) {
+		if (!skipRenew) resetSession();
+    }
+    //function logout() { $("#expires").html("<b>Your session has expired. Logging off...</b>"); try {$("#SessionTimeout").jqmShow().center();} catch(ex){} setTimeout("window.location = '/admin/logout.aspx';", 5000); }
+    function resetSession() { min = 3000 * sec; }
+</script></head>
+<body class="body">
+<form method="post" action="/events/2026-USA-Ultimate-Club-Nationals/schedule/Men/Club-Men/" id="main">
+<div class="aspNetHidden">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['main'];
+if (!theForm) {
+    theForm = document.main;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/WebResource.axd?d=pynGkmcFUV13He1Qd6_TZCuATqmKWvVIdumT-ns2J3B5K0zjWuAQ6KKspY5Gtz9ECvo92w2&amp;t=639190617332169432" type="text/javascript"></script>
+
+
+<script src="/ScriptResource.axd?d=NJmAwtEo3Ipnlaxl6CMhvlId-D6C4GVKoJxVymjSOIU6Ws_RXyjgRct9nxZgtsCIos4D53TTX2WDvWuUUBDMHnOtQ_5r7tgVnVKTKFPRwkEkqTUYok_QnYjinVtVbF0t5Cdtt5QnIfsJET6jIinD3QzuAUg1&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=dwY9oWetJoJoVpgL6Zq8OJAoJat6skar5eHTHjX5NGyQgVXLkPhTlEqHvx45cmSlmHtEcsCSSg9J3qMNVfHuvHD5jouD2LFHN0UfgLdjUoUh5mKWt1eDQfDrZDap-FbyXC5xv6rcsMrs6hFeI9nGk1Gt5Q01&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('sm', 'main', [], [], [], 90, '');
+//]]>
+</script>
+
+	<div id="wrapper">
+		<header id="main_header">
+			
+
+<div id="logoArea">
+	<span class="logo"><a href="http://www.usaultimate.org" target="_blank"><img src="/cms/images/layout/logo.png" alt="USA Ultimate"/></a></span>
+	<span class="slogan"><img src="/cms/images/layout/slogan.png" alt="Account Management"/></span>
+	<!-- Needs to be switched to account_header.png -->
+</div>
+
+
+<nav class="mainNav">
+	<ul class="sf-menu clearfix">
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl00_liItem" class="firstnavitemli">
+             <a href="https://usaultimate.org/about/" id="CT_Header_CC_TopNav_rptNav_ctl00_lnkLink1" class="firstnavitema">About</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_lnk" style="">Contact Us</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/about/staff/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">USA Ultimate Staff</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl02_lnkInner" style="">Youth Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl03_lnkInner" style="">College Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl04_lnkInner" style="">Club Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl05_lnkInner" style="">Masters Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/contacts/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl06_lnkInner" style="">Beach Division</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#CurrentAffiliates" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl07_lnkInner" style="">USA Ultimate Affiliates</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/board-of-directors/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl08_lnkInner" style="">Board of Directors</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/local/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl02_lnk" style="">Where to Play</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/discover-ultimate/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl03_lnk" style="">About Ultimate</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/rules/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl01_lnkInner" style="">Rules of Ultimate</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/spirit-of-the-game/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl02_lnkInner" style="">Spirit of the Game</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/about/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl04_lnk" style="">About USA Ultimate</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/about/volunteer/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl01_lnkInner" style="">Volunteer Opportunities</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.archive.usaultimate.org/about/history/hall_of_fame/default.aspx" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl05_lnk" style="">Hall of Fame</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/about/governance/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_lnk" style="">Governance</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/wp-content/uploads/2020/03/USAUltimateBylaws_rev20171120.pdf" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_rptSubSubNav_ctl01_lnkInner" style="">Bylaws</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/about/suspensions/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_rptSubSubNav_ctl02_lnkInner" style="">Suspensions</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/strategic-plan/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl06_rptSubSubNav_ctl03_lnkInner" style="">Strategic Plan</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/equity-diversity-inclusion/" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_rptSubNav_ctl07_lnk" style="">Equity and Diversity</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl00$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl00_ccSubNav_hdn" value="6" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl01_liItem">
+             <a href="https://www.usaultimate.org/news/default.aspx" id="CT_Header_CC_TopNav_rptNav_ctl01_lnkLink1">News</a>
+             
+             
+<ul>
+
+<li>
+    <a id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl01_lnk" style="">USA Ultimate Mobile App</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://itunes.apple.com/us/app/usa-ultimate/id1032772331?mt=8" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">iOS</a>
+         </li>
+        
+         <li>
+            <a href="https://play.google.com/store/apps/details?id=org.usaultimate.usaultimate&hl=en" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl02_lnkInner" style="">Android</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://play.usaultimate.org/teams/events/rankings/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_lnk" style="">Rankings</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=College-Men" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl01_lnkInner" style="">College Men's</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=College-Women" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl02_lnkInner" style="">College Women's</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=Club-Men" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl03_lnkInner" style="">TCT Men's</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=Club-Mixed" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl04_lnkInner" style="">TCT Mixed</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/teams/events/team_rankings/?RankSet=Club-Women" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl05_lnkInner" style="">TCT Women's</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/college/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl03_lnk" style="">College News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/club/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl04_lnk" style="">Triple Crown Tour News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/beach/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl05_lnk" style="">Beach News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/youth/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl06_lnk" style="">Youth News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/news/topics/team-usa/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl07_lnk" style="">National Teams News</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/watch/" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_rptSubNav_ctl08_lnk" style="">Videos</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl01$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl01_ccSubNav_hdn" value="25" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl02_liItem">
+             <a href="https://play.usaultimate.org/" id="CT_Header_CC_TopNav_rptNav_ctl02_lnkLink1">Events</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://play.usaultimate.org/events/tournament/" id="CT_Header_CC_TopNav_rptNav_ctl02_ccSubNav_rptSubNav_ctl01_lnk" style="">Tournament Calendar</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl02$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl02_ccSubNav_hdn" value="144" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl03_liItem">
+             <a id="CT_Header_CC_TopNav_rptNav_ctl03_lnkLink1">Competition</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://www.usaultimate.org/youth/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl01_lnk" style="">Youth Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/youth/guidelines-and-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">Youth Guidelines</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/college/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_lnk" style="">College Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/resources/college-eligibility-guidelines/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl01_lnkInner" style="">College Eligibility</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/college/guidelines-and-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl02_lnkInner" style="">College Guidelines</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/resources/?_resource_filters=college" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl02_rptSubSubNav_ctl03_lnkInner" style="">College Resources</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/club/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl03_lnk" style="">Club Division (Triple Crown Tour)</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/club/guidelines-and-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl01_lnkInner" style="">TCT Guidelines</a>
+         </li>
+        
+         <li>
+            <a href="https://play.usaultimate.org/events/2022-US-Open-Club-Championships/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl02_lnkInner" style="">U.S. Open Club Championships</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/masters-ultimate/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl04_lnk" style="">Masters Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/masters-ultimate/masters-guidelines-registration/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl01_lnkInner" style="">Masters Guidelines</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/beach-ultimate/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl05_lnk" style="">Beach Division</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/wp-content/uploads/2022/01/2022-Beach-Guidelines-Final.pdf" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl01_lnkInner" style="">Beach Guidelines</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/team-usa/" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl06_lnk" style="">USA Ultimate National Teams</a>
+    
+</li>
+
+<li>
+    <a href="https://ultimate.mobilecoach.org/page/5344/skills-challenge" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_rptSubNav_ctl07_lnk" style="">Skills Challenge App Program</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl03$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl03_ccSubNav_hdn" value="26" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl04_liItem">
+             <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_lnkLink1">Programs</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://usaultimate.org/affiliate-program/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_lnk" style="">Affiliates</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#Benefits" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl01_lnkInner" style="">Benefits</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#Grants" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl02_lnkInner" style="">Grants</a>
+         </li>
+        
+         <li>
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSfEeecOBhzwri2jJNWtH-iGlUjQJ_y69L5I7RJK-Zs0rIg_UQ/viewform?c=0&w=1" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl03_lnkInner" style="">Apply</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/affiliate-program/#FAQs" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl01_rptSubSubNav_ctl04_lnkInner" style="">FAQ</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/youth/camps-clinics/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl02_lnk" style="">Camps</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/wp-content/uploads/2020/11/Chaperone-Requirements.pdf" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl03_lnk" style="">Chaperones</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://www.usaultimate.org/youth_requirements/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl03_rptSubSubNav_ctl01_lnkInner" style="">Youth Safety</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/coaches/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl04_lnk" style="">Coaching</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/coaches/become-a-coach/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl01_lnkInner" style="">Coaching Development Program</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/athlete-safety/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl04_rptSubSubNav_ctl02_lnkInner" style="">Athlete Protection</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_lnk" style="">Event Sanctioning & Insurance</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/sanctioning/tournament-sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl01_lnkInner" style="">Tournament Sanctioning</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/sanctioning/league-sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl02_lnkInner" style="">League Sanctioning</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/sanctioning/development-event-sanctioning/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl05_rptSubSubNav_ctl03_lnkInner" style="">Practice Insurance</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="http://gum.usaultimate.org/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl06_lnk" style="">Girls' Ultimate Movement (GUM)</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs-services/learn-to-play" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl07_lnk" style="">Learn to Play</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/coach-organizer-convention/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl08_lnk" style="">Coach & Organizer Convention</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs-services/new-start" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl09_lnk" style="">New Start Grant Kits</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_lnk" style="">Organizer Resources</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/host-a-championship-event/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl01_lnkInner" style="">Bid to Host USA Ultimate Events</a>
+         </li>
+        
+         <li>
+            <a href="https://www.usaultimate.org/tdcp/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl02_lnkInner" style="">Tournament Director's Certification Program</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl03_lnkInner" style="">Youth & Education Resources</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl04_lnkInner" style="">Women's Development</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl10_rptSubSubNav_ctl05_lnkInner" style="">College Development</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+<li>
+    <a href="https://usaultimate.org/youth/parents/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl11_lnk" style="">Parent Resources</a>
+    
+</li>
+
+<li>
+    <a href="https://www.usaultimate.org/officiating/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_lnk" style="">Rules & Officiating</a>
+    
+        <ul>
+        
+         <li>
+            <a href="https://usaultimate.org/rules/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_rptSubSubNav_ctl01_lnkInner" style="">Rules</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/observers/" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_rptSubSubNav_ctl02_lnkInner" style="">Observer Certification Program</a>
+         </li>
+        
+         <li>
+            <a href="https://usaultimate.org/programs/disc-standards" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_rptSubNav_ctl12_rptSubSubNav_ctl03_lnkInner" style="">Disc Standards</a>
+         </li>
+        
+        </ul>
+        
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl04$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl04_ccSubNav_hdn" value="27" />
+        </li>
+	
+        <li id="CT_Header_CC_TopNav_rptNav_ctl05_liItem" class="lastnavitemli">
+             <a href="https://www.usaultimate.org/membership/default.aspx" id="CT_Header_CC_TopNav_rptNav_ctl05_lnkLink1" class="lastnavitema">Membership</a>
+             
+             
+<ul>
+
+<li>
+    <a href="https://www.usaultimate.org/membervalue/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl01_lnk" style="">Benefits & Value</a>
+    
+</li>
+
+<li>
+    <a href="https://docs.google.com/forms/d/e/1FAIpQLSfmC4E50X2uP3IL70ZZgeku8TriWdsABdti-9eUNgAesoUXrA/viewform" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl02_lnk" style="">Gift Certificates</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/membership/levels/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl03_lnk" style="">Membership Levels</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/play-it-forward/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl04_lnk" style="">Play It Forward</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/membership/#resources" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl05_lnk" style="">Registration Forms: Waiver & Medical Authorization</a>
+    
+</li>
+
+<li>
+    <a href="https://usaultimate.org/programs/signature-series/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl06_lnk" style="">Signature Series Disc</a>
+    
+</li>
+
+<li>
+    <a href="/members/" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_rptSubNav_ctl07_lnk" style="">Login</a>
+    
+</li>
+
+</ul>
+
+<input type="hidden" name="CT_Header$CC_TopNav$rptNav$ctl05$ccSubNav$hdn" id="CT_Header_CC_TopNav_rptNav_ctl05_ccSubNav_hdn" value="28" />
+        </li>
+	
+	</ul>
+</nav>
+
+
+
+
+
+			
+<div class="login_area">
+    <div id="CT_LoginBar_0_divMemberPic" class="account_img">
+		<a href="/members/">
+			<img src="/assets/1/7/noImageAvailableSmall_h120.gif" border="0" />        
+		</a>
+    </div>
+	
+	<div id="CT_LoginBar_0_login_bar" class="login_bar" style="text-align:left;">
+		<div id="welcome_text">
+			<span>Welcome Back, <span class='username' id='account_btns'><a id='manage_btn' href='/members/manage/'>Brian Honea</a><br />USAU Account ID# 402444</span>
+		</div>
+		<br />
+		<div id="account_btns" class="clearfix" style="text-align:left;">
+			<a id='manage_btn' href='/members/'>Manage Account</a>
+			
+			<a id='logout_btn' href='/members/logout/'>Log Out</a>
+		</div>
+	</div>
+</div>
+
+		</header>
+		<div id="container" class="oneCol">
+			<div id="main_col" class="column">
+				<div class="headingBox">
+					
+<div class="breadcrumbs_area">
+    <div class="breadcrumbs">
+        <a href='/events/tournament/'>Home</a><span class='separator'>&gt;</span><a href='/events/2026-USA-Ultimate-Club-Nationals/'>2026 USA Ultimate Club Nationals</a><span class='separator'>&gt;</span>Schedules &amp; Standings
+    </div>
+</div>
+
+
+				</div>
+				
+
+				
+
+
+<div class="alt_page_header has-link clearfix">
+	<h1 class="title">Club - Men </h1>
+    <a class="divCollapseBtn btn" href="javascript:void(0);"><img height="13px" src="/cms/images/buttons/btn_expand_collapse.png"</a>
+    <a id="CT_Main_0_lnkBack" class="btn back" href="/events/2026-USA-Ultimate-Club-Nationals/">Go back</a>
+</div>
+<div class="clear"></div>
+
+<script type="text/javascript" language="javascript" src="/cms/includes/jquery/bracket-calc.v2.min.js"></script>
+<script type="text/javascript" language="javascript" src="/cms/includes/jquery/hide-tied-gd.js"></script>
+<script type="text/javascript" language="javascript">
+    jQuery(function ($) {
+	    $('.bracket_area').initBrackets();
+	    $('#poolSlide').hideGoalDiff();
+        
+	    $('ul.tabs li a').click(function(){
+	        var active_tab_index = $('ul.tabs li').index($(this).parent());
+	        $.ajax({
+	            type: 'GET',
+	            url: '/Ajax.aspx',
+	            data: {
+	            F: 'SetTabSession',
+	            idx: active_tab_index
+	            },
+                dataType: 'json',
+                success: function (result) {
+                    if (result.success) {
+                        //console.log('Active tab session set');
+                    } else {
+                        console.log('Active tab session set Failed [' + result.error +']');
+                    }
+                },
+                error: function (result) {
+                    console.log('Active tab session set error');
+                }
+            });
+	    });
+
+	    $('a.divCollapseBtn').click(function(){
+	        $('h3.slide_trigger a').trigger('click');
+	    });
+        
+	    checkStandings();
+    });
+
+    //expand all slides
+    $(window).load(function() {
+        $('h3.slide_trigger a').trigger('click');
+    });
+
+	function checkStandings() {
+	    $.ajax({
+	        type: 'POST',
+	        url: '/ajax/json.aspx',
+	        data: {
+	            f: 'STANDINGS_AMS',
+	            Modified: '10/25/2026 6:24:48 PM',
+	            event: 14732,
+	            eventGroup: 20002
+	            },
+	        dataType: 'json',
+	        success: function (result, textStatus) {
+	            if (result.success) {
+	                if(result.refresh){
+	                    $( "#blackOverlay" ).show(100, function(){
+	                        setTimeout(function() {
+	                            window.location.href = window.location.href;
+	                        }, 5000); 
+	                    });
+	                }
+	            } else {
+	                console.log('Checking Standings: Error Received [' + result.error +']');
+	            }
+	        },
+	        error: function (result, textStatus) {
+	            console.log('Checking Standings: Error Received');
+	            window.location.href = window.location.href;
+	        }
+	    });
+	}
+</script>
+<style>
+    #blackOverlay {
+        background: url('/cms/images/admin/black-overlay-trans.png') repeat;
+        width: 100%;
+        height: 100%;
+        position: fixed;
+        z-index: 150;
+        display: none;
+        left: 5px;
+        top: 5px;
+	}
+	#blackOverlay div {
+        width: 110px;
+        margin: 0 auto;
+        margin-top: 300px;
+        opacity: 1;
+	}
+</style>
+
+<div id="blackOverlay"><div style="width:250px;color:#fff;">Refreshing Standings and Event data...<br /><img src="/cms/images/admin/ajax-loader-trans.gif" /></div></div>
+
+
+
+
+		<ul class="tabsLeft tabs">
+	
+			<li id="CT_Main_0_rptTabs_ctl01_liTab" class="active"><a href="#" rel="section_31364_1_20002">Friday Pool Play</a></li>
+	
+			<li id="CT_Main_0_rptTabs_ctl02_liTab"><a href="#" rel="section_31365_3_20002">2026 Men's Club Championship</a></li>
+	
+			<li id="CT_Main_0_rptTabs_ctl03_liTab"><a href="#" rel="section_31366_2_20002">Fourth Place Crossovers</a></li>
+	
+			<li id="CT_Main_0_rptTabs_ctl04_liTab"><a href="#" rel="section_31367_3_20002">2027 Pro Flight Qualification</a></li>
+	
+			<li id="CT_Main_0_rptTabs_ctl05_liTab"><a href="#" rel="section_31368_3_20002">Elite Flight Placement</a></li>
+	
+		</ul>
+	
+
+
+		<div class="slides">
+	
+			<section style="display: block;" id="poolSlide" class="slide">
+<div id="section_31364_1_20002">
+<section class="section page" data-type="pool" data-sideitem="sideItem31364">
+		<div class="clearfix">
+			<div class="pool" >
+				<h3 class="col_title">Pool A</h3>
+				<table class="global_table">
+					<tbody>
+						<tr>
+							<th scope="col">Team</th>
+							<th scope="col">W - L</th>
+							<th scope="col">Tie</th>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=j1517WDa8Un5D%2fij%2bgbLl2zjU7EWbHCY5hNJQnr3IT4%3d">Ring of Fire (8)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>3 - 0</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=jRipdbHM5vT%2fvrLHQR4T14zk%2fSx4gCeflpLg7iE2%2b7A%3d">Chicago Machine (1)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>2 - 1</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=Aewce2EtxhVAvHjalwUDbr7dXfFnRgWcKgUzbg29MBs%3d">GOAT (12)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>1 - 2</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=oogbHKHyFR1WGXuCnw9hFqvPRgmSSyZ0t5KUTP8IGVk%3d">Furious George (13)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>0 - 3</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="pool" >
+				<h3 class="col_title">Pool B</h3>
+				<table class="global_table">
+					<tbody>
+						<tr>
+							<th scope="col">Team</th>
+							<th scope="col">W - L</th>
+							<th scope="col">Tie</th>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=VLlJ0%2fdW3F3mw4zHv%2fpScEXUFilS6Mx7NmQz1M1UJvY%3d">PoNY (2)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>3 - 0</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=AHp8e9pnLQHABBhqB%2fBGG3YDmrAmhvPBEXSppCGvspI%3d">Chain Lightning (7)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>2 - 1</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=xZeP2gXv43%2fBCtLGsdU6iSIjakIEHOaZJrC7jscAlEc%3d">Johnny Bravo (14)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>1 - 2</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=OOwjbp2jWZyHsKIB9NffDh1a%2bAlalN8e08fezpztvpA%3d">Sockeye (11)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>0 - 3</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="pool" >
+				<h3 class="col_title">Pool C</h3>
+				<table class="global_table">
+					<tbody>
+						<tr>
+							<th scope="col">Team</th>
+							<th scope="col">W - L</th>
+							<th scope="col">Tie</th>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=86BatnsQ7EAbXmmO5qta%2fmNI9mZyks1U1zHk8CCy0Ys%3d">Rhino Slam! (3)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>3 - 0</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=Ftz1Ak3XcOORNY6P8SDvL8pWbwkZ74mq8jJD%2bWmtjmY%3d">Philadelphia Pacmen (10)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>2 - 1</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=qv0YMfQI7CpthWhY9qsXJ%2by6Ei3s9LCNLNWgirgJ4RE%3d">Sub Zero (6)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>1 - 2</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=8yZ4PuA%2b4WS64mWQ3jW5gjWKO7bgMuGSxjEdZXFZmfc%3d">Mephisto (15)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>0 - 3</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="pool" >
+				<h3 class="col_title">Pool D</h3>
+				<table class="global_table">
+					<tbody>
+						<tr>
+							<th scope="col">Team</th>
+							<th scope="col">W - L</th>
+							<th scope="col">Tie</th>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=PKfkSGsh5jT9GEZ6tUOzUfv%2bs8zI4AiuJZaDmFq2WDo%3d">Revolver (5)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>3 - 0</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=c%2b%2bYxB0QIhKk0R7zimS8cT42I6wOMXEdZWsE18NOWTY%3d">DiG (4)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>2 - 1</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=gt4EMm%2fSH4jnxbKnOAHJRENMiSShWjTkKj9DsTLPsLw%3d">Truck Stop (9)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>1 - 2</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+						<tr style='border: 1px solid #eee;'>
+							<td><a href="/events/teams/?EventTeamId=kO2VtRsa7Si%2f6iQ6Iwde25CUQG%2fbVYLNOEzZMxdC1jo%3d">Doublewide (16)</a></td>
+							<td class='WinLosePoints' style='padding-left: 3px; padding-right: 3px; text-align: left;'>0 - 3</td>
+							<td style='font-size: 10px'><span class='tieBreakerPoints'></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+			<table class="global_table scores_table">
+				<thead>
+					<tr>
+						<th colspan="8">Pool A Schedule &amp; Scores</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<th scope="col">Date</th>
+						<th scope="col">Time</th>
+						<th scope="col">Field</th>
+						<th scope="col">Team 1</th>
+						<th scope="col">Team 2</th>
+						<th scope="col">Score</th>
+						<th scope="col">Status</th>
+						<th scope="col">Options</th>
+					</tr>
+					<tr data-game="418579">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">9:00 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">5</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=jRipdbHM5vT%2fvrLHQR4T14zk%2fSx4gCeflpLg7iE2%2b7A%3d">Chicago Machine (1)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=Aewce2EtxhVAvHjalwUDbr7dXfFnRgWcKgUzbg29MBs%3d">GOAT (12)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">12</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=9oi7gfr5bk2o99T87kHthbY1vORtvFAycDuAStlBerU%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418580" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">9:00 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">15</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=j1517WDa8Un5D%2fij%2bgbLl2zjU7EWbHCY5hNJQnr3IT4%3d">Ring of Fire (8)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=oogbHKHyFR1WGXuCnw9hFqvPRgmSSyZ0t5KUTP8IGVk%3d">Furious George (13)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">6</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=UtoY2Lb0TI5epE2NMOBD8MTEIlAVt%2b4vO2QCQKtyPYU%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418581">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">11:15 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">5</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=jRipdbHM5vT%2fvrLHQR4T14zk%2fSx4gCeflpLg7iE2%2b7A%3d">Chicago Machine (1)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=oogbHKHyFR1WGXuCnw9hFqvPRgmSSyZ0t5KUTP8IGVk%3d">Furious George (13)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">14</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=JNQhKZu5%2bfvMiZnTO%2bb5X6o%2faLRN0g%2bPZFToNNowkk4%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418582" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">11:15 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">15</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=j1517WDa8Un5D%2fij%2bgbLl2zjU7EWbHCY5hNJQnr3IT4%3d">Ring of Fire (8)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=Aewce2EtxhVAvHjalwUDbr7dXfFnRgWcKgUzbg29MBs%3d">GOAT (12)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">14</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">12</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=5He8hYpP9ahGXaKL54GXiaWQq1RcGt9VKTTEz3e%2fLcI%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418583">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">1:30 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">10</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=jRipdbHM5vT%2fvrLHQR4T14zk%2fSx4gCeflpLg7iE2%2b7A%3d">Chicago Machine (1)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=j1517WDa8Un5D%2fij%2bgbLl2zjU7EWbHCY5hNJQnr3IT4%3d">Ring of Fire (8)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">13</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">14</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=kR4Kxy7sFRvVcAdPDkI7TQEbhxLDeY5ZW7auD7ugy%2fs%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418584" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">1:30 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">7</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=Aewce2EtxhVAvHjalwUDbr7dXfFnRgWcKgUzbg29MBs%3d">GOAT (12)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=oogbHKHyFR1WGXuCnw9hFqvPRgmSSyZ0t5KUTP8IGVk%3d">Furious George (13)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">13</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=VBUK8sp0R9%2bfmtLTnRjO3Fg4iQ6VRLIUexuQpfF5SXs%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<table class="global_table scores_table">
+				<thead>
+					<tr>
+						<th colspan="8">Pool B Schedule &amp; Scores</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<th scope="col">Date</th>
+						<th scope="col">Time</th>
+						<th scope="col">Field</th>
+						<th scope="col">Team 1</th>
+						<th scope="col">Team 2</th>
+						<th scope="col">Score</th>
+						<th scope="col">Status</th>
+						<th scope="col">Options</th>
+					</tr>
+					<tr data-game="418585">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">11:15 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">10</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=VLlJ0%2fdW3F3mw4zHv%2fpScEXUFilS6Mx7NmQz1M1UJvY%3d">PoNY (2)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=OOwjbp2jWZyHsKIB9NffDh1a%2bAlalN8e08fezpztvpA%3d">Sockeye (11)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">12</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=8njUiyTx1wHPrHogwq7utL6bGjexdfuAi1XQmps4rDg%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418586" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">11:15 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">11</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=AHp8e9pnLQHABBhqB%2fBGG3YDmrAmhvPBEXSppCGvspI%3d">Chain Lightning (7)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=xZeP2gXv43%2fBCtLGsdU6iSIjakIEHOaZJrC7jscAlEc%3d">Johnny Bravo (14)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">10</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=Q7G8Ttty6hREVevIwtMVlAdy0FydO6q4qjNKIDuyvZo%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418587">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">1:30 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">3</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=VLlJ0%2fdW3F3mw4zHv%2fpScEXUFilS6Mx7NmQz1M1UJvY%3d">PoNY (2)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=xZeP2gXv43%2fBCtLGsdU6iSIjakIEHOaZJrC7jscAlEc%3d">Johnny Bravo (14)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">12</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=2dUpu%2b%2bxjhC44aBmAHSgirQKSnwn3DF2eMfzMP7CHd4%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418588" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">1:30 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">5</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=AHp8e9pnLQHABBhqB%2fBGG3YDmrAmhvPBEXSppCGvspI%3d">Chain Lightning (7)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=OOwjbp2jWZyHsKIB9NffDh1a%2bAlalN8e08fezpztvpA%3d">Sockeye (11)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">14</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">12</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=2mL%2bKpNrTNyRtZ3CldSj6ws10umqifa8LFj5FA1g2PE%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418589">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">3:45 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">3</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=VLlJ0%2fdW3F3mw4zHv%2fpScEXUFilS6Mx7NmQz1M1UJvY%3d">PoNY (2)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=AHp8e9pnLQHABBhqB%2fBGG3YDmrAmhvPBEXSppCGvspI%3d">Chain Lightning (7)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">14</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=btdgFGifuq21uY7pZfdULjfh%2bSByJVPg%2bORwIIOgWxk%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418590" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">3:45 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">5</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=OOwjbp2jWZyHsKIB9NffDh1a%2bAlalN8e08fezpztvpA%3d">Sockeye (11)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=xZeP2gXv43%2fBCtLGsdU6iSIjakIEHOaZJrC7jscAlEc%3d">Johnny Bravo (14)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">12</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">15</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=ohFL5TavK%2fBOn6MtOjG06sCorqhj6CWvw5YD3bMCv7c%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<table class="global_table scores_table">
+				<thead>
+					<tr>
+						<th colspan="8">Pool C Schedule &amp; Scores</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<th scope="col">Date</th>
+						<th scope="col">Time</th>
+						<th scope="col">Field</th>
+						<th scope="col">Team 1</th>
+						<th scope="col">Team 2</th>
+						<th scope="col">Score</th>
+						<th scope="col">Status</th>
+						<th scope="col">Options</th>
+					</tr>
+					<tr data-game="418591">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">9:00 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">11</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=86BatnsQ7EAbXmmO5qta%2fmNI9mZyks1U1zHk8CCy0Ys%3d">Rhino Slam! (3)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=Ftz1Ak3XcOORNY6P8SDvL8pWbwkZ74mq8jJD%2bWmtjmY%3d">Philadelphia Pacmen (10)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">14</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=5SEVbE0KCxnyLJLx9EN%2fXcO3kU%2bPWn0Ee%2fBpoENgbeM%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418592" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">9:00 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">6</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=qv0YMfQI7CpthWhY9qsXJ%2by6Ei3s9LCNLNWgirgJ4RE%3d">Sub Zero (6)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=8yZ4PuA%2b4WS64mWQ3jW5gjWKO7bgMuGSxjEdZXFZmfc%3d">Mephisto (15)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">12</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=gO1lqPm0LQMgDnz%2bvlj9McEWVXCvoN%2bnsQESpbArhjU%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418593">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">1:30 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">14</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=86BatnsQ7EAbXmmO5qta%2fmNI9mZyks1U1zHk8CCy0Ys%3d">Rhino Slam! (3)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=8yZ4PuA%2b4WS64mWQ3jW5gjWKO7bgMuGSxjEdZXFZmfc%3d">Mephisto (15)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">13</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=GFSudKKL6AV6S5UHjdhZngA0OhT9CjtgS%2fwY6YTQfg4%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418594" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">1:30 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">18</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=qv0YMfQI7CpthWhY9qsXJ%2by6Ei3s9LCNLNWgirgJ4RE%3d">Sub Zero (6)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=Ftz1Ak3XcOORNY6P8SDvL8pWbwkZ74mq8jJD%2bWmtjmY%3d">Philadelphia Pacmen (10)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">11</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">15</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=1pdyddx%2foly6lt105zFCBVmG9XUaRwaI8vo8bxbqVUw%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418595">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">3:45 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">10</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=86BatnsQ7EAbXmmO5qta%2fmNI9mZyks1U1zHk8CCy0Ys%3d">Rhino Slam! (3)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=qv0YMfQI7CpthWhY9qsXJ%2by6Ei3s9LCNLNWgirgJ4RE%3d">Sub Zero (6)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">12</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=CdgMjUQnhiANi5pg5%2fsSNqavhGVj2YiPpSB3vwfr4QQ%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418596" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">3:45 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">18</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=Ftz1Ak3XcOORNY6P8SDvL8pWbwkZ74mq8jJD%2bWmtjmY%3d">Philadelphia Pacmen (10)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=8yZ4PuA%2b4WS64mWQ3jW5gjWKO7bgMuGSxjEdZXFZmfc%3d">Mephisto (15)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">10</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=vK2zp%2fWBMIgfFsSqccYLDthBaQF3Gu920lgsD0n1gB4%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<table class="global_table scores_table">
+				<thead>
+					<tr>
+						<th colspan="8">Pool D Schedule &amp; Scores</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<th scope="col">Date</th>
+						<th scope="col">Time</th>
+						<th scope="col">Field</th>
+						<th scope="col">Team 1</th>
+						<th scope="col">Team 2</th>
+						<th scope="col">Score</th>
+						<th scope="col">Status</th>
+						<th scope="col">Options</th>
+					</tr>
+					<tr data-game="418599">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">9:00 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">9</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=PKfkSGsh5jT9GEZ6tUOzUfv%2bs8zI4AiuJZaDmFq2WDo%3d">Revolver (5)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=kO2VtRsa7Si%2f6iQ6Iwde25CUQG%2fbVYLNOEzZMxdC1jo%3d">Doublewide (16)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">5</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=ndSHoZyxi6g8w8hN4QxHO1JiQKRlPfk0ZfXkhSF2jgc%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418600" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">9:00 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">10</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=c%2b%2bYxB0QIhKk0R7zimS8cT42I6wOMXEdZWsE18NOWTY%3d">DiG (4)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=gt4EMm%2fSH4jnxbKnOAHJRENMiSShWjTkKj9DsTLPsLw%3d">Truck Stop (9)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">10</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=WIoEm%2b9UMhpBqWuhm%2fe0NzbnEgexx0nfTCCJvmF4X4Q%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418597">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">11:15 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">9</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=PKfkSGsh5jT9GEZ6tUOzUfv%2bs8zI4AiuJZaDmFq2WDo%3d">Revolver (5)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=gt4EMm%2fSH4jnxbKnOAHJRENMiSShWjTkKj9DsTLPsLw%3d">Truck Stop (9)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">12</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=fLK4SD0OHh%2f%2bDBeX8%2bwCWMS6p4h41xP9CmFL9z37GnE%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418598" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">11:15 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">17</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=c%2b%2bYxB0QIhKk0R7zimS8cT42I6wOMXEdZWsE18NOWTY%3d">DiG (4)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=kO2VtRsa7Si%2f6iQ6Iwde25CUQG%2fbVYLNOEzZMxdC1jo%3d">Doublewide (16)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">9</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=nAo0sv8tHFf%2bssNHB7CeO45z0YzplP4EkLtlS6dBMCQ%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418601">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">3:45 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">4</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=PKfkSGsh5jT9GEZ6tUOzUfv%2bs8zI4AiuJZaDmFq2WDo%3d">Revolver (5)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=c%2b%2bYxB0QIhKk0R7zimS8cT42I6wOMXEdZWsE18NOWTY%3d">DiG (4)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">14</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=GATghrJQsgSGu0aA%2bbIkuoIhGrObHB5CBVQwUfykqeY%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418602" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Fri 10/23</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">3:45 PM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">14</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=gt4EMm%2fSH4jnxbKnOAHJRENMiSShWjTkKj9DsTLPsLw%3d">Truck Stop (9)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=kO2VtRsa7Si%2f6iQ6Iwde25CUQG%2fbVYLNOEzZMxdC1jo%3d">Doublewide (16)</a>
+</span>
+</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">7</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=FTAjyaR4LVa4UqQyQk0%2bK9OoMfzm0dsrOb7Be%2fRp9PI%3d" class="options editGame editPool" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+</section>
+
+</div>
+</section>
+
+	
+			<section style="display: none;" id="bracketSlide" class="slide">
+<div id="section_31365_3_20002">
+<section class="section page" data-type="cluster" data-sideitem="siteItem31365">
+			<div class="mod_slide alt_slide">
+				<h3 class="slide_trigger">
+					<a href="#">Championship</a>
+				</h3>
+				<div class="mod_slide_contents">
+					<div class="bracket_wrpr">
+						<div class="bracket_area clearfix">
+							<div class="bracket_col">
+								<h4 class="col_title">Final</h4>
+								<div id="game418613" class="bracket_game top_game" data-index="1" data-relation="">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=zI4o4Il3cCxIUhCOO%2bfHCkToy05qQ2Lnc%2bmuGsJmeY4%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=j1517WDa8Un5D%2fij%2bgbLl2zjU7EWbHCY5hNJQnr3IT4%3d">Ring of Fire (8)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">12</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=jRipdbHM5vT%2fvrLHQR4T14zk%2fSx4gCeflpLg7iE2%2b7A%3d">Chicago Machine (1)</a></span>
+										</span>
+									</div>
+	<p class='location'>4</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 3:45 PM</span>
+								</div>
+							</div>
+							<div class="bracket_col">
+								<h4 class="col_title">Semifinals</h4>
+								<div id="game418611" class="bracket_game top_game has_next" data-index="1" data-relation="game418613">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=Bkty%2bEp4YSvLUDmKjfniZFa%2bOG8FDf3PrktOzD5w0kc%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=j1517WDa8Un5D%2fij%2bgbLl2zjU7EWbHCY5hNJQnr3IT4%3d">Ring of Fire (8)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">12</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=PKfkSGsh5jT9GEZ6tUOzUfv%2bs8zI4AiuJZaDmFq2WDo%3d">Revolver (5)</a></span>
+										</span>
+									</div>
+	<p class='location'>2</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 11:15 AM</span>
+								</div>
+								<div id="game418612" class="bracket_game btm_game has_next" data-index="2" data-relation="game418613">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=fD7XsPgy%2f0rMQBPXVd7VYXk9%2bINvsgrAn%2f7oyX9kxsQ%3d">G2</a></p>
+										</div>
+									</div>
+									<div class="top_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">14</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=86BatnsQ7EAbXmmO5qta%2fmNI9mZyks1U1zHk8CCy0Ys%3d">Rhino Slam! (3)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=jRipdbHM5vT%2fvrLHQR4T14zk%2fSx4gCeflpLg7iE2%2b7A%3d">Chicago Machine (1)</a></span>
+										</span>
+									</div>
+	<p class='location'>3</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 11:15 AM</span>
+								</div>
+							</div>
+							<div class="bracket_col">
+								<h4 class="col_title">Quarterfinals</h4>
+								<div id="game418607" class="bracket_game top_game has_next" data-index="1" data-relation="game418611">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=2DbtxLOnTdAoI5rfG255Z2ZvwJA1EKDesuzpy8ofcxY%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=j1517WDa8Un5D%2fij%2bgbLl2zjU7EWbHCY5hNJQnr3IT4%3d">Ring of Fire (8)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">9</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=qv0YMfQI7CpthWhY9qsXJ%2by6Ei3s9LCNLNWgirgJ4RE%3d">Sub Zero (6)</a></span>
+										</span>
+									</div>
+	<p class='location'>4</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 3:45 PM</span>
+								</div>
+								<div id="game418608" class="bracket_game btm_game has_next" data-index="2" data-relation="game418611">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=ulrkWMj55oaxWvpF8282bDfMFyoms1tlzvpXRL3uMGw%3d">G2</a></p>
+										</div>
+									</div>
+									<div class="top_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">11</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=xZeP2gXv43%2fBCtLGsdU6iSIjakIEHOaZJrC7jscAlEc%3d">Johnny Bravo (14)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=PKfkSGsh5jT9GEZ6tUOzUfv%2bs8zI4AiuJZaDmFq2WDo%3d">Revolver (5)</a></span>
+										</span>
+									</div>
+	<p class='location'>11</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 3:45 PM</span>
+								</div>
+								<div id="game418609" class="bracket_game top_game has_next" data-index="3" data-relation="game418612">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=4zEcrztQnDCEqJth8P7uWsGwyX2uy31C7A4s9MnAZuU%3d">G3</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=86BatnsQ7EAbXmmO5qta%2fmNI9mZyks1U1zHk8CCy0Ys%3d">Rhino Slam! (3)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">11</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=Aewce2EtxhVAvHjalwUDbr7dXfFnRgWcKgUzbg29MBs%3d">GOAT (12)</a></span>
+										</span>
+									</div>
+	<p class='location'>3</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 3:45 PM</span>
+								</div>
+								<div id="game418610" class="bracket_game btm_game has_next" data-index="4" data-relation="game418612">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=eGg6Mxqu3NSojHUa3mSmkIhMCNcuW78ysMMcqzWH6RU%3d">G4</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=jRipdbHM5vT%2fvrLHQR4T14zk%2fSx4gCeflpLg7iE2%2b7A%3d">Chicago Machine (1)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">14</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=VLlJ0%2fdW3F3mw4zHv%2fpScEXUFilS6Mx7NmQz1M1UJvY%3d">PoNY (2)</a></span>
+										</span>
+									</div>
+	<p class='location'>1</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 3:45 PM</span>
+								</div>
+							</div>
+							<div class="bracket_col">
+								<h4 class="col_title">Prequarterfinals</h4>
+								<div id="game418603" class="bracket_game btm_game has_next" data-index="2" data-relation="game418607">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=7Y13fg%2boSf5XrGekLBZG0H8Tl4tKyPzfNLhv3UUwC9c%3d">G2</a></p>
+										</div>
+									</div>
+									<div class="top_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">14</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=AHp8e9pnLQHABBhqB%2fBGG3YDmrAmhvPBEXSppCGvspI%3d">Chain Lightning (7)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=qv0YMfQI7CpthWhY9qsXJ%2by6Ei3s9LCNLNWgirgJ4RE%3d">Sub Zero (6)</a></span>
+										</span>
+									</div>
+	<p class='location'>3</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 11:15 AM</span>
+								</div>
+								<div id="game418604" class="bracket_game top_game has_next" data-index="3" data-relation="game418608">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=KWlNSsnAY6yIsmwA8u7smzK4ryIM6nERa2kBmadfC7c%3d">G3</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=xZeP2gXv43%2fBCtLGsdU6iSIjakIEHOaZJrC7jscAlEc%3d">Johnny Bravo (14)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">12</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=Ftz1Ak3XcOORNY6P8SDvL8pWbwkZ74mq8jJD%2bWmtjmY%3d">Philadelphia Pacmen (10)</a></span>
+										</span>
+									</div>
+	<p class='location'>11</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 11:15 AM</span>
+								</div>
+								<div id="game418605" class="bracket_game btm_game has_next" data-index="6" data-relation="game418609">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=nOlWRnxXaHxwIJ9eZV4%2fsa4kYQ97F3ts%2b4CV%2bvA1lWI%3d">G6</a></p>
+										</div>
+									</div>
+									<div class="top_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">12</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=c%2b%2bYxB0QIhKk0R7zimS8cT42I6wOMXEdZWsE18NOWTY%3d">DiG (4)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=Aewce2EtxhVAvHjalwUDbr7dXfFnRgWcKgUzbg29MBs%3d">GOAT (12)</a></span>
+										</span>
+									</div>
+	<p class='location'>10</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 11:15 AM</span>
+								</div>
+								<div id="game418606" class="bracket_game top_game has_next" data-index="7" data-relation="game418610">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=PbDQzZSIDlOeEzqAHjctz0b2P1E2NCGUT34zMe1t9I8%3d">G7</a></p>
+										</div>
+									</div>
+									<div class="top_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">8</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=gt4EMm%2fSH4jnxbKnOAHJRENMiSShWjTkKj9DsTLPsLw%3d">Truck Stop (9)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=jRipdbHM5vT%2fvrLHQR4T14zk%2fSx4gCeflpLg7iE2%2b7A%3d">Chicago Machine (1)</a></span>
+										</span>
+									</div>
+	<p class='location'>4</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 11:15 AM</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+</section>
+
+</div>
+</section>
+
+	
+			<section style="display: none;" id="clusterSlide" class="slide">
+<div id="section_31366_2_20002">
+<section class="section page" data-type="cluster" data-sideitem="siteItem31366">
+			<table class="global_table scores_table">
+				<thead>
+					<tr>
+						<th colspan="8">Crossover</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<th scope="col">Date</th>
+						<th scope="col">Time</th>
+						<th scope="col">Field</th>
+						<th scope="col">Team 1</th>
+						<th scope="col">Team 2</th>
+						<th scope="col">Score</th>
+						<th scope="col">Status</th>
+						<th scope="col">Options</th>
+					</tr>
+					<tr data-game="418614">
+						<td>
+							<span class="adjust-data" data-type="game-date">Sat 10/24</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">11:15 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">15</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=OOwjbp2jWZyHsKIB9NffDh1a%2bAlalN8e08fezpztvpA%3d">Sockeye (11)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=8yZ4PuA%2b4WS64mWQ3jW5gjWKO7bgMuGSxjEdZXFZmfc%3d">Mephisto (15)</a>
+					</span>
+						</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">15</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">9</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=LdY7TM2LKi94EWdXwTSjT13ESsRyee8H5OFdExL0Fys%3d" class="options editGame editCluster" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+					<tr data-game="418615" class="alt">
+						<td>
+							<span class="adjust-data" data-type="game-date">Sat 10/24</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-time">11:15 AM</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type"game-field">16</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-home">
+								<a href="/events/teams/?EventTeamId=oogbHKHyFR1WGXuCnw9hFqvPRgmSSyZ0t5KUTP8IGVk%3d">Furious George (13)</a>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-team-away">
+								<a href="/events/teams/?EventTeamId=kO2VtRsa7Si%2f6iQ6Iwde25CUQG%2fbVYLNOEzZMxdC1jo%3d">Doublewide (16)</a>
+					</span>
+						</td>
+						<td>
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-home">13</span>
+							</span>
+							&nbsp;-&nbsp;
+							<span class="isScore">
+								<span class="adjust-data" data-type="game-score-away">14</span>
+							</span>
+						</td>
+						<td>
+							<span class="adjust-data" data-type="game-status">Final</span>
+						</td>
+						<td class="options">
+							<a href="/teams/events/match_report/?Score=y&EventGameId=CYdOasN5BPwjBa27SfFNF0uN%2bDem%2bNyE5gJoaKASo6U%3d" class="options editGame editCluster" data-icon="e">
+								<span>Match Report</span>
+							</a>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+</section>
+
+</div>
+</section>
+
+	
+			<section style="display: none;" id="bracketSlide" class="slide">
+<div id="section_31367_3_20002">
+<section class="section page" data-type="cluster" data-sideitem="siteItem31367">
+			<div class="mod_slide alt_slide">
+				<h3 class="slide_trigger">
+					<a href="#">Fifth Place Bracket</a>
+				</h3>
+				<div class="mod_slide_contents">
+					<div class="bracket_wrpr">
+						<div class="bracket_area clearfix">
+							<div class="bracket_col">
+								<h4 class="col_title">Fifth Place</h4>
+								<div id="game418618" class="bracket_game top_game" data-index="1" data-relation="">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=Yrq%2bmh4oi4qi6yfSqOv%2bqm%2f3cry8d3%2f8E5ah163X8jE%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=VLlJ0%2fdW3F3mw4zHv%2fpScEXUFilS6Mx7NmQz1M1UJvY%3d">PoNY (2)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">13</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=qv0YMfQI7CpthWhY9qsXJ%2by6Ei3s9LCNLNWgirgJ4RE%3d">Sub Zero (6)</a></span>
+										</span>
+									</div>
+	<p class='location'>14</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 11:15 AM</span>
+								</div>
+							</div>
+							<div class="bracket_col">
+								<h4 class="col_title">Fifth Place Semifinal</h4>
+								<div id="game418616" class="bracket_game top_game has_next" data-index="1" data-relation="game418618">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=fySdkW1n5Nu5WAiZVxSfCMC6GjNwEpoqB7S2XB3dp1I%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=VLlJ0%2fdW3F3mw4zHv%2fpScEXUFilS6Mx7NmQz1M1UJvY%3d">PoNY (2)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">12</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=xZeP2gXv43%2fBCtLGsdU6iSIjakIEHOaZJrC7jscAlEc%3d">Johnny Bravo (14)</a></span>
+										</span>
+									</div>
+	<p class='location'>12</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 9:00 AM</span>
+								</div>
+								<div id="game418617" class="bracket_game btm_game has_next" data-index="2" data-relation="game418618">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=FoZ9O%2b55VvSnAjzwvyl7yDXj%2fAUJo1iduwsKalsmHYQ%3d">G2</a></p>
+										</div>
+									</div>
+									<div class="top_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">14</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=Aewce2EtxhVAvHjalwUDbr7dXfFnRgWcKgUzbg29MBs%3d">GOAT (12)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=qv0YMfQI7CpthWhY9qsXJ%2by6Ei3s9LCNLNWgirgJ4RE%3d">Sub Zero (6)</a></span>
+										</span>
+									</div>
+	<p class='location'>13</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 9:00 AM</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+</section>
+<section class="section page" data-type="cluster" data-sideitem="siteItem31367">
+			<div class="mod_slide alt_slide">
+				<h3 class="slide_trigger">
+					<a href="#">Pro Flight Play In (A)</a>
+				</h3>
+				<div class="mod_slide_contents">
+					<div class="bracket_wrpr">
+						<div class="bracket_area clearfix">
+							<div class="bracket_col">
+								<h4 class="col_title">Pro Flight Play In / 7th Place (tie)</h4>
+								<div id="game418622" class="bracket_game top_game" data-index="1" data-relation="">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=FNNomnTelGZmhD7FI1%2fyf7xcjHoGq5nSXfCOEjftt90%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">12</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=xZeP2gXv43%2fBCtLGsdU6iSIjakIEHOaZJrC7jscAlEc%3d">Johnny Bravo (14)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=c%2b%2bYxB0QIhKk0R7zimS8cT42I6wOMXEdZWsE18NOWTY%3d">DiG (4)</a></span>
+										</span>
+									</div>
+	<p class='location'>12</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 11:15 AM</span>
+								</div>
+							</div>
+							<div class="bracket_col">
+								<h4 class="col_title">Seventh Place Semifinal</h4>
+								<div id="game418621" class="bracket_game btm_game has_next" data-index="2" data-relation="game418622">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=2rwYotTBEDpUYk29ulzYEj9a8Ep7MffDv6h3pK%2bRLc4%3d">G2</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=c%2b%2bYxB0QIhKk0R7zimS8cT42I6wOMXEdZWsE18NOWTY%3d">DiG (4)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">11</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=Ftz1Ak3XcOORNY6P8SDvL8pWbwkZ74mq8jJD%2bWmtjmY%3d">Philadelphia Pacmen (10)</a></span>
+										</span>
+									</div>
+	<p class='location'>14</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 9:00 AM</span>
+								</div>
+							</div>
+							<div class="bracket_col">
+								<h4 class="col_title">Seventh Place Quarterfinal</h4>
+								<div id="game418619" class="bracket_game top_game has_next" data-index="3" data-relation="game418621">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=9UbseWbeQAb6YXFcoGx0BiuB6eutHKuFGFRQJfLSpWE%3d">G3</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=c%2b%2bYxB0QIhKk0R7zimS8cT42I6wOMXEdZWsE18NOWTY%3d">DiG (4)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">10</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=oogbHKHyFR1WGXuCnw9hFqvPRgmSSyZ0t5KUTP8IGVk%3d">Furious George (13)</a></span>
+										</span>
+									</div>
+	<p class='location'>5</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 3:45 PM</span>
+								</div>
+								<div id="game418620" class="bracket_game btm_game has_next" data-index="4" data-relation="game418621">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=8cHhmmEl4EWnRznUbjSN5f8Bi5SbgXCWQfh9P2zFReU%3d">G4</a></p>
+										</div>
+									</div>
+									<div class="top_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">14</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=OOwjbp2jWZyHsKIB9NffDh1a%2bAlalN8e08fezpztvpA%3d">Sockeye (11)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=Ftz1Ak3XcOORNY6P8SDvL8pWbwkZ74mq8jJD%2bWmtjmY%3d">Philadelphia Pacmen (10)</a></span>
+										</span>
+									</div>
+	<p class='location'>14</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 3:45 PM</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+</section>
+<section class="section page" data-type="cluster" data-sideitem="siteItem31367">
+			<div class="mod_slide alt_slide">
+				<h3 class="slide_trigger">
+					<a href="#">Pro Flight Play In (B)</a>
+				</h3>
+				<div class="mod_slide_contents">
+					<div class="bracket_wrpr">
+						<div class="bracket_area clearfix">
+							<div class="bracket_col">
+								<h4 class="col_title">Pro Flight Play In / 7th Place (tie)</h4>
+								<div id="game418626" class="bracket_game top_game" data-index="1" data-relation="">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=xEactB3OSs0yD9giYvg00uH%2bv%2fdhJ%2buvIofuuh4epwQ%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">14</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=gt4EMm%2fSH4jnxbKnOAHJRENMiSShWjTkKj9DsTLPsLw%3d">Truck Stop (9)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">13</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=Aewce2EtxhVAvHjalwUDbr7dXfFnRgWcKgUzbg29MBs%3d">GOAT (12)</a></span>
+										</span>
+									</div>
+	<p class='location'>13</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 11:15 AM</span>
+								</div>
+							</div>
+							<div class="bracket_col">
+								<h4 class="col_title">Seventh Place Semifinal</h4>
+								<div id="game418625" class="bracket_game top_game has_next" data-index="1" data-relation="game418626">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=IQLzOV6Er%2bz6LSLPogk0lXU6YUpNmjejOFBEUPvrUoM%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=gt4EMm%2fSH4jnxbKnOAHJRENMiSShWjTkKj9DsTLPsLw%3d">Truck Stop (9)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">14</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=AHp8e9pnLQHABBhqB%2fBGG3YDmrAmhvPBEXSppCGvspI%3d">Chain Lightning (7)</a></span>
+										</span>
+									</div>
+	<p class='location'>15</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 9:00 AM</span>
+								</div>
+							</div>
+							<div class="bracket_col">
+								<h4 class="col_title">Seventh Place Quarterfinal</h4>
+								<div id="game418623" class="bracket_game top_game has_next" data-index="1" data-relation="game418625">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=fjl4wLnydzDy6kBqn76dHs7ZbjAZqYKBUhgji3UspCM%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=gt4EMm%2fSH4jnxbKnOAHJRENMiSShWjTkKj9DsTLPsLw%3d">Truck Stop (9)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">7</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=kO2VtRsa7Si%2f6iQ6Iwde25CUQG%2fbVYLNOEzZMxdC1jo%3d">Doublewide (16)</a></span>
+										</span>
+									</div>
+	<p class='location'>15</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 3:45 PM</span>
+								</div>
+								<div id="game418624" class="bracket_game btm_game has_next" data-index="2" data-relation="game418625">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=iMdWOCdbZO150Ft4BC%2fTPgLmJJ9UYnd5sMf%2bt6mnA%2bI%3d">G2</a></p>
+										</div>
+									</div>
+									<div class="top_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">13</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=8yZ4PuA%2b4WS64mWQ3jW5gjWKO7bgMuGSxjEdZXFZmfc%3d">Mephisto (15)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=AHp8e9pnLQHABBhqB%2fBGG3YDmrAmhvPBEXSppCGvspI%3d">Chain Lightning (7)</a></span>
+										</span>
+									</div>
+	<p class='location'>16</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/24/2026 3:45 PM</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+</section>
+
+</div>
+</section>
+
+	
+			<section style="display: none;" id="bracketSlide" class="slide">
+<div id="section_31368_3_20002">
+<section class="section page" data-type="cluster" data-sideitem="siteItem31368">
+			<div class="mod_slide alt_slide">
+				<h3 class="slide_trigger">
+					<a href="#">Eleventh Place</a>
+				</h3>
+				<div class="mod_slide_contents">
+					<div class="bracket_wrpr">
+						<div class="bracket_area clearfix">
+							<div class="bracket_col">
+								<h4 class="col_title">Eleventh Place</h4>
+								<div id="game418627" class="bracket_game top_game" data-index="1" data-relation="">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=XwTUYTMSgWo9ZQX8RehkHl1b3aC%2fpQNlF1AdXRxMQqE%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=Ftz1Ak3XcOORNY6P8SDvL8pWbwkZ74mq8jJD%2bWmtjmY%3d">Philadelphia Pacmen (10)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">14</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=AHp8e9pnLQHABBhqB%2fBGG3YDmrAmhvPBEXSppCGvspI%3d">Chain Lightning (7)</a></span>
+										</span>
+									</div>
+	<p class='location'>15</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 11:15 AM</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+</section>
+<section class="section page" data-type="cluster" data-sideitem="siteItem31368">
+			<div class="mod_slide alt_slide">
+				<h3 class="slide_trigger">
+					<a href="#">Thirteenth Place Bracket</a>
+				</h3>
+				<div class="mod_slide_contents">
+					<div class="bracket_wrpr">
+						<div class="bracket_area clearfix">
+							<div class="bracket_col">
+								<h4 class="col_title">Thirteenth Place</h4>
+								<div id="game418630" class="bracket_game top_game" data-index="1" data-relation="">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=y4eR%2babFBLc1PkDh8iIyrXPbSeY5avcJGCwj0IPIBzw%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=OOwjbp2jWZyHsKIB9NffDh1a%2bAlalN8e08fezpztvpA%3d">Sockeye (11)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">12</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=kO2VtRsa7Si%2f6iQ6Iwde25CUQG%2fbVYLNOEzZMxdC1jo%3d">Doublewide (16)</a></span>
+										</span>
+									</div>
+	<p class='location'>16</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 11:15 AM</span>
+								</div>
+							</div>
+							<div class="bracket_col">
+								<h4 class="col_title">Thirteenth Place Semifinal</h4>
+								<div id="game418628" class="bracket_game top_game has_next" data-index="1" data-relation="game418630">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=3Rzzp1Y%2bsH%2fNfZiB447cqu1I2eh%2bcvkg4kdZB6Zm%2bUg%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">9</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=oogbHKHyFR1WGXuCnw9hFqvPRgmSSyZ0t5KUTP8IGVk%3d">Furious George (13)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">15</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=OOwjbp2jWZyHsKIB9NffDh1a%2bAlalN8e08fezpztvpA%3d">Sockeye (11)</a></span>
+										</span>
+									</div>
+	<p class='location'>16</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 9:00 AM</span>
+								</div>
+								<div id="game418629" class="bracket_game btm_game has_next" data-index="2" data-relation="game418630">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=7%2f9wwhqYQ37Ndu8TReBD37%2bNYjmj3%2bwdhaeLqSY9R5E%3d">G2</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">14</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=kO2VtRsa7Si%2f6iQ6Iwde25CUQG%2fbVYLNOEzZMxdC1jo%3d">Doublewide (16)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">13</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=8yZ4PuA%2b4WS64mWQ3jW5gjWKO7bgMuGSxjEdZXFZmfc%3d">Mephisto (15)</a></span>
+										</span>
+									</div>
+	<p class='location'>17</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 9:00 AM</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+</section>
+<section class="section page" data-type="cluster" data-sideitem="siteItem31368">
+			<div class="mod_slide alt_slide">
+				<h3 class="slide_trigger">
+					<a href="#">Fifteenth Place</a>
+				</h3>
+				<div class="mod_slide_contents">
+					<div class="bracket_wrpr">
+						<div class="bracket_area clearfix">
+							<div class="bracket_col">
+								<h4 class="col_title">Fifteenth Place</h4>
+								<div id="game418631" class="bracket_game top_game" data-index="1" data-relation="">
+									<div class="gameID_area">
+										<div class="gameID">
+											<span></span>
+											<p><a href="/teams/events/match_report/?Score=y&EventGameId=yvqYJlq%2bD1rgOxCO3NNkLDJsYxLF6Z6NaEnP1eCvFgY%3d">G1</a></p>
+										</div>
+									</div>
+									<div class="top_area  winner">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-home">14</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-home"><a href="/events/teams/?EventTeamId=oogbHKHyFR1WGXuCnw9hFqvPRgmSSyZ0t5KUTP8IGVk%3d">Furious George (13)</a></span>
+										</span>
+									</div>
+									<div class="btm_area  loser">
+										<span class="isScore">
+											<span class="score adjust-data" data-type="game-score-away">10</span>
+										</span>
+										<span class="isName">
+											<span class="team adjust-data" data-type="game-team-away"><a href="/events/teams/?EventTeamId=8yZ4PuA%2b4WS64mWQ3jW5gjWKO7bgMuGSxjEdZXFZmfc%3d">Mephisto (15)</a></span>
+										</span>
+									</div>
+	<p class='location'>17</p>
+<span class='game-status'>Final</span>
+	<span class='date'>10/25/2026 11:15 AM</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+</section>
+
+</div>
+</section>
+
+	
+		</div>
+	
+
+
+<br />
+
+			</div>
+		</div>
+	</div>
+	<div id="footer">
+		<div class="footer">
+			
+
+<div class="footer_info clearfix">
+	&copy; 2026 usaultimate.org All Rights Reserved.
+	<ul class="footer_links clearfix">
+		<li><a href="http://www.usaultimate.org/privacy_policy.aspx">Privacy Policy</a></li>
+		<li>|</li>
+		<li><a href="http://www.usaultimate.org/site_map.aspx">Site Map</a></li>
+		<li>|</li>
+		<li><a href="http://www.usaultimate.org/about/contacts/">Contact Us</a></li>
+	</ul>
+</div>
+
+<div class="vcard">
+	<a class="fn org url" href="http://www.usaultimate.org">USA Ultimate</a>
+	<div class="adr">
+		<div><span class="street-address">3630 Sinton Road</span> • <span class="extended-address">Suite 103</span></div> 
+		<span class="locality">Colorado Springs</span>,  
+		<abbr class="region" title="Colorado">CO</abbr>
+		<span class="postal-code">80907</span>
+		<div class="country-name">USA</div>
+	</div>
+	<div class="tel">719.219.8322 <span class="type">Work</span></div>
+</div>
+
+		</div>
+	</div>
+	
+	
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="3989C74E" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="u7khpw8Ty0RSTigQP1PqBGL6wnBBkNT92l+QOequxlBHAvN875pkWw/wACpqKwUAdyJmP/aga0zTiaOgG8fCxU7FA/SNAFI9vVUtXcxpTbTw/Ko367F7xJKxRPYswOQxBVUQfF9SfJY6W5XYUp34t2pmwYGJWubN2MFNSoOBcUWL5ZaMXC5ptbw3hVIH4qNP/u8Kt3JDBGW7WmOjaccVWYf8njY=" />
+</div><input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="7GgX4ODZni2Ejq7FeEH2RhNz5/4tvbzXBIMe1N5yJLiqyRn0WA67joJlpYIwwwrZNXOujXqaM2n4y+baWD7AVvniUhmYu5N1Ie5sTjVaxXs2CZH+v3A510ut792/eqlCl29bjRtlgsA1Xp/+ZuD2yX39Oio6XoAR3ecc5xjkstNtTps0UTG7E7567FNA+D7Il6BEv47k4UQ5SWYwOdFw26ll0LnGtEyNiN0s3s6Rfsab5PuWHXVgpMnzEp3DnBlzVB3MxhZktZNj2yyd9+CXmgHwihZDMvDgYAhMy2vUap3M334rT1NygI5005GuDWo8KQPU1OutDpTXTJ+3h/e5Kc9gJClBHotZinAlKcP+tGuHzMXGYsxcDx0+kmBpvRuGTdHM5TNFRgjcgmLlsuhwLCeVOZxXi9CIHx6BduymoPAxtEzVCm+V6G/8dOvA1U7mZ959GydLezbbeQYsymMpJHi7rXhE96afUvLod5OpLL8TnQKewddn8cuZU+URQU3z4CVjrplwDrZe0VUWUfwlfnvSH0zoBA6DPW15/OsSliahcX3zmq0S0E7Y+hQYTDcT17mAaeCuBJdiVZd9+R2yN8xeuLRUIMgy9FSkn/28zOu/MrtoRyIBVmTVH3HAhV8meWccMCzApsXU+BGxQ6z4xy/XOybG3krwHMziDl0Q2GyMWjcpOabRtvvE+7Xe3/U+wxYHadZ3NRAzHgq680/6ya7uh9Mh4vlt/6WfzI0vsgQ2TO36HG4YjRPKyp/XoVP93p7t6JzIkUDv7F7kjHsV7Ek9ft531r9tzcZma3Vus5G9SCV+26JHg4zwtyvKNyKQwXEZpA==" /></form>  
+</body>
+</html>

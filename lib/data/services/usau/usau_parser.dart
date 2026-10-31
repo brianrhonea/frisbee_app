@@ -3,10 +3,12 @@ import 'package:html/parser.dart' as html;
 
 import '../../../domain/models/ranking.dart';
 import '../../../domain/models/tournament.dart';
+import '../../../domain/models/usau_schedule.dart';
 import '../../../domain/models/usau_team.dart';
 
 /// Dart port of `functions/src/usau/parse.ts`. Keep the two in sync until the
-/// Cloud Functions take over scraping again.
+/// Cloud Functions take over scraping again. Event schedules
+/// ([parseEventDivisions], [parseDivisionSchedule]) are app-only for now.
 const usauBase = 'https://play.usaultimate.org';
 
 /// A published ranking list on USA Ultimate, e.g. "Club Men".
@@ -228,7 +230,15 @@ UsauPostBack? _postBackFor(Document doc, Element link) {
   final target = _postBackTarget.firstMatch(link.attributes['href'] ?? '');
   final form = doc.querySelector('form');
   if (target == null || form == null) return null;
+  final fields = _formFields(form)
+    ..['__EVENTTARGET'] = target[1]!
+    ..['__EVENTARGUMENT'] = '';
+  return (action: form.attributes['action'] ?? '', fields: fields);
+}
 
+/// The values [form] would submit by default: named inputs (skipping
+/// buttons and unchecked boxes) and each select's selected option.
+Map<String, String> _formFields(Element form) {
   final fields = <String, String>{};
   for (final input in form.querySelectorAll('input')) {
     final name = input.attributes['name'];
@@ -256,9 +266,7 @@ UsauPostBack? _postBackFor(Document doc, Element link) {
       fields[name] = selected.attributes['value'] ?? _clean(selected.text);
     }
   }
-  fields['__EVENTTARGET'] = target[1]!;
-  fields['__EVENTARGUMENT'] = '';
-  return (action: form.attributes['action'] ?? '', fields: fields);
+  return fields;
 }
 
 /// Maps each column in [patterns] to the index of the first matching header
@@ -610,4 +618,215 @@ List<UsauRequest> parseTeamTabs(String source, {required String pageUrl}) {
     out.add((url: url, fields: null));
   }
   return out;
+}
+
+/// A division schedule link on an event page, and the form post that opens
+/// it.
+typedef UsauDivisionLink = ({UsauDivision division, UsauRequest request});
+
+final _divisionTitle = RegExp(
+  r"^(.*?)(?:'s)?\s+Division\s+Schedule$",
+  caseSensitive: false,
+);
+
+/// Parses an event page (`events/<slug>/`) for its division schedule buttons.
+/// Each `dl.groupType` is a gender ("Men's Division Schedule") with one
+/// submit button per competition level ("Club"). Empty when no schedule has
+/// been published.
+List<UsauDivisionLink> parseEventDivisions(
+  String source, {
+  required String pageUrl,
+}) {
+  final doc = html.parse(source);
+  final form = doc.querySelector('form');
+  if (form == null) return const [];
+  final action = Uri.parse(
+    pageUrl,
+  ).resolve(form.attributes['action'] ?? '').toString();
+  final base = _formFields(form);
+  final out = <UsauDivisionLink>[];
+  for (final group in doc.querySelectorAll('dl.groupType')) {
+    final title = _clean(group.querySelector('dt')?.text);
+    final label = _divisionTitle.firstMatch(title)?[1] ?? title;
+    for (final button in group.querySelectorAll('input[type=submit]')) {
+      final name = button.attributes['name'];
+      if (name == null || name.isEmpty) continue;
+      final value = button.attributes['value'] ?? '';
+      out.add((
+        division: UsauDivision(label: label, level: _clean(value)),
+        request: (
+          url: action,
+          fields: {
+            ...base,
+            '__EVENTTARGET': '',
+            '__EVENTARGUMENT': '',
+            name: value,
+          },
+        ),
+      ));
+    }
+  }
+  return out;
+}
+
+/// Parses a division schedule page
+/// (`events/<slug>/schedule/<gender>/<level>-<gender>/`).
+///
+/// Each tab in `ul.tabs` names a stage whose content is the element with
+/// the tab's `rel` as its id. A stage holds pool standings (`div.pool`),
+/// game tables (`table.scores_table`) and brackets (`div.mod_slide` with
+/// `div.bracket_col` columns listed final first).
+UsauDivisionSchedule parseDivisionSchedule(
+  String source, {
+  required String url,
+}) {
+  final doc = html.parse(source);
+  final stages = <UsauStage>[];
+  for (final a in doc.querySelectorAll('ul.tabs li a')) {
+    final rel = a.attributes['rel'] ?? '';
+    if (rel.isEmpty) continue;
+    final content = doc.getElementById(rel);
+    if (content == null) continue;
+    final stage = UsauStage(
+      title: _clean(a.text),
+      pools: [for (final p in content.querySelectorAll('div.pool')) _pool(p)],
+      gameLists: [
+        for (final t in content.querySelectorAll('table.scores_table'))
+          _gameList(t),
+      ].where((l) => l.games.isNotEmpty).toList(),
+      brackets: [
+        for (final s in content.querySelectorAll('.mod_slide')) ?_bracket(s),
+      ],
+    );
+    if (!stage.isEmpty) stages.add(stage);
+  }
+  return UsauDivisionSchedule(
+    title: _clean(doc.querySelector('.alt_page_header h1')?.text),
+    url: url,
+    stages: stages,
+  );
+}
+
+UsauPool _pool(Element pool) => UsauPool(
+  name: _clean(pool.querySelector('.col_title')?.text),
+  teams: [
+    for (final tr in pool.querySelectorAll('tr'))
+      if (_cells(tr) case [
+        final team,
+        final record,
+        ...,
+      ] when _clean(team.text).isNotEmpty)
+        _poolTeam(team, record),
+  ],
+);
+
+UsauPoolTeam _poolTeam(Element team, Element record) {
+  final (:name, :seed) = splitSeed(_clean(team.text));
+  return UsauPoolTeam(
+    name: name,
+    seed: seed,
+    record: _clean(record.text),
+    url: _absolute(team.querySelector('a')?.attributes['href']),
+  );
+}
+
+String _dataText(Element scope, String type) =>
+    _clean(scope.querySelector('[data-type="$type"]')?.text);
+
+UsauGameSide _side(
+  Element scope,
+  String side, {
+  required bool won,
+  required String score,
+}) {
+  final team = scope.querySelector('[data-type="game-team-$side"]');
+  final (:name, :seed) = splitSeed(_clean(team?.text));
+  return UsauGameSide(
+    name: name,
+    seed: seed,
+    score: score,
+    won: won,
+    url: _absolute(team?.querySelector('a')?.attributes['href']),
+  );
+}
+
+UsauGameList _gameList(Element table) {
+  final games = <UsauScheduleGame>[];
+  for (final tr in table.querySelectorAll('tr[data-game]')) {
+    final cells = _cells(tr);
+    if (cells.length < 3) continue;
+    final home = _dataText(tr, 'game-score-home');
+    final away = _dataText(tr, 'game-score-away');
+    final status = _dataText(tr, 'game-status');
+    final (h, a) = (int.tryParse(home), int.tryParse(away));
+    final done = RegExp('final', caseSensitive: false).hasMatch(status);
+    final decided = done && h != null && a != null && h != a;
+    games.add(
+      UsauScheduleGame(
+        id: tr.attributes['data-game'] ?? '',
+        date: _dataText(tr, 'game-date'),
+        time: _dataText(tr, 'game-time'),
+        // The field span's data-type attribute is malformed on USAU, so
+        // read the third column.
+        field: _clean(cells[2].text),
+        status: status,
+        home: _side(tr, 'home', won: decided && h > a, score: home),
+        away: _side(tr, 'away', won: decided && a > h, score: away),
+      ),
+    );
+  }
+  return UsauGameList(
+    title: _clean(table.querySelector('thead th')?.text),
+    games: games,
+  );
+}
+
+UsauBracket? _bracket(Element slide) {
+  final columns = slide.querySelectorAll('.bracket_col');
+  if (columns.isEmpty) return null;
+  return UsauBracket(
+    title: _clean(slide.querySelector('.slide_trigger')?.text),
+    rounds: [
+      for (final col in columns.reversed)
+        UsauBracketRound(
+          name: _clean(col.querySelector('.col_title')?.text),
+          games: [
+            for (final g in col.querySelectorAll('.bracket_game'))
+              _bracketGame(g),
+          ],
+        ),
+    ],
+  );
+}
+
+String _gameId(String? domId) =>
+    (domId ?? '').replaceFirst(RegExp('^game'), '');
+
+UsauBracketGame _bracketGame(Element game) {
+  final top = game.querySelector('.top_area');
+  final btm = game.querySelector('.btm_area');
+  final when = _clean(game.querySelector('.date')?.text);
+  final m = RegExp(r'^(\S+)\s+(.+)$').firstMatch(when);
+  return UsauBracketGame(
+    id: _gameId(game.id),
+    nextId: _gameId(game.attributes['data-relation']),
+    slot: int.tryParse(game.attributes['data-index'] ?? ''),
+    label: _clean(game.querySelector('.gameID')?.text),
+    date: m?[1] ?? when,
+    time: m?[2] ?? '',
+    field: _clean(game.querySelector('.location')?.text),
+    status: _clean(game.querySelector('.game-status')?.text),
+    home: _side(
+      game,
+      'home',
+      won: top?.classes.contains('winner') ?? false,
+      score: _dataText(game, 'game-score-home'),
+    ),
+    away: _side(
+      game,
+      'away',
+      won: btm?.classes.contains('winner') ?? false,
+      score: _dataText(game, 'game-score-away'),
+    ),
+  );
 }

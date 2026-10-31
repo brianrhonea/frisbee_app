@@ -45,4 +45,18 @@ abstract class EventRepository {
     String uid,
     List<String> optionIds,
   );
+
+  // Personal schedule: events only [uid] sees, without responses or polls.
+
+  /// [uid]'s personal events, sorted by start time.
+  Stream<List<TeamEvent>> watchMyEvents(String uid);
+
+  /// Emits null if the event is deleted.
+  Stream<TeamEvent?> watchMyEvent(String uid, String eventId);
+
+  /// Creates the event when [TeamEvent.isNew], otherwise updates it.
+  /// Returns the saved event id.
+  Future<Result<String>> saveMyEvent(String uid, TeamEvent event);
+
+  Future<Result<void>> deleteMyEvent(String uid, String eventId);
 }

@@ -2,31 +2,38 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/team/team_repository.dart';
+import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
-/// Creates or edits an event. Form state lives in the screen; this loads the
-/// original and saves the submitted draft.
+/// Creates or edits a team or personal event. Form state lives in the
+/// screen; this loads the original and saves the submitted draft.
+///
+/// A new event can go on the user's personal schedule or on any team
+/// schedule they may edit ([setSchedule]); an existing one stays where it is.
 class EventEditorViewModel extends ChangeNotifier {
   EventEditorViewModel({
-    required this.teamId,
+    required String? teamId,
     required this.eventId,
     required EventRepository eventRepository,
+    required TeamRepository teamRepository,
     required AuthRepository authRepository,
     DateTime? initialDay,
-  }) : _events = eventRepository,
+  }) : _teamId = teamId,
+       _events = eventRepository,
+       _teams = teamRepository,
        _auth = authRepository,
        _initialDay = initialDay {
     load = Command0<void>(_load)..execute();
     save = Command1<String, TeamEvent>(_save);
   }
 
-  final String teamId;
-
   /// Null when creating an event.
   final String? eventId;
   final EventRepository _events;
+  final TeamRepository _teams;
   final AuthRepository _auth;
   final DateTime? _initialDay;
 
@@ -38,6 +45,30 @@ class EventEditorViewModel extends ChangeNotifier {
   TeamEvent? _original;
 
   bool get isNew => eventId == null;
+
+  String get _uid => _auth.currentUser?.uid ?? '';
+
+  String? _teamId;
+
+  /// Team whose schedule the event is on; null for the personal schedule.
+  String? get teamId => _teamId;
+
+  bool get isPersonal => _teamId == null;
+
+  List<Team> _editableTeams = const [];
+
+  /// Teams whose schedule a new event may go on.
+  List<Team> get editableTeams => _editableTeams;
+
+  bool get canChooseSchedule => isNew && _editableTeams.isNotEmpty;
+
+  /// Moves a new event to [teamId]'s schedule, or the personal one if null.
+  void setSchedule(String? teamId) {
+    if (!isNew) return;
+    if (teamId != null && !_editableTeams.any((t) => t.id == teamId)) return;
+    _teamId = teamId;
+    notifyListeners();
+  }
 
   /// Starting values for the form.
   TeamEvent get initial =>
@@ -54,9 +85,14 @@ class EventEditorViewModel extends ChangeNotifier {
 
   Future<Result<void>> _load() async {
     final id = eventId;
-    if (id == null) return const Result.ok(null);
+    if (id == null) return _loadTeams();
+    final teamId = _teamId;
     try {
-      _original = await _events.watchEvent(teamId, id).first;
+      _original =
+          await (teamId == null
+                  ? _events.watchMyEvent(_uid, id)
+                  : _events.watchEvent(teamId, id))
+              .first;
     } on Exception catch (e) {
       return Result.error(e);
     }
@@ -67,12 +103,33 @@ class EventEditorViewModel extends ChangeNotifier {
     return const Result.ok(null);
   }
 
+  Future<Result<void>> _loadTeams() async {
+    try {
+      final teams = await _teams.watchMyTeams(_uid).first;
+      _editableTeams = [
+        for (final t in teams)
+          if (t.canEdit(_uid)) t,
+      ];
+    } on Exception {
+      // Without the team list the event can still go on the personal
+      // schedule.
+      _editableTeams = const [];
+    }
+    if (!_editableTeams.any((t) => t.id == _teamId)) _teamId = null;
+    notifyListeners();
+    return const Result.ok(null);
+  }
+
   Future<Result<String>> _save(TeamEvent draft) {
     final event = draft.copyWith(id: eventId ?? '');
+    final teamId = _teamId;
+    if (teamId == null) {
+      return _events.saveMyEvent(_uid, event.copyWith(poll: () => null));
+    }
     return _events.saveEvent(
       teamId,
       event,
-      _auth.currentUser?.uid ?? '',
+      _uid,
       clearVotes: _pollChanged(_original?.poll, event.poll),
     );
   }

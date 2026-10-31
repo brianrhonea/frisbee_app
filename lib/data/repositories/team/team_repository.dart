@@ -18,7 +18,12 @@ abstract class TeamRepository {
 
   Future<Result<void>> updateTeam(Team team);
 
-  Future<Result<void>> regenerateInviteCode(Team team);
+  /// The code other users enter to join as a player. Kept off the team so
+  /// only owners, coaches and captains can read it; others get an error.
+  Stream<String?> watchInviteCode(String teamId);
+
+  /// Replaces the invite code; the old one stops working. Owner only.
+  Future<Result<void>> regenerateInviteCode(String teamId);
 
   Future<Result<void>> setMemberRole(String teamId, String uid, TeamRole role);
 
@@ -52,7 +57,13 @@ abstract class TeamRepository {
     List<RosterPlayer> players,
   );
 
-  Stream<List<RosterPlayer>> watchRoster(String teamId);
+  /// Roster sorted by number, then name. Only team admins may pass
+  /// [withStatus] to include paid and USA Ultimate status; without it those
+  /// fields are left empty.
+  Stream<List<RosterPlayer>> watchRoster(
+    String teamId, {
+    bool withStatus = false,
+  });
 
   /// Creates the player when [RosterPlayer.id] is empty, otherwise updates it.
   Future<Result<void>> savePlayer(String teamId, RosterPlayer player);

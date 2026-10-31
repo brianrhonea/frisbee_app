@@ -20,10 +20,30 @@ import 'team_form.dart';
 
 enum _MenuAction { edit, leave, delete }
 
+/// Team detail tabs, in display order. Linkable via `Routes.team(tab:)`.
+enum TeamTab {
+  schedule('Schedule'),
+  roster('Roster'),
+  playbook('Playbook'),
+  stats('Stats'),
+  members('Members');
+
+  const TeamTab(this.label);
+  final String label;
+
+  static TeamTab byName(String? name) =>
+      values.where((t) => t.name == name).firstOrNull ?? schedule;
+}
+
 class TeamDetailScreen extends StatefulWidget {
-  const TeamDetailScreen({super.key, required this.viewModel});
+  const TeamDetailScreen({
+    super.key,
+    required this.viewModel,
+    this.initialTab = TeamTab.schedule,
+  });
 
   final TeamDetailViewModel viewModel;
+  final TeamTab initialTab;
 
   @override
   State<TeamDetailScreen> createState() => _TeamDetailScreenState();
@@ -157,7 +177,8 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
           );
         }
         return DefaultTabController(
-          length: 5,
+          length: TeamTab.values.length,
+          initialIndex: widget.initialTab.index,
           child: Scaffold(
             appBar: AppBar(
               title: Text(team.name),
@@ -183,16 +204,10 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                   ],
                 ),
               ],
-              bottom: const TabBar(
+              bottom: TabBar(
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                tabs: [
-                  Tab(text: 'Schedule'),
-                  Tab(text: 'Roster'),
-                  Tab(text: 'Playbook'),
-                  Tab(text: 'Stats'),
-                  Tab(text: 'Members'),
-                ],
+                tabs: [for (final t in TeamTab.values) Tab(text: t.label)],
               ),
             ),
             body: TabBarView(

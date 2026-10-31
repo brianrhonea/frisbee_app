@@ -54,7 +54,7 @@ class UsauRosterViewModel extends ChangeNotifier {
         }
         notifyListeners();
       }, onError: _onError),
-      _teams.watchRoster(teamId).listen((r) {
+      _teams.watchRoster(teamId, withStatus: true).listen((r) {
         _roster = r;
         notifyListeners();
       }, onError: _onError),

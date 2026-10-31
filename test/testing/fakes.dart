@@ -1,16 +1,23 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
+
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
+import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
+import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
+import 'package:frisbee_app/data/repositories/usau_schedule/usau_schedule_repository.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/play.dart';
+import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/tournament.dart';
+import 'package:frisbee_app/domain/models/usau_schedule.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 const testUser = AppUser(uid: 'u1', email: 'a@b.com', displayName: 'Alex');
@@ -88,6 +95,14 @@ class FakeTeamRepository implements TeamRepository {
   final _teamsController = StreamController<void>.broadcast();
   String? joinedCode;
 
+  /// teamId → invite code; unlisted teams use `CODE` plus the team id.
+  final codes = <String, String>{};
+
+  /// Teams whose invite code was watched, to check who may read it.
+  final inviteWatches = <String>[];
+
+  String _codeOf(String teamId) => codes[teamId] ?? 'CODE$teamId';
+
   void _emit() => _teamsController.add(null);
 
   @override
@@ -115,7 +130,6 @@ class FakeTeamRepository implements TeamRepository {
       city: team.city,
       ownerId: owner.uid,
       members: {owner.uid: TeamRole.owner},
-      inviteCode: 'CODE$id',
     );
     _emit();
     return Result.ok(id);
@@ -125,7 +139,7 @@ class FakeTeamRepository implements TeamRepository {
   Future<Result<String>> joinTeam(String inviteCode, AppUser user) async {
     joinedCode = inviteCode;
     final team = teams.values
-        .where((t) => t.inviteCode == inviteCode)
+        .where((t) => _codeOf(t.id) == inviteCode)
         .firstOrNull;
     if (team == null) return Result.error(Exception('No team'));
     teams[team.id] = Team(
@@ -134,7 +148,6 @@ class FakeTeamRepository implements TeamRepository {
       division: team.division,
       level: team.level,
       ownerId: team.ownerId,
-      inviteCode: team.inviteCode,
       members: {...team.members, user.uid: TeamRole.player},
     );
     _emit();
@@ -149,8 +162,18 @@ class FakeTeamRepository implements TeamRepository {
   }
 
   @override
-  Future<Result<void>> regenerateInviteCode(Team team) async =>
-      const Result.ok(null);
+  Stream<String?> watchInviteCode(String teamId) async* {
+    inviteWatches.add(teamId);
+    yield _codeOf(teamId);
+    yield* _teamsController.stream.map((_) => _codeOf(teamId));
+  }
+
+  @override
+  Future<Result<void>> regenerateInviteCode(String teamId) async {
+    codes[teamId] = 'NEW$teamId';
+    _emit();
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<void>> setMemberRole(
@@ -174,7 +197,6 @@ class FakeTeamRepository implements TeamRepository {
       level: t.level,
       city: t.city,
       ownerId: t.ownerId,
-      inviteCode: t.inviteCode,
       members: t.members,
       memberNames: t.memberNames,
       statKeepers: on
@@ -200,7 +222,6 @@ class FakeTeamRepository implements TeamRepository {
       level: t.level,
       city: t.city,
       ownerId: newOwnerUid,
-      inviteCode: t.inviteCode,
       members: {
         ...t.members,
         newOwnerUid: TeamRole.owner,
@@ -241,7 +262,6 @@ class FakeTeamRepository implements TeamRepository {
       level: t.level,
       city: t.city,
       ownerId: t.ownerId,
-      inviteCode: t.inviteCode,
       members: t.members,
       memberNames: t.memberNames,
       statKeepers: t.statKeepers,
@@ -262,8 +282,21 @@ class FakeTeamRepository implements TeamRepository {
   }
 
   @override
-  Stream<List<RosterPlayer>> watchRoster(String teamId) =>
-      Stream.value(roster[teamId] ?? const []);
+  Stream<List<RosterPlayer>> watchRoster(
+    String teamId, {
+    bool withStatus = false,
+  }) => Stream.value([
+    for (final p in roster[teamId] ?? const <RosterPlayer>[])
+      withStatus
+          ? p
+          : RosterPlayer(
+              id: p.id,
+              name: p.name,
+              number: p.number,
+              position: p.position,
+              userId: p.userId,
+            ),
+  ]);
 
   @override
   Future<Result<void>> savePlayer(String teamId, RosterPlayer player) async =>
@@ -276,11 +309,14 @@ class FakeTeamRepository implements TeamRepository {
 
 class FakePlayRepository implements PlayRepository {
   final plays = <String, Play>{};
+
+  /// Per-team plays; teams not listed here see [plays].
+  final byTeam = <String, List<Play>>{};
   int saves = 0;
 
   @override
   Stream<List<Play>> watchPlays(String teamId) =>
-      Stream.value(plays.values.toList());
+      Stream.value(byTeam[teamId] ?? plays.values.toList());
 
   @override
   Future<Result<Play>> getPlay(String teamId, String playId) async {
@@ -312,6 +348,33 @@ class FakeTournamentRepository implements TournamentRepository {
   Stream<List<Tournament>> watchTournaments() => Stream.value(tournaments);
 }
 
+class FakeUsauScheduleRepository implements UsauScheduleRepository {
+  FakeUsauScheduleRepository({this.schedules = const {}});
+
+  /// Each division's schedule; a division mapped to null fails to load.
+  final Map<UsauDivision, UsauDivisionSchedule?> schedules;
+  final requests = <(UsauDivision, bool)>[];
+
+  /// When set, schedule loads wait for it to complete.
+  Completer<void>? hold;
+
+  @override
+  Future<Result<List<UsauDivision>>> getDivisions(String eventUrl) async =>
+      Result.ok(schedules.keys.toList());
+
+  @override
+  Future<Result<UsauDivisionSchedule>> getSchedule(
+    String eventUrl,
+    UsauDivision division, {
+    bool refresh = false,
+  }) async {
+    requests.add((division, refresh));
+    await hold?.future;
+    final s = schedules[division];
+    return s == null ? Result.error(Exception('No schedule')) : Result.ok(s);
+  }
+}
+
 Team teamWith(
   Map<String, TeamRole> members, {
   String id = 't1',
@@ -324,23 +387,36 @@ Team teamWith(
   level: CompetitionLevel.club,
   ownerId: members.entries.firstWhere((e) => e.value == TeamRole.owner).key,
   members: members,
-  inviteCode: 'CODE$id',
 );
+
+class FakeRankingRepository implements RankingRepository {
+  FakeRankingRepository(this.divisions);
+
+  final List<RankingDivision> divisions;
+
+  @override
+  Stream<List<RankingDivision>> watchDivisions() => Stream.value(divisions);
+}
 
 class FakeEventRepository implements EventRepository {
   final events = <String, TeamEvent>{};
+
+  /// Per-team events for multi-team tests; teams not listed here see
+  /// [events].
+  final byTeam = <String, Map<String, TeamEvent>>{};
   final _changes = StreamController<void>.broadcast();
   bool? lastClearVotes;
 
-  void _emit() => _changes.add(null);
+  void emit() => _changes.add(null);
 
-  List<TeamEvent> _sorted() =>
-      events.values.toList()..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+  List<TeamEvent> _sorted(String teamId) =>
+      (byTeam[teamId] ?? events).values.toList()
+        ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
   @override
   Stream<List<TeamEvent>> watchEvents(String teamId) async* {
-    yield _sorted();
-    yield* _changes.stream.map((_) => _sorted());
+    yield _sorted(teamId);
+    yield* _changes.stream.map((_) => _sorted(teamId));
   }
 
   @override
@@ -359,14 +435,14 @@ class FakeEventRepository implements EventRepository {
     lastClearVotes = clearVotes;
     final id = event.isNew ? 'e${events.length + 1}' : event.id;
     events[id] = event.copyWith(id: id);
-    _emit();
+    emit();
     return Result.ok(id);
   }
 
   @override
   Future<Result<void>> deleteEvent(String teamId, String eventId) async {
-    events.remove(eventId);
-    _emit();
+    (byTeam[teamId] ?? events).remove(eventId);
+    emit();
     return const Result.ok(null);
   }
 
@@ -410,7 +486,7 @@ class FakeEventRepository implements EventRepository {
       reactions: going ? null : ({...e.reactions}..remove(uid)),
       votes: going ? null : ({...e.votes}..remove(uid)),
     );
-    _emit();
+    emit();
     return const Result.ok(null);
   }
 
@@ -427,7 +503,7 @@ class FakeEventRepository implements EventRepository {
     on ? mine.add(reaction) : mine.remove(reaction);
     reactions[uid] = mine;
     events[eventId] = _with(eventId, reactions: reactions);
-    _emit();
+    emit();
     return const Result.ok(null);
   }
 
@@ -441,7 +517,56 @@ class FakeEventRepository implements EventRepository {
     final votes = {...events[eventId]!.votes};
     optionIds.isEmpty ? votes.remove(uid) : votes[uid] = optionIds;
     events[eventId] = _with(eventId, votes: votes);
-    _emit();
+    emit();
+    return const Result.ok(null);
+  }
+
+  /// Personal events, keyed by uid then event id.
+  final mine = <String, Map<String, TeamEvent>>{};
+
+  List<TeamEvent> _mineSorted(String uid) =>
+      (mine[uid] ?? const {}).values.toList()
+        ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+
+  @override
+  Stream<List<TeamEvent>> watchMyEvents(String uid) async* {
+    yield _mineSorted(uid);
+    yield* _changes.stream.map((_) => _mineSorted(uid));
+  }
+
+  @override
+  Stream<TeamEvent?> watchMyEvent(String uid, String eventId) async* {
+    yield mine[uid]?[eventId];
+    yield* _changes.stream.map((_) => mine[uid]?[eventId]);
+  }
+
+  @override
+  Future<Result<String>> saveMyEvent(String uid, TeamEvent event) async {
+    final events = mine[uid] ??= {};
+    final id = event.isNew ? 'm${events.length + 1}' : event.id;
+    events[id] = event.copyWith(id: id);
+    emit();
+    return Result.ok(id);
+  }
+
+  @override
+  Future<Result<void>> deleteMyEvent(String uid, String eventId) async {
+    mine[uid]?.remove(eventId);
+    emit();
+    return const Result.ok(null);
+  }
+}
+
+class FakeThemeRepository extends ThemeRepository {
+  ThemeMode _mode = ThemeMode.system;
+
+  @override
+  ThemeMode get themeMode => _mode;
+
+  @override
+  Future<Result<void>> setThemeMode(ThemeMode mode) async {
+    _mode = mode;
+    notifyListeners();
     return const Result.ok(null);
   }
 }

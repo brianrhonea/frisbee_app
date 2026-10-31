@@ -14,6 +14,20 @@ service cloud.firestore {
     function codePath(code) {
       return /databases/$(database)/documents/inviteCodes/$(code);
     }
+    // The team's current invite code, readable by admins only.
+    function invitePath(teamId) {
+      return /databases/$(database)/documents/teams/$(teamId)/private/invite;
+    }
+    // Code a user entered to join; the join() proof.
+    function joinPath(teamId, userId) {
+      return /databases/$(database)/documents/teams/$(teamId)/joins/$(userId);
+    }
+    // Older teams kept the code on the team doc until an admin opened them.
+    function currentCode(teamId, team) {
+      return exists(invitePath(teamId))
+        ? get(invitePath(teamId)).data.code
+        : team.get('inviteCode', '');
+    }
 
     // Roles (TeamRole in lib/domain/models/team.dart):
     //   owner   everything: roles, ownership, new invite codes
@@ -44,10 +58,43 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
 
+    // Event details, shared by team and personal events.
+    function validEvent(e) {
+      return e.title is string && e.title.size() > 0 && e.title.size() <= 100
+        && e.type in ['practice', 'game', 'tournament', 'scrimmage', 'workout', 'social', 'other']
+        && e.startsAt is timestamp
+        && (e.endsAt == null || (e.endsAt is timestamp && e.endsAt >= e.startsAt))
+        && validString(e.location, 200)
+        && validString(e.notes, 5000)
+        && (e.poll == null || validPoll(e.poll));
+    }
+
+    function validPoll(p) {
+      return p.keys().hasOnly(['question', 'options', 'multiple'])
+        && p.question is string && p.question.size() > 0 && p.question.size() <= 200
+        && p.options is list && p.options.size() >= 2 && p.options.size() <= 10
+        && p.multiple is bool;
+    }
+
     // ---- Users ------------------------------------------------------------
 
     match /users/{userId} {
       allow read, write: if signedIn() && uid() == userId;
+
+      // Personal schedule: private to its owner, no polls or responses.
+      match /events/{eventId} {
+        function validMine() {
+          let d = request.resource.data;
+          return d.keys().hasOnly([
+                   'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
+                   'poll', 'createdAt', 'updatedAt'])
+            && d.get('poll', null) == null
+            && validEvent(d);
+        }
+
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create, update: if signedIn() && uid() == userId && validMine();
+      }
     }
 
     // ---- Teams ------------------------------------------------------------
@@ -55,22 +102,22 @@ service cloud.firestore {
     match /teams/{teamId} {
       allow read: if signedIn() && isMember(resource.data);
 
-      // Creator becomes sole owner and must create the matching invite code
-      // in the same batch.
+      // Creator becomes sole owner and must create the private invite code
+      // and its lookup in the same batch. The code isn't on the team doc,
+      // which every member can read.
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
-             'memberIds', 'memberNames', 'inviteCode', 'createdAt'])
+             'memberIds', 'memberNames', 'createdAt'])
         && validTeamFields(request.resource.data)
         && request.resource.data.ownerId == uid()
         && request.resource.data.members == {(uid()): 'owner'}
         && request.resource.data.memberIds == [uid()]
         && request.resource.data.memberNames.keys().hasOnly([uid()])
-        && request.resource.data.inviteCode is string
-        && getAfter(codePath(request.resource.data.inviteCode)).data.teamId == teamId;
+        && getAfter(codePath(getAfter(invitePath(teamId)).data.code)).data.teamId == teamId;
 
       allow update: if signedIn() && (
-        editDetails() || linkUsau() || regenerateCode() || changeRole() ||
+        editDetails() || linkUsau() || dropLegacyCode() || changeRole() ||
         setStatKeepers() || transferOwnership() || removeMember() || join()
       );
 
@@ -94,10 +141,13 @@ service cloud.firestore {
           && (t.get('usauSyncedAt', null) == null || t.usauSyncedAt == request.time);
       }
 
-      function regenerateCode() {
-        return isOwner(resource.data)
-          && changed().hasOnly(['inviteCode'])
-          && getAfter(codePath(request.resource.data.inviteCode)).data.teamId == teamId;
+      // Admins move an older team's code off the team doc (into
+      // private/invite) and clear the old join proof.
+      function dropLegacyCode() {
+        return isEditor(resource.data)
+          && changed().hasOnly(['inviteCode', 'joinCode'])
+          && request.resource.data.get('inviteCode', null) == null
+          && request.resource.data.get('joinCode', null) == null;
       }
 
       // Owner changes another existing member's role. Rules can't pull the
@@ -168,12 +218,13 @@ service cloud.firestore {
                   && resource.data.members[target] in ['player', 'stats']));
       }
 
-      // Non-member joins as a player by proving they know the invite code.
+      // Non-member joins as a player by proving they know the invite code,
+      // written to joins/{uid} in the same batch.
       function join() {
         let diff = request.resource.data.members.diff(resource.data.members);
         return !isMember(resource.data)
-          && changed().hasOnly(['members', 'memberIds', 'memberNames', 'joinCode'])
-          && request.resource.data.joinCode == resource.data.inviteCode
+          && changed().hasOnly(['members', 'memberIds', 'memberNames'])
+          && getAfter(joinPath(teamId, uid())).data.code == currentCode(teamId, resource.data)
           && diff.addedKeys() == [uid()].toSet()
           && diff.changedKeys().size() == 0
           && diff.removedKeys().size() == 0
@@ -185,19 +236,56 @@ service cloud.firestore {
           && validString(request.resource.data.memberNames[uid()], 80);
       }
 
+      // Current invite code. Owners, coaches and captains can read it; only
+      // the owner can change it (coaches and captains may move an older
+      // team's code here, keeping its existing lookup).
+      match /private/{docId} {
+        allow read: if signedIn() && docId == 'invite'
+          && isEditor(get(teamPath(teamId)).data);
+        allow create, update: if signedIn() && docId == 'invite'
+          && request.resource.data.keys().hasOnly(['code'])
+          && request.resource.data.code is string
+          && isEditor(getAfter(teamPath(teamId)).data)
+          && getAfter(codePath(request.resource.data.code)).data.teamId == teamId
+          && (request.method == 'create' || isOwner(get(teamPath(teamId)).data));
+        allow delete: if signedIn() && isOwner(get(teamPath(teamId)).data);
+      }
+
+      // Join proofs: each user writes only their own. The owner can list
+      // them to delete the team.
+      match /joins/{userId} {
+        allow read: if signedIn()
+          && (uid() == userId || isOwner(get(teamPath(teamId)).data));
+        allow create, update: if signedIn() && uid() == userId
+          && request.resource.data.keys().hasOnly(['code'])
+          && validString(request.resource.data.code, 12);
+        allow delete: if signedIn() && isOwner(get(teamPath(teamId)).data);
+      }
+
+      // What every member sees: name, number, position. Payment and USA
+      // Ultimate status live in rosterStatus, readable by admins only.
       match /roster/{playerId} {
         allow read: if signedIn() && isMember(get(teamPath(teamId)).data);
         allow delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
         allow create, update: if signedIn()
           && isEditor(get(teamPath(teamId)).data)
-          && request.resource.data.keys().hasOnly(['name', 'number', 'position', 'userId', 'onUsau', 'paid'])
-          && (request.resource.data.get('onUsau', null) == null || request.resource.data.onUsau is bool)
-          && (request.resource.data.get('paid', false) is bool)
+          && request.resource.data.keys().hasOnly(['name', 'number', 'position', 'userId'])
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.name.size() <= 80
           && (request.resource.data.number == null || request.resource.data.number is int)
           && request.resource.data.position in ['handler', 'cutter', 'hybrid'];
+      }
+
+      // Per-player paid mark and USA Ultimate status, keyed like roster.
+      // Owners, coaches and captains only; players can't read it.
+      match /rosterStatus/{playerId} {
+        allow read, delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
+        allow create, update: if signedIn()
+          && isEditor(get(teamPath(teamId)).data)
+          && request.resource.data.keys().hasOnly(['onUsau', 'paid'])
+          && (request.resource.data.get('onUsau', null) == null || request.resource.data.onUsau is bool)
+          && request.resource.data.get('paid', false) is bool;
       }
 
       match /plays/{playId} {
@@ -225,23 +313,6 @@ service cloud.firestore {
       // vote, and leaving "going" must drop their reactions and votes.
       match /events/{eventId} {
         function team() { return get(teamPath(teamId)).data; }
-
-        function validEvent(e) {
-          return e.title is string && e.title.size() > 0 && e.title.size() <= 100
-            && e.type in ['practice', 'game', 'tournament', 'social', 'other']
-            && e.startsAt is timestamp
-            && (e.endsAt == null || (e.endsAt is timestamp && e.endsAt >= e.startsAt))
-            && validString(e.location, 200)
-            && validString(e.notes, 5000)
-            && (e.poll == null || validPoll(e.poll));
-        }
-
-        function validPoll(p) {
-          return p.keys().hasOnly(['question', 'options', 'multiple'])
-            && p.question is string && p.question.size() > 0 && p.question.size() <= 200
-            && p.options is list && p.options.size() >= 2 && p.options.size() <= 10
-            && p.multiple is bool;
-        }
 
         // Only `uid()`'s entry in map field `f` changed.
         function onlyMine(f) {
@@ -362,9 +433,10 @@ service cloud.firestore {
     match /inviteCodes/{code} {
       // Single-document lookups only; codes can't be listed.
       allow get: if signedIn();
+      // Only the owner mints codes, alongside the team's private/invite.
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['teamId'])
-        && getAfter(teamPath(request.resource.data.teamId)).data.inviteCode == code
+        && getAfter(invitePath(request.resource.data.teamId)).data.code == code
         && getAfter(teamPath(request.resource.data.teamId)).data.members
              .get(uid(), '') == 'owner';
       allow delete: if signedIn() && isOwner(get(teamPath(resource.data.teamId)).data);

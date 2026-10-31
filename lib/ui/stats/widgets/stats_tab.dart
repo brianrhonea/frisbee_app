@@ -597,6 +597,7 @@ class _NewEventDialogState extends State<_NewEventDialog> {
                   for (final t in const [
                     EventType.practice,
                     EventType.game,
+                    EventType.scrimmage,
                     EventType.other,
                   ])
                     ButtonSegment(value: t, label: Text(t.label)),

@@ -14,17 +14,20 @@ const schedule = {
   retryCount: 1,
 };
 
-/** Daily: refresh USA Ultimate tournaments into `usau_tournaments`. */
+// Every two months (1st of Jan, Mar, May, Jul, Sep, Nov) while the user
+// base is small; run more often as it grows.
+
+/** Refreshes USA Ultimate tournaments into `usau_tournaments`. */
 export const scrapeUsauTournaments = onSchedule(
-  { ...schedule, schedule: "every day 05:00" },
+  { ...schedule, schedule: "0 5 1 */2 *" },
   async () => {
     await syncTournaments(getFirestore());
   },
 );
 
-/** Daily: refresh USA Ultimate rankings into `usau_rankings`. */
+/** Refreshes USA Ultimate rankings into `usau_rankings`. */
 export const scrapeUsauRankings = onSchedule(
-  { ...schedule, schedule: "every day 05:30" },
+  { ...schedule, schedule: "30 5 1 */2 *" },
   async () => {
     await syncRankings(getFirestore());
   },

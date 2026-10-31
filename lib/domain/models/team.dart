@@ -84,7 +84,6 @@ class Team {
     this.memberNames = const {},
     this.statKeepers = const {},
     this.city = '',
-    this.inviteCode,
     this.usauUrl,
     this.usauName,
     this.usauSyncedAt,
@@ -97,9 +96,6 @@ class Team {
   final CompetitionLevel level;
   final String city;
   final String ownerId;
-
-  /// Code other users enter to join as a player.
-  final String? inviteCode;
 
   /// uid → role.
   final Map<String, TeamRole> members;
@@ -154,7 +150,6 @@ class Team {
       ),
       city: map['city'] as String? ?? '',
       ownerId: map['ownerId'] as String? ?? '',
-      inviteCode: map['inviteCode'] as String?,
       members: {
         for (final e in rawMembers.entries)
           e.key as String: enumByName(
@@ -200,7 +195,6 @@ class Team {
     level: level ?? this.level,
     city: city ?? this.city,
     ownerId: ownerId,
-    inviteCode: inviteCode,
     members: members ?? this.members,
     memberNames: memberNames,
     statKeepers: statKeepers ?? this.statKeepers,

@@ -4,8 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../../../domain/models/tournament.dart';
 import '../../../routing/routes.dart';
-import '../../core/ui/status_views.dart';
-import '../../core/ui/usau_attribution.dart';
 import '../view_models/tournaments_viewmodel.dart';
 
 String formatDateRange(DateTime? start, DateTime? end) {
@@ -20,67 +18,9 @@ String formatDateRange(DateTime? start, DateTime? end) {
   return '${md.format(start)} – ${DateFormat.yMMMd().format(end)}';
 }
 
-class TournamentsScreen extends StatelessWidget {
-  const TournamentsScreen({super.key, required this.viewModel});
-
-  final TournamentsViewModel viewModel;
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = viewModel;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Tournaments')),
-      body: ListenableBuilder(
-        listenable: vm,
-        builder: (context, _) {
-          if (vm.loading) return const LoadingView();
-          if (vm.error != null) {
-            return ErrorView(error: vm.error, onRetry: vm.retry);
-          }
-          if (vm.isEmpty) {
-            return const EmptyView(
-              icon: Icons.emoji_events_outlined,
-              title: 'No tournaments yet',
-              message:
-                  'Tournament data from USA Ultimate syncs daily. '
-                  'Check back soon.',
-            );
-          }
-          final list = vm.tournaments;
-          return ConstrainedContent(
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _Filters(viewModel: vm)),
-                if (list.isEmpty)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: EmptyView(
-                      icon: Icons.search_off,
-                      title: 'No matching tournaments',
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    sliver: SliverList.separated(
-                      itemCount: list.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (context, i) =>
-                          _TournamentCard(tournament: list[i]),
-                    ),
-                  ),
-                const SliverToBoxAdapter(child: UsauAttribution()),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _Filters extends StatelessWidget {
-  const _Filters({required this.viewModel});
+/// Search, upcoming/past and level/division filters for the USAU list.
+class TournamentFilters extends StatelessWidget {
+  const TournamentFilters({super.key, required this.viewModel});
 
   final TournamentsViewModel viewModel;
 
@@ -166,8 +106,9 @@ class _DropdownChip extends StatelessWidget {
   }
 }
 
-class _TournamentCard extends StatelessWidget {
-  const _TournamentCard({required this.tournament});
+/// One USA Ultimate tournament; opens its detail page.
+class TournamentCard extends StatelessWidget {
+  const TournamentCard({super.key, required this.tournament});
 
   final Tournament tournament;
 

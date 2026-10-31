@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
+import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/tournament.dart';
 
@@ -111,6 +112,37 @@ void main() {
         const RankingEntry(rank: 1, teamName: 'A', wins: 3, losses: 1).record,
         '3-1',
       );
+    });
+  });
+
+  group('RosterPlayer', () {
+    const sam = RosterPlayer(
+      id: 'r1',
+      name: 'Sam',
+      number: 7,
+      onUsau: true,
+      paid: true,
+    );
+
+    test('shared entry leaves out admin-only status', () {
+      expect(
+        sam.toMap().keys,
+        unorderedEquals(['name', 'number', 'position', 'userId']),
+      );
+      expect(sam.toStatusMap(), {'onUsau': true, 'paid': true});
+    });
+
+    test('reads status only from the status record', () {
+      final shared = RosterPlayer.fromMap('r1', {...sam.toMap(), 'paid': true});
+      expect(shared.paid, isFalse);
+      expect(shared.onUsau, isNull);
+      final admin = RosterPlayer.fromMap(
+        'r1',
+        sam.toMap(),
+        status: sam.toStatusMap(),
+      );
+      expect(admin.paid, isTrue);
+      expect(admin.onUsau, isTrue);
     });
   });
 }

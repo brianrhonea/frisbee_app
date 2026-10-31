@@ -9,10 +9,12 @@ import {
 import {
   arrayRemove,
   arrayUnion,
+  collection,
   deleteDoc,
   deleteField,
   doc,
   getDoc,
+  getDocs,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -66,8 +68,8 @@ beforeEach(async () => {
       statKeepers: [STATS],
       memberIds: [OWNER, COACH, CAPTAIN, STATS, PLAYER],
       memberNames: { [OWNER]: "O", [COACH]: "C", [CAPTAIN]: "K", [STATS]: "S", [PLAYER]: "P" },
-      inviteCode: CODE,
     });
+    await setDoc(doc(fs, "teams", TEAM, "private", "invite"), { code: CODE });
     await setDoc(doc(fs, "inviteCodes", CODE), { teamId: TEAM });
   });
 });
@@ -85,10 +87,24 @@ describe("team create", () => {
       members: { [OUTSIDER]: "owner" },
       memberIds: [OUTSIDER],
       memberNames: { [OUTSIDER]: "Me" },
-      inviteCode: "ZZZ999",
     });
+    batch.set(doc(fs, "teams", "t2", "private", "invite"), { code: "ZZZ999" });
     batch.set(doc(fs, "inviteCodes", "ZZZ999"), { teamId: "t2" });
     await assertSucceeds(batch.commit());
+  });
+
+  it("rejects a team that keeps its invite code on the team doc", async () => {
+    const fs = db(OUTSIDER);
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, "teams", "t2"), {
+      name: "New", division: "open", level: "college", city: "",
+      ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" },
+      memberIds: [OUTSIDER], memberNames: { [OUTSIDER]: "Me" },
+      inviteCode: "ZZZ999",
+    });
+    batch.set(doc(fs, "teams", "t2", "private", "invite"), { code: "ZZZ999" });
+    batch.set(doc(fs, "inviteCodes", "ZZZ999"), { teamId: "t2" });
+    await assertFails(batch.commit());
   });
 
   it("rejects reusing an existing invite code", async () => {
@@ -98,8 +114,8 @@ describe("team create", () => {
       name: "New", division: "open", level: "college", city: "",
       ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" },
       memberIds: [OUTSIDER], memberNames: { [OUTSIDER]: "Me" },
-      inviteCode: CODE,
     });
+    batch.set(doc(fs, "teams", "t2", "private", "invite"), { code: CODE });
     batch.set(doc(fs, "inviteCodes", CODE), { teamId: "t2" });
     await assertFails(batch.commit());
   });
@@ -113,28 +129,51 @@ describe("team read", () => {
 });
 
 describe("join", () => {
-  const joinUpdate = (code: string) => ({
+  const joinUpdate = {
     [`members.${OUTSIDER}`]: "player",
     [`memberNames.${OUTSIDER}`]: "New Player",
     memberIds: arrayUnion(OUTSIDER),
-    joinCode: code,
-  });
+  };
+  const join = (code: string, update: Record<string, unknown> = joinUpdate, uid = OUTSIDER) => {
+    const fs = db(uid);
+    return writeBatch(fs)
+      .set(doc(fs, "teams", TEAM, "joins", uid), { code })
+      .update(doc(fs, "teams", TEAM), update)
+      .commit();
+  };
 
   it("allows joining with the current code", async () => {
-    await assertSucceeds(updateDoc(doc(db(OUTSIDER), "teams", TEAM), joinUpdate(CODE)));
+    await assertSucceeds(join(CODE));
   });
 
-  it("rejects a wrong code", async () => {
-    await assertFails(updateDoc(doc(db(OUTSIDER), "teams", TEAM), joinUpdate("WRONG1")));
+  it("rejects a wrong code or no proof", async () => {
+    await assertFails(join("WRONG1"));
+    await assertFails(updateDoc(doc(db(OUTSIDER), "teams", TEAM), joinUpdate));
+  });
+
+  it("rejects putting the code on the team doc", async () => {
+    await assertFails(join(CODE, { ...joinUpdate, joinCode: CODE }));
   });
 
   it("rejects joining as coach", async () => {
-    await assertFails(
-      updateDoc(doc(db(OUTSIDER), "teams", TEAM), {
-        ...joinUpdate(CODE),
-        [`members.${OUTSIDER}`]: "coach",
-      }),
-    );
+    await assertFails(join(CODE, { ...joinUpdate, [`members.${OUTSIDER}`]: "coach" }));
+  });
+
+  it("join proofs are private to the joiner", async () => {
+    await assertSucceeds(join(CODE));
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "teams", TEAM, "joins", OUTSIDER)));
+    await assertFails(getDoc(doc(db(PLAYER), "teams", TEAM, "joins", OUTSIDER)));
+    await assertFails(getDoc(doc(db(COACH), "teams", TEAM, "joins", OUTSIDER)));
+    await assertFails(setDoc(doc(db(PLAYER), "teams", TEAM, "joins", OUTSIDER), { code: "X" }));
+  });
+
+  it("older teams with the code on the team doc still accept joins", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await deleteDoc(doc(ctx.firestore(), "teams", TEAM, "private", "invite"));
+      await updateDoc(doc(ctx.firestore(), "teams", TEAM), { inviteCode: CODE });
+    });
+    await assertFails(join("WRONG1"));
+    await assertSucceeds(join(CODE));
   });
 });
 
@@ -227,19 +266,51 @@ describe("roles and removal", () => {
 });
 
 describe("invite codes and admin", () => {
+  const invite = (uid: string) => doc(db(uid), "teams", TEAM, "private", "invite");
   const regenerate = (uid: string) => {
     const fs = db(uid);
     return writeBatch(fs)
-      .update(doc(fs, "teams", TEAM), { inviteCode: "NEW777" })
+      .set(doc(fs, "teams", TEAM, "private", "invite"), { code: "NEW777" })
       .set(doc(fs, "inviteCodes", "NEW777"), { teamId: TEAM })
       .delete(doc(fs, "inviteCodes", CODE))
       .commit();
   };
 
+  it("only owners, coaches and captains can read the invite code", async () => {
+    for (const uid of [OWNER, COACH, CAPTAIN]) {
+      await assertSucceeds(getDoc(invite(uid)));
+    }
+    for (const uid of [PLAYER, STATS, OUTSIDER]) {
+      await assertFails(getDoc(invite(uid)));
+    }
+  });
+
   it("only the owner generates a new invite code", async () => {
     await assertFails(regenerate(COACH));
     await assertFails(regenerate(CAPTAIN));
+    await assertFails(regenerate(PLAYER));
     await assertSucceeds(regenerate(OWNER));
+  });
+
+  it("codes can't point at a code the team doesn't own", async () => {
+    await assertFails(setDoc(invite(OWNER), { code: "NOPE22" }));
+    await assertFails(setDoc(doc(db(OWNER), "inviteCodes", "NOPE22"), { teamId: TEAM }));
+  });
+
+  it("admins move an older team's code off the team doc", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await deleteDoc(doc(ctx.firestore(), "teams", TEAM, "private", "invite"));
+      await updateDoc(doc(ctx.firestore(), "teams", TEAM), { inviteCode: CODE, joinCode: CODE });
+    });
+    const move = (uid: string) => {
+      const fs = db(uid);
+      return writeBatch(fs)
+        .set(doc(fs, "teams", TEAM, "private", "invite"), { code: CODE })
+        .update(doc(fs, "teams", TEAM), { inviteCode: deleteField(), joinCode: deleteField() })
+        .commit();
+    };
+    await assertFails(move(PLAYER));
+    await assertSucceeds(move(CAPTAIN));
   });
 
   it("captains and coaches manage the team; stats keepers and players cannot", async () => {
@@ -282,9 +353,59 @@ describe("roster and plays", () => {
     const ref = doc(db(OWNER), "teams", TEAM, "roster", "r1");
     await assertSucceeds(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null }));
     await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "goalie", userId: null }));
-    await assertSucceeds(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, onUsau: true, paid: false }));
-    await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, paid: "yes" }));
     await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, memberId: "123" }));
+  });
+
+  it("roster entries can't carry paid or USA Ultimate status", async () => {
+    const ref = doc(db(OWNER), "teams", TEAM, "roster", "r1");
+    await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, paid: true }));
+    await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, onUsau: true }));
+  });
+
+  it("admins can strip legacy status from roster entries", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "roster", "r1"), {
+        name: "Sam", number: 7, position: "handler", userId: null, onUsau: true, paid: true,
+      }),
+    );
+    const strip = { onUsau: deleteField(), paid: deleteField() };
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM, "roster", "r1"), strip));
+    await assertSucceeds(updateDoc(doc(db(COACH), "teams", TEAM, "roster", "r1"), strip));
+  });
+});
+
+describe("roster status", () => {
+  const status = (uid: string) => doc(db(uid), "teams", TEAM, "rosterStatus", "r1");
+
+  beforeEach(() =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "rosterStatus", "r1"), { onUsau: true, paid: false }),
+    ),
+  );
+
+  it("only owners, coaches and captains can read it", async () => {
+    for (const uid of [OWNER, COACH, CAPTAIN]) {
+      await assertSucceeds(getDoc(status(uid)));
+    }
+    for (const uid of [PLAYER, STATS, OUTSIDER]) {
+      await assertFails(getDoc(status(uid)));
+    }
+  });
+
+  it("players can't list it", async () => {
+    await assertFails(getDocs(collection(db(PLAYER), "teams", TEAM, "rosterStatus")));
+    await assertSucceeds(getDocs(collection(db(CAPTAIN), "teams", TEAM, "rosterStatus")));
+  });
+
+  it("only admins write it, with valid fields", async () => {
+    await assertSucceeds(setDoc(status(CAPTAIN), { onUsau: false, paid: true }));
+    await assertSucceeds(setDoc(status(OWNER), { onUsau: null, paid: false }));
+    await assertFails(setDoc(status(PLAYER), { onUsau: true, paid: true }));
+    await assertFails(setDoc(status(STATS), { onUsau: true, paid: true }));
+    await assertFails(setDoc(status(COACH), { onUsau: true, paid: "yes" }));
+    await assertFails(setDoc(status(COACH), { paid: true, note: "cash" }));
+    await assertFails(deleteDoc(status(PLAYER)));
+    await assertSucceeds(deleteDoc(status(COACH)));
   });
 });
 
@@ -303,7 +424,8 @@ describe("USA Ultimate link", () => {
     await assertSucceeds(
       writeBatch(fs)
         .update(doc(fs, "teams", TEAM), { usauSyncedAt: serverTimestamp() })
-        .set(doc(fs, "teams", TEAM, "roster", "r9"), { name: "New", number: 12, position: "hybrid", userId: null, onUsau: true, paid: false })
+        .set(doc(fs, "teams", TEAM, "roster", "r9"), { name: "New", number: 12, position: "hybrid", userId: null })
+        .set(doc(fs, "teams", TEAM, "rosterStatus", "r9"), { onUsau: true, paid: false })
         .commit(),
     );
     await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { usauSyncedAt: new Date(2020, 1, 1) }));
@@ -339,6 +461,13 @@ describe("events", () => {
     await assertSucceeds(setDoc(ev(COACH), event(COACH)));
     await assertFails(setDoc(doc(db(PLAYER), "teams", TEAM, "events", "e2"), event(PLAYER)));
     await assertFails(setDoc(doc(db(OUTSIDER), "teams", TEAM, "events", "e3"), event(OUTSIDER)));
+  });
+
+  it("accepts every event type and rejects unknown ones", async () => {
+    for (const type of ["practice", "game", "tournament", "scrimmage", "workout", "social", "other"]) {
+      await assertSucceeds(setDoc(doc(db(COACH), "teams", TEAM, "events", `t-${type}`), event(COACH, { type })));
+    }
+    await assertFails(setDoc(doc(db(COACH), "teams", TEAM, "events", "t-bogus"), event(COACH, { type: "bogus" })));
   });
 
   it("rejects events created with pre-filled responses", async () => {
@@ -396,6 +525,41 @@ describe("events", () => {
     await seed();
     await assertFails(deleteDoc(ev(PLAYER)));
     await assertSucceeds(deleteDoc(ev(COACH)));
+  });
+});
+
+describe("personal events", () => {
+  const mine = (extra: Record<string, unknown> = {}) => ({
+    title: "Track workout",
+    type: "workout",
+    startsAt: new Date("2026-11-02T07:00:00Z"),
+    endsAt: null,
+    location: "",
+    notes: "",
+    poll: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const ref = (as: string, owner = PLAYER) => doc(db(as), "users", owner, "events", "m1");
+
+  it("only the owner can create, read, edit and delete", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER), mine()));
+    await assertSucceeds(getDoc(ref(PLAYER)));
+    await assertSucceeds(updateDoc(ref(PLAYER), { title: "Pickup", type: "other" }));
+    await assertFails(getDoc(ref(COACH)));
+    await assertFails(updateDoc(ref(OWNER), { title: "Hijack" }));
+    await assertFails(deleteDoc(ref(OUTSIDER)));
+    await assertSucceeds(deleteDoc(ref(PLAYER)));
+  });
+
+  it("validates details and rejects polls and responses", async () => {
+    await assertFails(setDoc(ref(PLAYER), mine({ title: "" })));
+    await assertFails(setDoc(ref(PLAYER), mine({ type: "bogus" })));
+    await assertFails(setDoc(ref(PLAYER), mine({ rsvps: {} })));
+    await assertFails(
+      setDoc(ref(PLAYER), mine({ poll: { question: "?", options: [{ id: "a", text: "A" }, { id: "b", text: "B" }], multiple: false } })),
+    );
   });
 });
 

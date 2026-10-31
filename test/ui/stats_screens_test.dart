@@ -139,7 +139,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('No events yet. Create one'));
     await tester.pumpAndSettle();
-    expect(find.text('Scrimmage'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Scrimmage'), findsOneWidget);
     await tester.tap(find.text('Add to schedule'));
     await tester.pumpAndSettle();
 
