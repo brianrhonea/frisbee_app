@@ -61,6 +61,9 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   bool get canWrite;
 
+  /// Whether messages can carry photos and files.
+  bool get canAttach => true;
+
   /// Who may delete [m] besides its author.
   @protected
   bool get canModerate => false;

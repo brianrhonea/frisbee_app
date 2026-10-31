@@ -5,21 +5,26 @@ import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../domain/models/meeting.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../domain/models/schedule_entry.dart';
 
-/// The user's schedule: their personal events plus the events of every team
-/// they belong to, merged and sorted by start time. Composed by view models
-/// that show it.
+/// The user's schedule: their personal events plus the events and meetings
+/// of every team they belong to, merged and sorted by start time. Composed
+/// by view models that show it.
 class MySchedule extends ChangeNotifier {
   MySchedule({
     required TeamRepository teamRepository,
     required EventRepository eventRepository,
     required String? uid,
+    MeetingRepository? meetingRepository,
     DateTime Function()? clock,
   }) : _events = eventRepository,
+       _meetings = meetingRepository,
+       _uid = uid,
        _clock = clock ?? DateTime.now {
     if (uid == null) {
       _teamsLoaded = true;
@@ -40,6 +45,8 @@ class MySchedule extends ChangeNotifier {
   static const maxRetryDelay = Duration(minutes: 1);
 
   final EventRepository _events;
+  final MeetingRepository? _meetings;
+  final String? _uid;
   Timer? _retry;
   int _failures = 0;
 
@@ -77,6 +84,12 @@ class MySchedule extends ChangeNotifier {
   final Map<String, StreamSubscription<List<TeamEvent>>> _eventSubs = {};
   final Map<String, List<TeamEvent>> _byTeam = {};
 
+  /// Meeting listeners per team, keyed by the role they were opened with:
+  /// which meetings a member may see depends on it.
+  final Map<String, ({TeamRole? role, StreamSubscription<Object?> sub})>
+  _meetingSubs = {};
+  final Map<String, List<TeamMeeting>> _meetingsByTeam = {};
+
   List<Team> _teams = const [];
   List<Team> get teams => _teams;
 
@@ -100,6 +113,15 @@ class MySchedule extends ChangeNotifier {
         _byTeam.remove(id);
       }
     }
+    for (final id in _meetingSubs.keys.toList()) {
+      if (!ids.contains(id)) {
+        _meetingSubs.remove(id)!.sub.cancel();
+        _meetingsByTeam.remove(id);
+      }
+    }
+    for (final team in teams) {
+      _watchMeetings(team);
+    }
     for (final id in ids) {
       _eventSubs[id] ??= _events.watchEvents(id).listen(
         (e) {
@@ -113,7 +135,28 @@ class MySchedule extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Personal and team events, soonest first.
+  void _watchMeetings(Team team) {
+    final meetings = _meetings;
+    final uid = _uid;
+    if (meetings == null || uid == null) return;
+    final role = team.roleOf(uid);
+    final current = _meetingSubs[team.id];
+    if (current != null && current.role == role) return;
+    current?.sub.cancel();
+    _meetingSubs[team.id] = (
+      role: role,
+      sub: meetings.watchMeetings(team, uid).listen(
+        (m) {
+          _meetingsByTeam[team.id] = m;
+          notifyListeners();
+        },
+        onError: (Object e) =>
+            _log.warning('Meetings for team ${team.id} failed to load', e),
+      ),
+    );
+  }
+
+  /// Personal and team events and meetings, soonest first.
   List<ScheduleEntry> get entries {
     final teams = {for (final t in _teams) t.id: t};
     return [
@@ -121,6 +164,10 @@ class MySchedule extends ChangeNotifier {
       for (final MapEntry(key: id, value: events) in _byTeam.entries)
         if (teams[id] case final team?)
           for (final e in events) ScheduleEntry(team: team, event: e),
+      for (final MapEntry(key: id, value: meetings) in _meetingsByTeam.entries)
+        if (teams[id] case final team?)
+          for (final m in meetings)
+            if (!m.isEnded) ScheduleEntry(team: team, event: m.toEvent()),
     ]..sort((a, b) => a.event.startsAt.compareTo(b.event.startsAt));
   }
 
@@ -172,6 +219,9 @@ class MySchedule extends ChangeNotifier {
     _retry?.cancel();
     for (final s in _eventSubs.values) {
       s.cancel();
+    }
+    for (final m in _meetingSubs.values) {
+      m.sub.cancel();
     }
     super.dispose();
   }

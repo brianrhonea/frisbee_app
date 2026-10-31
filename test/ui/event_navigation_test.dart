@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
+import 'package:frisbee_app/data/repositories/meeting/meeting_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
@@ -17,6 +20,7 @@ import 'package:frisbee_app/data/repositories/tournament/tournament_repository.d
 import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
+import 'package:frisbee_app/routing/open_link.dart';
 import 'package:frisbee_app/routing/router.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
@@ -28,6 +32,7 @@ import 'package:frisbee_app/ui/teams/widgets/team_section_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../testing/fakes.dart';
+import '../testing/meeting_fakes.dart';
 
 /// Event pages open over the current tab and back returns to it.
 void main() {
@@ -82,6 +87,7 @@ void main() {
           Provider<ChatRepository>.value(value: FakeChatRepository()),
           Provider<FilePickerService>.value(value: FakeFilePickerService()),
           Provider<EventRepository>.value(value: events),
+          Provider<MeetingRepository>.value(value: FakeMeetingRepository()),
           Provider<TeamPostRepository>.value(value: FakeTeamPostRepository()),
           Provider<StatsRepository>.value(
             value: MockStatsRepository(teamRepository: teams),
@@ -218,5 +224,26 @@ void main() {
     );
     expect(section.section, TeamSection.events);
     expect(find.text('Team Events'), findsOneWidget);
+  });
+
+  testWidgets('notification links open one after another', (tester) async {
+    await pumpApp(tester);
+    final router = GoRouter.of(tester.element(find.byType(HomeScreen)));
+    // A play (over the tabs) loads the team into the Teams tab; a team
+    // page opened after it must not stack a second copy of that team.
+    unawaited(router.push('/notifications'));
+    await tester.pumpAndSettle();
+    router.openLink('/teams/t1/plays/p1');
+    await tester.pumpAndSettle();
+    router.pop();
+    await tester.pumpAndSettle();
+    router.pop();
+    await tester.pumpAndSettle();
+    unawaited(router.push('/notifications'));
+    await tester.pumpAndSettle();
+    router.openLink('/teams/t1/events');
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(TeamSectionScreen), findsOneWidget);
   });
 }

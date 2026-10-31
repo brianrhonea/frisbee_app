@@ -5,8 +5,10 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/playbook/play_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../domain/models/meeting.dart';
 import '../../../domain/models/play.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
@@ -26,9 +28,11 @@ class TeamDetailViewModel extends ChangeNotifier {
     required PlayRepository playRepository,
     required EventRepository eventRepository,
     required AuthRepository authRepository,
+    MeetingRepository? meetingRepository,
     DateTime Function()? clock,
   }) : _teams = teamRepository,
        _plays = playRepository,
+       _meetings = meetingRepository,
        _auth = authRepository,
        _clock = clock ?? DateTime.now {
     savePlayer = Command1<void, RosterPlayer>(
@@ -62,6 +66,7 @@ class TeamDetailViewModel extends ChangeNotifier {
         _teamLoaded = true;
         _watchRoster();
         _watchInviteCode();
+        _watchMeetings();
         notifyListeners();
       }, onError: _onError),
       _plays.watchPlays(teamId).listen((p) {
@@ -69,7 +74,7 @@ class TeamDetailViewModel extends ChangeNotifier {
         notifyListeners();
       }, onError: _onError),
       eventRepository.watchEvents(teamId).listen((e) {
-        _events = e;
+        _teamEvents = e;
         notifyListeners();
       }, onError: _onError),
     ];
@@ -78,11 +83,14 @@ class TeamDetailViewModel extends ChangeNotifier {
   final String teamId;
   final TeamRepository _teams;
   final PlayRepository _plays;
+  final MeetingRepository? _meetings;
   final AuthRepository _auth;
   final DateTime Function() _clock;
   late final List<StreamSubscription<Object?>> _subs;
   StreamSubscription<List<RosterPlayer>>? _rosterSub;
   StreamSubscription<String?>? _inviteSub;
+  StreamSubscription<List<TeamMeeting>>? _meetingSub;
+  TeamRole? _meetingRole;
 
   String? _inviteCode;
 
@@ -101,6 +109,25 @@ class TeamDetailViewModel extends ChangeNotifier {
       _inviteSub = null;
       _inviteCode = null;
     }
+  }
+
+  /// (Re)subscribes to meetings when the role changes: it decides which
+  /// meetings the member may see.
+  void _watchMeetings() {
+    final team = _team;
+    final meetings = _meetings;
+    if (team == null || meetings == null) return;
+    final role = team.roleOf(uid);
+    if (_meetingSub != null && role == _meetingRole) return;
+    _meetingRole = role;
+    _meetingSub?.cancel();
+    _meetingSub = meetings.watchMeetings(team, uid).listen((m) {
+      _meetingEvents = [
+        for (final meeting in m)
+          if (!meeting.isEnded) meeting.toEvent(),
+      ];
+      notifyListeners();
+    }, onError: _onError);
   }
 
   bool? _rosterWithStatus;
@@ -158,16 +185,22 @@ class TeamDetailViewModel extends ChangeNotifier {
   List<Play> _playList = const [];
   List<Play> get plays => _playList;
 
-  List<TeamEvent> _events = const [];
+  List<TeamEvent> _teamEvents = const [];
 
-  /// All events, sorted by start time.
-  List<TeamEvent> get events => _events;
+  /// Meetings the user can see, as schedule entries
+  /// ([EventType.meeting]).
+  List<TeamEvent> _meetingEvents = const [];
+
+  /// All events and meetings, sorted by start time.
+  List<TeamEvent> get events =>
+      [..._teamEvents, ..._meetingEvents]
+        ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
   /// Events that haven't finished yet, soonest first.
   List<TeamEvent> get upcomingEvents {
     final now = _clock();
     return [
-      for (final e in _events)
+      for (final e in events)
         if (!(e.endsAt ?? e.startsAt.add(const Duration(hours: 2))).isBefore(
           now,
         ))
@@ -177,7 +210,7 @@ class TeamDetailViewModel extends ChangeNotifier {
 
   /// Events starting on the calendar day of [day].
   List<TeamEvent> eventsOn(DateTime day) => [
-    for (final e in _events)
+    for (final e in events)
       if (DateUtils.isSameDay(e.startsAt, day)) e,
   ];
 
@@ -241,6 +274,7 @@ class TeamDetailViewModel extends ChangeNotifier {
     }
     _rosterSub?.cancel();
     _inviteSub?.cancel();
+    _meetingSub?.cancel();
     super.dispose();
   }
 }

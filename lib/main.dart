@@ -20,9 +20,18 @@ import 'firebase_options.dart';
 import 'routing/router.dart';
 import 'ui/core/themes/theme.dart';
 import 'ui/core/ui/brand.dart';
+import 'ui/meetings/view_models/meeting_alerts_viewmodel.dart';
+import 'ui/meetings/widgets/meeting_alerts.dart';
+import 'routing/open_link.dart';
 
 /// Run with `--dart-define=USE_EMULATORS=true` to use local Firebase emulators.
 const _useEmulators = bool.fromEnvironment('USE_EMULATORS');
+
+/// Run with `--dart-define=FIRESTORE_MEMORY_CACHE=true` to keep Firestore's
+/// cache in memory. On desktop only one process can open the on-disk cache
+/// (a second copy of the app crashes), so use this for the second copy when
+/// testing two accounts on one computer.
+const _memoryCache = bool.fromEnvironment('FIRESTORE_MEMORY_CACHE');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +42,11 @@ Future<void> main() async {
 
   DefaultFirebaseOptions.ensureConfigured();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (_memoryCache) {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: false,
+    );
+  }
   if (_useEmulators) {
     final host = defaultTargetPlatform == TargetPlatform.android
         ? '10.0.2.2'
@@ -68,6 +82,8 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
   late final AuthRepository _auth = context.read();
   late final NotificationRepository _notifications = context.read();
   late final GoRouter _router = router(_auth);
+  late final MeetingAlertsViewModel _meetingAlerts;
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
   StreamSubscription<String>? _opened;
   String? _syncedUid;
 
@@ -78,6 +94,11 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
   void initState() {
     super.initState();
     _auth.addListener(_onAuth);
+    _meetingAlerts = MeetingAlertsViewModel(
+      authRepository: _auth,
+      notificationRepository: _notifications,
+      presence: context.read(),
+    );
     _opened = _notifications.openedRoutes.listen((route) {
       _pendingRoute = route;
       _openPending();
@@ -100,13 +121,16 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
     if (route == null || !_auth.isReady || !_auth.isAuthenticated) return;
     _pendingRoute = null;
     // After the redirect away from the splash page has settled.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _router.push(route));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _router.openLink(route),
+    );
   }
 
   @override
   void dispose() {
     _auth.removeListener(_onAuth);
     _opened?.cancel();
+    _meetingAlerts.dispose();
     _router.dispose();
     super.dispose();
   }
@@ -119,5 +143,12 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
     darkTheme: AppTheme.dark,
     themeMode: context.watch<ThemeRepository>().themeMode,
     routerConfig: _router,
+    scaffoldMessengerKey: _messengerKey,
+    builder: (_, child) => MeetingAlerts(
+      viewModel: _meetingAlerts,
+      router: _router,
+      messengerKey: _messengerKey,
+      child: child ?? const SizedBox.shrink(),
+    ),
   );
 }

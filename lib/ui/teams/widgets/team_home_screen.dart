@@ -185,7 +185,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
 
   void _openEvent(TeamEvent e) {
     if (vm.isMember) {
-      context.push(Routes.event(vm.teamId, e.id));
+      context.push(Routes.teamEvent(vm.teamId, e));
     } else {
       showModalBottomSheet<void>(
         context: context,

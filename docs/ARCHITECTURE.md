@@ -145,6 +145,7 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
 | Team chat: rooms with per-role and per-person read/write access, photos and files | `ui/chat` | `ChatListViewModel`, `ChatRoomViewModel`, `ChatRoomSettingsViewModel` | Chat, Team |
 | Direct messages: search people by name, 1:1 conversations, unread tracking | `ui/messages` | `InboxViewModel`, `PeopleSearchViewModel`, `DirectChatViewModel` | DirectMessage |
 | Schedule: team and personal events, RSVP, reactions, polls | `ui/schedule` | `ScheduleViewModel` (`MySchedule`), `EventEditorViewModel`, `EventDetailViewModel`, `MyEventDetailViewModel` | Event, Team |
+| Team meetings: invite roles or people, RSVP, lobby with admin approval, video calls (camera, screen share, chat, per-person volume) | `ui/meetings` | `MeetingEditorViewModel`, `MeetingDetailViewModel`, `MeetingRoomViewModel`, `MeetingChatViewModel`, `MeetingAlertsViewModel` | Meeting, MeetingSettings, Team |
 | Playbook: draw plays, animate steps, play back | `ui/playbook` | `PlayEditorViewModel` | Play, Team |
 | Stats: tournaments, live game tracking (lines, pull timer, timeouts), stat sheets, season stats | `ui/stats` | `StatsViewModel`, `TournamentViewModel`, `GameTrackerViewModel` | Stats, Event, Team |
 | Events: USA Ultimate tournaments, schedules and brackets | `ui/tournaments`, `ui/events` | `TournamentsViewModel`, `TournamentDetailViewModel` | Tournament, UsauSchedule |
@@ -292,6 +293,11 @@ teams/{teamId}                  name, division, level, city, ownerId,
   statsTournaments/{id}         tournament with roster and lines
   statsGames/{id}               one game: points, lines, timeouts, all in one doc
   chats/{roomId}                name, readRoles, writeRoles, readUsers, writeUsers
+  meetings/{meetingId}          title, startsAt, endsAt, notes, inviteRoles [], inviteUsers [],
+                                requireApproval, status (scheduled/live/ended), startedBy,
+                                startedAt, endedAt, rsvps {uid}, createdBy
+    requests/{uid}              join request: status (pending/admitted/denied), decidedBy
+    messages/{messageId}        in-call chat: authorId, authorName, text, createdAt
     messages/{messageId}        authorId, authorName, text, attachments [], createdAt
 conversations/{uidA_uidB}       participants [a,b] (sorted), names {}, lastMessage,
                                 lastMessageAt, lastSenderId, readAt {}
@@ -310,7 +316,8 @@ sentReminders/{key}             one per event and start time, so reminders go on
     lists alone answer "who can read".
 - **Cascades.** Firestore doesn't delete subcollections, so
   `TeamRepositoryFirebase.deleteTeam` clears every subcollection first:
-  chat rooms (attachments, then messages, then the room), roster, plays,
+  chat rooms (attachments, then messages, then the room), meetings
+  (messages and requests, then the meeting), roster, plays,
   events, stats, joins and the invite code. `AuthRepositoryFirebase
   .deleteAccount` removes personal events, notification settings, devices
   and feed, `users/{uid}` and `profiles/{uid}`. Conversations stay for the
@@ -361,6 +368,9 @@ take, but the server enforces every one.
 | Roster status | Editors | Editors |
 | Plays, team events | Members | Editors; members write only their own RSVP, reactions and votes, and only when going |
 | Stats | Members | Editors and stats keepers |
+| Meetings | Admins, plus invited roles and people | Create, edit, delete: admins. Start: admins (scheduled → live). End: admins. Invitees write only their own RSVP |
+| Meeting join requests | The requester and admins | The invitee creates or renews their own pending request (approval meetings, not ended); admins admit or deny |
+| Meeting chat | Admins and invitees allowed in the call (admitted, if approval is on) | Same people, while live, text only (4000 chars). Delete: author or admins |
 | Chat room details | Editors (to manage access); others only rooms they can read | Create and update: editors. Delete: owner |
 | Chat messages | The owner, plus roles and people the room lets read | Create: the owner, plus roles and people the room lets write, posting as themselves. Delete: author or owner. No edits |
 | Chat attachments | Same as messages (Storage rules read the room from Firestore) | Room writers, into their own folder, 10 MB max. Delete: author or owner |
@@ -383,6 +393,7 @@ Service Agent** role on the project.
 | Google OAuth (system browser + loopback) | Google sign-in on Windows | `GoogleDesktopOAuth` |
 | Cloud Firestore | All app data, real-time listeners | Firebase repositories |
 | Cloud Storage | Chat and DM attachments | `AttachmentStorage` |
+| LiveKit Cloud (WebRTC SFU) | Meeting audio, video and screen share | `LiveKitMeetingCall` (`livekit_client`); tokens from the `meetings-joinToken` function via `MeetingTokenService` |
 | play.usaultimate.org (HTML scraping, ASP.NET postbacks) | Tournaments, rankings, team pages and rosters, event schedules and brackets | `UsauClient` + `UsauParser` |
 
 Notes on USA Ultimate data:
@@ -428,6 +439,40 @@ Cloud Functions in `functions/src/notifications`, exported as the
 - **Logic** that decides recipients and wording is pure (`model.ts`) and
   unit-tested in `functions/test/notifications`.
 
+## Meetings
+
+Meetings live in `teams/{teamId}/meetings`, not `events`, because
+non-admins may only see the ones they're invited to and Firestore queries
+must be provably limited to readable documents. Admins query the whole
+collection; everyone else merges `inviteRoles array-contains <role>` and
+`inviteUsers array-contains <uid>`, sorted on the device (no composite
+index). `TeamMeeting.toEvent()` puts them on the schedule as
+`EventType.meeting`, and `Routes.teamEvent` sends those to the meeting
+page.
+
+- **Calls** run on LiveKit Cloud. The `meetings` functions group
+  (`functions/src/meetings`) holds:
+  - `joinToken` (callable): repeats the rules' checks (member, invited, live,
+    admitted when approval is on) and returns a 6-hour token. The identity
+    is the uid; the photo goes in metadata. The app calls it over plain
+    HTTPS (`MeetingTokenService`) so it works on Windows, which has no
+    `cloud_functions` plugin.
+  - `closeRoom`: deletes the LiveKit room when a meeting ends or is
+    deleted, so nobody stays connected.
+- **Media** sits behind `MeetingMediaService` / `MeetingCall`
+  (`data/services/meeting_call.dart`); `meeting_call_livekit.dart` is the
+  only file that knows LiveKit, and tests use fakes. Screen share works on
+  Windows, macOS and Android (a `mediaProjection` foreground service via
+  `flutter_background`). iOS would need a broadcast upload extension.
+- **Per-user settings** (`MeetingSettings`, in SharedPreferences): chosen
+  mic, speaker and camera, mic and camera on at join, meeting volume, and
+  each person's volume (0–200%, applied with `Helper.setVolume`).
+- **Started alerts:** the `teamMeeting` trigger notifies invitees who said
+  they're attending, except whoever started it and anyone already waiting
+  or let in. The feed entry id starts `meetingStarted_`, and
+  `MeetingAlertsViewModel` turns a fresh unread one into an in-app banner
+  with **Join**, unless `MeetingPresence` says that room is already open.
+
 ## Secrets and configuration
 
 - Firebase API keys come from `secrets.local.json` at build time, via
@@ -437,6 +482,9 @@ Cloud Functions in `functions/src/notifications`, exported as the
   injects them for iOS builds.
 - `USE_EMULATORS=true` points Auth, Firestore and Storage at local
   emulators (ports 9099, 8080 and 9199).
+- LiveKit's `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` are
+  Cloud Functions secrets (`firebase functions:secrets:set …`). The app
+  never sees the key; it gets per-meeting tokens from `joinToken`.
 - Full rules are in `CLAUDE.md`.
 
 ## Testing and checks
@@ -459,13 +507,17 @@ cd functions && npm run test:rules               # Firestore + Storage rules (em
 |---|---|
 | Firestore rules | Deployed (`firebase deploy --only firestore:rules`) |
 | Storage rules | Deployed (`firebase deploy --only storage`); Blaze plan and Storage enabled |
-| Notification functions | Ready; deploy with `firebase deploy --only functions:notifications` |
+| Meeting functions | Deployed (`firebase deploy --only functions:meetings`); LiveKit secrets set |
+| Notification functions | Deployed (`firebase deploy --only functions:notifications`) |
 | USA Ultimate functions | Not deployed, on purpose, until there are more users |
 | Firestore indexes | Collection-group overrides for reminders and pruning; deploy with `firebase deploy --only firestore:indexes` |
 | iOS builds | Codemagic (`codemagic.yaml`, `docs/ios-release.md`) |
 
 ## Known gaps
 
+- Meetings: no screen share on iOS, no mic input level, no reminders
+  before a meeting. Without approval, the started alert can't tell who's
+  sitting in the lobby, so lobby users may get it too.
 - Direct messages have no blocking or reporting yet.
 - Messages can't be edited.
 - Chat attachments aren't available offline.

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/auth/auth_repository.dart';
+import '../data/repositories/meeting/meeting_repository.dart';
 import '../ui/auth/view_models/sign_in_viewmodel.dart';
 import '../ui/auth/view_models/sign_up_viewmodel.dart';
 import '../ui/auth/widgets/sign_in_screen.dart';
@@ -13,6 +14,12 @@ import '../ui/chat/widgets/chat_layout.dart';
 import '../ui/chat/widgets/chat_room_screen.dart';
 import '../ui/chat/widgets/chat_room_settings_screen.dart';
 import '../ui/core/ui/adaptive_shell.dart';
+import '../ui/meetings/view_models/meeting_detail_viewmodel.dart';
+import '../ui/meetings/view_models/meeting_editor_viewmodel.dart';
+import '../ui/meetings/view_models/meeting_room_viewmodel.dart';
+import '../ui/meetings/widgets/meeting_detail_screen.dart';
+import '../ui/meetings/widgets/meeting_editor_screen.dart';
+import '../ui/meetings/widgets/meeting_room_screen.dart';
 import '../ui/messages/view_models/direct_chat_viewmodel.dart';
 import '../ui/messages/view_models/inbox_viewmodel.dart';
 import '../ui/messages/view_models/people_search_viewmodel.dart';
@@ -202,6 +209,97 @@ GoRouter router(AuthRepository auth) => GoRouter(
         ),
       ],
     ),
+    // Team meetings, full screen over the shell (see
+    // Routes.teamMeetingsPath).
+    GoRoute(
+      path: '${Routes.teamMeetingsPath}/:teamId',
+      redirect: (_, state) {
+        final teamId = state.pathParameters['teamId']!;
+        final base = '${Routes.teamMeetingsPath}/$teamId';
+        return state.uri.path == base ? Routes.teamEvents(teamId) : null;
+      },
+      routes: [
+        GoRoute(
+          path: 'new',
+          builder: (_, state) {
+            final teamId = state.pathParameters['teamId']!;
+            final date = state.uri.queryParameters['date'];
+            return ViewModelHost(
+              key: ValueKey('new-meeting-$teamId-$date'),
+              create: (c) => MeetingEditorViewModel(
+                teamId: teamId,
+                meetingId: null,
+                initialDay: date == null ? null : DateTime.tryParse(date),
+                meetingRepository: c.read(),
+                teamRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, vm) => MeetingEditorScreen(viewModel: vm),
+            );
+          },
+        ),
+        GoRoute(
+          path: ':meetingId',
+          builder: (_, state) {
+            final teamId = state.pathParameters['teamId']!;
+            final meetingId = state.pathParameters['meetingId']!;
+            return ViewModelHost(
+              key: ValueKey('meeting-$teamId-$meetingId'),
+              create: (c) => MeetingDetailViewModel(
+                teamId: teamId,
+                meetingId: meetingId,
+                meetingRepository: c.read(),
+                teamRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, vm) => MeetingDetailScreen(viewModel: vm),
+            );
+          },
+          routes: [
+            GoRoute(
+              path: 'edit',
+              builder: (_, state) {
+                final teamId = state.pathParameters['teamId']!;
+                final meetingId = state.pathParameters['meetingId']!;
+                return ViewModelHost(
+                  key: ValueKey('edit-meeting-$teamId-$meetingId'),
+                  create: (c) => MeetingEditorViewModel(
+                    teamId: teamId,
+                    meetingId: meetingId,
+                    meetingRepository: c.read(),
+                    teamRepository: c.read(),
+                    authRepository: c.read(),
+                  ),
+                  builder: (_, vm) => MeetingEditorScreen(viewModel: vm),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'room',
+              builder: (_, state) {
+                final teamId = state.pathParameters['teamId']!;
+                final meetingId = state.pathParameters['meetingId']!;
+                return ViewModelHost(
+                  key: ValueKey('meeting-room-$teamId-$meetingId'),
+                  create: (c) => MeetingRoomViewModel(
+                    teamId: teamId,
+                    meetingId: meetingId,
+                    meetingRepository: c.read(),
+                    teamRepository: c.read(),
+                    authRepository: c.read(),
+                    media: c.read(),
+                    settingsRepository: c.read(),
+                    filePicker: c.read(),
+                    presence: c.read(),
+                  ),
+                  builder: (_, vm) => MeetingRoomScreen(viewModel: vm),
+                );
+              },
+            ),
+          ],
+        ),
+      ],
+    ),
     // Direct messages, full screen over the shell (opened with push).
     GoRoute(
       path: Routes.messages,
@@ -319,6 +417,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                   teamRepository: c.read(),
                   playRepository: c.read(),
                   eventRepository: c.read(),
+                  meetingRepository: c.read<MeetingRepository>(),
                   tournamentRepository: c.read(),
                   rankingRepository: c.read(),
                 ),
@@ -556,6 +655,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                   authRepository: c.read(),
                   teamRepository: c.read(),
                   eventRepository: c.read(),
+                  meetingRepository: c.read<MeetingRepository>(),
                 ),
                 builder: (_, vm) => ScheduleScreen(viewModel: vm),
               ),
@@ -647,6 +747,7 @@ Widget _teamSection(GoRouterState state, TeamSection section) {
       teamRepository: c.read(),
       playRepository: c.read(),
       eventRepository: c.read(),
+      meetingRepository: c.read<MeetingRepository>(),
       authRepository: c.read(),
     ),
     builder: (_, vm) => TeamSectionScreen(viewModel: vm, section: section),

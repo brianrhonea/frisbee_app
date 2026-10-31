@@ -75,6 +75,8 @@ You're notified about:
 - **Event reminders**: a reminder about a day before each team or personal
   event, unless you've said you can't go.
 - **Team activity**: new and updated plays in the playbook.
+- **Meetings**: meetings you're invited to, cancellations, and a heads-up
+  when one you're attending starts.
 
 You aren't notified about things you did yourself.
 
@@ -164,6 +166,37 @@ Your whole week in one place: personal events plus every team you're on.
 
 Event types: Practice, Game, Tournament, Scrimmage, Workout, Social, Other.
 Personal events are private: only you can see them.
+
+### Meetings
+
+Video meetings for your team. They show on the schedule with a 🎥 icon,
+but only to the people invited.
+
+- **Schedule one** (owners, coaches and captains): on the team's Events
+  tab tap **New** → **Meeting**. Give it a title, time and agenda, then
+  pick who's invited: whole roles (Admins are always in), particular
+  people, or both. Turn on **Require admin approval to join** to let people
+  in one at a time.
+- **RSVP** on the meeting page: **Attending** or **Not attending**. Admins
+  see everyone's answers.
+- **Go to meeting room** opens the lobby. Pick your microphone, speaker
+  and camera, check your camera preview and set the meeting volume. UltiUP
+  asks for camera and microphone access the first time.
+- **Starting:** an admin taps **Start meeting** (or **Start meeting early**
+  before the start time). Everyone attending who isn't already there gets a
+  notification, or a banner with **Join** if UltiUP is open.
+- **Getting in:** without approval, tap **Join meeting** once it's started.
+  With approval, tap **Ask to join** and wait; admins see the waiting list
+  in the lobby and in the call, and tap **Admit** or **Deny**.
+- **In the call** you'll see everyone's camera, or their photo when it's
+  off; a green border shows who's talking. The buttons along the bottom:
+  mic, camera, mute all sound, share screen (Windows, Mac and Android),
+  chat, settings and **Leave**. Admins can also **End for everyone**.
+- **Chat** lets you type instead of unmuting. Only people in the call can
+  read it.
+- **Volume:** tap a person to make them louder or quieter (0–200%) or mute
+  them, just for you. Settings (⚙) changes devices mid-call and the
+  overall volume. UltiUP remembers these on this device.
 
 ### Events
 

@@ -11,6 +11,7 @@ import {
 } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
+import { invitees, type MeetingDoc, meetingChange, type MeetingTeam, startedRecipients } from "../meetings/model";
 import { deliver } from "./deliver";
 import {
   chatNotice,
@@ -18,6 +19,9 @@ import {
   directMessageNotice,
   eventChange,
   eventChangeNotice,
+  meetingCancelledNotice,
+  meetingInviteNotice,
+  meetingStartedNotice,
   millis,
   playNotice,
   reminderNotice,
@@ -100,6 +104,63 @@ export const teamEvent = onDocumentWrittenWithAuthContext(
       (team.memberIds ?? []).filter((uid) => uid !== event.authId),
       eventChangeNotice({ change, teamId, eventId, teamName: teamName(team), before, after }),
     );
+  },
+);
+
+/**
+ * Team meetings: invitees hear when they're invited and when an upcoming
+ * meeting is cancelled; invitees attending hear when it starts, unless
+ * they're already in the room or its lobby.
+ */
+export const teamMeeting = onDocumentWrittenWithAuthContext(
+  "teams/{teamId}/meetings/{meetingId}",
+  async (event) => {
+    const before = event.data?.before.data() as (MeetingDoc & Data) | undefined;
+    const after = event.data?.after.data() as (MeetingDoc & Data) | undefined;
+    const change = meetingChange(before, after);
+    if (change === null || change === "ended") return;
+    const { teamId, meetingId } = event.params;
+    const team = await liveTeam(teamId);
+    if (!team) return;
+    const meetingTeam = team as MeetingTeam;
+    const db = getFirestore();
+    const args = { teamId, meetingId, teamName: teamName(team) };
+    const notActor = (uid: string) => uid !== event.authId;
+    const upcoming = (m: Data) => (millis(m.startsAt) ?? 0) > Date.now() - hour;
+
+    switch (change) {
+      case "created":
+        if (!upcoming(after!)) return;
+        await deliver(
+          db,
+          getMessaging(),
+          invitees(meetingTeam, after!).filter(notActor),
+          meetingInviteNotice({ ...args, meeting: after! }),
+        );
+        return;
+      case "cancelled":
+        if (before!.status !== "live" && !upcoming(before!)) return;
+        await deliver(
+          db,
+          getMessaging(),
+          invitees(meetingTeam, before!).filter(notActor),
+          meetingCancelledNotice({ ...args, meeting: before! }),
+        );
+        return;
+      case "started": {
+        const waiting = await db
+          .collection(`teams/${teamId}/meetings/${meetingId}/requests`)
+          .where("status", "in", ["pending", "admitted"])
+          .get();
+        await deliver(
+          db,
+          getMessaging(),
+          startedRecipients(meetingTeam, after!, waiting.docs.map((d) => d.id)),
+          meetingStartedNotice({ ...args, meeting: after! }),
+        );
+        return;
+      }
+    }
   },
 );
 

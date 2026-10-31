@@ -10,6 +10,7 @@ import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/notifications_viewmodel.dart';
+import '../../../routing/open_link.dart';
 
 IconData categoryIcon(NotificationCategory c) => switch (c) {
   NotificationCategory.chat => Icons.forum_outlined,
@@ -17,6 +18,7 @@ IconData categoryIcon(NotificationCategory c) => switch (c) {
   NotificationCategory.eventChanges => Icons.event_outlined,
   NotificationCategory.eventReminders => Icons.alarm,
   NotificationCategory.teamActivity => Icons.sports_outlined,
+  NotificationCategory.meetings => Icons.videocam_outlined,
 };
 
 /// The in-app feed: everything the Cloud Functions sent, including what
@@ -66,7 +68,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   void _open(AppNotification n) {
     vm.open.execute(n);
-    if (n.route case final route?) context.push(route);
+    if (n.route case final route?) GoRouter.of(context).openLink(route);
   }
 
   Future<void> _clearAll() async {

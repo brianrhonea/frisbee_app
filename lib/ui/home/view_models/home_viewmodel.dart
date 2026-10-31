@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/direct_message/direct_message_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/playbook/play_repository.dart';
 import '../../../data/repositories/ranking/ranking_repository.dart';
@@ -31,6 +32,7 @@ class HomeViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required PlayRepository playRepository,
     required EventRepository eventRepository,
+    MeetingRepository? meetingRepository,
     required TournamentRepository tournamentRepository,
     required RankingRepository rankingRepository,
     DateTime Function()? clock,
@@ -42,6 +44,7 @@ class HomeViewModel extends ChangeNotifier {
     _feed = MySchedule(
       teamRepository: teamRepository,
       eventRepository: eventRepository,
+      meetingRepository: meetingRepository,
       uid: _auth.currentUser?.uid,
       clock: _clock,
     )..addListener(_onFeed);

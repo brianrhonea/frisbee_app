@@ -8,6 +8,7 @@ export const categories = [
   "eventChanges",
   "eventReminders",
   "teamActivity",
+  "meetings",
 ] as const;
 export type Category = (typeof categories)[number];
 
@@ -316,4 +317,65 @@ export function playNotice(a: {
 export function reminderRecipients(team: TeamDoc, event: Data): string[] {
   const rsvps = (event.rsvps ?? {}) as Record<string, unknown>;
   return (team.memberIds ?? []).filter((uid) => rsvps[uid] !== "notGoing");
+}
+
+/** Meeting notices go to the meeting page, or straight to its room. */
+const meetingRoute = (teamId: string, meetingId: string) => `/team-meetings/${teamId}/${meetingId}`;
+
+export function meetingInviteNotice(a: {
+  teamId: string;
+  meetingId: string;
+  teamName: string;
+  meeting: Data;
+}): Notice {
+  const title = String(a.meeting.title ?? "") || "Meeting";
+  return {
+    category: "meetings",
+    teamId: a.teamId,
+    route: meetingRoute(a.teamId, a.meetingId),
+    collapseId: `meeting_${a.teamId}_${a.meetingId}`,
+    text: (prefs) => ({
+      title: `${a.teamName}: you're invited to a meeting`,
+      body: [title, whenAndWhere(a.meeting, prefs)].filter(Boolean).join(" · "),
+    }),
+  };
+}
+
+/**
+ * The meeting is live. Its feed id starts with `meetingStarted_`, which the
+ * app looks for to pop up a Join prompt (MeetingAlertsViewModel).
+ */
+export function meetingStartedNotice(a: {
+  teamId: string;
+  meetingId: string;
+  teamName: string;
+  meeting: Data;
+}): Notice {
+  const title = String(a.meeting.title ?? "") || "Your meeting";
+  return {
+    category: "meetings",
+    teamId: a.teamId,
+    route: `${meetingRoute(a.teamId, a.meetingId)}/room`,
+    collapseId: `meetingStarted_${a.teamId}_${a.meetingId}`,
+    text: () => ({ title: `${title} has started`, body: `${a.teamName} · Tap to join` }),
+  };
+}
+
+export function meetingCancelledNotice(a: {
+  teamId: string;
+  meetingId: string;
+  teamName: string;
+  meeting: Data;
+}): Notice {
+  const title = String(a.meeting.title ?? "") || "Meeting";
+  return {
+    category: "meetings",
+    teamId: a.teamId,
+    route: `/teams/${a.teamId}/events`,
+    collapseId: `meeting_${a.teamId}_${a.meetingId}`,
+    text: (prefs) => ({
+      title: `${a.teamName}: ${title} cancelled`,
+      body: `Was ${whenAndWhere(a.meeting, prefs)}`,
+    }),
+  };
 }

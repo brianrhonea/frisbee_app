@@ -28,7 +28,7 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
 
   // Playback is view state: the controller's value maps onto the play's
   // timeline (0 = setup, 1 = end of the last step).
-  late final AnimationController _anim = AnimationController(vsync: this);
+  late final AnimationController _anim;
 
   /// True while showing a playback frame instead of the selected step.
   bool _timeline = false;
@@ -39,6 +39,9 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
   @override
   void initState() {
     super.initState();
+    // Created here, not lazily: a first use in dispose() would look up
+    // TickerMode on a deactivated element.
+    _anim = AnimationController(vsync: this);
     vm.save.addListener(_onSave);
   }
 

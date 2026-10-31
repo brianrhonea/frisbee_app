@@ -12,6 +12,7 @@ extension EventTypeStyle on EventType {
     EventType.workout => Icons.fitness_center,
     EventType.social => Icons.celebration_outlined,
     EventType.other => Icons.event_outlined,
+    EventType.meeting => Icons.videocam_outlined,
   };
 
   Color color(ColorScheme scheme) => switch (this) {
@@ -22,6 +23,7 @@ extension EventTypeStyle on EventType {
     EventType.workout => Colors.deepPurple.shade300,
     EventType.social => Colors.pink.shade400,
     EventType.other => scheme.outline,
+    EventType.meeting => Colors.indigo.shade400,
   };
 }
 

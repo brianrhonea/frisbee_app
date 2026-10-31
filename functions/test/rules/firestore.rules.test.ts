@@ -1170,3 +1170,164 @@ describe("notifications", () => {
     await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { deletingAt: deleteField() }));
   });
 });
+
+describe("meetings", () => {
+  // Invites players by name only: STATS is invited, PLAYER isn't.
+  const meeting = (overrides: Record<string, unknown> = {}) => ({
+    title: "Film review",
+    startsAt: new Date("2026-11-02T19:00:00Z"),
+    endsAt: null,
+    notes: "",
+    inviteRoles: [],
+    inviteUsers: [STATS],
+    requireApproval: false,
+    status: "scheduled",
+    rsvps: {},
+    createdBy: COACH,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  });
+  const ref = (uid: string, id = "m1") => doc(db(uid), "teams", TEAM, "meetings", id);
+  const meetings = (uid: string) => collection(db(uid), "teams", TEAM, "meetings");
+  const request = (uid: string, who = uid) =>
+    doc(db(uid), "teams", TEAM, "meetings", "m1", "requests", who);
+  const messages = (uid: string) => collection(db(uid), "teams", TEAM, "meetings", "m1", "messages");
+  const seed = (overrides: Record<string, unknown> = {}) =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "meetings", "m1"), {
+        ...meeting(overrides),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+  const say = (uid: string) => ({ authorId: uid, authorName: "N", text: "Hi", createdAt: serverTimestamp() });
+
+  it("admins schedule meetings; players and outsiders can't", async () => {
+    await assertSucceeds(setDoc(ref(CAPTAIN), meeting({ createdBy: CAPTAIN })));
+    await assertFails(setDoc(ref(PLAYER, "m2"), meeting({ createdBy: PLAYER })));
+    await assertFails(setDoc(ref(OUTSIDER, "m3"), meeting({ createdBy: OUTSIDER })));
+  });
+
+  it("new meetings start scheduled, with no RSVPs", async () => {
+    await assertFails(setDoc(ref(COACH), meeting({ status: "live" })));
+    await assertFails(setDoc(ref(COACH), meeting({ rsvps: { [COACH]: "attending" } })));
+    await assertFails(setDoc(ref(COACH), meeting({ inviteRoles: ["fan"] })));
+  });
+
+  it("only admins and invitees can read, and queries must be limited to theirs", async () => {
+    await seed();
+    await assertSucceeds(getDoc(ref(OWNER)));
+    await assertSucceeds(getDoc(ref(CAPTAIN)));
+    await assertSucceeds(getDoc(ref(STATS)));
+    await assertFails(getDoc(ref(PLAYER)));
+    await assertFails(getDoc(ref(OUTSIDER)));
+    await assertSucceeds(getDocs(meetings(COACH)));
+    await assertFails(getDocs(meetings(PLAYER)));
+    await assertSucceeds(getDocs(query(meetings(PLAYER), where("inviteRoles", "array-contains", "player"))));
+    await assertSucceeds(getDocs(query(meetings(STATS), where("inviteUsers", "array-contains", STATS))));
+  });
+
+  it("invitees answer only for themselves", async () => {
+    await seed();
+    await assertSucceeds(updateDoc(ref(STATS), { [`rsvps.${STATS}`]: "attending" }));
+    await assertSucceeds(updateDoc(ref(STATS), { [`rsvps.${STATS}`]: deleteField() }));
+    await assertFails(updateDoc(ref(STATS), { [`rsvps.${STATS}`]: "maybe" }));
+    await assertFails(updateDoc(ref(STATS), { [`rsvps.${COACH}`]: "attending" }));
+    await assertFails(updateDoc(ref(PLAYER), { [`rsvps.${PLAYER}`]: "attending" }));
+    await assertFails(updateDoc(ref(STATS), { title: "Mine now" }));
+  });
+
+  it("admins start and end meetings; invitees can't", async () => {
+    await seed();
+    await assertFails(
+      updateDoc(ref(STATS), { status: "live", startedAt: serverTimestamp(), startedBy: STATS }),
+    );
+    await assertFails(
+      updateDoc(ref(COACH), { status: "live", startedAt: serverTimestamp(), startedBy: OWNER }),
+    );
+    await assertSucceeds(
+      updateDoc(ref(COACH), { status: "live", startedAt: serverTimestamp(), startedBy: COACH }),
+    );
+    await assertFails(updateDoc(ref(STATS), { status: "ended", endedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(ref(CAPTAIN), { status: "ended", endedAt: serverTimestamp() }));
+    await assertFails(
+      updateDoc(ref(COACH), { status: "live", startedAt: serverTimestamp(), startedBy: COACH }),
+    );
+  });
+
+  it("admins edit and delete; invitees can't", async () => {
+    await seed();
+    await assertSucceeds(
+      updateDoc(ref(COACH), { title: "Film", inviteRoles: ["player"], updatedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(ref(COACH), { rsvps: { [STATS]: "attending" } }));
+    await assertFails(deleteDoc(ref(STATS)));
+    await assertSucceeds(deleteDoc(ref(OWNER)));
+  });
+
+  describe("join requests", () => {
+    const ask = () => ({ name: "N", status: "pending", requestedAt: serverTimestamp() });
+
+    it("invitees ask only when approval is on, for themselves", async () => {
+      await seed();
+      await assertFails(setDoc(request(STATS), ask()));
+      await seed({ requireApproval: true, status: "live" });
+      await assertSucceeds(setDoc(request(STATS), ask()));
+      await assertFails(setDoc(request(STATS, PLAYER), ask()));
+      await assertFails(setDoc(request(PLAYER), ask()));
+      await assertFails(setDoc(request(STATS), { ...ask(), status: "admitted" }));
+    });
+
+    it("admins let people in or turn them away; requests are private", async () => {
+      await seed({ requireApproval: true, status: "live" });
+      await assertSucceeds(setDoc(request(STATS), ask()));
+      await assertFails(getDoc(request(PLAYER, STATS)));
+      await assertSucceeds(getDocs(collection(db(CAPTAIN), "teams", TEAM, "meetings", "m1", "requests")));
+      await assertFails(
+        updateDoc(request(STATS), { status: "admitted", decidedBy: STATS, decidedAt: serverTimestamp() }),
+      );
+      await assertSucceeds(
+        updateDoc(request(COACH, STATS), { status: "admitted", decidedBy: COACH, decidedAt: serverTimestamp() }),
+      );
+      // Asking again after a decision.
+      await assertSucceeds(setDoc(request(STATS), ask()));
+    });
+
+    it("no asking once the meeting has ended", async () => {
+      await seed({ requireApproval: true, status: "ended" });
+      await assertFails(setDoc(request(STATS), ask()));
+    });
+  });
+
+  describe("chat", () => {
+    it("people in a live call chat; others can't", async () => {
+      await seed({ status: "live" });
+      await assertSucceeds(setDoc(doc(messages(STATS), "a"), say(STATS)));
+      await assertSucceeds(getDocs(messages(COACH)));
+      await assertFails(setDoc(doc(messages(PLAYER), "b"), say(PLAYER)));
+      await assertFails(getDocs(messages(PLAYER)));
+      await assertFails(setDoc(doc(messages(STATS), "c"), say(COACH)));
+    });
+
+    it("needs the meeting to be live", async () => {
+      await seed();
+      await assertFails(setDoc(doc(messages(COACH), "a"), say(COACH)));
+    });
+
+    it("with approval on, only people let in can chat", async () => {
+      await seed({ status: "live", requireApproval: true });
+      await assertFails(setDoc(doc(messages(STATS), "a"), say(STATS)));
+      await assertFails(getDocs(messages(STATS)));
+      await env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "teams", TEAM, "meetings", "m1", "requests", STATS), {
+          name: "S",
+          status: "admitted",
+        }),
+      );
+      await assertSucceeds(setDoc(doc(messages(STATS), "a"), say(STATS)));
+      await assertSucceeds(getDocs(messages(STATS)));
+      await assertSucceeds(setDoc(doc(messages(CAPTAIN), "b"), say(CAPTAIN)));
+    });
+  });
+});

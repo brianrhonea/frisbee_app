@@ -39,6 +39,38 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
         : day,
   );
 
+  /// Events and meetings are added from the same button.
+  Future<void> _add(DateTime? day) async {
+    final route = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.event_outlined),
+              title: const Text('Event'),
+              subtitle: const Text('Practice, game, social…'),
+              onTap: () =>
+                  Navigator.pop(context, Routes.newEvent(vm.teamId, day: day)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.videocam_outlined),
+              title: const Text('Meeting'),
+              subtitle: const Text('A video call for the team or some of it'),
+              onTap: () => Navigator.pop(
+                context,
+                Routes.newMeeting(vm.teamId, day: day),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (route != null && mounted) context.push(route);
+  }
+
   @override
   Widget build(BuildContext context) {
     final selected = _selected;
@@ -65,7 +97,7 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
       icon: Icons.event_available_outlined,
       title: selected == null ? 'Nothing scheduled' : 'No events this day',
       message: vm.canEdit
-          ? 'Add practices, games and socials so the team can RSVP.'
+          ? 'Add practices, games, socials and meetings so the team can RSVP.'
           : "Your coaches haven't scheduled anything yet.",
     );
     final tiles = [
@@ -73,7 +105,7 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
         TeamEventTile(
           event: e,
           uid: vm.uid,
-          onTap: () => context.push(Routes.event(vm.teamId, e.id)),
+          onTap: () => context.push(Routes.teamEvent(vm.teamId, e)),
         ),
     ];
 
@@ -81,10 +113,9 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
       floatingActionButton: vm.canEdit
           ? FloatingActionButton.extended(
               heroTag: 'new-event',
-              onPressed: () =>
-                  context.push(Routes.newEvent(vm.teamId, day: selected)),
+              onPressed: () => _add(selected),
               icon: const Icon(Icons.add),
-              label: const Text('New event'),
+              label: const Text('New'),
             )
           : null,
       body: LayoutBuilder(

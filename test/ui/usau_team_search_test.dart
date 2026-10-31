@@ -5,6 +5,7 @@ import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
+import 'package:frisbee_app/data/repositories/meeting/meeting_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
@@ -27,6 +28,7 @@ import 'package:frisbee_app/utils/result.dart';
 import 'package:provider/provider.dart';
 
 import '../testing/fakes.dart';
+import '../testing/meeting_fakes.dart';
 
 const _divisions = [
   RankingDivision(
@@ -119,6 +121,7 @@ void main() {
           Provider<ChatRepository>.value(value: FakeChatRepository()),
           Provider<FilePickerService>.value(value: FakeFilePickerService()),
           Provider<EventRepository>.value(value: FakeEventRepository()),
+          Provider<MeetingRepository>.value(value: FakeMeetingRepository()),
           Provider<StatsRepository>.value(
             value: MockStatsRepository(teamRepository: teams),
           ),

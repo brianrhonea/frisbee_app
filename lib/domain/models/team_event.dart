@@ -7,10 +7,18 @@ enum EventType {
   scrimmage('Scrimmage'),
   workout('Workout'),
   social('Social'),
-  other('Other');
+  other('Other'),
+
+  /// A [TeamMeeting] shown on the schedule. Meetings are stored apart from
+  /// events, so this is never saved on an event.
+  meeting('Meeting');
 
   const EventType(this.label);
   final String label;
+
+  /// Types an event can be given in the editor.
+  static List<EventType> get editable =>
+      values.where((t) => t != meeting).toList();
 }
 
 enum RsvpStatus {

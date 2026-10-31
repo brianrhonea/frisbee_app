@@ -1,4 +1,5 @@
 import '../domain/models/schedule_entry.dart';
+import '../domain/models/team_event.dart';
 
 abstract final class Routes {
   static const signIn = '/sign-in';
@@ -58,6 +59,27 @@ abstract final class Routes {
   static String editEvent(String teamId, String eventId) =>
       '$teamEventsPath/$teamId/$eventId/edit';
 
+  // Team meetings, over the shell like events; use `context.push`.
+  static const teamMeetingsPath = '/team-meetings';
+  static String newMeeting(String teamId, {DateTime? day}) => Uri(
+    path: '$teamMeetingsPath/$teamId/new',
+    queryParameters: day == null
+        ? null
+        : {'date': day.toIso8601String().substring(0, 10)},
+  ).toString();
+  static String meeting(String teamId, String meetingId) =>
+      '$teamMeetingsPath/$teamId/$meetingId';
+  static String editMeeting(String teamId, String meetingId) =>
+      '$teamMeetingsPath/$teamId/$meetingId/edit';
+
+  /// The lobby and, once joined, the call.
+  static String meetingRoom(String teamId, String meetingId) =>
+      '$teamMeetingsPath/$teamId/$meetingId/room';
+
+  /// Detail page for a team schedule entry: an event or a meeting.
+  static String teamEvent(String teamId, TeamEvent e) =>
+      e.type == EventType.meeting ? meeting(teamId, e.id) : event(teamId, e.id);
+
   // Personal schedule.
   static const myEventsPath = '/my-events';
   static String newMyEvent({DateTime? day}) => Uri(
@@ -71,7 +93,7 @@ abstract final class Routes {
 
   /// Detail page for a team or personal event.
   static String scheduleEvent(ScheduleEntry e) => switch (e.team) {
-    final team? => event(team.id, e.event.id),
+    final team? => teamEvent(team.id, e.event),
     null => myEvent(e.event.id),
   };
   static String statsTournament(String teamId, String tournamentId) =>
