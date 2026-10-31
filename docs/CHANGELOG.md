@@ -10,13 +10,58 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
-| 0.0.6   | 2026-10-30 | `feature/team-videos`                   | (this branch)       |
+| 0.0.7   | 2026-10-31 | `feature/community-groups`              | (this branch)       |
+| 0.0.6   | 2026-10-30 | `feature/team-videos`                   | `d623748` and later |
 | 0.0.5   | 2026-10-30 | `feature/team-meetings`                 | `1b2e424` and later |
 | 0.0.4   | 2026-10-29 | `feature/ultiup-schedule`               | `06830cc` and later |
 | 0.0.3   | 2026-10-29 | `feature/roster-import`                 | `5620a1d`           |
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.7 — Community groups and pickup tournaments
+
+Branch `feature/community-groups`.
+
+**Added**
+- **Community groups**: open pickup communities, alongside teams. No
+  roster, playbook, videos or stats; instead Events, Chat, Tournaments and
+  Members. Roles are Owner, Organizer and Member.
+- Find groups in Teams search (filter All, Teams or Groups). Anyone can
+  **Join**; if the owner turns on **Approve new members**, people **Ask to
+  join** and organizers approve or decline requests on the Members page.
+- A group's description and location. Organizers search for an address
+  (OpenStreetMap / Nominatim) and fine-tune it on the map; the home page
+  shows the map with a **Directions** button.
+- **Pickup** events. Tournament events in groups take **Attending**,
+  **Planning to attend** and **Not able to make it :(** RSVPs.
+- **Tournaments** for groups: from a Tournament event, organizers import
+  who's attending or planning to, then **Assign teams** at a chosen team
+  size (3–12), or add teams ("Team 1"…) and pick players by hand. Rename
+  teams and pick each team's captain.
+- Formats: round robin, pool play + single elimination, single
+  elimination and double elimination (with an if-needed final). Settings
+  for 3v3 to 7v7, game length, breaks, score cap, timeouts per half,
+  fields, start time and ideal end time. The schedule is generated
+  automatically, with a warning if it runs past the ideal end.
+- The tournament page: schedule, pool standings, bracket and teams, plus
+  "You're on…" with your captain and next game. Teams are private to the
+  tournament's players and organizers.
+- Captains **report** scores; the other captain **confirms**, or reports
+  their own score instead. Organizers can set or correct any score.
+  Confirmed results move teams on in the bracket; organizers seed the
+  bracket from pool standings when pools finish.
+
+**Infrastructure**
+- Groups are `teams/{id}` with `kind: 'community'`. Firestore rules for
+  group creation (no invite code), open join, `joinRequests` and
+  approvals, group details and location, `groupTournaments` and their
+  `games` (captain reports and confirmations, and bracket advancement
+  checked against the source game with `getAfter`). Rules tests are
+  written; they need Java and the emulator to run.
+- Pure-Dart tournament engine in `lib/domain/tournament_engine/`
+  (team builder, schedule generator, standings, bracket progress).
+- New packages: `flutter_map`, `latlong2`.
 
 ## 0.0.6 — Team videos
 

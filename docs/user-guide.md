@@ -150,6 +150,47 @@ team name and filter by ranking list (for example, Club Mixed). Tap a team
 to see its USA Ultimate page. Only teams in the USA Ultimate rankings show
 up.
 
+### Community groups
+
+A community group is an open pickup community: no roster or stats, just
+**Events**, **Chat**, **Tournaments** and **Members**. In a group, roles
+are **Owner**, **Organizer** (like a captain: runs events and
+tournaments) and **Member**.
+
+- **Start one**: Teams tab → **New** → **Community group**. Add a
+  description and a location (search an address, then tap the map to
+  fine-tune). Turn on **Approve new members** to review who joins.
+- **Find one**: tap 🔍 in the Teams tab and choose **Groups**. Open a group
+  to see its description and map, then tap **Join** (or **Ask to join**,
+  if it needs approval). Organizers approve requests on the Members page.
+- **Pickup** events work like any team event. For **Tournament** events
+  the RSVPs are **Attending**, **Planning to attend** and **Not able to
+  make it :(**.
+
+**Running a tournament** (owners and organizers):
+
+1. Post a Tournament event so people can RSVP. On the event, tap **Set up
+   tournament** (or **New tournament** on the Tournaments page).
+2. Pick the format (round robin, pool play + single elimination, single
+   elimination, double elimination), players on the field (3v3 to 7v7),
+   game length, score cap, timeouts, fields, start and ideal end time.
+3. **Import RSVPs** brings in everyone attending or planning to attend.
+   **Add member** adds anyone else. Tap **Assign teams** and choose a team
+   size to deal them into teams, or **Add team** and place players
+   yourself. Tap a player to move them or make them captain, and rename
+   teams as you like.
+4. Check the **schedule preview** (it warns if games run past the ideal
+   end) and tap **Publish**.
+
+**Playing**: the tournament shows up for everyone on a team. Open it for
+the schedule, standings, bracket and teams; your games are highlighted.
+Each team's **captain** taps a game to **Report score**. The other captain
+then **confirms** it, or taps **That's not right** to report their own
+score for the first captain to confirm. Organizers can set or correct any
+score. Once a score is final, winners (and losers, in double elimination)
+move on in the bracket. With pool play, organizers tap **Pools are done:
+seed the bracket** when every pool game is final.
+
 ### Schedule
 
 Your whole week in one place: personal events plus every team you're on.
@@ -164,7 +205,8 @@ Your whole week in one place: personal events plus every team you're on.
   keep it. You can always swipe your personal events; team events only if
   you're an owner, coach or captain. Others can't be swiped.
 
-Event types: Practice, Game, Tournament, Scrimmage, Workout, Social, Other.
+Event types: Practice, Game, Tournament, Scrimmage, Workout, Social, Other
+(in groups: Pickup, Tournament, Social, Other).
 Personal events are private: only you can see them.
 
 ### Videos

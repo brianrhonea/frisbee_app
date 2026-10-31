@@ -147,6 +147,8 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
 | Schedule: team and personal events, RSVP, reactions, polls | `ui/schedule` | `ScheduleViewModel` (`MySchedule`), `EventEditorViewModel`, `EventDetailViewModel`, `MyEventDetailViewModel` | Event, Team |
 | Team meetings: invite roles or people, RSVP, lobby with admin approval, video calls (camera, screen share, chat, per-person volume, watch team videos together) | `ui/meetings` | `MeetingEditorViewModel`, `MeetingDetailViewModel`, `MeetingRoomViewModel`, `MeetingChatViewModel`, `WatchTogetherViewModel`, `MeetingAlertsViewModel` | Meeting, MeetingSettings, Team, Video |
 | Videos: YouTube links or uploaded video files shared with the team, in folders, thumbnails, embedded player (WebView2 on Windows), media_kit for uploads | `ui/videos` | `TeamVideosViewModel`, `VideoViewModel`, `VideoEditorViewModel` | Video, Team (`YouTubeInfoService` for link checks) |
+| Community groups: open or approval join, description, location map (flutter_map + Nominatim), pickup events | `ui/teams`, `ui/groups` | `TeamsViewModel`, `TeamSearchViewModel`, `TeamHomeViewModel`, `TeamDetailViewModel`, `LocationPickerViewModel` | Team (`GeocodingService`) |
+| Group tournaments: teams from RSVPs, generated schedule (round robin, pools + single elim, single elim, double elim), captain-reported scores, bracket | `ui/group_tournaments` | `GroupTournamentsViewModel`, `TournamentEditorViewModel`, `GroupTournamentViewModel` | GroupTournament, Team, Event |
 | Playbook: draw plays, animate steps, play back | `ui/playbook` | `PlayEditorViewModel` | Play, Team |
 | Stats: tournaments, live game tracking (lines, pull timer, timeouts), stat sheets, season stats | `ui/stats` | `StatsViewModel`, `TournamentViewModel`, `GameTrackerViewModel` | Stats, Event, Team |
 | Events: USA Ultimate tournaments, schedules and brackets | `ui/tournaments`, `ui/events` | `TournamentsViewModel`, `TournamentDetailViewModel` | Tournament, UsauSchedule |
@@ -295,6 +297,11 @@ teams/{teamId}                  name, division, level, city, ownerId,
                                 size, contentType}, folderId ('' = unsorted), title, description,
                                 authorId, authorName, createdAt, updatedAt
   videoFolders/{folderId}       name (1–40), createdAt
+  joinRequests/{uid}            community groups needing approval: name, createdAt
+  groupTournaments/{id}         community groups: name, eventId, settings {}, status, teams [],
+                                participantIds [], captains {teamId: uid}, createdBy
+    games/{gameId}              order, stage, round, pool, field, startsAt, teamA, teamB,
+                                sourceA, sourceB, status, scoreA, scoreB, report {}, ifNeeded
   statsTournaments/{id}         tournament with roster and lines
   statsGames/{id}               one game: points, lines, timeouts, all in one doc
   chats/{roomId}                name, readRoles, writeRoles, readUsers, writeUsers
@@ -380,6 +387,10 @@ take, but the server enforces every one.
 | Meeting chat | Admins and invitees allowed in the call (admitted, if approval is on) | Same people, while live, text only (4000 chars). Delete: author or admins |
 | Meeting playback (watch together) | Same people as the chat | Admins, while live, as themselves (`presenterId`), and only a video on the team. Delete: admins |
 | Team videos | Members | Owners, coaches and captains; `youtubeId` or a video `file` (MP4, MOV, MKV, WebM, AVI, WMV, MPEG or 3GP; ≤ 500 MB, under the video's own Storage path, fixed once created), `title` (1–100) and `description` (≤ 2000). Delete: same |
+| Community group (team doc with `kind: 'community'`) | Members (listing: anyone signed in) | Created without an invite code; anyone adds themselves as a member when approval is off; organizers add a requester only while their `joinRequests` doc exists, deleting it in the same batch; no coach role |
+| Group join requests | The requester and editors | The requester creates or deletes their own; editors delete |
+| Group tournaments | Editors, and players on its teams (`participantIds`) | Editors; players must be group members and captains must be players |
+| Tournament games | Same as the tournament | Editors write anything valid. A captain of either team writes a `report` for their own team; the other captain confirms it (scores must match). Anyone who can read may fill an empty team slot, only with the winner or loser `getAfter` shows on the source game |
 | Video folders | Members | Owners, coaches and captains; only `name` (1–40). Delete: same |
 | Uploaded video files (Storage `teams/{id}/videos/{videoId}/{name}`) | Members | Owners, coaches and captains; `video/*`, ≤ 500 MB. Delete: same |
 | Chat room details | Editors (to manage access); others only rooms they can read | Create and update: editors. Delete: owner |
@@ -408,6 +419,8 @@ Service Agent** role on the project.
 | YouTube oEmbed (`youtube.com/oembed`, no key) | Video title and whether it can be embedded, when a link is pasted | `YouTubeInfoService` |
 | YouTube embedded player | Playing team videos (`youtube_player_iframe`; on Windows the embed in WebView2 via `webview_windows`) | `youTubePlayer()` |
 | Cloud Storage + media_kit | Uploaded team video files | `VideoRepositoryFirebase`, `fileVideoPlayer()` |
+| OpenStreetMap tiles (`tile.openstreetmap.org`, no key) | Group location maps | `GroupMap` (`flutter_map`) |
+| Nominatim (`nominatim.openstreetmap.org`, no key, app User-Agent) | Address search for group locations | `GeocodingService` |
 | play.usaultimate.org (HTML scraping, ASP.NET postbacks) | Tournaments, rankings, team pages and rosters, event schedules and brackets | `UsauClient` + `UsauParser` |
 
 Notes on USA Ultimate data:
@@ -573,6 +586,38 @@ asks Storage for it each time (`fileUrl`).
 - Screens take the players as parameters, so widget tests swap in
   stand-ins (`fakePlayer` and `fakeFilePlayer` in
   `test/testing/video_fakes.dart`).
+
+## Community groups
+
+A group is a team doc with `kind: 'community'` (`TeamKind`), so chat,
+events, posts, members, the directory and notifications all work
+unchanged. `TeamSection.forKind` picks a group's sections (Events, Chat,
+Tournaments, Members); `TeamRole.labelFor(kind)` shows captain as
+Organizer and player as Member. Groups have no invite code: open groups
+are joined directly (`joinGroup`), approval groups through
+`joinRequests/{uid}` (`requestToJoin`, `approveJoinRequest`).
+
+## Group tournaments
+
+The engine in `lib/domain/tournament_engine/` is pure Dart and unit
+tested (`test/domain/tournament_engine_test.dart`):
+
+- `team_builder.dart`: deals players into teams of a size, random captain.
+- `generator.dart`: round robin (circle method), snake-seeded pools,
+  cross-seeded single elimination with byes, double elimination with a
+  losers' bracket and an if-needed final, then a slot × field scheduler
+  that respects game dependencies and never double-books a team.
+- `standings.dart`: wins, then head to head, then point difference, then
+  points for.
+- `progress.dart`: which slots fill once a game is final (`fillsAfter`),
+  bracket seeds from pools, the champion.
+
+Bracket games store where their teams come from (`sourceA`/`sourceB`:
+winner or loser of a game, or a pool rank). There's no Cloud Function:
+confirming a score writes the game and the filled slots in one batch, and
+the rules check each fill against the source game with `getAfter`.
+`GroupTournamentViewModel` also applies any fills that didn't land
+(`pendingFills`).
 
 ## Secrets and configuration
 
