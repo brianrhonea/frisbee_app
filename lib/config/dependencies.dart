@@ -9,6 +9,8 @@ import '../data/repositories/direct_message/direct_message_repository.dart';
 import '../data/repositories/direct_message/direct_message_repository_firebase.dart';
 import '../data/repositories/event/event_repository.dart';
 import '../data/repositories/event/event_repository_firebase.dart';
+import '../data/repositories/group_tournament/group_tournament_repository.dart';
+import '../data/repositories/group_tournament/group_tournament_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
 import '../data/repositories/meeting/meeting_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_settings_repository.dart';
@@ -68,6 +70,9 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),
   Provider<YouTubeInfoService>(create: (_) => YouTubeInfoService()),
   Provider<GeocodingService>(create: (_) => GeocodingService()),
+  Provider<GroupTournamentRepository>(
+    create: (_) => GroupTournamentRepositoryFirebase(),
+  ),
   Provider<ChatRepository>(
     create: (context) =>
         ChatRepositoryFirebase(attachments: context.read<AttachmentStorage>()),

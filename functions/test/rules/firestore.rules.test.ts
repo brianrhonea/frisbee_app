@@ -346,6 +346,174 @@ describe("community groups", () => {
   });
 });
 
+describe("group tournaments", () => {
+  const GROUP = "group1";
+  const ORGANIZER = "organizer";
+  const CAP_A = "capA";
+  const PLAYER_A = "playerA";
+  const CAP_B = "capB";
+  const MEMBER = "member"; // in the group, not playing
+  const TOUR = "tour1";
+
+  const tournament = (extra: Record<string, unknown> = {}) => ({
+    name: "Fall Hat",
+    eventId: null,
+    settings: { format: "singleElim" },
+    status: "scheduled",
+    teams: [
+      { id: "A", name: "Team 1", captainId: CAP_A, playerIds: [CAP_A, PLAYER_A], playerNames: {} },
+      { id: "B", name: "Team 2", captainId: CAP_B, playerIds: [CAP_B], playerNames: {} },
+    ],
+    participantIds: [CAP_A, PLAYER_A, CAP_B],
+    captains: { A: CAP_A, B: CAP_B },
+    createdBy: ORGANIZER,
+    createdAt: new Date(),
+    ...extra,
+  });
+
+  const game = (extra: Record<string, unknown> = {}) => ({
+    order: 0, stage: "winners", round: 1, label: "Semifinal", pool: null,
+    field: 1, startsAt: new Date(), teamA: "A", teamB: "B",
+    sourceA: null, sourceB: null, status: "scheduled",
+    scoreA: null, scoreB: null, report: null, ifNeeded: false,
+    ...extra,
+  });
+
+  const gameRef = (uid: string, id: string) =>
+    doc(db(uid), "teams", GROUP, "groupTournaments", TOUR, "games", id);
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", GROUP), {
+        name: "Pickup", division: "mixed", level: "pickup", city: "",
+        kind: "community", description: "", requiresApproval: false, location: null,
+        ownerId: OWNER,
+        members: {
+          [OWNER]: "owner", [ORGANIZER]: "captain", [CAP_A]: "player",
+          [PLAYER_A]: "player", [CAP_B]: "player", [MEMBER]: "player",
+        },
+        memberIds: [OWNER, ORGANIZER, CAP_A, PLAYER_A, CAP_B, MEMBER],
+        memberNames: {},
+      });
+      await setDoc(doc(fs, "teams", GROUP, "groupTournaments", TOUR), tournament());
+      await setDoc(doc(fs, "teams", GROUP, "groupTournaments", TOUR, "games", "g1"), game());
+      await setDoc(
+        doc(fs, "teams", GROUP, "groupTournaments", TOUR, "games", "g2"),
+        game({
+          order: 1, label: "Final", teamA: null, teamB: null,
+          sourceA: { type: "winner", game: "g1" }, sourceB: { type: "loser", game: "g1" },
+        }),
+      );
+    });
+  });
+
+  it("organizers create tournaments for group members only", async () => {
+    const ref = (uid: string) => doc(db(uid), "teams", GROUP, "groupTournaments", "t2");
+    const fresh = (uid: string, extra: Record<string, unknown> = {}) =>
+      tournament({ createdBy: uid, createdAt: serverTimestamp(), ...extra });
+    await assertFails(setDoc(ref(MEMBER), fresh(MEMBER)));
+    await assertFails(
+      setDoc(ref(ORGANIZER), fresh(ORGANIZER, { participantIds: [CAP_A, OUTSIDER] })),
+    );
+    await assertFails(
+      setDoc(ref(ORGANIZER), fresh(ORGANIZER, { captains: { A: MEMBER } })),
+    );
+    await assertSucceeds(setDoc(ref(ORGANIZER), fresh(ORGANIZER)));
+    // Teams don't run these.
+    await assertFails(
+      setDoc(doc(db(COACH), "teams", TEAM, "groupTournaments", "t3"), fresh(COACH)),
+    );
+  });
+
+  it("only players and organizers see a tournament and its games", async () => {
+    const tour = (uid: string) => doc(db(uid), "teams", GROUP, "groupTournaments", TOUR);
+    await assertSucceeds(getDoc(tour(PLAYER_A)));
+    await assertSucceeds(getDoc(tour(ORGANIZER)));
+    await assertFails(getDoc(tour(MEMBER)));
+    await assertFails(getDoc(tour(OUTSIDER)));
+    await assertSucceeds(getDoc(gameRef(PLAYER_A, "g1")));
+    await assertFails(getDoc(gameRef(MEMBER, "g1")));
+    // Players list only the ones they're in.
+    const col = collection(db(PLAYER_A), "teams", GROUP, "groupTournaments");
+    await assertSucceeds(getDocs(query(col, where("participantIds", "array-contains", PLAYER_A))));
+    await assertFails(getDocs(col));
+  });
+
+  it("captains report; others can't; no ties", async () => {
+    const report = (uid: string, byTeam: string, a = 11, b = 7) =>
+      updateDoc(gameRef(uid, "g1"), { status: "reported", report: { scoreA: a, scoreB: b, byTeam } });
+    await assertFails(report(PLAYER_A, "A"));
+    await assertFails(report(CAP_A, "B"));
+    await assertFails(report(CAP_A, "A", 9, 9));
+    await assertFails(report(MEMBER, "A"));
+    await assertSucceeds(report(CAP_A, "A"));
+    // The other captain disagrees and files their own.
+    await assertSucceeds(report(CAP_B, "B", 11, 9));
+  });
+
+  it("the other captain confirms the reported score", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "teams", GROUP, "groupTournaments", TOUR, "games", "g1"), {
+        status: "reported", report: { scoreA: 11, scoreB: 7, byTeam: "A" },
+      }),
+    );
+    const confirm = (uid: string, a = 11, b = 7) =>
+      updateDoc(gameRef(uid, "g1"), { status: "done", scoreA: a, scoreB: b, report: null });
+    await assertFails(confirm(CAP_A));
+    await assertFails(confirm(CAP_B, 11, 5));
+    await assertSucceeds(confirm(CAP_B));
+  });
+
+  it("winners move on only to the games that wait for them", async () => {
+    // Not final yet: nothing moves.
+    await assertFails(updateDoc(gameRef(PLAYER_A, "g2"), { teamA: "A" }));
+
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "teams", GROUP, "groupTournaments", TOUR, "games", "g1"), {
+        status: "done", scoreA: 11, scoreB: 7,
+      }),
+    );
+    await assertFails(updateDoc(gameRef(PLAYER_A, "g2"), { teamA: "B" }));
+    await assertFails(updateDoc(gameRef(MEMBER, "g2"), { teamA: "A", teamB: "B" }));
+    await assertFails(updateDoc(gameRef(PLAYER_A, "g2"), { teamA: "A", label: "Hacked" }));
+    await assertSucceeds(updateDoc(gameRef(PLAYER_A, "g2"), { teamA: "A", teamB: "B" }));
+    // Filled slots stay put.
+    await assertFails(updateDoc(gameRef(CAP_B, "g2"), { teamA: "B" }));
+  });
+
+  it("confirming and advancing go together in one batch", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "teams", GROUP, "groupTournaments", TOUR, "games", "g1"), {
+        status: "reported", report: { scoreA: 7, scoreB: 11, byTeam: "A" },
+      }),
+    );
+    const fs = db(CAP_B);
+    await assertSucceeds(
+      writeBatch(fs)
+        .update(doc(fs, "teams", GROUP, "groupTournaments", TOUR, "games", "g1"), {
+          status: "done", scoreA: 7, scoreB: 11, report: null,
+        })
+        .update(doc(fs, "teams", GROUP, "groupTournaments", TOUR, "games", "g2"), {
+          teamA: "B", teamB: "A",
+        })
+        .commit(),
+    );
+  });
+
+  it("organizers set any score; members can't touch games", async () => {
+    await assertSucceeds(
+      updateDoc(gameRef(ORGANIZER, "g1"), { status: "done", scoreA: 13, scoreB: 11, report: null }),
+    );
+    await assertFails(
+      updateDoc(gameRef(ORGANIZER, "g1"), { status: "done", scoreA: 11, scoreB: 11 }),
+    );
+    await assertFails(updateDoc(gameRef(MEMBER, "g1"), { field: 2 }));
+    await assertFails(deleteDoc(gameRef(CAP_A, "g1")));
+    await assertSucceeds(deleteDoc(gameRef(ORGANIZER, "g1")));
+  });
+});
+
 describe("roles and removal", () => {
   it("owner can promote a player; coach cannot", async () => {
     await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));

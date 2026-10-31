@@ -411,6 +411,14 @@ class TeamRepositoryFirebase implements TeamRepository {
           m,
         ]);
       }
+      final tournaments = await ref.collection('groupTournaments').get();
+      for (final t in tournaments.docs) {
+        final games = await t.reference.collection('games').get();
+        await deleteDocs(_db, [
+          for (final d in games.docs) d.reference,
+          t.reference,
+        ]);
+      }
       // Uploaded videos go before the videos that list them.
       for (final video in (await ref.collection('videos').get()).docs) {
         final path = TeamVideo.fromMap(

@@ -212,6 +212,7 @@ class GroupTournament {
     this.status = TournamentStatus.setup,
     this.teams = const [],
     this.createdBy,
+    this.createdAt,
   });
 
   /// Empty until saved.
@@ -224,6 +225,7 @@ class GroupTournament {
   final TournamentStatus status;
   final List<TournamentTeam> teams;
   final String? createdBy;
+  final DateTime? createdAt;
 
   bool get isNew => id.isEmpty;
 
@@ -260,6 +262,7 @@ class GroupTournament {
     status: status ?? this.status,
     teams: teams ?? this.teams,
     createdBy: createdBy,
+    createdAt: createdAt,
   );
 
   factory GroupTournament.fromMap(String id, Map<String, dynamic> map) =>
@@ -280,6 +283,7 @@ class GroupTournament {
             if (t is Map) TournamentTeam.fromMap(Map<String, dynamic>.from(t)),
         ],
         createdBy: map['createdBy'] as String?,
+        createdAt: parseDate(map['createdAt']),
       );
 
   /// Everything but createdBy/createdAt, which are set once.

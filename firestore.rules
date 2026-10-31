@@ -839,6 +839,140 @@ service cloud.firestore {
           && validFolder(request.resource.data);
       }
 
+      // Community group tournaments (GroupTournament in
+      // lib/domain/models/group_tournament.dart). Owners and organizers run
+      // them; teams and rosters are private to the players on them
+      // (participantIds) and organizers. Players must be group members.
+      match /groupTournaments/{tournamentId} {
+        function team() { return get(teamPath(teamId)).data; }
+        function tournamentPath() {
+          return /databases/$(database)/documents/teams/$(teamId)/groupTournaments/$(tournamentId);
+        }
+
+        function validTournament(t) {
+          return t.keys().hasOnly([
+                   'name', 'eventId', 'settings', 'status', 'teams',
+                   'participantIds', 'captains', 'createdBy', 'createdAt'])
+            && t.name is string && t.name.size() > 0 && t.name.size() <= 100
+            && (t.eventId == null || validString(t.eventId, 100))
+            && t.settings is map
+            && t.status in ['setup', 'scheduled', 'done']
+            && t.teams is list && t.teams.size() <= 64
+            && t.participantIds is list && t.participantIds.size() <= 1000
+            && t.participantIds.toSet()
+                 .difference(team().memberIds.toSet()).size() == 0
+            && t.captains is map
+            && t.captains.values().toSet()
+                 .difference(t.participantIds.toSet()).size() == 0;
+        }
+
+        allow read: if signedIn()
+          && (isEditor(team()) || uid() in resource.data.participantIds);
+        allow create: if signedIn() && isGroup(team()) && isEditor(team())
+          && request.resource.data.createdBy == uid()
+          && request.resource.data.createdAt == request.time
+          && validTournament(request.resource.data);
+        allow update: if signedIn() && isGroup(team()) && isEditor(team())
+          && !('createdBy' in changed()) && !('createdAt' in changed())
+          && validTournament(request.resource.data);
+        allow delete: if signedIn() && isEditor(team());
+
+        // Games (GroupGame). Organizers write anything. A team's captain
+        // reports a score, the other captain confirms it (or reports their
+        // own), and anyone playing moves a game's winner and loser on to
+        // the games waiting for them, checked against that game's result.
+        match /games/{gameId} {
+          function tournament() { return get(tournamentPath()).data; }
+          function gamePath(id) {
+            return /databases/$(database)/documents/teams/$(teamId)/groupTournaments/$(tournamentId)/games/$(id);
+          }
+          function captainOf(teamRef) {
+            return teamRef != null
+              && tournament().captains.get(teamRef, '') == uid();
+          }
+          function validScore(n) { return n is int && n >= 0 && n <= 99; }
+
+          function validGame(g) {
+            return g.keys().hasOnly([
+                     'order', 'stage', 'round', 'label', 'pool', 'field',
+                     'startsAt', 'teamA', 'teamB', 'sourceA', 'sourceB',
+                     'status', 'scoreA', 'scoreB', 'report', 'ifNeeded'])
+              && g.stage in ['pool', 'winners', 'losers', 'grandFinal', 'reset']
+              && g.status in ['scheduled', 'reported', 'done']
+              && validString(g.label, 60)
+              && (g.status != 'done'
+                  || (validScore(g.scoreA) && validScore(g.scoreB)
+                      && g.scoreA != g.scoreB));
+          }
+
+          // Captain of either team files a score, while the game isn't
+          // final. Re-filing replaces the other captain's report.
+          function report() {
+            let g = resource.data;
+            let r = request.resource.data.report;
+            return changed().hasOnly(['report', 'status'])
+              && g.teamA != null && g.teamB != null
+              && g.status != 'done'
+              && request.resource.data.status == 'reported'
+              && r.keys().hasOnly(['scoreA', 'scoreB', 'byTeam'])
+              && validScore(r.scoreA) && validScore(r.scoreB)
+              && r.scoreA != r.scoreB
+              && r.byTeam in [g.teamA, g.teamB]
+              && captainOf(r.byTeam);
+          }
+
+          // The other captain accepts the report as the final score.
+          function confirm() {
+            let g = resource.data;
+            let d = request.resource.data;
+            let other = g.report.byTeam == g.teamA ? g.teamB : g.teamA;
+            return g.status == 'reported'
+              && changed().hasOnly(['status', 'scoreA', 'scoreB', 'report'])
+              && captainOf(other)
+              && d.status == 'done'
+              && d.scoreA == g.report.scoreA
+              && d.scoreB == g.report.scoreB
+              && d.report == null;
+          }
+
+          function resultOf(source) {
+            let g = getAfter(gamePath(source.game)).data;
+            let winner = g.scoreA > g.scoreB ? g.teamA : g.teamB;
+            let loser = g.scoreA > g.scoreB ? g.teamB : g.teamA;
+            return g.status == 'done'
+              ? (source.type == 'winner' ? winner : loser)
+              : null;
+          }
+
+          // An empty slot gets the team its source game sent it.
+          function slotFilled(side) {
+            let before = resource.data['team' + side];
+            let after = request.resource.data['team' + side];
+            let source = resource.data['source' + side];
+            return after == before
+              || (before == null
+                  && source != null
+                  && source.type in ['winner', 'loser']
+                  && after != null
+                  && after == resultOf(source));
+          }
+
+          function advance() {
+            return uid() in tournament().participantIds
+              && changed().hasOnly(['teamA', 'teamB'])
+              && slotFilled('A') && slotFilled('B');
+          }
+
+          allow read: if signedIn()
+            && (isEditor(team()) || uid() in tournament().participantIds);
+          allow create, delete: if signedIn() && isEditor(team());
+          allow update: if signedIn() && (
+            (isEditor(team()) && validGame(request.resource.data))
+            || report() || confirm() || advance()
+          );
+        }
+      }
+
       // Chat rooms (ChatRoom in lib/domain/models/chat.dart). Each room
       // lists the roles and members who can read and who can write; write
       // lists are subsets of read lists. The owner can read and post in
