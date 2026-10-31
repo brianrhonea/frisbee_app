@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
@@ -97,6 +98,7 @@ void main() {
   late FakeChatRepository chats;
   late FakeAuthRepository auth;
   late FakeFilePickerService picker;
+  late FakeNotificationRepository notifications;
 
   setUp(() {
     teams = FakeTeamRepository();
@@ -105,6 +107,7 @@ void main() {
       ..rooms['caps'] = captains;
     auth = FakeAuthRepository(user: testUser);
     picker = FakeFilePickerService();
+    notifications = FakeNotificationRepository();
   });
 
   void joinAs(TeamRole role) => teams.teams['t1'] = teamWith({
@@ -159,9 +162,25 @@ void main() {
       roomId: roomId,
       teamRepository: teams,
       chatRepository: chats,
+      notificationRepository: notifications,
       authRepository: auth,
       filePicker: picker,
     );
+
+    test("mutes and unmutes the room's notifications", () async {
+      joinAs(TeamRole.player);
+      final vm = load('general');
+      await pumpEventQueue();
+      expect(vm.muted, isFalse);
+      await vm.toggleMuted.execute();
+      await pumpEventQueue();
+      expect(vm.muted, isTrue);
+      expect(notifications.prefs.isRoomMuted('t1', 'general'), isTrue);
+      await vm.toggleMuted.execute();
+      await pumpEventQueue();
+      expect(vm.muted, isFalse);
+      vm.dispose();
+    });
 
     test('sends text with attachments and clears drafts', () async {
       joinAs(TeamRole.player);
@@ -315,6 +334,7 @@ void main() {
       Provider<ChatRepository>.value(value: chats),
       ChangeNotifierProvider<AuthRepository>.value(value: auth),
       Provider<FilePickerService>.value(value: picker),
+      Provider<NotificationRepository>.value(value: notifications),
     ],
     child: child,
   );
@@ -358,6 +378,7 @@ void main() {
         roomId: roomId,
         teamRepository: teams,
         chatRepository: chats,
+        notificationRepository: notifications,
         authRepository: auth,
         filePicker: picker,
       );

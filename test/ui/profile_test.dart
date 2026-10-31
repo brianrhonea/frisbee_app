@@ -14,6 +14,7 @@ void main() {
     final vm = ProfileViewModel(
       authRepository: FakeAuthRepository(user: testUser),
       themeRepository: theme,
+      notificationRepository: FakeNotificationRepository(),
     );
     await tester.pumpWidget(
       ListenableBuilder(

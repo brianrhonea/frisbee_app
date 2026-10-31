@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -10,6 +12,7 @@ import 'package:provider/provider.dart';
 
 import 'config/dependencies.dart';
 import 'data/repositories/auth/auth_repository.dart';
+import 'data/repositories/notification/notification_repository.dart';
 import 'data/repositories/theme/theme_repository.dart';
 import 'data/repositories/theme/theme_repository_prefs.dart';
 import 'data/services/shared_preferences_service.dart';
@@ -62,10 +65,48 @@ class FrisbeeApp extends StatefulWidget {
 }
 
 class _FrisbeeAppState extends State<FrisbeeApp> {
-  late final GoRouter _router = router(context.read<AuthRepository>());
+  late final AuthRepository _auth = context.read();
+  late final NotificationRepository _notifications = context.read();
+  late final GoRouter _router = router(_auth);
+  StreamSubscription<String>? _opened;
+  String? _syncedUid;
+
+  /// A tapped notification waiting for sign-in to finish.
+  String? _pendingRoute;
+
+  @override
+  void initState() {
+    super.initState();
+    _auth.addListener(_onAuth);
+    _opened = _notifications.openedRoutes.listen((route) {
+      _pendingRoute = route;
+      _openPending();
+    });
+    _onAuth();
+  }
+
+  /// Registers this device for push whenever someone signs in.
+  void _onAuth() {
+    final uid = _auth.currentUser?.uid;
+    if (uid != null && uid != _syncedUid) {
+      unawaited(_notifications.syncDevice(uid));
+    }
+    _syncedUid = uid;
+    _openPending();
+  }
+
+  void _openPending() {
+    final route = _pendingRoute;
+    if (route == null || !_auth.isReady || !_auth.isAuthenticated) return;
+    _pendingRoute = null;
+    // After the redirect away from the splash page has settled.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _router.push(route));
+  }
 
   @override
   void dispose() {
+    _auth.removeListener(_onAuth);
+    _opened?.cancel();
     _router.dispose();
     super.dispose();
   }

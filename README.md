@@ -61,16 +61,24 @@ In the [Firebase console](https://console.firebase.google.com/project/frisbee-ap
    - In Xcode, add the **Sign in with Apple** capability to the iOS Runner target, and set your signing team for both iOS and macOS (macOS entitlements already include network, keychain and Apple sign-in).
    - Set `platform :ios, '15.0'` in `ios/Podfile` if `pod install` complains.
 
-Then deploy the security rules:
+Then deploy the security rules and indexes:
 
 ```
-firebase deploy --only firestore:rules,storage
+firebase deploy --only firestore:rules,firestore:indexes,storage
 ```
 
 The Storage rules read chat rooms from Firestore; accept the prompt to let
 them (or grant it under Storage > Rules).
 
-Don't deploy `functions` (or run a bare `firebase deploy`) until you're ready to move USA Ultimate collection to the cloud; see below.
+Notifications are sent by the Cloud Functions in `functions/src/notifications` (Firestore triggers and an hourly reminder job). Deploy only that group:
+
+```
+firebase deploy --only functions:notifications
+```
+
+iOS push also needs an APNs key uploaded to Firebase (see [iOS release](docs/ios-release.md)). Android needs nothing extra. Windows has no push (FCM has no Windows plugin); notifications still show in the app's feed.
+
+Don't deploy the other functions (or run a bare `firebase deploy`) until you're ready to move USA Ultimate collection to the cloud; see below.
 
 ## Secrets
 

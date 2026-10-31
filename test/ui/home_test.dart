@@ -131,6 +131,7 @@ void main() {
     final vm = HomeViewModel(
       authRepository: FakeAuthRepository(user: testUser),
       directMessageRepository: dms,
+      notificationRepository: FakeNotificationRepository(),
       teamRepository: teams,
       playRepository: plays,
       eventRepository: events,

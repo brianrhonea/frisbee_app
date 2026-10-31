@@ -9,9 +9,11 @@ users see, `docs/user-guide.md`.
 
 - **Client:** one Flutter app for Android, iOS, macOS and Windows.
 - **Backend:** Firebase only. Auth for sign-in, Cloud Firestore for app
-  data, Cloud Storage for chat photos and files. There's no app server.
-  Every read and write goes straight from the app to Firebase, and
-  `firestore.rules` and `storage.rules` are the security boundary.
+  data, Cloud Storage for chat photos and files, Cloud Messaging for push.
+  There's no app server. Every read and write goes straight from the app to
+  Firebase, and `firestore.rules` and `storage.rules` are the security
+  boundary. The only server code that runs is the `notifications` group of
+  Cloud Functions, which reacts to writes and sends notifications.
 - **USA Ultimate data:** scraped on-device from play.usaultimate.org and
   held in memory. Cloud Functions that would do this on a schedule exist in
   `functions/`, but are deliberately not deployed yet.
@@ -85,6 +87,8 @@ instance for the app's lifetime:
 | `RankingRepository` | `RankingRepositoryUsau` (the alternative is `…Firebase`) | `UsauClient` |
 | `UsauTeamRepository` | `UsauTeamRepositoryUsau` | `UsauClient` |
 | `UsauScheduleRepository` | `UsauScheduleRepositoryUsau` | `UsauClient` |
+| `PushService` | `firebase_messaging` permission, FID registration, tapped-notification routes; no-op on Windows | – |
+| `NotificationRepository` | `NotificationRepositoryFirebase` | `PushService` |
 | `ThemeRepository` (`ChangeNotifier`) | `ThemeRepositoryPrefs` (shared_preferences), loaded before `runApp` | – |
 
 View models are **not** provided globally. Each route creates its own
@@ -139,7 +143,8 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
 | Stats: tournaments, live game tracking (lines, pull timer, timeouts), stat sheets, season stats | `ui/stats` | `StatsViewModel`, `TournamentViewModel`, `GameTrackerViewModel` | Stats, Event, Team |
 | Events: USA Ultimate tournaments, schedules and brackets | `ui/tournaments`, `ui/events` | `TournamentsViewModel`, `TournamentDetailViewModel` | Tournament, UsauSchedule |
 | Rankings: every USAU ranking list, team pages | `ui/rankings` | `RankingsViewModel`, `UsauTeamViewModel` | Ranking, UsauTeam |
-| Profile and settings: name, light/dark theme, sign out, delete account | `ui/profile` | `ProfileViewModel` | Auth, Theme |
+| Notifications: feed with unread badge on Home, push on this device, per-category and per-team settings, per-room mute | `ui/notifications` | `NotificationsViewModel`, `NotificationSettingsViewModel` (mute lives in `ChatRoomViewModel`) | Notification, Team |
+| Profile and settings: name, light/dark theme, notifications link, sign out, delete account | `ui/profile` | `ProfileViewModel` | Auth, Theme, Notification |
 
 ### Roles
 
@@ -260,6 +265,9 @@ conversations where someone else posted after the user last read.
 ```
 users/{uid}                     private profile: email, displayName, photoUrl (owner only)
   events/{eventId}              personal schedule (owner only)
+  settings/notifications        categories {}, teams {teamId: {}}, mutedRooms [], utcOffsetMinutes
+  devices/{fid}                 push targets: platform (owner writes, Functions send)
+  notifications/{id}            feed: category, title, body, route, read, count (Functions write)
 profiles/{uid}                  public directory: name, keywords (search prefixes), photoUrl
 inviteCodes/{code}              → { teamId }; single lookups only, never listed
 teams/{teamId}                  name, division, level, city, ownerId,
@@ -281,6 +289,7 @@ conversations/{uidA_uidB}       participants [a,b] (sorted), names {}, lastMessa
 usau_tournaments/{id}           written by Cloud Functions only (not deployed)
 usau_rankings/{key}             written by Cloud Functions only (not deployed)
 meta/usau                       last sync times (Functions only)
+sentReminders/{key}             one per event and start time, so reminders go once (Functions only)
 ```
 
 - **Denormalisation.**
@@ -293,12 +302,16 @@ meta/usau                       last sync times (Functions only)
   `TeamRepositoryFirebase.deleteTeam` clears every subcollection first:
   chat rooms (attachments, then messages, then the room), roster, plays,
   events, stats, joins and the invite code. `AuthRepositoryFirebase
-  .deleteAccount` removes personal events, `users/{uid}` and
-  `profiles/{uid}`. Conversations stay for the other person.
+  .deleteAccount` removes personal events, notification settings, devices
+  and feed, `users/{uid}` and `profiles/{uid}`. Conversations stay for the
+  other person. `deleteTeam` first stamps `deletingAt` on the team, so the
+  notification functions don't announce every event the cascade removes.
 - **Indexes.** All current queries use single-field indexes:
   `array-contains` on members, room access and participants;
   `orderBy createdAt / startDate / date`. Inbox order and people-search
-  ranking are sorted client-side to avoid composite indexes.
+  ranking are sorted client-side to avoid composite indexes. The
+  reminder job and feed pruning need collection-group indexes on
+  `events.startsAt` and `notifications.createdAt` (`firestore.indexes.json`).
 
 ### Cloud Storage
 
@@ -343,7 +356,10 @@ take, but the server enforces every one.
 | Chat attachments | Same as messages (Storage rules read the room from Firestore) | Room writers, into their own folder, 10 MB max. Delete: author or owner |
 | Conversations | The two uids in the id | Create: a participant, with the other person listed in `profiles`. Update: the preview or your own `readAt` only. No deletes |
 | DM messages and attachments | The two participants | Your own only; delete your own |
+| Notification settings, devices | That user | That user; known fields and categories only |
+| Notification feed | That user | Functions create; the user marks entries read or deletes them |
 | `usau_*`, `meta` | Signed-in users | Nobody from clients (Admin SDK only) |
+| `sentReminders` | Nobody | Nobody from clients (Admin SDK only) |
 
 Storage rules use `firestore.get()` to check team and room access. That
 needs the Storage service agent to hold the **Firebase Rules Firestore
@@ -369,6 +385,39 @@ Notes on USA Ultimate data:
   start). Then switch `dependencies.dart` to `TournamentRepositoryFirebase`
   and `RankingRepositoryFirebase`, which read `usau_*` from Firestore.
 
+## Notifications
+
+Cloud Functions in `functions/src/notifications`, exported as the
+`notifications` group (`firebase deploy --only functions:notifications`):
+
+| Function | Trigger | Who's notified |
+|---|---|---|
+| `chatMessage` | Team chat message created | Everyone who can read the room (`roomReaders` mirrors `canReadRoom`), except the author |
+| `directMessage` | DM created | The other participant |
+| `teamEvent` | Team event written | Every member but whoever did it (auth context), when an editable field changed; never for past events |
+| `teamPlay` | Play created or saved | Every member but whoever saved it |
+| `eventReminders` | Hourly | Events starting 23–24 h out: team members who haven't said they can't go, or the personal event's owner. Also prunes feed entries over 60 days old |
+
+- **Delivery** (`deliver.ts`): for each recipient, read their preferences
+  (`wants()`: room mute, then team override, then category; everything is
+  on by default), write the feed entry, then send to each device by FID
+  with `sendEach`. FIDs FCM no longer knows are deleted.
+- **Folding:** chat, DMs, event changes and plays fold into one feed entry
+  per room, conversation, event or play (`collapseId`). Repeats while it's
+  unread count up ("3 new messages"); the same id groups pushes on the device.
+- **Times** are worded in the recipient's offset (`utcOffsetMinutes`, written
+  at each sign-in), since Functions run in UTC.
+- **Client:** `_FrisbeeAppState` calls `syncDevice` when someone signs in,
+  which registers the device if push is already allowed. Tapped pushes carry
+  a `route` and are opened with `router.push` once auth is ready. Signing
+  out (or deleting the account) unregisters the device first.
+- **Platforms:** Android and iOS get push (iOS needs the APNs key in
+  Firebase and Push on the App ID). macOS needs the Push capability added
+  when its signing is set up. Windows has no FCM plugin, so it shows the
+  feed only.
+- **Logic** that decides recipients and wording is pure (`model.ts`) and
+  unit-tested in `functions/test/notifications`.
+
 ## Secrets and configuration
 
 - Firebase API keys come from `secrets.local.json` at build time, via
@@ -384,7 +433,7 @@ Notes on USA Ultimate data:
 
 ```
 flutter analyze && flutter test                 # unit, view-model and widget tests with fakes
-cd functions && npm run build && npm test        # USAU parser tests against HTML fixtures
+cd functions && npm run build && npm test        # USAU parser and notification logic tests
 cd functions && npm run test:rules               # Firestore + Storage rules (emulators; needs Java)
 ```
 
@@ -400,7 +449,9 @@ cd functions && npm run test:rules               # Firestore + Storage rules (em
 |---|---|
 | Firestore rules | Deployed (`firebase deploy --only firestore:rules`) |
 | Storage rules | Deployed (`firebase deploy --only storage`); Blaze plan and Storage enabled |
-| Cloud Functions | Not deployed, on purpose, until there are more users |
+| Notification functions | Ready; deploy with `firebase deploy --only functions:notifications` |
+| USA Ultimate functions | Not deployed, on purpose, until there are more users |
+| Firestore indexes | Collection-group overrides for reminders and pruning; deploy with `firebase deploy --only firestore:indexes` |
 | iOS builds | Codemagic (`codemagic.yaml`, `docs/ios-release.md`) |
 
 ## Known gaps

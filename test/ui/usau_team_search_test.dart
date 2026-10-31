@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
@@ -108,6 +109,9 @@ void main() {
             value: FakeThemeRepository(),
           ),
           Provider<PlayRepository>.value(value: FakePlayRepository()),
+          Provider<NotificationRepository>.value(
+            value: FakeNotificationRepository(),
+          ),
           Provider<DirectMessageRepository>.value(
             value: FakeDirectMessageRepository(),
           ),

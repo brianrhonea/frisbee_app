@@ -48,6 +48,7 @@ class ChatTab extends StatelessWidget {
                       roomId: selected,
                       teamRepository: c.read(),
                       chatRepository: c.read(),
+                      notificationRepository: c.read(),
                       authRepository: c.read(),
                       filePicker: c.read(),
                     ),

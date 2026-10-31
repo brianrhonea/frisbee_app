@@ -121,6 +121,20 @@ class ChatRoomView extends StatelessWidget {
                   ],
                 ),
           actions: [
+            if (room != null && vm.access.canRead)
+              IconButton(
+                tooltip: vm.muted
+                    ? 'Unmute notifications'
+                    : 'Mute notifications',
+                icon: Icon(
+                  vm.muted
+                      ? Icons.notifications_off_outlined
+                      : Icons.notifications_outlined,
+                ),
+                onPressed: vm.toggleMuted.running
+                    ? null
+                    : vm.toggleMuted.execute,
+              ),
             if (room != null && vm.canManage)
               IconButton(
                 tooltip: 'Room settings',

@@ -316,6 +316,18 @@ class _Header extends StatelessWidget {
             ),
             const Expanded(child: Center(child: UltiUpWordmark())),
             IconButton(
+              tooltip: vm.unreadNotifications == 0
+                  ? 'Notifications'
+                  : 'Notifications, ${vm.unreadNotifications} unread',
+              onPressed: () => context.push(Routes.notifications),
+              icon: Badge(
+                isLabelVisible: vm.unreadNotifications > 0,
+                label: Text('${vm.unreadNotifications}'),
+                backgroundColor: c.accent,
+                child: const Icon(Icons.notifications_outlined),
+              ),
+            ),
+            IconButton(
               tooltip: vm.unreadMessages == 0
                   ? 'Messages'
                   : 'Messages, ${vm.unreadMessages} unread',

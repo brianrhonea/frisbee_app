@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/chat/chat_repository.dart';
+import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/notification.dart';
 import '../../../domain/models/team.dart';
+import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import 'message_thread_viewmodel.dart';
 
@@ -17,10 +20,23 @@ class ChatRoomViewModel extends MessageThreadViewModel {
     required this.roomId,
     required TeamRepository teamRepository,
     required ChatRepository chatRepository,
+    required NotificationRepository notificationRepository,
     required super.authRepository,
     required super.filePicker,
   }) : _chats = chatRepository {
+    toggleMuted = Command0<void>(
+      () => notificationRepository.setRoomMuted(
+        uid,
+        teamId,
+        roomId,
+        muted: !muted,
+      ),
+    );
     _subs = [
+      notificationRepository.watchPreferences(uid).listen((p) {
+        _prefs = p;
+        notifyListeners();
+      }, onError: (_) {}),
       teamRepository.watchTeam(teamId).listen((t) {
         _team = t;
         _teamLoaded = true;
@@ -45,8 +61,14 @@ class ChatRoomViewModel extends MessageThreadViewModel {
   ChatRoom? _room;
   bool _roomLoaded = false;
   Object? _error;
+  NotificationPreferences? _prefs;
 
   Team? get team => _team;
+
+  /// Whether this room's notifications are silenced for the user.
+  bool get muted => _prefs?.isRoomMuted(teamId, roomId) ?? false;
+
+  late final Command0<void> toggleMuted;
   ChatRoom? get room => _room;
   bool get loaded => _teamLoaded && _roomLoaded;
   Object? get error => _error ?? messageError;
@@ -103,6 +125,7 @@ class ChatRoomViewModel extends MessageThreadViewModel {
     for (final s in _subs) {
       s.cancel();
     }
+    toggleMuted.dispose();
     super.dispose();
   }
 }

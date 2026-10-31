@@ -17,6 +17,10 @@ abstract final class Routes {
   static const newMessage = '/messages/new';
   static String conversation(String id) => '/messages/$id';
 
+  // The notification feed and its settings, over the shell.
+  static const notifications = '/notifications';
+  static const notificationSettings = '/notifications/settings';
+
   /// [tab] opens a team tab by name, e.g. 'playbook' ([TeamTab]).
   static String team(String teamId, {String? tab}) => Uri(
     path: '/teams/$teamId',

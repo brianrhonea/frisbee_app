@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/direct_message/direct_message_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/playbook/play_repository.dart';
 import '../../../data/repositories/ranking/ranking_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
@@ -26,6 +27,7 @@ class HomeViewModel extends ChangeNotifier {
   HomeViewModel({
     required AuthRepository authRepository,
     required DirectMessageRepository directMessageRepository,
+    required NotificationRepository notificationRepository,
     required TeamRepository teamRepository,
     required PlayRepository playRepository,
     required EventRepository eventRepository,
@@ -50,6 +52,14 @@ class HomeViewModel extends ChangeNotifier {
           final unread = c.where((c) => c.isUnread(uid)).length;
           if (unread == _unreadMessages) return;
           _unreadMessages = unread;
+          notifyListeners();
+        }, onError: (_) {}),
+      );
+      _subs.add(
+        notificationRepository.watchFeed(uid).listen((n) {
+          final unread = n.where((n) => !n.read).length;
+          if (unread == _unreadNotifications) return;
+          _unreadNotifications = unread;
           notifyListeners();
         }, onError: (_) {}),
       );
@@ -92,6 +102,11 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Direct-message conversations with a message the user hasn't opened.
   int get unreadMessages => _unreadMessages;
+
+  int _unreadNotifications = 0;
+
+  /// Unread entries in the notification feed.
+  int get unreadNotifications => _unreadNotifications;
 
   /// Joins by invite code; result value is the team id.
   late final Command1<String, String> joinTeam;
