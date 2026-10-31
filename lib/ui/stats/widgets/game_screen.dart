@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/stats.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/game_tracker_viewmodel.dart';
 import 'line_picker.dart';
@@ -54,11 +56,6 @@ class GameScreen extends StatelessWidget {
             ),
             actions: [
               if (vm.canEdit) ...[
-                IconButton(
-                  tooltip: 'Undo',
-                  icon: const Icon(Icons.undo),
-                  onPressed: vm.canUndo ? vm.undo : null,
-                ),
                 PopupMenuButton<_Menu>(
                   onSelected: (m) => _onMenu(context, m),
                   itemBuilder: (_) => [
@@ -76,6 +73,11 @@ class GameScreen extends StatelessWidget {
                         game.finished ? 'Resume tracking' : 'End game early',
                       ),
                     ),
+                    if (vm.canDelete)
+                      const PopupMenuItem(
+                        value: _Menu.delete,
+                        child: Text('Delete game'),
+                      ),
                   ],
                 ),
               ],
@@ -123,11 +125,35 @@ class GameScreen extends StatelessWidget {
         }
       case _Menu.resume:
         vm.setFinished(false);
+      case _Menu.delete:
+        if (!await confirmDeleteGame(context, game)) return;
+        await vm.deleteGame.execute();
+        if (!context.mounted) return;
+        if (vm.deleteGame.error) {
+          showErrorSnackBar(context, vm.deleteGame.result);
+          vm.deleteGame.clearResult();
+        } else {
+          context.pop();
+        }
     }
   }
 }
 
-enum _Menu { gameTo, timeouts, end, resume }
+enum _Menu { gameTo, timeouts, end, resume, delete }
+
+/// Asks before deleting [game] and its stats.
+Future<bool> confirmDeleteGame(BuildContext context, StatsGame game) =>
+    confirmDialog(
+      context,
+      title: 'Delete game vs ${game.opponent}?',
+      message:
+          'This permanently deletes the game '
+          '(${game.ourScore}–${game.theirScore}, '
+          '${DateFormat.yMMMd().format(game.date)}) and every stat in it. '
+          'Season and tournament totals will no longer count it.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
 
 const _linesTab = 1;
 const _statsTab = 3;
@@ -248,6 +274,9 @@ class _TrackTab extends StatelessWidget {
     final point = vm.currentPoint;
     final tracking = vm.canEdit && point != null && !vm.over;
     final pickingLine = vm.canEdit && point == null && !vm.over;
+    // After game point, the bar stays for Undo so a wrong final score can
+    // be taken back.
+    final undoOnly = vm.over && vm.canUndo;
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
@@ -292,25 +321,73 @@ class _TrackTab extends StatelessWidget {
               ),
             ),
             // Pinned so the buttons never scroll away mid-point.
-            if (tracking || pickingLine)
+            if (tracking || pickingLine || undoOnly)
               Material(
                 elevation: 3,
                 color: Theme.of(context).colorScheme.surfaceContainer,
                 child: SafeArea(
                   top: false,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                    child: pickingLine
-                        ? _StartBar(viewModel: vm)
-                        : vm.side == Side.offense
-                        ? _OffenseActions(viewModel: vm)
-                        : _DefenseActions(viewModel: vm),
+                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        UndoBar(viewModel: vm),
+                        if (!undoOnly) ...[
+                          const SizedBox(height: 6),
+                          pickingLine
+                              ? _StartBar(viewModel: vm)
+                              : vm.side == Side.offense
+                              ? _OffenseActions(viewModel: vm)
+                              : _DefenseActions(viewModel: vm),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Undo for the last thing recorded, naming it so a wrong tap is easy to
+/// spot and take back.
+class UndoBar extends StatelessWidget {
+  const UndoBar({super.key, required this.viewModel});
+
+  final GameTrackerViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final theme = Theme.of(context);
+    final label = vm.undoLabel;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label == null ? 'Nothing to undo' : 'Last: $label',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: vm.canUndo ? vm.undo : null,
+          icon: const Icon(Icons.undo, size: 18),
+          label: const Text('Undo last'),
+        ),
+      ],
     );
   }
 }
@@ -755,9 +832,9 @@ class _SubSheetState extends State<_SubSheet> {
       VoidCallback? onTap,
     }) => ListTile(
       enabled: enabled,
-      leading: CircleAvatar(
-        child: Text(p?.number == null ? '–' : '${p!.number}'),
-      ),
+      leading: p?.number == null
+          ? const CircleAvatar(child: Text('–'))
+          : JerseyNumber(p!.number!),
       title: Text(p?.name ?? 'Player'),
       subtitle: id == vm.holder
           ? const Text('Has the disc. The sub takes it and throws next.')
@@ -920,7 +997,7 @@ class _PlayerGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 8,
       crossAxisSpacing: 8,
-      childAspectRatio: 0.95,
+      childAspectRatio: 0.82,
       children: [
         for (final id in vm.onField)
           _PlayerTile(
@@ -961,37 +1038,50 @@ class _PlayerTile extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      p?.number == null ? '–' : '#${p!.number}',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: fg,
-                        fontWeight: FontWeight.w800,
+                    // Scales down so long numbers stay centered in the tile.
+                    SizedBox(
+                      height: 36,
+                      child: FittedBox(
+                        child: Text(
+                          p?.number == null ? '–' : '#${p!.number}',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: fg,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
                     ),
-                    if (holding) ...[
-                      const SizedBox(width: 6),
-                      Icon(Icons.album, size: 18, color: fg),
-                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                      p?.name ?? 'Player',
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: fg,
+                        height: 1.15,
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  p?.name ?? 'Player',
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(color: fg),
+              ),
+              // In the corner so it doesn't push the number off center.
+              if (holding)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Icon(Icons.album, size: 16, color: fg),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),

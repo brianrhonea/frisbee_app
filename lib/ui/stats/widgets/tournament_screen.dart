@@ -12,8 +12,10 @@ import '../view_models/tournament_viewmodel.dart';
 import 'game_to_field.dart';
 import 'line_picker.dart';
 import 'line_tile.dart';
+import 'player_chooser.dart' show JerseyNumber;
 import 'stat_sheet.dart';
-import 'stats_tab.dart' show GameRow;
+import 'game_screen.dart' show confirmDeleteGame;
+import 'stats_tab.dart' show GameRow, confirmDeleteTournament, runDelete;
 
 /// A tournament folder: games, the attending roster, saved lines and stats.
 class TournamentScreen extends StatelessWidget {
@@ -39,6 +41,19 @@ class TournamentScreen extends StatelessWidget {
       context.push(Routes.statsGame(vm.teamId, value));
     } else {
       showErrorSnackBar(context, r);
+    }
+  }
+
+  Future<void> _delete(BuildContext context, StatsTournament t) async {
+    final vm = viewModel;
+    if (!await confirmDeleteTournament(context, t, vm.games.length)) return;
+    await vm.deleteTournament.execute();
+    if (!context.mounted) return;
+    if (vm.deleteTournament.error) {
+      showErrorSnackBar(context, vm.deleteTournament.result);
+      vm.deleteTournament.clearResult();
+    } else {
+      context.pop();
     }
   }
 
@@ -80,6 +95,14 @@ class TournamentScreen extends StatelessWidget {
                 ),
               ],
             ),
+            actions: [
+              if (vm.canDelete)
+                IconButton(
+                  tooltip: 'Delete tournament',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () => _delete(context, t),
+                ),
+            ],
             bottom: const TabBar(
               tabs: [
                 Tab(text: 'Games'),
@@ -112,6 +135,18 @@ class TournamentScreen extends StatelessWidget {
                             game: g,
                             onTap: () =>
                                 context.push(Routes.statsGame(vm.teamId, g.id)),
+                            onDelete: vm.canDelete
+                                ? () async {
+                                    if (await confirmDeleteGame(context, g)) {
+                                      if (!context.mounted) return;
+                                      await runDelete(
+                                        context,
+                                        vm.deleteGame,
+                                        () => vm.deleteGame.execute(g.id),
+                                      );
+                                    }
+                                  }
+                                : null,
                           ).withRound(i + 1),
                       ],
                     ),
@@ -211,9 +246,7 @@ class _RosterAndLines extends StatelessWidget {
           children: [
             for (final p in roster)
               Chip(
-                avatar: p.number == null
-                    ? null
-                    : CircleAvatar(child: Text('${p.number}')),
+                avatar: p.number == null ? null : JerseyNumber(p.number!),
                 label: Text(p.name),
               ),
           ],

@@ -22,6 +22,27 @@ List<(PlayerPosition?, List<RosterPlayer>)> sortPlayers(
   ];
 }
 
+/// A player's jersey number in a circle, scaled down so two- and
+/// three-digit numbers stay centered inside it.
+class JerseyNumber extends StatelessWidget {
+  const JerseyNumber(this.number, {super.key});
+
+  final int number;
+
+  @override
+  Widget build(BuildContext context) => CircleAvatar(
+    child: Padding(
+      padding: const EdgeInsets.all(4),
+      child: FittedBox(
+        child: Text(
+          '$number',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+    ),
+  );
+}
+
 /// Tap-to-select chips for building a line of [max] players, with an
 /// A–Z / position sort toggle.
 class PlayerChooser extends StatefulWidget {
@@ -86,9 +107,12 @@ class _PlayerChooserState extends State<PlayerChooser> {
             children: [
               for (final p in group)
                 FilterChip(
-                  avatar: p.number == null
-                      ? null
-                      : CircleAvatar(child: Text('${p.number}')),
+                  avatar: p.number == null ? null : JerseyNumber(p.number!),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 6,
+                  ),
+                  labelStyle: theme.textTheme.bodyLarge,
                   label: Text(p.name),
                   selected: widget.selected.contains(p.id),
                   onSelected: full && !widget.selected.contains(p.id)

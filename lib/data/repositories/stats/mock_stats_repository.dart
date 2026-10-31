@@ -112,6 +112,18 @@ class MockStatsRepository implements StatsRepository {
     return const Result.ok(null);
   }
 
+  @override
+  Future<Result<void>> deleteTournament(
+    String teamId,
+    String tournamentId,
+  ) async {
+    final s = await _load(teamId);
+    s.tournaments.remove(tournamentId);
+    s.games.removeWhere((_, g) => g.tournamentId == tournamentId);
+    _changes.add(teamId);
+    return const Result.ok(null);
+  }
+
   // ---- Sample data -------------------------------------------------------
 
   static const _sampleNames = [

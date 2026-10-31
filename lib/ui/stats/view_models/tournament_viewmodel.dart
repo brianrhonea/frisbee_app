@@ -29,6 +29,10 @@ class TournamentViewModel extends ChangeNotifier {
   }) : _stats = statsRepository,
        _auth = authRepository {
     addGame = Command1<String, NewTournamentGame>(_addGame);
+    deleteGame = Command1<void, String>((id) => _stats.deleteGame(teamId, id));
+    deleteTournament = Command0<void>(
+      () => _stats.deleteTournament(teamId, tournamentId),
+    );
     _subs = [
       teamRepository.watchTeam(teamId).listen((t) {
         _team = t;
@@ -64,6 +68,9 @@ class TournamentViewModel extends ChangeNotifier {
   /// Owners, coaches and stats keepers manage it; everyone else views.
   bool get canEdit =>
       _team?.canKeepStats(_auth.currentUser?.uid ?? '') ?? false;
+
+  /// Owners, coaches and captains delete games and the tournament.
+  bool get canDelete => _team?.canEdit(_auth.currentUser?.uid ?? '') ?? false;
   static const _uuid = Uuid();
 
   StatsTournament? _tournament;
@@ -103,6 +110,11 @@ class TournamentViewModel extends ChangeNotifier {
 
   /// Result is the new game's id.
   late final Command1<String, NewTournamentGame> addGame;
+
+  late final Command1<void, String> deleteGame;
+
+  /// Deletes the tournament and all its games.
+  late final Command0<void> deleteTournament;
 
   Future<Result<String>> _addGame(NewTournamentGame g) => _stats.saveGame(
     teamId,
