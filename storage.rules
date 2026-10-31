@@ -1,7 +1,7 @@
 rules_version = '2';
 
-// Chat attachments. Access follows the room's access in Firestore (see the
-// chats rules in firestore.rules); keep the two in step.
+// Chat attachments and team post photos. Access follows the room's or
+// post's access in Firestore (see firestore.rules); keep the two in step.
 service firebase.storage {
   match /b/{bucket}/o {
 
@@ -46,6 +46,29 @@ service firebase.storage {
         && canWrite(teamId, roomId);
       allow delete: if request.auth != null
         && (request.auth.uid == userId || role(team(teamId)) == 'owner');
+    }
+
+    // Team post photos, uploaded by owners, coaches and captains before the
+    // post is saved. Visible like the post (see posts in firestore.rules):
+    // to anyone signed in once it's public, otherwise to members.
+    match /teams/{teamId}/posts/{postId}/{upload}/{fileName} {
+      function isEditor(t) {
+        return role(t) in ['owner', 'coach', 'captain'];
+      }
+      function postPath() {
+        return /databases/(default)/documents/teams/$(teamId)/posts/$(postId);
+      }
+
+      allow get: if request.auth != null && (
+        (firestore.exists(postPath())
+          && firestore.get(postPath()).data.public == true)
+        || isMember(team(teamId)));
+      allow create, update: if request.auth != null
+        && isEditor(team(teamId))
+        && request.resource.size <= 10 * 1024 * 1024
+        && (request.resource.contentType == null
+            || request.resource.contentType.matches('image/.*'));
+      allow delete: if request.auth != null && isEditor(team(teamId));
     }
 
     // Direct-message attachments: conversation ids are "{uidA}_{uidB}", so

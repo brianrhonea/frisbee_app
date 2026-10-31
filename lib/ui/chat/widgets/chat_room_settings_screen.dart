@@ -59,7 +59,7 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
   void _onDelete() {
     if (vm.delete.completed) {
       vm.delete.clearResult();
-      context.go(Routes.team(vm.teamId, tab: 'chat'));
+      context.go(Routes.teamChat(vm.teamId));
     } else if (vm.delete.error) {
       showErrorSnackBar(context, vm.delete.result);
       vm.delete.clearResult();

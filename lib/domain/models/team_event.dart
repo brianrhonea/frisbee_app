@@ -96,6 +96,7 @@ class TeamEvent {
     this.reactions = const {},
     this.votes = const {},
     this.createdBy,
+    this.isPublic = false,
   });
 
   /// Empty id means the event has not been saved yet.
@@ -113,6 +114,10 @@ class TeamEvent {
   /// uid → chosen [PollOption.id]s.
   final Map<String, List<String>> votes;
   final String? createdBy;
+
+  /// Shown on the team's public home page, to people outside the team.
+  /// Only the details are shared there (see [toPublicMap]), never responses.
+  final bool isPublic;
 
   bool get isNew => id.isEmpty;
 
@@ -155,6 +160,7 @@ class TeamEvent {
     String? location,
     String? notes,
     EventPoll? Function()? poll,
+    bool? isPublic,
   }) => TeamEvent(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -168,6 +174,7 @@ class TeamEvent {
     reactions: reactions,
     votes: votes,
     createdBy: createdBy,
+    isPublic: isPublic ?? this.isPublic,
   );
 
   factory TeamEvent.fromMap(String id, Map<String, dynamic> map) {
@@ -207,6 +214,7 @@ class TeamEvent {
           ],
       },
       createdBy: map['createdBy'] as String?,
+      isPublic: map['public'] as bool? ?? false,
     );
   }
 
@@ -219,5 +227,16 @@ class TeamEvent {
     'location': location,
     'notes': notes,
     'poll': poll?.toMap(),
+  };
+
+  /// The copy in `publicEvents` that non-members read: details only, no
+  /// poll or responses.
+  Map<String, dynamic> toPublicMap() => {
+    'title': title,
+    'type': type.name,
+    'startsAt': startsAt,
+    'endsAt': endsAt,
+    'location': location,
+    'notes': notes,
   };
 }

@@ -11,6 +11,7 @@ import 'package:frisbee_app/data/repositories/notification/notification_reposito
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
+import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/data/repositories/usau_schedule/usau_schedule_repository.dart';
@@ -24,6 +25,7 @@ import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
+import 'package:frisbee_app/domain/models/team_post.dart';
 import 'package:frisbee_app/domain/models/tournament.dart';
 import 'package:frisbee_app/domain/models/usau_schedule.dart';
 import 'package:frisbee_app/utils/result.dart';
@@ -165,6 +167,34 @@ class FakeTeamRepository implements TeamRepository {
   @override
   Future<Result<void>> updateTeam(Team team) async {
     teams[team.id] = team;
+    listings[team.id] = TeamListing.of(team);
+    _emit();
+    return const Result.ok(null);
+  }
+
+  /// The public team directory; teams appear here only once listed.
+  final listings = <String, TeamListing>{};
+
+  /// Teams whose listing was (re)published.
+  final published = <String>[];
+
+  @override
+  Future<Result<List<TeamListing>>> searchTeams(String query) async =>
+      Result.ok([
+        for (final l in listings.values)
+          if (l.matches(query)) l,
+      ]);
+
+  @override
+  Stream<TeamListing?> watchListing(String teamId) async* {
+    yield listings[teamId];
+    yield* _teamsController.stream.map((_) => listings[teamId]);
+  }
+
+  @override
+  Future<Result<void>> publishListing(Team team) async {
+    published.add(team.id);
+    listings[team.id] = TeamListing.of(team);
     _emit();
     return const Result.ok(null);
   }
@@ -431,6 +461,27 @@ class FakeEventRepository implements EventRepository {
   Stream<TeamEvent?> watchEvent(String teamId, String eventId) async* {
     yield events[eventId];
     yield* _changes.stream.map((_) => events[eventId]);
+  }
+
+  List<TeamEvent> _public(String teamId) => [
+    for (final e in _sorted(teamId))
+      if (e.isPublic)
+        TeamEvent(
+          id: e.id,
+          title: e.title,
+          type: e.type,
+          startsAt: e.startsAt,
+          endsAt: e.endsAt,
+          location: e.location,
+          notes: e.notes,
+          isPublic: true,
+        ),
+  ];
+
+  @override
+  Stream<List<TeamEvent>> watchPublicEvents(String teamId) async* {
+    yield _public(teamId);
+    yield* _changes.stream.map((_) => _public(teamId));
   }
 
   @override
@@ -1002,3 +1053,155 @@ class FakeNotificationRepository implements NotificationRepository {
   @override
   Stream<String> get openedRoutes => opened.stream;
 }
+
+class FakeTeamPostRepository implements TeamPostRepository {
+  /// teamId → posts.
+  final posts = <String, List<TeamPost>>{};
+  final _changes = StreamController<void>.broadcast();
+
+  /// Whether each watch asked for public posts only, in order.
+  final watches = <bool>[];
+
+  List<TeamPost> _of(String teamId, bool publicOnly) => [
+    for (final p in posts[teamId] ?? const <TeamPost>[])
+      if (!publicOnly || p.isPublic) p,
+  ]..sort(TeamPost.newestFirst);
+
+  @override
+  Stream<List<TeamPost>> watchPosts(
+    String teamId, {
+    bool publicOnly = false,
+  }) async* {
+    watches.add(publicOnly);
+    yield _of(teamId, publicOnly);
+    yield* _changes.stream.map((_) => _of(teamId, publicOnly));
+  }
+
+  /// Photos uploaded by [savePost], by name.
+  final uploaded = <String>[];
+
+  @override
+  Future<Result<void>> savePost(
+    String teamId,
+    PostDraft draft,
+    AppUser author,
+  ) async {
+    final post = draft.post;
+    final list = posts.putIfAbsent(teamId, () => []);
+    final images = [
+      ...post.images,
+      for (final a in draft.newImages)
+        ChatAttachment(
+          path: 'teams/$teamId/posts/${a.name}',
+          name: a.name,
+          contentType: a.contentType,
+          size: a.size,
+        ),
+    ];
+    uploaded.addAll(draft.newImages.map((a) => a.name));
+    if (post.isNew) {
+      list.add(
+        TeamPost(
+          id: 'p${list.length + 1}',
+          title: post.title,
+          body: post.body,
+          location: post.location,
+          links: post.links,
+          images: images,
+          isPublic: post.isPublic,
+          authorId: author.uid,
+          authorName: author.label,
+          createdAt: DateTime.now(),
+        ),
+      );
+    } else {
+      final i = list.indexWhere((p) => p.id == post.id);
+      if (i < 0) return Result.error(Exception('No post'));
+      list[i] = post.copyWith(images: images);
+    }
+    _changes.add(null);
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<Uint8List>> downloadImage(ChatAttachment image) async =>
+      Result.ok(Uint8List.fromList(_png));
+
+  @override
+  Future<Result<void>> deletePost(String teamId, String postId) async {
+    posts[teamId]?.removeWhere((p) => p.id == postId);
+    _changes.add(null);
+    return const Result.ok(null);
+  }
+}
+
+/// A 1×1 PNG, for image widgets in tests.
+const _png = <int>[
+  0x89,
+  0x50,
+  0x4E,
+  0x47,
+  0x0D,
+  0x0A,
+  0x1A,
+  0x0A,
+  0x00,
+  0x00,
+  0x00,
+  0x0D,
+  0x49,
+  0x48,
+  0x44,
+  0x52,
+  0x00,
+  0x00,
+  0x00,
+  0x01,
+  0x00,
+  0x00,
+  0x00,
+  0x01,
+  0x08,
+  0x06,
+  0x00,
+  0x00,
+  0x00,
+  0x1F,
+  0x15,
+  0xC4,
+  0x89,
+  0x00,
+  0x00,
+  0x00,
+  0x0D,
+  0x49,
+  0x44,
+  0x41,
+  0x54,
+  0x78,
+  0x9C,
+  0x63,
+  0x00,
+  0x01,
+  0x00,
+  0x00,
+  0x05,
+  0x00,
+  0x01,
+  0x0D,
+  0x0A,
+  0x2D,
+  0xB4,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x49,
+  0x45,
+  0x4E,
+  0x44,
+  0xAE,
+  0x42,
+  0x60,
+  0x82,
+];

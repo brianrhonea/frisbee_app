@@ -16,7 +16,19 @@ abstract class TeamRepository {
   /// Joins the team with [inviteCode] as a player. Returns the team id.
   Future<Result<String>> joinTeam(String inviteCode, AppUser user);
 
+  /// Saves the team's details and its public directory listing.
   Future<Result<void>> updateTeam(Team team);
+
+  /// Teams in the public directory whose name or city words start with the
+  /// words of [query].
+  Future<Result<List<TeamListing>>> searchTeams(String query);
+
+  /// The team's public directory listing; null if it has none yet.
+  Stream<TeamListing?> watchListing(String teamId);
+
+  /// Writes the team's directory listing from its details, e.g. for teams
+  /// created before the directory existed. Owners, coaches and captains.
+  Future<Result<void>> publishListing(Team team);
 
   /// The code other users enter to join as a player. Kept off the team so
   /// only owners, coaches and captains can read it; others get an error.

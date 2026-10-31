@@ -109,11 +109,16 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
   `parentNavigatorKey: _rootKey`, and are opened with `context.push` so back
   returns where you were:
   - team events (`/team-events/…`) and personal events (`/my-events/…`)
+    (team sections like `/teams/:id/events` stay in the Teams tab)
   - plays, stats screens and the USA Ultimate roster import
   - chat rooms and room settings (`/teams/:id/chats/…`)
   - direct messages (`/messages`, `/messages/new`, `/messages/:conversationId`)
 - **Path helpers** are all in `routing/routes.dart`, for example
-  `Routes.team(id, tab: 'chat')` and `Routes.conversation(id)`.
+  `Routes.teamChat(id)` and `Routes.conversation(id)`.
+- **Team pages:** `/teams/:id` is the team home (`TeamHomeScreen`). Each
+  `TeamSection` (Team Events, Chat, Roster, Playbook, Stats, Members) is a
+  child route, e.g. `/teams/:id/events`, shown by `TeamSectionScreen`. Old
+  `?tab=` links redirect to the matching section.
 - **Responsive layouts:** Home becomes a two-column dashboard when its
   content area is at least 960 px wide (`HomeScreen.dashboardBreakpoint`);
   below that it stays a single column.
@@ -134,7 +139,8 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
 |---|---|---|---|
 | Sign-in (email, Google, Apple; browser OAuth on Windows) | `ui/auth` | `SignInViewModel`, `SignUpViewModel` | Auth |
 | Home: this week, my team, playbook preview, coming up, rankings podium, inbox badge | `ui/home` | `HomeViewModel` (composes `MySchedule`) | Auth, Team, Play, Event, Tournament, Ranking, DirectMessage |
-| Teams: create, join by invite code, roles, members, roster | `ui/teams` | `TeamsViewModel`, `CreateTeamViewModel`, `TeamDetailViewModel` | Team, Play, Event |
+| Teams: create, join by invite code, roles, members, roster | `ui/teams` | `TeamsViewModel`, `CreateTeamViewModel`, `TeamDetailViewModel` (sections) | Team, Play, Event |
+| Team home: summary, section links, upcoming events, posts; public page for non-members; team search | `ui/teams` | `TeamHomeViewModel`, `TeamSearchViewModel` | Team, Event, TeamPost |
 | USA Ultimate roster import and sync, USAU team search | `ui/teams` | `UsauRosterViewModel`, `UsauTeamSearchViewModel` | Team, UsauTeam, Ranking |
 | Team chat: rooms with per-role and per-person read/write access, photos and files | `ui/chat` | `ChatListViewModel`, `ChatRoomViewModel`, `ChatRoomSettingsViewModel` | Chat, Team |
 | Direct messages: search people by name, 1:1 conversations, unread tracking | `ui/messages` | `InboxViewModel`, `PeopleSearchViewModel`, `DirectChatViewModel` | DirectMessage |
@@ -270,6 +276,8 @@ users/{uid}                     private profile: email, displayName, photoUrl (o
   notifications/{id}            feed: category, title, body, route, read, count (Functions write)
 profiles/{uid}                  public directory: name, keywords (search prefixes), photoUrl
 inviteCodes/{code}              → { teamId }; single lookups only, never listed
+teamDirectory/{teamId}          public listing for team search: name, division, level,
+                                city, keywords (copied from the team; editors write)
 teams/{teamId}                  name, division, level, city, ownerId,
                                 members {uid: role}, memberIds [], memberNames {},
                                 statKeepers [], USAU link fields
@@ -278,7 +286,9 @@ teams/{teamId}                  name, division, level, city, ownerId,
   roster/{playerId}             name, number, position, userId (all members)
   rosterStatus/{playerId}       paid, onUsau (editors only)
   plays/{playId}                elements, arrows, animation steps
-  events/{eventId}              team event, plus rsvps {uid}, reactions {uid}, votes {uid}, poll
+  events/{eventId}              team event, plus rsvps {uid}, reactions {uid}, votes {uid}, poll, public
+  publicEvents/{eventId}        details of events marked public, no responses (anyone signed in reads)
+  posts/{postId}                title, body, public, authorId, authorName (public ones: anyone reads)
   statsTournaments/{id}         tournament with roster and lines
   statsGames/{id}               one game: points, lines, timeouts, all in one doc
   chats/{roomId}                name, readRoles, writeRoles, readUsers, writeUsers

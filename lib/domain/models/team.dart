@@ -233,3 +233,66 @@ class NewTeam {
     'city': city,
   };
 }
+
+/// A team's entry in the public team directory (`teamDirectory/{teamId}`):
+/// what anyone signed in sees when searching, without members or invite
+/// code. Mirrors the team's editable fields.
+class TeamListing {
+  const TeamListing({
+    required this.id,
+    required this.name,
+    required this.division,
+    required this.level,
+    this.city = '',
+  });
+
+  factory TeamListing.of(Team team) => TeamListing(
+    id: team.id,
+    name: team.name,
+    division: team.division,
+    level: team.level,
+    city: team.city,
+  );
+
+  final String id;
+  final String name;
+  final Division division;
+  final CompetitionLevel level;
+  final String city;
+
+  /// "Mixed · Club · Denver".
+  String get subtitle =>
+      [division.label, level.label, if (city.isNotEmpty) city].join(' · ');
+
+  /// Whether every word of [query] starts a word of the name or city.
+  bool matches(String query) => matchesSearch('$name $city', query);
+
+  /// Whether this still matches [team], or needs republishing.
+  bool sameAs(Team team) =>
+      id == team.id &&
+      name == team.name &&
+      division == team.division &&
+      level == team.level &&
+      city == team.city;
+
+  factory TeamListing.fromMap(String id, Map<String, dynamic> map) =>
+      TeamListing(
+        id: id,
+        name: map['name'] as String? ?? '',
+        division: enumByName(Division.values, map['division'], Division.mixed),
+        level: enumByName(
+          CompetitionLevel.values,
+          map['level'],
+          CompetitionLevel.club,
+        ),
+        city: map['city'] as String? ?? '',
+      );
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'division': division.name,
+    'level': level.name,
+    'city': city,
+    'keywords': searchKeywords('$name $city'),
+  };
+}

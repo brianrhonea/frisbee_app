@@ -22,28 +22,8 @@ class UserProfile {
     'photoUrl': photoUrl,
   };
 
-  /// Every prefix of every word in [name], lowercased, so a search for
-  /// "jo" or "smi" finds "Jo Smith". Capped to keep the document small.
-  static List<String> searchKeywords(String name) {
-    final words = searchWords(name);
-    return {
-      for (final w in words)
-        for (var i = 1; i <= w.length && i <= 20; i++) w.substring(0, i),
-    }.take(100).toList();
-  }
-
-  /// Lowercased words of a name or search query.
-  static List<String> searchWords(String text) => text
-      .toLowerCase()
-      .split(RegExp(r'[\s\-_.]+'))
-      .where((w) => w.isNotEmpty)
-      .toList();
-
   /// Whether every word of [query] starts a word of this name.
-  bool matches(String query) {
-    final words = searchWords(name);
-    return searchWords(query).every((q) => words.any((w) => w.startsWith(q)));
-  }
+  bool matches(String query) => matchesSearch(name, query);
 }
 
 /// A private conversation between two users. Its id is their uids, sorted

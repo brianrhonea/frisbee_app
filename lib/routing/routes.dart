@@ -6,7 +6,8 @@ abstract final class Routes {
   static const home = '/home';
   static const teams = '/teams';
   static const createTeam = '/teams/new';
-  static const searchUsauTeams = '/teams/search';
+  static const searchTeams = '/teams/search';
+  static const searchUsauTeams = '/teams/search/usau';
   static const schedule = '/schedule';
   static const tournaments = '/tournaments';
   static const rankings = '/rankings';
@@ -21,14 +22,20 @@ abstract final class Routes {
   static const notifications = '/notifications';
   static const notificationSettings = '/notifications/settings';
 
-  /// [tab] opens a team tab by name, e.g. 'playbook' ([TeamTab]).
-  static String team(String teamId, {String? tab}) => Uri(
-    path: '/teams/$teamId',
-    queryParameters: tab == null ? null : {'tab': tab},
-  ).toString();
+  /// The team's home page: a summary for members, the public page for
+  /// everyone else.
+  static String team(String teamId) => '/teams/$teamId';
+
+  // Team sections, opened from the team home page (TeamSection).
+  static String teamEvents(String teamId) => '/teams/$teamId/events';
+  static String teamChat(String teamId) => '/teams/$teamId/chat';
+  static String teamRoster(String teamId) => '/teams/$teamId/roster';
+  static String teamPlaybook(String teamId) => '/teams/$teamId/playbook';
+  static String teamStats(String teamId) => '/teams/$teamId/stats';
+  static String teamMembers(String teamId) => '/teams/$teamId/members';
   static String newPlay(String teamId) => '/teams/$teamId/plays/new';
   // Chat pages open over the team; use `context.push` so back returns to
-  // the Chat tab.
+  // the chat room list.
   static String chatRoom(String teamId, String roomId) =>
       '/teams/$teamId/chats/$roomId';
   static String newChatRoom(String teamId) => '/teams/$teamId/chats/new';

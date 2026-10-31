@@ -111,7 +111,8 @@ class _EventForm extends StatefulWidget {
   final String submitLabel;
   final ValueChanged<TeamEvent> onSubmit;
 
-  /// Polls are for team events only.
+  /// Polls, and showing the event on the public team page, are for team
+  /// events only.
   final bool allowPoll;
 
   /// Shown above the title when the event can go on more than one schedule.
@@ -138,6 +139,7 @@ class _EventFormState extends State<_EventForm> {
       ? null
       : TimeOfDay.fromDateTime(widget.initial.endsAt!);
 
+  late bool _public = widget.initial.isPublic;
   late bool _hasPoll = widget.initial.poll != null;
   late final _question = TextEditingController(
     text: widget.initial.poll?.question ?? '',
@@ -222,6 +224,7 @@ class _EventFormState extends State<_EventForm> {
         endsAt: () => endsAt,
         location: _location.text.trim(),
         notes: _notes.text.trim(),
+        isPublic: _public && widget.allowPoll,
         poll: () => _hasPoll && widget.allowPoll
             ? EventPoll(
                 question: _question.text.trim(),
@@ -339,6 +342,19 @@ class _EventFormState extends State<_EventForm> {
             ),
           ),
           if (widget.allowPoll) ...[
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              secondary: const Icon(Icons.public),
+              title: const Text('Public'),
+              subtitle: Text(
+                _public
+                    ? 'Shown on the team page to anyone who finds the team. '
+                          'RSVPs and polls stay private.'
+                    : 'Only team members can see it',
+              ),
+              value: _public,
+              onChanged: (v) => setState(() => _public = v),
+            ),
             const Divider(height: 32),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,

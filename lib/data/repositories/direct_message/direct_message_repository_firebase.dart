@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/direct_message.dart';
+import '../../../domain/models/model_utils.dart';
 import '../../../utils/result.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
@@ -41,7 +42,7 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     String query, {
     required String excludeUid,
   }) => guard(() async {
-    final words = UserProfile.searchWords(query);
+    final words = searchWords(query);
     if (words.isEmpty) return const [];
     // Match the longest word in Firestore, then the rest here.
     final key = (words.toList()..sort((a, b) => b.length - a.length)).first;

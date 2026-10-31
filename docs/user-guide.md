@@ -12,7 +12,7 @@ version 0.0.4.
    - **Join with code**: enter the 6-character invite code your team admin
      gave you. You join as a player.
    - **Create team**: you become its owner. Share the invite code from the
-     team's **Members** tab.
+     team's **Members** page.
 3. **Profile** opens from your avatar at the top of Home. Change your
    display name, pick a theme (System, Light or Dark), sign out or delete
    your account there.
@@ -24,9 +24,10 @@ team card in the Teams tab.
 
 | You can…                                        | Owner | Coach / Captain | Player |
 |-------------------------------------------------|:-----:|:---------------:|:------:|
-| See schedule, roster names, numbers, positions  | ✓     | ✓               | ✓      |
+| See team events, posts, roster names, numbers, positions | ✓ | ✓          | ✓      |
 | RSVP, react and vote on team events             | ✓     | ✓               | ✓      |
 | Create, edit and delete team events             | ✓     | ✓               |        |
+| Write posts; make posts and events public       | ✓     | ✓               |        |
 | Edit the roster and team details                | ✓     | ✓               |        |
 | See paid and USA Ultimate status, sync roster   | ✓     | ✓               |        |
 | Draw and edit plays                             | ✓     | ✓               |        |
@@ -40,7 +41,7 @@ team card in the Teams tab.
 | Give a player stats access                      | ✓     |                 |        |
 | Make a new invite code, transfer or delete team | ✓     |                 |        |
 
-Anyone can leave a team from its Members tab (the owner must transfer
+Anyone can leave a team from the ⋮ menu on its home page (the owner must transfer
 ownership first).
 
 ## The tabs
@@ -106,11 +107,17 @@ shows how many conversations have something new.
 
 ### Teams
 
-Your teams. Tap one to open its page, which has six tabs:
+Your teams. Tap one to open its home page: the team at a glance, what's
+**Up next**, and the team's **Posts**. Owners, coaches and captains tap
+**New post** to share news (tryouts, fees, field changes). Each post is
+**Public** or for members only; admins can edit or delete posts.
 
-- **Schedule**: the team calendar. Open an event to RSVP **Going**,
+Tiles on the home page open each part of the team:
+
+- **Team Events**: the team calendar. Open an event to RSVP **Going**,
   **Maybe** or **Can't go**. Once you're going, you can react and vote in
-  the event's poll.
+  the event's poll. Admins can make an event **Public** to show it on the
+  team's public page; RSVPs and polls stay private.
 - **Chat**: the team's chat rooms. Every team has a **General** room for
   everyone. Owners, coaches and captains add rooms (say, Captains or
   Carpool) and choose, per role and per person, who can read and who can
@@ -131,7 +138,12 @@ Your teams. Tap one to open its page, which has six tabs:
 - **Members**: who's on the team and their roles. Admins find the invite
   code here.
 
-**Search USA Ultimate teams**: tap 🔍 at the top of the Teams tab, type a
+**Find a team**: tap 🔍 at the top of the Teams tab and type part of a
+team's name or city. Tap a team to see its public page: name, division and
+city, plus any public events and posts. Members, rosters and chat stay
+private. Tap **Join** and enter the invite code to join.
+
+**Search USA Ultimate rankings**: at the bottom of Find a team. Type a
 team name and filter by ranking list (for example, Club Mixed). Tap a team
 to see its USA Ultimate page. Only teams in the USA Ultimate rankings show
 up.

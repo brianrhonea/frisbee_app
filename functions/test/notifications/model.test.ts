@@ -149,7 +149,7 @@ describe("notices", () => {
 
     const cancelled = eventChangeNotice({ change: "deleted", teamId: "t1", eventId: "e1", teamName: "Hawks", before: event });
     expect(cancelled.text(denver, 1).title).toBe("Hawks: Hat league cancelled");
-    expect(cancelled.route).toBe("/teams/t1?tab=schedule");
+    expect(cancelled.route).toBe("/teams/t1/events");
   });
 
   it("reminds everyone who hasn't said they can't go", () => {

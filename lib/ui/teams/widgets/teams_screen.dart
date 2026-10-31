@@ -62,9 +62,9 @@ class _TeamsScreenState extends State<TeamsScreen> {
         title: const Text('Teams'),
         actions: [
           IconButton(
-            tooltip: 'Search USA Ultimate teams',
+            tooltip: 'Find a team',
             icon: const Icon(Icons.search),
-            onPressed: () => context.push(Routes.searchUsauTeams),
+            onPressed: () => context.push(Routes.searchTeams),
           ),
           ListenableBuilder(
             listenable: vm.joinTeam,
@@ -92,7 +92,9 @@ class _TeamsScreenState extends State<TeamsScreen> {
             return EmptyView(
               icon: Icons.groups_outlined,
               title: 'No teams yet',
-              message: 'Create a team or join one with an invite code.',
+              message:
+                  'Create a team, join one with an invite code, or search '
+                  'for teams near you.',
               action: OutlinedButton(
                 onPressed: _join,
                 child: const Text('Join with code'),

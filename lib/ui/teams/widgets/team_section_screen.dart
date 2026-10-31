@@ -1,0 +1,179 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../routing/routes.dart';
+import '../../../utils/command.dart';
+import '../../chat/view_models/chat_list_viewmodel.dart';
+import '../../chat/widgets/chat_tab.dart';
+import '../../core/ui/back_or.dart';
+import '../../core/ui/error_message.dart';
+import '../../core/ui/status_views.dart';
+import '../../core/ui/view_model_host.dart';
+import '../../playbook/widgets/playbook_tab.dart';
+import '../../schedule/widgets/team_events_tab.dart';
+import '../../stats/view_models/stats_viewmodel.dart';
+import '../../stats/widgets/stats_tab.dart';
+import '../view_models/team_detail_viewmodel.dart';
+import 'members_tab.dart';
+import 'roster_tab.dart';
+
+/// The parts of a team members open from its home page, in display order.
+enum TeamSection {
+  events('Team Events', Icons.event_outlined, 'events'),
+  chat('Chat', Icons.chat_bubble_outline, 'chat'),
+  roster('Roster', Icons.badge_outlined, 'roster'),
+  playbook('Playbook', Icons.draw_outlined, 'playbook'),
+  stats('Stats', Icons.insights_outlined, 'stats'),
+  members('Members', Icons.groups_outlined, 'members');
+
+  const TeamSection(this.label, this.icon, this.path);
+  final String label;
+  final IconData icon;
+
+  /// Last segment of the section's route, e.g. `/teams/{id}/events`.
+  final String path;
+
+  String route(String teamId) => switch (this) {
+    events => Routes.teamEvents(teamId),
+    chat => Routes.teamChat(teamId),
+    roster => Routes.teamRoster(teamId),
+    playbook => Routes.teamPlaybook(teamId),
+    stats => Routes.teamStats(teamId),
+    members => Routes.teamMembers(teamId),
+  };
+
+  /// The section an old `?tab=` link meant, when teams had tabs; the
+  /// Schedule tab is now Team Events.
+  static TeamSection? fromLegacyTab(String? tab) => tab == 'schedule'
+      ? events
+      : values.where((s) => s.name == tab).firstOrNull;
+}
+
+/// One section of a team, e.g. its Team Events calendar or roster.
+class TeamSectionScreen extends StatefulWidget {
+  const TeamSectionScreen({
+    super.key,
+    required this.viewModel,
+    required this.section,
+  });
+
+  final TeamDetailViewModel viewModel;
+  final TeamSection section;
+
+  @override
+  State<TeamSectionScreen> createState() => _TeamSectionScreenState();
+}
+
+class _TeamSectionScreenState extends State<TeamSectionScreen> {
+  TeamDetailViewModel get vm => widget.viewModel;
+
+  late final List<Command<void>> _commands = [
+    vm.savePlayer,
+    vm.deletePlayer,
+    vm.regenerateInviteCode,
+    vm.setMemberRole,
+    vm.transferOwnership,
+    vm.setStatKeeper,
+    vm.removeMember,
+    vm.deletePlay,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    for (final c in _commands) {
+      c.addListener(_onCommand);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _commands) {
+      c.removeListener(_onCommand);
+    }
+    super.dispose();
+  }
+
+  void _onCommand() {
+    for (final c in _commands) {
+      if (c.error) {
+        showErrorSnackBar(context, c.result);
+        c.clearResult();
+      }
+    }
+  }
+
+  Widget _body() => switch (widget.section) {
+    TeamSection.events => TeamEventsTab(viewModel: vm),
+    TeamSection.chat => ViewModelHost(
+      create: (c) => ChatListViewModel(
+        teamId: vm.teamId,
+        teamRepository: c.read(),
+        chatRepository: c.read(),
+        authRepository: c.read(),
+      ),
+      builder: (_, chatVm) => ChatTab(viewModel: chatVm),
+    ),
+    TeamSection.roster => RosterTab(viewModel: vm),
+    TeamSection.playbook => PlaybookTab(viewModel: vm),
+    TeamSection.stats => ViewModelHost(
+      create: (c) => StatsViewModel(
+        teamId: vm.teamId,
+        statsRepository: c.read(),
+        eventRepository: c.read(),
+        teamRepository: c.read(),
+        authRepository: c.read(),
+      ),
+      builder: (_, statsVm) => StatsTab(viewModel: statsVm),
+    ),
+    TeamSection.members => MembersTab(viewModel: vm),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: vm,
+      builder: (context, _) {
+        final team = vm.team;
+        final leading = backOr(context, Routes.team(vm.teamId));
+        if (!vm.loaded) {
+          return Scaffold(
+            appBar: AppBar(leading: leading),
+            body: const LoadingView(),
+          );
+        }
+        if (team == null) {
+          return Scaffold(
+            appBar: AppBar(leading: leading),
+            body: vm.error != null
+                ? ErrorView(error: vm.error)
+                : const EmptyView(
+                    icon: Icons.group_off_outlined,
+                    title: 'Team not available',
+                    message: 'It may have been deleted or you were removed.',
+                  ),
+          );
+        }
+        final theme = Theme.of(context);
+        return Scaffold(
+          appBar: AppBar(
+            leading: leading,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.section.label),
+                Text(
+                  team.name,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          body: _body(),
+        );
+      },
+    );
+  }
+}

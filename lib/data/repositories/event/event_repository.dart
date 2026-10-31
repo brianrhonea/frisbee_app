@@ -8,8 +8,13 @@ abstract class EventRepository {
   /// Emits null if the event is deleted.
   Stream<TeamEvent?> watchEvent(String teamId, String eventId);
 
+  /// The team's public events, sorted by start time: details only, no
+  /// responses. Anyone signed in may read them.
+  Stream<List<TeamEvent>> watchPublicEvents(String teamId);
+
   /// Creates the event when [TeamEvent.isNew], otherwise updates its
-  /// editable fields, leaving responses intact. [clearVotes] wipes poll
+  /// editable fields, leaving responses intact. Keeps the public copy in
+  /// step with [TeamEvent.isPublic]. [clearVotes] wipes poll
   /// votes, e.g. when the poll is removed. Returns the saved event id.
   Future<Result<String>> saveEvent(
     String teamId,
