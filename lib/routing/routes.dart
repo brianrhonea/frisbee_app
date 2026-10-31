@@ -62,7 +62,11 @@ abstract final class Routes {
 
   // Video pages open over the tabs, like event pages; use `context.push`.
   static const teamVideosPath = '/team-videos';
-  static String newVideo(String teamId) => '$teamVideosPath/$teamId/new';
+
+  /// [folderId] starts the new video in that folder.
+  static String newVideo(String teamId, {String? folderId}) =>
+      '$teamVideosPath/$teamId/new'
+      '${folderId == null ? '' : '?folder=${Uri.encodeQueryComponent(folderId)}'}';
   static String video(String teamId, String videoId) =>
       '$teamVideosPath/$teamId/$videoId';
   static String editVideo(String teamId, String videoId) =>

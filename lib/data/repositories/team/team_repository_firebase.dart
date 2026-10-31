@@ -10,6 +10,7 @@ import '../../../domain/models/model_utils.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_post.dart';
+import '../../../domain/models/team_video.dart';
 import '../../../utils/result.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
@@ -338,6 +339,14 @@ class TeamRepositoryFirebase implements TeamRepository {
           m,
         ]);
       }
+      // Uploaded videos go before the videos that list them.
+      for (final video in (await ref.collection('videos').get()).docs) {
+        final path = TeamVideo.fromMap(
+          video.id,
+          plainData(video.data()),
+        ).file?.path;
+        if (path != null) await _files.delete([path]);
+      }
       // Post photos go before their posts, which list them.
       for (final post in (await ref.collection('posts').get()).docs) {
         await _files.delete(
@@ -356,6 +365,7 @@ class TeamRepositoryFirebase implements TeamRepository {
         'publicEvents',
         'posts',
         'videos',
+        'videoFolders',
         'statsTournaments',
         'statsGames',
         'private',

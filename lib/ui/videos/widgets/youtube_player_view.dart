@@ -55,6 +55,21 @@ class _IframePlayerState extends State<_IframePlayer> {
       YoutubePlayer(controller: _controller, aspectRatio: 16 / 9);
 }
 
+/// The virtual https host the Windows player pages are served from.
+const youTubePlayerHost = 'player.ultiup.app';
+
+Future<void>? _environment;
+
+/// Sets up WebView2 once per run, before any web view starts, so videos
+/// can start without a click in the page: watch together plays them from
+/// code. A second call reuses the first.
+Future<void> ensureWebViewEnvironment() => _environment ??=
+    win.WebviewController.initializeEnvironment(
+      additionalArguments: '--autoplay-policy=no-user-gesture-required',
+    ).catchError((Object _) {
+      // Already set up (e.g. after a hot restart); that's fine.
+    });
+
 /// The embed in an Edge WebView2. YouTube's embed won't play without a
 /// page origin, so a small player page is served from a virtual https host
 /// mapped to a temp folder, rather than loaded as a bare string.
@@ -71,7 +86,7 @@ enum _WinState { starting, ready, failed }
 
 class _WindowsPlayerState extends State<_WindowsPlayer> {
   static final _log = Logger('YouTubePlayer');
-  static const _host = 'player.ultiup.app';
+  static const _host = youTubePlayerHost;
 
   final _controller = win.WebviewController();
   var _state = _WinState.starting;
@@ -96,6 +111,7 @@ class _WindowsPlayerState extends State<_WindowsPlayer> {
       if (await win.WebviewController.getWebViewVersion() == null) {
         throw StateError('WebView2 runtime is not installed');
       }
+      await ensureWebViewEnvironment();
       final folder = await _playerFolder();
       await _controller.initialize();
       await _controller.addVirtualHostNameMapping(

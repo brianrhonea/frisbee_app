@@ -3,9 +3,11 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/video/video_repository.dart';
+import '../../../data/services/file_picker_service.dart';
 import '../../../data/services/youtube_info_service.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_video.dart';
+import '../../../domain/models/video_folder.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
@@ -28,8 +30,11 @@ enum LinkCheck {
   unknown,
 }
 
+/// Where a new video comes from.
+enum VideoSource { youTube, upload }
+
 /// Posts or edits a team video. Form state lives in the screen; this loads
-/// the original, checks links with YouTube, and saves.
+/// the original, checks YouTube links or picks a video file, and saves.
 class VideoEditorViewModel extends ChangeNotifier {
   VideoEditorViewModel({
     required this.teamId,
@@ -38,10 +43,13 @@ class VideoEditorViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required AuthRepository authRepository,
     required YouTubeInfoService youTubeInfo,
+    required FilePickerService filePicker,
+    this.initialFolderId,
   }) : _videos = videoRepository,
        _teams = teamRepository,
        _auth = authRepository,
-       _info = youTubeInfo {
+       _info = youTubeInfo,
+       _picker = filePicker {
     load = Command0<void>(_load)..execute();
     save = Command1<String, TeamVideo>(_save);
   }
@@ -50,10 +58,14 @@ class VideoEditorViewModel extends ChangeNotifier {
 
   /// Null when posting a new video.
   final String? videoId;
+
+  /// The folder a new video starts in, e.g. the one being viewed.
+  final String? initialFolderId;
   final VideoRepository _videos;
   final TeamRepository _teams;
   final AuthRepository _auth;
   final YouTubeInfoService _info;
+  final FilePickerService _picker;
 
   late final Command0<void> load;
 
@@ -68,7 +80,19 @@ class VideoEditorViewModel extends ChangeNotifier {
   bool get canEdit => _team?.canEdit(_auth.currentUser?.uid ?? '') ?? false;
 
   /// Starting values for the form.
-  TeamVideo get initial => _original ?? const TeamVideo(id: '', youtubeId: '');
+  TeamVideo get initial =>
+      _original ??
+      TeamVideo(
+        id: '',
+        folderId: _folders.any((f) => f.id == initialFolderId)
+            ? initialFolderId!
+            : '',
+      );
+
+  List<VideoFolder> _folders = const [];
+
+  /// The team's folders, A–Z, to file the video in.
+  List<VideoFolder> get folders => _folders;
 
   LinkCheck _check = LinkCheck.empty;
   LinkCheck get linkCheck => _check;
@@ -84,9 +108,69 @@ class VideoEditorViewModel extends ChangeNotifier {
   String? _channel;
   String? get channel => _channel;
 
+  VideoSource _source = VideoSource.youTube;
+
+  /// A new video's source; an existing one keeps its own.
+  VideoSource get source => switch (_original) {
+    final v? => v.isYouTube ? VideoSource.youTube : VideoSource.upload,
+    null => _source,
+  };
+
+  set source(VideoSource value) {
+    if (!isNew || value == _source) return;
+    _source = value;
+    notifyListeners();
+  }
+
+  /// Bytes the team's uploads already use, out of
+  /// [TeamVideo.teamQuotaBytes].
+  int _usedBytes = 0;
+  int get usedBytes => _usedBytes;
+
+  /// The video file picked to upload.
+  PickedFile? _file;
+  PickedFile? get pickedFile => _file;
+
+  /// Why [pickedFile] can't be uploaded, if it can't.
+  String? _fileProblem;
+  String? get fileProblem => _fileProblem;
+
+  /// 0–1 while uploading.
+  double? _progress;
+  double? get uploadProgress => _progress;
+
+  /// Picks a video file and checks its type and the per-file and per-team
+  /// limits.
+  Future<void> pickFile() async {
+    final file = await _picker.pickVideo(VideoFile.types.keys.toList());
+    if (file == null || _disposed) return;
+    _file = file;
+    final size = file.size;
+    _fileProblem = file.path == null
+        ? "This device can't upload files that big."
+        : VideoFile.contentTypeFor(file.name) == null
+        ? "UltiUP can't play that kind of file. Use MP4, MOV, MKV, WebM, "
+              'AVI, WMV, MPEG or 3GP.'
+        : size == null || size <= 0
+        ? "Couldn't read that file."
+        : size > TeamVideo.maxFileBytes
+        ? 'Videos can be up to '
+              '${TeamVideo.formatBytes(TeamVideo.maxFileBytes)}; this one is '
+              '${TeamVideo.formatBytes(size)}. Upload longer videos to YouTube.'
+        : _usedBytes + size > TeamVideo.teamQuotaBytes
+        ? 'The team has '
+              '${TeamVideo.formatBytes(TeamVideo.teamQuotaBytes - _usedBytes)} '
+              'of its ${TeamVideo.formatBytes(TeamVideo.teamQuotaBytes)} left. '
+              'Remove an uploaded video, or use YouTube.'
+        : null;
+    notifyListeners();
+  }
+
   Future<Result<void>> _load() async {
     try {
       _team = await _teams.watchTeam(teamId).first;
+      _usedBytes = TeamVideo.bytesUsed(await _videos.watchVideos(teamId).first);
+      _folders = await _videos.watchFolders(teamId).first;
       final id = videoId;
       if (id != null) {
         _original = await _videos.watchVideo(teamId, id).first;
@@ -101,7 +185,7 @@ class VideoEditorViewModel extends ChangeNotifier {
     if (!canEdit) {
       return Result.error(Exception('Only admins can post videos.'));
     }
-    if (_original case final v?) await checkLink(v.youtubeId);
+    if (_original case final v? when v.isYouTube) await checkLink(v.youtubeId);
     return const Result.ok(null);
   }
 
@@ -140,8 +224,18 @@ class VideoEditorViewModel extends ChangeNotifier {
     if (!canEdit) {
       return Result.error(Exception('Only admins can post videos.'));
     }
-    if (TeamVideo.youtubeIdFrom(draft.youtubeId) != draft.youtubeId) {
+    final uploading = isNew && _source == VideoSource.upload;
+    final keepsFile = _original?.isYouTube == false;
+    if (!uploading &&
+        !keepsFile &&
+        TeamVideo.youtubeIdFrom(draft.youtubeId) != draft.youtubeId) {
       return Result.error(Exception('Paste a YouTube link.'));
+    }
+    final picked = _file;
+    if (uploading && (picked == null || _fileProblem != null)) {
+      return Result.error(
+        Exception(_fileProblem ?? 'Pick a video file to upload.'),
+      );
     }
     final title = draft.title.trim().isNotEmpty
         ? draft.title.trim()
@@ -151,16 +245,31 @@ class VideoEditorViewModel extends ChangeNotifier {
     }
     final user = _auth.currentUser;
     if (user == null) return Result.error(Exception('Sign in to post.'));
-    return _videos.saveVideo(
-      teamId,
-      draft.copyWith(
-        id: videoId ?? '',
-        title: title.length > TeamVideo.maxTitle
-            ? title.substring(0, TeamVideo.maxTitle)
-            : title,
-      ),
-      user,
+    final video = draft.copyWith(
+      id: videoId ?? '',
+      title: title.length > TeamVideo.maxTitle
+          ? title.substring(0, TeamVideo.maxTitle)
+          : title,
     );
+    if (!uploading) return _videos.saveVideo(teamId, video, user);
+    _progress = 0;
+    notifyListeners();
+    final result = await _videos.uploadVideo(
+      teamId,
+      video,
+      (path: picked!.path!, name: picked.name, size: picked.size!),
+      user,
+      onProgress: (p) {
+        if (_disposed) return;
+        _progress = p;
+        notifyListeners();
+      },
+    );
+    if (!_disposed) {
+      _progress = null;
+      notifyListeners();
+    }
+    return result;
   }
 
   bool _disposed = false;

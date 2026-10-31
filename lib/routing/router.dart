@@ -332,6 +332,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                     settingsRepository: c.read(),
                     filePicker: c.read(),
                     presence: c.read(),
+                    videoRepository: c.read(),
                   ),
                   builder: (_, vm) => MeetingRoomScreen(viewModel: vm),
                 );
@@ -790,6 +791,10 @@ Widget _videoEditor(GoRouterState state, String? videoId) {
       teamRepository: c.read(),
       authRepository: c.read(),
       youTubeInfo: c.read(),
+      filePicker: c.read(),
+      initialFolderId: videoId == null
+          ? state.uri.queryParameters['folder']
+          : null,
     ),
     builder: (_, vm) => VideoEditorScreen(viewModel: vm),
   );

@@ -771,6 +771,12 @@ class FakeFilePickerService implements FilePickerService {
   @override
   Future<List<PickedFile>> pick({bool imagesOnly = false}) async => next;
 
+  /// Returned by the next [pickVideo].
+  PickedFile? nextVideo;
+
+  @override
+  Future<PickedFile?> pickVideo(List<String> extensions) async => nextVideo;
+
   @override
   Future<bool> save(String fileName, Uint8List bytes, String mimeType) async {
     saved.add(fileName);

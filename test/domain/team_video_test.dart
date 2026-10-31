@@ -48,7 +48,7 @@ void main() {
     });
   });
 
-  test('stores only the id, title and description', () {
+  test('stores only the id, folder, title and description', () {
     final v = TeamVideo.fromMap('v1', {
       'youtubeId': 'dQw4w9WgXcQ',
       'title': 'Film',
@@ -58,8 +58,10 @@ void main() {
     });
     expect(v.watchUrl, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
     expect(v.thumbnailUrl, 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
-    expect(v.copyWith(title: '  Film 2  ').toEditableMap(), {
+    expect(v.folderId, '');
+    expect(v.copyWith(title: '  Film 2  ', folderId: 'f1').toEditableMap(), {
       'youtubeId': 'dQw4w9WgXcQ',
+      'folderId': 'f1',
       'title': 'Film 2',
       'description': 'Zone O',
     });

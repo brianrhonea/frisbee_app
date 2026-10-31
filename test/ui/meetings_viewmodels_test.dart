@@ -17,6 +17,7 @@ import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
 import '../testing/meeting_fakes.dart';
+import '../testing/video_fakes.dart';
 
 const coach = AppUser(uid: 'c', displayName: 'Casey');
 const player = AppUser(uid: 'p1', displayName: 'Pat');
@@ -27,9 +28,11 @@ void main() {
   late FakeMeetingRepository meetings;
   late FakeMeetingMediaService media;
   late FakeMeetingSettingsRepository settings;
+  late FakeVideoRepository videos;
   late MeetingPresence presence;
 
   setUp(() {
+    videos = FakeVideoRepository();
     teams = FakeTeamRepository();
     meetings = FakeMeetingRepository();
     media = FakeMeetingMediaService();
@@ -59,6 +62,7 @@ void main() {
     settingsRepository: settings,
     filePicker: FakeFilePickerService(),
     presence: presence,
+    videoRepository: videos,
   );
 
   void requireApproval() {

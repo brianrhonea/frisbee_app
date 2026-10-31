@@ -3,24 +3,29 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../domain/models/team_video.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/video_viewmodel.dart';
+import 'file_video_player.dart';
 import 'youtube_player_view.dart';
 
-/// A team video: YouTube's player, its title and description.
+/// A team video: the player (YouTube's, or media_kit for uploads), its
+/// title and description.
 class VideoScreen extends StatefulWidget {
   const VideoScreen({
     super.key,
     required this.viewModel,
     this.player = youTubePlayer,
+    this.filePlayer = fileVideoPlayer,
   });
 
   final VideoViewModel viewModel;
   final YouTubePlayerBuilder player;
+  final FileVideoPlayerBuilder filePlayer;
 
   @override
   State<VideoScreen> createState() => _VideoScreenState();
@@ -61,14 +66,34 @@ class _VideoScreenState extends State<VideoScreen> {
     if (await confirmDialog(
       context,
       title: 'Remove this video?',
-      message:
-          'It will no longer be listed for the team. The video stays on '
-          'YouTube.',
+      message: vm.video?.isYouTube ?? true
+          ? 'It will no longer be listed for the team. The video stays on '
+                'YouTube.'
+          : 'The uploaded file will be deleted and its space freed.',
       confirmLabel: 'Remove',
       destructive: true,
     )) {
       vm.deleteVideo.execute();
     }
+  }
+
+  Widget _player(TeamVideo video) {
+    if (video.isYouTube) return widget.player(video.youtubeId);
+    if (vm.fileUrl case final url?) return widget.filePlayer(url);
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: vm.fileError != null
+              ? const Text(
+                  "Couldn't load this video.",
+                  style: TextStyle(color: Colors.white),
+                )
+              : const CircularProgressIndicator(),
+        ),
+      ),
+    );
   }
 
   @override
@@ -100,6 +125,7 @@ class _VideoScreenState extends State<VideoScreen> {
       final byline = [
         if (video.authorName.isNotEmpty) 'Shared by ${video.authorName}',
         if (when != null) DateFormat.yMMMd().format(when),
+        if (video.file case final f?) TeamVideo.formatBytes(f.size),
       ].join(' · ');
       return Scaffold(
         appBar: AppBar(
@@ -130,8 +156,8 @@ class _VideoScreenState extends State<VideoScreen> {
               children: [
                 // Keyed by video, so editing the link swaps players.
                 KeyedSubtree(
-                  key: ValueKey(video.youtubeId),
-                  child: widget.player(video.youtubeId),
+                  key: ValueKey(video.file?.path ?? video.youtubeId),
+                  child: _player(video),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -155,14 +181,15 @@ class _VideoScreenState extends State<VideoScreen> {
                           child: SelectableText(video.description),
                         ),
                       const SizedBox(height: 12),
-                      TextButton.icon(
-                        onPressed: () => launchUrl(
-                          Uri.parse(video.watchUrl),
-                          mode: LaunchMode.externalApplication,
+                      if (video.isYouTube)
+                        TextButton.icon(
+                          onPressed: () => launchUrl(
+                            Uri.parse(video.watchUrl),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          icon: const Icon(Icons.open_in_new),
+                          label: const Text('Open on YouTube'),
                         ),
-                        icon: const Icon(Icons.open_in_new),
-                        label: const Text('Open on YouTube'),
-                      ),
                     ],
                   ),
                 ),
