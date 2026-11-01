@@ -11,6 +11,7 @@ import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
+import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/data/repositories/usau_team/usau_team_repository.dart';
@@ -122,6 +123,7 @@ void main() {
           Provider<FilePickerService>.value(value: FakeFilePickerService()),
           Provider<EventRepository>.value(value: FakeEventRepository()),
           Provider<MeetingRepository>.value(value: FakeMeetingRepository()),
+          Provider<TeamPostRepository>.value(value: FakeTeamPostRepository()),
           Provider<StatsRepository>.value(
             value: MockStatsRepository(teamRepository: teams),
           ),
@@ -141,7 +143,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Teams').last);
+    await tester.tap(find.text('Team').last);
     await tester.pumpAndSettle();
     expect(find.byType(TeamsScreen), findsOneWidget);
 

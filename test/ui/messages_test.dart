@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
+import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
+import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:provider/provider.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
+import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/model_utils.dart';
+import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/messages/view_models/direct_chat_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/inbox_viewmodel.dart';
@@ -68,6 +72,8 @@ void main() {
 
   late FakeDirectMessageRepository dms;
   late FakeAuthRepository auth;
+  late FakeTeamRepository teams;
+  late FakeChatRepository chats;
 
   setUp(() {
     dms = FakeDirectMessageRepository()
@@ -77,15 +83,26 @@ void main() {
         UserProfile(uid: 'u1', name: 'Alex'),
       ]);
     auth = FakeAuthRepository(user: testUser);
+    teams = FakeTeamRepository();
+    chats = FakeChatRepository();
   });
 
   Widget withRepos(Widget child) => MultiProvider(
     providers: [
       Provider<DirectMessageRepository>.value(value: dms),
+      Provider<TeamRepository>.value(value: teams),
+      Provider<ChatRepository>.value(value: chats),
       ChangeNotifierProvider<AuthRepository>.value(value: auth),
       Provider<FilePickerService>.value(value: FakeFilePickerService()),
     ],
     child: child,
+  );
+
+  InboxViewModel inbox() => InboxViewModel(
+    directMessageRepository: dms,
+    teamRepository: teams,
+    chatRepository: chats,
+    authRepository: auth,
   );
 
   test('search finds people by name, not yourself, and opens a chat', () async {
@@ -134,6 +151,9 @@ void main() {
   });
 
   testWidgets('inbox lists conversations with unread marks', (tester) async {
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     dms.conversations['a_u1'] = Conversation(
       id: 'a_u1',
       participants: const ['a', 'u1'],
@@ -142,10 +162,7 @@ void main() {
       lastMessageAt: DateTime(2026, 10, 1),
       lastSenderId: 'a',
     );
-    final vm = InboxViewModel(
-      directMessageRepository: dms,
-      authRepository: auth,
-    );
+    final vm = inbox();
     addTearDown(vm.dispose);
     await tester.pumpWidget(
       MaterialApp(
@@ -211,10 +228,7 @@ void main() {
       author: const AppUser(uid: 'a', displayName: 'Avery'),
       text: 'Ride at 6?',
     );
-    final vm = InboxViewModel(
-      directMessageRepository: dms,
-      authRepository: auth,
-    );
+    final vm = inbox();
     addTearDown(vm.dispose);
     await tester.pumpWidget(
       withRepos(
@@ -229,5 +243,33 @@ void main() {
     expect(vm.selectedId, 'a_u1');
     // The preview in the list and the message in the open pane.
     expect(find.text('Ride at 6?'), findsNWidgets(2));
+  });
+
+  test('the inbox lists team chat rooms beside direct messages', () async {
+    teams.teams['t1'] = teamWith({
+      'owner': TeamRole.owner,
+      testUser.uid: TeamRole.player,
+    });
+    chats.rooms['general'] = ChatRoom.general();
+    chats.messages['general'] = [
+      ChatMessage(
+        id: 'm1',
+        authorId: 'a',
+        authorName: 'Avery Jones',
+        text: 'Field 3 at noon',
+        createdAt: DateTime(2026, 10, 2),
+      ),
+    ];
+    final vm = inbox();
+    addTearDown(vm.dispose);
+    await pumpEventQueue();
+    final room = vm.allItems.whereType<RoomItem>().single;
+    expect(room.title, endsWith('Team chat'));
+    expect(room.preview, 'Avery: Field 3 at noon');
+    vm.setFilter(InboxFilter.unread);
+    expect(vm.items, isEmpty);
+    vm.setFilter(InboxFilter.all);
+    vm.setQuery('team chat');
+    expect(vm.items.single.key, room.key);
   });
 }

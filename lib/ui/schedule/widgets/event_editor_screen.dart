@@ -85,6 +85,7 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
                   saving: vm.save.running,
                   submitLabel: vm.isNew ? 'Create event' : 'Save',
                   allowPoll: !vm.isPersonal,
+                  allowPublic: !vm.isPrivateGroup,
                   types: vm.types,
                   schedulePicker: vm.canChooseSchedule
                       ? _SchedulePicker(viewModel: vm)
@@ -105,8 +106,12 @@ class _EventForm extends StatefulWidget {
     required this.onSubmit,
     required this.types,
     this.allowPoll = true,
+    this.allowPublic = true,
     this.schedulePicker,
   });
+
+  /// Offer the Public switch; a private group's events are members-only.
+  final bool allowPublic;
 
   /// Types to choose from; groups and teams offer different ones.
   final List<EventType> types;
@@ -234,7 +239,7 @@ class _EventFormState extends State<_EventForm> {
         endsAt: () => endsAt,
         location: _location.text.trim(),
         notes: _notes.text.trim(),
-        isPublic: _public && widget.allowPoll,
+        isPublic: _public && widget.allowPoll && widget.allowPublic,
         poll: () => _hasPoll && widget.allowPoll
             ? EventPoll(
                 question: _question.text.trim(),
@@ -352,19 +357,20 @@ class _EventFormState extends State<_EventForm> {
             ),
           ),
           if (widget.allowPoll) ...[
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              secondary: const Icon(Icons.public),
-              title: const Text('Public'),
-              subtitle: Text(
-                _public
-                    ? 'Shown on the team page to anyone who finds the team. '
-                          'RSVPs and polls stay private.'
-                    : 'Only team members can see it',
+            if (widget.allowPublic)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.public),
+                title: const Text('Public'),
+                subtitle: Text(
+                  _public
+                      ? 'Shown on the team page to anyone who finds the team. '
+                            'RSVPs and polls stay private.'
+                      : 'Only team members can see it',
+                ),
+                value: _public,
+                onChanged: (v) => setState(() => _public = v),
               ),
-              value: _public,
-              onChanged: (v) => setState(() => _public = v),
-            ),
             const Divider(height: 32),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,

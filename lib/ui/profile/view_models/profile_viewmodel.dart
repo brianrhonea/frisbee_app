@@ -5,6 +5,7 @@ import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/theme/theme_repository.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../utils/command.dart';
+import '../../../utils/result.dart';
 
 class ProfileViewModel extends ChangeNotifier {
   ProfileViewModel({
@@ -22,10 +23,7 @@ class ProfileViewModel extends ChangeNotifier {
       await _unregister();
       return _auth.signOut();
     });
-    deleteAccount = Command0<void>(() async {
-      await _unregister();
-      return _auth.deleteAccount();
-    });
+    deleteAccount = Command1<void, String?>(_deleteAccount);
     _auth.addListener(notifyListeners);
   }
 
@@ -39,6 +37,18 @@ class ProfileViewModel extends ChangeNotifier {
     }
   }
 
+  /// Confirms it's the user (with [password] if they sign in with one),
+  /// then deletes their account and everything they created.
+  Future<Result<void>> _deleteAccount(String? password) async {
+    final confirmed = await _auth.reauthenticate(password: password);
+    if (confirmed is Error<void>) return confirmed;
+    await _unregister();
+    return _auth.deleteAccount();
+  }
+
+  /// How the user confirms it's them before deleting their account.
+  SignInMethod? get reauthMethod => _auth.reauthMethod;
+
   /// Light, dark, or following the device.
   ThemeMode get themeMode => _theme.themeMode;
 
@@ -48,7 +58,8 @@ class ProfileViewModel extends ChangeNotifier {
 
   late final Command1<void, String> updateDisplayName;
   late final Command0<void> signOut;
-  late final Command0<void> deleteAccount;
+  /// Takes the user's password, or null for Google and Apple accounts.
+  late final Command1<void, String?> deleteAccount;
 
   @override
   void dispose() {

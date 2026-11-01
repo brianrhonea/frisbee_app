@@ -25,6 +25,14 @@ class SignInViewModel extends ChangeNotifier {
   late final Command0<void> signInWithApple;
   late final Command1<void, String> sendPasswordReset;
 
+  /// Why the user was just signed out (e.g. their account was deleted),
+  /// to show once; null if nothing to say.
+  String? takeNotice() {
+    final notice = _auth.signedOutNotice;
+    _auth.clearSignedOutNotice();
+    return notice;
+  }
+
   bool get showGoogle => PlatformSupport.googleSignIn;
   bool get showApple => PlatformSupport.appleSignIn;
 

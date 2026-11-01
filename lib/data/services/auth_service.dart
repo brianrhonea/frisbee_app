@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../domain/models/app_user.dart';
 import '../../utils/platform_support.dart';
 import 'google_desktop_oauth.dart';
 
@@ -45,15 +46,55 @@ class AuthService {
       _auth.sendPasswordResetEmail(email: email);
 
   Future<void> signInWithGoogle() async {
+    await _auth.signInWithCredential(await _googleCredential());
+  }
+
+  /// How the user confirms it's them: their password if they have one,
+  /// else Google, else Apple.
+  SignInMethod? get reauthMethod {
+    final ids = {
+      for (final p in _auth.currentUser?.providerData ?? const <UserInfo>[])
+        p.providerId,
+    };
+    if (ids.contains(EmailAuthProvider.PROVIDER_ID)) {
+      return SignInMethod.password;
+    }
+    if (ids.contains(GoogleAuthProvider.PROVIDER_ID)) {
+      return SignInMethod.google;
+    }
+    if (ids.contains(AppleAuthProvider.PROVIDER_ID)) return SignInMethod.apple;
+    return null;
+  }
+
+  /// Signs the current user in again, as Firebase requires before deleting
+  /// an account. [password] is needed for [SignInMethod.password].
+  Future<void> reauthenticate({String? password}) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in.');
+    switch (reauthMethod) {
+      case SignInMethod.password:
+        await user.reauthenticateWithCredential(
+          EmailAuthProvider.credential(
+            email: user.email ?? '',
+            password: password ?? '',
+          ),
+        );
+      case SignInMethod.google:
+        await user.reauthenticateWithCredential(await _googleCredential());
+      case SignInMethod.apple:
+        await user.reauthenticateWithProvider(AppleAuthProvider());
+      case null:
+        throw Exception("Your sign-in method can't confirm it's you here.");
+    }
+  }
+
+  Future<OAuthCredential> _googleCredential() async {
     if (PlatformSupport.desktopGoogleSignIn) {
       final tokens = await _googleDesktopOAuth.signIn();
-      await _auth.signInWithCredential(
-        GoogleAuthProvider.credential(
-          idToken: tokens.idToken,
-          accessToken: tokens.accessToken,
-        ),
+      return GoogleAuthProvider.credential(
+        idToken: tokens.idToken,
+        accessToken: tokens.accessToken,
       );
-      return;
     }
     if (!PlatformSupport.nativeGoogleSignIn) {
       throw Exception('Google sign-in is not supported on this platform.');
@@ -63,9 +104,8 @@ class AuthService {
       _googleInitialized = true;
     }
     final account = await _googleSignIn.authenticate();
-    final idToken = account.authentication.idToken;
-    await _auth.signInWithCredential(
-      GoogleAuthProvider.credential(idToken: idToken),
+    return GoogleAuthProvider.credential(
+      idToken: account.authentication.idToken,
     );
   }
 
@@ -85,6 +125,4 @@ class AuthService {
     if (_googleInitialized) await _googleSignIn.signOut();
     await _auth.signOut();
   }
-
-  Future<void> deleteAccount() async => _auth.currentUser?.delete();
 }

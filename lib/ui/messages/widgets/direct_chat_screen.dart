@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../routing/routes.dart';
 import '../../chat/widgets/chat_layout.dart';
 import '../../chat/widgets/message_thread_view.dart';
+import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/direct_chat_viewmodel.dart';
@@ -25,15 +26,22 @@ class DirectChatScreen extends StatelessWidget {
     return ViewModelHost(
       create: (c) => InboxViewModel(
         directMessageRepository: c.read(),
+        teamRepository: c.read(),
+        chatRepository: c.read(),
         authRepository: c.read(),
       ),
       builder: (context, inbox) {
         // Switching conversations replaces this page, so back still leaves.
-        void open(String id) {
-          if (id != vm.conversationId) {
-            context.pushReplacement(Routes.conversation(id));
-          }
-        }
+        void open(InboxItem item) => switch (item) {
+          DirectItem(:final conversation)
+              when conversation.id != vm.conversationId =>
+            context.pushReplacement(Routes.conversation(conversation.id)),
+          RoomItem(:final team, :final room) => context.pushReplacement(
+            Routes.chatRoom(team.id, room.id),
+          ),
+          _ => null,
+        };
+        final selectedKey = 'dm:${vm.conversationId}';
 
         return LayoutBuilder(
           builder: (context, constraints) {
@@ -41,9 +49,10 @@ class DirectChatScreen extends StatelessWidget {
               return Scaffold(
                 appBar: AppBar(title: const Text('Messages')),
                 body: ChatSplit(
-                  list: ConversationList(
+                  list: InboxList(
                     viewModel: inbox,
-                    selectedId: vm.conversationId,
+                    showHeader: false,
+                    selectedKey: selectedKey,
                     onOpen: open,
                   ),
                   detail: DirectChatView(viewModel: vm),
@@ -55,12 +64,13 @@ class DirectChatScreen extends StatelessWidget {
               leading: const ChatListButton(),
               drawer: ChatDrawer(
                 title: 'Messages',
-                list: ConversationList(
+                list: InboxList(
                   viewModel: inbox,
-                  selectedId: vm.conversationId,
-                  onOpen: (id) {
+                  showHeader: false,
+                  selectedKey: selectedKey,
+                  onOpen: (item) {
                     Navigator.pop(context); // close the panel
-                    open(id);
+                    open(item);
                   },
                 ),
               ),
@@ -113,24 +123,13 @@ class DirectChatView extends StatelessWidget {
         }
         return Scaffold(
           drawer: drawer,
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
+          appBar: ChatHeaderBar(
             leading: leading,
-            titleSpacing: leading == null ? null : 0,
-            title: vm.conversation == null
+            avatar: vm.conversation == null
                 ? null
-                : Row(
-                    children: [
-                      PersonAvatar(name: vm.otherName),
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Text(
-                          vm.otherName,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
+                : PersonAvatar(name: vm.otherName, radius: 18),
+            title: vm.conversation == null ? null : vm.otherName,
+            subtitle: vm.conversation == null ? null : 'Direct message',
           ),
           body: body,
         );

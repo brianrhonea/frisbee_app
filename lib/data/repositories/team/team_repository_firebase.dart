@@ -115,6 +115,9 @@ class TeamRepositoryFirebase implements TeamRepository {
   CollectionReference<Map<String, dynamic>> _requests(String teamId) =>
       _teams.doc(teamId).collection('joinRequests');
 
+  CollectionReference<Map<String, dynamic>> _invites(String uid) =>
+      _db.collection('users').doc(uid).collection('teamInvites');
+
   Map<String, dynamic> _teamDoc(NewTeam team, AppUser owner) => {
     ...team.toMap(),
     'ownerId': owner.uid,
@@ -246,6 +249,45 @@ class TeamRepositoryFirebase implements TeamRepository {
   @override
   Future<Result<void>> declineJoinRequest(String teamId, String uid) =>
       guard(() => _requests(teamId).doc(uid).delete());
+
+  @override
+  Future<Result<void>> inviteToTeam(Team team, String uid, AppUser from) =>
+      guard(
+        () => _invites(uid).doc(team.id).set({
+          'teamName': team.name,
+          'kind': team.kind.name,
+          'invitedBy': from.uid,
+          'invitedByName': from.label,
+          'createdAt': FieldValue.serverTimestamp(),
+        }),
+      );
+
+  @override
+  Stream<List<TeamInvite>> watchMyInvites(String uid) => _invites(uid)
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map(
+        (snap) => [
+          for (final d in snap.docs)
+            TeamInvite.fromMap(d.id, plainData(d.data())),
+        ],
+      );
+
+  // The invite is the proof the rules check, so it's deleted in the same
+  // batch; so is any request to join the user had pending.
+  @override
+  Future<Result<void>> acceptInvite(TeamInvite invite, AppUser user) => guard(
+    () =>
+        (_db.batch()
+              ..update(_teams.doc(invite.teamId), _newMember(user))
+              ..delete(_invites(user.uid).doc(invite.teamId))
+              ..delete(_requests(invite.teamId).doc(user.uid)))
+            .commit(),
+  );
+
+  @override
+  Future<Result<void>> declineInvite(String uid, String teamId) =>
+      guard(() => _invites(uid).doc(teamId).delete());
 
   @override
   Future<Result<void>> updateTeam(Team team) => guard(
@@ -622,6 +664,13 @@ class TeamRepositoryFirebase implements TeamRepository {
               ..set(_status(teamId).doc(ref.id), player.toStatusMap()))
             .commit();
       });
+
+  @override
+  Future<Result<void>> linkPlayer(
+    String teamId,
+    String playerId,
+    String? uid,
+  ) => guard(() => _roster(teamId).doc(playerId).update({'userId': uid}));
 
   @override
   Future<Result<void>> deletePlayer(String teamId, String playerId) => guard(

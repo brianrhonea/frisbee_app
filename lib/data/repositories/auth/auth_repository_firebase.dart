@@ -7,20 +7,23 @@ import 'package:logging/logging.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/direct_message.dart';
 import '../../../utils/result.dart';
+import '../../services/account_service.dart';
 import '../../services/auth_service.dart';
-import '../../services/firestore_utils.dart';
 import 'auth_repository.dart';
 
 class AuthRepositoryFirebase extends AuthRepository {
   AuthRepositoryFirebase({
     required AuthService authService,
+    required AccountService accountService,
     FirebaseFirestore? firestore,
   }) : _authService = authService,
+       _accounts = accountService,
        _firestore = firestore ?? FirebaseFirestore.instance {
     _subscription = _authService.userChanges().listen(_onUserChanged);
   }
 
   final AuthService _authService;
+  final AccountService _accounts;
   final FirebaseFirestore _firestore;
   final _log = Logger('AuthRepository');
   late final StreamSubscription<User?> _subscription;
@@ -69,7 +72,8 @@ class AuthRepositoryFirebase extends AuthRepository {
             photoUrl: user.photoUrl,
           ).toMap(),
           'updatedAt': FieldValue.serverTimestamp(),
-        });
+          // Merge: the player's profile details and stats live here too.
+        }, SetOptions(merge: true));
       }
     } on Exception catch (e) {
       _log.warning('Failed to save user profile', e);
@@ -113,20 +117,34 @@ class AuthRepositoryFirebase extends AuthRepository {
   Future<Result<void>> signOut() => guard(_authService.signOut);
 
   @override
+  SignInMethod? get reauthMethod =>
+      _currentUser == null ? null : _authService.reauthMethod;
+
+  @override
+  Future<Result<void>> reauthenticate({String? password}) =>
+      guard(() => _authService.reauthenticate(password: password));
+
+  /// The `account-deleteAccount` function deletes the user's data across
+  /// every team and conversation, then the login; then sign out here.
+  @override
   Future<Result<void>> deleteAccount() => guard(() async {
-    final uid = _currentUser?.uid;
-    if (uid != null) {
-      final user = _firestore.collection('users').doc(uid);
-      // Client SDKs don't delete subcollections with their parent.
-      for (final sub in ['events', 'devices', 'notifications', 'settings']) {
-        final docs = (await user.collection(sub).get()).docs;
-        await deleteDocs(_firestore, [for (final d in docs) d.reference]);
-      }
-      await user.delete();
-      await _firestore.collection('profiles').doc(uid).delete();
+    await _accounts.deleteAccount();
+    _signedOutNotice = 'Account deleted successfully';
+    try {
+      await _authService.signOut();
+    } on Exception catch (e) {
+      // The login is already gone; the auth state follows on its own.
+      _log.warning('Sign-out after deleting the account failed', e);
     }
-    await _authService.deleteAccount();
   });
+
+  String? _signedOutNotice;
+
+  @override
+  String? get signedOutNotice => _signedOutNotice;
+
+  @override
+  void clearSignedOutNotice() => _signedOutNotice = null;
 
   @override
   void dispose() {

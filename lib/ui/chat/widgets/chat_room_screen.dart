@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../routing/routes.dart';
+import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/chat_list_viewmodel.dart';
@@ -105,23 +106,32 @@ class ChatRoomView extends StatelessWidget {
         final room = vm.room;
         void openSettings() =>
             context.push(Routes.chatRoomSettings(vm.teamId, vm.roomId));
-        final bar = AppBar(
-          automaticallyImplyLeading: false,
+        final team = vm.team;
+        final count = team?.members.length ?? 0;
+        final readable = room != null && vm.access.canRead;
+        final bar = ChatHeaderBar(
           leading: leading,
-          title: room == null || !vm.access.canRead
-              ? null
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(room.name),
-                    Text(
-                      room.audience,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
+          avatar: readable
+              ? TeamBadge(size: 36, community: team?.isCommunity ?? false)
+              : null,
+          title: readable
+              ? [
+                  ?team?.name,
+                  room.isGeneral
+                      ? ((team?.isCommunity ?? false)
+                            ? 'Group chat'
+                            : 'Team chat')
+                      : room.name,
+                ].join(' · ')
+              : null,
+          subtitle: readable
+              ? [
+                  if (count > 0) '$count ${count == 1 ? 'member' : 'members'}',
+                  room.audience,
+                ].join(' · ')
+              : null,
           actions: [
-            if (room != null && vm.access.canRead)
+            if (readable)
               IconButton(
                 tooltip: vm.muted
                     ? 'Unmute notifications'
@@ -141,6 +151,7 @@ class ChatRoomView extends StatelessWidget {
                 icon: const Icon(Icons.tune),
                 onPressed: openSettings,
               ),
+            const SizedBox(width: 4),
           ],
         );
         final Widget body;

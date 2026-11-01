@@ -5,9 +5,21 @@ import '../../../domain/models/roster_player.dart';
 
 /// Add/edit a roster player; pops with the updated player or null.
 class PlayerDialog extends StatefulWidget {
-  const PlayerDialog({super.key, this.initial});
+  const PlayerDialog({
+    super.key,
+    this.initial,
+    this.members = const {},
+    this.linkedElsewhere = const {},
+  });
 
   final RosterPlayer? initial;
+
+  /// Team members (uid → name) the player can be linked to, so their stats
+  /// count on that member's profile. Empty hides the choice.
+  final Map<String, String> members;
+
+  /// Members already linked to another roster spot.
+  final Set<String> linkedElsewhere;
 
   @override
   State<PlayerDialog> createState() => _PlayerDialogState();
@@ -22,6 +34,7 @@ class _PlayerDialogState extends State<PlayerDialog> {
   late PlayerPosition _position =
       widget.initial?.position ?? PlayerPosition.hybrid;
   late bool _paid = widget.initial?.paid ?? false;
+  late String? _userId = widget.initial?.userId;
 
   @override
   void dispose() {
@@ -39,7 +52,7 @@ class _PlayerDialogState extends State<PlayerDialog> {
         name: _name.text.trim(),
         number: int.tryParse(_number.text),
         position: _position,
-        userId: widget.initial?.userId,
+        userId: _userId,
         onUsau: widget.initial?.onUsau,
         paid: _paid,
       ),
@@ -92,6 +105,26 @@ class _PlayerDialogState extends State<PlayerDialog> {
                 title: const Text('Paid'),
                 subtitle: const Text('Dues or USA Ultimate fees received'),
               ),
+              if (widget.members.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String?>(
+                  initialValue: widget.members.containsKey(_userId)
+                      ? _userId
+                      : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Linked account',
+                    helperText: "Their stats show on this member's profile",
+                  ),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('None')),
+                    for (final e in widget.members.entries)
+                      if (!widget.linkedElsewhere.contains(e.key))
+                        DropdownMenuItem(value: e.key, child: Text(e.value)),
+                  ],
+                  onChanged: (v) => setState(() => _userId = v),
+                ),
+              ],
             ],
           ),
         ),

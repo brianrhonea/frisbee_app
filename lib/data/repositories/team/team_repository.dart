@@ -39,6 +39,18 @@ abstract class TeamRepository {
 
   Future<Result<void>> declineJoinRequest(String teamId, String uid);
 
+  /// Invites [uid] to join [team]. Owners and organizers only; inviting
+  /// again refreshes the invite.
+  Future<Result<void>> inviteToTeam(Team team, String uid, AppUser from);
+
+  /// [uid]'s pending invitations, newest first.
+  Stream<List<TeamInvite>> watchMyInvites(String uid);
+
+  /// Joins the invite's team as a player and clears the invite.
+  Future<Result<void>> acceptInvite(TeamInvite invite, AppUser user);
+
+  Future<Result<void>> declineInvite(String uid, String teamId);
+
   /// Saves the team's details and its public directory listing.
   Future<Result<void>> updateTeam(Team team);
 
@@ -104,4 +116,10 @@ abstract class TeamRepository {
   Future<Result<void>> savePlayer(String teamId, RosterPlayer player);
 
   Future<Result<void>> deletePlayer(String teamId, String playerId);
+
+  /// Links roster player [playerId] to the account [uid], or unlinks it
+  /// when null, so their stats show on that player's profile. Members may
+  /// claim an unlinked player for themselves or unlink their own; admins
+  /// may link anyone.
+  Future<Result<void>> linkPlayer(String teamId, String playerId, String? uid);
 }

@@ -67,6 +67,14 @@ class EventEditorViewModel extends ChangeNotifier {
       _editableTeams.where((t) => t.id == _teamId).firstOrNull?.isCommunity ??
       false;
 
+  /// The event is on a private group's schedule, so it can't be public.
+  bool get isPrivateGroup =>
+      _editableTeams
+          .where((t) => t.id == _teamId)
+          .firstOrNull
+          ?.isPrivateGroup ??
+      false;
+
   /// Event types the chosen schedule offers.
   List<EventType> get types => isPersonal
       ? EventType.editableFor(community: false)

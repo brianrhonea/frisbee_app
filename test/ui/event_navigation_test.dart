@@ -27,6 +27,8 @@ import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_detail_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_editor_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/my_event_detail_screen.dart';
+import 'package:frisbee_app/ui/schedule/widgets/team_events_tab.dart';
+import 'package:frisbee_app/ui/teams/widgets/roster_tab.dart';
 import 'package:frisbee_app/ui/teams/widgets/team_home_screen.dart';
 import 'package:frisbee_app/ui/teams/widgets/team_section_screen.dart';
 import 'package:provider/provider.dart';
@@ -168,10 +170,10 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    await tapText(tester, 'Teams');
+    await tapText(tester, 'Team');
     await tapText(tester, 'Northside Flyers');
     await tapText(tester, 'Roster');
-    expect(find.byType(TeamSectionScreen), findsOneWidget);
+    expect(find.byType(RosterTab), findsOneWidget);
 
     await tapText(tester, 'Home');
     await tapText(tester, 'Team practice');
@@ -180,17 +182,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
 
-    // The Teams tab kept its place, and back returns to the team home.
-    await tapText(tester, 'Teams');
-    expect(find.byType(TeamSectionScreen), findsOneWidget);
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    // The Teams tab kept its place on the roster tab; Overview returns to
+    // the team summary on the same page.
+    await tapText(tester, 'Team');
+    expect(find.byType(RosterTab), findsOneWidget);
+    await tapText(tester, 'Overview');
+    expect(find.byType(RosterTab), findsNothing);
     expect(find.byType(TeamHomeScreen), findsOneWidget);
   });
 
   testWidgets('events from the team home page return to it', (tester) async {
     await pumpApp(tester);
-    await tapText(tester, 'Teams');
+    await tapText(tester, 'Team');
     await tapText(tester, 'Northside Flyers');
     expect(find.byType(TeamHomeScreen), findsOneWidget);
     await tapText(tester, 'Team practice');
@@ -202,15 +205,21 @@ void main() {
 
   testWidgets('events from Team Events return to it', (tester) async {
     await pumpApp(tester);
-    await tapText(tester, 'Teams');
+    await tapText(tester, 'Team');
     await tapText(tester, 'Northside Flyers');
     await tapText(tester, 'Team Events');
-    expect(find.byType(TeamSectionScreen), findsOneWidget);
+    // The tab shows in place on the team page, as a list with no calendar.
+    expect(find.byType(TeamHomeScreen), findsOneWidget);
+    expect(find.byType(TeamEventsTab), findsOneWidget);
+    expect(find.byTooltip('Next month'), findsNothing);
     await tapText(tester, 'Team practice');
+    // The details and RSVP open in a popup over the tab.
     expect(find.byType(EventDetailScreen), findsOneWidget);
-    await tester.pageBack();
+    expect(find.text('Going'), findsWidgets);
+    await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
-    expect(find.byType(TeamSectionScreen), findsOneWidget);
+    expect(find.byType(EventDetailScreen), findsNothing);
+    expect(find.byType(TeamEventsTab), findsOneWidget);
   });
 
   testWidgets('old ?tab= team links open the matching section', (tester) async {
@@ -219,11 +228,9 @@ void main() {
       tester.element(find.byType(HomeScreen)),
     ).go('/teams/t1?tab=schedule');
     await tester.pumpAndSettle();
-    final section = tester.widget<TeamSectionScreen>(
-      find.byType(TeamSectionScreen),
-    );
-    expect(section.section, TeamSection.events);
-    expect(find.text('Team Events'), findsOneWidget);
+    final home = tester.widget<TeamHomeScreen>(find.byType(TeamHomeScreen));
+    expect(home.section, TeamSection.events);
+    expect(find.byType(TeamEventsTab), findsOneWidget);
   });
 
   testWidgets('notification links open one after another', (tester) async {
@@ -244,6 +251,6 @@ void main() {
     router.openLink('/teams/t1/events');
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.byType(TeamSectionScreen), findsOneWidget);
+    expect(find.byType(TeamEventsTab), findsOneWidget);
   });
 }

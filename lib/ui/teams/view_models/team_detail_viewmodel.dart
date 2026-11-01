@@ -240,6 +240,15 @@ class TeamDetailViewModel extends ChangeNotifier {
     ];
   }
 
+  /// Events that have finished, most recent first.
+  List<TeamEvent> get pastEvents {
+    final upcoming = upcomingEvents.toSet();
+    return [
+      for (final e in events.reversed)
+        if (!upcoming.contains(e)) e,
+    ];
+  }
+
   /// Events starting on the calendar day of [day].
   List<TeamEvent> eventsOn(DateTime day) => [
     for (final e in events)

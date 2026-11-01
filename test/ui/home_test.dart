@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frisbee_app/domain/models/direct_message.dart';
-import 'package:frisbee_app/domain/models/play.dart';
-import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
+import 'package:frisbee_app/domain/models/team_post.dart';
 import 'package:frisbee_app/domain/models/tournament.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/home/view_models/home_viewmodel.dart';
@@ -12,36 +10,12 @@ import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
 
 import '../testing/fakes.dart';
 
-RankingDivision division(String key, String label, List<String> teams) =>
-    RankingDivision(
-      key: key,
-      label: label,
-      entries: [
-        for (var i = 0; i < teams.length; i++)
-          RankingEntry(
-            rank: i + 1,
-            teamName: teams[i],
-            rating: 2000.0 - i * 50,
-          ),
-      ],
-    );
-
 TeamEvent event(String id, String title, EventType type, DateTime at) =>
     TeamEvent(id: id, title: title, type: type, startsAt: at);
 
 void main() {
   // A Wednesday.
   final now = DateTime(2026, 10, 28, 9);
-  final rankings = [
-    division('College-Women', 'College Women', ['Ws A', 'Ws B', 'Ws C']),
-    division('Club-Mixed', 'Club Mixed', [
-      'Alpha',
-      'Beta',
-      'Gamma',
-      'Northside Flyers',
-      for (var i = 5; i <= 12; i++) 'Team $i',
-    ]),
-  ];
   final tournaments = [
     Tournament(
       id: 'past',
@@ -63,30 +37,36 @@ void main() {
     ),
   ];
 
-  Team team(String id, String name, {String? owner}) => Team(
+  Team team(
+    String id,
+    String name, {
+    String? owner,
+    TeamRole role = TeamRole.owner,
+    String city = 'Denver',
+  }) => Team(
     id: id,
     name: name,
     division: Division.mixed,
     level: CompetitionLevel.club,
+    city: city,
     ownerId: owner ?? testUser.uid,
-    members: {owner ?? testUser.uid: TeamRole.owner},
+    members: {
+      owner ?? testUser.uid: TeamRole.owner,
+      if (owner != null) testUser.uid: role,
+    },
   );
 
   late FakeTeamRepository teams;
-  late FakeDirectMessageRepository dms;
-  late FakePlayRepository plays;
   late FakeEventRepository events;
+  late FakeTeamPostRepository posts;
 
   Future<HomeViewModel> load({
     bool withTeam = true,
-    String teamName = 'Northside Flyers',
-    Map<String, List<Play>> teamPlays = const {},
     bool withPersonal = false,
   }) async {
     teams = FakeTeamRepository();
-    dms = FakeDirectMessageRepository();
-    plays = FakePlayRepository()..byTeam.addAll(teamPlays);
     events = FakeEventRepository();
+    posts = FakeTeamPostRepository();
     if (withPersonal) {
       events.mine[testUser.uid] = {
         'run': event(
@@ -97,7 +77,18 @@ void main() {
         ),
       };
     }
-    if (withTeam) teams.teams['t1'] = team('t1', teamName);
+    if (withTeam) {
+      teams.teams['t1'] = team('t1', 'Northside Flyers');
+      posts.posts['t1'] = [
+        TeamPost(
+          id: 'p1',
+          title: 'Next stop: the postseason',
+          body: 'A 15–11 win.',
+          authorName: 'Theo Brooks',
+          createdAt: now.subtract(const Duration(hours: 4)),
+        ),
+      ];
+    }
     events.events.addAll({
       for (final e in [
         event(
@@ -130,13 +121,11 @@ void main() {
     });
     final vm = HomeViewModel(
       authRepository: FakeAuthRepository(user: testUser),
-      directMessageRepository: dms,
-      notificationRepository: FakeNotificationRepository(),
       teamRepository: teams,
-      playRepository: plays,
       eventRepository: events,
+      teamPostRepository: posts,
       tournamentRepository: FakeTournamentRepository(tournaments),
-      rankingRepository: FakeRankingRepository(rankings),
+      filePicker: FakeFilePickerService(),
       clock: () => now,
     );
     await pumpEventQueue();
@@ -144,125 +133,72 @@ void main() {
   }
 
   group('HomeViewModel', () {
-    test(
-      'greets by first name and counts down to the next team event',
-      () async {
-        final vm = await load();
-        expect(vm.firstName, 'Alex');
-        expect(vm.initials, 'A');
-        expect(vm.daysUntilNext, 1);
-      },
-    );
-
-    test('without a team, counts down to the next tournament', () async {
-      final vm = await load(withTeam: false);
-      expect(vm.teamsLoaded, isTrue);
-      expect(vm.selectedTeam, isNull);
-      expect(vm.weekEvents, isEmpty);
-      expect(vm.daysUntilNext, 3);
-    });
-
-    test('weekly outlook covers today and the next six days', () async {
-      final vm = await load();
-      expect(vm.weekDays.first, DateTime(2026, 10, 28));
-      expect(vm.weekDays.last, DateTime(2026, 11, 3));
-      expect(vm.weekEvents.map((e) => e.event.id), ['prac', 'lift', 'regs']);
-      expect(vm.eventsOn(DateTime(2026, 10, 31)).length, 2);
-      expect(vm.weekEvents.first.team?.id, 't1');
-    });
-
-    test(
-      'this week mixes personal events in; team events leave them out',
-      () async {
-        final vm = await load(withPersonal: true);
-        expect(vm.weekEvents.map((e) => e.event.id), [
-          'prac',
-          'run',
-          'lift',
-          'regs',
-        ]);
-        expect(vm.weekEvents[1].isPersonal, isTrue);
-        // Team events lead each day; personal ones follow.
-        expect(vm.upcomingEvents.map((e) => e.event.id), [
-          'prac',
-          'run',
-          'regs',
-          'lift',
-        ]);
-      },
-    );
-
-    test('personal events show without a team', () async {
-      final vm = await load(withTeam: false, withPersonal: true);
-      expect(vm.weekEvents.map((e) => e.event.id), ['run']);
-      expect(vm.upcomingEvents.map((e) => e.event.id), ['run']);
-      expect(vm.daysUntilNext, 2);
-      expect(vm.weekEvents.single.isPersonal, isTrue);
-    });
-
-    test('team events put tournaments ahead of workouts on a day', () async {
-      final vm = await load();
+    test('features the next team event and lists the rest', () async {
+      final vm = await load(withPersonal: true);
+      expect(vm.firstName, 'Alex');
+      expect(vm.nextTeamEvent?.event.id, 'prac');
+      expect(vm.nextTeamEvent?.team?.id, 't1');
+      // Team events lead each day; personal ones follow.
       expect(vm.upcomingEvents.map((e) => e.event.id), [
-        'prac',
+        'run',
         'regs',
         'lift',
         'far',
       ]);
-      expect(vm.nextEventFor(vm.selectedTeam!)?.event.id, 'prac');
+      expect(vm.nextEventFor(vm.teams.single)?.event.id, 'prac');
     });
 
-    test('other events are behind a toggle', () async {
+    test('personal events show without a team', () async {
+      final vm = await load(withTeam: false, withPersonal: true);
+      expect(vm.teamsLoaded, isTrue);
+      expect(vm.nextTeamEvent, isNull);
+      expect(vm.upcomingEvents.map((e) => e.event.id), ['run']);
+      expect(vm.upcomingEvents.single.isPersonal, isTrue);
+      expect(vm.postsLoaded, isTrue);
+      expect(vm.posts, isEmpty);
+    });
+
+    test('the feed merges every team\'s posts, newest first', () async {
       final vm = await load();
-      expect(vm.showOtherEvents, isFalse);
-      vm.setShowOtherEvents(true);
-      expect(vm.showOtherEvents, isTrue);
-      expect(vm.otherEvents.map((t) => t.id), ['next']);
-    });
-
-    test('podium and top ten come from the team\'s division', () async {
-      final vm = await load();
-      expect(vm.featuredDivision?.key, 'Club-Mixed');
-      expect(vm.podium.map((e) => e.teamName), ['Alpha', 'Beta', 'Gamma']);
-      expect(vm.topTen.map((e) => e.rank), [4, 5, 6, 7, 8, 9, 10]);
-      expect(vm.myRanking?.rank, 4);
-      expect(vm.isMine(vm.topTen.first), isTrue);
-      expect(vm.myRankingBelowTopTen, isNull);
-    });
-
-    test('quick filter switches divisions', () async {
-      final vm = await load();
-      vm.selectDivision('College-Women');
-      expect(vm.podium.map((e) => e.teamName), ['Ws A', 'Ws B', 'Ws C']);
-      expect(vm.topTen, isEmpty);
-      expect(vm.myRanking, isNull);
-    });
-
-    test('shows the user\'s team when it is below the top ten', () async {
-      final vm = await load(teamName: 'Team 12');
-      expect(vm.myRankingBelowTopTen?.rank, 12);
-    });
-
-    test('falls back to the first list without a team', () async {
-      final vm = await load(withTeam: false);
-      expect(vm.featuredDivision?.key, 'College-Women');
-      expect(vm.myRanking, isNull);
-    });
-
-    test('previews the selected team\'s plays', () async {
-      final vm = await load(
-        teamPlays: const {
-          't1': [Play(id: 'p1', name: 'Ho stack')],
-          't2': [Play(id: 'p2', name: 'Zone'), Play(id: 'p3', name: 'Cup')],
-        },
+      expect(vm.postsLoaded, isTrue);
+      teams.teams['t2'] = team(
+        't2',
+        'Sunday pickup',
+        owner: 'u9',
+        role: TeamRole.player,
       );
-      await teams.updateTeam(team('t2', 'Second'));
+      posts.posts['t2'] = [
+        TeamPost(
+          id: 'q1',
+          body: 'Field 5 is booked.',
+          createdAt: now.subtract(const Duration(hours: 1)),
+        ),
+      ];
+      await teams.updateTeam(teams.teams['t2']!);
       await pumpEventQueue();
-      expect(vm.plays.map((p) => p.id), ['p1']);
-      vm.selectTeam('t2');
+      expect(vm.posts.map((p) => p.post.id), ['q1', 'p1']);
+      expect(vm.posts.first.team.name, 'Sunday pickup');
+      // Only teams the user runs take posts.
+      expect(vm.postableTeams.map((t) => t.id), ['t1']);
+    });
+
+    test('posts go to the chosen team', () async {
+      final vm = await load();
+      await vm.savePost.execute((
+        teamId: 't1',
+        draft: const PostDraft(
+          post: TeamPost(id: '', body: 'Bring cleats'),
+        ),
+      ));
       await pumpEventQueue();
-      expect(vm.selectedTeam?.id, 't2');
-      expect(vm.playCount, 2);
-      expect(vm.canEdit(vm.selectedTeam!), isTrue);
+      expect(vm.savePost.completed, isTrue);
+      expect(vm.posts.map((p) => p.post.body), contains('Bring cleats'));
+    });
+
+    test('names the home city and the next tournament', () async {
+      final vm = await load();
+      expect(vm.homeCity, 'Denver');
+      expect(vm.nextTournament?.id, 'next');
     });
 
     test('joins a team by invite code', () async {
@@ -279,19 +215,13 @@ void main() {
     ('light', AppTheme.light),
     ('dark', AppTheme.dark),
   ]) {
-    testWidgets('home screen lays out at phone width ($name)', (tester) async {
+    testWidgets('community feed lays out at phone width ($name)', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(390 * 3, 844 * 3);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
-      final page = find.byType(Scrollable).first;
-      final vm = await tester.runAsync(
-        () => load(
-          withPersonal: true,
-          teamPlays: const {
-            't1': [Play(id: 'p1', name: 'Ho stack')],
-          },
-        ),
-      );
+      final vm = await tester.runAsync(() => load(withPersonal: true));
       await tester.pumpWidget(
         MaterialApp(
           theme: theme,
@@ -300,56 +230,38 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text("LET'S GO, ALEX."), findsOneWidget);
-      expect(find.text('THIS WEEK'), findsOneWidget);
-      expect(find.text('Thursday practice'), findsWidgets);
-      expect(find.text('Tempo run'), findsOneWidget);
-      expect(find.textContaining('Personal'), findsOneWidget);
-      expect(find.text('1 days out'), findsOneWidget);
+      expect(find.text('Good things fly together.'), findsOneWidget);
+      expect(find.text('DENVER / YOUR ULTIMATE COMMUNITY'), findsOneWidget);
+      // The next event sits above the feed in place of the side column.
+      expect(find.text('Thursday practice'), findsOneWidget);
+      expect(find.text('Coming up'), findsOneWidget);
+      expect(find.text("What's happening on your sideline?"), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('Ho stack'),
+        find.text('Next stop: the postseason'),
         300,
-        scrollable: page,
+        scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('New play'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('Show other events'),
-        300,
-        scrollable: page,
-      );
-      await tester.tap(find.text('Show other events'));
+      expect(find.text('Theo Brooks'), findsOneWidget);
+      expect(find.textContaining('Northside Flyers ·'), findsOneWidget);
+
+      await tester.tap(find.text('Your teams'));
       await tester.pump();
-      await tester.scrollUntilVisible(
-        find.text('Fall Classic'),
-        300,
-        scrollable: page,
+      expect(find.text('Northside Flyers'), findsOneWidget);
+      expect(
+        find.text('Next: Thursday practice · Thu, Oct 29'),
+        findsOneWidget,
       );
-      expect(find.text('Fall Classic'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('YOU: #4'),
-        300,
-        scrollable: page,
-      );
-      expect(find.text('Alpha'), findsOneWidget);
-      expect(find.text('Northside Flyers'), findsWidgets);
       expect(tester.takeException(), isNull);
     });
   }
 
-  testWidgets('home screen lays out as a dashboard at desktop width', (
+  testWidgets('community feed shows a side column at desktop width', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final vm = await tester.runAsync(
-      () => load(
-        withPersonal: true,
-        teamPlays: const {
-          't1': [Play(id: 'p1', name: 'Ho stack')],
-        },
-      ),
-    );
+    final vm = await tester.runAsync(() => load(withPersonal: true));
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
@@ -358,39 +270,19 @@ void main() {
     );
     await tester.pump();
 
-    // Team and rankings sit in a right-hand column beside the schedule.
-    final week = tester.getTopLeft(find.text('THIS WEEK'));
-    final team = tester.getTopLeft(find.text('MY TEAM'));
-    expect(team.dx, greaterThan(week.dx + 400));
-    expect(team.dy, week.dy);
-    expect(tester.getTopLeft(find.text('RANKINGS')).dx, team.dx);
-    expect(find.text('Ho stack'), findsOneWidget);
+    // What's up next sits in a right-hand column beside the feed.
+    final feed = tester.getTopLeft(
+      find.text("What's happening on your sideline?"),
+    );
+    final upNext = tester.getTopLeft(find.text('UP NEXT · NORTHSIDE FLYERS'));
+    expect(upNext.dx, greaterThan(feed.dx + 400));
+    expect(find.text('Coming up'), findsOneWidget);
+    expect(find.text('Fall Classic'), findsOneWidget);
+    expect(find.text('Create post'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  test('counts unread direct messages', () async {
-    final vm = await load();
-    expect(vm.unreadMessages, 0);
-    dms.conversations['a_u1'] = Conversation(
-      id: 'a_u1',
-      participants: const ['a', 'u1'],
-      lastMessage: 'hey',
-      lastMessageAt: DateTime(2026, 10, 30),
-      lastSenderId: 'a',
-    );
-    dms.conversations['b_u1'] = Conversation(
-      id: 'b_u1',
-      participants: const ['b', 'u1'],
-      lastMessage: 'mine',
-      lastMessageAt: DateTime(2026, 10, 30),
-      lastSenderId: 'u1',
-    );
-    dms.emit();
-    await pumpEventQueue();
-    expect(vm.unreadMessages, 1);
-  });
-
-  testWidgets('home screen offers to join a team', (tester) async {
+  testWidgets('community feed offers to join a team', (tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -405,7 +297,7 @@ void main() {
 
     await tester.ensureVisible(find.text('Join with code'));
     await tester.pumpAndSettle();
-    expect(find.text('JOIN YOUR TEAM.'), findsOneWidget);
+    expect(find.text('Join your team.'), findsOneWidget);
     await tester.tap(find.text('Join with code'));
     await tester.pumpAndSettle();
     expect(find.text('Invite code'), findsOneWidget);

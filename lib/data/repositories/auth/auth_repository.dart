@@ -33,5 +33,20 @@ abstract class AuthRepository extends ChangeNotifier {
 
   Future<Result<void>> signOut();
 
+  /// How the user confirms it's them before deleting their account; null
+  /// when signed out.
+  SignInMethod? get reauthMethod;
+
+  /// Signs the user in again; [password] for [SignInMethod.password].
+  Future<Result<void>> reauthenticate({String? password});
+
+  /// Deletes the account and everything the user created, then signs out.
+  /// Needs a recent [reauthenticate]. Sets [signedOutNotice].
   Future<Result<void>> deleteAccount();
+
+  /// A message for the sign-in page about why the user was signed out,
+  /// e.g. after deleting their account. Shown once.
+  String? get signedOutNotice;
+
+  void clearSignedOutNotice();
 }

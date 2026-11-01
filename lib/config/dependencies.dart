@@ -16,6 +16,8 @@ import '../data/repositories/meeting/meeting_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_settings_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/notification/notification_repository_firebase.dart';
+import '../data/repositories/profile/profile_repository.dart';
+import '../data/repositories/profile/profile_repository_firebase.dart';
 import '../data/repositories/playbook/play_repository.dart';
 import '../data/repositories/playbook/play_repository_firebase.dart';
 import '../data/repositories/ranking/ranking_repository.dart';
@@ -34,6 +36,7 @@ import '../data/repositories/usau_schedule/usau_schedule_repository.dart';
 import '../data/repositories/usau_schedule/usau_schedule_repository_usau.dart';
 import '../data/repositories/usau_team/usau_team_repository.dart';
 import '../data/repositories/usau_team/usau_team_repository_usau.dart';
+import '../data/services/account_service.dart';
 import '../data/services/attachment_storage.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/file_picker_service.dart';
@@ -51,9 +54,16 @@ import '../firebase_options.dart';
 /// Services and repositories backed by Firebase.
 List<SingleChildWidget> get firebaseProviders => [
   Provider(create: (_) => AuthService()),
+  Provider(
+    create: (_) => AccountService(
+      projectId: DefaultFirebaseOptions.currentPlatform.projectId,
+    ),
+  ),
   ChangeNotifierProvider<AuthRepository>(
-    create: (context) =>
-        AuthRepositoryFirebase(authService: context.read<AuthService>()),
+    create: (context) => AuthRepositoryFirebase(
+      authService: context.read<AuthService>(),
+      accountService: context.read<AccountService>(),
+    ),
   ),
   Provider(create: (_) => AttachmentStorage()),
   Provider<TeamRepository>(
@@ -61,6 +71,7 @@ List<SingleChildWidget> get firebaseProviders => [
         TeamRepositoryFirebase(attachments: context.read<AttachmentStorage>()),
   ),
   Provider<PlayRepository>(create: (_) => PlayRepositoryFirebase()),
+  Provider<ProfileRepository>(create: (_) => ProfileRepositoryFirebase()),
   Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),
   Provider<TeamPostRepository>(
     create: (context) => TeamPostRepositoryFirebase(

@@ -147,6 +147,12 @@ class TeamHomeViewModel extends ChangeNotifier {
     _contentError = null;
     _eventList = const [];
     _postList = const [];
+    // A private group shows outsiders nothing beyond its listing.
+    if (isPrivateToMe) {
+      _eventsSub = null;
+      _postsSub = null;
+      return;
+    }
     _eventsSub =
         (member
                 ? _events.watchEvents(teamId)
@@ -188,6 +194,9 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   /// A community group rather than a team.
   bool get isGroup => summary?.isCommunity ?? false;
+
+  /// A private group the user isn't in: only its listing is visible.
+  bool get isPrivateToMe => !isMember && (summary?.isPrivateGroup ?? false);
 
   /// The user asked to join this group and is waiting for approval.
   bool get requestPending => _requestPending;

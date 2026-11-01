@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// Condensed display face for headings and the wordmark.
-const headingFont = 'Barlow Condensed';
+/// The app's typeface, for body text and headings alike.
+const appFont = 'Inter';
+
+/// Headings use the app font at heavier weights.
+const headingFont = appFont;
+
+/// Corner radius of cards and panels.
+const cardRadius = 14.0;
+
+/// Corner radius of buttons, fields and small tiles.
+const controlRadius = 10.0;
 
 abstract final class AppTheme {
   static ThemeData get light => _build(Brightness.light, AppColors.light);
@@ -15,13 +24,21 @@ abstract final class AppTheme {
           brightness: brightness,
         ).copyWith(
           primary: c.accent,
-          onPrimary: Colors.white,
+          onPrimary: c.onAccent,
+          primaryContainer: c.accentSoft,
+          onPrimaryContainer: c.ink,
+          secondary: c.highlight,
+          onSecondary: c.onHighlight,
+          secondaryContainer: c.accentSoft,
+          onSecondaryContainer: c.ink,
           surface: c.background,
           onSurface: c.ink,
           onSurfaceVariant: c.muted,
           surfaceContainerLowest: c.card,
           surfaceContainerLow: c.card,
           surfaceContainer: c.card,
+          surfaceContainerHigh: c.card,
+          surfaceContainerHighest: c.accentSoft,
           outline: c.muted,
           outlineVariant: c.border,
         );
@@ -29,33 +46,105 @@ abstract final class AppTheme {
       colorScheme: scheme,
       useMaterial3: true,
       brightness: brightness,
+      fontFamily: appFont,
     );
-    TextStyle? heading(TextStyle? s, {FontWeight w = FontWeight.w700}) =>
-        s?.copyWith(fontFamily: headingFont, fontWeight: w, letterSpacing: 0.2);
+    TextStyle? heading(
+      TextStyle? s, {
+      FontWeight w = FontWeight.w700,
+      double spacing = -0.3,
+    }) => s?.copyWith(fontWeight: w, letterSpacing: spacing, color: c.ink);
     final text = base.textTheme;
+    final controlShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(controlRadius),
+    );
+    const buttonText = TextStyle(
+      fontFamily: appFont,
+      fontWeight: FontWeight.w600,
+      fontSize: 14,
+    );
+    const buttonPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 14);
     return base.copyWith(
       scaffoldBackgroundColor: c.background,
       extensions: [c],
       textTheme: text.copyWith(
         displaySmall: heading(text.displaySmall, w: FontWeight.w800),
         headlineLarge: heading(text.headlineLarge, w: FontWeight.w800),
-        headlineMedium: heading(text.headlineMedium, w: FontWeight.w800),
-        headlineSmall: heading(text.headlineSmall),
+        headlineMedium: heading(
+          text.headlineMedium,
+          w: FontWeight.w800,
+          spacing: -0.8,
+        ),
+        headlineSmall: heading(text.headlineSmall, w: FontWeight.w800),
         titleLarge: heading(text.titleLarge),
+        titleMedium: heading(text.titleMedium, spacing: -0.1),
+        titleSmall: heading(text.titleSmall, spacing: 0),
+        labelLarge: text.labelLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: c.background,
         foregroundColor: c.ink,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
-        titleTextStyle: heading(
-          text.titleLarge,
-        )?.copyWith(color: c.ink, fontSize: 24),
+        titleTextStyle: TextStyle(
+          fontFamily: appFont,
+          fontWeight: FontWeight.w700,
+          fontSize: 20,
+          letterSpacing: -0.3,
+          color: c.ink,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: controlShape,
+          textStyle: buttonText,
+          padding: buttonPadding,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          shape: controlShape,
+          textStyle: buttonText,
+          padding: buttonPadding,
+          foregroundColor: c.ink,
+          backgroundColor: c.card,
+          side: BorderSide(color: c.border),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          shape: controlShape,
+          textStyle: buttonText,
+          foregroundColor: c.ink,
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: c.accent,
+        foregroundColor: c.onAccent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(cardRadius),
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        border: const OutlineInputBorder(),
         filled: true,
-        fillColor: c.card,
+        fillColor: c.field,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+        hintStyle: TextStyle(color: c.muted),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: BorderSide(color: c.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: BorderSide(color: c.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: BorderSide(color: c.accent, width: 1.5),
+        ),
       ),
       cardTheme: CardThemeData(
         clipBehavior: Clip.antiAlias,
@@ -63,53 +152,130 @@ abstract final class AppTheme {
         elevation: 0,
         color: c.card,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(cardRadius),
           side: BorderSide(color: c.border),
         ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: c.card,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(cardRadius + 4),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: c.card,
+        surfaceTintColor: Colors.transparent,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: c.card,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          side: BorderSide(color: c.border),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: c.accentSoft,
+        selectedColor: c.highlight,
+        side: BorderSide.none,
+        shape: const StadiumBorder(),
+        labelStyle: TextStyle(
+          fontFamily: appFont,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: c.ink,
+        ),
+        checkmarkColor: c.onHighlight,
+      ),
+      tabBarTheme: TabBarThemeData(
+        labelColor: c.ink,
+        unselectedLabelColor: c.muted,
+        indicatorColor: c.ink,
+        indicatorSize: TabBarIndicatorSize.label,
+        dividerColor: c.border,
+        labelStyle: const TextStyle(
+          fontFamily: appFont,
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontFamily: appFont,
+          fontWeight: FontWeight.w500,
+          fontSize: 13,
+        ),
+      ),
+      badgeTheme: BadgeThemeData(
+        backgroundColor: c.highlight,
+        textColor: c.onHighlight,
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: c.card,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: Colors.transparent,
+        indicatorColor: c.accentSoft,
         height: 64,
         iconTheme: WidgetStateProperty.resolveWith(
           (s) => IconThemeData(
-            color: s.contains(WidgetState.selected) ? c.accent : c.muted,
+            color: s.contains(WidgetState.selected) ? c.ink : c.muted,
           ),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (s) => TextStyle(
-            fontSize: 12,
+            fontFamily: appFont,
+            fontSize: 11,
             fontWeight: s.contains(WidgetState.selected)
-                ? FontWeight.w600
+                ? FontWeight.w700
                 : FontWeight.w500,
-            color: s.contains(WidgetState.selected) ? c.accent : c.muted,
+            color: s.contains(WidgetState.selected) ? c.ink : c.muted,
           ),
         ),
       ),
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: c.card,
-        indicatorColor: c.accentSoft,
-        selectedIconTheme: IconThemeData(color: c.accent),
-        unselectedIconTheme: IconThemeData(color: c.muted),
+        backgroundColor: c.sidebar,
+        indicatorColor: c.highlight,
+        selectedIconTheme: IconThemeData(color: c.onHighlight),
+        unselectedIconTheme: IconThemeData(color: c.onSidebarMuted),
       ),
-      dividerTheme: DividerThemeData(color: c.border),
+      listTileTheme: ListTileThemeData(
+        selectedColor: c.ink,
+        selectedTileColor: c.accentSoft,
+        iconColor: c.muted,
+      ),
+      dividerTheme: DividerThemeData(color: c.border, space: 1),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: c.feature,
+        contentTextStyle: TextStyle(fontFamily: appFont, color: c.onFeature),
+        actionTextColor: c.highlight,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+        ),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: c.accent),
     );
   }
 }
 
-/// Named colors from the app's design (slate background, navy ink and
-/// feature cards, terracotta accent). Read with `AppColors.of(context)`.
+/// Named colors from the app's design: a warm off-white page, white cards,
+/// forest-green ink, sidebar and feature cards, and a lime highlight. Read
+/// with `AppColors.of(context)`.
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   const AppColors({
     required this.background,
     required this.card,
+    required this.field,
     required this.border,
     required this.ink,
     required this.muted,
     required this.accent,
+    required this.onAccent,
     required this.accentSoft,
+    required this.highlight,
+    required this.onHighlight,
+    required this.sidebar,
+    required this.onSidebar,
+    required this.onSidebarMuted,
     required this.feature,
     required this.onFeature,
     required this.onFeatureMuted,
@@ -120,17 +286,34 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.personal,
   });
 
+  /// The page behind cards.
   final Color background;
   final Color card;
+
+  /// Fill of text fields and search boxes.
+  final Color field;
   final Color border;
   final Color ink;
   final Color muted;
-  final Color accent;
 
-  /// Tinted fill behind accent content, e.g. a date tile.
+  /// Primary actions: filled buttons, the user's own message bubbles.
+  final Color accent;
+  final Color onAccent;
+
+  /// Tinted fill behind accent content, e.g. a date tile or pinned bar.
   final Color accentSoft;
 
-  /// Dark navy "feature" cards (rankings, hero) and their text.
+  /// Lime: the selected sidebar item, badges and calls to action on
+  /// feature cards.
+  final Color highlight;
+  final Color onHighlight;
+
+  /// The navigation sidebar and rail, and the phone's top bar.
+  final Color sidebar;
+  final Color onSidebar;
+  final Color onSidebarMuted;
+
+  /// Dark "feature" cards (up next, hero) and their text.
   final Color feature;
   final Color onFeature;
   final Color onFeatureMuted;
@@ -143,37 +326,51 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color personal;
 
   static const light = AppColors(
-    background: Color(0xFFE3E9F0),
-    card: Color(0xFFF0F3F7),
-    border: Color(0xFFCFD8E2),
-    ink: Color(0xFF1E2A36),
-    muted: Color(0xFF5C6B7A),
-    accent: Color(0xFFC0533B),
-    accentSoft: Color(0xFFF2DDD6),
-    feature: Color(0xFF27323E),
-    onFeature: Color(0xFFF3F5F8),
-    onFeatureMuted: Color(0xFF9DAAB7),
-    featureHighlight: Color(0xFF3A4653),
-    positive: Color(0xFF9FD3AE),
-    positiveSoft: Color(0xFF3B5246),
-    team: Color(0xFF1E6FD9),
+    background: Color(0xFFF4F4EF),
+    card: Color(0xFFFFFFFF),
+    field: Color(0xFFF4F5F0),
+    border: Color(0xFFE3E5DC),
+    ink: Color(0xFF18241D),
+    muted: Color(0xFF6B736A),
+    accent: Color(0xFF1F3B2C),
+    onAccent: Color(0xFFFFFFFF),
+    accentSoft: Color(0xFFE8EDE1),
+    highlight: Color(0xFFD7F06A),
+    onHighlight: Color(0xFF18241D),
+    sidebar: Color(0xFF1F3B2C),
+    onSidebar: Color(0xFFF2F5EE),
+    onSidebarMuted: Color(0xFFA9BAAC),
+    feature: Color(0xFF1F3B2C),
+    onFeature: Color(0xFFF2F5EE),
+    onFeatureMuted: Color(0xFFA9BAAC),
+    featureHighlight: Color(0xFF2D4D3B),
+    positive: Color(0xFF2F8F57),
+    positiveSoft: Color(0xFFDDEFD9),
+    team: Color(0xFF2F6FD0),
     personal: Color(0xFF8A4FD1),
   );
 
   static const dark = AppColors(
-    background: Color(0xFF11161C),
-    card: Color(0xFF1A2129),
-    border: Color(0xFF2A343E),
-    ink: Color(0xFFE8EDF2),
-    muted: Color(0xFF93A1AF),
-    accent: Color(0xFFE07A5F),
-    accentSoft: Color(0xFF3A2621),
-    feature: Color(0xFF222C37),
-    onFeature: Color(0xFFF3F5F8),
-    onFeatureMuted: Color(0xFF9DAAB7),
-    featureHighlight: Color(0xFF33404D),
-    positive: Color(0xFF9FD3AE),
-    positiveSoft: Color(0xFF2F4239),
+    background: Color(0xFF0E1310),
+    card: Color(0xFF161D18),
+    field: Color(0xFF1C241E),
+    border: Color(0xFF28322B),
+    ink: Color(0xFFE7ECE4),
+    muted: Color(0xFF98A399),
+    accent: Color(0xFFC9E36B),
+    onAccent: Color(0xFF142019),
+    accentSoft: Color(0xFF223026),
+    highlight: Color(0xFFC9E36B),
+    onHighlight: Color(0xFF142019),
+    sidebar: Color(0xFF121A15),
+    onSidebar: Color(0xFFE7ECE4),
+    onSidebarMuted: Color(0xFF8E9C91),
+    feature: Color(0xFF1C2B22),
+    onFeature: Color(0xFFF2F5EE),
+    onFeatureMuted: Color(0xFFA3B3A6),
+    featureHighlight: Color(0xFF2A3D31),
+    positive: Color(0xFF8FD3A3),
+    positiveSoft: Color(0xFF243A2C),
     team: Color(0xFF6AA6F5),
     personal: Color(0xFFB794EC),
   );
@@ -191,11 +388,18 @@ class AppColors extends ThemeExtension<AppColors> {
     return AppColors(
       background: l(background, other.background),
       card: l(card, other.card),
+      field: l(field, other.field),
       border: l(border, other.border),
       ink: l(ink, other.ink),
       muted: l(muted, other.muted),
       accent: l(accent, other.accent),
+      onAccent: l(onAccent, other.onAccent),
       accentSoft: l(accentSoft, other.accentSoft),
+      highlight: l(highlight, other.highlight),
+      onHighlight: l(onHighlight, other.onHighlight),
+      sidebar: l(sidebar, other.sidebar),
+      onSidebar: l(onSidebar, other.onSidebar),
+      onSidebarMuted: l(onSidebarMuted, other.onSidebarMuted),
       feature: l(feature, other.feature),
       onFeature: l(onFeature, other.onFeature),
       onFeatureMuted: l(onFeatureMuted, other.onFeatureMuted),

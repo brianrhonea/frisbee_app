@@ -63,6 +63,10 @@ enum TeamSection {
   String labelFor(TeamKind kind) =>
       this == events && kind == TeamKind.community ? 'Events' : label;
 
+  /// The section named [path] (e.g. `?section=events`), if any.
+  static TeamSection? fromPath(String? path) =>
+      values.where((s) => s.path == path).firstOrNull;
+
   /// The section an old `?tab=` link meant, when teams had tabs; the
   /// Schedule tab is now Team Events.
   static TeamSection? fromLegacyTab(String? tab) => tab == 'schedule'
@@ -70,9 +74,10 @@ enum TeamSection {
       : values.where((s) => s.name == tab).firstOrNull;
 }
 
-/// One section of a team, e.g. its Team Events calendar or roster.
-class TeamSectionScreen extends StatefulWidget {
-  const TeamSectionScreen({
+/// One section's content, e.g. the Team Events list or the roster: a tab
+/// of the team page. Reports failed actions in a snack bar.
+class TeamSectionBody extends StatefulWidget {
+  const TeamSectionBody({
     super.key,
     required this.viewModel,
     required this.section,
@@ -82,10 +87,10 @@ class TeamSectionScreen extends StatefulWidget {
   final TeamSection section;
 
   @override
-  State<TeamSectionScreen> createState() => _TeamSectionScreenState();
+  State<TeamSectionBody> createState() => _TeamSectionBodyState();
 }
 
-class _TeamSectionScreenState extends State<TeamSectionScreen> {
+class _TeamSectionBodyState extends State<TeamSectionBody> {
   TeamDetailViewModel get vm => widget.viewModel;
 
   late final List<Command<void>> _commands = [
@@ -171,6 +176,23 @@ class _TeamSectionScreenState extends State<TeamSectionScreen> {
   };
 
   @override
+  Widget build(BuildContext context) => _body();
+}
+
+/// One section of a team on a page of its own.
+class TeamSectionScreen extends StatelessWidget {
+  const TeamSectionScreen({
+    super.key,
+    required this.viewModel,
+    required this.section,
+  });
+
+  final TeamDetailViewModel viewModel;
+  final TeamSection section;
+
+  TeamDetailViewModel get vm => viewModel;
+
+  @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: vm,
@@ -195,15 +217,15 @@ class _TeamSectionScreenState extends State<TeamSectionScreen> {
                   ),
           );
         }
-        if (!TeamSection.forKind(team.kind).contains(widget.section)) {
+        if (!TeamSection.forKind(team.kind).contains(section)) {
           return Scaffold(
             appBar: AppBar(leading: leading),
             body: EmptyView(
-              icon: widget.section.icon,
+              icon: section.icon,
               title: 'Not in community groups',
               message:
                   'Groups have events, chat, tournaments and members. '
-                  '${widget.section.label} is for teams.',
+                  '${section.label} is for teams.',
             ),
           );
         }
@@ -214,7 +236,7 @@ class _TeamSectionScreenState extends State<TeamSectionScreen> {
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.section.labelFor(team.kind)),
+                Text(section.labelFor(team.kind)),
                 Text(
                   team.name,
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -224,7 +246,7 @@ class _TeamSectionScreenState extends State<TeamSectionScreen> {
               ],
             ),
           ),
-          body: _body(),
+          body: TeamSectionBody(viewModel: vm, section: section),
         );
       },
     );

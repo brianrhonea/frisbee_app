@@ -314,6 +314,41 @@ export function playNotice(a: {
   };
 }
 
+/**
+ * Someone asked to join a group that needs approval. Repeats fold into one
+ * entry per group until it's read.
+ */
+export function joinRequestNotice(a: { teamId: string; teamName: string; request: Data }): Notice {
+  const name = String(a.request.name ?? "") || "Someone";
+  return {
+    category: "teamActivity",
+    teamId: a.teamId,
+    route: `/teams/${a.teamId}/members`,
+    collapseId: `joinRequest_${a.teamId}`,
+    text: (_, count) => ({
+      title: `${a.teamName}: request to join`,
+      body: count > 1 ? `${count} people want to join · ${name}` : `${name} wants to join`,
+    }),
+  };
+}
+
+/** An owner or organizer invited the user to join their team or group. */
+export function teamInviteNotice(a: { teamId: string; invite: Data }): Notice {
+  const team = String(a.invite.teamName ?? "") || "a team";
+  const from = String(a.invite.invitedByName ?? "") || "Someone";
+  const kind = a.invite.kind === "community" ? "group" : "team";
+  return {
+    category: "teamActivity",
+    teamId: a.teamId,
+    route: "/teams",
+    collapseId: `teamInvite_${a.teamId}`,
+    text: () => ({
+      title: `You're invited to join ${team}`,
+      body: `${from} invited you to their ${kind}. Tap to accept or decline.`,
+    }),
+  };
+}
+
 /** Team members a reminder goes to: everyone who hasn't said they can't go. */
 export function reminderRecipients(team: TeamDoc, event: Data): string[] {
   const rsvps = (event.rsvps ?? {}) as Record<string, unknown>;

@@ -19,6 +19,8 @@ import {
   directMessageNotice,
   eventChange,
   eventChangeNotice,
+  joinRequestNotice,
+  teamInviteNotice,
   meetingCancelledNotice,
   meetingInviteNotice,
   meetingStartedNotice,
@@ -186,6 +188,36 @@ export const teamPlay = onDocumentWrittenWithAuthContext(
         play,
       }),
     );
+  },
+);
+
+/** A request to join a group that needs approval: the group's owner. */
+export const groupJoinRequest = onDocumentCreated(
+  "teams/{teamId}/joinRequests/{userId}",
+  async (event) => {
+    const request = event.data?.data();
+    if (!request) return;
+    const { teamId } = event.params;
+    const team = await liveTeam(teamId);
+    if (!team?.ownerId) return;
+    await deliver(
+      getFirestore(),
+      getMessaging(),
+      [team.ownerId],
+      joinRequestNotice({ teamId, teamName: teamName(team), request }),
+    );
+  },
+);
+
+/** An invitation to join a team or group: the person invited. */
+export const teamInvite = onDocumentWrittenWithAuthContext(
+  "users/{userId}/teamInvites/{teamId}",
+  async (event) => {
+    const invite = event.data?.after.data() as Data | undefined;
+    if (!invite) return;
+    const { userId, teamId } = event.params;
+    if (!(await liveTeam(teamId))) return;
+    await deliver(getFirestore(), getMessaging(), [userId], teamInviteNotice({ teamId, invite }));
   },
 );
 

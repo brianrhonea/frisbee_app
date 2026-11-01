@@ -8,6 +8,7 @@ import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/message_thread_viewmodel.dart';
 
@@ -155,7 +156,7 @@ class _MessageList extends StatelessWidget {
     final count = messages.length + (vm.hasMore ? 1 : 0);
     return ListView.builder(
       reverse: true,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       itemCount: count,
       itemBuilder: (context, i) {
         if (i == messages.length) {
@@ -179,15 +180,11 @@ class _MessageList extends StatelessWidget {
           children: [
             if (newDay && m.createdAt != null)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Text(
                   _dayLabel(m.createdAt!),
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: c.muted,
-                  ),
+                  style: TextStyle(fontSize: 11.5, color: c.muted),
                 ),
               ),
             _MessageBubble(
@@ -213,8 +210,8 @@ class _MessageList extends StatelessWidget {
     final today = DateUtils.dateOnly(DateTime.now());
     final day = DateUtils.dateOnly(d);
     return switch (today.difference(day).inDays) {
-      0 => 'Today',
-      1 => 'Yesterday',
+      0 => 'Today, ${DateFormat.MMMMd().format(d)}',
+      1 => 'Yesterday, ${DateFormat.MMMMd().format(d)}',
       _ => DateFormat.yMMMEd().format(d),
     };
   }
@@ -240,12 +237,18 @@ class _MessageBubble extends StatelessWidget {
     final c = AppColors.of(context);
     final m = message;
     final time = m.createdAt;
+    final ink = mine ? c.onAccent : c.ink;
     final bubble = Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       decoration: BoxDecoration(
-        color: mine ? c.accentSoft : c.card,
+        color: mine ? c.accent : c.card,
         border: mine ? null : Border.all(color: c.border),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(14),
+          topRight: const Radius.circular(14),
+          bottomLeft: Radius.circular(mine ? 14 : 4),
+          bottomRight: Radius.circular(mine ? 4 : 14),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -260,18 +263,22 @@ class _MessageBubble extends StatelessWidget {
           if (m.text.isNotEmpty)
             SelectableText(
               m.text,
-              style: TextStyle(color: c.ink, fontSize: 15),
+              style: TextStyle(color: ink, fontSize: 13.5, height: 1.4),
             ),
-          const SizedBox(height: 2),
-          Text(
-            time == null ? 'Sending…' : DateFormat.jm().format(time),
-            style: TextStyle(fontSize: 11, color: c.muted),
-          ),
         ],
       ),
     );
+    final stamp = Padding(
+      padding: EdgeInsets.only(top: 3, left: mine ? 0 : 2, right: 2),
+      child: Text(
+        time == null ? 'Sending…' : DateFormat.jm().format(time),
+        style: TextStyle(fontSize: 10.5, color: c.muted),
+      ),
+    );
+    // Room for the author's avatar beside their messages.
+    const avatarGap = 36.0;
     return Padding(
-      padding: EdgeInsets.only(top: showAuthor ? 8 : 2),
+      padding: EdgeInsets.only(top: showAuthor ? 10 : 3),
       child: Column(
         crossAxisAlignment: mine
             ? CrossAxisAlignment.end
@@ -279,11 +286,11 @@ class _MessageBubble extends StatelessWidget {
         children: [
           if (showAuthor && !mine)
             Padding(
-              padding: const EdgeInsets.only(left: 12, bottom: 2),
+              padding: const EdgeInsets.only(left: avatarGap, bottom: 4),
               child: Text(
                 m.authorName,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w700,
                   color: c.muted,
                 ),
@@ -293,17 +300,31 @@ class _MessageBubble extends StatelessWidget {
             mainAxisAlignment: mine
                 ? MainAxisAlignment.end
                 : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              if (!mine)
+                SizedBox(
+                  width: avatarGap,
+                  child: showAuthor
+                      ? Align(
+                          alignment: Alignment.bottomLeft,
+                          child: PersonAvatar(name: m.authorName, radius: 13),
+                        )
+                      : null,
+                ),
               if (mine && onDelete != null) _DeleteButton(onDelete: onDelete!),
               Flexible(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
+                  constraints: const BoxConstraints(maxWidth: 460),
                   child: GestureDetector(onLongPress: onDelete, child: bubble),
                 ),
               ),
               if (!mine && onDelete != null) _DeleteButton(onDelete: onDelete!),
             ],
+          ),
+          Padding(
+            padding: EdgeInsets.only(left: mine ? 0 : avatarGap),
+            child: stamp,
           ),
         ],
       ),
@@ -550,9 +571,11 @@ class _Composer extends StatelessWidget {
       listenable: Listenable.merge([vm.send, vm.pickFiles]),
       builder: (context, _) {
         final sending = vm.send.running;
+        final wide = !ScreenSize.of(context).isMobile;
         return Container(
-          padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+          padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
           decoration: BoxDecoration(
+            color: c.card,
             border: Border(top: BorderSide(color: c.border)),
           ),
           child: Column(
@@ -574,13 +597,13 @@ class _Composer extends StatelessWidget {
                 ),
               if (sending) const LinearProgressIndicator(minHeight: 2),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   if (vm.canAttach)
                     PopupMenuButton<_AttachKind>(
                       tooltip: 'Attach',
                       enabled: !sending && !vm.pickFiles.running,
-                      icon: const Icon(Icons.attach_file),
+                      icon: Icon(Icons.add, color: c.muted),
                       onSelected: (k) =>
                           vm.pickFiles.execute(k == _AttachKind.photo),
                       itemBuilder: (_) => const [
@@ -620,6 +643,7 @@ class _Composer extends StatelessWidget {
                         maxLines: 5,
                         maxLength: 4000,
                         textCapitalization: TextCapitalization.sentences,
+                        style: const TextStyle(fontSize: 13.5),
                         decoration: const InputDecoration(
                           hintText: 'Message',
                           counterText: '',
@@ -628,14 +652,29 @@ class _Composer extends StatelessWidget {
                       ),
                     ),
                   ),
-                  IconButton(
+                  const SizedBox(width: 8),
+                  IconButton.filled(
                     tooltip: 'Send',
-                    color: c.accent,
-                    icon: const Icon(Icons.send),
+                    style: IconButton.styleFrom(
+                      backgroundColor: c.accent,
+                      foregroundColor: c.onAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(controlRadius),
+                      ),
+                    ),
+                    icon: const Icon(Icons.arrow_upward, size: 20),
                     onPressed: sending ? null : onSend,
                   ),
                 ],
               ),
+              if (wide)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8, top: 6),
+                  child: Text(
+                    'Enter to send · Shift + Enter for a new line',
+                    style: TextStyle(fontSize: 10.5, color: c.muted),
+                  ),
+                ),
             ],
           ),
         );

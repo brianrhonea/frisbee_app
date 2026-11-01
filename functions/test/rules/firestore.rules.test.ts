@@ -179,6 +179,66 @@ describe("join", () => {
   });
 });
 
+describe("team invites", () => {
+  const invitePath = (uid = OUTSIDER) => ["users", uid, "teamInvites", TEAM] as const;
+  const invite = (from = CAPTAIN) => ({
+    teamName: "Team",
+    kind: "team",
+    invitedBy: from,
+    invitedByName: "K",
+    createdAt: serverTimestamp(),
+  });
+  const joinUpdate = {
+    [`members.${OUTSIDER}`]: "player",
+    [`memberNames.${OUTSIDER}`]: "New Player",
+    memberIds: arrayUnion(OUTSIDER),
+  };
+  const accept = (update: Record<string, unknown> = joinUpdate) => {
+    const fs = db(OUTSIDER);
+    return writeBatch(fs)
+      .update(doc(fs, "teams", TEAM), update)
+      .delete(doc(fs, ...invitePath()))
+      .commit();
+  };
+  const seedInvite = () =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), ...invitePath()), { ...invite(), createdAt: new Date() }),
+    );
+
+  it("owners and organizers invite people who aren't members", async () => {
+    await assertSucceeds(setDoc(doc(db(CAPTAIN), ...invitePath()), invite()));
+    await assertFails(setDoc(doc(db(PLAYER), ...invitePath()), invite(PLAYER)));
+    await assertFails(setDoc(doc(db(OUTSIDER), ...invitePath()), invite(OUTSIDER)));
+    // Not someone already on the team, nor with a made-up team name.
+    await assertFails(setDoc(doc(db(CAPTAIN), ...invitePath(PLAYER)), invite()));
+    await assertFails(setDoc(doc(db(CAPTAIN), ...invitePath()), { ...invite(), teamName: "Other" }));
+  });
+
+  it("only the invitee and the team's editors see an invite", async () => {
+    await seedInvite();
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), ...invitePath())));
+    await assertSucceeds(getDoc(doc(db(COACH), ...invitePath())));
+    await assertFails(getDoc(doc(db(PLAYER), ...invitePath())));
+  });
+
+  it("the invitee joins as a player without a code", async () => {
+    await seedInvite();
+    await assertFails(accept({ ...joinUpdate, [`members.${OUTSIDER}`]: "coach" }));
+    await assertSucceeds(accept());
+  });
+
+  it("joining needs an invite, used up in the same batch", async () => {
+    await assertFails(accept());
+    await seedInvite();
+    await assertFails(updateDoc(doc(db(OUTSIDER), "teams", TEAM), joinUpdate));
+  });
+
+  it("the invitee declines by deleting it", async () => {
+    await seedInvite();
+    await assertSucceeds(deleteDoc(doc(db(OUTSIDER), ...invitePath())));
+  });
+});
+
 describe("community groups", () => {
   const GROUP = "group1";
   const ORGANIZER = "organizer";
@@ -343,6 +403,47 @@ describe("community groups", () => {
     await assertFails(setDoc(ref, { ...listing, requiresApproval: true }));
     await assertFails(setDoc(ref, { ...listing, kind: "team" }));
     await assertSucceeds(setDoc(ref, listing));
+  });
+
+  it("a private group's listing leaves out its location", async () => {
+    await setGroup(true);
+    const listing = {
+      name: "Pickup Crew", division: "mixed", level: "pickup", city: "Denver",
+      kind: "community", description: "Sunday pickup", requiresApproval: true,
+      keywords: ["pickup"],
+    };
+    const ref = doc(db(ORGANIZER), "teamDirectory", GROUP);
+    await assertFails(
+      setDoc(ref, { ...listing, location: { address: "City Park", lat: 39.75, lng: -104.95 } }),
+    );
+    await assertSucceeds(setDoc(ref, listing));
+  });
+
+  describe("private content", () => {
+    const seed = () =>
+      env.withSecurityRulesDisabled(async (ctx) => {
+        const fs = ctx.firestore();
+        await setDoc(doc(fs, "teams", GROUP, "posts", "p1"), {
+          title: "", body: "Hi", public: true, authorId: OWNER, authorName: "O",
+        });
+        await setDoc(doc(fs, "teams", GROUP, "publicEvents", "e1"), { title: "Pickup" });
+      });
+
+    it("outsiders see an open group's public posts and events", async () => {
+      await setGroup(false);
+      await seed();
+      await assertSucceeds(getDoc(doc(db(OUTSIDER), "teams", GROUP, "posts", "p1")));
+      await assertSucceeds(getDoc(doc(db(OUTSIDER), "teams", GROUP, "publicEvents", "e1")));
+    });
+
+    it("only members see a private group's posts and events", async () => {
+      await setGroup(true);
+      await seed();
+      await assertFails(getDoc(doc(db(OUTSIDER), "teams", GROUP, "posts", "p1")));
+      await assertFails(getDoc(doc(db(OUTSIDER), "teams", GROUP, "publicEvents", "e1")));
+      await assertSucceeds(getDoc(doc(db(MEMBER), "teams", GROUP, "posts", "p1")));
+      await assertSucceeds(getDoc(doc(db(MEMBER), "teams", GROUP, "publicEvents", "e1")));
+    });
   });
 });
 
@@ -708,6 +809,31 @@ describe("roster and plays", () => {
     const strip = { onUsau: deleteField(), paid: deleteField() };
     await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM, "roster", "r1"), strip));
     await assertSucceeds(updateDoc(doc(db(COACH), "teams", TEAM, "roster", "r1"), strip));
+  });
+
+  it("admins link a roster spot to a member only", async () => {
+    const ref = doc(db(CAPTAIN), "teams", TEAM, "roster", "r1");
+    const spot = (userId: string | null) => ({ name: "Sam", number: 7, position: "handler", userId });
+    await assertSucceeds(setDoc(ref, spot(PLAYER)));
+    await assertSucceeds(setDoc(ref, spot(null)));
+    await assertFails(setDoc(ref, spot(OUTSIDER)));
+  });
+
+  it("members claim an unlinked spot for themselves and let go of their own", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", TEAM, "roster", "r1"), { name: "Pat", number: 4, position: "cutter", userId: null });
+      await setDoc(doc(fs, "teams", TEAM, "roster", "r2"), { name: "Cam", number: 5, position: "cutter", userId: CAPTAIN });
+    });
+    const spot = (uid: string, id: string) => doc(db(uid), "teams", TEAM, "roster", id);
+    // Not for someone else, nor with other changes, nor someone's spot.
+    await assertFails(updateDoc(spot(PLAYER, "r1"), { userId: STATS }));
+    await assertFails(updateDoc(spot(PLAYER, "r1"), { userId: PLAYER, number: 99 }));
+    await assertFails(updateDoc(spot(PLAYER, "r2"), { userId: PLAYER }));
+    await assertFails(updateDoc(spot(PLAYER, "r2"), { userId: null }));
+    await assertFails(updateDoc(spot(OUTSIDER, "r1"), { userId: OUTSIDER }));
+    await assertSucceeds(updateDoc(spot(PLAYER, "r1"), { userId: PLAYER }));
+    await assertSucceeds(updateDoc(spot(PLAYER, "r1"), { userId: null }));
   });
 });
 
@@ -1507,6 +1633,33 @@ describe("direct messages", () => {
     await assertFails(setDoc(doc(db(OUTSIDER), "profiles", PLAYER), profile()));
     await assertFails(setDoc(doc(db(PLAYER), "profiles", PLAYER), { ...profile(), email: "a@b.c" }));
     await assertFails(setDoc(doc(db(PLAYER), "profiles", PLAYER), profile("")));
+  });
+
+  it("profiles carry player details and a published summary", async () => {
+    const ref = doc(db(PLAYER), "profiles", PLAYER);
+    const full = {
+      ...profile(),
+      tags: ["denver", "state"],
+      bio: "Handler. Hucks.",
+      pronouns: "they/them",
+      hometown: "Denver",
+      school: "State",
+      throwingHand: "left",
+      playingSince: 2015,
+      visibility: { stats: true, teams: true, games: false },
+      teams: [{ id: TEAM, name: "Tide", kind: "team", subtitle: "", role: "Player", number: 4, position: "Cutter" }],
+      stats: { "2026": { games: 1, points: 10, goals: 2, assists: 1, blocks: 0, completions: 9, throwaways: 1, catches: 8, drops: 0 } },
+      games: [],
+      summaryUpdatedAt: serverTimestamp(),
+    };
+    await assertSucceeds(setDoc(ref, full));
+    await assertFails(setDoc(ref, { ...full, bio: "x".repeat(281) }));
+    await assertFails(setDoc(ref, { ...full, throwingHand: "foot" }));
+    await assertFails(setDoc(ref, { ...full, playingSince: "long ago" }));
+    await assertFails(setDoc(ref, { ...full, visibility: { email: true } }));
+    await assertFails(setDoc(ref, { ...full, games: [1, 2, 3, 4, 5, 6] }));
+    await assertFails(setDoc(ref, { ...full, followers: 10 }));
+    await assertFails(setDoc(doc(db(OUTSIDER), "profiles", PLAYER), full));
   });
 
   it("participants start a conversation with a listed user", async () => {

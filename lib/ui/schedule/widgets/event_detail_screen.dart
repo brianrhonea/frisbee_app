@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/team_event.dart';
@@ -9,14 +10,72 @@ import '../../../utils/command.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart' show ScreenSize;
 import '../../core/ui/status_views.dart';
+import '../../core/ui/view_model_host.dart';
 import '../view_models/event_detail_viewmodel.dart';
 import 'event_style.dart';
 
+/// Opens a team event's full details and RSVP over the current page: a
+/// dialog on wide screens, a sheet that slides up on phones.
+Future<void> showEventDetails(
+  BuildContext context, {
+  required String teamId,
+  required String eventId,
+}) {
+  Widget content(BuildContext _) => ViewModelHost(
+    key: ValueKey('event-$teamId-$eventId'),
+    create: (c) => EventDetailViewModel(
+      teamId: teamId,
+      eventId: eventId,
+      eventRepository: c.read(),
+      teamRepository: c.read(),
+      authRepository: c.read(),
+      tournamentRepository: c.read(),
+    ),
+    builder: (_, vm) => EventDetailScreen(viewModel: vm, popup: true),
+  );
+  if (ScreenSize.of(context).isMobile) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+      ),
+      builder: content,
+    );
+  }
+  return showDialog<void>(
+    context: context,
+    builder: (context) => Dialog(
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 640,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+        ),
+        child: content(context),
+      ),
+    ),
+  );
+}
+
+/// A team event: details, RSVP, reactions, poll and who's coming. A page of
+/// its own (e.g. from a notification), or the body of [showEventDetails].
 class EventDetailScreen extends StatefulWidget {
-  const EventDetailScreen({super.key, required this.viewModel});
+  const EventDetailScreen({
+    super.key,
+    required this.viewModel,
+    this.popup = false,
+  });
 
   final EventDetailViewModel viewModel;
+
+  /// Shown over another page by [showEventDetails]: no app bar, and
+  /// leaving closes the popup.
+  final bool popup;
 
   @override
   State<EventDetailScreen> createState() => _EventDetailScreenState();
@@ -24,6 +83,7 @@ class EventDetailScreen extends StatefulWidget {
 
 class _EventDetailScreenState extends State<EventDetailScreen> {
   EventDetailViewModel get vm => widget.viewModel;
+  bool get popup => widget.popup;
 
   late final List<Command<void>> _commands = [
     vm.setRsvp,
@@ -51,7 +111,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   void _onCommand() {
     if (vm.deleteEvent.completed) {
       vm.deleteEvent.clearResult();
-      context.canPop() ? context.pop() : context.go(Routes.team(vm.teamId));
+      if (popup) {
+        Navigator.pop(context);
+      } else {
+        context.canPop() ? context.pop() : context.go(Routes.team(vm.teamId));
+      }
       return;
     }
     for (final c in _commands) {
@@ -74,91 +138,139 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
+  /// Opens [route] as a page; from a popup, closes the popup first.
+  void _open(String route) {
+    if (popup) {
+      final router = GoRouter.of(context);
+      Navigator.pop(context);
+      router.push(route);
+    } else {
+      context.push(route);
+    }
+  }
+
+  List<Widget> _actions(TeamEvent e) => [
+    if (vm.canEdit) ...[
+      IconButton(
+        tooltip: 'Edit',
+        icon: const Icon(Icons.edit_outlined),
+        onPressed: () => _open(Routes.editEvent(vm.teamId, vm.eventId)),
+      ),
+      IconButton(
+        tooltip: 'Delete',
+        icon: const Icon(Icons.delete_outline),
+        onPressed: () => _delete(e),
+      ),
+    ],
+  ];
+
+  List<Widget> _details(TeamEvent e) => [
+    EventHeader(event: e),
+    if (vm.tournament case final t?) ...[
+      const SizedBox(height: 12),
+      FilledButton.icon(
+        onPressed: () => _open(Routes.groupTournament(vm.teamId, t.id)),
+        icon: const Icon(Icons.emoji_events_outlined),
+        label: Text('View ${t.name}'),
+      ),
+    ] else if (vm.canSetUpTournament) ...[
+      const SizedBox(height: 12),
+      OutlinedButton.icon(
+        onPressed: () =>
+            _open(Routes.newGroupTournament(vm.teamId, eventId: vm.eventId)),
+        icon: const Icon(Icons.emoji_events_outlined),
+        label: const Text('Set up tournament'),
+      ),
+    ],
+    const SizedBox(height: 20),
+    _RsvpSection(viewModel: vm),
+    const SizedBox(height: 16),
+    _Reactions(viewModel: vm),
+    if (e.poll != null) ...[
+      const SizedBox(height: 20),
+      _PollCard(viewModel: vm, poll: e.poll!),
+    ],
+    const SizedBox(height: 20),
+    _Responses(viewModel: vm),
+  ];
+
+  /// The popup's frame: a title row with the actions and Close, then [body].
+  Widget _popup(
+    Widget body, {
+    String title = '',
+    List<Widget> actions = const [],
+  }) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            ...actions,
+            IconButton(
+              tooltip: 'Close',
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+      Flexible(child: body),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: vm,
       builder: (context, _) {
         final e = vm.event;
-        if (!vm.loaded) {
+        final Widget? missing = !vm.loaded
+            ? const LoadingView()
+            : e != null
+            ? null
+            : vm.error != null
+            ? ErrorView(error: vm.error)
+            : const EmptyView(
+                icon: Icons.event_busy_outlined,
+                title: 'Event not available',
+                message: 'It may have been deleted.',
+              );
+        if (missing != null) {
+          if (popup) return _popup(SizedBox(height: 240, child: missing));
           return Scaffold(
             appBar: AppBar(leading: backOr(context, Routes.team(vm.teamId))),
-            body: const LoadingView(),
+            body: missing,
           );
         }
-        if (e == null) {
-          return Scaffold(
-            appBar: AppBar(leading: backOr(context, Routes.team(vm.teamId))),
-            body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
-                    icon: Icons.event_busy_outlined,
-                    title: 'Event not available',
-                    message: 'It may have been deleted.',
-                  ),
-          );
+        final list = ListView(
+          shrinkWrap: popup,
+          padding: popup
+              ? const EdgeInsets.fromLTRB(20, 4, 20, 24)
+              : const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          children: _details(e!),
+        );
+        if (popup) {
+          return _popup(list, title: e.type.label, actions: _actions(e));
         }
         return Scaffold(
           appBar: AppBar(
             leading: backOr(context, Routes.team(vm.teamId)),
             title: Text(e.type.label),
-            actions: [
-              if (vm.canEdit) ...[
-                IconButton(
-                  tooltip: 'Edit',
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () =>
-                      context.push(Routes.editEvent(vm.teamId, vm.eventId)),
-                ),
-                IconButton(
-                  tooltip: 'Delete',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => _delete(e),
-                ),
-              ],
-            ],
+            actions: _actions(e),
           ),
           body: Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                children: [
-                  EventHeader(event: e),
-                  if (vm.tournament case final t?) ...[
-                    const SizedBox(height: 12),
-                    FilledButton.icon(
-                      onPressed: () =>
-                          context.push(Routes.groupTournament(vm.teamId, t.id)),
-                      icon: const Icon(Icons.emoji_events_outlined),
-                      label: Text('View ${t.name}'),
-                    ),
-                  ] else if (vm.canSetUpTournament) ...[
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () => context.push(
-                        Routes.newGroupTournament(
-                          vm.teamId,
-                          eventId: vm.eventId,
-                        ),
-                      ),
-                      icon: const Icon(Icons.emoji_events_outlined),
-                      label: const Text('Set up tournament'),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  _RsvpSection(viewModel: vm),
-                  const SizedBox(height: 16),
-                  _Reactions(viewModel: vm),
-                  if (e.poll != null) ...[
-                    const SizedBox(height: 20),
-                    _PollCard(viewModel: vm, poll: e.poll!),
-                  ],
-                  const SizedBox(height: 20),
-                  _Responses(viewModel: vm),
-                ],
-              ),
+              child: list,
             ),
           ),
         );

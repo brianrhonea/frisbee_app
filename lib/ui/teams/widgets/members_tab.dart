@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/team.dart';
+import '../../../routing/routes.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/team_detail_viewmodel.dart';
+import 'invite_members_dialog.dart';
 
 class MembersTab extends StatelessWidget {
   const MembersTab({super.key, required this.viewModel});
@@ -26,6 +29,19 @@ class MembersTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (viewModel.canEdit) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                onPressed: () => showInviteMembers(context, team),
+                icon: const Icon(Icons.person_search),
+                label: Text(
+                  team.isCommunity ? 'Invite members' : 'Invite players',
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           if (viewModel.inviteCode case final code?
               when viewModel.canShareCode) ...[
             _InviteCard(viewModel: viewModel, code: code),
@@ -45,6 +61,7 @@ class MembersTab extends StatelessWidget {
           for (final m in members)
             ListTile(
               contentPadding: EdgeInsets.zero,
+              onTap: () => context.push(Routes.player(m.key)),
               leading: CircleAvatar(
                 child: Text(team.nameOf(m.key)[0].toUpperCase()),
               ),

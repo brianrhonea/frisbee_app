@@ -25,7 +25,7 @@ enum NotificationCategory {
   ),
   teamActivity(
     'Team activity',
-    'New and updated plays in the playbook',
+    'New and updated plays, and requests to join your groups',
     perTeam: true,
   ),
   meetings(

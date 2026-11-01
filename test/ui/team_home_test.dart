@@ -267,7 +267,13 @@ void main() {
 
       await tester.tap(find.text('Open tryouts'));
       await tester.pumpAndSettle();
-      expect(find.text('Central Park'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text('Central Park'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('posts show their place, links and photos', (tester) async {

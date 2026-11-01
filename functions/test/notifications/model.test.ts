@@ -7,6 +7,8 @@ import {
   eventChangeNotice,
   formatWhen,
   messagePreview,
+  joinRequestNotice,
+  teamInviteNotice,
   playNotice,
   reminderNotice,
   reminderRecipients,
@@ -163,5 +165,29 @@ describe("notices", () => {
     const n = playNotice({ created: true, teamId: "t1", playId: "p1", teamName: "Hawks", play: { name: "Ho stack" } });
     expect(n.text({}, 1)).toEqual({ title: "Hawks: new play", body: "Ho stack" });
     expect(n.route).toBe("/teams/t1/plays/p1");
+  });
+});
+
+describe("joinRequestNotice", () => {
+  it("names who wants in, and folds repeats", () => {
+    const n = joinRequestNotice({ teamId: "g1", teamName: "Sunday Pickup", request: { name: "Sam" } });
+    expect(n.text({}, 1)).toEqual({ title: "Sunday Pickup: request to join", body: "Sam wants to join" });
+    expect(n.text({}, 3).body).toBe("3 people want to join · Sam");
+    expect(n.route).toBe("/teams/g1/members");
+    expect(n.category).toBe("teamActivity");
+  });
+});
+
+describe("teamInviteNotice", () => {
+  it("says who invited them, and to what", () => {
+    const n = teamInviteNotice({
+      teamId: "g1",
+      invite: { teamName: "Sunday Pickup", invitedByName: "Ana", kind: "community" },
+    });
+    expect(n.text({}, 1)).toEqual({
+      title: "You're invited to join Sunday Pickup",
+      body: "Ana invited you to their group. Tap to accept or decline.",
+    });
+    expect(n.route).toBe("/teams");
   });
 });

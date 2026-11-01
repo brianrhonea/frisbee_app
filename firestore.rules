@@ -18,6 +18,10 @@ service cloud.firestore {
     function invitePath(teamId) {
       return /databases/$(database)/documents/teams/$(teamId)/private/invite;
     }
+    // An invitation to join a team, sent to someone found in the directory.
+    function teamInvitePath(userId, teamId) {
+      return /databases/$(database)/documents/users/$(userId)/teamInvites/$(teamId);
+    }
     // A request to join a group that requires approval.
     function requestPath(teamId, userId) {
       return /databases/$(database)/documents/teams/$(teamId)/joinRequests/$(userId);
@@ -77,6 +81,13 @@ service cloud.firestore {
     // Community groups (kind 'community'): open to anyone, no invite code,
     // no roster or stats. Teams have no kind field.
     function isGroup(t) { return t.get('kind', 'team') == 'community'; }
+    // A group that needs approval is private: outsiders see its name, city
+    // and description in search, never its location, posts or events.
+    function isPrivateGroup(t) {
+      return isGroup(t) && t.get('requiresApproval', false) == true;
+    }
+    // Whether someone outside the team may see its public content.
+    function showsPublic(t) { return isMember(t) || !isPrivateGroup(t); }
 
     function validGroupFields(t) {
       return validString(t.description, 1000)
@@ -137,6 +148,27 @@ service cloud.firestore {
 
         allow read, delete: if signedIn() && uid() == userId;
         allow create, update: if signedIn() && uid() == userId && validMine();
+      }
+
+      // Invitations to join a team or group (TeamInvite in
+      // lib/domain/models/team.dart). Its owners and organizers send them to
+      // people who aren't on it yet; the invitee accepts (see acceptInvite)
+      // or declines by deleting it.
+      match /teamInvites/{teamId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        allow read, delete: if signedIn()
+          && (uid() == userId || isEditor(team()));
+        allow create, update: if signedIn()
+          && isEditor(team())
+          && !(userId in team().memberIds)
+          && request.resource.data.keys().hasOnly([
+               'teamName', 'kind', 'invitedBy', 'invitedByName', 'createdAt'])
+          && request.resource.data.teamName == team().name
+          && request.resource.data.kind == team().get('kind', 'team')
+          && request.resource.data.invitedBy == uid()
+          && validString(request.resource.data.invitedByName, 80)
+          && request.resource.data.createdAt == request.time;
       }
 
       // Notification preferences (NotificationPreferences in
@@ -218,7 +250,7 @@ service cloud.firestore {
       allow update: if signedIn() && (
         editDetails() || linkUsau() || dropLegacyCode() || changeRole() ||
         setStatKeepers() || transferOwnership() || removeMember() || join() ||
-        joinOpenGroup() || approveRequest() || markDeleting()
+        joinOpenGroup() || approveRequest() || acceptInvite() || markDeleting()
       );
 
       allow delete: if signedIn() && resource.data.ownerId == uid();
@@ -254,6 +286,14 @@ service cloud.firestore {
         return isGroup(resource.data)
           && !resource.data.requiresApproval
           && addsOnly(uid());
+      }
+
+      // Someone an owner or organizer invited joins as a player, with no
+      // code, deleting the invite in the same batch.
+      function acceptInvite() {
+        return addsOnly(uid())
+          && exists(teamInvitePath(uid(), teamId))
+          && !existsAfter(teamInvitePath(uid(), teamId));
       }
 
       // Owners and organizers add someone who asked to join, deleting the
@@ -432,17 +472,38 @@ service cloud.firestore {
 
       // What every member sees: name, number, position. Payment and USA
       // Ultimate status live in rosterStatus, readable by admins only.
+      // userId links a spot to a member's account, so the spot's stats
+      // count on their profile. Admins link anyone on the team; a member
+      // claims an unlinked spot for themselves or lets go of their own.
       match /roster/{playerId} {
+        function linkedTo(d) { return d.get('userId', null); }
+
+        // Admins may link a member, or keep the link to someone who left.
+        function validLink(t) {
+          let u = linkedTo(request.resource.data);
+          return u == null
+            || (u is string && u in t.memberIds)
+            || (resource != null && u == linkedTo(resource.data));
+        }
+
         allow read: if signedIn() && isMember(get(teamPath(teamId)).data);
         allow delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
         allow create, update: if signedIn()
           && isEditor(get(teamPath(teamId)).data)
+          && validLink(get(teamPath(teamId)).data)
           && request.resource.data.keys().hasOnly(['name', 'number', 'position', 'userId'])
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.name.size() <= 80
           && (request.resource.data.number == null || request.resource.data.number is int)
           && request.resource.data.position in ['handler', 'cutter', 'hybrid'];
+        allow update: if signedIn()
+          && isMember(get(teamPath(teamId)).data)
+          && changed().hasOnly(['userId'])
+          && ((linkedTo(resource.data) == null
+                && linkedTo(request.resource.data) == uid())
+              || (linkedTo(resource.data) == uid()
+                && linkedTo(request.resource.data) == null));
       }
 
       // Per-player paid mark and USA Ultimate status, keyed like roster.
@@ -537,7 +598,7 @@ service cloud.firestore {
       // details only, so people outside the team never see responses.
       // Editors write them alongside the event.
       match /publicEvents/{eventId} {
-        allow read: if signedIn();
+        allow read: if signedIn() && showsPublic(get(teamPath(teamId)).data);
         allow delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
         allow create, update: if signedIn()
           && isEditor(get(teamPath(teamId)).data)
@@ -718,7 +779,8 @@ service cloud.firestore {
       }
 
       // Home page posts (TeamPost in lib/domain/models/team_post.dart).
-      // Editors post; anyone signed in reads public posts, members the rest.
+      // Editors post; anyone signed in reads public posts (except a private
+      // group's), members the rest.
       match /posts/{postId} {
         function team() { return get(teamPath(teamId)).data; }
 
@@ -747,7 +809,8 @@ service cloud.firestore {
         }
 
         allow read: if signedIn()
-          && (resource.data.public == true || isMember(team()));
+          && (isMember(team())
+              || (resource.data.public == true && showsPublic(team())));
         allow delete: if signedIn() && isEditor(team());
         allow create: if signedIn()
           && isEditor(team())
@@ -1117,7 +1180,8 @@ service cloud.firestore {
           && d.get('kind', 'team') == team.get('kind', 'team')
           && d.get('description', '') == team.get('description', '')
           && d.get('requiresApproval', false) == team.get('requiresApproval', false)
-          && d.get('location', null) == team.get('location', null)
+          && d.get('location', null)
+               == (isPrivateGroup(team) ? null : team.get('location', null))
           && d.keywords is list && d.keywords.size() <= 100;
       }
 
@@ -1135,18 +1199,45 @@ service cloud.firestore {
 
     // The people directory: name and photo only (never email), so any
     // signed-in user can search for someone to message.
+    // The people directory and public player profiles: anyone signed in
+    // can read and search them; each player writes only their own. Stats,
+    // teams and games are published by the player's app, already without
+    // the parts they hide.
     match /profiles/{userId} {
+      function validProfile(p) {
+        return p.keys().hasOnly([
+            'name', 'keywords', 'photoUrl', 'updatedAt', 'tags',
+            'bio', 'pronouns', 'hometown', 'school', 'throwingHand',
+            'playingSince', 'visibility',
+            'teams', 'stats', 'games', 'summaryUpdatedAt'])
+          && p.name is string
+          && p.name.size() > 0
+          && p.name.size() <= 80
+          && p.keywords is list
+          && p.keywords.size() <= 100
+          && (p.photoUrl == null || validString(p.photoUrl, 2000))
+          && p.get('tags', []) is list
+          && p.get('tags', []).size() <= 100
+          && validString(p.get('bio', ''), 280)
+          && validString(p.get('pronouns', ''), 30)
+          && validString(p.get('hometown', ''), 60)
+          && validString(p.get('school', ''), 60)
+          && p.get('throwingHand', null) in [null, 'right', 'left', 'both']
+          && (p.get('playingSince', null) == null || p.playingSince is int)
+          && p.get('visibility', {}) is map
+          && p.get('visibility', {}).keys().hasOnly(['stats', 'teams', 'games'])
+          && p.get('teams', []) is list
+          && p.get('teams', []).size() <= 50
+          && p.get('stats', {}) is map
+          && p.get('stats', {}).size() <= 50
+          && p.get('games', []) is list
+          && p.get('games', []).size() <= 5;
+      }
+
       allow read: if signedIn();
       allow delete: if signedIn() && uid() == userId;
       allow create, update: if signedIn() && uid() == userId
-        && request.resource.data.keys().hasOnly(['name', 'keywords', 'photoUrl', 'updatedAt'])
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() <= 80
-        && request.resource.data.keywords is list
-        && request.resource.data.keywords.size() <= 100
-        && (request.resource.data.photoUrl == null
-            || validString(request.resource.data.photoUrl, 2000));
+        && validProfile(request.resource.data);
     }
 
     // One conversation per pair of users, id "{uidA}_{uidB}" with the uids

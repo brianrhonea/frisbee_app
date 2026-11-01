@@ -7,9 +7,9 @@ import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../core/ui/status_views.dart';
 import '../view_models/people_search_viewmodel.dart';
-import 'inbox_screen.dart';
 
 /// Search the directory by name and start a conversation.
 class PeopleSearchScreen extends StatefulWidget {

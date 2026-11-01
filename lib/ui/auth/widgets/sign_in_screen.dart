@@ -29,6 +29,12 @@ class _SignInScreenState extends State<SignInScreen> {
     vm.signInWithGoogle.addListener(_onResult);
     vm.signInWithApple.addListener(_onResult);
     vm.sendPasswordReset.addListener(_onReset);
+    // E.g. "Account deleted successfully", once the page is up.
+    if (vm.takeNotice() case final notice?) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) showSnackBar(context, notice);
+      });
+    }
   }
 
   @override

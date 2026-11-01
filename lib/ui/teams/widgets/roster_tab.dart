@@ -17,9 +17,26 @@ class RosterTab extends StatelessWidget {
   Future<void> _edit(BuildContext context, [RosterPlayer? player]) async {
     final result = await showDialog<RosterPlayer>(
       context: context,
-      builder: (_) => PlayerDialog(initial: player),
+      builder: (_) => PlayerDialog(
+        initial: player,
+        members: _members(),
+        linkedElsewhere: {
+          for (final p in viewModel.roster)
+            if (p.id != player?.id && p.userId != null) p.userId!,
+        },
+      ),
     );
     if (result != null) viewModel.savePlayer.execute(result);
+  }
+
+  /// Members by name, for linking a roster spot to an account.
+  Map<String, String> _members() {
+    final team = viewModel.team;
+    if (team == null) return const {};
+    final entries = [
+      for (final uid in team.members.keys) MapEntry(uid, team.nameOf(uid)),
+    ]..sort((a, b) => a.value.compareTo(b.value));
+    return Map.fromEntries(entries);
   }
 
   Future<void> _delete(BuildContext context, RosterPlayer player) async {

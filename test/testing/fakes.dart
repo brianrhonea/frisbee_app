@@ -9,7 +9,9 @@ import 'package:frisbee_app/data/repositories/direct_message/direct_message_repo
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
+import 'package:frisbee_app/data/repositories/profile/profile_repository.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
+import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
@@ -21,8 +23,10 @@ import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/domain/models/play.dart';
+import 'package:frisbee_app/domain/models/player_profile.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
+import 'package:frisbee_app/domain/models/stats.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/team_post.dart';
@@ -59,7 +63,11 @@ class FakeAuthRepository extends AuthRepository {
       nextError = null;
       return Result.error(e);
     }
-    action();
+    try {
+      action();
+    } on Exception catch (e) {
+      return Result.error(e);
+    }
     return const Result.ok(null);
   }
 
@@ -96,7 +104,39 @@ class FakeAuthRepository extends AuthRepository {
   Future<Result<void>> signOut() => _run(() => setUser(null));
 
   @override
-  Future<Result<void>> deleteAccount() => _run(() => setUser(null));
+  Future<Result<void>> deleteAccount() => _run(() {
+    if (!reauthenticated) throw Exception('Sign in again first.');
+    deleted = true;
+    _signedOutNotice = 'Account deleted successfully';
+    setUser(null);
+  });
+
+  /// What [reauthMethod] says; password by default.
+  SignInMethod? method = SignInMethod.password;
+
+  /// The password [reauthenticate] accepts.
+  String password = 'secret';
+  bool reauthenticated = false;
+  bool deleted = false;
+
+  @override
+  SignInMethod? get reauthMethod => currentUser == null ? null : method;
+
+  @override
+  Future<Result<void>> reauthenticate({String? password}) => _run(() {
+    if (method == SignInMethod.password && password != this.password) {
+      throw Exception('Incorrect email or password.');
+    }
+    reauthenticated = true;
+  });
+
+  String? _signedOutNotice;
+
+  @override
+  String? get signedOutNotice => _signedOutNotice;
+
+  @override
+  void clearSignedOutNotice() => _signedOutNotice = null;
 }
 
 class FakeTeamRepository implements TeamRepository {
@@ -214,6 +254,53 @@ class FakeTeamRepository implements TeamRepository {
   @override
   Future<Result<void>> declineJoinRequest(String teamId, String uid) async {
     joinRequests[teamId]?.removeWhere((r) => r.uid == uid);
+    _emit();
+    return const Result.ok(null);
+  }
+
+  /// uid → pending invitations.
+  final invites = <String, List<TeamInvite>>{};
+
+  @override
+  Future<Result<void>> inviteToTeam(Team team, String uid, AppUser from) async {
+    final mine = invites[uid] ??= [];
+    mine
+      ..removeWhere((i) => i.teamId == team.id)
+      ..insert(
+        0,
+        TeamInvite(
+          teamId: team.id,
+          teamName: team.name,
+          kind: team.kind,
+          invitedBy: from.uid,
+          invitedByName: from.label,
+        ),
+      );
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<List<TeamInvite>> watchMyInvites(String uid) async* {
+    List<TeamInvite> mine() => List.of(invites[uid] ?? const []);
+    yield mine();
+    yield* _teamsController.stream.map((_) => mine());
+  }
+
+  @override
+  Future<Result<void>> acceptInvite(TeamInvite invite, AppUser user) async {
+    if (!teams.containsKey(invite.teamId)) {
+      return Result.error(Exception('Team not found'));
+    }
+    _addMember(invite.teamId, user.uid, user.label);
+    invites[user.uid]?.removeWhere((i) => i.teamId == invite.teamId);
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> declineInvite(String uid, String teamId) async {
+    invites[uid]?.removeWhere((i) => i.teamId == teamId);
     _emit();
     return const Result.ok(null);
   }
@@ -392,11 +479,9 @@ class FakeTeamRepository implements TeamRepository {
     return const Result.ok(null);
   }
 
-  @override
-  Stream<List<RosterPlayer>> watchRoster(
-    String teamId, {
-    bool withStatus = false,
-  }) => Stream.value([
+  final _rosterChanges = StreamController<void>.broadcast();
+
+  List<RosterPlayer> _rosterOf(String teamId, bool withStatus) => [
     for (final p in roster[teamId] ?? const <RosterPlayer>[])
       withStatus
           ? p
@@ -407,7 +492,45 @@ class FakeTeamRepository implements TeamRepository {
               position: p.position,
               userId: p.userId,
             ),
-  ]);
+  ];
+
+  @override
+  Stream<List<RosterPlayer>> watchRoster(
+    String teamId, {
+    bool withStatus = false,
+  }) async* {
+    yield _rosterOf(teamId, withStatus);
+    yield* _rosterChanges.stream.map((_) => _rosterOf(teamId, withStatus));
+  }
+
+  /// (teamId, playerId, uid) for each [linkPlayer] call.
+  final links = <(String, String, String?)>[];
+
+  @override
+  Future<Result<void>> linkPlayer(
+    String teamId,
+    String playerId,
+    String? uid,
+  ) async {
+    links.add((teamId, playerId, uid));
+    final list = roster[teamId] ?? const <RosterPlayer>[];
+    roster[teamId] = [
+      for (final p in list)
+        p.id == playerId
+            ? RosterPlayer(
+                id: p.id,
+                name: p.name,
+                number: p.number,
+                position: p.position,
+                userId: uid,
+                onUsau: p.onUsau,
+                paid: p.paid,
+              )
+            : p,
+    ];
+    _rosterChanges.add(null);
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<void>> savePlayer(String teamId, RosterPlayer player) async =>
@@ -1284,3 +1407,101 @@ const _png = <int>[
   0x60,
   0x82,
 ];
+
+/// Profiles kept in memory. Records what was published.
+class FakeProfileRepository implements ProfileRepository {
+  final profiles = <String, PlayerProfile>{};
+  final published = <ProfileSummary>[];
+  final _changes = StreamController<String>.broadcast();
+
+  @override
+  Stream<PlayerProfile?> watchProfile(String uid) async* {
+    yield profiles[uid];
+    yield* _changes.stream.where((id) => id == uid).map((_) => profiles[uid]);
+  }
+
+  void put(PlayerProfile p) {
+    profiles[p.uid] = p;
+    _changes.add(p.uid);
+  }
+
+  @override
+  Future<Result<void>> saveDetails(
+    AppUser user,
+    ProfileDetails details, {
+    required List<String> tags,
+  }) async {
+    final old = profiles[user.uid];
+    put(
+      PlayerProfile(
+        uid: user.uid,
+        name: user.label,
+        details: details,
+        summary: old?.summary ?? const ProfileSummary(),
+      ),
+    );
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> publishSummary(
+    AppUser user,
+    ProfileSummary summary, {
+    required List<String> tags,
+  }) async {
+    published.add(summary);
+    final old = profiles[user.uid];
+    put(
+      PlayerProfile(
+        uid: user.uid,
+        name: user.label,
+        details: old?.details ?? const ProfileDetails(),
+        summary: summary,
+      ),
+    );
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<List<PlayerProfile>>> searchPlayers(String query) async =>
+      Result.ok([
+        for (final p in profiles.values)
+          if (p.matches(query)) p,
+      ]);
+}
+
+/// Tracked games kept in memory, by team.
+class FakeStatsRepository implements StatsRepository {
+  final games = <String, List<StatsGame>>{};
+
+  @override
+  Stream<List<StatsGame>> watchGames(String teamId) async* {
+    yield games[teamId] ?? const [];
+  }
+
+  @override
+  Stream<List<RosterPlayer>> watchPlayers(String teamId) async* {
+    yield const [];
+  }
+
+  @override
+  Stream<List<StatsTournament>> watchTournaments(String teamId) async* {
+    yield const [];
+  }
+
+  @override
+  Future<Result<String>> saveTournament(String teamId, StatsTournament t) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Result<String>> saveGame(String teamId, StatsGame game) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Result<void>> deleteGame(String teamId, String gameId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Result<void>> deleteTournament(String teamId, String tournamentId) =>
+      throw UnimplementedError();
+}

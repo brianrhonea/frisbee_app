@@ -67,7 +67,7 @@ void main() {
 
   group('models', () {
     test('groups round-trip their fields; teams store none', () {
-      final g = makeGroup(requiresApproval: true, location: location);
+      final g = makeGroup(location: location);
       final listing = TeamListing.of(g);
       final map = listing.toMap();
       expect(map['kind'], 'community');
@@ -81,7 +81,12 @@ void main() {
       expect(back.subtitle, 'Community group · Denver');
 
       expect(g.toEditableMap().containsKey('kind'), isFalse);
-      expect(g.toEditableMap()['requiresApproval'], isTrue);
+      expect(g.toEditableMap()['requiresApproval'], isFalse);
+
+      // A private group keeps its location off the public listing.
+      final private = makeGroup(requiresApproval: true, location: location);
+      expect(TeamListing.of(private).toMap()['location'], isNull);
+      expect(private.toEditableMap()['requiresApproval'], isTrue);
 
       final team = teamWith({'owner': TeamRole.owner});
       expect(team.toEditableMap().keys, ['name', 'division', 'level', 'city']);
@@ -294,7 +299,8 @@ void main() {
       ]) {
         expect(find.text(s.label), findsNothing);
       }
-      expect(find.text('You: Member · 2 members'), findsOneWidget);
+      expect(find.text('You: Member'), findsWidgets);
+      expect(find.textContaining('2 members · '), findsOneWidget);
     });
 
     testWidgets('approval groups show Ask to join, then pending', (

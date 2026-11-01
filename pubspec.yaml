@@ -87,18 +87,19 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # Headings. Barlow Condensed, SIL Open Font License (assets/fonts/OFL.txt).
+  # Inter, SIL Open Font License (assets/fonts/Inter-OFL.txt).
   fonts:
-    - family: Barlow Condensed
+    - family: Inter
       fonts:
-        - asset: assets/fonts/BarlowCondensed-SemiBold.ttf
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
           weight: 600
-        - asset: assets/fonts/BarlowCondensed-Bold.ttf
+        - asset: assets/fonts/Inter-Bold.ttf
           weight: 700
-        - asset: assets/fonts/BarlowCondensed-BoldItalic.ttf
-          weight: 700
-          style: italic
-        - asset: assets/fonts/BarlowCondensed-ExtraBold.ttf
+        - asset: assets/fonts/Inter-ExtraBold.ttf
           weight: 800
 
   # UltiUP logo variants (see lib/ui/core/ui/brand.dart).

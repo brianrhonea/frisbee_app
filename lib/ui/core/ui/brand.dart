@@ -31,11 +31,12 @@ class UltiUpLogo extends StatelessWidget {
   );
 }
 
-/// Logo followed by the app name.
+/// Logo followed by the app name, in [color] (default: the page's ink).
 class UltiUpWordmark extends StatelessWidget {
-  const UltiUpWordmark({super.key, this.size = 28});
+  const UltiUpWordmark({super.key, this.size = 28, this.color});
 
   final double size;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -44,17 +45,16 @@ class UltiUpWordmark extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         UltiUpLogo(size: size),
-        SizedBox(width: size * 0.3),
+        SizedBox(width: size * 0.32),
         Text(
-          appName.toUpperCase(),
+          appName,
           style: TextStyle(
-            fontFamily: headingFont,
-            fontWeight: FontWeight.w700,
-            fontStyle: FontStyle.italic,
-            fontSize: size,
+            fontFamily: appFont,
+            fontWeight: FontWeight.w800,
+            fontSize: size * 0.72,
             height: 1,
-            letterSpacing: 0.5,
-            color: c.ink,
+            letterSpacing: -0.6,
+            color: color ?? c.ink,
           ),
         ),
       ],

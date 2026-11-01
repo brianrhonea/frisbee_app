@@ -15,7 +15,23 @@ abstract final class Routes {
   static const rankings = '/rankings';
   static const profile = '/profile';
 
-  // Direct messages open over the shell; use `context.push`.
+  /// Another player's profile.
+  static String player(String uid) => '/players/$uid';
+
+  /// Explore: find teams and groups, events and rankings; [query] fills
+  /// the search.
+  static String explore({String? query}) {
+    final q = query?.trim() ?? '';
+    return Uri(
+      path: explorePath,
+      queryParameters: q.isEmpty ? null : {'q': q},
+    ).toString();
+  }
+
+  static const explorePath = '/explore';
+
+  // The inbox is a shell tab; a conversation opened on its own (e.g. from a
+  // notification or on a phone) opens over the shell, with `context.push`.
   static const messages = '/messages';
   static const newMessage = '/messages/new';
   static String conversation(String id) => '/messages/$id';
@@ -28,14 +44,17 @@ abstract final class Routes {
   /// everyone else.
   static String team(String teamId) => '/teams/$teamId';
 
-  // Team sections, opened from the team home page (TeamSection).
-  static String teamEvents(String teamId) => '/teams/$teamId/events';
-  static String teamChat(String teamId) => '/teams/$teamId/chat';
-  static String teamRoster(String teamId) => '/teams/$teamId/roster';
-  static String teamPlaybook(String teamId) => '/teams/$teamId/playbook';
-  static String teamStats(String teamId) => '/teams/$teamId/stats';
-  static String teamMembers(String teamId) => '/teams/$teamId/members';
-  static String teamVideos(String teamId) => '/teams/$teamId/videos';
+  // Team sections (TeamSection) are tabs of the team page, shown in place.
+  // The old `/teams/{id}/events`-style paths redirect here.
+  static String teamSection(String teamId, String section) =>
+      '/teams/$teamId?section=$section';
+  static String teamEvents(String teamId) => teamSection(teamId, 'events');
+  static String teamChat(String teamId) => teamSection(teamId, 'chat');
+  static String teamRoster(String teamId) => teamSection(teamId, 'roster');
+  static String teamPlaybook(String teamId) => teamSection(teamId, 'playbook');
+  static String teamStats(String teamId) => teamSection(teamId, 'stats');
+  static String teamMembers(String teamId) => teamSection(teamId, 'members');
+  static String teamVideos(String teamId) => teamSection(teamId, 'videos');
   static String newPlay(String teamId) => '/teams/$teamId/plays/new';
   // Chat pages open over the team; use `context.push` so back returns to
   // the chat room list.
@@ -61,7 +80,8 @@ abstract final class Routes {
   static String editEvent(String teamId, String eventId) =>
       '$teamEventsPath/$teamId/$eventId/edit';
 
-  static String teamTournaments(String teamId) => '/teams/$teamId/tournaments';
+  static String teamTournaments(String teamId) =>
+      teamSection(teamId, 'tournaments');
 
   // Community group tournament pages open over the tabs, like video pages;
   // use `context.push`.

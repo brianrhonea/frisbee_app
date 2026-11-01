@@ -15,12 +15,25 @@ class TeamsViewModel extends ChangeNotifier {
   }) : _teams = teamRepository,
        _auth = authRepository {
     joinTeam = Command1<String, String>(_joinTeam);
+    acceptInvite = Command1<String, TeamInvite>(_acceptInvite);
+    declineInvite = Command1<void, TeamInvite>(_declineInvite);
     _subscribe();
   }
 
   final TeamRepository _teams;
   final AuthRepository _auth;
   StreamSubscription<List<Team>>? _sub;
+  StreamSubscription<List<TeamInvite>>? _invitesSub;
+
+  List<TeamInvite> _invites = const [];
+
+  /// Invitations from owners and organizers, newest first.
+  List<TeamInvite> get invites => _invites;
+
+  /// Joins the invite's team; result value is the team id.
+  late final Command1<String, TeamInvite> acceptInvite;
+
+  late final Command1<void, TeamInvite> declineInvite;
 
   List<Team> _items = const [];
 
@@ -48,6 +61,11 @@ class TeamsViewModel extends ChangeNotifier {
     final user = _auth.currentUser;
     if (user == null) return;
     _sub?.cancel();
+    _invitesSub?.cancel();
+    _invitesSub = _teams.watchMyInvites(user.uid).listen((invites) {
+      _invites = invites;
+      notifyListeners();
+    }, onError: (Object _) {});
     _loading = true;
     _error = null;
     _sub = _teams
@@ -78,9 +96,23 @@ class TeamsViewModel extends ChangeNotifier {
     return _teams.joinTeam(code, user);
   }
 
+  Future<Result<String>> _acceptInvite(TeamInvite invite) async {
+    final user = _auth.currentUser;
+    if (user == null) return Result.error(Exception('Not signed in'));
+    final result = await _teams.acceptInvite(invite, user);
+    return switch (result) {
+      Ok() => Result.ok(invite.teamId),
+      Error(:final error) => Result.error(error),
+    };
+  }
+
+  Future<Result<void>> _declineInvite(TeamInvite invite) =>
+      _teams.declineInvite(uid, invite.teamId);
+
   @override
   void dispose() {
     _sub?.cancel();
+    _invitesSub?.cancel();
     super.dispose();
   }
 }

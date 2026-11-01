@@ -26,3 +26,6 @@ class AppUser {
   @override
   int get hashCode => Object.hash(uid, email, displayName, photoUrl);
 }
+
+/// How a user signs in.
+enum SignInMethod { password, google, apple }

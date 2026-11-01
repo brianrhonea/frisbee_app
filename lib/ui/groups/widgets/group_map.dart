@@ -70,8 +70,12 @@ class GroupMap extends StatelessWidget {
               ),
             ],
           ),
-        const SimpleAttributionWidget(
-          source: Text('OpenStreetMap contributors'),
+        // Small type so the attribution fits narrow cards; it can't wrap.
+        DefaultTextStyle.merge(
+          style: const TextStyle(fontSize: 10),
+          child: const SimpleAttributionWidget(
+            source: Text('OpenStreetMap contributors'),
+          ),
         ),
       ],
     );

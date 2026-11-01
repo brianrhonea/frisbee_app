@@ -15,7 +15,6 @@ import '../ui/chat/view_models/chat_room_viewmodel.dart';
 import '../ui/chat/widgets/chat_layout.dart';
 import '../ui/chat/widgets/chat_room_screen.dart';
 import '../ui/chat/widgets/chat_room_settings_screen.dart';
-import '../ui/core/ui/adaptive_shell.dart';
 import '../ui/meetings/view_models/meeting_detail_viewmodel.dart';
 import '../ui/meetings/view_models/meeting_editor_viewmodel.dart';
 import '../ui/meetings/view_models/meeting_room_viewmodel.dart';
@@ -31,6 +30,10 @@ import '../ui/messages/widgets/people_search_screen.dart';
 import '../ui/core/ui/status_views.dart';
 import '../ui/core/ui/view_model_host.dart';
 import '../ui/events/widgets/events_screen.dart';
+import '../ui/explore/view_models/player_search_viewmodel.dart';
+import '../ui/explore/widgets/explore_screen.dart';
+import '../ui/shell/view_models/shell_viewmodel.dart';
+import '../ui/shell/widgets/app_shell.dart';
 import '../ui/home/view_models/home_viewmodel.dart';
 import '../ui/home/widgets/home_screen.dart';
 import '../ui/playbook/view_models/play_editor_viewmodel.dart';
@@ -39,6 +42,7 @@ import '../ui/notifications/view_models/notification_settings_viewmodel.dart';
 import '../ui/notifications/view_models/notifications_viewmodel.dart';
 import '../ui/notifications/widgets/notification_settings_screen.dart';
 import '../ui/notifications/widgets/notifications_screen.dart';
+import '../ui/profile/view_models/player_profile_viewmodel.dart';
 import '../ui/profile/view_models/profile_viewmodel.dart';
 import '../ui/profile/widgets/profile_screen.dart';
 import '../ui/rankings/view_models/rankings_viewmodel.dart';
@@ -60,7 +64,6 @@ import '../ui/stats/widgets/game_screen.dart';
 import '../ui/stats/widgets/stats_tab.dart';
 import '../ui/stats/widgets/tournament_screen.dart';
 import '../ui/teams/view_models/create_team_viewmodel.dart';
-import '../ui/teams/view_models/team_detail_viewmodel.dart';
 import '../ui/teams/view_models/team_home_viewmodel.dart';
 import '../ui/teams/view_models/team_search_viewmodel.dart';
 import '../ui/teams/view_models/teams_viewmodel.dart';
@@ -113,18 +116,6 @@ GoRouter router(AuthRepository auth) => GoRouter(
       builder: (context, _) => ViewModelHost(
         create: (c) => SignUpViewModel(authRepository: c.read()),
         builder: (_, vm) => SignUpScreen(viewModel: vm),
-      ),
-    ),
-    // Opened from the avatar on Home, over the shell.
-    GoRoute(
-      path: Routes.profile,
-      builder: (_, _) => ViewModelHost(
-        create: (c) => ProfileViewModel(
-          authRepository: c.read(),
-          themeRepository: c.read(),
-          notificationRepository: c.read(),
-        ),
-        builder: (_, vm) => ProfileScreen(viewModel: vm),
       ),
     ),
     // Opened from the bell on Home, over the shell.
@@ -392,48 +383,6 @@ GoRouter router(AuthRepository auth) => GoRouter(
         ),
       ],
     ),
-    // Direct messages, full screen over the shell (opened with push).
-    GoRoute(
-      path: Routes.messages,
-      builder: (_, _) => ViewModelHost(
-        create: (c) => InboxViewModel(
-          directMessageRepository: c.read(),
-          authRepository: c.read(),
-        ),
-        builder: (_, vm) => InboxScreen(viewModel: vm),
-      ),
-      routes: [
-        GoRoute(
-          path: 'new',
-          builder: (_, _) => ViewModelHost(
-            create: (c) => PeopleSearchViewModel(
-              directMessageRepository: c.read(),
-              authRepository: c.read(),
-            ),
-            builder: (_, vm) => PeopleSearchScreen(viewModel: vm),
-          ),
-        ),
-        GoRoute(
-          path: ':conversationId',
-          pageBuilder: (_, state) {
-            final id = state.pathParameters['conversationId']!;
-            return chatPage(
-              state.pageKey,
-              ViewModelHost(
-                key: ValueKey('dm-$id'),
-                create: (c) => DirectChatViewModel(
-                  conversationId: id,
-                  directMessageRepository: c.read(),
-                  authRepository: c.read(),
-                  filePicker: c.read(),
-                ),
-                builder: (_, vm) => DirectChatScreen(viewModel: vm),
-              ),
-            );
-          },
-        ),
-      ],
-    ),
     // Personal schedule, full screen over the shell.
     GoRoute(
       path: Routes.myEventsPath,
@@ -494,9 +443,23 @@ GoRouter router(AuthRepository auth) => GoRouter(
         ),
       ],
     ),
+    // The app frame; branch order matches ShellSection.
     StatefulShellRoute.indexedStack(
-      builder: (_, _, shell) => AdaptiveShell(navigationShell: shell),
+      builder: (_, state, shell) => ViewModelHost(
+        create: (c) => ShellViewModel(
+          authRepository: c.read(),
+          teamRepository: c.read(),
+          directMessageRepository: c.read(),
+          notificationRepository: c.read(),
+        ),
+        builder: (_, vm) => AppShell(
+          viewModel: vm,
+          navigationShell: shell,
+          location: state.uri.toString(),
+        ),
+      ),
       branches: [
+        // Community: the feed and the user's schedule.
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -504,20 +467,105 @@ GoRouter router(AuthRepository auth) => GoRouter(
               builder: (_, _) => ViewModelHost(
                 create: (c) => HomeViewModel(
                   authRepository: c.read(),
-                  directMessageRepository: c.read(),
-                  notificationRepository: c.read(),
                   teamRepository: c.read(),
-                  playRepository: c.read(),
                   eventRepository: c.read(),
                   meetingRepository: c.read<MeetingRepository>(),
+                  teamPostRepository: c.read(),
                   tournamentRepository: c.read(),
-                  rankingRepository: c.read(),
+                  filePicker: c.read(),
                 ),
                 builder: (_, vm) => HomeScreen(viewModel: vm),
               ),
             ),
+            GoRoute(
+              path: Routes.schedule,
+              builder: (_, _) => ViewModelHost(
+                create: (c) => ScheduleViewModel(
+                  authRepository: c.read(),
+                  teamRepository: c.read(),
+                  eventRepository: c.read(),
+                  meetingRepository: c.read<MeetingRepository>(),
+                ),
+                builder: (_, vm) => ScheduleScreen(viewModel: vm),
+              ),
+            ),
           ],
         ),
+        // Explore: search, events and rankings.
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: Routes.explorePath,
+              builder: (_, state) => ViewModelHost(
+                create: (c) => TeamSearchViewModel(
+                  teamRepository: c.read(),
+                  authRepository: c.read(),
+                ),
+                builder: (_, vm) => ViewModelHost(
+                  create: (c) =>
+                      PlayerSearchViewModel(profileRepository: c.read()),
+                  builder: (_, players) => ExploreScreen(
+                    viewModel: vm,
+                    players: players,
+                    initialQuery: state.uri.queryParameters['q'] ?? '',
+                  ),
+                ),
+              ),
+            ),
+            GoRoute(
+              path: '/players/:uid',
+              // Your own profile lives on the Profile tab.
+              redirect: (_, state) =>
+                  state.pathParameters['uid'] == auth.currentUser?.uid
+                  ? Routes.profile
+                  : null,
+              builder: (_, state) {
+                final uid = state.pathParameters['uid']!;
+                return ViewModelHost(
+                  key: ValueKey(uid),
+                  create: (c) => _playerProfile(c, uid),
+                  builder: (_, vm) => PlayerProfileScreen(viewModel: vm),
+                );
+              },
+            ),
+            GoRoute(
+              path: Routes.tournaments,
+              builder: (_, _) => ViewModelHost(
+                create: (c) =>
+                    TournamentsViewModel(tournamentRepository: c.read()),
+                builder: (_, vm) => EventsScreen(viewModel: vm),
+              ),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  builder: (_, state) {
+                    final id = state.pathParameters['id']!;
+                    return ViewModelHost(
+                      key: ValueKey('tournament-$id'),
+                      create: (c) => TournamentDetailViewModel(
+                        tournamentId: id,
+                        tournamentRepository: c.read(),
+                        usauScheduleRepository: c.read(),
+                      ),
+                      builder: (_, vm) => TournamentDetailScreen(viewModel: vm),
+                    );
+                  },
+                ),
+              ],
+            ),
+            GoRoute(
+              path: Routes.rankings,
+              builder: (_, _) => ViewModelHost(
+                create: (c) => RankingsViewModel(rankingRepository: c.read()),
+                builder: (_, vm) => RankingsScreen(viewModel: vm),
+              ),
+              routes: [
+                GoRoute(path: 'team', builder: (_, state) => _usauTeam(state)),
+              ],
+            ),
+          ],
+        ),
+        // My team: the user's teams and every team page.
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -598,14 +646,22 @@ GoRouter router(AuthRepository auth) => GoRouter(
                         authRepository: c.read(),
                         filePicker: c.read(),
                       ),
-                      builder: (_, vm) => TeamHomeScreen(viewModel: vm),
+                      builder: (_, vm) => TeamHomeScreen(
+                        viewModel: vm,
+                        section: TeamSection.fromPath(
+                          state.uri.queryParameters['section'],
+                        ),
+                      ),
                     );
                   },
                   routes: [
+                    // Sections are tabs of the team page; old links (e.g.
+                    // in the notification feed) name them by path.
                     for (final section in TeamSection.values)
                       GoRoute(
                         path: section.path,
-                        builder: (_, state) => _teamSection(state, section),
+                        redirect: (_, state) =>
+                            section.route(state.pathParameters['teamId']!),
                       ),
                     GoRoute(
                       path: 'chats/new',
@@ -745,44 +801,49 @@ GoRouter router(AuthRepository auth) => GoRouter(
             ),
           ],
         ),
+        // Messages: direct messages and team chats.
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: Routes.schedule,
+              path: Routes.messages,
               builder: (_, _) => ViewModelHost(
-                create: (c) => ScheduleViewModel(
-                  authRepository: c.read(),
+                create: (c) => InboxViewModel(
+                  directMessageRepository: c.read(),
                   teamRepository: c.read(),
-                  eventRepository: c.read(),
-                  meetingRepository: c.read<MeetingRepository>(),
+                  chatRepository: c.read(),
+                  authRepository: c.read(),
                 ),
-                builder: (_, vm) => ScheduleScreen(viewModel: vm),
-              ),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: Routes.tournaments,
-              builder: (_, _) => ViewModelHost(
-                create: (c) =>
-                    TournamentsViewModel(tournamentRepository: c.read()),
-                builder: (_, vm) => EventsScreen(viewModel: vm),
+                builder: (_, vm) => InboxScreen(viewModel: vm),
               ),
               routes: [
                 GoRoute(
-                  path: ':id',
-                  builder: (_, state) {
-                    final id = state.pathParameters['id']!;
-                    return ViewModelHost(
-                      key: ValueKey('tournament-$id'),
-                      create: (c) => TournamentDetailViewModel(
-                        tournamentId: id,
-                        tournamentRepository: c.read(),
-                        usauScheduleRepository: c.read(),
+                  path: 'new',
+                  parentNavigatorKey: _rootKey,
+                  builder: (_, _) => ViewModelHost(
+                    create: (c) => PeopleSearchViewModel(
+                      directMessageRepository: c.read(),
+                      authRepository: c.read(),
+                    ),
+                    builder: (_, vm) => PeopleSearchScreen(viewModel: vm),
+                  ),
+                ),
+                GoRoute(
+                  path: ':conversationId',
+                  parentNavigatorKey: _rootKey,
+                  pageBuilder: (_, state) {
+                    final id = state.pathParameters['conversationId']!;
+                    return chatPage(
+                      state.pageKey,
+                      ViewModelHost(
+                        key: ValueKey('dm-$id'),
+                        create: (c) => DirectChatViewModel(
+                          conversationId: id,
+                          directMessageRepository: c.read(),
+                          authRepository: c.read(),
+                          filePicker: c.read(),
+                        ),
+                        builder: (_, vm) => DirectChatScreen(viewModel: vm),
                       ),
-                      builder: (_, vm) => TournamentDetailScreen(viewModel: vm),
                     );
                   },
                 ),
@@ -790,17 +851,26 @@ GoRouter router(AuthRepository auth) => GoRouter(
             ),
           ],
         ),
+        // My profile.
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: Routes.rankings,
+              path: Routes.profile,
               builder: (_, _) => ViewModelHost(
-                create: (c) => RankingsViewModel(rankingRepository: c.read()),
-                builder: (_, vm) => RankingsScreen(viewModel: vm),
+                create: (c) => ProfileViewModel(
+                  authRepository: c.read(),
+                  themeRepository: c.read(),
+                  notificationRepository: c.read(),
+                ),
+                builder: (_, settings) => ViewModelHost(
+                  create: (c) => _playerProfile(
+                    c,
+                    c.read<AuthRepository>().currentUser?.uid ?? '',
+                  ),
+                  builder: (_, vm) =>
+                      PlayerProfileScreen(viewModel: vm, settings: settings),
+                ),
               ),
-              routes: [
-                GoRoute(path: 'team', builder: (_, state) => _usauTeam(state)),
-              ],
             ),
           ],
         ),
@@ -808,6 +878,16 @@ GoRouter router(AuthRepository auth) => GoRouter(
     ),
   ],
 );
+
+PlayerProfileViewModel _playerProfile(BuildContext c, String uid) =>
+    PlayerProfileViewModel(
+      uid: uid,
+      profileRepository: c.read(),
+      authRepository: c.read(),
+      teamRepository: c.read(),
+      statsRepository: c.read(),
+      directMessageRepository: c.read(),
+    );
 
 /// Sends signed-out users to sign-in (remembering where they were headed)
 /// and signed-in users away from the auth screens.
@@ -879,22 +959,6 @@ Widget _videoEditor(GoRouterState state, String? videoId) {
 }
 
 /// A USA Ultimate team page, from Rankings or Teams search.
-Widget _teamSection(GoRouterState state, TeamSection section) {
-  final teamId = state.pathParameters['teamId']!;
-  return ViewModelHost(
-    key: ValueKey('team-$teamId-${section.name}'),
-    create: (c) => TeamDetailViewModel(
-      teamId: teamId,
-      teamRepository: c.read(),
-      playRepository: c.read(),
-      eventRepository: c.read(),
-      meetingRepository: c.read<MeetingRepository>(),
-      authRepository: c.read(),
-    ),
-    builder: (_, vm) => TeamSectionScreen(viewModel: vm, section: section),
-  );
-}
-
 Widget _usauTeam(GoRouterState state) {
   final url = state.uri.queryParameters['url'] ?? '';
   return ViewModelHost(

@@ -215,6 +215,10 @@ class Team {
 
   bool get isCommunity => kind == TeamKind.community;
 
+  /// A group that needs approval to join. Its location, posts and events are
+  /// for members only; search shows just its name, city and description.
+  bool get isPrivateGroup => isCommunity && requiresApproval;
+
   /// uid → role.
   final Map<String, TeamRole> members;
 
@@ -434,6 +438,10 @@ class TeamListing {
 
   bool get isCommunity => kind == TeamKind.community;
 
+  /// A group that needs approval to join. Its location, posts and events are
+  /// for members only; search shows just its name, city and description.
+  bool get isPrivateGroup => isCommunity && requiresApproval;
+
   /// "Mixed · Club · Denver", or "Community group · Denver".
   String get subtitle => [
     if (isCommunity) kind.label else ...[division.label, level.label],
@@ -453,7 +461,7 @@ class TeamListing {
       kind == team.kind &&
       description == team.description &&
       requiresApproval == team.requiresApproval &&
-      location == team.location;
+      location == (team.isPrivateGroup ? null : team.location);
 
   factory TeamListing.fromMap(String id, Map<String, dynamic> map) =>
       TeamListing(
@@ -481,7 +489,8 @@ class TeamListing {
       kind: kind,
       description: description,
       requiresApproval: requiresApproval,
-      location: location,
+      // A private group's location is for members only.
+      location: isPrivateGroup ? null : location,
     ),
     'keywords': searchKeywords('$name $city'),
   };
@@ -504,6 +513,39 @@ class GroupJoinRequest {
       GroupJoinRequest(
         uid: uid,
         name: map['name'] as String? ?? '',
+        createdAt: parseDate(map['createdAt']),
+      );
+}
+
+/// An invitation to join a team or group
+/// (`users/{uid}/teamInvites/{teamId}`), sent by an owner or organizer who
+/// found the user in the people directory. Accepting joins without a code.
+class TeamInvite {
+  const TeamInvite({
+    required this.teamId,
+    required this.teamName,
+    this.kind = TeamKind.team,
+    this.invitedBy = '',
+    this.invitedByName = '',
+    this.createdAt,
+  });
+
+  final String teamId;
+  final String teamName;
+  final TeamKind kind;
+  final String invitedBy;
+  final String invitedByName;
+  final DateTime? createdAt;
+
+  bool get isCommunity => kind == TeamKind.community;
+
+  factory TeamInvite.fromMap(String teamId, Map<String, dynamic> map) =>
+      TeamInvite(
+        teamId: teamId,
+        teamName: map['teamName'] as String? ?? '',
+        kind: enumByName(TeamKind.values, map['kind'], TeamKind.team),
+        invitedBy: map['invitedBy'] as String? ?? '',
+        invitedByName: map['invitedByName'] as String? ?? '',
         createdAt: parseDate(map['createdAt']),
       );
 }

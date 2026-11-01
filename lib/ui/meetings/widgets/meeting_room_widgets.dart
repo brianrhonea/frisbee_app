@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../data/services/meeting_call.dart';
-import '../../messages/widgets/inbox_screen.dart' show PersonAvatar;
+import '../../core/ui/layout.dart' show PersonAvatar;
 import '../view_models/meeting_room_viewmodel.dart';
 
 /// A person's photo or initials at [size].

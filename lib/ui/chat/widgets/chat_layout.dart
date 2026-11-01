@@ -137,3 +137,73 @@ CustomTransitionPage<void> chatPage(LocalKey key, Widget child) =>
         child: child,
       ),
     );
+
+/// The bar above an open conversation: [avatar], [title] over [subtitle],
+/// and [actions], on the card color with a line below.
+class ChatHeaderBar extends StatelessWidget implements PreferredSizeWidget {
+  const ChatHeaderBar({
+    super.key,
+    this.leading,
+    this.avatar,
+    this.title,
+    this.subtitle,
+    this.actions = const [],
+  });
+
+  final Widget? leading;
+  final Widget? avatar;
+  final String? title;
+  final String? subtitle;
+  final List<Widget> actions;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(64);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final t = title;
+    final canPop = Navigator.canPop(context);
+    return AppBar(
+      automaticallyImplyLeading: leading == null && canPop,
+      leading: leading,
+      toolbarHeight: 64,
+      backgroundColor: c.card,
+      titleSpacing: leading == null && !canPop ? 16 : 0,
+      shape: Border(bottom: BorderSide(color: c.border)),
+      title: t == null
+          ? null
+          : Row(
+              children: [
+                if (avatar != null) ...[avatar!, const SizedBox(width: 12)],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        t,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: c.ink,
+                        ),
+                      ),
+                      if (subtitle != null)
+                        Text(
+                          subtitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11.5, color: c.muted),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+      actions: actions,
+    );
+  }
+}

@@ -177,6 +177,27 @@ void main() {
       expect(listing.sameAs(team), isTrue);
       expect(listing.sameAs(team.copyWith(city: 'Durham')), isFalse);
     });
+
+    test("a private group's listing leaves out its location", () {
+      final group = Team.fromMap('g1', {
+        'name': 'Friends',
+        'division': 'mixed',
+        'level': 'pickup',
+        'kind': 'community',
+        'requiresApproval': true,
+        'location': {'address': 'City Park', 'lat': 39.75, 'lng': -104.95},
+        'members': {'a': 'owner'},
+      });
+      expect(group.isPrivateGroup, isTrue);
+      final map = TeamListing.of(group).toMap();
+      expect(map['location'], isNull);
+      final listing = TeamListing.fromMap('g1', map);
+      expect(listing.location, isNull);
+      expect(listing.sameAs(group), isTrue);
+      // An open group shows it.
+      final open = group.copyWith(requiresApproval: false);
+      expect(TeamListing.of(open).toMap()['location'], isNotNull);
+    });
   });
 
   group('public events and posts', () {

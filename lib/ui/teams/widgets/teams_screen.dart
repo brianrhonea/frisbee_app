@@ -25,12 +25,37 @@ class _TeamsScreenState extends State<TeamsScreen> {
   void initState() {
     super.initState();
     vm.joinTeam.addListener(_onJoin);
+    vm.acceptInvite.addListener(_onAccept);
+    vm.declineInvite.addListener(_onDecline);
   }
 
   @override
   void dispose() {
     vm.joinTeam.removeListener(_onJoin);
+    vm.acceptInvite.removeListener(_onAccept);
+    vm.declineInvite.removeListener(_onDecline);
     super.dispose();
+  }
+
+  void _onAccept() {
+    final cmd = vm.acceptInvite;
+    switch (cmd.result) {
+      case Ok<String>(:final value):
+        cmd.clearResult();
+        context.go(Routes.team(value));
+      case Error<String>():
+        showErrorSnackBar(context, cmd.result);
+        cmd.clearResult();
+      case null:
+        break;
+    }
+  }
+
+  void _onDecline() {
+    if (vm.declineInvite.result is Error) {
+      showErrorSnackBar(context, vm.declineInvite.result);
+      vm.declineInvite.clearResult();
+    }
   }
 
   void _onJoin() {
@@ -82,13 +107,22 @@ class _TeamsScreenState extends State<TeamsScreen> {
         label: const Text('New'),
       ),
       body: ListenableBuilder(
-        listenable: vm,
+        listenable: Listenable.merge([vm, vm.acceptInvite, vm.declineInvite]),
         builder: (context, _) {
           if (vm.loading) return const LoadingView();
           if (vm.error != null) {
             return ErrorView(error: vm.error, onRetry: vm.retry);
           }
-          if (vm.all.isEmpty) {
+          final invites = [
+            for (final i in vm.invites)
+              _InviteTile(
+                invite: i,
+                busy: vm.acceptInvite.running || vm.declineInvite.running,
+                onAccept: () => vm.acceptInvite.execute(i),
+                onDecline: () => vm.declineInvite.execute(i),
+              ),
+          ];
+          if (vm.all.isEmpty && invites.isEmpty) {
             return EmptyView(
               icon: Icons.groups_outlined,
               title: 'No teams or groups yet',
@@ -119,6 +153,11 @@ class _TeamsScreenState extends State<TeamsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               children: [
+                if (invites.isNotEmpty) ...[
+                  const _Heading('Invitations'),
+                  ...invites,
+                  const SizedBox(height: 8),
+                ],
                 if (teams.isNotEmpty) ...[
                   if (groups.isNotEmpty) const _Heading('My teams'),
                   for (final t in teams) _TeamCard(team: t, role: vm.roleIn(t)),
@@ -209,6 +248,61 @@ class _TeamCard extends StatelessWidget {
               ? null
               : Chip(label: Text(role!.labelFor(team.kind))),
           onTap: () => context.go(Routes.team(team.id)),
+        ),
+      ),
+    );
+  }
+}
+
+/// An invitation to join a team or group, with Accept and Decline.
+class _InviteTile extends StatelessWidget {
+  const _InviteTile({
+    required this.invite,
+    required this.busy,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  final TeamInvite invite;
+  final bool busy;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) {
+    final what = invite.isCommunity ? 'group' : 'team';
+    final from = invite.invitedByName.isEmpty
+        ? 'You were invited to join this $what.'
+        : '${invite.invitedByName} invited you to join this $what.';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Row(
+          children: [
+            Icon(invite.isCommunity ? Icons.diversity_3 : Icons.groups),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    invite.teamName,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  Text(from, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: busy ? null : onDecline,
+              child: const Text('Decline'),
+            ),
+            const SizedBox(width: 4),
+            FilledButton(
+              onPressed: busy ? null : onAccept,
+              child: const Text('Accept'),
+            ),
+          ],
         ),
       ),
     );

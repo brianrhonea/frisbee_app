@@ -225,7 +225,7 @@ class WeekDayCell extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: large ? 16 : 14,
-                  color: selected ? Colors.white : c.ink,
+                  color: selected ? c.onAccent : c.ink,
                 ),
               ),
             ),

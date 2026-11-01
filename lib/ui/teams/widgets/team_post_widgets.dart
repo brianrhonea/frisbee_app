@@ -1,37 +1,49 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart';
 
 enum _PostAction { edit, delete }
 
 /// Loads a post photo's bytes.
 typedef ImageLoader = Future<Result<Uint8List>> Function(ChatAttachment image);
 
-/// A post on the team home page: text, place, links and photos.
-/// [onEdit] and [onDelete] are for team admins; [showVisibility] marks each
-/// post public or members-only.
+/// A post: author and team, title, text, photos, place and links.
+/// [teamName] names the team it's from (on the community feed); [onEdit]
+/// and [onDelete] are for team admins; [showVisibility] marks each post
+/// public or members-only.
 class TeamPostCard extends StatelessWidget {
   const TeamPostCard({
     super.key,
     required this.post,
     required this.loadImage,
+    this.teamName,
+    this.onOpenTeam,
     this.showVisibility = false,
     this.onEdit,
     this.onDelete,
+    this.now,
   });
 
   final TeamPost post;
   final ImageLoader loadImage;
+  final String? teamName;
+
+  /// Opens the team's page from its name.
+  final VoidCallback? onOpenTeam;
   final bool showVisibility;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+
+  /// For "2 hours ago"; defaults to the current time.
+  final DateTime? now;
 
   Future<void> _open(BuildContext context, Uri uri) async {
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
@@ -50,28 +62,48 @@ class TeamPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = AppColors.of(context);
     final when = post.createdAt;
+    final author = post.authorName.isEmpty ? 'Team admin' : post.authorName;
     final byline = [
-      if (post.authorName.isNotEmpty) post.authorName,
-      if (when != null) DateFormat.MMMd().add_jm().format(when),
+      ?teamName,
+      if (when != null) timeAgo(when, now ?? DateTime.now()),
       if (post.edited) 'edited',
     ].join(' · ');
+    final images = post.images;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 4, 16),
+        padding: const EdgeInsets.fromLTRB(18, 16, 8, 16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
+                PersonAvatar(name: author, radius: 18),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    byline,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        author,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
+                          color: c.ink,
+                        ),
+                      ),
+                      if (byline.isNotEmpty)
+                        InkWell(
+                          onTap: onOpenTeam,
+                          child: Text(
+                            byline,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11.5, color: c.muted),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 if (showVisibility)
@@ -81,13 +113,14 @@ class TeamPostCard extends StatelessWidget {
                         : 'Only team members can see this',
                     child: Icon(
                       post.isPublic ? Icons.public : Icons.lock_outline,
-                      size: 16,
-                      color: scheme.outline,
+                      size: 15,
+                      color: c.muted,
                     ),
                   ),
                 if (onEdit != null || onDelete != null)
                   PopupMenuButton<_PostAction>(
                     tooltip: 'Post options',
+                    icon: Icon(Icons.more_horiz, color: c.muted),
                     onSelected: (a) => switch (a) {
                       _PostAction.edit => onEdit?.call(),
                       _PostAction.delete => onDelete?.call(),
@@ -106,39 +139,61 @@ class TeamPostCard extends StatelessWidget {
                     ],
                   )
                 else
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
               ],
             ),
             Padding(
-              padding: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.only(right: 10),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (post.title.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(post.title, style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 14),
+                    Text(
+                      post.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        letterSpacing: -0.3,
+                        color: c.ink,
+                      ),
+                    ),
                   ],
                   if (post.body.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    SizedBox(height: post.title.isEmpty ? 12 : 6),
                     SelectableText(
                       post.body,
-                      style: theme.textTheme.bodyMedium,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: c.ink,
+                      ),
                     ),
                   ],
-                  if (post.images.isNotEmpty) ...[
+                  if (images.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final i in post.images)
-                          PostImage(
-                            image: i,
-                            loadImage: loadImage,
-                            size: post.images.length == 1 ? 320 : 156,
-                          ),
-                      ],
-                    ),
+                    if (images.length == 1)
+                      PostImage(
+                        image: images.single,
+                        loadImage: loadImage,
+                        aspectRatio: 16 / 10,
+                      )
+                    else
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 6,
+                        crossAxisSpacing: 6,
+                        children: [
+                          for (final i in images)
+                            PostImage(
+                              image: i,
+                              loadImage: loadImage,
+                              aspectRatio: 1,
+                            ),
+                        ],
+                      ),
                   ],
                   if (post.location.isNotEmpty) ...[
                     const SizedBox(height: 8),
@@ -221,11 +276,17 @@ class PostImage extends StatefulWidget {
     required this.image,
     required this.loadImage,
     this.size = 156,
+    this.aspectRatio,
   });
 
   final ChatAttachment image;
   final ImageLoader loadImage;
+
+  /// Width and height of a square photo, when [aspectRatio] is null.
   final double size;
+
+  /// Fills the available width at this shape instead of [size].
+  final double? aspectRatio;
 
   @override
   State<PostImage> createState() => _PostImageState();
@@ -247,7 +308,10 @@ class _PostImageState extends State<PostImage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final side = widget.size;
+    final ratio = widget.aspectRatio;
+    Widget box(Widget child) => ratio == null
+        ? SizedBox.square(dimension: widget.size, child: child)
+        : AspectRatio(aspectRatio: ratio, child: child);
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: ColoredBox(
@@ -255,45 +319,41 @@ class _PostImageState extends State<PostImage> {
         child: FutureBuilder(
           future: _data,
           builder: (context, snap) => switch (snap.data) {
-            null => SizedBox.square(
-              dimension: side,
-              child: const Center(child: CircularProgressIndicator()),
-            ),
-            Error() => SizedBox.square(
-              dimension: side,
-              child: IconButton(
+            null => box(const Center(child: CircularProgressIndicator())),
+            Error() => box(
+              IconButton(
                 tooltip: "Couldn't load photo. Retry",
                 onPressed: _retry,
                 icon: const Icon(Icons.broken_image_outlined),
               ),
             ),
-            Ok(:final value) => InkWell(
-              onTap: () => showDialog<void>(
-                context: context,
-                builder: (context) => Dialog(
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    children: [
-                      InteractiveViewer(child: Image.memory(value)),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: IconButton.filledTonal(
-                          tooltip: 'Close',
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close),
+            Ok(:final value) => box(
+              InkWell(
+                onTap: () => showDialog<void>(
+                  context: context,
+                  builder: (context) => Dialog(
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      children: [
+                        InteractiveViewer(child: Image.memory(value)),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: IconButton.filledTonal(
+                            tooltip: 'Close',
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              child: Image.memory(
-                value,
-                width: side,
-                height: side,
-                fit: BoxFit.cover,
-                semanticLabel: widget.image.name,
+                child: Image.memory(
+                  value,
+                  fit: BoxFit.cover,
+                  semanticLabel: widget.image.name,
+                ),
               ),
             ),
           },
@@ -312,7 +372,11 @@ class PostEditorDialog extends StatefulWidget {
     required this.loadImage,
     this.initial,
     this.suggested = false,
+    this.allowPublic = true,
   });
+
+  /// Offer the Public switch. A private group's posts are members-only.
+  final bool allowPublic;
 
   /// The post being edited; null for a new one.
   final TeamPost? initial;
@@ -399,7 +463,7 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
       location: _location.text.trim(),
       links: List.of(_links),
       images: List.of(_kept),
-      isPublic: _public,
+      isPublic: _public && widget.allowPublic,
     );
     Navigator.pop(context, PostDraft(post: post, newImages: List.of(_added)));
   }
@@ -542,18 +606,19 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
                         ),
                     ],
                   ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  secondary: const Icon(Icons.public),
-                  title: const Text('Public'),
-                  subtitle: Text(
-                    _public
-                        ? 'Anyone who finds the team can see it'
-                        : 'Only team members can see it',
+                if (widget.allowPublic)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: const Icon(Icons.public),
+                    title: const Text('Public'),
+                    subtitle: Text(
+                      _public
+                          ? 'Anyone who finds the team can see it'
+                          : 'Only team members can see it',
+                    ),
+                    value: _public,
+                    onChanged: (v) => setState(() => _public = v),
                   ),
-                  value: _public,
-                  onChanged: (v) => setState(() => _public = v),
-                ),
               ],
             ),
           ),

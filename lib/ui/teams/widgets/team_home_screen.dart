@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../domain/models/team_post.dart';
@@ -10,12 +12,17 @@ import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
+import '../../core/ui/view_model_host.dart';
 import '../../groups/widgets/group_map.dart';
 import '../../schedule/widgets/event_style.dart';
 import '../../schedule/widgets/team_events_tab.dart';
+import '../view_models/team_detail_viewmodel.dart';
 import '../view_models/team_home_viewmodel.dart';
+import 'invite_members_dialog.dart';
 import 'join_team_dialog.dart';
 import 'team_form.dart';
 import 'team_post_widgets.dart';
@@ -23,12 +30,16 @@ import 'team_section_screen.dart';
 
 enum _MenuAction { edit, leave, delete }
 
-/// A team's home page. Members see a summary, links to each section, what's
-/// coming up and the team's posts; anyone else sees the public page.
+/// A team's home page. Members see a summary, tabs for each section, what's
+/// coming up and the team's posts; anyone else sees the public page. The
+/// tabs show their section in place, under a compact header.
 class TeamHomeScreen extends StatefulWidget {
-  const TeamHomeScreen({super.key, required this.viewModel});
+  const TeamHomeScreen({super.key, required this.viewModel, this.section});
 
   final TeamHomeViewModel viewModel;
+
+  /// The open tab; null for the overview.
+  final TeamSection? section;
 
   @override
   State<TeamHomeScreen> createState() => _TeamHomeScreenState();
@@ -182,6 +193,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         initial: post,
         pickImages: vm.pickImages,
         loadImage: vm.imageData,
+        allowPublic: !(vm.team?.isPrivateGroup ?? false),
       ),
     );
     if (draft != null) vm.savePost.execute(draft);
@@ -201,7 +213,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
 
   void _openEvent(TeamEvent e) {
     if (vm.isMember) {
-      context.push(Routes.teamEvent(vm.teamId, e));
+      openTeamEvent(context, vm.teamId, e);
     } else {
       showModalBottomSheet<void>(
         context: context,
@@ -222,158 +234,326 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         vm.savePost,
       ]),
       builder: (context, _) {
+        final mobile = ScreenSize.of(context).isMobile;
         final leading = backOr(context, Routes.teams);
         final summary = vm.summary;
-        if (!vm.loaded) {
+        if (!vm.loaded || summary == null) {
           return Scaffold(
             appBar: AppBar(leading: leading),
-            body: const LoadingView(),
-          );
-        }
-        if (summary == null) {
-          return Scaffold(
-            appBar: AppBar(leading: leading),
-            body: const EmptyView(
-              icon: Icons.group_off_outlined,
-              title: 'Team not available',
-              message: 'It may have been deleted or you were removed.',
-            ),
+            body: !vm.loaded
+                ? const LoadingView()
+                : const EmptyView(
+                    icon: Icons.group_off_outlined,
+                    title: 'Team not available',
+                    message: 'It may have been deleted or you were removed.',
+                  ),
           );
         }
         final team = vm.team;
-        final noun = summary.isCommunity ? 'group' : 'team';
-        final location = summary.location;
-        return Scaffold(
-          appBar: AppBar(
-            leading: leading,
-            title: Text(summary.name),
-            actions: [
-              if (team != null)
-                PopupMenuButton<_MenuAction>(
-                  onSelected: (a) => _onMenu(a, team),
-                  itemBuilder: (_) => [
-                    if (vm.canEdit)
-                      PopupMenuItem(
-                        value: _MenuAction.edit,
-                        child: Text('Edit $noun'),
-                      ),
-                    if (!vm.isOwner)
-                      PopupMenuItem(
-                        value: _MenuAction.leave,
-                        child: Text('Leave $noun'),
-                      ),
-                    if (vm.isOwner)
-                      PopupMenuItem(
-                        value: _MenuAction.delete,
-                        child: Text('Delete $noun'),
-                      ),
-                  ],
+        final menu = team == null ? null : _menu(team);
+        final section = widget.section;
+        if (team != null &&
+            section != null &&
+            TeamSection.forKind(team.kind).contains(section)) {
+          return Scaffold(
+            appBar: mobile
+                ? AppBar(
+                    leading: leading,
+                    title: Text(summary.name),
+                    actions: [?menu],
+                  )
+                : null,
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SectionHeader(
+                  viewModel: vm,
+                  summary: summary,
+                  section: section,
+                  menu: mobile ? null : menu,
                 ),
-            ],
-          ),
-          floatingActionButton: vm.canPost
+                Expanded(
+                  child: ViewModelHost(
+                    key: ValueKey('team-sections-${vm.teamId}'),
+                    create: (c) => TeamDetailViewModel(
+                      teamId: vm.teamId,
+                      teamRepository: c.read(),
+                      playRepository: c.read(),
+                      eventRepository: c.read(),
+                      meetingRepository: c.read<MeetingRepository>(),
+                      authRepository: c.read(),
+                    ),
+                    builder: (_, detail) => ListenableBuilder(
+                      listenable: detail,
+                      builder: (context, _) => !detail.loaded
+                          ? const LoadingView()
+                          : detail.team == null
+                          ? ErrorView(error: detail.error)
+                          : TeamSectionBody(
+                              key: ValueKey(section),
+                              viewModel: detail,
+                              section: section,
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return Scaffold(
+          appBar: mobile
+              ? AppBar(
+                  leading: leading,
+                  title: Text(summary.name),
+                  actions: [?menu],
+                )
+              : null,
+          floatingActionButton: mobile && vm.canPost
               ? FloatingActionButton.extended(
                   onPressed: vm.savePost.running ? null : _editPost,
                   icon: const Icon(Icons.post_add),
                   label: const Text('New post'),
                 )
               : null,
-          body: ConstrainedContent(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-              children: [
-                if (vm.savePost.running)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 8),
-                    child: LinearProgressIndicator(),
-                  ),
-                _Header(viewModel: vm, summary: summary),
-                if (summary.description.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(summary.description),
-                ],
-                const SizedBox(height: 16),
-                if (vm.isMember)
-                  _SectionGrid(
-                    teamId: vm.teamId,
-                    kind: summary.kind,
-                    upcomingCount: vm.upcomingEvents.length,
-                    memberCount: vm.memberCount,
-                  )
-                else if (summary.isCommunity)
-                  _GroupJoinCard(
-                    requiresApproval: summary.requiresApproval,
-                    pending: vm.requestPending,
-                    busy: vm.joinGroup.running || vm.cancelJoinRequest.running,
-                    onJoin: vm.joinGroup.execute,
-                    onCancel: vm.cancelJoinRequest.execute,
-                  )
-                else
-                  _JoinCard(joining: vm.joinTeam.running, onJoin: _join),
-                if (location != null) ...[
-                  const SizedBox(height: 16),
-                  GroupMapCard(location: location),
-                ],
-                if (vm.contentError != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    errorMessage(vm.contentError),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+          body: PageScroll(
+            children: [
+              if (vm.savePost.running)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: LinearProgressIndicator(),
+                ),
+              _Hero(
+                viewModel: vm,
+                summary: summary,
+                menu: mobile ? null : menu,
+                onJoin: _join,
+              ),
+              const SizedBox(height: 16),
+              SideColumnLayout(
+                main: [
+                  _about(summary),
+                  if (!vm.isMember) _joinCard(summary),
+                  if (vm.contentError != null)
+                    Text(
+                      errorMessage(vm.contentError),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
-                  ),
+                  if (team != null) _MembersCard(team: team),
+                  ..._posts(context),
                 ],
-                ..._events(context),
-                ..._posts(context),
-              ],
-            ),
+                side: [..._events(context), _details(summary)],
+                narrow: [
+                  _about(summary),
+                  if (!vm.isMember) _joinCard(summary),
+                  ..._events(context),
+                  if (team != null) _MembersCard(team: team),
+                  ..._posts(context),
+                  _details(summary),
+                ],
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  List<Widget> _events(BuildContext context) {
-    final events = vm.upcomingEvents;
-    // Nothing public to show isn't worth a heading on the public page.
-    if (events.isEmpty && !vm.isMember) return const [];
-    return [
-      _ListHeader(
-        title: vm.isMember ? 'Up next' : 'Upcoming events',
-        action: vm.isMember
-            ? TextButton(
-                onPressed: () =>
-                    context.go(TeamSection.events.route(vm.teamId)),
-                child: const Text('See all'),
-              )
-            : null,
-      ),
-      if (events.isEmpty)
-        const _Note('Nothing scheduled yet.')
-      else
-        Card(
-          clipBehavior: Clip.antiAlias,
-          child: Column(
+  Widget _menu(Team team) {
+    final noun = team.isCommunity ? 'group' : 'team';
+    return PopupMenuButton<_MenuAction>(
+      tooltip: 'More',
+      icon: const Icon(Icons.more_horiz),
+      onSelected: (a) => _onMenu(a, team),
+      itemBuilder: (_) => [
+        if (vm.canEdit)
+          PopupMenuItem(value: _MenuAction.edit, child: Text('Edit $noun')),
+        if (!vm.isOwner)
+          PopupMenuItem(value: _MenuAction.leave, child: Text('Leave $noun')),
+        if (vm.isOwner)
+          PopupMenuItem(value: _MenuAction.delete, child: Text('Delete $noun')),
+      ],
+    );
+  }
+
+  Widget _about(TeamListing summary) {
+    final c = AppColors.of(context);
+    final upcoming = vm.upcomingEvents.length;
+    return SectionCard(
+      title: summary.isCommunity ? 'About the group' : 'About the team',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            summary.description.isEmpty
+                ? (vm.canEdit
+                      ? 'Add a description so people know what the '
+                            '${summary.isCommunity ? 'group' : 'team'} is '
+                            'about.'
+                      : 'No description yet.')
+                : summary.description,
+            style: TextStyle(
+              fontSize: 13.5,
+              height: 1.45,
+              color: summary.description.isEmpty ? c.muted : c.ink,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
             children: [
-              for (final e in events.take(TeamHomeViewModel.upcomingLimit))
-                TeamEventTile(
-                  event: e,
-                  uid: vm.uid,
-                  showResponses: vm.isMember,
-                  onTap: () => _openEvent(e),
+              if (summary.isCommunity) ...[
+                Tag(summary.kind.label),
+                Tag(
+                  summary.requiresApproval
+                      ? 'Approval to join'
+                      : 'Open to join',
                 ),
+              ] else ...[
+                Tag(summary.division.label),
+                Tag(summary.level.label),
+              ],
+              if (summary.city.isNotEmpty) Tag(summary.city),
             ],
           ),
+          if (vm.isMember) ...[
+            const SizedBox(height: 16),
+            Divider(height: 1, color: c.border),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: StatBlock(
+                    value: '${vm.memberCount}',
+                    label: summary.isCommunity ? 'Members' : 'Rostered',
+                  ),
+                ),
+                Expanded(
+                  child: StatBlock(value: '$upcoming', label: 'Upcoming'),
+                ),
+                Expanded(
+                  child: StatBlock(value: '${vm.posts.length}', label: 'Posts'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _joinCard(TeamListing summary) => summary.isCommunity
+      ? _GroupJoinCard(
+          requiresApproval: summary.requiresApproval,
+          pending: vm.requestPending,
+          busy: vm.joinGroup.running || vm.cancelJoinRequest.running,
+          onJoin: vm.joinGroup.execute,
+          onCancel: vm.cancelJoinRequest.execute,
+        )
+      : _JoinCard(joining: vm.joinTeam.running, onJoin: _join);
+
+  Widget _details(TeamListing summary) {
+    final c = AppColors.of(context);
+    final location = summary.location;
+    final role = vm.myRole;
+    return SectionCard(
+      title: summary.isCommunity ? 'Group details' : 'Club details',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (location != null) ...[
+            GroupMapCard(location: location),
+            const SizedBox(height: 10),
+          ],
+          for (final (icon, text) in [
+            if (summary.city.isNotEmpty) (Icons.place_outlined, summary.city),
+            (Icons.groups_outlined, summary.subtitle),
+            if (role != null)
+              (Icons.badge_outlined, 'You: ${role.labelFor(summary.kind)}'),
+          ])
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Icon(icon, size: 16, color: c.muted),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      text,
+                      style: TextStyle(fontSize: 12.5, color: c.ink),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Text(
+            summary.isCommunity
+                ? (summary.requiresApproval
+                      ? 'Organizers approve new members.'
+                      : 'Open to new players. Join any time.')
+                : 'Joining takes an invite code from a coach or captain.',
+            style: TextStyle(fontSize: 11.5, color: c.muted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _events(BuildContext context) {
+    final events = vm.upcomingEvents;
+    // Nothing public to show isn't worth a card on the public page.
+    if (events.isEmpty && !vm.isMember) return const [];
+    final next = events.firstOrNull;
+    final rest = events.skip(1).take(TeamHomeViewModel.upcomingLimit).toList();
+    return [
+      if (next != null)
+        _UpNextCard(
+          event: next,
+          teamName: vm.summary?.name ?? '',
+          onOpen: () => _openEvent(next),
         ),
+      SectionCard(
+        title: next == null ? 'Up next' : 'Coming up',
+        action: vm.isMember
+            ? CardLink(
+                label: 'All events',
+                onTap: () => context.go(TeamSection.events.route(vm.teamId)),
+              )
+            : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (rest.isEmpty)
+              _Note(
+                next == null
+                    ? 'Nothing scheduled yet.'
+                    : 'Nothing else '
+                          'scheduled yet.',
+              ),
+            for (final e in rest)
+              _EventRow(event: e, onTap: () => _openEvent(e)),
+          ],
+        ),
+      ),
     ];
   }
 
   List<Widget> _posts(BuildContext context) {
     final posts = vm.posts;
+    if (vm.isPrivateToMe) {
+      return const [
+        _Note(
+          'This is a private group. Its location, events and posts are '
+          'only visible to members.',
+        ),
+      ];
+    }
     if (posts.isEmpty && !vm.isMember) {
       return vm.upcomingEvents.isEmpty
           ? [
-              const SizedBox(height: 24),
               _Note(
                 "This ${vm.isGroup ? 'group' : 'team'} hasn't shared "
                 'anything publicly yet.',
@@ -381,8 +561,31 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
             ]
           : const [];
     }
+    final c = AppColors.of(context);
     return [
-      _ListHeader(title: 'Posts'),
+      Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                vm.isGroup ? 'From the group' : 'From the team',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  color: c.ink,
+                ),
+              ),
+            ),
+            if (vm.canPost && !ScreenSize.of(context).isMobile)
+              TextButton.icon(
+                onPressed: vm.savePost.running ? null : _editPost,
+                icon: const Icon(Icons.post_add, size: 18),
+                label: const Text('New post'),
+              ),
+          ],
+        ),
+      ),
       if (posts.isEmpty)
         _Note(
           vm.canPost
@@ -392,166 +595,532 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
               : 'No posts yet.',
         ),
       for (final p in posts)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: TeamPostCard(
-            post: p,
-            loadImage: vm.imageData,
-            showVisibility: vm.isMember,
-            onEdit: vm.canPost ? () => _editPost(p) : null,
-            onDelete: vm.canPost ? () => _deletePost(p) : null,
-          ),
+        TeamPostCard(
+          post: p,
+          loadImage: vm.imageData,
+          showVisibility: vm.isMember,
+          onEdit: vm.canPost ? () => _editPost(p) : null,
+          onDelete: vm.canPost ? () => _deletePost(p) : null,
         ),
     ];
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.viewModel, required this.summary});
+/// The banner, name, actions and section tabs at the top of the page.
+class _Hero extends StatelessWidget {
+  const _Hero({
+    required this.viewModel,
+    required this.summary,
+    required this.menu,
+    required this.onJoin,
+  });
 
   final TeamHomeViewModel viewModel;
   final TeamListing summary;
+  final Widget? menu;
+  final VoidCallback onJoin;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final role = viewModel.myRole;
-    final count = viewModel.memberCount;
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 32,
-          child: summary.isCommunity
-              ? const Icon(Icons.diversity_3_outlined, size: 32)
-              : Text(
-                  summary.name.isEmpty ? '?' : summary.name[0].toUpperCase(),
-                  style: theme.textTheme.headlineSmall,
-                ),
+    final c = AppColors.of(context);
+    final vm = viewModel;
+    final mobile = ScreenSize.of(context).isMobile;
+    final teamId = vm.teamId;
+    final founded = vm.team?.createdAt?.year;
+    final banner = [
+      if (summary.city.isNotEmpty) summary.city,
+      if (summary.isCommunity)
+        'pickup group'
+      else
+        '${summary.division.label} ${summary.level.label}',
+    ].join(' ').toUpperCase();
+    final count = vm.memberCount;
+    final actions = <Widget>[
+      if (vm.isMember)
+        OutlinedButton.icon(
+          onPressed: () => context.go(TeamSection.chat.route(teamId)),
+          icon: const Icon(Icons.chat_bubble_outline, size: 17),
+          label: const Text('Message'),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(summary.name, style: theme.textTheme.titleLarge),
-              const SizedBox(height: 2),
-              Text(
-                summary.subtitle,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              if (role != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  [
-                    'You: ${role.labelFor(summary.kind)}',
-                    '$count ${count == 1 ? 'member' : 'members'}',
-                  ].join(' · '),
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ],
+      if (vm.team case final team? when vm.canEdit)
+        FilledButton.icon(
+          onPressed: () => showInviteMembers(context, team),
+          icon: const Icon(Icons.person_add_alt, size: 18),
+          label: Text(
+            summary.isCommunity ? 'Invite members' : 'Invite players',
           ),
         ),
-      ],
+      ?menu,
+    ];
+    return Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: mobile ? 120 : 170,
+            child: CustomPaint(
+              painter: _BannerPainter(
+                base: c.feature,
+                accent: c.highlight,
+                light: c.featureHighlight,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Tag(banner, strong: true),
+                    const Spacer(),
+                    if (founded != null)
+                      Text(
+                        'EST. $founded',
+                        style: TextStyle(
+                          color: c.onFeature,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(mobile ? 14 : 20, 16, 14, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 16,
+                  runSpacing: 12,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TeamBadge(
+                          size: mobile ? 48 : 58,
+                          community: summary.isCommunity,
+                        ),
+                        const SizedBox(width: 14),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: mobile ? 240 : 420,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                summary.name,
+                                style: TextStyle(
+                                  fontSize: mobile ? 22 : 28,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.9,
+                                  height: 1.1,
+                                  color: c.ink,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                summary.subtitle,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: c.muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (actions.isNotEmpty && !mobile)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (var i = 0; i < actions.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 8),
+                            actions[i],
+                          ],
+                        ],
+                      ),
+                  ],
+                ),
+                // Phones put the buttons below the name, side by side.
+                if (actions.isNotEmpty && mobile) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      for (var i = 0; i < actions.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        Expanded(child: actions[i]),
+                      ],
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        vm.isMember
+                            ? '$count ${count == 1 ? 'member' : 'members'}'
+                                  ' · ${vm.upcomingEvents.length} upcoming'
+                            : summary.isCommunity
+                            ? 'Community group'
+                            : 'Team',
+                        style: TextStyle(fontSize: 12, color: c.muted),
+                      ),
+                    ),
+                    if (vm.myRole case final role?)
+                      Tag('You: ${role.labelFor(summary.kind)}'),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (vm.isMember)
+                  _TeamTabs(teamId: teamId, kind: summary.kind, selected: null)
+                else
+                  const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Links to each team section.
-class _SectionGrid extends StatelessWidget {
-  const _SectionGrid({
+/// Overview plus a tab per section. Switching tabs stays on the team page.
+class _TeamTabs extends StatelessWidget {
+  const _TeamTabs({
     required this.teamId,
     required this.kind,
-    required this.upcomingCount,
-    required this.memberCount,
+    required this.selected,
   });
 
   final String teamId;
   final TeamKind kind;
-  final int upcomingCount;
-  final int memberCount;
 
-  String? _caption(TeamSection s) => switch (s) {
-    TeamSection.events => upcomingCount == 0 ? null : '$upcomingCount upcoming',
-    TeamSection.members => '$memberCount',
-    _ => null,
-  };
+  /// Null for the overview.
+  final TeamSection? selected;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 560 ? 6 : 3;
-        const spacing = 8.0;
-        final width =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final s in TeamSection.forKind(kind))
-              SizedBox(
-                width: width,
-                child: _SectionTile(
-                  section: s,
-                  label: s.labelFor(kind),
-                  caption: _caption(s),
-                  onTap: () => context.go(s.route(teamId)),
-                ),
-              ),
-          ],
-        );
-      },
+    final sections = TeamSection.forKind(kind);
+    final current = selected;
+    return UnderlineTabs(
+      labels: ['Overview', for (final s in sections) s.labelFor(kind)],
+      selected: current == null ? 0 : sections.indexOf(current) + 1,
+      onSelect: (i) => context.go(
+        i == 0 ? Routes.team(teamId) : sections[i - 1].route(teamId),
+      ),
     );
   }
 }
 
-class _SectionTile extends StatelessWidget {
-  const _SectionTile({
+/// The top of a section tab: the team's badge and name, then the tabs.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.viewModel,
+    required this.summary,
     required this.section,
-    required this.label,
-    required this.onTap,
-    this.caption,
+    required this.menu,
   });
 
+  final TeamHomeViewModel viewModel;
+  final TeamListing summary;
   final TeamSection section;
-  final String label;
-  final String? caption;
+  final Widget? menu;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final mobile = ScreenSize.of(context).isMobile;
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(mobile ? 16 : 24, mobile ? 4 : 16, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!mobile)
+              Row(
+                children: [
+                  TeamBadge(size: 40, community: summary.isCommunity),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          summary.name,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            color: c.ink,
+                          ),
+                        ),
+                        Text(
+                          summary.subtitle,
+                          style: TextStyle(fontSize: 12, color: c.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ?menu,
+                ],
+              ),
+            _TeamTabs(
+              teamId: viewModel.teamId,
+              kind: summary.kind,
+              selected: section,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A placeholder team photo: dark green with arcs like a disc in flight.
+class _BannerPainter extends CustomPainter {
+  _BannerPainter({
+    required this.base,
+    required this.accent,
+    required this.light,
+  });
+
+  final Color base;
+  final Color accent;
+  final Color light;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [base, Color.lerp(base, light, 0.9)!],
+        ).createShader(rect),
+    );
+    final arc = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    for (var i = 0; i < 6; i++) {
+      arc.color = accent.withValues(alpha: 0.05 + i * 0.025);
+      final r = size.width * (0.18 + i * 0.09);
+      canvas.drawCircle(Offset(size.width * 0.92, size.height * 1.35), r, arc);
+    }
+    canvas.drawCircle(
+      Offset(size.width * 0.78, size.height * 0.32),
+      size.height * 0.11,
+      Paint()..color = accent.withValues(alpha: 0.85),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_BannerPainter old) =>
+      old.base != base || old.accent != accent || old.light != light;
+}
+
+/// The team's next event on a dark card.
+class _UpNextCard extends StatelessWidget {
+  const _UpNextCard({
+    required this.event,
+    required this.teamName,
+    required this.onOpen,
+  });
+
+  final TeamEvent event;
+  final String teamName;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final e = event;
+    return FeatureCard(
+      onTap: onOpen,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Eyebrow(
+                  'Up next · ${e.type.label}',
+                  color: c.onFeatureMuted,
+                ),
+              ),
+              Icon(Icons.north_east, size: 15, color: c.highlight),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            e.title,
+            style: TextStyle(
+              color: c.onFeature,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${DateFormat.MMMEd().format(e.startsAt)} · ${eventTimeRange(e)}',
+            style: TextStyle(
+              color: c.onFeature,
+              fontWeight: FontWeight.w600,
+              fontSize: 12.5,
+            ),
+          ),
+          if (e.location.isNotEmpty)
+            Text(
+              e.location,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: c.onFeatureMuted, fontSize: 12),
+            ),
+          const SizedBox(height: 14),
+          HighlightButton(label: 'View details', onPressed: onOpen),
+        ],
+      ),
+    );
+  }
+}
+
+class _EventRow extends StatelessWidget {
+  const _EventRow({required this.event, required this.onTap});
+
+  final TeamEvent event;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-          child: Column(
-            children: [
-              Icon(section.icon, color: scheme.primary),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge,
+    final c = AppColors.of(context);
+    final e = event;
+    final going = e.responders(RsvpStatus.going).length;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            DateBadge(date: e.startsAt, size: 34),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    e.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.5,
+                      color: c.ink,
+                    ),
+                  ),
+                  Text(
+                    [
+                      e.type.label,
+                      eventTimeRange(e),
+                      if (going > 0) '$going going',
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, color: c.muted),
+                  ),
+                ],
               ),
-              Text(
-                caption ?? '',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+/// A few members with their roles, linking to the full list.
+class _MembersCard extends StatelessWidget {
+  const _MembersCard({required this.team});
+
+  final Team team;
+
+  static const _shown = 6;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final members = team.members.entries.toList()
+      ..sort((a, b) {
+        final byRole = a.value.index.compareTo(b.value.index);
+        if (byRole != 0) return byRole;
+        return (team.memberNames[a.key] ?? '').compareTo(
+          team.memberNames[b.key] ?? '',
+        );
+      });
+    final count = members.length;
+    return SectionCard(
+      title: team.isCommunity ? 'Meet the group' : 'Meet the sideline',
+      action: CardLink(
+        label: 'All $count ${team.isCommunity ? 'members' : 'players'}',
+        onTap: () => context.go(TeamSection.members.route(team.id)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth >= 520 ? 3 : 2;
+          const gap = 10.0;
+          final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final MapEntry(key: uid, value: role) in members.take(
+                _shown,
+              ))
+                SizedBox(
+                  width: width,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: c.field,
+                      borderRadius: BorderRadius.circular(controlRadius),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        PersonAvatar(
+                          name: team.memberNames[uid] ?? '?',
+                          radius: 17,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          team.memberNames[uid] ?? 'Member',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5,
+                            color: c.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Eyebrow(team.roleLabel(role)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -564,26 +1133,23 @@ class _JoinCard extends StatelessWidget {
   final VoidCallback onJoin;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          const Icon(Icons.lock_outline),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              "You're not on this team. Ask a coach or captain for the "
-              'invite code to join.',
-            ),
+  Widget build(BuildContext context) => SectionCard(
+    child: Row(
+      children: [
+        const Icon(Icons.lock_outline),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Text(
+            "You're not on this team. Ask a coach or captain for the "
+            'invite code to join.',
           ),
-          const SizedBox(width: 12),
-          FilledButton.tonal(
-            onPressed: joining ? null : onJoin,
-            child: const Text('Join'),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        FilledButton(
+          onPressed: joining ? null : onJoin,
+          child: const Text('Join'),
+        ),
+      ],
     ),
   );
 }
@@ -605,62 +1171,39 @@ class _GroupJoinCard extends StatelessWidget {
   final VoidCallback onCancel;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Icon(
-            pending
-                ? Icons.hourglass_top
-                : (requiresApproval
-                      ? Icons.how_to_reg_outlined
-                      : Icons.group_add_outlined),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(switch ((pending, requiresApproval)) {
-              (true, _) => 'Request sent. An organizer will let you in soon.',
-              (false, true) =>
-                'Organizers approve new members. Ask to join to see '
-                    'members, events and tournaments.',
-              (false, false) =>
-                'Join to see members, chat, and sign up for pickup and '
-                    'tournaments.',
-            }),
-          ),
-          const SizedBox(width: 12),
-          if (pending)
-            OutlinedButton(
-              onPressed: busy ? null : onCancel,
-              child: const Text('Cancel request'),
-            )
-          else
-            FilledButton(
-              onPressed: busy ? null : onJoin,
-              child: Text(requiresApproval ? 'Ask to join' : 'Join'),
-            ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _ListHeader extends StatelessWidget {
-  const _ListHeader({required this.title, this.action});
-
-  final String title;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 24, bottom: 4),
+  Widget build(BuildContext context) => SectionCard(
     child: Row(
       children: [
-        Expanded(
-          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+        Icon(
+          pending
+              ? Icons.hourglass_top
+              : (requiresApproval
+                    ? Icons.how_to_reg_outlined
+                    : Icons.group_add_outlined),
         ),
-        ?action,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(switch ((pending, requiresApproval)) {
+            (true, _) => 'Request sent. An organizer will let you in soon.',
+            (false, true) =>
+              'Organizers approve new members. Ask to join to see '
+                  'members, events and tournaments.',
+            (false, false) =>
+              'Join to see members, chat, and sign up for pickup and '
+                  'tournaments.',
+          }),
+        ),
+        const SizedBox(width: 12),
+        if (pending)
+          OutlinedButton(
+            onPressed: busy ? null : onCancel,
+            child: const Text('Cancel request'),
+          )
+        else
+          FilledButton(
+            onPressed: busy ? null : onJoin,
+            child: Text(requiresApproval ? 'Ask to join' : 'Join'),
+          ),
       ],
     ),
   );
@@ -673,12 +1216,10 @@ class _Note extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
+    padding: const EdgeInsets.symmetric(vertical: 4),
     child: Text(
       text,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
+      style: TextStyle(fontSize: 12.5, color: AppColors.of(context).muted),
     ),
   );
 }
