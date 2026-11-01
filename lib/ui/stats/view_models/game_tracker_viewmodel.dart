@@ -39,6 +39,7 @@ class GameTrackerViewModel extends ChangeNotifier {
     required StatsRepository statsRepository,
     required TeamRepository teamRepository,
     required AuthRepository authRepository,
+    this.saveDelay = const Duration(seconds: 3),
   }) : _stats = statsRepository,
        _auth = authRepository {
     deleteGame = Command0<void>(() => _stats.deleteGame(teamId, gameId));
@@ -72,6 +73,17 @@ class GameTrackerViewModel extends ChangeNotifier {
 
   final String teamId;
   final String gameId;
+
+  /// How long taps within a point wait to be saved together. Each save is
+  /// a write, and every screen watching the team's games re-reads the game,
+  /// so saving every tap is the costliest thing the app does. Points
+  /// ending, undo and game changes still save at once. Zero saves every
+  /// change at once.
+  final Duration saveDelay;
+  Timer? _saveTimer;
+  StatsGame? _unsaved;
+  bool _disposed = false;
+
   final StatsRepository _stats;
   final AuthRepository _auth;
   late final List<StreamSubscription<Object?>> _subs;
@@ -688,12 +700,46 @@ class GameTrackerViewModel extends ChangeNotifier {
       _history.add((before: _game!, label: undo, sideOverride: _sideOverride));
       if (_history.length > _maxHistory) _history.removeAt(0);
     }
+    final before = _game;
     _game = g;
     notifyListeners();
-    unawaited(_stats.saveGame(teamId, g).then(_saved));
+    if (saveDelay == Duration.zero ||
+        before == null ||
+        _isMilestone(before, g)) {
+      _flush(g);
+    } else {
+      _unsaved = g;
+      _saveTimer ??= Timer(saveDelay, _flush);
+    }
+  }
+
+  /// Changes worth saving at once: a point starting or ending, the game
+  /// ending, anything that isn't a play added to the current point (undo,
+  /// settings, lines).
+  static bool _isMilestone(StatsGame before, StatsGame after) {
+    if (before.finished != after.finished) return true;
+    final a = before.points, b = after.points;
+    if (a.length != b.length) return true;
+    if (b.isEmpty) return !identical(before.points, after.points);
+    if (a.last.result != b.last.result) return true;
+    // Only a longer action list on the same point can wait.
+    if (b.last.actions.length <= a.last.actions.length) return true;
+    String rest(StatsGame g) => g.copyWith(points: const []).toMap().toString();
+    return rest(before) != rest(after);
+  }
+
+  /// Saves [g], or the change waiting to be saved.
+  void _flush([StatsGame? g]) {
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    final game = g ?? _unsaved;
+    _unsaved = null;
+    if (game == null) return;
+    unawaited(_stats.saveGame(teamId, game).then(_saved));
   }
 
   void _saved(Result<Object?> r) {
+    if (_disposed) return;
     final error = switch (r) {
       Ok() => null,
       Error(:final error) => error,
@@ -710,6 +756,8 @@ class GameTrackerViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _flush();
+    _disposed = true;
     for (final s in _subs) {
       s.cancel();
     }

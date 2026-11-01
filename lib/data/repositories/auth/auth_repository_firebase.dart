@@ -9,6 +9,7 @@ import '../../../domain/models/direct_message.dart';
 import '../../../utils/result.dart';
 import '../../services/account_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/shared_streams.dart';
 import 'auth_repository.dart';
 
 class AuthRepositoryFirebase extends AuthRepository {
@@ -47,6 +48,9 @@ class AuthRepositoryFirebase extends AuthRepository {
             photoUrl: user.photoURL,
           );
     if (next == _currentUser && _isReady) return;
+    // Shared listeners belong to the old user; drop them so the next
+    // user's screens open their own.
+    if (next?.uid != _currentUser?.uid) SharedStreams.instance.clear();
     _currentUser = next;
     _isReady = true;
     if (next != null) unawaited(_upsertProfile(next));

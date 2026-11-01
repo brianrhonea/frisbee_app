@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
+import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/domain/models/stats.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/team.dart';
@@ -483,6 +484,8 @@ void main() {
       first.useLine(ids);
       first.tapPlayer(ids[0]);
       first.tapPlayer(ids[1]);
+      // Leaving the screen saves what was waiting.
+      first.dispose();
       await pumpEventQueue();
       final reopened = GameTrackerViewModel(
         teamId: 't1',
@@ -495,6 +498,78 @@ void main() {
       expect(reopened.undoLabel, contains('→'));
       reopened.undo();
       expect(reopened.currentPoint!.actions, hasLength(1));
+    });
+  });
+
+  group('saving', () {
+    const delay = Duration(milliseconds: 200);
+
+    /// A tracker on the mock that notes each save.
+    Future<(GameTrackerViewModel, List<StatsGame>)> counted() async {
+      final vm = await tracker();
+      vm.dispose();
+      final saves = <StatsGame>[];
+      final tracked = GameTrackerViewModel(
+        teamId: 't1',
+        gameId: vm.gameId,
+        statsRepository: _CountingStats(stats, saves),
+        teamRepository: teams,
+        authRepository: FakeAuthRepository(user: testUser),
+        saveDelay: delay,
+      );
+      await pumpEventQueue();
+      return (tracked, saves);
+    }
+
+    test('taps within a point are saved together', () async {
+      final (vm, saves) = await counted();
+      final ids = seven(vm);
+      vm.useLine(ids); // A point starts: saved at once.
+      expect(saves, hasLength(1));
+      vm.tapPlayer(ids[0]);
+      vm.tapPlayer(ids[1]);
+      vm.tapPlayer(ids[2]);
+      vm.tapPlayer(ids[3]);
+      expect(saves, hasLength(1));
+      await Future<void>.delayed(delay * 2);
+      expect(saves, hasLength(2));
+      expect(saves.last.points.last.actions, hasLength(4));
+      vm.dispose();
+    });
+
+    test('a point ending saves at once, with the plays before it', () async {
+      final (vm, saves) = await counted();
+      scorePoint(vm, seven(vm));
+      // The line, then the goal; the pickup and pass ride along.
+      expect(saves, hasLength(2));
+      expect(saves.last.points.single.result, PointResult.weScored);
+      await Future<void>.delayed(delay * 2);
+      expect(saves, hasLength(2));
+      vm.dispose();
+    });
+
+    test('leaving the screen saves what was waiting', () async {
+      final (vm, saves) = await counted();
+      final ids = seven(vm);
+      vm.useLine(ids);
+      vm.tapPlayer(ids[0]);
+      vm.dispose();
+      expect(saves, hasLength(2));
+      expect(saves.last.points.last.actions, hasLength(1));
+      await Future<void>.delayed(delay * 2);
+      expect(saves, hasLength(2));
+    });
+
+    test('undo saves at once', () async {
+      final (vm, saves) = await counted();
+      final ids = seven(vm);
+      vm.useLine(ids);
+      vm.tapPlayer(ids[0]);
+      vm.tapPlayer(ids[1]);
+      vm.undo();
+      expect(saves, hasLength(2));
+      expect(saves.last.points.last.actions, hasLength(1));
+      vm.dispose();
     });
   });
 
@@ -515,4 +590,42 @@ void main() {
       expect(keeper.canDelete, isFalse);
     });
   });
+}
+
+/// Passes everything to [_inner], noting each saved game.
+class _CountingStats implements StatsRepository {
+  _CountingStats(this._inner, this.saves);
+
+  final StatsRepository _inner;
+  final List<StatsGame> saves;
+
+  @override
+  Future<Result<String>> saveGame(String teamId, StatsGame game) {
+    saves.add(game);
+    return _inner.saveGame(teamId, game);
+  }
+
+  @override
+  Stream<List<StatsGame>> watchGames(String teamId) =>
+      _inner.watchGames(teamId);
+
+  @override
+  Stream<List<RosterPlayer>> watchPlayers(String teamId) =>
+      _inner.watchPlayers(teamId);
+
+  @override
+  Stream<List<StatsTournament>> watchTournaments(String teamId) =>
+      _inner.watchTournaments(teamId);
+
+  @override
+  Future<Result<String>> saveTournament(String teamId, StatsTournament t) =>
+      _inner.saveTournament(teamId, t);
+
+  @override
+  Future<Result<void>> deleteGame(String teamId, String gameId) =>
+      _inner.deleteGame(teamId, gameId);
+
+  @override
+  Future<Result<void>> deleteTournament(String teamId, String tournamentId) =>
+      _inner.deleteTournament(teamId, tournamentId);
 }

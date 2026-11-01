@@ -353,16 +353,42 @@ class PlayerProfileViewModel extends ChangeNotifier {
 
   bool _publishing = false;
 
+  /// Publishing is a write, and stats change with every save while one of
+  /// the user's games is tracked, so stats-only changes wait at least this
+  /// long between publishes. Team and visibility changes go out at once.
+  static const publishGap = Duration(seconds: 60);
+  DateTime? _lastPublish;
+  ProfileVisibility? _publishedVisibility;
+  Timer? _publishLater;
+
   /// Keeps the published summary in step with the live one.
   Future<void> _maybePublish() async {
     final user = _auth.currentUser;
     if (!isMe || user == null || _publishing) return;
+    if (_publishLater != null) return;
     if (!_profileLoaded || !_teamsLoaded || !_statsLoaded) return;
     // Users without a display name aren't in the directory.
     if ((user.displayName?.trim() ?? '').isEmpty) return;
     final visible = _visibleLive;
     final published = _profile?.summary ?? const ProfileSummary();
     if (_profile != null && visible.sameAs(published)) return;
+    final last = _lastPublish;
+    final statsOnly =
+        _profile != null &&
+        visibility == _publishedVisibility &&
+        listEquals(visible.teams, published.teams);
+    if (last != null && statsOnly) {
+      final wait = publishGap - DateTime.now().difference(last);
+      if (wait > Duration.zero) {
+        _publishLater = Timer(wait, () {
+          _publishLater = null;
+          _maybePublish();
+        });
+        return;
+      }
+    }
+    _lastPublish = DateTime.now();
+    _publishedVisibility = visibility;
     _publishing = true;
     try {
       await _profiles.publishSummary(
@@ -465,6 +491,7 @@ class PlayerProfileViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _publishLater?.cancel();
     for (final s in [..._subs, ..._rosterSubs.values, ..._gameSubs.values]) {
       s.cancel();
     }

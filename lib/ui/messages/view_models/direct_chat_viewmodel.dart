@@ -41,6 +41,11 @@ class DirectChatViewModel extends MessageThreadViewModel {
   Conversation? _conversation;
   bool _loaded = false;
   bool _marking = false;
+
+  /// The last message already marked read. Until the server fills in the
+  /// read time, snapshots still look unread; this keeps them from writing
+  /// again.
+  DateTime? _markedUpTo;
   Object? _error;
 
   bool get loaded => _loaded;
@@ -56,6 +61,8 @@ class DirectChatViewModel extends MessageThreadViewModel {
   void _markRead() {
     final c = _conversation;
     if (_marking || c == null || !c.isUnread(uid)) return;
+    if (_markedUpTo != null && _markedUpTo == c.lastMessageAt) return;
+    _markedUpTo = c.lastMessageAt;
     _marking = true;
     _dms.markRead(conversationId, uid).whenComplete(() => _marking = false);
   }

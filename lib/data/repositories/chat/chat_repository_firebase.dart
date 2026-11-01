@@ -9,6 +9,7 @@ import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
+import '../../services/shared_streams.dart';
 import 'chat_repository.dart';
 
 /// Rooms live at `teams/{teamId}/chats/{roomId}` with messages beneath.
@@ -19,11 +20,16 @@ class ChatRepositoryFirebase implements ChatRepository {
   ChatRepositoryFirebase({
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
+    SharedStreams? sharedStreams,
   }) : _files = attachments,
-       _db = firestore ?? FirebaseFirestore.instance;
+       _db = firestore ?? FirebaseFirestore.instance,
+       _shared = sharedStreams ?? SharedStreams.instance;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
+
+  /// One listener per query, shared by every screen (see [SharedStreams]).
+  final SharedStreams _shared;
 
   CollectionReference<Map<String, dynamic>> _rooms(String teamId) =>
       chatRooms(_db, teamId);
@@ -37,21 +43,33 @@ class ChatRepositoryFirebase implements ChatRepository {
   Stream<List<ChatRoom>> watchRooms(Team team, String uid) {
     final role = team.roleOf(uid);
     if (role == null) return Stream.value(const []);
+    return _shared.get(
+      'rooms/${team.id}/$uid/${role.name}',
+      () => _openRooms(team, uid, role),
+    );
+  }
+
+  Stream<List<ChatRoom>> _openRooms(Team team, String uid, TeamRole role) {
     List<ChatRoom> parse(QuerySnapshot<Map<String, dynamic>> snap) => [
       for (final d in snap.docs) ChatRoom.fromMap(d.id, plainData(d.data())),
     ];
     if (role.canEdit) {
-      return _rooms(team.id).snapshots().map((s) => _sorted(parse(s)));
+      return countedSnapshots(
+        _rooms(team.id),
+        'chatRooms',
+      ).map((s) => _sorted(parse(s)));
     }
     // Rules only allow queries that are limited to rooms the member can
     // read, so ask by role and by uid and merge the two.
     return _merge(
-      _rooms(
-        team.id,
-      ).where('readRoles', arrayContains: role.name).snapshots().map(parse),
-      _rooms(
-        team.id,
-      ).where('readUsers', arrayContains: uid).snapshots().map(parse),
+      countedSnapshots(
+        _rooms(team.id).where('readRoles', arrayContains: role.name),
+        'chatRooms',
+      ).map(parse),
+      countedSnapshots(
+        _rooms(team.id).where('readUsers', arrayContains: uid),
+        'chatRooms',
+      ).map(parse),
     );
   }
 

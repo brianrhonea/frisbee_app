@@ -1202,14 +1202,18 @@ service cloud.firestore {
     // ---- Team directory ---------------------------------------------------
 
     // Public team listings for search (TeamListing in
-    // lib/domain/models/team.dart): name, division, level and city only,
-    // copied from the team. Editors write them with the team, so getAfter
-    // covers the create and edit batches.
+    // lib/domain/models/team.dart): name, division, level, city and the
+    // linked USA Ultimate page, copied from the team. Editors write them
+    // with the team, so getAfter covers the create and edit batches.
     match /teamDirectory/{teamId} {
       function validListing(d, team) {
         return d.keys().hasOnly([
                  'name', 'division', 'level', 'city', 'keywords', 'kind',
-                 'description', 'requiresApproval', 'location'])
+                 'description', 'requiresApproval', 'location', 'usauUrl',
+                 'usauName'])
+          && d.get('usauUrl', null) == team.get('usauUrl', null)
+          && d.get('usauName', null) == team.get('usauName', null)
+
           && d.name == team.name
           && d.division == team.division
           && d.level == team.level

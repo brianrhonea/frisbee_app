@@ -4,6 +4,7 @@ import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/stats.dart';
 import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
+import '../../services/shared_streams.dart';
 import '../team/team_repository.dart';
 import 'stats_repository.dart';
 
@@ -15,11 +16,16 @@ class StatsRepositoryFirebase implements StatsRepository {
   StatsRepositoryFirebase({
     required TeamRepository teamRepository,
     FirebaseFirestore? firestore,
+    SharedStreams? sharedStreams,
   }) : _teams = teamRepository,
-       _db = firestore ?? FirebaseFirestore.instance;
+       _db = firestore ?? FirebaseFirestore.instance,
+       _shared = sharedStreams ?? SharedStreams.instance;
 
   final TeamRepository _teams;
   final FirebaseFirestore _db;
+
+  /// One listener per query, shared by every screen (see [SharedStreams]).
+  final SharedStreams _shared;
 
   DocumentReference<Map<String, dynamic>> _team(String teamId) =>
       _db.collection('teams').doc(teamId);
@@ -35,27 +41,34 @@ class StatsRepositoryFirebase implements StatsRepository {
       _teams.watchRoster(teamId);
 
   @override
-  Stream<List<StatsTournament>> watchTournaments(String teamId) =>
-      _tournaments(teamId)
-          .orderBy('startDate', descending: true)
-          .snapshots()
-          .map(
-            (snap) => [
-              for (final d in snap.docs)
-                StatsTournament.fromMap(d.id, plainData(d.data())),
-            ],
-          );
+  Stream<List<StatsTournament>> watchTournaments(String teamId) => _shared.get(
+    'statsTournaments/$teamId',
+    () =>
+        countedSnapshots(
+          _tournaments(teamId).orderBy('startDate', descending: true),
+          'statsTournaments',
+        ).map(
+          (snap) => [
+            for (final d in snap.docs)
+              StatsTournament.fromMap(d.id, plainData(d.data())),
+          ],
+        ),
+  );
 
   @override
-  Stream<List<StatsGame>> watchGames(String teamId) => _games(teamId)
-      .orderBy('date', descending: true)
-      .snapshots()
-      .map(
-        (snap) => [
-          for (final d in snap.docs)
-            StatsGame.fromMap(d.id, plainData(d.data())),
-        ],
-      );
+  Stream<List<StatsGame>> watchGames(String teamId) => _shared.get(
+    'statsGames/$teamId',
+    () =>
+        countedSnapshots(
+          _games(teamId).orderBy('date', descending: true),
+          'statsGames',
+        ).map(
+          (snap) => [
+            for (final d in snap.docs)
+              StatsGame.fromMap(d.id, plainData(d.data())),
+          ],
+        ),
+  );
 
   @override
   Future<Result<String>> saveTournament(String teamId, StatsTournament t) =>

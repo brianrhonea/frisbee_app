@@ -16,9 +16,12 @@ import '../../../utils/result.dart';
 import '../../../data/repositories/follow/follow_repository.dart';
 import '../../../data/repositories/group_tournament/group_tournament_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
+import '../../../data/repositories/ranking/ranking_repository.dart';
+import '../../../data/repositories/usau_team/usau_team_repository.dart';
 import '../../../domain/models/follow.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
+import 'team_usau_viewmodel.dart';
 
 /// Backs the team home page. Members get the team summary, upcoming
 /// events and every post; anyone else who finds the team gets its public
@@ -34,8 +37,12 @@ class TeamHomeViewModel extends ChangeNotifier {
     FollowRepository? followRepository,
     NotificationRepository? notificationRepository,
     GroupTournamentRepository? groupTournamentRepository,
+    UsauTeamRepository? usauTeamRepository,
+    RankingRepository? rankingRepository,
     DateTime Function()? clock,
-  }) : _teams = teamRepository,
+  }) : _usauTeams = usauTeamRepository,
+       _rankings = rankingRepository,
+       _teams = teamRepository,
        _events = eventRepository,
        _posts = teamPostRepository,
        _auth = authRepository,
@@ -77,6 +84,9 @@ class TeamHomeViewModel extends ChangeNotifier {
   /// Upcoming events shown on the home page; the rest are in Team Events.
   static const upcomingLimit = 3;
 
+  /// Newest posts loaded on the team page.
+  static const postLimit = 30;
+
   final String teamId;
   final TeamRepository _teams;
   final EventRepository _events;
@@ -84,6 +94,13 @@ class TeamHomeViewModel extends ChangeNotifier {
   final AuthRepository _auth;
   final FilePickerService _picker;
   final GroupTournamentRepository? _groupTournaments;
+  final UsauTeamRepository? _usauTeams;
+  final RankingRepository? _rankings;
+  TeamUsauViewModel? _usau;
+
+  /// The team's USA Ultimate ranking, record and schedule, when it's
+  /// linked to a USA Ultimate team; shown to everyone.
+  TeamUsauViewModel? get usau => _usau;
   StreamSubscription<List<TournamentListing>>? _listingsSub;
   List<TournamentListing> _tournamentListings = const [];
 
@@ -129,11 +146,32 @@ class TeamHomeViewModel extends ChangeNotifier {
   }
 
   void _onChange() {
+    _watchUsau();
     _watchListings();
     _watchContent();
     _watchRequest();
     _publishListing();
     notifyListeners();
+  }
+
+  /// Follows the linked USA Ultimate page, replacing it if the link
+  /// changes.
+  void _watchUsau() {
+    final repo = _usauTeams;
+    final url = summary?.usauUrl;
+    if (repo == null || url == _usau?.url) return;
+    _usau
+      ?..removeListener(notifyListeners)
+      ..dispose();
+    _usau = url == null
+        ? null
+        : (TeamUsauViewModel(
+            url: url,
+            name: summary?.usauName ?? '',
+            usauTeamRepository: repo,
+            rankingRepository: _rankings,
+            clock: _clock,
+          )..addListener(notifyListeners));
   }
 
   void _watchListings() {
@@ -185,18 +223,22 @@ class TeamHomeViewModel extends ChangeNotifier {
       _postsSub = null;
       return;
     }
+    // Only what's coming up is shown here; Team Events has the history.
+    final since = _clock().subtract(const Duration(days: 1));
     _eventsSub =
         (member
-                ? _events.watchEvents(teamId)
-                : _events.watchPublicEvents(teamId))
+                ? _events.watchEvents(teamId, since: since)
+                : _events.watchPublicEvents(teamId, since: since))
             .listen((e) {
               _eventList = e;
               notifyListeners();
             }, onError: _onContentError);
-    _postsSub = _posts.watchPosts(teamId, publicOnly: !member).listen((p) {
-      _postList = p;
-      notifyListeners();
-    }, onError: _onContentError);
+    _postsSub = _posts
+        .watchPosts(teamId, publicOnly: !member, limit: postLimit)
+        .listen((p) {
+          _postList = p;
+          notifyListeners();
+        }, onError: _onContentError);
   }
 
   /// Teams from before the directory, or edited elsewhere, get their
@@ -216,11 +258,13 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   late final FollowSlot _followSlot;
 
-  /// The team's Follow button; null until it has loaded.
-  FollowViewModel? get follow => _followSlot.of(switch (summary) {
-    final s? => FollowTarget.team(teamId, s.name),
-    null => null,
-  });
+  /// The team's Follow button, for people not on it; null for members
+  /// (their feed already has every post) and until membership is known.
+  FollowViewModel? get follow {
+    final s = summary;
+    if (!loaded || isMember || s == null) return null;
+    return _followSlot.of(FollowTarget.team(teamId, s.name));
+  }
 
   /// True once membership and the listing are known.
   bool get loaded => _teamLoaded && _listingLoaded;
@@ -349,6 +393,9 @@ class TeamHomeViewModel extends ChangeNotifier {
     _eventsSub?.cancel();
     _postsSub?.cancel();
     _followSlot.dispose();
+    _usau
+      ?..removeListener(notifyListeners)
+      ..dispose();
     super.dispose();
   }
 }

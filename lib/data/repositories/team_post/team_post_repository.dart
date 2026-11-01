@@ -7,8 +7,13 @@ import '../../../utils/result.dart';
 
 abstract class TeamPostRepository {
   /// The team's posts, newest first. Members see every post; pass
-  /// [publicOnly] for everyone else, who may read only public ones.
-  Stream<List<TeamPost>> watchPosts(String teamId, {bool publicOnly = false});
+  /// [publicOnly] for everyone else, who may read only public ones. With
+  /// [limit], only that many of the newest.
+  Stream<List<TeamPost>> watchPosts(
+    String teamId, {
+    bool publicOnly = false,
+    int? limit,
+  });
 
   /// Public posts about one of the group's tournaments ([tournamentKey] is
   /// a FollowTarget key), for people following it from outside the group.

@@ -318,9 +318,9 @@ class _FlakyEventRepository extends FakeEventRepository {
   int myListens = 0;
 
   @override
-  Stream<List<TeamEvent>> watchMyEvents(String uid) {
+  Stream<List<TeamEvent>> watchMyEvents(String uid, {DateTime? since}) {
     myListens++;
     if (myListens == 1) return Stream.error(Exception('permission-denied'));
-    return super.watchMyEvents(uid);
+    return super.watchMyEvents(uid, since: since);
   }
 }

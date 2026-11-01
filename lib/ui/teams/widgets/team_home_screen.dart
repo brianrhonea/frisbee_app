@@ -28,6 +28,7 @@ import 'join_team_dialog.dart';
 import 'team_form.dart';
 import 'team_post_widgets.dart';
 import 'team_section_screen.dart';
+import 'team_usau_card.dart';
 
 enum _MenuAction { edit, leave, delete }
 
@@ -347,6 +348,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 ],
                 side: [
                   ..._events(context),
+                  ?_usau(),
                   ..._tournaments(context),
                   _details(summary),
                 ],
@@ -354,6 +356,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                   _about(summary),
                   if (!vm.isMember) _joinCard(summary),
                   ..._events(context),
+                  ?_usau(),
                   ..._tournaments(context),
                   if (team != null) _MembersCard(team: team),
                   ..._posts(context),
@@ -383,6 +386,13 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       ],
     );
   }
+
+  /// Ranking, record and schedule from the linked USA Ultimate page, for
+  /// everyone; null when the team isn't linked.
+  Widget? _usau() => switch (vm.usau) {
+    final usau? => TeamUsauCard(viewModel: usau),
+    null => null,
+  };
 
   Widget _about(TeamListing summary) {
     final c = AppColors.of(context);

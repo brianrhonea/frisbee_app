@@ -12,6 +12,7 @@ import 'package:frisbee_app/ui/teams/widgets/team_section_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
+import '../testing/social_fakes.dart';
 
 void main() {
   late FakeTeamRepository teams;
@@ -110,6 +111,43 @@ void main() {
         expect(posts.watches, [true]);
       },
     );
+
+    group('Follow button', () {
+      TeamHomeViewModel followVm() => TeamHomeViewModel(
+        teamId: 't1',
+        teamRepository: teams,
+        eventRepository: events,
+        teamPostRepository: posts,
+        authRepository: auth,
+        filePicker: picker,
+        followRepository: FakeFollowRepository(),
+        notificationRepository: FakeNotificationRepository(),
+        clock: () => now,
+      );
+
+      for (final role in [TeamRole.owner, TeamRole.player]) {
+        test('is hidden from the ${role.name}, who sees every post', () async {
+          addTeam({
+            testUser.uid: role,
+            'other': role == TeamRole.owner ? TeamRole.coach : TeamRole.owner,
+          });
+          final vm = followVm();
+          await pumpEventQueue();
+          expect(vm.isMember, isTrue);
+          expect(vm.follow, isNull);
+          vm.dispose();
+        });
+      }
+
+      test('is offered to people not on the team', () async {
+        addTeam({'owner': TeamRole.owner});
+        final vm = followVm();
+        await pumpEventQueue();
+        expect(vm.isMember, isFalse);
+        expect(vm.follow?.target.key, 'team_t1');
+        vm.dispose();
+      });
+    });
 
     test('an unlisted team is not available to others', () async {
       addTeam({'owner': TeamRole.owner}, listed: false);

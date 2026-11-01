@@ -7,6 +7,7 @@ import '../../../domain/models/notification.dart';
 import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/push_service.dart';
+import '../../services/shared_streams.dart';
 import 'notification_repository.dart';
 
 /// Preferences live in `users/{uid}/settings/notifications`, the feed in
@@ -18,9 +19,14 @@ class NotificationRepositoryFirebase implements NotificationRepository {
     required PushService push,
     FirebaseFirestore? firestore,
     DateTime Function()? clock,
+    SharedStreams? sharedStreams,
   }) : _push = push,
        _db = firestore ?? FirebaseFirestore.instance,
-       _clock = clock ?? DateTime.now;
+       _clock = clock ?? DateTime.now,
+       _shared = sharedStreams ?? SharedStreams.instance;
+
+  /// One listener per query, shared by every screen (see [SharedStreams]).
+  final SharedStreams _shared;
 
   final PushService _push;
   final FirebaseFirestore _db;
@@ -50,9 +56,13 @@ class NotificationRepositoryFirebase implements NotificationRepository {
   );
 
   @override
-  Stream<NotificationPreferences> watchPreferences(String uid) => _prefs(uid)
-      .snapshots()
-      .map((d) => NotificationPreferences.fromMap(plainData(d.data() ?? {})));
+  Stream<NotificationPreferences> watchPreferences(String uid) => _shared.get(
+    'notificationPrefs/$uid',
+    () => countedDocSnapshots(
+      _prefs(uid),
+      'notificationPrefs',
+    ).map((d) => NotificationPreferences.fromMap(plainData(d.data() ?? {}))),
+  );
 
   @override
   Future<Result<void>> setCategory(
@@ -104,16 +114,19 @@ class NotificationRepositoryFirebase implements NotificationRepository {
   }
 
   @override
-  Stream<List<AppNotification>> watchFeed(String uid) => _feed(uid)
-      .orderBy('createdAt', descending: true)
-      .limit(feedLimit)
-      .snapshots()
-      .map(
-        (snap) => [
-          for (final d in snap.docs)
-            AppNotification.fromMap(d.id, plainData(d.data())),
-        ],
-      );
+  Stream<List<AppNotification>> watchFeed(String uid) => _shared.get(
+    'notifications/$uid',
+    () =>
+        countedSnapshots(
+          _feed(uid).orderBy('createdAt', descending: true).limit(feedLimit),
+          'notifications',
+        ).map(
+          (snap) => [
+            for (final d in snap.docs)
+              AppNotification.fromMap(d.id, plainData(d.data())),
+          ],
+        ),
+  );
 
   @override
   Future<Result<void>> markRead(String uid, Iterable<String> ids) =>

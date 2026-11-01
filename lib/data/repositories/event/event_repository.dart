@@ -2,15 +2,18 @@ import '../../../domain/models/team_event.dart';
 import '../../../utils/result.dart';
 
 abstract class EventRepository {
-  /// Events for a team, sorted by start time.
-  Stream<List<TeamEvent>> watchEvents(String teamId);
+  /// Events for a team, sorted by start time; with [since], only those
+  /// starting on or after that day (reads far fewer documents than the
+  /// team's whole history).
+  Stream<List<TeamEvent>> watchEvents(String teamId, {DateTime? since});
 
   /// Emits null if the event is deleted.
   Stream<TeamEvent?> watchEvent(String teamId, String eventId);
 
   /// The team's public events, sorted by start time: details only, no
-  /// responses. Anyone signed in may read them.
-  Stream<List<TeamEvent>> watchPublicEvents(String teamId);
+  /// responses. Anyone signed in may read them. [since] as for
+  /// [watchEvents].
+  Stream<List<TeamEvent>> watchPublicEvents(String teamId, {DateTime? since});
 
   /// Creates the event when [TeamEvent.isNew], otherwise updates its
   /// editable fields, leaving responses intact. Keeps the public copy in
@@ -53,8 +56,9 @@ abstract class EventRepository {
 
   // Personal schedule: events only [uid] sees, without responses or polls.
 
-  /// [uid]'s personal events, sorted by start time.
-  Stream<List<TeamEvent>> watchMyEvents(String uid);
+  /// [uid]'s personal events, sorted by start time. [since] as for
+  /// [watchEvents].
+  Stream<List<TeamEvent>> watchMyEvents(String uid, {DateTime? since});
 
   /// Emits null if the event is deleted.
   Stream<TeamEvent?> watchMyEvent(String uid, String eventId);

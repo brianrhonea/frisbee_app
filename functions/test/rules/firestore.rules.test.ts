@@ -1355,6 +1355,17 @@ describe("team directory", () => {
     await assertSucceeds(batch.commit());
   });
 
+  it("the listing carries the team's linked USA Ultimate page, and only that", async () => {
+    const usau = { usauUrl: "https://play.usaultimate.org/teams/events/Eventteam/?TeamId=1", usauName: "Team" };
+    const fs = db(COACH);
+    const batch = writeBatch(fs);
+    batch.update(doc(fs, "teams", TEAM), usau);
+    batch.set(doc(fs, "teamDirectory", TEAM), listing(usau));
+    await assertSucceeds(batch.commit());
+    await assertFails(setDoc(ref(COACH), listing({ ...usau, usauUrl: "https://example.com/" })));
+    await assertFails(setDoc(ref(COACH), listing()));
+  });
+
   it("a new team lists itself in its create batch", async () => {
     const fs = db(OUTSIDER);
     const batch = writeBatch(fs);

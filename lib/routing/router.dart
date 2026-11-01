@@ -699,6 +699,8 @@ GoRouter router(AuthRepository auth) => GoRouter(
                         followRepository: c.read(),
                         notificationRepository: c.read(),
                         groupTournamentRepository: c.read(),
+                        usauTeamRepository: c.read(),
+                        rankingRepository: c.read(),
                       ),
                       builder: (_, vm) => TeamHomeScreen(
                         viewModel: vm,

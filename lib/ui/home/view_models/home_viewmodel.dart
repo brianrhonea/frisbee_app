@@ -68,6 +68,7 @@ class HomeViewModel extends ChangeNotifier {
       meetingRepository: meetingRepository,
       uid: _auth.currentUser?.uid,
       clock: _clock,
+      upcomingOnly: true,
     )..addListener(_onFeed);
     _subs.add(
       tournamentRepository.watchTournaments().listen((t) {

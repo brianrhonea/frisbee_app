@@ -1,5 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/data/services/firestore_utils.dart';
 import 'package:frisbee_app/domain/models/player_profile.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/stats.dart';
@@ -87,6 +89,36 @@ void main() {
       expect(vm.primaryTeam?.number, 17);
       expect(vm.summary.games.single.won, isTrue);
       expect(profiles.published.last.seasons['2026']?.goals, 1);
+      vm.dispose();
+    });
+
+    test('what is published reads back the same, so it is not '
+        'published again', () async {
+      final vm = profileOf(testUser.uid);
+      await pumpEventQueue();
+      await vm.claim.execute(('t1', 'r1'));
+      await pumpEventQueue();
+      final sent = vm.summary;
+      expect(sent.games, isNotEmpty);
+      // As ProfileRepositoryFirebase writes it, and as Firestore hands it
+      // back (dates come back as Timestamps).
+      Object? stored(Object? v) => switch (v) {
+        DateTime d => Timestamp.fromDate(d),
+        Map m => m.map((k, v) => MapEntry('$k', stored(v))),
+        List l => l.map(stored).toList(),
+        _ => v,
+      };
+      final doc = stored({
+        'name': 'Alex Smith',
+        'teams': [for (final t in sent.teams) t.toMap()],
+        'stats': {for (final e in sent.seasons.entries) e.key: e.value.toMap()},
+        'games': [for (final g in sent.games) g.toMap()],
+      });
+      final back = PlayerProfile.fromMap(
+        testUser.uid,
+        plainData(doc! as Map<String, dynamic>),
+      ).summary;
+      expect(back.sameAs(sent), isTrue);
       vm.dispose();
     });
 

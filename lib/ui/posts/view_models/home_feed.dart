@@ -128,17 +128,19 @@ class HomeFeed extends ChangeNotifier {
           .map((p) => [for (final post in p) UserPostItem(post)]);
     }
 
+    // Each source loads at most a page more than is shown; the keys carry
+    // the limit, so "Show older posts" swaps in bigger queries.
     for (final t in _teams) {
-      wanted['team:${t.id}'] = () =>
-          _teamItems(t.id, t.name, _teamPosts.watchPosts(t.id));
+      wanted['team:${t.id}:$_limit'] = () =>
+          _teamItems(t.id, t.name, _teamPosts.watchPosts(t.id, limit: _limit));
     }
     for (final f in _follows) {
       final target = f.target;
       if (f.type == FollowType.team && !myTeams.containsKey(target.id)) {
-        wanted['public:${target.id}'] = () => _teamItems(
+        wanted['public:${target.id}:$_limit'] = () => _teamItems(
           target.id,
           target.name,
-          _teamPosts.watchPosts(target.id, publicOnly: true),
+          _teamPosts.watchPosts(target.id, publicOnly: true, limit: _limit),
         );
       }
       final group = target.groupId;

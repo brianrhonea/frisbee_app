@@ -201,9 +201,18 @@ class ProfileGame {
     'line': line.toMap(),
   };
 
+  // Field by field: comparing toMap()s would compare the nested line maps
+  // by identity, so a game read back would never equal the one published
+  // and the profile would republish on every snapshot.
   @override
   bool operator ==(Object other) =>
-      other is ProfileGame && _mapEquals(toMap(), other.toMap());
+      other is ProfileGame &&
+      teamName == other.teamName &&
+      opponent == other.opponent &&
+      date == other.date &&
+      ourScore == other.ourScore &&
+      theirScore == other.theirScore &&
+      line == other.line;
 
   @override
   int get hashCode => Object.hashAll([teamName, opponent, date, line]);

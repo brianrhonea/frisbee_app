@@ -3,13 +3,36 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
+import '../../services/shared_streams.dart';
 import 'event_repository.dart';
 
 class EventRepositoryFirebase implements EventRepository {
-  EventRepositoryFirebase({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+  EventRepositoryFirebase({
+    FirebaseFirestore? firestore,
+    SharedStreams? sharedStreams,
+  }) : _db = firestore ?? FirebaseFirestore.instance,
+       _shared = sharedStreams ?? SharedStreams.instance;
 
   final FirebaseFirestore _db;
+
+  /// One listener per query, shared by every screen (see [SharedStreams]).
+  final SharedStreams _shared;
+
+  /// [since] as a day, so callers asking within the same day share a query.
+  static DateTime? _day(DateTime? since) =>
+      since == null ? null : DateTime(since.year, since.month, since.day);
+
+  static Query<Map<String, dynamic>> _from(
+    CollectionReference<Map<String, dynamic>> col,
+    DateTime? since,
+  ) =>
+      (since == null
+              ? col
+              : col.where(
+                  'startsAt',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(since),
+                ))
+          .orderBy('startsAt');
 
   CollectionReference<Map<String, dynamic>> _events(String teamId) =>
       _db.collection('teams').doc(teamId).collection('events');
@@ -31,17 +54,29 @@ class EventRepositoryFirebase implements EventRepository {
       d.exists ? TeamEvent.fromMap(d.id, plainData(d.data())) : null;
 
   @override
-  Stream<List<TeamEvent>> watchEvents(String teamId) =>
-      _events(teamId).orderBy('startsAt').snapshots().map(_parse);
+  Stream<List<TeamEvent>> watchEvents(String teamId, {DateTime? since}) {
+    final day = _day(since);
+    return _shared.get(
+      'events/$teamId/${day?.toIso8601String() ?? 'all'}',
+      () => countedSnapshots(_from(_events(teamId), day), 'events').map(_parse),
+    );
+  }
 
   @override
   Stream<TeamEvent?> watchEvent(String teamId, String eventId) =>
       _events(teamId).doc(eventId).snapshots().map(_parseOne);
 
   @override
-  Stream<List<TeamEvent>> watchPublicEvents(String teamId) => _publicEvents(
-    teamId,
-  ).orderBy('startsAt').snapshots().map(_parse).map(_markPublic);
+  Stream<List<TeamEvent>> watchPublicEvents(String teamId, {DateTime? since}) {
+    final day = _day(since);
+    return _shared.get(
+      'publicEvents/$teamId/${day?.toIso8601String() ?? 'all'}',
+      () => countedSnapshots(
+        _from(_publicEvents(teamId), day),
+        'publicEvents',
+      ).map(_parse).map(_markPublic),
+    );
+  }
 
   static List<TeamEvent> _markPublic(List<TeamEvent> events) => [
     for (final e in events) e.copyWith(isPublic: true),
@@ -148,8 +183,14 @@ class EventRepositoryFirebase implements EventRepository {
   );
 
   @override
-  Stream<List<TeamEvent>> watchMyEvents(String uid) =>
-      _myEvents(uid).orderBy('startsAt').snapshots().map(_parse);
+  Stream<List<TeamEvent>> watchMyEvents(String uid, {DateTime? since}) {
+    final day = _day(since);
+    return _shared.get(
+      'myEvents/$uid/${day?.toIso8601String() ?? 'all'}',
+      () =>
+          countedSnapshots(_from(_myEvents(uid), day), 'myEvents').map(_parse),
+    );
+  }
 
   @override
   Stream<TeamEvent?> watchMyEvent(String uid, String eventId) =>

@@ -412,6 +412,8 @@ class TeamListing {
     this.description = '',
     this.requiresApproval = false,
     this.location,
+    this.usauUrl,
+    this.usauName,
   });
 
   factory TeamListing.of(Team team) => TeamListing(
@@ -424,6 +426,8 @@ class TeamListing {
     description: team.description,
     requiresApproval: team.requiresApproval,
     location: team.location,
+    usauUrl: team.usauUrl,
+    usauName: team.usauName,
   );
 
   final String id;
@@ -435,6 +439,13 @@ class TeamListing {
   final String description;
   final bool requiresApproval;
   final GroupLocation? location;
+
+  /// The linked USA Ultimate team page, so anyone can see the team's
+  /// schedule, record and ranking.
+  final String? usauUrl;
+
+  /// Team name as USA Ultimate shows it.
+  final String? usauName;
 
   bool get isCommunity => kind == TeamKind.community;
 
@@ -461,7 +472,9 @@ class TeamListing {
       kind == team.kind &&
       description == team.description &&
       requiresApproval == team.requiresApproval &&
-      location == (team.isPrivateGroup ? null : team.location);
+      location == (team.isPrivateGroup ? null : team.location) &&
+      usauUrl == team.usauUrl &&
+      usauName == team.usauName;
 
   factory TeamListing.fromMap(String id, Map<String, dynamic> map) =>
       TeamListing(
@@ -478,6 +491,8 @@ class TeamListing {
         description: map['description'] as String? ?? '',
         requiresApproval: map['requiresApproval'] as bool? ?? false,
         location: GroupLocation.fromMap(map['location']),
+        usauUrl: map['usauUrl'] as String?,
+        usauName: map['usauName'] as String?,
       );
 
   Map<String, dynamic> toMap() => {
@@ -493,6 +508,7 @@ class TeamListing {
       location: isPrivateGroup ? null : location,
     ),
     'keywords': searchKeywords('$name $city'),
+    if (usauUrl case final url?) ...{'usauUrl': url, 'usauName': ?usauName},
   };
 }
 

@@ -22,6 +22,7 @@ class MySchedule extends ChangeNotifier {
     required String? uid,
     MeetingRepository? meetingRepository,
     DateTime Function()? clock,
+    this.upcomingOnly = false,
   }) : _events = eventRepository,
        _meetings = meetingRepository,
        _uid = uid,
@@ -41,6 +42,17 @@ class MySchedule extends ChangeNotifier {
 
   static final _log = Logger('MySchedule');
 
+  /// Leaves out events that started more than [lookBack] ago, for screens
+  /// that only show what's coming up: a team's whole history costs a read
+  /// per event every time it loads.
+  final bool upcomingOnly;
+
+  /// How far back [upcomingOnly] still loads, so multi-day events under
+  /// way stay in.
+  static const lookBack = Duration(days: 7);
+
+  DateTime? get _since => upcomingOnly ? _clock().subtract(lookBack) : null;
+
   /// Longest wait between attempts to re-listen to personal events.
   static const maxRetryDelay = Duration(minutes: 1);
 
@@ -56,7 +68,7 @@ class MySchedule extends ChangeNotifier {
   void _watchMine(String uid) {
     _mineSub?.cancel();
     _mineSub = _events
-        .watchMyEvents(uid)
+        .watchMyEvents(uid, since: _since)
         .listen(
           (e) {
             _failures = 0;
@@ -123,7 +135,7 @@ class MySchedule extends ChangeNotifier {
       _watchMeetings(team);
     }
     for (final id in ids) {
-      _eventSubs[id] ??= _events.watchEvents(id).listen(
+      _eventSubs[id] ??= _events.watchEvents(id, since: _since).listen(
         (e) {
           _byTeam[id] = e;
           notifyListeners();

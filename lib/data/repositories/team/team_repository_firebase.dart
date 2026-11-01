@@ -14,6 +14,7 @@ import '../../../domain/models/team_video.dart';
 import '../../../utils/result.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
+import '../../services/shared_streams.dart';
 import '../chat/chat_repository_firebase.dart';
 import 'team_repository.dart';
 
@@ -38,14 +39,19 @@ class TeamRepositoryFirebase implements TeamRepository {
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
     Random? random,
+    SharedStreams? sharedStreams,
   }) : _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
-       _random = random ?? Random.secure();
+       _random = random ?? Random.secure(),
+       _shared = sharedStreams ?? SharedStreams.instance;
 
   /// Chat attachments and post photos go with the team.
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
   final Random _random;
+
+  /// One listener per query, shared by every screen (see [SharedStreams]).
+  final SharedStreams _shared;
 
   static final _log = Logger('TeamRepository');
 
@@ -93,24 +99,32 @@ class TeamRepositoryFirebase implements TeamRepository {
       code.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
 
   @override
-  Stream<List<Team>> watchMyTeams(String uid) => _teams
-      .where('memberIds', arrayContains: uid)
-      .snapshots()
-      .map(
-        (snap) =>
-            snap.docs
-                .map((d) => Team.fromMap(d.id, plainData(d.data())))
-                .toList()
-              ..sort(
-                (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-              ),
-      );
+  Stream<List<Team>> watchMyTeams(String uid) => _shared.get(
+    'myTeams/$uid',
+    () =>
+        countedSnapshots(
+          _teams.where('memberIds', arrayContains: uid),
+          'myTeams',
+        ).map(
+          (snap) =>
+              snap.docs
+                  .map((d) => Team.fromMap(d.id, plainData(d.data())))
+                  .toList()
+                ..sort(
+                  (a, b) =>
+                      a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+                ),
+        ),
+  );
 
   @override
-  Stream<Team?> watchTeam(String teamId) => _teams
-      .doc(teamId)
-      .snapshots()
-      .map((d) => d.exists ? Team.fromMap(d.id, plainData(d.data())) : null);
+  Stream<Team?> watchTeam(String teamId) => _shared.get(
+    'team/$teamId',
+    () => countedDocSnapshots(
+      _teams.doc(teamId),
+      'team',
+    ).map((d) => d.exists ? Team.fromMap(d.id, plainData(d.data())) : null),
+  );
 
   CollectionReference<Map<String, dynamic>> _requests(String teamId) =>
       _teams.doc(teamId).collection('joinRequests');
@@ -321,12 +335,12 @@ class TeamRepositoryFirebase implements TeamRepository {
   );
 
   @override
-  Stream<TeamListing?> watchListing(String teamId) => _directory
-      .doc(teamId)
-      .snapshots()
-      .map(
-        (d) => d.exists ? TeamListing.fromMap(d.id, plainData(d.data())) : null,
-      );
+  Stream<TeamListing?> watchListing(String teamId) => _shared.get(
+    'listing/$teamId',
+    () => countedDocSnapshots(_directory.doc(teamId), 'teamListing').map(
+      (d) => d.exists ? TeamListing.fromMap(d.id, plainData(d.data())) : null,
+    ),
+  );
 
   @override
   Future<Result<void>> publishListing(Team team) =>
@@ -518,16 +532,20 @@ class TeamRepositoryFirebase implements TeamRepository {
     String teamId, {
     bool withStatus = false,
   }) {
-    final roster = _roster(teamId).snapshots();
     if (!withStatus) {
-      return roster.map(
-        (snap) => _sorted([
-          for (final d in snap.docs)
-            RosterPlayer.fromMap(d.id, plainData(d.data())),
-        ]),
+      return _shared.get(
+        'roster/$teamId',
+        () => countedSnapshots(_roster(teamId), 'roster').map(
+          (snap) => _sorted([
+            for (final d in snap.docs)
+              RosterPlayer.fromMap(d.id, plainData(d.data())),
+          ]),
+        ),
       );
     }
-    return _combineLatest(roster, _status(teamId).snapshots(), (r, s) {
+    final roster = countedSnapshots(_roster(teamId), 'roster');
+    final status = countedSnapshots(_status(teamId), 'rosterStatus');
+    return _combineLatest(roster, status, (r, s) {
       final status = {for (final d in s.docs) d.id: plainData(d.data())};
       _moveLegacyStatus(teamId, r.docs, status.keys.toSet());
       return _sorted([

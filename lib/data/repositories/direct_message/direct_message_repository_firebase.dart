@@ -9,6 +9,7 @@ import '../../../domain/models/model_utils.dart';
 import '../../../utils/result.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
+import '../../services/shared_streams.dart';
 import 'direct_message_repository.dart';
 
 /// The directory is `profiles/{uid}` (name and photo, written by
@@ -20,11 +21,16 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
   DirectMessageRepositoryFirebase({
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
+    SharedStreams? sharedStreams,
   }) : _files = attachments,
-       _db = firestore ?? FirebaseFirestore.instance;
+       _db = firestore ?? FirebaseFirestore.instance,
+       _shared = sharedStreams ?? SharedStreams.instance;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
+
+  /// One listener per query, shared by every screen (see [SharedStreams]).
+  final SharedStreams _shared;
 
   static const _searchLimit = 20;
 
@@ -62,17 +68,21 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
   });
 
   @override
-  Stream<List<Conversation>> watchConversations(String uid) => _conversations
-      .where('participants', arrayContains: uid)
-      .snapshots()
-      .map(
-        (snap) =>
-            [
-                for (final d in snap.docs)
-                  Conversation.fromMap(d.id, plainData(d.data())),
-              ].where((c) => c.hasMessages).toList()
-              ..sort((a, b) => b.lastMessageAt!.compareTo(a.lastMessageAt!)),
-      );
+  Stream<List<Conversation>> watchConversations(String uid) => _shared.get(
+    'conversations/$uid',
+    () =>
+        countedSnapshots(
+          _conversations.where('participants', arrayContains: uid),
+          'conversations',
+        ).map(
+          (snap) =>
+              [
+                  for (final d in snap.docs)
+                    Conversation.fromMap(d.id, plainData(d.data())),
+                ].where((c) => c.hasMessages).toList()
+                ..sort((a, b) => b.lastMessageAt!.compareTo(a.lastMessageAt!)),
+        ),
+  );
 
   @override
   Stream<Conversation?> watchConversation(String id) => _conversations
@@ -105,16 +115,15 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
 
   @override
   Stream<List<ChatMessage>> watchMessages(String id, {required int limit}) =>
-      _messages(id)
-          .orderBy('createdAt', descending: true)
-          .limit(limit)
-          .snapshots()
-          .map(
-            (snap) => [
-              for (final d in snap.docs.reversed)
-                ChatMessage.fromMap(d.id, plainData(d.data())),
-            ],
-          );
+      countedSnapshots(
+        _messages(id).orderBy('createdAt', descending: true).limit(limit),
+        'directMessages',
+      ).map(
+        (snap) => [
+          for (final d in snap.docs.reversed)
+            ChatMessage.fromMap(d.id, plainData(d.data())),
+        ],
+      );
 
   @override
   Future<Result<void>> sendMessage(

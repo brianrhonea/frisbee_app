@@ -8,6 +8,7 @@ import '../../../domain/models/team_post.dart';
 import '../../../utils/result.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
+import '../../services/shared_streams.dart';
 import 'team_post_repository.dart';
 
 /// Posts live in `teams/{teamId}/posts`; their photos in Cloud Storage
@@ -18,11 +19,16 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
   TeamPostRepositoryFirebase({
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
+    SharedStreams? sharedStreams,
   }) : _files = attachments,
-       _db = firestore ?? FirebaseFirestore.instance;
+       _db = firestore ?? FirebaseFirestore.instance,
+       _shared = sharedStreams ?? SharedStreams.instance;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
+
+  /// One listener per query, shared by every screen (see [SharedStreams]).
+  final SharedStreams _shared;
 
   CollectionReference<Map<String, dynamic>> _posts(String teamId) =>
       _db.collection('teams').doc(teamId).collection('posts');
@@ -33,33 +39,45 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
       'teams/$teamId/posts/$postId/${DateTime.now().millisecondsSinceEpoch}';
 
   @override
-  Stream<List<TeamPost>> watchPosts(String teamId, {bool publicOnly = false}) {
-    // Non-members must filter on `public` for the rules to allow the query.
-    // Sorted here so the filter needs no composite index.
-    final Query<Map<String, dynamic>> q = publicOnly
+  Stream<List<TeamPost>> watchPosts(
+    String teamId, {
+    bool publicOnly = false,
+    int? limit,
+  }) => _shared.get('posts/$teamId/$publicOnly/${limit ?? 'all'}', () {
+    // Non-members must filter on `public` for the rules to allow the query
+    // (public + createdAt has a composite index).
+    Query<Map<String, dynamic>> q = publicOnly
         ? _posts(teamId).where('public', isEqualTo: true)
         : _posts(teamId);
-    return q.snapshots().map(
+    if (limit != null) {
+      q = q.orderBy('createdAt', descending: true).limit(limit);
+    }
+    return countedSnapshots(q, 'teamPosts').map(
       (snap) => [
         for (final d in snap.docs) TeamPost.fromMap(d.id, plainData(d.data())),
       ]..sort(TeamPost.newestFirst),
     );
-  }
+  });
 
   @override
   Stream<List<TeamPost>> watchTournamentPosts(
     String groupId,
     String tournamentKey,
-  ) => _posts(groupId)
-      .where('public', isEqualTo: true)
-      .where('tournamentKey', isEqualTo: tournamentKey)
-      .snapshots()
-      .map(
-        (snap) => [
-          for (final d in snap.docs)
-            TeamPost.fromMap(d.id, plainData(d.data())),
-        ]..sort(TeamPost.newestFirst),
-      );
+  ) => _shared.get(
+    'tournamentPosts/$groupId/$tournamentKey',
+    () =>
+        countedSnapshots(
+          _posts(groupId)
+              .where('public', isEqualTo: true)
+              .where('tournamentKey', isEqualTo: tournamentKey),
+          'tournamentPosts',
+        ).map(
+          (snap) => [
+            for (final d in snap.docs)
+              TeamPost.fromMap(d.id, plainData(d.data())),
+          ]..sort(TeamPost.newestFirst),
+        ),
+  );
 
   @override
   Future<Result<void>> savePost(

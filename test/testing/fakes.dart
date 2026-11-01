@@ -648,10 +648,25 @@ class FakeEventRepository implements EventRepository {
         ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
   @override
-  Stream<List<TeamEvent>> watchEvents(String teamId) async* {
-    yield _sorted(teamId);
-    yield* _changes.stream.map((_) => _sorted(teamId));
+  Stream<List<TeamEvent>> watchEvents(String teamId, {DateTime? since}) async* {
+    sinceRequests.add(since);
+    yield _since(_sorted(teamId), since);
+    yield* _changes.stream.map((_) => _since(_sorted(teamId), since));
   }
+
+  /// The `since` each watchEvents call asked for.
+  final sinceRequests = <DateTime?>[];
+
+  static List<TeamEvent> _since(List<TeamEvent> events, DateTime? since) =>
+      since == null
+      ? events
+      : [
+          for (final e in events)
+            if (!e.startsAt.isBefore(
+              DateTime(since.year, since.month, since.day),
+            ))
+              e,
+        ];
 
   @override
   Stream<TeamEvent?> watchEvent(String teamId, String eventId) async* {
@@ -675,9 +690,12 @@ class FakeEventRepository implements EventRepository {
   ];
 
   @override
-  Stream<List<TeamEvent>> watchPublicEvents(String teamId) async* {
-    yield _public(teamId);
-    yield* _changes.stream.map((_) => _public(teamId));
+  Stream<List<TeamEvent>> watchPublicEvents(
+    String teamId, {
+    DateTime? since,
+  }) async* {
+    yield _since(_public(teamId), since);
+    yield* _changes.stream.map((_) => _since(_public(teamId), since));
   }
 
   @override
@@ -784,9 +802,9 @@ class FakeEventRepository implements EventRepository {
         ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
   @override
-  Stream<List<TeamEvent>> watchMyEvents(String uid) async* {
-    yield _mineSorted(uid);
-    yield* _changes.stream.map((_) => _mineSorted(uid));
+  Stream<List<TeamEvent>> watchMyEvents(String uid, {DateTime? since}) async* {
+    yield _since(_mineSorted(uid), since);
+    yield* _changes.stream.map((_) => _since(_mineSorted(uid), since));
   }
 
   @override
@@ -1273,10 +1291,16 @@ class FakeTeamPostRepository implements TeamPostRepository {
   Stream<List<TeamPost>> watchPosts(
     String teamId, {
     bool publicOnly = false,
+    int? limit,
   }) async* {
     watches.add(publicOnly);
-    yield _of(teamId, publicOnly);
-    yield* _changes.stream.map((_) => _of(teamId, publicOnly));
+    List<TeamPost> page() {
+      final all = _of(teamId, publicOnly);
+      return limit == null ? all : all.take(limit).toList();
+    }
+
+    yield page();
+    yield* _changes.stream.map((_) => page());
   }
 
   @override
