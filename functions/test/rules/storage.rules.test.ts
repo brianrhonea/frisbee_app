@@ -194,3 +194,17 @@ describe("direct message attachments", () => {
     await assertSucceeds(dm(PLAYER, PLAYER).delete());
   });
 });
+
+describe("user post photos", () => {
+  const photo = (uid: string, owner = uid) => storage(uid).ref(`users/${owner}/posts/p1/1/0-photo.png`);
+
+  it("authors upload into their own folder; anyone signed in sees them", async () => {
+    await assertSucceeds(photo(PLAYER).put(bytes(10), { contentType: "image/png" }).then());
+    await assertFails(photo(OUTSIDER, PLAYER).put(bytes(10), { contentType: "image/png" }).then());
+    await assertFails(photo(PLAYER).put(bytes(10), { contentType: "application/pdf" }).then());
+    await assertFails(photo(PLAYER).put(bytes(10 * 1024 * 1024 + 1), { contentType: "image/png" }).then());
+    await assertSucceeds(photo(OUTSIDER, PLAYER).getMetadata());
+    await assertFails(photo(OUTSIDER, PLAYER).delete());
+    await assertSucceeds(photo(PLAYER).delete());
+  });
+});

@@ -48,17 +48,45 @@ ownership first).
 
 ### Home
 
+Home has the week, your team, then your **feed**. On a wide screen,
+your events, playbook and rankings sit beside the feed.
+
 - **This week**: the next seven days. Dots under each day show events:
   **blue for team**, **purple for personal**. Each event has a TEAM or
   PERSONAL tag (or the team's name if you're on several teams). Tap a day or
   **Full schedule** to open the Schedule tab.
 - **My team**: your team at a glance. If you're on several teams, switch
   with the chips.
-- **Playbook**: a preview of your team's plays. Tap one to open it.
-- **Coming up**: your next team and personal events. Turn on **Show other
-  events** to add upcoming USA Ultimate tournaments.
-- **Rankings**: the top 3 on a podium and ranks 4–10. Switch division with
-  the chips, or tap **Full rankings**.
+- **Feed**: posts from you, your teams and groups, and everything you
+  follow, newest first. Tap **Share an update or workout** to post. See
+  [Following and posts](#following-and-posts).
+- **Playbook** (wide screens): a preview of your team's plays. Tap one to
+  open it.
+- **Coming up** (wide screens): your next team and personal events. Turn
+  on **Show other events** to add upcoming USA Ultimate tournaments.
+- **Rankings** (wide screens): the top 3 on a podium and ranks 4–10.
+  Switch division with the chips, or tap **Full rankings**.
+
+### Following and posts
+
+- **Follow** a person, team, community group, group tournament or USA
+  Ultimate event from its page. Their posts then show up in your Home
+  feed. Posts from your own teams and groups are always there.
+- Tap the **bell** next to **Following** to be notified when they post. To
+  turn every post notification off, use **Posts you follow** in
+  notification settings.
+- **Following** (Profile → Following, or **Following** above the feed)
+  lists everything you follow, with each bell and **Unfollow**.
+- **Write a post**: text, up to 4 photos and 5 links. Anyone signed in can
+  see your posts on your profile. Optionally tag a tournament or event you
+  follow, so its followers see the post too.
+- **Share a workout**: pick the activity, then add how long it took, an
+  optional distance and effort, and any exercises with sets, reps and
+  weight. Runs with a distance show your pace.
+- **Profiles**: tap a post's author, someone in a team's Members list, or
+  **View profile** in New message. You'll see their posts and follower
+  counts, and buttons to Follow or Message them. Edit or delete your own
+  posts from the ⋮ on each one.
 
 ### Notifications
 
@@ -75,6 +103,8 @@ You're notified about:
 - **Event reminders**: a reminder about a day before each team or personal
   event, unless you've said you can't go.
 - **Team activity**: new and updated plays in the playbook.
+- **Posts you follow**: new posts from people, teams and tournaments whose
+  bell you turned on.
 - **Meetings**: meetings you're invited to, cancellations, and a heads-up
   when one you're attending starts.
 
@@ -114,7 +144,9 @@ Your teams. Tap one to open its home page: the team at a glance, what's
 **New post** to share news (tryouts, fees, field changes). Each post is
 **Public** or for members only; admins can edit or delete posts.
 
-Tiles on the home page open each part of the team:
+Members get a tab bar under the team name: **Home** (the above), then
+one tab for each part of the team. Switching tabs keeps you on the team
+page; back takes you out of the team. The tabs:
 
 - **Team Events**: the team calendar. Open an event to RSVP **Going**,
   **Maybe** or **Can't go**. Once you're going, you can react and vote in
@@ -302,7 +334,8 @@ but only to the people invited.
 ### Events
 
 Upcoming USA Ultimate tournaments. Filter the list, and tap a tournament for
-its details and a link to USA Ultimate.
+its details and a link to USA Ultimate. Back returns to wherever you
+opened it from (Events, Home or Following).
 
 If USA Ultimate has posted a schedule, the tournament page also shows
 **Schedule & brackets**. Pick a division (Men, Mixed, Women), then a stage
@@ -313,7 +346,8 @@ event.
 
 ### Rankings
 
-USA Ultimate rankings by division. Tap a team for its USA Ultimate page.
+USA Ultimate rankings by division. Tap a team for its USA Ultimate page;
+back returns to the list (or to Home, if you opened it there).
 
 ## Privacy
 
@@ -326,6 +360,9 @@ USA Ultimate rankings by division. Tap a team for its USA Ultimate page.
   people the room gives access to (and the team owner).
 - **Notifications** and your notification settings are visible only to
   you.
+- **Your posts** (and their photos) are public to anyone signed in to
+  UltiUP. **Who you follow** is private: others see only how many people
+  follow you and how many you follow.
 - **The invite code** is visible only to owners, coaches and captains.
   Anyone with the code can join as a player, so share it only with your team.
   The owner can make a new code at any time; the old one stops working.

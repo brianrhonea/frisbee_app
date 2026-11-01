@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/tournament.dart';
+import '../../../routing/routes.dart';
+import '../../core/ui/back_or.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/usau_attribution.dart';
+import '../../follow/widgets/follow_button.dart';
 import '../view_models/tournament_detail_viewmodel.dart';
 import 'event_schedule_widgets.dart';
 import 'tournament_widgets.dart';
@@ -21,18 +24,22 @@ class TournamentDetailScreen extends StatelessWidget {
       listenable: vm,
       builder: (context, _) {
         final t = vm.tournament;
+        final leading = backOr(context, Routes.tournaments);
         if (vm.loading) {
-          return Scaffold(appBar: AppBar(), body: const LoadingView());
+          return Scaffold(
+            appBar: AppBar(leading: leading),
+            body: const LoadingView(),
+          );
         }
         if (vm.error != null) {
           return Scaffold(
-            appBar: AppBar(),
+            appBar: AppBar(leading: leading),
             body: ErrorView(error: vm.error, onRetry: vm.retry),
           );
         }
         if (t == null) {
           return Scaffold(
-            appBar: AppBar(),
+            appBar: AppBar(leading: leading),
             body: const EmptyView(
               icon: Icons.event_busy,
               title: 'Tournament not found',
@@ -41,8 +48,11 @@ class TournamentDetailScreen extends StatelessWidget {
         }
         return Scaffold(
           appBar: AppBar(
+            leading: leading,
             title: Text(t.name),
             actions: [
+              if (vm.follow case final follow?)
+                FollowControl(viewModel: follow, compact: true),
               if (vm.schedule != null)
                 IconButton(
                   tooltip: 'Refresh scores',

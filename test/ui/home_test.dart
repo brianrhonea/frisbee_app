@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/feed_item.dart';
+import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/team_post.dart';
 import 'package:frisbee_app/domain/models/tournament.dart';
+import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/home/view_models/home_viewmodel.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
 
 import '../testing/fakes.dart';
+import '../testing/social_fakes.dart';
 
 TeamEvent event(String id, String title, EventType type, DateTime at) =>
     TeamEvent(id: id, title: title, type: type, startsAt: at);
@@ -59,6 +63,8 @@ void main() {
   late FakeTeamRepository teams;
   late FakeEventRepository events;
   late FakeTeamPostRepository posts;
+  late FakeFollowRepository follows;
+  late FakeUserPostRepository userPosts;
 
   Future<HomeViewModel> load({
     bool withTeam = true,
@@ -67,6 +73,8 @@ void main() {
     teams = FakeTeamRepository();
     events = FakeEventRepository();
     posts = FakeTeamPostRepository();
+    follows = FakeFollowRepository();
+    userPosts = FakeUserPostRepository();
     if (withPersonal) {
       events.mine[testUser.uid] = {
         'run': event(
@@ -125,6 +133,8 @@ void main() {
       eventRepository: events,
       teamPostRepository: posts,
       tournamentRepository: FakeTournamentRepository(tournaments),
+      followRepository: follows,
+      userPostRepository: userPosts,
       filePicker: FakeFilePickerService(),
       clock: () => now,
     );
@@ -176,8 +186,8 @@ void main() {
       ];
       await teams.updateTeam(teams.teams['t2']!);
       await pumpEventQueue();
-      expect(vm.posts.map((p) => p.post.id), ['q1', 'p1']);
-      expect(vm.posts.first.team.name, 'Sunday pickup');
+      expect(vm.posts.map((p) => p.id), ['team/t2/q1', 'team/t1/p1']);
+      expect((vm.posts.first as TeamPostItem).teamName, 'Sunday pickup');
       // Only teams the user runs take posts.
       expect(vm.postableTeams.map((t) => t.id), ['t1']);
     });
@@ -192,7 +202,59 @@ void main() {
       ));
       await pumpEventQueue();
       expect(vm.savePost.completed, isTrue);
-      expect(vm.posts.map((p) => p.post.body), contains('Bring cleats'));
+      expect(
+        vm.posts.map((p) => (p as TeamPostItem).post.body),
+        contains('Bring cleats'),
+      );
+    });
+
+    UserPost userPost(String id, String author, DateTime at) => UserPost(
+      id: id,
+      authorId: author,
+      authorName: author == testUser.uid ? 'Alex' : 'Sam',
+      body: 'Post $id',
+      createdAt: at,
+    );
+
+    test('the feed adds my posts and those of people I follow', () async {
+      final vm = await load();
+      userPosts.posts.addAll([
+        userPost('mine', testUser.uid, DateTime(2026, 10, 27)),
+        userPost('sam', 'sam', DateTime(2026, 10, 28)),
+        userPost('stranger', 'zed', DateTime(2026, 10, 28, 1)),
+      ]);
+      await follows.follow(testUser.uid, const FollowTarget.user('sam', 'Sam'));
+      await pumpEventQueue();
+      expect(vm.posts.map((i) => i.id), [
+        'team/t1/p1',
+        'user/sam',
+        'user/mine',
+      ]);
+      expect(vm.followsAnything, isTrue);
+
+      await follows.unfollow(testUser.uid, FollowTarget.userKey('sam'));
+      await pumpEventQueue();
+      expect(vm.posts.map((i) => i.id), ['team/t1/p1', 'user/mine']);
+    });
+
+    test('followed teams I am not on show only their public posts', () async {
+      final vm = await load();
+      posts.posts['other'] = [
+        TeamPost(id: 'pub', body: 'Open tryouts', isPublic: true),
+        const TeamPost(id: 'priv', body: 'Members only'),
+      ];
+      await follows.follow(
+        testUser.uid,
+        const FollowTarget.team('other', 'Other'),
+      );
+      await pumpEventQueue();
+      expect(vm.posts.map((i) => i.id), contains('team/other/pub'));
+      expect(vm.posts.map((i) => i.id), isNot(contains('team/other/priv')));
+      // Not on that team, so no editing its posts.
+      final pub = vm.posts.whereType<TeamPostItem>().firstWhere(
+        (p) => p.teamId == 'other',
+      );
+      expect(vm.canEditPost(pub), isFalse);
     });
 
     test('names the home city and the next tournament', () async {
@@ -244,6 +306,8 @@ void main() {
       expect(find.text('Theo Brooks'), findsOneWidget);
       expect(find.textContaining('Northside Flyers ·'), findsOneWidget);
 
+      await tester.ensureVisible(find.text('Your teams'));
+      await tester.pump();
       await tester.tap(find.text('Your teams'));
       await tester.pump();
       expect(find.text('Northside Flyers'), findsOneWidget);

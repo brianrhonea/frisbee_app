@@ -4,35 +4,33 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/follow/follow_repository.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/team_post/team_post_repository.dart';
 import '../../../data/repositories/tournament/tournament_repository.dart';
+import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../../../data/services/file_picker_service.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/feed_item.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../domain/models/tournament.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../posts/view_models/home_feed.dart';
 import '../../schedule/view_models/my_schedule.dart';
 import '../../teams/view_models/team_home_viewmodel.dart' show pickPostImages;
-
-/// A post on the community feed and the team it's from.
-class FeedPost {
-  const FeedPost({required this.team, required this.post});
-
-  final Team team;
-  final TeamPost post;
-}
 
 /// A post to save on [teamId]'s page.
 typedef FeedPostDraft = ({String teamId, PostDraft draft});
 
-/// The community feed: posts from every team and group the user is on,
-/// newest first, with what's coming up on their schedule beside it.
+/// The community feed: the user's own posts and those of the people,
+/// teams and tournaments they follow, every post of their teams and
+/// groups, newest first, with what's coming up on their schedule beside
+/// it.
 class HomeViewModel extends ChangeNotifier {
   HomeViewModel({
     required AuthRepository authRepository,
@@ -41,18 +39,29 @@ class HomeViewModel extends ChangeNotifier {
     MeetingRepository? meetingRepository,
     required TeamPostRepository teamPostRepository,
     required TournamentRepository tournamentRepository,
+    required FollowRepository followRepository,
+    required UserPostRepository userPostRepository,
     required FilePickerService filePicker,
     DateTime Function()? clock,
   }) : _auth = authRepository,
        _teamRepo = teamRepository,
        _posts = teamPostRepository,
+       _userPosts = userPostRepository,
        _picker = filePicker,
        _clock = clock ?? DateTime.now {
     joinTeam = Command1<String, String>(_joinTeam);
     savePost = Command1<void, FeedPostDraft>(_savePost);
-    deletePost = Command1<void, FeedPost>(
-      (p) => _posts.deletePost(p.team.id, p.post.id),
+    deletePost = Command1<void, TeamPostItem>(
+      (p) => _posts.deletePost(p.teamId, p.post.id),
     );
+    deleteUserPost = Command1<void, String>(_userPosts.deletePost);
+    feed = HomeFeed(
+      uid: _auth.currentUser?.uid ?? '',
+      followRepository: followRepository,
+      teamRepository: teamRepository,
+      teamPostRepository: teamPostRepository,
+      userPostRepository: userPostRepository,
+    )..addListener(notifyListeners);
     _feed = MySchedule(
       teamRepository: teamRepository,
       eventRepository: eventRepository,
@@ -71,13 +80,12 @@ class HomeViewModel extends ChangeNotifier {
   final AuthRepository _auth;
   final TeamRepository _teamRepo;
   final TeamPostRepository _posts;
+  final UserPostRepository _userPosts;
   final FilePickerService _picker;
   final DateTime Function() _clock;
+  final _downloads = <String, Future<Result<Uint8List>>>{};
   late final MySchedule _feed;
   final List<StreamSubscription<Object?>> _subs = [];
-  final Map<String, StreamSubscription<List<TeamPost>>> _postSubs = {};
-  final Map<String, List<TeamPost>> _postsByTeam = {};
-  final _downloads = <String, Future<Result<Uint8List>>>{};
 
   /// Events listed under "Coming up".
   static const upcomingLimit = 4;
@@ -87,7 +95,10 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Creates or edits a post on one of the user's teams.
   late final Command1<void, FeedPostDraft> savePost;
-  late final Command1<void, FeedPost> deletePost;
+  late final Command1<void, TeamPostItem> deletePost;
+
+  /// Deletes one of the user's own posts, by id.
+  late final Command1<void, String> deleteUserPost;
 
   AppUser? get user => _auth.currentUser;
 
@@ -130,10 +141,7 @@ class HomeViewModel extends ChangeNotifier {
         .key;
   }
 
-  void _onFeed() {
-    _watchPosts();
-    notifyListeners();
-  }
+  void _onFeed() => notifyListeners();
 
   Future<Result<String>> _joinTeam(String code) async {
     final user = _auth.currentUser;
@@ -143,55 +151,23 @@ class HomeViewModel extends ChangeNotifier {
 
   // Posts ------------------------------------------------------------------
 
-  bool _postsLoaded = false;
+  /// Posts from the user, their teams and everything they follow.
+  late final HomeFeed feed;
 
-  /// False until every team's posts have loaded once.
-  bool get postsLoaded => _postsLoaded || (teamsLoaded && teams.isEmpty);
+  bool get postsLoaded => feed.loaded;
+  List<FeedItem> get posts => feed.items;
+  bool get hasMorePosts => feed.hasMore;
+  void loadMorePosts() => feed.loadMore();
 
-  /// Posts from all the user's teams, newest first.
-  List<FeedPost> get posts {
-    final byId = {for (final t in teams) t.id: t};
-    final list = [
-      for (final e in _postsByTeam.entries)
-        if (byId[e.key] case final team?)
-          for (final p in e.value) FeedPost(team: team, post: p),
-    ];
-    list.sort((a, b) => TeamPost.newestFirst(a.post, b.post));
-    return list;
-  }
+  /// Whether the user follows anything yet, for the empty feed's advice.
+  bool get followsAnything => feed.follows.isNotEmpty;
 
-  /// Follows each team's posts, and stops following teams the user left.
-  void _watchPosts() {
-    final ids = {for (final t in teams) t.id};
-    for (final id in _postSubs.keys.toList()) {
-      if (ids.contains(id)) continue;
-      _postSubs.remove(id)?.cancel();
-      _postsByTeam.remove(id);
-    }
-    for (final id in ids) {
-      if (_postSubs.containsKey(id)) continue;
-      _postSubs[id] = _posts
-          .watchPosts(id)
-          .listen(
-            (p) {
-              _postsByTeam[id] = p;
-              _checkPostsLoaded();
-              notifyListeners();
-            },
-            onError: (Object _) {
-              _postsByTeam[id] = const [];
-              _checkPostsLoaded();
-              notifyListeners();
-            },
-          );
-    }
-    _checkPostsLoaded();
-  }
+  /// The team behind [item] if the user is on it.
+  Team? teamOf(TeamPostItem item) =>
+      teams.where((t) => t.id == item.teamId).firstOrNull;
 
-  void _checkPostsLoaded() {
-    if (_postsLoaded || !teamsLoaded) return;
-    _postsLoaded = teams.every((t) => _postsByTeam.containsKey(t.id));
-  }
+  /// Whether the user may edit or delete [item].
+  bool canEditPost(TeamPostItem item) => teamOf(item)?.canEdit(_uid) ?? false;
 
   Future<Result<void>> _savePost(FeedPostDraft d) async {
     final me = _auth.currentUser;
@@ -203,11 +179,16 @@ class HomeViewModel extends ChangeNotifier {
   Future<Result<List<NewAttachment>>> pickImages() => pickPostImages(_picker);
 
   /// A post photo's bytes, fetched once per photo.
+  /// People's photos are under `users/`, team posts' under `teams/`.
   Future<Result<Uint8List>> imageData(ChatAttachment image) =>
-      _downloads[image.path] ??= _posts.downloadImage(image).then((r) {
-        if (r is Error) _downloads.remove(image.path);
-        return r;
-      });
+      _downloads[image.path] ??=
+          (image.path.startsWith('users/')
+                  ? _userPosts.downloadImage(image)
+                  : _posts.downloadImage(image))
+              .then((r) {
+                if (r is Error) _downloads.remove(image.path);
+                return r;
+              });
 
   // Schedule ---------------------------------------------------------------
 
@@ -243,12 +224,16 @@ class HomeViewModel extends ChangeNotifier {
     _feed
       ..removeListener(_onFeed)
       ..dispose();
-    for (final s in [..._subs, ..._postSubs.values]) {
+    feed
+      ..removeListener(notifyListeners)
+      ..dispose();
+    for (final s in _subs) {
       s.cancel();
     }
     joinTeam.dispose();
     savePost.dispose();
     deletePost.dispose();
+    deleteUserPost.dispose();
     super.dispose();
   }
 }

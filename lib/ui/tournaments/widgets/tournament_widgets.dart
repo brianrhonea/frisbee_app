@@ -139,7 +139,7 @@ class TournamentCard extends StatelessWidget {
         ),
         isThreeLine: true,
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.go(Routes.tournament(t.id)),
+        onTap: () => context.push(Routes.tournament(t.id)),
       ),
     );
   }

@@ -10,6 +10,13 @@ abstract class TeamPostRepository {
   /// [publicOnly] for everyone else, who may read only public ones.
   Stream<List<TeamPost>> watchPosts(String teamId, {bool publicOnly = false});
 
+  /// Public posts about one of the group's tournaments ([tournamentKey] is
+  /// a FollowTarget key), for people following it from outside the group.
+  Stream<List<TeamPost>> watchTournamentPosts(
+    String groupId,
+    String tournamentKey,
+  );
+
   /// Creates the post when [TeamPost.isNew], otherwise updates its editable
   /// fields. Uploads [PostDraft.newImages] and deletes photos dropped from
   /// the saved post. Owners, coaches and captains only.

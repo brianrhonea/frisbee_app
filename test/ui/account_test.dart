@@ -127,9 +127,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light,
-          home: SignInScreen(
-            viewModel: SignInViewModel(authRepository: auth),
-          ),
+          home: SignInScreen(viewModel: SignInViewModel(authRepository: auth)),
         ),
       );
       await tester.pump();

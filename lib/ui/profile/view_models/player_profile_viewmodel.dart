@@ -4,16 +4,23 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/direct_message/direct_message_repository.dart';
+import '../../../data/repositories/follow/follow_repository.dart';
+import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/profile/profile_repository.dart';
 import '../../../data/repositories/stats/stats_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../data/repositories/user_post/user_post_repository.dart';
+import '../../../domain/models/chat.dart';
 import '../../../domain/models/direct_message.dart';
+import '../../../domain/models/follow.dart';
 import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/stats.dart';
 import '../../../domain/models/team.dart';
+import '../../../domain/models/user_post.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../follow/view_models/follow_viewmodel.dart';
 
 /// A team whose roster the user isn't linked to yet, and the roster spots
 /// they could claim, best name match first.
@@ -23,6 +30,9 @@ typedef ClaimableTeam = ({Team team, List<RosterPlayer> players});
 /// profile the player sees their stats computed live from the games of
 /// every team whose roster they're linked to, and their app publishes the
 /// parts they choose to show.
+///
+/// With [FollowRepository] and [UserPostRepository] it also shows follower
+/// counts, the Follow button and the player's posts.
 class PlayerProfileViewModel extends ChangeNotifier {
   PlayerProfileViewModel({
     required this.uid,
@@ -31,11 +41,20 @@ class PlayerProfileViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required StatsRepository statsRepository,
     required DirectMessageRepository directMessageRepository,
+    FollowRepository? followRepository,
+    UserPostRepository? userPostRepository,
+    NotificationRepository? notificationRepository,
   }) : _profiles = profileRepository,
        _auth = authRepository,
        _teamRepo = teamRepository,
        _stats = statsRepository,
-       _dms = directMessageRepository {
+       _dms = directMessageRepository,
+       _userPosts = userPostRepository,
+       _followSlot = FollowSlot(
+         followRepository: followRepository,
+         notificationRepository: notificationRepository,
+         authRepository: authRepository,
+       ) {
     saveDetails = Command1<void, ProfileDetails>(_saveDetails);
     claim = Command1<void, (String, String)>(
       (r) => _teamRepo.linkPlayer(r.$1, r.$2, _me),
@@ -44,6 +63,37 @@ class PlayerProfileViewModel extends ChangeNotifier {
       (r) => _teamRepo.linkPlayer(r.$1, r.$2, null),
     );
     message = Command0<String>(_message);
+    deletePost = Command1<void, String>(
+      (id) async =>
+          await _userPosts?.deletePost(id) ??
+          Result.error(Exception('Posts are unavailable')),
+    );
+    if (_userPosts case final posts?) {
+      _subs.add(
+        posts
+            .watchPostsBy(uid)
+            .listen(
+              (p) {
+                _posts = p;
+                _postsLoaded = true;
+                notifyListeners();
+              },
+              onError: (Object e) {
+                _postsError = e;
+                _postsLoaded = true;
+                notifyListeners();
+              },
+            ),
+      );
+    }
+    if (followRepository != null) {
+      _subs.add(
+        followRepository.watchCounts(FollowTarget.userKey(uid)).listen((c) {
+          _counts = c;
+          notifyListeners();
+        }, onError: (Object _) {}),
+      );
+    }
     _subs.add(
       _profiles
           .watchProfile(uid)
@@ -75,6 +125,9 @@ class PlayerProfileViewModel extends ChangeNotifier {
   final TeamRepository _teamRepo;
   final StatsRepository _stats;
   final DirectMessageRepository _dms;
+  final UserPostRepository? _userPosts;
+  final FollowSlot _followSlot;
+  final _downloads = <String, Future<Result<Uint8List>>>{};
   final List<StreamSubscription<Object?>> _subs = [];
 
   String get _me => _auth.currentUser?.uid ?? '';
@@ -342,6 +395,44 @@ class PlayerProfileViewModel extends ChangeNotifier {
   /// its id.
   late final Command0<String> message;
 
+  // Follows and posts -----------------------------------------------------
+
+  /// Whether this profile shows posts and follows at all.
+  bool get social => _userPosts != null;
+
+  List<UserPost> _posts = const [];
+  bool _postsLoaded = false;
+  Object? _postsError;
+  FollowCounts _counts = const FollowCounts();
+
+  /// The player's posts, newest first.
+  List<UserPost> get posts => _posts;
+  bool get postsLoaded => _postsLoaded;
+  Object? get postsError => _postsError;
+  int get followers => _counts.followers;
+  int get following => _counts.following;
+
+  /// The Follow button; null on the user's own profile, and until the
+  /// profile loads.
+  FollowViewModel? get follow => isMe || !_profileLoaded
+      ? null
+      : _followSlot.of(FollowTarget.user(uid, name, photoUrl: photoUrl));
+
+  /// Deletes one of the user's own posts, by id.
+  late final Command1<void, String> deletePost;
+
+  /// A post photo's bytes, fetched once per photo.
+  Future<Result<Uint8List>> imageData(ChatAttachment image) =>
+      _downloads[image.path] ??=
+          (_userPosts?.downloadImage(image) ??
+                  Future.value(
+                    Result<Uint8List>.error(Exception('No posts here')),
+                  ))
+              .then((r) {
+                if (r is Error) _downloads.remove(image.path);
+                return r;
+              });
+
   Future<Result<void>> _saveDetails(ProfileDetails d) async {
     final user = _auth.currentUser;
     if (user == null) return Result.error(Exception('Not signed in'));
@@ -381,6 +472,8 @@ class PlayerProfileViewModel extends ChangeNotifier {
     claim.dispose();
     unclaim.dispose();
     message.dispose();
+    deletePost.dispose();
+    _followSlot.dispose();
     super.dispose();
   }
 }

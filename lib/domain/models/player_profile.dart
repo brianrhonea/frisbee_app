@@ -299,7 +299,11 @@ class ProfileDetails {
     school: m['school'] as String? ?? '',
     throwingHand: m['throwingHand'] == null
         ? null
-        : enumByName(ThrowingHand.values, m['throwingHand'], ThrowingHand.right),
+        : enumByName(
+            ThrowingHand.values,
+            m['throwingHand'],
+            ThrowingHand.right,
+          ),
     playingSince: (m['playingSince'] as num?)?.toInt(),
     visibility: ProfileVisibility.fromMap(
       Map<String, dynamic>.from((m['visibility'] as Map?) ?? const {}),

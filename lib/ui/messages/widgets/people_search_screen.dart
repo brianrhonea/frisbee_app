@@ -121,7 +121,18 @@ class _PeopleSearchScreenState extends State<PeopleSearchScreen> {
                           photoUrl: p.photoUrl,
                         ),
                         title: Text(p.name),
-                        trailing: const Icon(Icons.chat_bubble_outline),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'View profile',
+                              icon: const Icon(Icons.person_outline),
+                              onPressed: () =>
+                                  context.push(Routes.player(p.uid)),
+                            ),
+                            const Icon(Icons.chat_bubble_outline),
+                          ],
+                        ),
                         onTap: () => vm.open.execute(p),
                       );
                     },

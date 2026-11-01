@@ -2005,3 +2005,207 @@ describe("meetings", () => {
     });
   });
 });
+
+describe("follows", () => {
+  const ref = (uid: string, key: string, owner = uid) => doc(db(uid), "users", owner, "follows", key);
+  const follow = (type: string, targetId: string, extra: Record<string, unknown> = {}) => ({
+    key: `${type}_${targetId}`,
+    type,
+    targetId,
+    name: "Hawks",
+    notify: false,
+    createdAt: serverTimestamp(),
+    ...extra,
+  });
+
+  it("lets people follow users, teams, tournaments and events", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER, "user_u2"), follow("user", "u2", { photoUrl: "https://x.org/a.png" })));
+    await assertSucceeds(setDoc(ref(PLAYER, `team_${TEAM}`), follow("team", TEAM, { notify: true })));
+    await assertSucceeds(
+      setDoc(ref(PLAYER, "tournament_g1_t1"), follow("tournament", "g1_t1", { groupId: "g1" })),
+    );
+    await assertSucceeds(setDoc(ref(PLAYER, "event_123"), follow("event", "123")));
+  });
+
+  it("keeps follows private and well-formed", async () => {
+    await assertFails(setDoc(ref(OUTSIDER, "team_x", PLAYER), follow("team", "x")));
+    await assertFails(setDoc(ref(PLAYER, "team_x"), follow("team", "y")));
+    await assertFails(setDoc(ref(PLAYER, "page_x"), follow("page", "x")));
+    await assertFails(setDoc(ref(PLAYER, `user_${PLAYER}`), follow("user", PLAYER)));
+    await assertFails(setDoc(ref(PLAYER, "tournament_g1_t1"), follow("tournament", "g1_t1")));
+    await assertFails(setDoc(ref(PLAYER, "tournament_g1_t1"), follow("tournament", "g1_t1", { groupId: "g2" })));
+    await assertFails(setDoc(ref(PLAYER, "team_x"), follow("team", "x", { notify: "yes" })));
+    await assertFails(setDoc(ref(PLAYER, "team_x"), follow("team", "x", { extra: 1 })));
+    await assertFails(setDoc(ref(PLAYER, "team_x"), follow("team", "x", { createdAt: new Date("2020-01-01") })));
+
+    await assertSucceeds(setDoc(ref(PLAYER, "team_x"), follow("team", "x")));
+    await assertFails(getDoc(ref(OUTSIDER, "team_x", PLAYER)));
+    await assertSucceeds(getDoc(ref(PLAYER, "team_x")));
+  });
+
+  it("lets the bell be switched but nothing else changed", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER, "team_x"), follow("team", "x")));
+    await assertSucceeds(updateDoc(ref(PLAYER, "team_x"), { notify: true }));
+    await assertFails(updateDoc(ref(PLAYER, "team_x"), { targetId: "y" }));
+    await assertFails(updateDoc(ref(OUTSIDER, "team_x", PLAYER), { notify: false }));
+    await assertSucceeds(deleteDoc(ref(PLAYER, "team_x")));
+  });
+
+  it("lets anyone signed in read follower counts, nobody write them", async () => {
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "followCounts", "team_x")));
+    await assertFails(setDoc(doc(db(OUTSIDER), "followCounts", "team_x"), { followers: 1000 }));
+  });
+
+  it("accepts the posts notification category", async () => {
+    await assertSucceeds(
+      setDoc(doc(db(PLAYER), "users", PLAYER, "settings", "notifications"), {
+        categories: { posts: false },
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+});
+
+describe("user posts", () => {
+  const ref = (uid: string, id = "p1") => doc(db(uid), "posts", id);
+  const post = (uid: string, extra: Record<string, unknown> = {}) => ({
+    kind: "text",
+    body: "Good throws today",
+    links: [],
+    images: [],
+    workout: null,
+    tournamentKey: null,
+    tournamentName: null,
+    authorId: uid,
+    authorName: "P",
+    authorPhotoUrl: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const workout = (extra: Record<string, unknown> = {}) => ({
+    activity: "gym",
+    durationMinutes: 60,
+    effort: 7,
+    exercises: [{ name: "Squat", sets: 3, reps: 5, weight: "100 kg" }, { name: "Plank" }],
+    ...extra,
+  });
+
+  it("lets anyone signed in post as themselves and read every post", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER), post(PLAYER)));
+    await assertFails(setDoc(ref(PLAYER, "p2"), post(OUTSIDER)));
+    await assertSucceeds(getDoc(ref(OUTSIDER)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "posts", "p1")));
+  });
+
+  it("validates text posts", async () => {
+    await assertFails(setDoc(ref(PLAYER), post(PLAYER, { body: "" })));
+    await assertFails(setDoc(ref(PLAYER), post(PLAYER, { kind: "poll" })));
+    await assertFails(setDoc(ref(PLAYER), post(PLAYER, { workout: workout() })));
+    await assertFails(setDoc(ref(PLAYER), post(PLAYER, { links: ["ftp://x.org"] })));
+    await assertFails(setDoc(ref(PLAYER), post(PLAYER, { pinned: true })));
+    await assertFails(setDoc(ref(PLAYER), post(PLAYER, { createdAt: new Date("2020-01-01") })));
+    await assertSucceeds(
+      setDoc(ref(PLAYER), post(PLAYER, { tournamentKey: "event_123", tournamentName: "Nationals" })),
+    );
+    await assertFails(setDoc(ref(PLAYER, "p2"), post(PLAYER, { tournamentKey: "team_x" })));
+  });
+
+  it("validates workouts", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER), post(PLAYER, { kind: "workout", body: "", workout: workout() })));
+    await assertSucceeds(
+      setDoc(ref(PLAYER, "run"), post(PLAYER, {
+        kind: "workout",
+        workout: { activity: "run", durationMinutes: 40, distanceKm: 8.5, exercises: [] },
+      })),
+    );
+    for (const bad of [
+      workout({ activity: "nap" }),
+      workout({ durationMinutes: 0 }),
+      workout({ durationMinutes: 2000 }),
+      workout({ distanceKm: -1 }),
+      workout({ effort: 11 }),
+      workout({ exercises: [{ name: "" }] }),
+      workout({ exercises: [{ name: "Squat", sets: 0 }] }),
+      workout({ exercises: Array(21).fill({ name: "Squat" }) }),
+      workout({ calories: 500 }),
+    ]) {
+      await assertFails(setDoc(ref(PLAYER, "bad"), post(PLAYER, { kind: "workout", workout: bad })));
+    }
+    await assertFails(setDoc(ref(PLAYER, "bad"), post(PLAYER, { kind: "workout", workout: null })));
+  });
+
+  it("lets only the author edit or delete", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER), post(PLAYER)));
+    await assertSucceeds(updateDoc(ref(PLAYER), { body: "Great throws today", updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref(PLAYER), { authorId: OUTSIDER }));
+    await assertFails(updateDoc(ref(OUTSIDER), { body: "Hijack" }));
+    await assertFails(deleteDoc(ref(OUTSIDER)));
+    await assertSucceeds(deleteDoc(ref(PLAYER)));
+  });
+
+  it("team posts may name one of the group's own tournaments", async () => {
+    const teamPost = (key: string) => ({
+      title: "",
+      body: "Sign up!",
+      public: true,
+      tournamentKey: key,
+      authorId: COACH,
+      authorName: "C",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    await assertSucceeds(setDoc(doc(db(COACH), "teams", TEAM, "posts", "a"), teamPost(`tournament_${TEAM}_t1`)));
+    await assertFails(setDoc(doc(db(COACH), "teams", TEAM, "posts", "b"), teamPost("tournament_other_t1")));
+  });
+});
+
+describe("tournament directory", () => {
+  const GROUP = "group1";
+  const ORGANIZER = "organizer";
+  const MEMBER = "member";
+  const ref = (uid: string, id = `${GROUP}_t1`) => doc(db(uid), "tournamentDirectory", id);
+  const listing = (extra: Record<string, unknown> = {}) => ({
+    groupId: GROUP,
+    tournamentId: "t1",
+    name: "Fall Hat",
+    startsAt: new Date(),
+    endsOn: null,
+    status: "setup",
+    format: "roundRobin",
+    ...extra,
+  });
+
+  beforeEach(() =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "teams", GROUP), {
+        name: "Pickup Crew",
+        kind: "community",
+        ownerId: OWNER,
+        members: { [OWNER]: "owner", [ORGANIZER]: "captain", [MEMBER]: "player" },
+        memberIds: [OWNER, ORGANIZER, MEMBER],
+      });
+    }),
+  );
+
+  it("lets organizers list their group's tournaments", async () => {
+    await assertSucceeds(setDoc(ref(ORGANIZER), listing()));
+    await assertSucceeds(updateDoc(ref(ORGANIZER), { status: "scheduled" }));
+    await assertFails(setDoc(ref(MEMBER, `${GROUP}_t2`), listing({ tournamentId: "t2" })));
+    await assertFails(setDoc(ref(OUTSIDER, `${GROUP}_t3`), listing({ tournamentId: "t3" })));
+  });
+
+  it("checks the id and fields, and teams can't list", async () => {
+    await assertFails(setDoc(ref(ORGANIZER, `${GROUP}_t9`), listing()));
+    await assertFails(setDoc(ref(ORGANIZER), listing({ status: "live" })));
+    await assertFails(setDoc(ref(ORGANIZER), listing({ secret: 1 })));
+    await assertFails(setDoc(ref(OWNER, `${TEAM}_t1`), listing({ groupId: TEAM })));
+  });
+
+  it("is public to anyone signed in; organizers delete", async () => {
+    await assertSucceeds(setDoc(ref(ORGANIZER), listing()));
+    await assertSucceeds(getDoc(ref(OUTSIDER)));
+    await assertFails(deleteDoc(ref(MEMBER)));
+    await assertSucceeds(deleteDoc(ref(ORGANIZER)));
+  });
+});

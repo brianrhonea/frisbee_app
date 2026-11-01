@@ -43,6 +43,12 @@ import '../ui/notifications/view_models/notifications_viewmodel.dart';
 import '../ui/notifications/widgets/notification_settings_screen.dart';
 import '../ui/notifications/widgets/notifications_screen.dart';
 import '../ui/profile/view_models/player_profile_viewmodel.dart';
+import '../ui/people/view_models/following_viewmodel.dart';
+import '../ui/people/widgets/following_screen.dart';
+import '../ui/posts/view_models/post_composer_viewmodel.dart';
+import '../ui/posts/view_models/post_detail_viewmodel.dart';
+import '../ui/posts/widgets/post_composer_screen.dart';
+import '../ui/posts/widgets/post_detail_screen.dart';
 import '../ui/profile/view_models/profile_viewmodel.dart';
 import '../ui/profile/widgets/profile_screen.dart';
 import '../ui/rankings/view_models/rankings_viewmodel.dart';
@@ -117,6 +123,44 @@ GoRouter router(AuthRepository auth) => GoRouter(
         create: (c) => SignUpViewModel(authRepository: c.read()),
         builder: (_, vm) => SignUpScreen(viewModel: vm),
       ),
+    ),
+    // People's posts and the composer, over the shell. `/posts` alone goes
+    // Home, where the feed is.
+    GoRoute(
+      path: Routes.postsPath,
+      redirect: (_, state) =>
+          state.uri.path == Routes.postsPath ? Routes.home : null,
+      routes: [
+        GoRoute(
+          path: 'new',
+          builder: (_, state) => _postComposer(
+            null,
+            workout: state.uri.queryParameters['kind'] == 'workout',
+          ),
+        ),
+        GoRoute(
+          path: ':postId',
+          builder: (_, state) {
+            final id = state.pathParameters['postId']!;
+            return ViewModelHost(
+              key: ValueKey('post-$id'),
+              create: (c) => PostDetailViewModel(
+                postId: id,
+                userPostRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, vm) => PostDetailScreen(viewModel: vm),
+            );
+          },
+          routes: [
+            GoRoute(
+              path: 'edit',
+              builder: (_, state) =>
+                  _postComposer(state.pathParameters['postId']),
+            ),
+          ],
+        ),
+      ],
     ),
     // Opened from the bell on Home, over the shell.
     GoRoute(
@@ -275,6 +319,8 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 teamRepository: c.read(),
                 tournamentRepository: c.read(),
                 authRepository: c.read(),
+                followRepository: c.read(),
+                notificationRepository: c.read(),
               ),
               builder: (_, vm) => GroupTournamentScreen(viewModel: vm),
             );
@@ -472,6 +518,8 @@ GoRouter router(AuthRepository auth) => GoRouter(
                   meetingRepository: c.read<MeetingRepository>(),
                   teamPostRepository: c.read(),
                   tournamentRepository: c.read(),
+                  followRepository: c.read(),
+                  userPostRepository: c.read(),
                   filePicker: c.read(),
                 ),
                 builder: (_, vm) => HomeScreen(viewModel: vm),
@@ -546,6 +594,9 @@ GoRouter router(AuthRepository auth) => GoRouter(
                         tournamentId: id,
                         tournamentRepository: c.read(),
                         usauScheduleRepository: c.read(),
+                        followRepository: c.read(),
+                        notificationRepository: c.read(),
+                        authRepository: c.read(),
                       ),
                       builder: (_, vm) => TournamentDetailScreen(viewModel: vm),
                     );
@@ -624,8 +675,8 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 ),
                 GoRoute(
                   path: ':teamId',
-                  // Teams had tabs before they had a home page; old links
-                  // (e.g. in the notification feed) name one with ?tab=.
+                  // Old links (e.g. in the notification feed) name a tab
+                  // with ?tab=.
                   redirect: (_, state) {
                     if (state.uri.pathSegments.length != 2) return null;
                     final tab = state.uri.queryParameters['tab'];
@@ -645,6 +696,9 @@ GoRouter router(AuthRepository auth) => GoRouter(
                         teamPostRepository: c.read(),
                         authRepository: c.read(),
                         filePicker: c.read(),
+                        followRepository: c.read(),
+                        notificationRepository: c.read(),
+                        groupTournamentRepository: c.read(),
                       ),
                       builder: (_, vm) => TeamHomeScreen(
                         viewModel: vm,
@@ -871,6 +925,21 @@ GoRouter router(AuthRepository auth) => GoRouter(
                       PlayerProfileScreen(viewModel: vm, settings: settings),
                 ),
               ),
+              routes: [
+                // Everything the user follows, over the shell.
+                GoRoute(
+                  path: 'following',
+                  parentNavigatorKey: _rootKey,
+                  builder: (_, _) => ViewModelHost(
+                    create: (c) => FollowingViewModel(
+                      followRepository: c.read(),
+                      notificationRepository: c.read(),
+                      authRepository: c.read(),
+                    ),
+                    builder: (_, vm) => FollowingScreen(viewModel: vm),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -887,6 +956,9 @@ PlayerProfileViewModel _playerProfile(BuildContext c, String uid) =>
       teamRepository: c.read(),
       statsRepository: c.read(),
       directMessageRepository: c.read(),
+      followRepository: c.read(),
+      userPostRepository: c.read(),
+      notificationRepository: c.read(),
     );
 
 /// Sends signed-out users to sign-in (remembering where they were headed)
@@ -915,6 +987,20 @@ String? authRedirect(AuthRepository auth, Uri uri) {
   if (public || path == _splash) return from ?? Routes.home;
   return null;
 }
+
+/// Writes a new post (or workout), or edits [postId].
+Widget _postComposer(String? postId, {bool workout = false}) => ViewModelHost(
+  key: ValueKey('post-composer-$postId-$workout'),
+  create: (c) => PostComposerViewModel(
+    postId: postId,
+    startWithWorkout: workout,
+    userPostRepository: c.read(),
+    followRepository: c.read(),
+    authRepository: c.read(),
+    filePicker: c.read(),
+  ),
+  builder: (_, vm) => PostComposerScreen(viewModel: vm),
+);
 
 /// Sets up a new group tournament, or edits [tournamentId].
 Widget _tournamentEditor(GoRouterState state, String? tournamentId) {

@@ -13,6 +13,12 @@ import '../../../domain/models/team_event.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../../data/repositories/follow/follow_repository.dart';
+import '../../../data/repositories/group_tournament/group_tournament_repository.dart';
+import '../../../data/repositories/notification/notification_repository.dart';
+import '../../../domain/models/follow.dart';
+import '../../../domain/models/group_tournament.dart';
+import '../../follow/view_models/follow_viewmodel.dart';
 
 /// Backs the team home page. Members get the team summary, upcoming
 /// events and every post; anyone else who finds the team gets its public
@@ -25,13 +31,22 @@ class TeamHomeViewModel extends ChangeNotifier {
     required TeamPostRepository teamPostRepository,
     required AuthRepository authRepository,
     required FilePickerService filePicker,
+    FollowRepository? followRepository,
+    NotificationRepository? notificationRepository,
+    GroupTournamentRepository? groupTournamentRepository,
     DateTime Function()? clock,
   }) : _teams = teamRepository,
        _events = eventRepository,
        _posts = teamPostRepository,
        _auth = authRepository,
        _picker = filePicker,
+       _groupTournaments = groupTournamentRepository,
        _clock = clock ?? DateTime.now {
+    _followSlot = FollowSlot(
+      followRepository: followRepository,
+      notificationRepository: notificationRepository,
+      authRepository: authRepository,
+    );
     updateTeam = Command1<void, Team>(_teams.updateTeam);
     leaveTeam = Command0<void>(() => _teams.removeMember(teamId, uid));
     deleteTeam = Command0<void>(_deleteTeam);
@@ -68,6 +83,13 @@ class TeamHomeViewModel extends ChangeNotifier {
   final TeamPostRepository _posts;
   final AuthRepository _auth;
   final FilePickerService _picker;
+  final GroupTournamentRepository? _groupTournaments;
+  StreamSubscription<List<TournamentListing>>? _listingsSub;
+  List<TournamentListing> _tournamentListings = const [];
+
+  /// A group's tournaments as anyone sees them, newest first, so people
+  /// can open and follow one they aren't playing in.
+  List<TournamentListing> get tournamentListings => _tournamentListings;
   final DateTime Function() _clock;
   final _downloads = <String, Future<Result<Uint8List>>>{};
 
@@ -107,10 +129,20 @@ class TeamHomeViewModel extends ChangeNotifier {
   }
 
   void _onChange() {
+    _watchListings();
     _watchContent();
     _watchRequest();
     _publishListing();
     notifyListeners();
+  }
+
+  void _watchListings() {
+    final repo = _groupTournaments;
+    if (repo == null || _listingsSub != null || !isGroup) return;
+    _listingsSub = repo.watchListings(teamId).listen((l) {
+      _tournamentListings = l;
+      notifyListeners();
+    }, onError: (Object _) {});
   }
 
   StreamSubscription<bool>? _requestSub;
@@ -181,6 +213,14 @@ class TeamHomeViewModel extends ChangeNotifier {
     _contentError = e;
     notifyListeners();
   }
+
+  late final FollowSlot _followSlot;
+
+  /// The team's Follow button; null until it has loaded.
+  FollowViewModel? get follow => _followSlot.of(switch (summary) {
+    final s? => FollowTarget.team(teamId, s.name),
+    null => null,
+  });
 
   /// True once membership and the listing are known.
   bool get loaded => _teamLoaded && _listingLoaded;
@@ -303,10 +343,12 @@ class TeamHomeViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _listingSub.cancel();
+    _listingsSub?.cancel();
     _requestSub?.cancel();
     _teamSub?.cancel();
     _eventsSub?.cancel();
     _postsSub?.cancel();
+    _followSlot.dispose();
     super.dispose();
   }
 }

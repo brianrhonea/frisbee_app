@@ -58,6 +58,7 @@ class ProfileViewModel extends ChangeNotifier {
 
   late final Command1<void, String> updateDisplayName;
   late final Command0<void> signOut;
+
   /// Takes the user's password, or null for Google and Apple accounts.
   late final Command1<void, String?> deleteAccount;
 

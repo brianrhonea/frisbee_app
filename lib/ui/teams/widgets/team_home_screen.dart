@@ -17,6 +17,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
+import '../../follow/widgets/follow_button.dart';
 import '../../groups/widgets/group_map.dart';
 import '../../schedule/widgets/event_style.dart';
 import '../../schedule/widgets/team_events_tab.dart';
@@ -344,11 +345,16 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                   if (team != null) _MembersCard(team: team),
                   ..._posts(context),
                 ],
-                side: [..._events(context), _details(summary)],
+                side: [
+                  ..._events(context),
+                  ..._tournaments(context),
+                  _details(summary),
+                ],
                 narrow: [
                   _about(summary),
                   if (!vm.isMember) _joinCard(summary),
                   ..._events(context),
+                  ..._tournaments(context),
                   if (team != null) _MembersCard(team: team),
                   ..._posts(context),
                   _details(summary),
@@ -541,6 +547,65 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     ];
   }
 
+  /// A group's tournaments, which anyone can open and follow. Members
+  /// have the full list in the Tournaments tab.
+  List<Widget> _tournaments(BuildContext context) {
+    final listings = vm.tournamentListings;
+    if (listings.isEmpty || vm.isMember) return const [];
+    final c = AppColors.of(context);
+    final day = DateFormat.MMMd();
+    return [
+      SectionCard(
+        title: 'Tournaments',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final t in listings.take(5))
+              InkWell(
+                borderRadius: BorderRadius.circular(controlRadius),
+                onTap: () => context.push(
+                  Routes.groupTournament(t.groupId, t.tournamentId),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.emoji_events_outlined,
+                        size: 18,
+                        color: c.muted,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t.name,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: c.ink,
+                              ),
+                            ),
+                            Text(
+                              '${day.format(t.startsAt)} · ${t.format.label}',
+                              style: TextStyle(fontSize: 12, color: c.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, size: 18, color: c.muted),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ];
+  }
+
   List<Widget> _posts(BuildContext context) {
     final posts = vm.posts;
     if (vm.isPrivateToMe) {
@@ -635,7 +700,12 @@ class _Hero extends StatelessWidget {
         '${summary.division.label} ${summary.level.label}',
     ].join(' ').toUpperCase();
     final count = vm.memberCount;
+    final follow = switch (vm.follow) {
+      final f? => FollowControl(viewModel: f, showCount: true),
+      null => null,
+    };
     final actions = <Widget>[
+      if (!mobile) ?follow,
       if (vm.isMember)
         OutlinedButton.icon(
           onPressed: () => context.go(TeamSection.chat.route(teamId)),
@@ -747,7 +817,12 @@ class _Hero extends StatelessWidget {
                       ),
                   ],
                 ),
-                // Phones put the buttons below the name, side by side.
+                // Phones put the buttons below the name, side by side,
+                // with Follow on its own line.
+                if (follow != null && mobile) ...[
+                  const SizedBox(height: 14),
+                  Align(alignment: Alignment.centerLeft, child: follow),
+                ],
                 if (actions.isNotEmpty && mobile) ...[
                   const SizedBox(height: 14),
                   Row(

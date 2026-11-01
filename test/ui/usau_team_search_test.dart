@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/data/repositories/follow/follow_repository.dart';
+import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
+import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
@@ -11,7 +14,6 @@ import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
-import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/data/repositories/usau_team/usau_team_repository.dart';
@@ -30,6 +32,7 @@ import 'package:provider/provider.dart';
 
 import '../testing/fakes.dart';
 import '../testing/meeting_fakes.dart';
+import '../testing/social_fakes.dart';
 
 const _divisions = [
   RankingDivision(
@@ -134,6 +137,9 @@ void main() {
             value: FakeRankingRepository(_divisions),
           ),
           Provider<UsauTeamRepository>.value(value: _Usau()),
+          Provider<FollowRepository>.value(value: FakeFollowRepository()),
+          Provider<TeamPostRepository>.value(value: FakeTeamPostRepository()),
+          Provider<UserPostRepository>.value(value: FakeUserPostRepository()),
         ],
         child: MaterialApp.router(
           theme: AppTheme.light,

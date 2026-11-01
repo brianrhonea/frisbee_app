@@ -13,11 +13,13 @@ import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
+import '../../follow/widgets/follow_button.dart';
+import '../../posts/widgets/post_widgets.dart';
 import '../view_models/player_profile_viewmodel.dart';
 import '../view_models/profile_viewmodel.dart';
 import 'delete_account_dialog.dart';
 
-enum _Tab { overview, stats, teams }
+enum _Tab { overview, posts, stats, teams }
 
 /// A player's profile: who they are, their numbers, recent games and
 /// teams. On the user's own profile, [settings] adds their app settings,
@@ -44,6 +46,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     vm.saveDetails,
     vm.claim,
     vm.unclaim,
+    vm.deletePost,
   ];
 
   @override
@@ -87,6 +90,18 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
         vm.message.clearResult();
       case null:
         break;
+    }
+  }
+
+  Future<void> _deletePost(String id) async {
+    if (await confirmDialog(
+      context,
+      title: 'Delete post?',
+      message: 'It and its photos are removed for everyone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    )) {
+      vm.deletePost.execute(id);
     }
   }
 
@@ -153,6 +168,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           side: side,
         ),
       ],
+      _Tab.posts => _posts(),
       _Tab.stats => [
         _NumbersCard(viewModel: vm),
         const SizedBox(height: 14),
@@ -163,12 +179,66 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           main: [_TeamsCard(viewModel: vm, wide: true)],
           side: [
             if (vm.isMe)
-              for (final c in vm.claimable)
-                _ClaimCard(viewModel: vm, claim: c),
+              for (final c in vm.claimable) _ClaimCard(viewModel: vm, claim: c),
           ],
         ),
       ],
     };
+  }
+
+  List<Widget> _posts() {
+    final c = AppColors.of(context);
+    return [
+      if (vm.isMe)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: () => context.push(Routes.newPost),
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('New post'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => context.push(Routes.newWorkout),
+                icon: const Icon(Icons.directions_run, size: 18),
+                label: const Text('Log a workout'),
+              ),
+            ],
+          ),
+        ),
+      if (!vm.postsLoaded)
+        const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        )
+      else if (vm.postsError != null)
+        ErrorView(error: vm.postsError)
+      else if (vm.posts.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            vm.isMe
+                ? 'Share an update or a workout with the people who follow '
+                      'you.'
+                : 'No posts yet.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: c.muted),
+          ),
+        )
+      else
+        for (final p in vm.posts)
+          UserPostCard(
+            key: ValueKey(p.id),
+            post: p,
+            loadImage: vm.imageData,
+            onOpen: () => context.push(Routes.post(p.id)),
+            onEdit: vm.isMe ? () => context.push(Routes.editPost(p.id)) : null,
+            onDelete: vm.isMe ? () => _deletePost(p.id) : null,
+          ),
+    ];
   }
 
   List<Widget> _games() {
@@ -189,8 +259,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
                 ),
               ),
             ),
-            if (vm.isMe && !vm.visibility.games)
-              const _HiddenTag(),
+            if (vm.isMe && !vm.visibility.games) const _HiddenTag(),
           ],
         ),
       ),
@@ -233,11 +302,25 @@ class _Hero extends StatelessWidget {
             icon: const Icon(Icons.edit_outlined, size: 18),
             label: const Text('Edit profile'),
           )
-        : FilledButton.icon(
-            onPressed: vm.message.running ? null : vm.message.execute,
-            icon: const Icon(Icons.chat_bubble_outline, size: 18),
-            label: const Text('Message'),
+        : Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (vm.follow case final follow?)
+                FollowControl(viewModel: follow),
+              FilledButton.icon(
+                onPressed: vm.message.running ? null : vm.message.execute,
+                icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                label: const Text('Message'),
+              ),
+            ],
           );
+    final tabs = [
+      _Tab.overview,
+      if (vm.social) _Tab.posts,
+      _Tab.stats,
+      _Tab.teams,
+    ];
     final meta = [
       if (d.hometown.isNotEmpty) d.hometown,
       if (d.school.isNotEmpty) d.school,
@@ -348,7 +431,11 @@ class _Hero extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text(
                     d.bio,
-                    style: TextStyle(fontSize: 13.5, height: 1.45, color: c.ink),
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      height: 1.45,
+                      color: c.ink,
+                    ),
                   ),
                 ],
                 if (meta.isNotEmpty) ...[
@@ -358,15 +445,33 @@ class _Hero extends StatelessWidget {
                     style: TextStyle(fontSize: 12, color: c.muted),
                   ),
                 ],
+                if (vm.social) ...[
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: vm.isMe
+                        ? () => context.push(Routes.following)
+                        : null,
+                    child: Text(
+                      '${vm.followers} '
+                      '${vm.followers == 1 ? 'follower' : 'followers'}'
+                      ' · ${vm.following} following',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: c.ink,
+                      ),
+                    ),
+                  ),
+                ],
                 if (mobile) ...[
                   const SizedBox(height: 12),
                   SizedBox(width: double.infinity, child: button),
                 ],
                 const SizedBox(height: 8),
                 UnderlineTabs(
-                  labels: const ['Overview', 'Stats', 'Teams'],
-                  selected: tab.index,
-                  onSelect: (i) => onTab(_Tab.values[i]),
+                  labels: [for (final t in tabs) t.label],
+                  selected: tabs.contains(tab) ? tabs.indexOf(tab) : 0,
+                  onSelect: (i) => onTab(tabs[i]),
                 ),
               ],
             ),
@@ -375,6 +480,15 @@ class _Hero extends StatelessWidget {
       ),
     );
   }
+}
+
+extension on _Tab {
+  String get label => switch (this) {
+    _Tab.overview => 'Overview',
+    _Tab.posts => 'Posts',
+    _Tab.stats => 'Stats',
+    _Tab.teams => 'Teams',
+  };
 }
 
 class _HiddenTag extends StatelessWidget {
@@ -386,7 +500,11 @@ class _HiddenTag extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.visibility_off_outlined, size: 14, color: AppColors.of(context).muted),
+        Icon(
+          Icons.visibility_off_outlined,
+          size: 14,
+          color: AppColors.of(context).muted,
+        ),
         const SizedBox(width: 4),
         Text(
           'Hidden',
@@ -473,7 +591,11 @@ class _NumbersCard extends StatelessWidget {
                         '${t.throws} throws',
                       ),
                       ('${t.games}', 'Games played', ''),
-                      ('${t.points}', 'Points played', _avg(t.perGame(t.points))),
+                      (
+                        '${t.points}',
+                        'Points played',
+                        _avg(t.perGame(t.points)),
+                      ),
                     ];
                     return Wrap(
                       runSpacing: 18,
@@ -756,7 +878,10 @@ class _TeamsCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(
                     children: [
-                      TeamBadge(size: 38, community: t.kind.name == 'community'),
+                      TeamBadge(
+                        size: 38,
+                        community: t.kind.name == 'community',
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -810,7 +935,10 @@ class _ClaimCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Eyebrow('Link your stats · ${claim.team.name}', color: c.onFeatureMuted),
+          Eyebrow(
+            'Link your stats · ${claim.team.name}',
+            color: c.onFeatureMuted,
+          ),
           const SizedBox(height: 8),
           Text(
             'Which player on the roster is you?',
@@ -952,12 +1080,7 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              field(
-                _bio,
-                'Bio',
-                maxLength: ProfileDetails.maxBio,
-                maxLines: 4,
-              ),
+              field(_bio, 'Bio', maxLength: ProfileDetails.maxBio, maxLines: 4),
               field(_pronouns, 'Pronouns', maxLength: 30),
               field(_hometown, 'Based in (city)'),
               field(_school, 'School'),
@@ -1153,6 +1276,12 @@ class _SettingsCardState extends State<SettingsCard> {
             ),
             const SizedBox(height: 8),
             for (final (icon, label, onTap, color) in [
+              (
+                Icons.people_outline,
+                'Following',
+                () => context.push(Routes.following),
+                null,
+              ),
               (
                 Icons.notifications_outlined,
                 'Notifications',

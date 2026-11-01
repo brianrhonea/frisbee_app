@@ -110,18 +110,35 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
   returns where you were:
   - team events (`/team-events/…`) and personal events (`/my-events/…`)
     (team sections like `/teams/:id/events` stay in the Teams tab)
+  - USA Ultimate tournaments (`/tournaments/:id`) and teams
+    (`/rankings/team?url=…`), so Home, Events, Rankings and Following all
+    return to where you were instead of switching tabs. These routes are
+    listed before the shell so they win over the `/tournaments` and
+    `/rankings` tabs.
   - plays, stats screens and the USA Ultimate roster import
   - chat rooms and room settings (`/teams/:id/chats/…`)
   - direct messages (`/messages`, `/messages/new`, `/messages/:conversationId`)
+  - people's profiles (`/people/:uid`), their posts (`/posts/:id`, where
+    post notifications lead), the composer (`/posts/new`, `?kind=workout`,
+    `/posts/:id/edit`) and Following (`/profile/following`)
 - **Path helpers** are all in `routing/routes.dart`, for example
   `Routes.teamChat(id)` and `Routes.conversation(id)`.
-- **Team pages:** `/teams/:id` is the team home (`TeamHomeScreen`). Each
-  `TeamSection` (Team Events, Chat, Roster, Playbook, Stats, Members) is a
-  child route, e.g. `/teams/:id/events`, shown by `TeamSectionScreen`. Old
-  `?tab=` links redirect to the matching section.
+- **Team pages:** one page with a tab bar for members: Home, then each
+  `TeamSection` (Team Events, Chat, Roster, Playbook, Videos, Stats,
+  Members; groups have Events, Chat, Tournaments, Members). `/teams/:id`
+  is the Home tab and `/teams/:id/events` etc. select a section. The
+  section routes are *siblings* of `:teamId`, not children, and every tab
+  builds the same page key (`_teamPage` in `router.dart`). Switching tabs
+  with `go` updates that page in place: no transition, `TeamHomeScreen`
+  and its view model are kept, and back leaves the team. The tab content
+  is a `TeamSectionView`, whose `TeamDetailViewModel` is only created once
+  a member opens a section. Old `?tab=` links redirect to the matching
+  section.
 - **Responsive layouts:** Home becomes a two-column dashboard when its
-  content area is at least 960 px wide (`HomeScreen.dashboardBreakpoint`);
-  below that it stays a single column.
+  content area is at least 960 px wide (`HomeScreen.dashboardBreakpoint`):
+  the week and the feed on the left, then team, events, playbook and
+  rankings on the right. Below that it's one column: the week, the team,
+  then the feed.
 - **Chat layout** (`ui/chat/widgets/chat_layout.dart`):
   - At 840 px or wider (`chatSplitBreakpoint`), team chat and Messages show
     the list on the left and the open conversation on the right.
@@ -278,7 +295,15 @@ users/{uid}                     private profile: email, displayName, photoUrl (o
   settings/notifications        categories {}, teams {teamId: {}}, mutedRooms [], utcOffsetMinutes
   devices/{fid}                 push targets: platform (owner writes, Functions send)
   notifications/{id}            feed: category, title, body, route, read, count (Functions write)
+  follows/{type_targetId}       key, type (user/team/tournament/event), targetId, groupId?,
+                                name, photoUrl?, notify (owner only; Functions query them)
 profiles/{uid}                  public directory: name, keywords (search prefixes), photoUrl
+posts/{postId}                  people's own posts: kind (text/workout), body, links [],
+                                images [], workout {}?, tournamentKey?, tournamentName?,
+                                authorId, authorName, authorPhotoUrl (anyone signed in reads)
+followCounts/{key}              followers, and following on user keys (Functions only)
+tournamentDirectory/{g_t}       group tournaments' public summary: groupId, tournamentId,
+                                name, startsAt, endsOn, status, format (organizers write)
 inviteCodes/{code}              → { teamId }; single lookups only, never listed
 teamDirectory/{teamId}          public listing for team search: name, division, level,
                                 city, keywords (copied from the team; editors write)
@@ -292,7 +317,8 @@ teams/{teamId}                  name, division, level, city, ownerId,
   plays/{playId}                elements, arrows, animation steps
   events/{eventId}              team event, plus rsvps {uid}, reactions {uid}, votes {uid}, poll, public
   publicEvents/{eventId}        details of events marked public, no responses (anyone signed in reads)
-  posts/{postId}                title, body, public, authorId, authorName (public ones: anyone reads)
+  posts/{postId}                title, body, public, tournamentKey?, authorId, authorName
+                                (public ones: anyone reads)
   videos/{videoId}              youtubeId (11 chars, never a URL; '' for uploads), file? {path, name,
                                 size, contentType}, folderId ('' = unsorted), title, description,
                                 authorId, authorName, createdAt, updatedAt
@@ -333,8 +359,10 @@ sentReminders/{key}             one per event and start time, so reminders go on
   chat rooms (attachments, then messages, then the room), meetings
   (messages and requests, then the meeting), roster, plays,
   events, videos, stats, joins and the invite code. `AuthRepositoryFirebase
-  .deleteAccount` removes personal events, notification settings, devices
-  and feed, `users/{uid}` and `profiles/{uid}`. Conversations stay for the
+  .deleteAccount` removes personal events, notification settings, devices,
+  feed, follows and posts, `users/{uid}` and `profiles/{uid}`. Functions in
+  the `follows` group drop everyone's follows of a deleted person, team or
+  group tournament, and a deleted post's photos. Conversations stay for the
   other person. `deleteTeam` first stamps `deletingAt` on the team, so the
   notification functions don't announce every event the cascade removes.
 - **Indexes.** All current queries use single-field indexes:
@@ -343,12 +371,17 @@ sentReminders/{key}             one per event and start time, so reminders go on
   ranking are sorted client-side to avoid composite indexes. The
   reminder job and feed pruning need collection-group indexes on
   `events.startsAt` and `notifications.createdAt` (`firestore.indexes.json`).
+  The feed's `posts` queries (`authorId in […]` or `tournamentKey in […]`,
+  newest first) need composite indexes, and so does the post triggers'
+  collection-group query on `follows` (`key in […]`, `notify == true`).
 
 ### Cloud Storage
 
 ```
 teams/{teamId}/chats/{roomId}/{uid}/{messageId}/{i}-{fileName}   team chat attachments
 conversations/{uidA_uidB}/{uid}/{messageId}/{i}-{fileName}       direct-message attachments
+teams/{teamId}/posts/{postId}/{upload}/{i}-{fileName}            team post photos
+users/{uid}/posts/{postId}/{upload}/{i}-{fileName}               people's post photos (anyone signed in reads)
 ```
 
 - **Size cap:** 10 MB per file (`maxAttachmentBytes`), checked in the
@@ -398,6 +431,10 @@ take, but the server enforces every one.
 | Chat attachments | Same as messages (Storage rules read the room from Firestore) | Room writers, into their own folder, 10 MB max. Delete: author or owner |
 | Conversations | The two uids in the id | Create: a participant, with the other person listed in `profiles`. Update: the preview or your own `readAt` only. No deletes |
 | DM messages and attachments | The two participants | Your own only; delete your own |
+| Follows | That user | That user; key must be `{type}_{targetId}`, known types, no self-follow; after creating, only the bell and name change |
+| People's posts (`posts`) | Any signed-in user | The author, as themselves; text needs a body or photo, workouts are checked field by field (≤ 20 exercises); a tag must be a tournament or event key. Edit and delete: the author |
+| `followCounts` | Any signed-in user | Nobody from clients (Functions only) |
+| `tournamentDirectory` | Any signed-in user | Organizers of that group, with the id `{groupId}_{tournamentId}` |
 | Notification settings, devices | That user | That user; known fields and categories only |
 | Notification feed | That user | Functions create; the user marks entries read or deletes them |
 | `usau_*`, `meta` | Signed-in users | Nobody from clients (Admin SDK only) |
@@ -444,6 +481,8 @@ Cloud Functions in `functions/src/notifications`, exported as the
 | `directMessage` | DM created | The other participant |
 | `teamEvent` | Team event written | Every member but whoever did it (auth context), when an editable field changed; never for past events |
 | `teamPlay` | Play created or saved | Every member but whoever saved it |
+| `userPost` | Person's post created | Followers of the author, or of the tournament it's tagged with, who turned the bell on |
+| `teamPost` | Team or group post created | Followers of the team, or of the tournament it's about, who turned the bell on; members-only posts reach only followers who are members |
 | `eventReminders` | Hourly | Events starting 23–24 h out: team members who haven't said they can't go, or the personal event's owner. Also prunes feed entries over 60 days old |
 
 - **Delivery** (`deliver.ts`): for each recipient, read their preferences
@@ -586,6 +625,40 @@ asks Storage for it each time (`fileUrl`).
 - Screens take the players as parameters, so widget tests swap in
   stand-ins (`fakePlayer` and `fakeFilePlayer` in
   `test/testing/video_fakes.dart`).
+
+## Follows and the feed
+
+- **Keys.** Everything followable has a `FollowTarget` key
+  (`lib/domain/models/follow.dart`): `user_{uid}`, `team_{teamId}` (teams
+  and groups), `tournament_{groupId}_{tournamentId}` and `event_{usauId}`.
+  The same key is the follow doc's id, the `followCounts` doc, and what
+  posts are tagged with. `firestore.rules` and `functions/src/notifications
+  /model.ts` (`followKey`, `followKeys`) build the same strings.
+- **Follow buttons.** `FollowViewModel` + `FollowControl`
+  (`lib/ui/follow`). Page view models own one through `FollowSlot`, made
+  once the page knows its target's name. The slot's repositories are
+  optional, so tests that don't pass them get no button.
+- **Feed.** `HomeFeed` (`lib/ui/posts/view_models/home_feed.dart`), owned
+  by `HomeViewModel`, watches the user's follows and teams. It keeps one
+  subscription per source and adds and drops them as those change:
+  - people (the user plus everyone followed): `posts where authorId in`,
+    in chunks of 30
+  - followed tournaments and events: `posts where tournamentKey in`
+  - each team the user is on: all its posts
+  - each followed team they're not on: its public posts
+  - each followed group tournament outside their groups: the group's
+    public posts with that `tournamentKey`
+
+  `mergeFeed()` dedupes by id and sorts newest first. **Show older posts**
+  raises the limit and re-queries the people and tournament sources.
+- **Notifications.** The post triggers query `collectionGroup('follows')`
+  for the post's keys with `notify == true`. The follower's uid is the
+  doc's grandparent. `deliver()` then applies the usual preference gates
+  under the new `posts` category, which teams can override like the
+  others.
+- **Counts.** `followCount` adds or takes one off `followCounts/{key}
+  .followers` and the follower's `followCounts/user_{uid}.following`
+  whenever a follow is created or deleted.
 
 ## Community groups
 

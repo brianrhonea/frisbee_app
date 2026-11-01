@@ -47,6 +47,21 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
   }
 
   @override
+  Stream<List<TeamPost>> watchTournamentPosts(
+    String groupId,
+    String tournamentKey,
+  ) => _posts(groupId)
+      .where('public', isEqualTo: true)
+      .where('tournamentKey', isEqualTo: tournamentKey)
+      .snapshots()
+      .map(
+        (snap) => [
+          for (final d in snap.docs)
+            TeamPost.fromMap(d.id, plainData(d.data())),
+        ]..sort(TeamPost.newestFirst),
+      );
+
+  @override
   Future<Result<void>> savePost(
     String teamId,
     PostDraft draft,

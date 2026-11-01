@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../domain/models/feed_item.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_post.dart';
@@ -14,6 +15,7 @@ import '../../core/ui/brand.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
+import '../../posts/widgets/post_widgets.dart';
 import '../../schedule/widgets/event_style.dart';
 import '../../shell/widgets/app_shell.dart';
 import '../../teams/widgets/join_team_dialog.dart';
@@ -22,7 +24,8 @@ import '../view_models/home_viewmodel.dart';
 
 enum _Tab { forYou, teams }
 
-/// The community feed: posts from the user's teams, with what's up next
+/// The community feed: the user's posts, their teams' and those of what
+/// they follow, with what's up next
 /// beside them (below the header on narrow screens), and a tab of the
 /// user's teams.
 class HomeScreen extends StatefulWidget {
@@ -38,7 +41,11 @@ class _HomeScreenState extends State<HomeScreen> {
   HomeViewModel get vm => widget.viewModel;
   var _tab = _Tab.forYou;
 
-  late final List<Command<void>> _commands = [vm.savePost, vm.deletePost];
+  late final List<Command<void>> _commands = [
+    vm.savePost,
+    vm.deletePost,
+    vm.deleteUserPost,
+  ];
 
   @override
   void initState() {
@@ -127,30 +134,44 @@ class _HomeScreenState extends State<HomeScreen> {
     if (draft != null) vm.savePost.execute((teamId: team.id, draft: draft));
   }
 
-  Future<void> _edit(FeedPost p) async {
+  Future<void> _edit(TeamPostItem p) async {
     final draft = await showDialog<PostDraft>(
       context: context,
       builder: (_) => PostEditorDialog(
         initial: p.post,
         pickImages: vm.pickImages,
         loadImage: vm.imageData,
-        allowPublic: !p.team.isPrivateGroup,
+        allowPublic: !(vm.teamOf(p)?.isPrivateGroup ?? false),
       ),
     );
-    if (draft != null) vm.savePost.execute((teamId: p.team.id, draft: draft));
+    if (draft != null) vm.savePost.execute((teamId: p.teamId, draft: draft));
   }
 
-  Future<void> _delete(FeedPost p) async {
+  Future<void> _delete(TeamPostItem p) async {
     if (await confirmDialog(
       context,
       title: 'Delete post?',
-      message: 'It will be removed from ${p.team.name} and the feed.',
+      message: 'It will be removed from ${p.teamName} and the feed.',
       confirmLabel: 'Delete',
       destructive: true,
     )) {
       vm.deletePost.execute(p);
     }
   }
+
+  Future<void> _deleteUserPost(String id) async {
+    if (await confirmDialog(
+      context,
+      title: 'Delete post?',
+      message: 'It and its photos are removed for everyone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    )) {
+      vm.deleteUserPost.execute(id);
+    }
+  }
+
+  void _newPost() => context.push(Routes.newPost);
 
   void _newPersonalEvent() => context.push(Routes.newMyEvent());
 
@@ -212,10 +233,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     '${city == null ? '' : '$city / '}Your ultimate community',
                 title: 'Good things fly together.',
                 subtitle: 'Your people. Your teams. Your next point.',
-                action: mobile || vm.postableTeams.isEmpty
+                action: mobile
                     ? null
                     : FilledButton.icon(
-                        onPressed: vm.savePost.running ? null : _compose,
+                        onPressed: _newPost,
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Create post'),
                       ),
@@ -257,8 +278,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _Composer(
         name: vm.user?.label ?? '',
         photoUrl: vm.user?.photoUrl,
-        canPost: vm.postableTeams.isNotEmpty,
-        onPost: vm.savePost.running ? null : _compose,
+        onPost: _newPost,
+        onWorkout: () => context.push(Routes.newWorkout),
+        onTeamPost: vm.postableTeams.isEmpty || vm.savePost.running
+            ? null
+            : _compose,
         onEvent: _newEvent,
       ),
       if (vm.teamsLoaded && vm.teams.isEmpty)
@@ -273,19 +297,41 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: EdgeInsets.all(32),
           child: Center(child: CircularProgressIndicator()),
         ),
-      for (final p in vm.posts)
-        TeamPostCard(
-          post: p.post,
-          teamName: p.team.name,
-          now: vm.now,
-          loadImage: vm.imageData,
-          showVisibility: true,
-          onOpenTeam: () => context.go(Routes.team(p.team.id)),
-          onEdit: vm.canEdit(p.team) ? () => _edit(p) : null,
-          onDelete: vm.canEdit(p.team) ? () => _delete(p) : null,
-        ),
-      if (vm.postsLoaded && vm.teams.isNotEmpty)
-        _CaughtUp(empty: vm.posts.isEmpty),
+      for (final item in vm.posts)
+        switch (item) {
+          UserPostItem(:final post) => UserPostCard(
+            key: ValueKey(item.id),
+            post: post,
+            loadImage: vm.imageData,
+            onOpen: () => context.push(Routes.post(post.id)),
+            onEdit: post.authorId == vm.user?.uid
+                ? () => context.push(Routes.editPost(post.id))
+                : null,
+            onDelete: post.authorId == vm.user?.uid
+                ? () => _deleteUserPost(post.id)
+                : null,
+          ),
+          final TeamPostItem p => TeamPostCard(
+            key: ValueKey(item.id),
+            post: p.post,
+            teamName: p.teamName,
+            now: vm.now,
+            loadImage: vm.imageData,
+            showVisibility: vm.teamOf(p) != null,
+            onOpenTeam: () => context.go(Routes.team(p.teamId)),
+            onEdit: vm.canEditPost(p) ? () => _edit(p) : null,
+            onDelete: vm.canEditPost(p) ? () => _delete(p) : null,
+          ),
+        },
+      if (vm.hasMorePosts)
+        Center(
+          child: TextButton(
+            onPressed: vm.loadMorePosts,
+            child: const Text('Show older posts'),
+          ),
+        )
+      else if (vm.postsLoaded)
+        _CaughtUp(empty: vm.posts.isEmpty, followsAnything: vm.followsAnything),
     ],
     _Tab.teams => [
       for (final t in vm.teams)
@@ -334,21 +380,25 @@ class _Composer extends StatelessWidget {
   const _Composer({
     required this.name,
     required this.photoUrl,
-    required this.canPost,
     required this.onPost,
+    required this.onWorkout,
+    required this.onTeamPost,
     required this.onEvent,
   });
 
   final String name;
   final String? photoUrl;
-  final bool canPost;
-  final VoidCallback? onPost;
+  final VoidCallback onPost;
+  final VoidCallback onWorkout;
+
+  /// Posts to one of the user's teams; null if they run none.
+  final VoidCallback? onTeamPost;
   final VoidCallback onEvent;
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final post = canPost ? onPost : null;
+    final post = onPost;
     final compact = TextButton.styleFrom(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       visualDensity: VisualDensity.compact,
@@ -374,10 +424,7 @@ class _Composer extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       child: Text(
-                        canPost
-                            ? "What's happening on your sideline?"
-                            : 'Coaches and captains post here. Add an '
-                                  'event to your schedule.',
+                        "What's happening on your sideline?",
                         style: TextStyle(color: c.muted, fontSize: 13.5),
                       ),
                     ),
@@ -389,14 +436,27 @@ class _Composer extends StatelessWidget {
           Divider(height: 1, color: c.border),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            child: Row(
+            // Wraps on phones, where the buttons don't fit on one line.
+            child: Wrap(
               children: [
-                if (canPost)
+                TextButton.icon(
+                  style: compact,
+                  onPressed: post,
+                  icon: const Icon(Icons.image_outlined, size: 18),
+                  label: const Text('Photo'),
+                ),
+                TextButton.icon(
+                  style: compact,
+                  onPressed: onWorkout,
+                  icon: const Icon(Icons.directions_run, size: 18),
+                  label: const Text('Workout'),
+                ),
+                if (onTeamPost case final teamPost?)
                   TextButton.icon(
                     style: compact,
-                    onPressed: post,
-                    icon: const Icon(Icons.image_outlined, size: 18),
-                    label: const Text('Photo'),
+                    onPressed: teamPost,
+                    icon: const Icon(Icons.campaign_outlined, size: 18),
+                    label: const Text('Team post'),
                   ),
                 TextButton.icon(
                   style: compact,
@@ -404,15 +464,6 @@ class _Composer extends StatelessWidget {
                   icon: const Icon(Icons.event_outlined, size: 18),
                   label: const Text('Event'),
                 ),
-                const Spacer(),
-                if (canPost)
-                  TextButton(
-                    onPressed: post,
-                    style: compact.copyWith(
-                      foregroundColor: WidgetStatePropertyAll(c.muted),
-                    ),
-                    child: const Text('Post →'),
-                  ),
               ],
             ),
           ),
@@ -423,9 +474,10 @@ class _Composer extends StatelessWidget {
 }
 
 class _CaughtUp extends StatelessWidget {
-  const _CaughtUp({required this.empty});
+  const _CaughtUp({required this.empty, required this.followsAnything});
 
   final bool empty;
+  final bool followsAnything;
 
   @override
   Widget build(BuildContext context) {
@@ -438,12 +490,13 @@ class _CaughtUp extends StatelessWidget {
           Icon(Icons.check_circle_outline, size: 15, color: c.muted),
           const SizedBox(width: 6),
           Flexible(
-            child: Text(
-              empty
-                  ? 'No posts yet. Team news shows up here.'
-                  : "You're all caught up with your teams.",
-              style: TextStyle(fontSize: 12, color: c.muted),
-            ),
+            child: Text(switch ((empty, followsAnything)) {
+              (true, false) =>
+                'No posts yet. Follow players, teams and tournaments to '
+                    'see their news here.',
+              (true, true) => 'No posts yet. News you follow shows up here.',
+              _ => "You're all caught up.",
+            }, style: TextStyle(fontSize: 12, color: c.muted)),
           ),
         ],
       ),

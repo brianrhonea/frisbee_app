@@ -65,6 +65,19 @@ class FakeGroupTournamentRepository implements GroupTournamentRepository {
     yield* _changes.stream.map((_) => visible());
   }
 
+  /// Every tournament is listed, like the directory mirror.
+  List<TournamentListing> _listings(String groupId) => [
+    for (final t
+        in (tournaments[groupId] ?? const <GroupTournament>[]).reversed)
+      TournamentListing.of(groupId, t),
+  ];
+
+  @override
+  Stream<List<TournamentListing>> watchListings(String groupId) async* {
+    yield _listings(groupId);
+    yield* _changes.stream.map((_) => _listings(groupId));
+  }
+
   @override
   Stream<GroupTournament?> watchTournament(String groupId, String id) async* {
     yield _find(groupId, id);

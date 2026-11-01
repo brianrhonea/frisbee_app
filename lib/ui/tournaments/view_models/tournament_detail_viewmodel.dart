@@ -2,12 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/follow/follow_repository.dart';
+import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/tournament/tournament_repository.dart';
 import '../../../data/repositories/usau_schedule/usau_schedule_repository.dart';
+import '../../../domain/models/follow.dart';
 import '../../../domain/models/tournament.dart';
 import '../../../domain/models/usau_schedule.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../follow/view_models/follow_viewmodel.dart';
 
 typedef ScheduleRequest = ({UsauDivision division, bool refresh});
 
@@ -18,8 +23,16 @@ class TournamentDetailViewModel extends ChangeNotifier {
     required this.tournamentId,
     required TournamentRepository tournamentRepository,
     required UsauScheduleRepository usauScheduleRepository,
+    FollowRepository? followRepository,
+    NotificationRepository? notificationRepository,
+    AuthRepository? authRepository,
   }) : _tournaments = tournamentRepository,
-       _schedules = usauScheduleRepository {
+       _schedules = usauScheduleRepository,
+       _followSlot = FollowSlot(
+         followRepository: followRepository,
+         notificationRepository: notificationRepository,
+         authRepository: authRepository,
+       ) {
     loadDivisions = Command0(_loadDivisions)..addListener(notifyListeners);
     loadSchedule = Command1(_loadSchedule)..addListener(notifyListeners);
     _subscribe();
@@ -33,8 +46,16 @@ class TournamentDetailViewModel extends ChangeNotifier {
   late final Command0<List<UsauDivision>> loadDivisions;
   late final Command1<UsauDivisionSchedule, ScheduleRequest> loadSchedule;
 
+  final FollowSlot _followSlot;
+
   Tournament? _tournament;
   Tournament? get tournament => _tournament;
+
+  /// Follow the event to see posts from people who tag it.
+  FollowViewModel? get follow => _followSlot.of(switch (_tournament) {
+    final t? => FollowTarget.event(tournamentId, t.name),
+    null => null,
+  });
 
   bool _loading = true;
   bool get loading => _loading;
@@ -208,6 +229,7 @@ class TournamentDetailViewModel extends ChangeNotifier {
     _sub?.cancel();
     loadDivisions.removeListener(notifyListeners);
     loadSchedule.removeListener(notifyListeners);
+    _followSlot.dispose();
     super.dispose();
   }
 }

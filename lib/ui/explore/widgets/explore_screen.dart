@@ -71,10 +71,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _onChanged(String text) {
     _debounce?.cancel();
-    _debounce = Timer(
-      const Duration(milliseconds: 300),
-      () => _search(text),
-    );
+    _debounce = Timer(const Duration(milliseconds: 300), () => _search(text));
   }
 
   @override
@@ -129,7 +126,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ? players.search.running
                   : vm.search.running ||
                         (vm.kind == null && players.search.running);
-              final failed = _playersOnly ? players.search.error : vm.search.error;
+              final failed = _playersOnly
+                  ? players.search.error
+                  : vm.search.error;
               final noMatches = _playersOnly
                   ? players.noMatches
                   : vm.noMatches && (vm.kind != null || players.noMatches);
@@ -177,7 +176,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     const EmptyView(
                       icon: Icons.search_off,
                       title: 'Nothing found',
-                      message: 'Try another word from the name, a city, '
+                      message:
+                          'Try another word from the name, a city, '
                           'school or team.',
                     )
                   else if (results.isEmpty && people.isEmpty)

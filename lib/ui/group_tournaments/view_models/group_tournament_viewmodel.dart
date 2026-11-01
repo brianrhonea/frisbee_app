@@ -11,6 +11,10 @@ import '../../../domain/tournament_engine/progress.dart';
 import '../../../domain/tournament_engine/standings.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../../data/repositories/follow/follow_repository.dart';
+import '../../../data/repositories/notification/notification_repository.dart';
+import '../../../domain/models/follow.dart';
+import '../../follow/view_models/follow_viewmodel.dart';
 
 typedef GameScore = ({String gameId, int scoreA, int scoreB});
 
@@ -35,8 +39,15 @@ class GroupTournamentViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required GroupTournamentRepository tournamentRepository,
     required AuthRepository authRepository,
+    FollowRepository? followRepository,
+    NotificationRepository? notificationRepository,
   }) : _repo = tournamentRepository,
-       _uid = authRepository.currentUser?.uid ?? '' {
+       _uid = authRepository.currentUser?.uid ?? '',
+       _followSlot = FollowSlot(
+         followRepository: followRepository,
+         notificationRepository: notificationRepository,
+         authRepository: authRepository,
+       ) {
     report = Command1<void, GameScore>(_report);
     confirm = Command1<void, GroupGame>(_confirm);
     setFinalScore = Command1<void, GameScore>(_setFinalScore);
@@ -54,6 +65,11 @@ class GroupTournamentViewModel extends ChangeNotifier {
         _loaded = true;
         notifyListeners();
       }, onError: _onError),
+      // The public listing, for people following it from outside.
+      _repo.watchListings(groupId).listen((l) {
+        _listing = l.where((x) => x.tournamentId == tournamentId).firstOrNull;
+        notifyListeners();
+      }, onError: (Object _) {}),
       _repo.watchGames(groupId, tournamentId).listen((g) {
         _games = g;
         _catchUp();
@@ -67,6 +83,22 @@ class GroupTournamentViewModel extends ChangeNotifier {
   final GroupTournamentRepository _repo;
   final String _uid;
   late final List<StreamSubscription<Object?>> _subs;
+
+  final FollowSlot _followSlot;
+  TournamentListing? _listing;
+
+  /// The public summary, shown to people who aren't in the tournament.
+  TournamentListing? get listing => _listing;
+
+  /// The tournament's Follow button, once its name is known.
+  FollowViewModel? get follow {
+    final name = _tournament?.name ?? _listing?.name;
+    return _followSlot.of(
+      name == null
+          ? null
+          : FollowTarget.tournament(groupId, tournamentId, name),
+    );
+  }
 
   Team? _group;
   GroupTournament? _tournament;
@@ -259,6 +291,7 @@ class GroupTournamentViewModel extends ChangeNotifier {
     for (final s in _subs) {
       s.cancel();
     }
+    _followSlot.dispose();
     super.dispose();
   }
 }

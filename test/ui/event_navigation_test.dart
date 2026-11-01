@@ -32,8 +32,13 @@ import 'package:frisbee_app/ui/teams/widgets/roster_tab.dart';
 import 'package:frisbee_app/ui/teams/widgets/team_home_screen.dart';
 import 'package:frisbee_app/ui/teams/widgets/team_section_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:frisbee_app/data/repositories/follow/follow_repository.dart';
+import 'package:frisbee_app/data/repositories/group_tournament/group_tournament_repository.dart';
+import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 
 import '../testing/fakes.dart';
+import '../testing/group_tournament_fakes.dart';
+import '../testing/social_fakes.dart';
 import '../testing/meeting_fakes.dart';
 
 /// Event pages open over the current tab and back returns to it.
@@ -99,6 +104,11 @@ void main() {
           ),
           Provider<RankingRepository>.value(
             value: FakeRankingRepository(const []),
+          ),
+          Provider<FollowRepository>.value(value: FakeFollowRepository()),
+          Provider<UserPostRepository>.value(value: FakeUserPostRepository()),
+          Provider<GroupTournamentRepository>.value(
+            value: FakeGroupTournamentRepository(),
           ),
         ],
         child: MaterialApp.router(

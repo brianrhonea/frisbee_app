@@ -30,6 +30,19 @@ abstract final class Routes {
 
   static const explorePath = '/explore';
 
+  /// Everything the user follows, with each bell.
+  static const following = '/profile/following';
+
+  // People's posts and the composer open over the shell; use
+  // `context.push`.
+  static const postsPath = '/posts';
+  static const newPost = '/posts/new';
+
+  /// The composer, starting on the Workout tab.
+  static const newWorkout = '/posts/new?kind=workout';
+  static String post(String id) => '$postsPath/$id';
+  static String editPost(String id) => '$postsPath/$id/edit';
+
   // The inbox is a shell tab; a conversation opened on its own (e.g. from a
   // notification or on a phone) opens over the shell, with `context.push`.
   static const messages = '/messages';

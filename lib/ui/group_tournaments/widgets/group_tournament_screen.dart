@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/tournament_engine/standings.dart';
@@ -8,6 +9,8 @@ import '../../../utils/command.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
+import '../../follow/view_models/follow_viewmodel.dart';
+import '../../follow/widgets/follow_button.dart';
 import '../view_models/group_tournament_viewmodel.dart';
 import 'tournament_widgets.dart';
 
@@ -117,6 +120,18 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
         if (!vm.loaded) {
           return Scaffold(appBar: AppBar(), body: const LoadingView());
         }
+        final follow = vm.follow;
+        final listing = vm.listing;
+        if (t == null && listing != null) {
+          return Scaffold(
+            appBar: AppBar(title: Text(listing.name)),
+            body: _PublicTournament(
+              listing: listing,
+              follow: follow,
+              onOpenGroup: () => context.go(Routes.team(vm.groupId)),
+            ),
+          );
+        }
         if (t == null) {
           return Scaffold(
             appBar: AppBar(),
@@ -144,6 +159,8 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
             appBar: AppBar(
               title: Text(t.name),
               actions: [
+                if (follow != null)
+                  FollowControl(viewModel: follow, compact: true),
                 if (vm.isOrganizer)
                   PopupMenuButton<_Menu>(
                     onSelected: _onMenu,
@@ -594,6 +611,81 @@ class _GameSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// What someone outside the tournament sees: when it is, how it's played,
+/// and a Follow button for its updates.
+class _PublicTournament extends StatelessWidget {
+  const _PublicTournament({
+    required this.listing,
+    required this.follow,
+    required this.onOpenGroup,
+  });
+
+  final TournamentListing listing;
+  final FollowViewModel? follow;
+  final VoidCallback onOpenGroup;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final day = DateFormat('EEEE, MMM d');
+    final end = listing.endsOn;
+    final when = end == null
+        ? '${day.format(listing.startsAt)} at '
+              '${DateFormat.jm().format(listing.startsAt)}'
+        : '${day.format(listing.startsAt)} to ${day.format(end)}';
+    final status = switch (listing.status) {
+      TournamentStatus.setup => 'Teams are being picked',
+      TournamentStatus.scheduled => 'Schedule published',
+      TournamentStatus.done => 'Finished',
+    };
+    final follow = this.follow;
+    return ConstrainedContent(
+      maxWidth: 640,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(listing.name, style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.event_outlined),
+            title: Text(when),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.account_tree_outlined),
+            title: Text(listing.format.label),
+            subtitle: Text(status),
+          ),
+          const SizedBox(height: 8),
+          if (follow != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FollowControl(viewModel: follow, showCount: true),
+            ),
+          const SizedBox(height: 16),
+          Text(
+            'Follow to see its updates on Home. To play, join the group and '
+            'sign up there.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: onOpenGroup,
+              icon: const Icon(Icons.diversity_3_outlined),
+              label: const Text('Open the group'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

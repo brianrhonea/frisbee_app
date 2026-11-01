@@ -67,10 +67,7 @@ void main() {
       expect(vm.isMe, isTrue);
       expect(vm.claimable.single.team.id, 't1');
       // Bo is linked to someone else; Alex matches the name.
-      expect([for (final p in vm.claimable.single.players) p.id], [
-        'r1',
-        'r3',
-      ]);
+      expect([for (final p in vm.claimable.single.players) p.id], ['r1', 'r3']);
       expect(vm.totals.isEmpty, isTrue);
       vm.dispose();
     });
@@ -287,7 +284,10 @@ void main() {
     final vm = profileOf(testUser.uid);
     for (final brightness in [AppTheme.light, AppTheme.dark]) {
       await tester.pumpWidget(
-        MaterialApp(theme: brightness, home: PlayerProfileScreen(viewModel: vm)),
+        MaterialApp(
+          theme: brightness,
+          home: PlayerProfileScreen(viewModel: vm),
+        ),
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
