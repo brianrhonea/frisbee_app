@@ -33,15 +33,8 @@ class TeamPostCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
-  Future<void> _open(BuildContext context, Uri uri) async {
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
-        context.mounted) {
-      showErrorSnackBar(
-        context,
-        Result<void>.error(Exception("Couldn't open $uri")),
-      );
-    }
-  }
+  Future<void> _open(BuildContext context, Uri uri) =>
+      openPostLink(context, uri);
 
   Uri _mapFor(String place) => Uri.https('www.google.com', '/maps/search/', {
     'api': '1',
@@ -142,7 +135,7 @@ class TeamPostCard extends StatelessWidget {
                   ],
                   if (post.location.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    _LinkRow(
+                    PostLinkRow(
                       icon: Icons.place_outlined,
                       text: post.location,
                       tooltip: 'Open in Maps',
@@ -150,7 +143,7 @@ class TeamPostCard extends StatelessWidget {
                     ),
                   ],
                   for (final l in post.links)
-                    _LinkRow(
+                    PostLinkRow(
                       icon: Icons.link,
                       text: Uri.parse(l).host.isEmpty ? l : _short(l),
                       tooltip: l,
@@ -165,14 +158,29 @@ class TeamPostCard extends StatelessWidget {
     );
   }
 
-  /// "example.com/page" without the scheme or a trailing slash.
-  static String _short(String link) => link
-      .replaceFirst(RegExp(r'^https?://(www\.)?'), '')
-      .replaceFirst(RegExp(r'/$'), '');
+  static String _short(String link) => shortLink(link);
 }
 
-class _LinkRow extends StatelessWidget {
-  const _LinkRow({
+/// Opens a post link in the browser, or says it couldn't.
+Future<void> openPostLink(BuildContext context, Uri uri) async {
+  if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+      context.mounted) {
+    showErrorSnackBar(
+      context,
+      Result<void>.error(Exception("Couldn't open $uri")),
+    );
+  }
+}
+
+/// "example.com/page" without the scheme or a trailing slash.
+String shortLink(String link) => link
+    .replaceFirst(RegExp(r'^https?://(www\.)?'), '')
+    .replaceFirst(RegExp(r'/$'), '');
+
+/// A tappable place or web link under a post.
+class PostLinkRow extends StatelessWidget {
+  const PostLinkRow({
+    super.key,
     required this.icon,
     required this.text,
     required this.tooltip,

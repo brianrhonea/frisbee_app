@@ -145,7 +145,8 @@ service cloud.firestore {
         function validPrefs() {
           let d = request.resource.data;
           let categories = ['chat', 'directMessages', 'eventChanges',
-                            'eventReminders', 'teamActivity', 'meetings'];
+                            'eventReminders', 'teamActivity', 'meetings',
+                            'posts'];
           return d.keys().hasOnly(['categories', 'teams', 'mutedRooms',
                                    'utcOffsetMinutes', 'updatedAt'])
             && (!('categories' in d)
@@ -170,6 +171,36 @@ service cloud.firestore {
           && fid.size() <= 300
           && request.resource.data.keys().hasOnly(['platform', 'updatedAt'])
           && request.resource.data.platform in ['android', 'iOS', 'macOS'];
+      }
+
+      // What the user follows (Follow in lib/domain/models/follow.dart),
+      // keyed "{type}_{targetId}". Private to the owner; Cloud Functions
+      // read them to notify followers and keep followCounts.
+      match /follows/{key} {
+        function validFollow() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['key', 'type', 'targetId', 'groupId',
+                                   'name', 'photoUrl', 'notify', 'createdAt'])
+            && d.type in ['user', 'team', 'tournament', 'event']
+            && validString(d.targetId, 300) && d.targetId.size() > 0
+            && d.key == key
+            && key == d.type + '_' + d.targetId
+            && (d.type != 'user' || d.targetId != userId)
+            && (d.type != 'tournament'
+                || (validString(d.get('groupId', null), 200)
+                    && d.targetId.matches(d.groupId + '_.+')))
+            && validString(d.name, 100)
+            && (d.get('photoUrl', null) == null
+                || validString(d.photoUrl, 2000))
+            && d.notify is bool;
+        }
+
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create: if signedIn() && uid() == userId && validFollow()
+          && request.resource.data.createdAt == request.time;
+        allow update: if signedIn() && uid() == userId
+          && changed().hasOnly(['notify', 'name', 'photoUrl'])
+          && validFollow();
       }
 
       // The notification feed. Cloud Functions write it; the owner marks
@@ -739,7 +770,12 @@ service cloud.firestore {
             && (links.size() < 5 || validLink(links[4]))
             && images is list && images.size() <= 4
             && (p.body.size() > 0 || images.size() > 0)
-            && p.public is bool;
+            && p.public is bool
+            // Ties the post to one of this group's tournaments (FollowTarget
+            // keys), so that tournament's followers see it.
+            && (p.get('tournamentKey', null) == null
+                || (validString(p.tournamentKey, 300)
+                    && p.tournamentKey.matches('tournament_' + teamId + '_.+')));
         }
 
         function validLink(l) {
@@ -753,7 +789,8 @@ service cloud.firestore {
           && isEditor(team())
           && request.resource.data.keys().hasOnly([
                'title', 'body', 'location', 'links', 'images', 'public',
-               'authorId', 'authorName', 'createdAt', 'updatedAt'])
+               'tournamentKey', 'authorId', 'authorName', 'createdAt',
+               'updatedAt'])
           && request.resource.data.authorId == uid()
           && validString(request.resource.data.authorName, 80)
           && request.resource.data.createdAt == request.time
@@ -761,7 +798,7 @@ service cloud.firestore {
         allow update: if signedIn() && isEditor(team())
           && changed().hasOnly([
                'title', 'body', 'location', 'links', 'images', 'public',
-               'updatedAt'])
+               'tournamentKey', 'updatedAt'])
           && validPost(request.resource.data);
       }
 
@@ -1129,6 +1166,149 @@ service cloud.firestore {
       // is anyone's to clear.
       allow delete: if signedIn()
         && (!exists(teamPath(teamId)) || isOwner(get(teamPath(teamId)).data));
+    }
+
+    // Group tournaments' public summaries (TournamentListing in
+    // lib/domain/models/group_tournament.dart), so people outside a
+    // tournament can find and follow it. Id "{groupId}_{tournamentId}".
+    // Organizers write it with the tournament.
+    match /tournamentDirectory/{listingId} {
+      function validTournamentListing(d) {
+        return d.keys().hasOnly(['groupId', 'tournamentId', 'name',
+                                 'startsAt', 'endsOn', 'status', 'format'])
+          && listingId == d.groupId + '_' + d.tournamentId
+          && validString(d.name, 100)
+          && d.startsAt is timestamp
+          && (d.get('endsOn', null) == null || d.endsOn is timestamp)
+          && d.status in ['setup', 'scheduled', 'done']
+          && validString(d.format, 40);
+      }
+      function organizes(groupId) {
+        let path = teamPath(groupId);
+        return exists(path) && isGroup(get(path).data)
+          && isEditor(get(path).data);
+      }
+
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && organizes(request.resource.data.groupId)
+        && validTournamentListing(request.resource.data)
+        && (resource == null
+            || (resource.data.groupId == request.resource.data.groupId
+                && resource.data.tournamentId
+                   == request.resource.data.tournamentId));
+      // Organizers delete it with the tournament; one left behind by a
+      // deleted group is anyone's to clear.
+      allow delete: if signedIn()
+        && (!exists(teamPath(resource.data.groupId))
+            || organizes(resource.data.groupId));
+    }
+
+    // ---- People: posts and follows ----------------------------------------
+
+    // Posts people write themselves (UserPost in
+    // lib/domain/models/user_post.dart): text, photos and links, or a
+    // workout. Public to anyone signed in. Photos are in Storage under
+    // users/{uid}/posts/{postId}/ (see storage.rules).
+    match /posts/{postId} {
+      function validLink(l) {
+        return l is string && l.size() <= 500 && l.matches('https?://.+');
+      }
+
+      // Workout and WorkoutExercise in lib/domain/models/workout.dart.
+      function validExercise(e) {
+        return e is map
+          && e.keys().hasOnly(['name', 'sets', 'reps', 'weight'])
+          && validString(e.name, 60) && e.name.size() > 0
+          && (!('sets' in e) || (e.sets is int && e.sets >= 1 && e.sets <= 100))
+          && (!('reps' in e) || (e.reps is int && e.reps >= 1 && e.reps <= 1000))
+          && (!('weight' in e) || validString(e.weight, 20));
+      }
+      function validExercises(x) {
+        return x is list && x.size() <= 20
+          && (x.size() < 1 || validExercise(x[0]))
+          && (x.size() < 2 || validExercise(x[1]))
+          && (x.size() < 3 || validExercise(x[2]))
+          && (x.size() < 4 || validExercise(x[3]))
+          && (x.size() < 5 || validExercise(x[4]))
+          && (x.size() < 6 || validExercise(x[5]))
+          && (x.size() < 7 || validExercise(x[6]))
+          && (x.size() < 8 || validExercise(x[7]))
+          && (x.size() < 9 || validExercise(x[8]))
+          && (x.size() < 10 || validExercise(x[9]))
+          && (x.size() < 11 || validExercise(x[10]))
+          && (x.size() < 12 || validExercise(x[11]))
+          && (x.size() < 13 || validExercise(x[12]))
+          && (x.size() < 14 || validExercise(x[13]))
+          && (x.size() < 15 || validExercise(x[14]))
+          && (x.size() < 16 || validExercise(x[15]))
+          && (x.size() < 17 || validExercise(x[16]))
+          && (x.size() < 18 || validExercise(x[17]))
+          && (x.size() < 19 || validExercise(x[18]))
+          && (x.size() < 20 || validExercise(x[19]));
+      }
+      function validWorkout(w) {
+        return w is map
+          && w.keys().hasOnly(['activity', 'durationMinutes', 'distanceKm',
+                               'effort', 'exercises'])
+          && w.activity in ['run', 'sprints', 'throwing', 'gym', 'agility',
+                            'mobility', 'other']
+          && w.durationMinutes is int
+          && w.durationMinutes >= 1 && w.durationMinutes <= 1440
+          && (!('distanceKm' in w)
+              || (w.distanceKm is number
+                  && w.distanceKm > 0 && w.distanceKm <= 1000))
+          && (!('effort' in w)
+              || (w.effort is int && w.effort >= 1 && w.effort <= 10))
+          && validExercises(w.get('exercises', []));
+      }
+      function validUserPost(p) {
+        let links = p.get('links', []);
+        let images = p.get('images', []);
+        let workout = p.get('workout', null);
+        return p.kind in ['text', 'workout']
+          && validString(p.body, 5000)
+          && links is list && links.size() <= 5
+          && (links.size() < 1 || validLink(links[0]))
+          && (links.size() < 2 || validLink(links[1]))
+          && (links.size() < 3 || validLink(links[2]))
+          && (links.size() < 4 || validLink(links[3]))
+          && (links.size() < 5 || validLink(links[4]))
+          && images is list && images.size() <= 4
+          && ((p.kind == 'workout' && validWorkout(workout))
+              || (p.kind == 'text' && workout == null
+                  && (p.body.size() > 0 || images.size() > 0)))
+          && (p.get('tournamentKey', null) == null
+              || (validString(p.tournamentKey, 300)
+                  && p.tournamentKey.matches('(tournament|event)_.+')))
+          && (p.get('tournamentName', null) == null
+              || validString(p.tournamentName, 100));
+      }
+
+      allow read: if signedIn();
+      allow delete: if signedIn() && resource.data.authorId == uid();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'kind', 'body', 'links', 'images', 'workout', 'tournamentKey',
+             'tournamentName', 'authorId', 'authorName', 'authorPhotoUrl',
+             'createdAt', 'updatedAt'])
+        && request.resource.data.authorId == uid()
+        && validString(request.resource.data.authorName, 80)
+        && (request.resource.data.get('authorPhotoUrl', null) == null
+            || validString(request.resource.data.authorPhotoUrl, 2000))
+        && request.resource.data.createdAt == request.time
+        && validUserPost(request.resource.data);
+      allow update: if signedIn() && resource.data.authorId == uid()
+        && changed().hasOnly([
+             'kind', 'body', 'links', 'images', 'workout', 'tournamentKey',
+             'tournamentName', 'updatedAt'])
+        && validUserPost(request.resource.data);
+    }
+
+    // Follower counts per FollowTarget key, plus `following` on user keys.
+    // Cloud Functions keep them; anyone signed in reads them.
+    match /followCounts/{key} {
+      allow read: if signedIn();
     }
 
     // ---- Direct messages --------------------------------------------------

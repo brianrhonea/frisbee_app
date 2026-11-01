@@ -7,14 +7,17 @@ import '../../../domain/models/ranking.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/tournament.dart';
+import '../../../domain/models/user_post.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/brand.dart';
+import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/usau_attribution.dart';
 import '../../playbook/widgets/field_geometry.dart';
+import '../../posts/widgets/post_widgets.dart';
 import '../../playbook/widgets/field_painter.dart';
 import '../../playbook/widgets/play_canvas.dart';
 import '../../schedule/widgets/event_style.dart';
@@ -44,12 +47,20 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     vm.joinTeam.addListener(_onJoin);
+    vm.deletePost.addListener(_onDelete);
   }
 
   @override
   void dispose() {
     vm.joinTeam.removeListener(_onJoin);
+    vm.deletePost.removeListener(_onDelete);
     super.dispose();
+  }
+
+  void _onDelete() {
+    final cmd = vm.deletePost;
+    if (cmd.result case Error()) showErrorSnackBar(context, cmd.result);
+    cmd.clearResult();
   }
 
   void _onJoin() {
@@ -92,7 +103,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Phone and narrow-window layout: every section in one scrolling column.
+  /// Phone and narrow-window layout: the week, the user's team, then the
+  /// feed. Rankings, events and the playbook have their own tabs and pages.
   Widget _column(BuildContext context) {
     return ConstrainedContent(
       maxWidth: 640,
@@ -105,18 +117,14 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 28),
           _teamSection(context),
           const SizedBox(height: 28),
-          _playbookSection(context),
-          const SizedBox(height: 28),
-          _eventsSection(context),
-          const SizedBox(height: 28),
-          _rankingsSection(context),
+          ..._feedSection(context),
         ],
       ),
     );
   }
 
-  /// Desktop layout: the header across the top, then a wide column for the
-  /// schedule and playbook beside a narrower one for team and rankings.
+  /// Desktop layout: the header across the top, then the week and the feed
+  /// beside a narrower column for team, events, playbook and rankings.
   Widget _dashboard(BuildContext context) {
     return ConstrainedContent(
       maxWidth: 1320,
@@ -135,9 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _weekSection(context),
                     const SizedBox(height: 28),
-                    _playbookSection(context),
-                    const SizedBox(height: 28),
-                    _eventsSection(context),
+                    ..._feedSection(context),
                   ],
                 ),
               ),
@@ -149,6 +155,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _teamSection(context),
                     const SizedBox(height: 28),
+                    _eventsSection(context),
+                    const SizedBox(height: 28),
+                    _playbookSection(context),
+                    const SizedBox(height: 28),
                     _rankingsSection(context),
                   ],
                 ),
@@ -159,6 +169,52 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Future<void> _deletePost(UserPost post) async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Delete post?',
+      message: 'It and its photos are removed for everyone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (ok) vm.deletePost.execute(post.id);
+  }
+
+  /// The composer prompt and the feed, as list children.
+  List<Widget> _feedSection(BuildContext context) => [
+    _SectionHeader(
+      title: 'Feed',
+      action: 'Following',
+      onTap: () => context.push(Routes.following),
+    ),
+    _ComposerPrompt(viewModel: vm),
+    const SizedBox(height: 12),
+    if (!vm.feedLoaded)
+      const _MutedCard(text: 'Loading posts…')
+    else if (vm.feed.isEmpty)
+      _EmptyFeed(followsAnything: vm.followsAnything)
+    else ...[
+      for (final item in vm.feed)
+        Padding(
+          key: ValueKey(item.id),
+          padding: const EdgeInsets.only(bottom: 10),
+          child: FeedItemCard(
+            item: item,
+            uid: vm.user?.uid ?? '',
+            loadImage: vm.imageData,
+            onDeleteUserPost: _deletePost,
+          ),
+        ),
+      if (vm.feedHasMore)
+        Center(
+          child: TextButton(
+            onPressed: vm.loadMorePosts,
+            child: const Text('Show older posts'),
+          ),
+        ),
+    ],
+  ];
 
   Widget _weekSection(BuildContext context) => _Section(
     header: _SectionHeader(
@@ -990,7 +1046,7 @@ class _EventsSection extends StatelessWidget {
             for (final t in other) ...[
               _TournamentCard(
                 tournament: t,
-                onTap: () => context.go(Routes.tournament(t.id)),
+                onTap: () => context.push(Routes.tournament(t.id)),
               ),
               const SizedBox(height: 10),
             ],
@@ -1170,7 +1226,7 @@ class _TournamentCard extends StatelessWidget {
 
 void _openTeam(BuildContext context, RankingEntry entry) {
   if (entry.teamUrl.isEmpty) return;
-  context.go(Routes.usauTeam(entry.teamUrl, name: entry.teamName));
+  context.push(Routes.usauTeam(entry.teamUrl, name: entry.teamName));
 }
 
 class _RankingsSection extends StatelessWidget {
@@ -1482,4 +1538,94 @@ class _MutedCard extends StatelessWidget {
     padding: const EdgeInsets.all(16),
     child: Text(text, style: TextStyle(color: AppColors.of(context).muted)),
   );
+}
+
+// Feed ---------------------------------------------------------------------
+
+/// "Share an update or workout", opening the composer.
+class _ComposerPrompt extends StatelessWidget {
+  const _ComposerPrompt({required this.viewModel});
+
+  final HomeViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final user = viewModel.user;
+    return _Panel(
+      onTap: () => context.push(Routes.newPost),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      child: Row(
+        children: [
+          PersonAvatar(name: user?.label ?? '', photoUrl: user?.photoUrl),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Share an update or workout',
+              style: TextStyle(color: c.muted),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Share a workout',
+            onPressed: () => context.push(Routes.newWorkout),
+            icon: const Icon(Icons.fitness_center),
+          ),
+          IconButton(
+            tooltip: 'Write a post',
+            onPressed: () => context.push(Routes.newPost),
+            icon: const Icon(Icons.edit_outlined),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyFeed extends StatelessWidget {
+  const _EmptyFeed({required this.followsAnything});
+
+  final bool followsAnything;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return _Panel(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            followsAnything ? 'No posts yet' : 'Your feed is empty',
+            style: _heading(context, 20),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            followsAnything
+                ? 'Posts from you, your teams and everything you follow '
+                      'show up here.'
+                : 'Follow people, teams, groups and tournaments to see '
+                      'their posts here. Your teams\' posts show up too.',
+            style: TextStyle(color: c.muted),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: () => context.go(Routes.searchTeams),
+                icon: const Icon(Icons.search),
+                label: const Text('Find teams and groups'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => context.push(Routes.newMessage),
+                icon: const Icon(Icons.person_search_outlined),
+                label: const Text('Find people'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

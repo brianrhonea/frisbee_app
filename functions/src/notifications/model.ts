@@ -9,6 +9,7 @@ export const categories = [
   "eventReminders",
   "teamActivity",
   "meetings",
+  "posts",
 ] as const;
 export type Category = (typeof categories)[number];
 
@@ -379,4 +380,112 @@ export function meetingCancelledNotice(a: {
       body: `Was ${whenAndWhere(a.meeting, prefs)}`,
     }),
   };
+}
+
+// ---- Follows and posts -----------------------------------------------------
+
+/**
+ * FollowTarget keys in lib/domain/models/follow.dart: "{type}_{targetId}".
+ * Group tournaments are "tournament_{groupId}_{tournamentId}".
+ */
+export const followKey = {
+  user: (uid: string) => `user_${uid}`,
+  team: (teamId: string) => `team_${teamId}`,
+};
+
+/** Whose followers hear about a post: its author or team, and its tournament. */
+export function followKeys(a: { authorId?: string; teamId?: string; post: Data }): string[] {
+  const keys = [
+    a.teamId ? followKey.team(a.teamId) : a.authorId ? followKey.user(a.authorId) : "",
+    typeof a.post.tournamentKey === "string" ? a.post.tournamentKey : "",
+  ];
+  return [...new Set(keys.filter(Boolean))];
+}
+
+/**
+ * Followers to notify: deduped, without the author, and, for posts only
+ * members may read, only members.
+ */
+export function postRecipients(followers: string[], authorId: string, readers?: string[]): string[] {
+  const allowed = readers ? new Set(readers) : undefined;
+  return [...new Set(followers)].filter((uid) => uid !== authorId && (!allowed || allowed.has(uid)));
+}
+
+const workoutActivities: Record<string, string> = {
+  run: "run",
+  sprints: "sprint session",
+  throwing: "throwing session",
+  gym: "gym session",
+  agility: "agility session",
+  mobility: "mobility session",
+  other: "workout",
+};
+
+/** "45 min run · 8 km", or the post's text. */
+export function postPreview(post: Data): string {
+  const workout = post.kind === "workout" ? (post.workout as Data | undefined) : undefined;
+  const text = String(post.body ?? "").trim().replace(/\s+/g, " ");
+  if (workout) {
+    const minutes = Number(workout.durationMinutes ?? 0);
+    const activity = workoutActivities[String(workout.activity)] ?? "workout";
+    const distance = typeof workout.distanceKm === "number" ? ` · ${workout.distanceKm} km` : "";
+    const summary = `${minutes > 0 ? `${minutes} min ` : ""}${activity}${distance}`;
+    return text ? `${summary} · ${clip(text, 90)}` : summary;
+  }
+  const title = String(post.title ?? "").trim();
+  const line = [title, text].filter(Boolean).join(": ");
+  if (line) return clip(line, 120);
+  const images = Array.isArray(post.images) ? post.images.length : 0;
+  return images > 1 ? `📷 ${images} photos` : "📷 Photo";
+}
+
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+/** A person someone follows posted. */
+export function userPostNotice(a: { postId: string; post: Data }): Notice {
+  const author = String(a.post.authorName ?? "") || "Someone";
+  const workout = a.post.kind === "workout";
+  const preview = postPreview(a.post);
+  return {
+    category: "posts",
+    route: `/posts/${a.postId}`,
+    collapseId: `posts_user_${String(a.post.authorId ?? "")}`,
+    text: (_, count) => ({
+      title: count > 1 ? `${author}: ${count} new posts` : `${author} ${workout ? "shared a workout" : "posted"}`,
+      body: preview,
+    }),
+  };
+}
+
+/** A team or group someone follows posted. */
+export function teamPostNotice(a: { teamId: string; teamName: string; post: Data }): Notice {
+  const preview = postPreview(a.post);
+  return {
+    category: "posts",
+    teamId: a.teamId,
+    route: `/teams/${a.teamId}`,
+    collapseId: `posts_team_${a.teamId}`,
+    text: (_, count) => ({
+      title: count > 1 ? `${a.teamName}: ${count} new posts` : `${a.teamName} posted`,
+      body: preview,
+    }),
+  };
+}
+
+/**
+ * followCounts changes for a follow doc write: +1 for the target's
+ * followers and the follower's `following` on create, -1 on delete.
+ */
+export function followCountChanges(
+  followerUid: string,
+  key: string,
+  before?: Data,
+  after?: Data,
+): { key: string; field: "followers" | "following"; by: number }[] {
+  const by = !before && after ? 1 : before && !after ? -1 : 0;
+  if (by === 0) return [];
+  return [
+    { key, field: "followers", by },
+    { key: followKey.user(followerUid), field: "following", by },
+  ];
 }

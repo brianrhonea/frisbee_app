@@ -15,6 +15,20 @@ abstract final class Routes {
   static const rankings = '/rankings';
   static const profile = '/profile';
 
+  /// Everything the user follows, with each bell.
+  static const following = '/profile/following';
+
+  // People's profiles and posts open over the shell; use `context.push`.
+  static const peoplePath = '/people';
+  static String person(String uid) => '$peoplePath/$uid';
+  static const postsPath = '/posts';
+  static const newPost = '/posts/new';
+
+  /// The composer, starting on the Workout tab.
+  static const newWorkout = '/posts/new?kind=workout';
+  static String post(String id) => '$postsPath/$id';
+  static String editPost(String id) => '$postsPath/$id/edit';
+
   // Direct messages open over the shell; use `context.push`.
   static const messages = '/messages';
   static const newMessage = '/messages/new';

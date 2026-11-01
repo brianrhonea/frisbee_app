@@ -5,13 +5,18 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/direct_message/direct_message_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
+import '../../../data/repositories/follow/follow_repository.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/playbook/play_repository.dart';
 import '../../../data/repositories/ranking/ranking_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../data/repositories/team_post/team_post_repository.dart';
 import '../../../data/repositories/tournament/tournament_repository.dart';
+import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../../../domain/models/app_user.dart';
+import '../../../domain/models/chat.dart';
+import '../../../domain/models/feed_item.dart';
 import '../../../domain/models/play.dart';
 import '../../../domain/models/ranking.dart';
 import '../../../domain/models/team.dart';
@@ -19,11 +24,13 @@ import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/tournament.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../posts/view_models/home_feed.dart';
 import '../../schedule/view_models/my_schedule.dart';
 
-/// Landing page, team first: this week's personal and team schedule, the
-/// user's team and its playbook, upcoming team events, then a USA Ultimate
-/// rankings snapshot.
+/// Landing page: this week's personal and team schedule, then the feed of
+/// posts from the user, their teams and everything they follow. Wide
+/// layouts add the user's team, its playbook, upcoming events and a USA
+/// Ultimate rankings snapshot beside the feed.
 class HomeViewModel extends ChangeNotifier {
   HomeViewModel({
     required AuthRepository authRepository,
@@ -35,12 +42,25 @@ class HomeViewModel extends ChangeNotifier {
     MeetingRepository? meetingRepository,
     required TournamentRepository tournamentRepository,
     required RankingRepository rankingRepository,
+    required FollowRepository followRepository,
+    required TeamPostRepository teamPostRepository,
+    required UserPostRepository userPostRepository,
     DateTime Function()? clock,
   }) : _auth = authRepository,
        _teamRepo = teamRepository,
        _playRepo = playRepository,
+       _teamPosts = teamPostRepository,
+       _userPosts = userPostRepository,
        _clock = clock ?? DateTime.now {
     joinTeam = Command1<String, String>(_joinTeam);
+    deletePost = Command1<void, String>(_userPosts.deletePost);
+    posts = HomeFeed(
+      uid: _auth.currentUser?.uid ?? '',
+      followRepository: followRepository,
+      teamRepository: teamRepository,
+      teamPostRepository: teamPostRepository,
+      userPostRepository: userPostRepository,
+    )..addListener(notifyListeners);
     _feed = MySchedule(
       teamRepository: teamRepository,
       eventRepository: eventRepository,
@@ -91,7 +111,10 @@ class HomeViewModel extends ChangeNotifier {
   final AuthRepository _auth;
   final TeamRepository _teamRepo;
   final PlayRepository _playRepo;
+  final TeamPostRepository _teamPosts;
+  final UserPostRepository _userPosts;
   final DateTime Function() _clock;
+  final _downloads = <String, Future<Result<Uint8List>>>{};
   late final MySchedule _feed;
   final List<StreamSubscription<Object?>> _subs = [];
   StreamSubscription<List<Play>>? _playsSub;
@@ -137,6 +160,35 @@ class HomeViewModel extends ChangeNotifier {
     if (words.isEmpty) return firstName.isEmpty ? '?' : firstName[0];
     return words.take(2).map((w) => w[0]).join();
   }
+
+  // Feed -------------------------------------------------------------------
+
+  /// Posts from the user, their teams and what they follow.
+  late final HomeFeed posts;
+
+  List<FeedItem> get feed => posts.items;
+  bool get feedLoaded => posts.loaded;
+  bool get feedHasMore => posts.hasMore;
+
+  /// Whether the user follows anything yet, for the empty feed's advice.
+  bool get followsAnything => posts.follows.isNotEmpty;
+
+  void loadMorePosts() => posts.loadMore();
+
+  /// Deletes one of the user's own posts.
+  late final Command1<void, String> deletePost;
+
+  /// A feed photo's bytes, fetched once. People's photos are under
+  /// `users/`, team posts' under `teams/`.
+  Future<Result<Uint8List>> imageData(ChatAttachment image) =>
+      _downloads[image.path] ??=
+          (image.path.startsWith('users/')
+                  ? _userPosts.downloadImage(image)
+                  : _teamPosts.downloadImage(image))
+              .then((r) {
+                if (r is Error) _downloads.remove(image.path);
+                return r;
+              });
 
   // Teams ------------------------------------------------------------------
 
@@ -354,6 +406,10 @@ class HomeViewModel extends ChangeNotifier {
       s.cancel();
     }
     joinTeam.dispose();
+    deletePost.dispose();
+    posts
+      ..removeListener(notifyListeners)
+      ..dispose();
     super.dispose();
   }
 }

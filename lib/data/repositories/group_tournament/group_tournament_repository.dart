@@ -14,6 +14,9 @@ abstract class GroupTournamentRepository {
     required bool organizer,
   });
 
+  /// The group's tournaments as anyone signed in sees them, soonest last.
+  Stream<List<TournamentListing>> watchListings(String groupId);
+
   /// Null if it's deleted or the user can't see it.
   Stream<GroupTournament?> watchTournament(String groupId, String id);
 
@@ -21,7 +24,8 @@ abstract class GroupTournamentRepository {
   Stream<List<GroupGame>> watchGames(String groupId, String tournamentId);
 
   /// Creates the tournament when [GroupTournament.isNew], otherwise saves
-  /// its name, settings and teams. Returns its id. Organizers only.
+  /// its name, settings and teams, and keeps its public listing in step.
+  /// Returns its id. Organizers only.
   Future<Result<String>> saveTournament(
     String groupId,
     GroupTournament tournament,

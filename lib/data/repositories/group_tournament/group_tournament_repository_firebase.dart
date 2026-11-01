@@ -45,6 +45,23 @@ class GroupTournamentRepositoryFirebase implements GroupTournamentRepository {
     );
   }
 
+  DocumentReference<Map<String, dynamic>> _listing(
+    String groupId,
+    String tournamentId,
+  ) => _db.collection('tournamentDirectory').doc('${groupId}_$tournamentId');
+
+  @override
+  Stream<List<TournamentListing>> watchListings(String groupId) => _db
+      .collection('tournamentDirectory')
+      .where('groupId', isEqualTo: groupId)
+      .snapshots()
+      .map(
+        (snap) => [
+          for (final d in snap.docs)
+            TournamentListing.fromMap(plainData(d.data())),
+        ]..sort((a, b) => b.startsAt.compareTo(a.startsAt)),
+      );
+
   @override
   Stream<GroupTournament?> watchTournament(String groupId, String id) =>
       _tournaments(groupId)
@@ -75,17 +92,24 @@ class GroupTournamentRepositoryFirebase implements GroupTournamentRepository {
     AppUser by,
   ) => guard(() async {
     final col = _tournaments(groupId);
+    final ref = tournament.isNew ? col.doc() : col.doc(tournament.id);
+    final batch = _db.batch();
     if (tournament.isNew) {
-      final ref = col.doc();
-      await ref.set({
+      batch.set(ref, {
         ...tournament.toMap(),
         'createdBy': by.uid,
         'createdAt': FieldValue.serverTimestamp(),
       });
-      return ref.id;
+    } else {
+      batch.update(ref, tournament.toMap());
     }
-    await col.doc(tournament.id).update(tournament.toMap());
-    return tournament.id;
+    final saved = GroupTournament.fromMap(ref.id, tournament.toMap());
+    batch.set(
+      _listing(groupId, ref.id),
+      TournamentListing.of(groupId, saved).toMap(),
+    );
+    await batch.commit();
+    return ref.id;
   });
 
   @override
@@ -197,10 +221,16 @@ class GroupTournamentRepositoryFirebase implements GroupTournamentRepository {
     String groupId,
     String tournamentId,
     TournamentStatus status,
-  ) => guard(
-    () =>
-        _tournaments(groupId).doc(tournamentId).update({'status': status.name}),
-  );
+  ) => guard(() async {
+    await _tournaments(
+      groupId,
+    ).doc(tournamentId).update({'status': status.name});
+    // Tournaments from before the directory have no listing until their
+    // next save; that's fine.
+    try {
+      await _listing(groupId, tournamentId).update({'status': status.name});
+    } on FirebaseException catch (_) {}
+  });
 
   @override
   Future<Result<void>> deleteTournament(String groupId, String tournamentId) =>
@@ -209,6 +239,7 @@ class GroupTournamentRepositoryFirebase implements GroupTournamentRepository {
         await deleteDocs(_db, [
           for (final d in games.docs) d.reference,
           _tournaments(groupId).doc(tournamentId),
+          _listing(groupId, tournamentId),
         ]);
       });
 }

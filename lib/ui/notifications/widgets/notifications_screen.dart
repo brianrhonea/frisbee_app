@@ -19,6 +19,7 @@ IconData categoryIcon(NotificationCategory c) => switch (c) {
   NotificationCategory.eventReminders => Icons.alarm,
   NotificationCategory.teamActivity => Icons.sports_outlined,
   NotificationCategory.meetings => Icons.videocam_outlined,
+  NotificationCategory.posts => Icons.dynamic_feed_outlined,
 };
 
 /// The in-app feed: everything the Cloud Functions sent, including what

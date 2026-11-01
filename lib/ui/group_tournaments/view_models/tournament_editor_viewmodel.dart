@@ -9,6 +9,7 @@ import '../../../data/repositories/group_tournament/group_tournament_repository.
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/team_post/team_post_repository.dart';
 import '../../../data/services/file_picker_service.dart';
+import '../../../domain/models/follow.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/team.dart';
@@ -545,6 +546,10 @@ class TournamentEditorViewModel extends ChangeNotifier {
       ].join('\n\n'),
       location: _group?.location?.address ?? '',
       isPublic: true,
+      tournamentKey: switch (_id) {
+        final id? => FollowTarget.tournamentKey(groupId, id),
+        null => null,
+      },
     );
   }
 

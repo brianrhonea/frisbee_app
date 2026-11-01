@@ -23,12 +23,16 @@ import {
   meetingInviteNotice,
   meetingStartedNotice,
   millis,
+  followKeys,
   playNotice,
+  postRecipients,
   reminderNotice,
   reminderRecipients,
   type RoomDoc,
   roomReaders,
   type TeamDoc,
+  teamPostNotice,
+  userPostNotice,
 } from "./model";
 
 const hour = 60 * 60 * 1000;
@@ -188,6 +192,53 @@ export const teamPlay = onDocumentWrittenWithAuthContext(
     );
   },
 );
+
+/**
+ * Followers of [keys] who turned on notifications for them (the bell on a
+ * follow), from every user's `follows` subcollection.
+ */
+async function notifyingFollowers(keys: string[]): Promise<string[]> {
+  if (keys.length === 0) return [];
+  const snap = await getFirestore()
+    .collectionGroup("follows")
+    .where("key", "in", keys.slice(0, 30))
+    .where("notify", "==", true)
+    .get();
+  return snap.docs.map((d) => d.ref.parent.parent?.id).filter((uid): uid is string => !!uid);
+}
+
+/** A person's post: followers of them, or of the tournament it's tagged with. */
+export const userPost = onDocumentCreated("posts/{postId}", async (event) => {
+  const post = event.data?.data();
+  if (!post) return;
+  const authorId = String(post.authorId ?? "");
+  const followers = await notifyingFollowers(followKeys({ authorId, post }));
+  await deliver(
+    getFirestore(),
+    getMessaging(),
+    postRecipients(followers, authorId),
+    userPostNotice({ postId: event.params.postId, post }),
+  );
+});
+
+/**
+ * A team or group post: followers of the team, or of the tournament it's
+ * about. Members-only posts go only to followers who are members.
+ */
+export const teamPost = onDocumentCreated("teams/{teamId}/posts/{postId}", async (event) => {
+  const post = event.data?.data();
+  if (!post) return;
+  const { teamId } = event.params;
+  const team = await liveTeam(teamId);
+  if (!team) return;
+  const followers = await notifyingFollowers(followKeys({ teamId, post }));
+  await deliver(
+    getFirestore(),
+    getMessaging(),
+    postRecipients(followers, String(post.authorId ?? ""), post.public === true ? undefined : team.memberIds ?? []),
+    teamPostNotice({ teamId, teamName: teamName(team), post }),
+  );
+});
 
 /**
  * Hourly: reminds people of team and personal events starting 23–24 hours

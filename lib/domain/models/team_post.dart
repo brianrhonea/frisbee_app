@@ -14,6 +14,7 @@ class TeamPost {
     this.links = const [],
     this.images = const [],
     this.isPublic = false,
+    this.tournamentKey,
     this.authorId = '',
     this.authorName = '',
     this.createdAt,
@@ -36,6 +37,10 @@ class TeamPost {
   /// Photos, stored like chat attachments.
   final List<ChatAttachment> images;
   final bool isPublic;
+
+  /// A community tournament the post is about (a FollowTarget key), so the
+  /// tournament's followers see it in their feed.
+  final String? tournamentKey;
   final String authorId;
   final String authorName;
   final DateTime? createdAt;
@@ -59,6 +64,7 @@ class TeamPost {
     List<String>? links,
     List<ChatAttachment>? images,
     bool? isPublic,
+    String? Function()? tournamentKey,
   }) => TeamPost(
     id: id,
     title: title ?? this.title,
@@ -67,6 +73,7 @@ class TeamPost {
     links: links ?? this.links,
     images: images ?? this.images,
     isPublic: isPublic ?? this.isPublic,
+    tournamentKey: tournamentKey == null ? this.tournamentKey : tournamentKey(),
     authorId: authorId,
     authorName: authorName,
     createdAt: createdAt,
@@ -84,6 +91,7 @@ class TeamPost {
         if (a is Map) ChatAttachment.fromMap(Map<String, dynamic>.from(a)),
     ],
     isPublic: map['public'] as bool? ?? false,
+    tournamentKey: map['tournamentKey'] as String?,
     authorId: map['authorId'] as String? ?? '',
     authorName: map['authorName'] as String? ?? '',
     createdAt: parseDate(map['createdAt']),
@@ -98,6 +106,7 @@ class TeamPost {
     'links': links,
     'images': [for (final i in images) i.toMap()],
     'public': isPublic,
+    if (tournamentKey != null) 'tournamentKey': tournamentKey,
   };
 
   /// Newest first; unsaved timestamps (pending writes) count as now.

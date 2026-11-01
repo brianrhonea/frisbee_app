@@ -10,7 +10,8 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
-| 0.0.7   | 2026-10-31 | `feature/community-groups`              | (this branch)       |
+| 0.0.8   | 2026-10-31 | `feature/follows-feed`                  | (this branch)       |
+| 0.0.7   | 2026-10-31 | `feature/community-groups`              | `9f19c55` and later |
 | 0.0.6   | 2026-10-30 | `feature/team-videos`                   | `d623748` and later |
 | 0.0.5   | 2026-10-30 | `feature/team-meetings`                 | `1b2e424` and later |
 | 0.0.4   | 2026-10-29 | `feature/ultiup-schedule`               | `06830cc` and later |
@@ -18,6 +19,69 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.8 — Follows, the home feed and workout posts
+
+Branch `feature/follows-feed`.
+
+**Added**
+- **Follow** people, teams, community groups, group tournaments and USA
+  Ultimate events. The button is on team and group pages, tournament and
+  event pages, and people's profiles. It shows the follower count.
+- A **bell** next to Following turns on notifications for that one's new
+  posts (push where the device allows, and always in Notifications). A new
+  **Posts you follow** notification category turns them all off.
+- **Home feed**: your posts, every post from your teams and groups, public
+  posts from teams you follow, posts by people you follow, and posts
+  tagged with a tournament you follow. Newest first, with **Show older
+  posts**. On phones, Home is now the week, your team, then the feed.
+  Playbook, events and rankings moved to the side column on wide screens,
+  and they're still in their tabs.
+- **Your own posts**: text, up to 4 photos and 5 links, optionally tagged
+  with a tournament or event you follow.
+- **Workouts**: share a run, sprints, throwing, gym, agility or mobility
+  session. Add the time, an optional distance (pace is worked out for
+  runs), effort 1–10 and up to 20 exercises with sets, reps and weight. The
+  feed shows it as a stat card.
+- **Profiles** (`/people/:uid`): name, photo, followers and following
+  counts, Follow, Message and their posts. Open one from a post's author,
+  a team's Members list, or **View profile** in people search.
+- **Following** (Profile → Following, or **Following** on the feed):
+  everything you follow, with each bell and Unfollow.
+- Group pages list the group's tournaments for people outside the group.
+  Someone who isn't playing in a tournament sees a public summary with
+  Follow.
+
+**Changed**
+- **Team pages have tabs.** Home, Team Events, Chat, Roster, Playbook,
+  Videos, Stats and Members (groups: Home, Events, Chat, Tournaments,
+  Members) sit in a tab bar under the team name. Switching tabs changes
+  only the content below it; back leaves the team. This replaces the
+  section tiles and the separate page for each section.
+- **USA Ultimate tournament and team pages open over the current tab.**
+  Tapping a tournament or ranked team on Home, Events, Rankings or
+  Following no longer switches you to the Events or Rankings tab, and
+  back returns to where you were. Opened from a link, back goes to
+  Events or Rankings.
+
+**Infrastructure**
+- New Firestore data: `users/{uid}/follows/{key}`, `posts/{id}`,
+  `followCounts/{key}` and `tournamentDirectory/{groupId_tournamentId}`.
+  Team posts get an optional `tournamentKey`, which the tournament
+  announcement sets. Rules and rules tests are written for all of them,
+  plus Storage `users/{uid}/posts/…`; the rules tests need Java and the
+  emulator to run.
+- New Cloud Functions:
+  - `notifications-userPost` and `notifications-teamPost` notify followers
+    who turned the bell on.
+  - A new `follows` group: `followCount` keeps `followCounts`;
+    `profileDeleted`, `teamDeleted` and `groupTournamentDeleted` drop
+    follows of deleted targets; `userPostDeleted` removes a deleted
+    post's photos.
+- New composite indexes: `posts` by `authorId` and by `tournamentKey`,
+  each with `createdAt`. Also a collection-group index on `follows`
+  (`key`, `notify`).
+- Deleting an account also deletes the user's follows and posts.
 
 ## 0.0.7 — Community groups and pickup tournaments
 

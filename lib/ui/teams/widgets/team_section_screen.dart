@@ -6,7 +6,6 @@ import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../chat/view_models/chat_list_viewmodel.dart';
 import '../../chat/widgets/chat_tab.dart';
-import '../../core/ui/back_or.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
@@ -70,9 +69,10 @@ enum TeamSection {
       : values.where((s) => s.name == tab).firstOrNull;
 }
 
-/// One section of a team, e.g. its Team Events calendar or roster.
-class TeamSectionScreen extends StatefulWidget {
-  const TeamSectionScreen({
+/// One section of a team, e.g. its Team Events calendar or roster: the
+/// content under the team page's tab bar.
+class TeamSectionView extends StatefulWidget {
+  const TeamSectionView({
     super.key,
     required this.viewModel,
     required this.section,
@@ -82,10 +82,10 @@ class TeamSectionScreen extends StatefulWidget {
   final TeamSection section;
 
   @override
-  State<TeamSectionScreen> createState() => _TeamSectionScreenState();
+  State<TeamSectionView> createState() => _TeamSectionViewState();
 }
 
-class _TeamSectionScreenState extends State<TeamSectionScreen> {
+class _TeamSectionViewState extends State<TeamSectionView> {
   TeamDetailViewModel get vm => widget.viewModel;
 
   late final List<Command<void>> _commands = [
@@ -176,56 +176,27 @@ class _TeamSectionScreenState extends State<TeamSectionScreen> {
       listenable: vm,
       builder: (context, _) {
         final team = vm.team;
-        final leading = backOr(context, Routes.team(vm.teamId));
-        if (!vm.loaded) {
-          return Scaffold(
-            appBar: AppBar(leading: leading),
-            body: const LoadingView(),
-          );
-        }
+        if (!vm.loaded) return const LoadingView();
         if (team == null) {
-          return Scaffold(
-            appBar: AppBar(leading: leading),
-            body: vm.error != null
-                ? ErrorView(error: vm.error)
-                : const EmptyView(
-                    icon: Icons.group_off_outlined,
-                    title: 'Team not available',
-                    message: 'It may have been deleted or you were removed.',
-                  ),
-          );
+          return vm.error != null
+              ? ErrorView(error: vm.error)
+              : const EmptyView(
+                  icon: Icons.group_off_outlined,
+                  title: 'Team not available',
+                  message: 'It may have been deleted or you were removed.',
+                );
         }
         if (!TeamSection.forKind(team.kind).contains(widget.section)) {
-          return Scaffold(
-            appBar: AppBar(leading: leading),
-            body: EmptyView(
-              icon: widget.section.icon,
-              title: 'Not in community groups',
-              message:
-                  'Groups have events, chat, tournaments and members. '
-                  '${widget.section.label} is for teams.',
-            ),
+          return EmptyView(
+            icon: widget.section.icon,
+            title: 'Not in community groups',
+            message:
+                'Groups have events, chat, tournaments and members. '
+                '${widget.section.label} is for teams.',
           );
         }
-        final theme = Theme.of(context);
-        return Scaffold(
-          appBar: AppBar(
-            leading: leading,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.section.labelFor(team.kind)),
-                Text(
-                  team.name,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          body: _body(),
-        );
+        // Keyed so one section's state doesn't carry into the next.
+        return KeyedSubtree(key: ValueKey(widget.section), child: _body());
       },
     );
   }

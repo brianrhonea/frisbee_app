@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/team.dart';
+import '../../../routing/routes.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -45,6 +47,7 @@ class MembersTab extends StatelessWidget {
           for (final m in members)
             ListTile(
               contentPadding: EdgeInsets.zero,
+              onTap: () => context.push(Routes.person(m.key)),
               leading: CircleAvatar(
                 child: Text(team.nameOf(m.key)[0].toUpperCase()),
               ),

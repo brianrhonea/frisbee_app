@@ -20,22 +20,94 @@ import 'join_team_dialog.dart';
 import 'team_form.dart';
 import 'team_post_widgets.dart';
 import 'team_section_screen.dart';
+import '../../follow/widgets/follow_button.dart';
 
 enum _MenuAction { edit, leave, delete }
 
-/// A team's home page. Members see a summary, links to each section, what's
-/// coming up and the team's posts; anyone else sees the public page.
+/// Builds the content of a team section tab.
+typedef TeamSectionBuilder =
+    Widget Function(BuildContext context, TeamSection section);
+
+/// A team's page. Members get a tab bar: Home (a summary, what's coming up
+/// and the team's posts) and one tab per section. Switching tabs swaps only
+/// the content below the bar. Anyone else sees the public page.
 class TeamHomeScreen extends StatefulWidget {
-  const TeamHomeScreen({super.key, required this.viewModel});
+  const TeamHomeScreen({
+    super.key,
+    required this.viewModel,
+    this.section,
+    this.sectionBuilder,
+  });
 
   final TeamHomeViewModel viewModel;
+
+  /// The selected tab; null for Home.
+  final TeamSection? section;
+
+  /// Builds a section tab's content. Only called for members.
+  final TeamSectionBuilder? sectionBuilder;
 
   @override
   State<TeamHomeScreen> createState() => _TeamHomeScreenState();
 }
 
-class _TeamHomeScreenState extends State<TeamHomeScreen> {
+class _TeamHomeScreenState extends State<TeamHomeScreen>
+    with TickerProviderStateMixin {
   TeamHomeViewModel get vm => widget.viewModel;
+
+  TabController? _tabController;
+
+  /// The sections shown as tabs after Home; null when there's no tab bar
+  /// (still loading, or not a member).
+  List<TeamSection>? get _sections {
+    final summary = vm.summary;
+    if (summary == null || !vm.isMember) return null;
+    return TeamSection.forKind(summary.kind);
+  }
+
+  /// The tab for [widget.section]: Home for null or a section this kind of
+  /// team doesn't have.
+  int _tabIndex(List<TeamSection> sections) {
+    final i = widget.section == null ? -1 : sections.indexOf(widget.section!);
+    return i + 1;
+  }
+
+  /// The controller for the current tabs, replaced when their number
+  /// changes (e.g. on joining).
+  TabController _tabsFor(List<TeamSection> sections) {
+    final length = sections.length + 1;
+    final current = _tabController;
+    if (current != null && current.length == length) return current;
+    if (current != null) {
+      // The old TabBar lets go of it during this frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) => current.dispose());
+    }
+    return _tabController = TabController(
+      length: length,
+      initialIndex: _tabIndex(sections),
+      vsync: this,
+    );
+  }
+
+  @override
+  void didUpdateWidget(TeamHomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final sections = _sections;
+    final controller = _tabController;
+    if (sections != null &&
+        controller != null &&
+        controller.length == sections.length + 1) {
+      controller.index = _tabIndex(sections);
+    }
+  }
+
+  void _selectTab(List<TeamSection> sections, int index) {
+    final route = index == 0
+        ? Routes.team(vm.teamId)
+        : sections[index - 1].route(vm.teamId);
+    // `go`, not `push`: tabs replace each other, so back leaves the team.
+    context.go(route);
+  }
 
   late final List<Command<void>> _commands = [
     vm.updateTeam,
@@ -62,6 +134,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       c.removeListener(_onCommand);
     }
     vm.joinTeam.removeListener(_onJoin);
+    _tabController?.dispose();
     super.dispose();
   }
 
@@ -242,11 +315,29 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         }
         final team = vm.team;
         final noun = summary.isCommunity ? 'group' : 'team';
-        final location = summary.location;
+        final sections = _sections;
+        final tabs = sections == null ? null : _tabsFor(sections);
+        final section = sections == null || _tabIndex(sections) == 0
+            ? null
+            : widget.section;
+        final sectionBuilder = widget.sectionBuilder;
         return Scaffold(
           appBar: AppBar(
             leading: leading,
             title: Text(summary.name),
+            bottom: sections == null
+                ? null
+                : TabBar(
+                    controller: tabs,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    onTap: (i) => _selectTab(sections, i),
+                    tabs: [
+                      const Tab(text: 'Home'),
+                      for (final s in sections)
+                        Tab(text: s.labelFor(summary.kind)),
+                    ],
+                  ),
             actions: [
               if (team != null)
                 PopupMenuButton<_MenuAction>(
@@ -271,66 +362,96 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 ),
             ],
           ),
-          floatingActionButton: vm.canPost
+          floatingActionButton: section == null && vm.canPost
               ? FloatingActionButton.extended(
                   onPressed: vm.savePost.running ? null : _editPost,
                   icon: const Icon(Icons.post_add),
                   label: const Text('New post'),
                 )
               : null,
-          body: ConstrainedContent(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-              children: [
-                if (vm.savePost.running)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 8),
-                    child: LinearProgressIndicator(),
-                  ),
-                _Header(viewModel: vm, summary: summary),
-                if (summary.description.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(summary.description),
-                ],
-                const SizedBox(height: 16),
-                if (vm.isMember)
-                  _SectionGrid(
-                    teamId: vm.teamId,
-                    kind: summary.kind,
-                    upcomingCount: vm.upcomingEvents.length,
-                    memberCount: vm.memberCount,
-                  )
-                else if (summary.isCommunity)
-                  _GroupJoinCard(
-                    requiresApproval: summary.requiresApproval,
-                    pending: vm.requestPending,
-                    busy: vm.joinGroup.running || vm.cancelJoinRequest.running,
-                    onJoin: vm.joinGroup.execute,
-                    onCancel: vm.cancelJoinRequest.execute,
-                  )
-                else
-                  _JoinCard(joining: vm.joinTeam.running, onJoin: _join),
-                if (location != null) ...[
-                  const SizedBox(height: 16),
-                  GroupMapCard(location: location),
-                ],
-                if (vm.contentError != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    errorMessage(vm.contentError),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ],
-                ..._events(context),
-                ..._posts(context),
-              ],
-            ),
-          ),
+          body: section != null && sectionBuilder != null
+              ? sectionBuilder(context, section)
+              : _home(context, summary),
         );
       },
     );
+  }
+
+  /// The Home tab, and the whole page for non-members.
+  Widget _home(BuildContext context, TeamListing summary) {
+    final location = summary.location;
+    return ConstrainedContent(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+        children: [
+          if (vm.savePost.running)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: LinearProgressIndicator(),
+            ),
+          _Header(viewModel: vm, summary: summary),
+          if (vm.follow case final follow?) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FollowControl(viewModel: follow, showCount: true),
+            ),
+          ],
+          if (summary.description.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(summary.description),
+          ],
+          if (!vm.isMember) ...[
+            const SizedBox(height: 16),
+            if (summary.isCommunity)
+              _GroupJoinCard(
+                requiresApproval: summary.requiresApproval,
+                pending: vm.requestPending,
+                busy: vm.joinGroup.running || vm.cancelJoinRequest.running,
+                onJoin: vm.joinGroup.execute,
+                onCancel: vm.cancelJoinRequest.execute,
+              )
+            else
+              _JoinCard(joining: vm.joinTeam.running, onJoin: _join),
+          ],
+          if (location != null) ...[
+            const SizedBox(height: 16),
+            GroupMapCard(location: location),
+          ],
+          if (vm.contentError != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              errorMessage(vm.contentError),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+          ..._events(context),
+          ..._tournaments(context),
+          ..._posts(context),
+        ],
+      ),
+    );
+  }
+
+  /// A group's tournaments, which anyone can open and follow. Members
+  /// have the full list in the Tournaments section.
+  List<Widget> _tournaments(BuildContext context) {
+    final listings = vm.tournamentListings;
+    if (listings.isEmpty || vm.isMember) return const [];
+    final day = DateFormat.MMMd();
+    return [
+      const _ListHeader(title: 'Tournaments'),
+      for (final t in listings.take(5))
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.emoji_events_outlined),
+          title: Text(t.name),
+          subtitle: Text('${day.format(t.startsAt)} · ${t.format.label}'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () =>
+              context.push(Routes.groupTournament(t.groupId, t.tournamentId)),
+        ),
+    ];
   }
 
   List<Widget> _events(BuildContext context) {
@@ -455,104 +576,6 @@ class _Header extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Links to each team section.
-class _SectionGrid extends StatelessWidget {
-  const _SectionGrid({
-    required this.teamId,
-    required this.kind,
-    required this.upcomingCount,
-    required this.memberCount,
-  });
-
-  final String teamId;
-  final TeamKind kind;
-  final int upcomingCount;
-  final int memberCount;
-
-  String? _caption(TeamSection s) => switch (s) {
-    TeamSection.events => upcomingCount == 0 ? null : '$upcomingCount upcoming',
-    TeamSection.members => '$memberCount',
-    _ => null,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 560 ? 6 : 3;
-        const spacing = 8.0;
-        final width =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final s in TeamSection.forKind(kind))
-              SizedBox(
-                width: width,
-                child: _SectionTile(
-                  section: s,
-                  label: s.labelFor(kind),
-                  caption: _caption(s),
-                  onTap: () => context.go(s.route(teamId)),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _SectionTile extends StatelessWidget {
-  const _SectionTile({
-    required this.section,
-    required this.label,
-    required this.onTap,
-    this.caption,
-  });
-
-  final TeamSection section;
-  final String label;
-  final String? caption;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-          child: Column(
-            children: [
-              Icon(section.icon, color: scheme.primary),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge,
-              ),
-              Text(
-                caption ?? '',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

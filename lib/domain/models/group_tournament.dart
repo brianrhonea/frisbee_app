@@ -566,3 +566,71 @@ class GroupGame {
     'ifNeeded': ifNeeded,
   };
 }
+
+/// A group tournament's public summary, at
+/// `tournamentDirectory/{groupId}_{tournamentId}`, so people outside it can
+/// find and follow it. Organizers write it alongside the tournament.
+class TournamentListing {
+  const TournamentListing({
+    required this.groupId,
+    required this.tournamentId,
+    required this.name,
+    required this.startsAt,
+    this.endsOn,
+    this.status = TournamentStatus.setup,
+    this.format = TournamentFormat.roundRobin,
+  });
+
+  factory TournamentListing.of(String groupId, GroupTournament t) =>
+      TournamentListing(
+        groupId: groupId,
+        tournamentId: t.id,
+        name: t.name,
+        startsAt: t.settings.startsAt,
+        endsOn: t.settings.laterDays.lastOrNull,
+        status: t.status,
+        format: t.settings.format,
+      );
+
+  final String groupId;
+  final String tournamentId;
+  final String name;
+  final DateTime startsAt;
+
+  /// The last day's start, for tournaments over several days.
+  final DateTime? endsOn;
+  final TournamentStatus status;
+  final TournamentFormat format;
+
+  String get docId => '${groupId}_$tournamentId';
+
+  factory TournamentListing.fromMap(Map<String, dynamic> map) =>
+      TournamentListing(
+        groupId: map['groupId'] as String? ?? '',
+        tournamentId: map['tournamentId'] as String? ?? '',
+        name: map['name'] as String? ?? '',
+        startsAt: parseDate(map['startsAt']) ?? DateTime(2000),
+        endsOn: parseDate(map['endsOn']),
+        status: enumByName(
+          TournamentStatus.values,
+          map['status'],
+          TournamentStatus.setup,
+        ),
+        format: enumByName(
+          TournamentFormat.values,
+          map['format'],
+          TournamentFormat.roundRobin,
+        ),
+      );
+
+  /// Dates as DateTimes; Firestore stores them as timestamps.
+  Map<String, dynamic> toMap() => {
+    'groupId': groupId,
+    'tournamentId': tournamentId,
+    'name': name,
+    'startsAt': startsAt,
+    'endsOn': endsOn,
+    'status': status.name,
+    'format': format.name,
+  };
+}

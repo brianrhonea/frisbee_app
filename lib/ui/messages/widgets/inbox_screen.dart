@@ -12,6 +12,9 @@ import '../../core/ui/view_model_host.dart';
 import '../view_models/direct_chat_viewmodel.dart';
 import '../view_models/inbox_viewmodel.dart';
 import 'direct_chat_screen.dart';
+import '../../core/ui/person_avatar.dart';
+
+export '../../core/ui/person_avatar.dart';
 
 /// Direct messages. Wide screens list conversations on the left and open
 /// the picked one on the right; phones list them and slide the picked one
@@ -190,35 +193,5 @@ class _ConversationTile extends StatelessWidget {
     if (DateUtils.isSameDay(d, now)) return DateFormat.jm().format(d);
     if (now.difference(d).inDays < 7) return DateFormat.E().format(d);
     return DateFormat.MMMd().format(d);
-  }
-}
-
-/// Initials in a circle, or the person's photo.
-class PersonAvatar extends StatelessWidget {
-  const PersonAvatar({super.key, required this.name, this.photoUrl});
-
-  final String name;
-  final String? photoUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final photo = photoUrl;
-    final initials = name
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .take(2)
-        .map((w) => w[0].toUpperCase())
-        .join();
-    return CircleAvatar(
-      backgroundColor: c.feature,
-      foregroundColor: c.onFeature,
-      backgroundImage: photo == null || photo.isEmpty
-          ? null
-          : NetworkImage(photo),
-      child: photo == null || photo.isEmpty
-          ? Text(initials, style: const TextStyle(fontWeight: FontWeight.w700))
-          : null,
-    );
   }
 }

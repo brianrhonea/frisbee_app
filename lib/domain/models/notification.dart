@@ -32,6 +32,11 @@ enum NotificationCategory {
     'Meetings',
     "Meeting invites, and when a meeting you're attending starts",
     perTeam: true,
+  ),
+  posts(
+    'Posts you follow',
+    'New posts from people, teams and tournaments whose bell you turned on',
+    perTeam: true,
   );
 
   const NotificationCategory(

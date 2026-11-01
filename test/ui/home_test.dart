@@ -5,12 +5,17 @@ import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
+import 'package:frisbee_app/domain/models/follow.dart';
+import 'package:frisbee_app/domain/models/team_post.dart';
 import 'package:frisbee_app/domain/models/tournament.dart';
+import 'package:frisbee_app/domain/models/user_post.dart';
+import 'package:frisbee_app/domain/models/workout.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/home/view_models/home_viewmodel.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
 
 import '../testing/fakes.dart';
+import '../testing/social_fakes.dart';
 
 RankingDivision division(String key, String label, List<String> teams) =>
     RankingDivision(
@@ -76,6 +81,9 @@ void main() {
   late FakeDirectMessageRepository dms;
   late FakePlayRepository plays;
   late FakeEventRepository events;
+  late FakeFollowRepository follows;
+  late FakeTeamPostRepository teamPosts;
+  late FakeUserPostRepository userPosts;
 
   Future<HomeViewModel> load({
     bool withTeam = true,
@@ -85,6 +93,9 @@ void main() {
   }) async {
     teams = FakeTeamRepository();
     dms = FakeDirectMessageRepository();
+    follows = FakeFollowRepository();
+    teamPosts = FakeTeamPostRepository();
+    userPosts = FakeUserPostRepository();
     plays = FakePlayRepository()..byTeam.addAll(teamPlays);
     events = FakeEventRepository();
     if (withPersonal) {
@@ -137,6 +148,9 @@ void main() {
       eventRepository: events,
       tournamentRepository: FakeTournamentRepository(tournaments),
       rankingRepository: FakeRankingRepository(rankings),
+      followRepository: follows,
+      teamPostRepository: teamPosts,
+      userPostRepository: userPosts,
       clock: () => now,
     );
     await pumpEventQueue();
@@ -306,32 +320,16 @@ void main() {
       expect(find.text('Tempo run'), findsOneWidget);
       expect(find.textContaining('Personal'), findsOneWidget);
       expect(find.text('1 days out'), findsOneWidget);
+      expect(find.text('MY TEAM'), findsOneWidget);
+      // The feed follows; rankings and the playbook have their own pages.
       await tester.scrollUntilVisible(
-        find.text('Ho stack'),
+        find.text('Your feed is empty'),
         300,
         scrollable: page,
       );
-      expect(find.text('New play'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('Show other events'),
-        300,
-        scrollable: page,
-      );
-      await tester.tap(find.text('Show other events'));
-      await tester.pump();
-      await tester.scrollUntilVisible(
-        find.text('Fall Classic'),
-        300,
-        scrollable: page,
-      );
-      expect(find.text('Fall Classic'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('YOU: #4'),
-        300,
-        scrollable: page,
-      );
-      expect(find.text('Alpha'), findsOneWidget);
-      expect(find.text('Northside Flyers'), findsWidgets);
+      expect(find.text('Share an update or workout'), findsOneWidget);
+      expect(find.text('RANKINGS'), findsNothing);
+      expect(find.text('Ho stack'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -365,6 +363,7 @@ void main() {
     expect(team.dy, week.dy);
     expect(tester.getTopLeft(find.text('RANKINGS')).dx, team.dx);
     expect(find.text('Ho stack'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('FEED')).dx, week.dx);
     expect(tester.takeException(), isNull);
   });
 
@@ -410,5 +409,144 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Invite code'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  group('feed', () {
+    UserPost post(String id, String author, DateTime at, {Workout? workout}) =>
+        UserPost(
+          id: id,
+          authorId: author,
+          authorName: author == testUser.uid ? 'Alex' : 'Sam',
+          body: 'Post $id',
+          workout: workout,
+          createdAt: at,
+        );
+
+    test('shows my posts, my teams\' posts and those I follow', () async {
+      final vm = await load();
+      userPosts.posts.addAll([
+        post('mine', testUser.uid, DateTime(2026, 10, 27)),
+        post('sam', 'sam', DateTime(2026, 10, 28)),
+        post('stranger', 'zed', DateTime(2026, 10, 28, 5)),
+      ]);
+      teamPosts.posts['t1'] = [
+        TeamPost(
+          id: 'tp',
+          body: 'Practice moved',
+          createdAt: DateTime(2026, 10, 26),
+        ),
+      ];
+      // Nudges the fake's watchers.
+      await teamPosts.deletePost('t1', 'none');
+      await follows.follow(testUser.uid, const FollowTarget.user('sam', 'Sam'));
+      await pumpEventQueue();
+
+      expect(vm.feed.map((i) => i.id), ['user/sam', 'user/mine', 'team/t1/tp']);
+      expect(vm.followsAnything, isTrue);
+
+      await follows.unfollow(testUser.uid, FollowTarget.userKey('sam'));
+      await pumpEventQueue();
+      expect(vm.feed.map((i) => i.id), ['user/mine', 'team/t1/tp']);
+    });
+
+    test('followed teams I am not on show their public posts', () async {
+      final vm = await load();
+      teamPosts.posts['other'] = [
+        TeamPost(
+          id: 'pub',
+          body: 'Open tryouts',
+          isPublic: true,
+          createdAt: DateTime(2026, 10, 27),
+        ),
+        TeamPost(
+          id: 'priv',
+          body: 'Members only',
+          createdAt: DateTime(2026, 10, 27),
+        ),
+      ];
+      await follows.follow(
+        testUser.uid,
+        const FollowTarget.team('other', 'Other'),
+      );
+      await pumpEventQueue();
+      expect(vm.feed.map((i) => i.id), ['team/other/pub']);
+    });
+
+    test('followed tournaments bring in posts tagged with them', () async {
+      final vm = await load();
+      const tag = FollowTarget.event('nats', 'Nationals');
+      userPosts.posts.add(
+        UserPost(
+          id: 'tagged',
+          authorId: 'zed',
+          body: 'Field 3 is flooded',
+          tournamentKey: tag.key,
+          createdAt: DateTime(2026, 10, 27),
+        ),
+      );
+      await follows.follow(testUser.uid, tag);
+      await pumpEventQueue();
+      expect(vm.feed.map((i) => i.id), ['user/tagged']);
+    });
+
+    test('pages older posts', () async {
+      final vm = await load();
+      userPosts.posts.addAll([
+        for (var i = 0; i < 25; i++)
+          post(
+            'p$i',
+            testUser.uid,
+            DateTime(2026, 10, 1).add(Duration(hours: i)),
+          ),
+      ]);
+      // Re-query with the new posts in place.
+      vm.loadMorePosts();
+      await pumpEventQueue();
+      expect(vm.feed, hasLength(25));
+      expect(vm.feedHasMore, isFalse);
+    });
+
+    testWidgets('renders posts and workouts', (tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final vm = await tester.runAsync(() async {
+        final vm = await load();
+        userPosts.posts.add(
+          post(
+            'w',
+            testUser.uid,
+            DateTime(2026, 10, 27),
+            workout: const Workout(
+              activity: WorkoutActivity.gym,
+              durationMinutes: 75,
+              effort: 8,
+              exercises: [WorkoutExercise(name: 'Squat', sets: 3, reps: 5)],
+            ),
+          ),
+        );
+        vm.loadMorePosts();
+        await pumpEventQueue();
+        return vm;
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: HomeScreen(viewModel: vm!),
+        ),
+      );
+      await tester.pump();
+      final page = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(
+        find.text('Squat'),
+        300,
+        scrollable: page,
+      );
+      expect(find.text('1 h 15 min'), findsOneWidget);
+      expect(find.text('8/10'), findsOneWidget);
+      expect(find.text('3 × 5'), findsOneWidget);
+      expect(find.textContaining('Shared a workout'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }

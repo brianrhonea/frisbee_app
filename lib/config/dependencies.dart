@@ -9,6 +9,8 @@ import '../data/repositories/direct_message/direct_message_repository.dart';
 import '../data/repositories/direct_message/direct_message_repository_firebase.dart';
 import '../data/repositories/event/event_repository.dart';
 import '../data/repositories/event/event_repository_firebase.dart';
+import '../data/repositories/follow/follow_repository.dart';
+import '../data/repositories/follow/follow_repository_firebase.dart';
 import '../data/repositories/group_tournament/group_tournament_repository.dart';
 import '../data/repositories/group_tournament/group_tournament_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
@@ -18,6 +20,8 @@ import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/notification/notification_repository_firebase.dart';
 import '../data/repositories/playbook/play_repository.dart';
 import '../data/repositories/playbook/play_repository_firebase.dart';
+import '../data/repositories/profile/profile_repository.dart';
+import '../data/repositories/profile/profile_repository_firebase.dart';
 import '../data/repositories/ranking/ranking_repository.dart';
 import '../data/repositories/stats/stats_repository.dart';
 import '../data/repositories/stats/stats_repository_firebase.dart';
@@ -34,6 +38,8 @@ import '../data/repositories/usau_schedule/usau_schedule_repository.dart';
 import '../data/repositories/usau_schedule/usau_schedule_repository_usau.dart';
 import '../data/repositories/usau_team/usau_team_repository.dart';
 import '../data/repositories/usau_team/usau_team_repository_usau.dart';
+import '../data/repositories/user_post/user_post_repository.dart';
+import '../data/repositories/user_post/user_post_repository_firebase.dart';
 import '../data/services/attachment_storage.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/file_picker_service.dart';
@@ -67,6 +73,13 @@ List<SingleChildWidget> get firebaseProviders => [
       attachments: context.read<AttachmentStorage>(),
     ),
   ),
+  Provider<UserPostRepository>(
+    create: (context) => UserPostRepositoryFirebase(
+      attachments: context.read<AttachmentStorage>(),
+    ),
+  ),
+  Provider<FollowRepository>(create: (_) => FollowRepositoryFirebase()),
+  Provider<ProfileRepository>(create: (_) => ProfileRepositoryFirebase()),
   Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),
   Provider<YouTubeInfoService>(create: (_) => YouTubeInfoService()),
   Provider<GeocodingService>(create: (_) => GeocodingService()),

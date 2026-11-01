@@ -39,6 +39,14 @@ import '../ui/notifications/view_models/notification_settings_viewmodel.dart';
 import '../ui/notifications/view_models/notifications_viewmodel.dart';
 import '../ui/notifications/widgets/notification_settings_screen.dart';
 import '../ui/notifications/widgets/notifications_screen.dart';
+import '../ui/people/view_models/following_viewmodel.dart';
+import '../ui/people/view_models/user_profile_viewmodel.dart';
+import '../ui/people/widgets/following_screen.dart';
+import '../ui/people/widgets/user_profile_screen.dart';
+import '../ui/posts/view_models/post_composer_viewmodel.dart';
+import '../ui/posts/view_models/post_detail_viewmodel.dart';
+import '../ui/posts/widgets/post_composer_screen.dart';
+import '../ui/posts/widgets/post_detail_screen.dart';
 import '../ui/profile/view_models/profile_viewmodel.dart';
 import '../ui/profile/widgets/profile_screen.dart';
 import '../ui/rankings/view_models/rankings_viewmodel.dart';
@@ -126,6 +134,77 @@ GoRouter router(AuthRepository auth) => GoRouter(
         ),
         builder: (_, vm) => ProfileScreen(viewModel: vm),
       ),
+      routes: [
+        GoRoute(
+          path: 'following',
+          builder: (_, _) => ViewModelHost(
+            create: (c) => FollowingViewModel(
+              followRepository: c.read(),
+              notificationRepository: c.read(),
+              authRepository: c.read(),
+            ),
+            builder: (_, vm) => FollowingScreen(viewModel: vm),
+          ),
+        ),
+      ],
+    ),
+    // People's profiles, full screen over the shell (opened with push).
+    GoRoute(
+      path: '${Routes.peoplePath}/:uid',
+      builder: (_, state) {
+        final uid = state.pathParameters['uid']!;
+        return ViewModelHost(
+          key: ValueKey('person-$uid'),
+          create: (c) => UserProfileViewModel(
+            uid: uid,
+            profileRepository: c.read(),
+            userPostRepository: c.read(),
+            followRepository: c.read(),
+            directMessageRepository: c.read(),
+            authRepository: c.read(),
+            notificationRepository: c.read(),
+          ),
+          builder: (_, vm) => UserProfileScreen(viewModel: vm),
+        );
+      },
+    ),
+    // People's posts and the composer, over the shell. `/posts` alone goes
+    // Home, where the feed is.
+    GoRoute(
+      path: Routes.postsPath,
+      redirect: (_, state) =>
+          state.uri.path == Routes.postsPath ? Routes.home : null,
+      routes: [
+        GoRoute(
+          path: 'new',
+          builder: (_, state) => _postComposer(
+            null,
+            workout: state.uri.queryParameters['kind'] == 'workout',
+          ),
+        ),
+        GoRoute(
+          path: ':postId',
+          builder: (_, state) {
+            final id = state.pathParameters['postId']!;
+            return ViewModelHost(
+              key: ValueKey('post-$id'),
+              create: (c) => PostDetailViewModel(
+                postId: id,
+                userPostRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, vm) => PostDetailScreen(viewModel: vm),
+            );
+          },
+          routes: [
+            GoRoute(
+              path: 'edit',
+              builder: (_, state) =>
+                  _postComposer(state.pathParameters['postId']),
+            ),
+          ],
+        ),
+      ],
     ),
     // Opened from the bell on Home, over the shell.
     GoRoute(
@@ -151,6 +230,29 @@ GoRouter router(AuthRepository auth) => GoRouter(
         ),
       ],
     ),
+    // USA Ultimate tournaments and teams, full screen over the shell so
+    // they open from Home, Events, Rankings or a follow and back returns
+    // there (opened with push). Listed before the shell so they win over
+    // the Events and Rankings tabs' paths.
+    GoRoute(
+      path: '${Routes.tournaments}/:id',
+      builder: (_, state) {
+        final id = state.pathParameters['id']!;
+        return ViewModelHost(
+          key: ValueKey('tournament-$id'),
+          create: (c) => TournamentDetailViewModel(
+            tournamentId: id,
+            tournamentRepository: c.read(),
+            usauScheduleRepository: c.read(),
+            followRepository: c.read(),
+            notificationRepository: c.read(),
+            authRepository: c.read(),
+          ),
+          builder: (_, vm) => TournamentDetailScreen(viewModel: vm),
+        );
+      },
+    ),
+    GoRoute(path: Routes.usauTeamPath, builder: (_, state) => _usauTeam(state)),
     // Team events, full screen over the shell (see Routes.teamEventsPath).
     GoRoute(
       path: '${Routes.teamEventsPath}/:teamId',
@@ -284,6 +386,8 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 teamRepository: c.read(),
                 tournamentRepository: c.read(),
                 authRepository: c.read(),
+                followRepository: c.read(),
+                notificationRepository: c.read(),
               ),
               builder: (_, vm) => GroupTournamentScreen(viewModel: vm),
             );
@@ -512,6 +616,9 @@ GoRouter router(AuthRepository auth) => GoRouter(
                   meetingRepository: c.read<MeetingRepository>(),
                   tournamentRepository: c.read(),
                   rankingRepository: c.read(),
+                  followRepository: c.read(),
+                  teamPostRepository: c.read(),
+                  userPostRepository: c.read(),
                 ),
                 builder: (_, vm) => HomeScreen(viewModel: vm),
               ),
@@ -574,10 +681,18 @@ GoRouter router(AuthRepository auth) => GoRouter(
                     ),
                   ],
                 ),
+                // A team's section tabs are siblings of its home page, not
+                // children, and share its page (see _teamPage): switching
+                // tabs swaps the content instead of stacking pages.
+                for (final section in TeamSection.values)
+                  GoRoute(
+                    path: ':teamId/${section.path}',
+                    pageBuilder: (_, state) => _teamPage(state, section),
+                  ),
                 GoRoute(
                   path: ':teamId',
-                  // Teams had tabs before they had a home page; old links
-                  // (e.g. in the notification feed) name one with ?tab=.
+                  // Old links (e.g. in the notification feed) name a tab
+                  // with ?tab=.
                   redirect: (_, state) {
                     if (state.uri.pathSegments.length != 2) return null;
                     final tab = state.uri.queryParameters['tab'];
@@ -586,27 +701,8 @@ GoRouter router(AuthRepository auth) => GoRouter(
                     return TeamSection.fromLegacyTab(tab)?.route(teamId) ??
                         Routes.team(teamId);
                   },
-                  builder: (_, state) {
-                    final teamId = state.pathParameters['teamId']!;
-                    return ViewModelHost(
-                      key: ValueKey('team-$teamId'),
-                      create: (c) => TeamHomeViewModel(
-                        teamId: teamId,
-                        teamRepository: c.read(),
-                        eventRepository: c.read(),
-                        teamPostRepository: c.read(),
-                        authRepository: c.read(),
-                        filePicker: c.read(),
-                      ),
-                      builder: (_, vm) => TeamHomeScreen(viewModel: vm),
-                    );
-                  },
+                  pageBuilder: (_, state) => _teamPage(state, null),
                   routes: [
-                    for (final section in TeamSection.values)
-                      GoRoute(
-                        path: section.path,
-                        builder: (_, state) => _teamSection(state, section),
-                      ),
                     GoRoute(
                       path: 'chats/new',
                       parentNavigatorKey: _rootKey,
@@ -770,23 +866,6 @@ GoRouter router(AuthRepository auth) => GoRouter(
                     TournamentsViewModel(tournamentRepository: c.read()),
                 builder: (_, vm) => EventsScreen(viewModel: vm),
               ),
-              routes: [
-                GoRoute(
-                  path: ':id',
-                  builder: (_, state) {
-                    final id = state.pathParameters['id']!;
-                    return ViewModelHost(
-                      key: ValueKey('tournament-$id'),
-                      create: (c) => TournamentDetailViewModel(
-                        tournamentId: id,
-                        tournamentRepository: c.read(),
-                        usauScheduleRepository: c.read(),
-                      ),
-                      builder: (_, vm) => TournamentDetailScreen(viewModel: vm),
-                    );
-                  },
-                ),
-              ],
             ),
           ],
         ),
@@ -798,9 +877,6 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 create: (c) => RankingsViewModel(rankingRepository: c.read()),
                 builder: (_, vm) => RankingsScreen(viewModel: vm),
               ),
-              routes: [
-                GoRoute(path: 'team', builder: (_, state) => _usauTeam(state)),
-              ],
             ),
           ],
         ),
@@ -835,6 +911,20 @@ String? authRedirect(AuthRepository auth, Uri uri) {
   if (public || path == _splash) return from ?? Routes.home;
   return null;
 }
+
+/// Writes a new post (or workout), or edits [postId].
+Widget _postComposer(String? postId, {bool workout = false}) => ViewModelHost(
+  key: ValueKey('post-composer-$postId-$workout'),
+  create: (c) => PostComposerViewModel(
+    postId: postId,
+    startWithWorkout: workout,
+    userPostRepository: c.read(),
+    followRepository: c.read(),
+    authRepository: c.read(),
+    filePicker: c.read(),
+  ),
+  builder: (_, vm) => PostComposerScreen(viewModel: vm),
+);
 
 /// Sets up a new group tournament, or edits [tournamentId].
 Widget _tournamentEditor(GoRouterState state, String? tournamentId) {
@@ -878,23 +968,49 @@ Widget _videoEditor(GoRouterState state, String? videoId) {
   );
 }
 
-/// A USA Ultimate team page, from Rankings or Teams search.
-Widget _teamSection(GoRouterState state, TeamSection section) {
+/// A team's page with [section]'s tab selected (null for Home).
+///
+/// Every tab of a team uses the same page key, so the navigator updates
+/// the page in place when the tab changes (no transition, and the header
+/// and its view model are kept) rather than pushing a new one.
+Page<void> _teamPage(GoRouterState state, TeamSection? section) {
   final teamId = state.pathParameters['teamId']!;
-  return ViewModelHost(
-    key: ValueKey('team-$teamId-${section.name}'),
-    create: (c) => TeamDetailViewModel(
-      teamId: teamId,
-      teamRepository: c.read(),
-      playRepository: c.read(),
-      eventRepository: c.read(),
-      meetingRepository: c.read<MeetingRepository>(),
-      authRepository: c.read(),
+  return MaterialPage(
+    key: ValueKey('team-page-$teamId'),
+    child: ViewModelHost(
+      key: ValueKey('team-$teamId'),
+      create: (c) => TeamHomeViewModel(
+        teamId: teamId,
+        teamRepository: c.read(),
+        eventRepository: c.read(),
+        teamPostRepository: c.read(),
+        authRepository: c.read(),
+        filePicker: c.read(),
+        followRepository: c.read(),
+        notificationRepository: c.read(),
+        groupTournamentRepository: c.read(),
+      ),
+      builder: (_, vm) => TeamHomeScreen(
+        viewModel: vm,
+        section: section,
+        sectionBuilder: (_, section) => ViewModelHost(
+          key: ValueKey('team-detail-$teamId'),
+          create: (c) => TeamDetailViewModel(
+            teamId: teamId,
+            teamRepository: c.read(),
+            playRepository: c.read(),
+            eventRepository: c.read(),
+            meetingRepository: c.read<MeetingRepository>(),
+            authRepository: c.read(),
+          ),
+          builder: (_, vm) => TeamSectionView(viewModel: vm, section: section),
+        ),
+      ),
     ),
-    builder: (_, vm) => TeamSectionScreen(viewModel: vm, section: section),
   );
 }
 
+/// A USA Ultimate team page, from Rankings, Home or Teams search.
 Widget _usauTeam(GoRouterState state) {
   final url = state.uri.queryParameters['url'] ?? '';
   return ViewModelHost(

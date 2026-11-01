@@ -125,6 +125,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 _ThemePicker(viewModel: vm),
                 const Divider(),
+                if (user != null)
+                  ListTile(
+                    leading: const Icon(Icons.account_circle_outlined),
+                    title: const Text('My posts'),
+                    subtitle: const Text('Your public profile and posts'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push(Routes.person(user.uid)),
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.people_outline),
+                  title: const Text('Following'),
+                  subtitle: const Text('People, teams and tournaments'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push(Routes.following),
+                ),
                 ListTile(
                   leading: const Icon(Icons.notifications_outlined),
                   title: const Text('Notifications'),

@@ -118,10 +118,22 @@ class AuthRepositoryFirebase extends AuthRepository {
     if (uid != null) {
       final user = _firestore.collection('users').doc(uid);
       // Client SDKs don't delete subcollections with their parent.
-      for (final sub in ['events', 'devices', 'notifications', 'settings']) {
+      for (final sub in [
+        'events',
+        'devices',
+        'notifications',
+        'settings',
+        'follows',
+      ]) {
         final docs = (await user.collection(sub).get()).docs;
         await deleteDocs(_firestore, [for (final d in docs) d.reference]);
       }
+      // Their posts; a Cloud Function removes each one's photos.
+      final posts = await _firestore
+          .collection('posts')
+          .where('authorId', isEqualTo: uid)
+          .get();
+      await deleteDocs(_firestore, [for (final d in posts.docs) d.reference]);
       await user.delete();
       await _firestore.collection('profiles').doc(uid).delete();
     }

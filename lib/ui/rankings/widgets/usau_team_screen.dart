@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/usau_team.dart';
+import '../../../routing/routes.dart';
+import '../../core/ui/back_or.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/usau_attribution.dart';
@@ -24,6 +26,7 @@ class UsauTeamScreen extends StatelessWidget {
           length: 3,
           child: Scaffold(
             appBar: AppBar(
+              leading: backOr(context, Routes.rankings),
               title: Text(vm.name),
               actions: [
                 IconButton(

@@ -1156,6 +1156,19 @@ class FakeTeamPostRepository implements TeamPostRepository {
     yield* _changes.stream.map((_) => _of(teamId, publicOnly));
   }
 
+  @override
+  Stream<List<TeamPost>> watchTournamentPosts(
+    String groupId,
+    String tournamentKey,
+  ) async* {
+    List<TeamPost> of() => [
+      for (final p in _of(groupId, true))
+        if (p.tournamentKey == tournamentKey) p,
+    ];
+    yield of();
+    yield* _changes.stream.map((_) => of());
+  }
+
   /// Photos uploaded by [savePost], by name.
   final uploaded = <String>[];
 
@@ -1188,6 +1201,7 @@ class FakeTeamPostRepository implements TeamPostRepository {
           links: post.links,
           images: images,
           isPublic: post.isPublic,
+          tournamentKey: post.tournamentKey,
           authorId: author.uid,
           authorName: author.label,
           createdAt: DateTime.now(),
