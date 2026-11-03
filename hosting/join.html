@@ -13,7 +13,7 @@
 </head>
 <body>
   <!--
-    Served for /join/<code> and /g/<groupId> (see firebase.json). With the
+    Served for /join/<code>, /g/<groupId> and /p/<postId> (see firebase.json). With the
     app installed, iOS and Android open it before this page loads; this is
     the fallback: other devices, in-app browsers, and pasted links.
   -->
@@ -31,7 +31,7 @@
     (function () {
       var parts = location.pathname.split('/').filter(Boolean);
       var kind = parts[0], id = parts[1] ? decodeURIComponent(parts[1]) : '';
-      var ok = (kind === 'join' || kind === 'g') && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+      var ok = (kind === 'join' || kind === 'g' || kind === 'p') && /^[A-Za-z0-9_-]{1,200}$/.test(id);
       if (!ok) {
         document.getElementById('open').hidden = true;
         document.getElementById('lead').hidden = true;
@@ -43,6 +43,12 @@
         'stall10://open/' + kind + '/' + encodeURIComponent(id);
       if (kind === 'join') {
         document.getElementById('expiry').hidden = false;
+      } else if (kind === 'p') {
+        document.getElementById('title').textContent =
+          'See this post on Stall 10';
+        document.getElementById('lead').textContent =
+          'Open the post in the Stall 10 app.';
+        document.title = 'A post on Stall 10';
       } else {
         document.getElementById('title').textContent =
           "You're invited to a group on Stall 10";

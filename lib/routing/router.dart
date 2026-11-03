@@ -148,6 +148,12 @@ GoRouter router(AuthRepository auth) => GoRouter(
       path: '/g/:groupId',
       redirect: (_, state) => Routes.team(state.pathParameters['groupId']!),
     ),
+    // Post links (InviteLinks.post), sent in messages or shared to other
+    // apps.
+    GoRoute(
+      path: '/p/:postId',
+      redirect: (_, state) => Routes.post(state.pathParameters['postId']!),
+    ),
     // People's posts, over the shell. `/posts` alone goes Home, where the
     // feed is. The composer is an overlay, not a route.
     GoRoute(
@@ -165,8 +171,12 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 postId: id,
                 userPostRepository: c.read(),
                 authRepository: c.read(),
+                commentRepository: c.read(),
               ),
-              builder: (_, vm) => PostDetailScreen(viewModel: vm),
+              builder: (_, vm) => PostDetailScreen(
+                viewModel: vm,
+                focusComment: state.uri.queryParameters['comment'] == '1',
+              ),
             );
           },
         ),
@@ -1015,10 +1025,14 @@ String? authRedirect(AuthRepository auth, Uri uri) {
   return null;
 }
 
-/// Team invite links (`/join/CODE`) and group links (`/g/ID`).
+/// Team invite links (`/join/CODE`), group links (`/g/ID`) and post links
+/// (`/p/ID`), which signing in returns to.
 bool _isInviteLink(String? location) {
   final path = location == null ? null : Uri.tryParse(location)?.path;
-  return path != null && (path.startsWith('/join/') || path.startsWith('/g/'));
+  return path != null &&
+      (path.startsWith('/join/') ||
+          path.startsWith('/g/') ||
+          path.startsWith('/p/'));
 }
 
 /// Sets up a new group tournament, or edits [tournamentId].

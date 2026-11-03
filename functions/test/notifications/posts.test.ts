@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  commentCountChange,
+  commentNotice,
   followCountChanges,
   followerNotice,
   followKeys,
@@ -144,5 +146,27 @@ describe("likes, reposts and followers", () => {
   it("can be turned off", () => {
     expect(wants({ categories: { social: false } }, "social")).toBe(false);
     expect(wants({}, "social")).toBe(true);
+  });
+});
+
+describe("comments", () => {
+  it("tells the post's author, folding comments on one post", () => {
+    const n = commentNotice({
+      postId: "p1",
+      post: { authorId: "sam", body: "Pickup tonight" },
+      comment: { authorId: "zed", authorName: "Zed", body: "  I'm\n in! " },
+    });
+    expect(n.category).toBe("social");
+    expect(n.route).toBe("/posts/p1");
+    expect(n.collapseId).toBe("comments_p1");
+    expect(n.text({}, 1)).toEqual({ title: "Zed commented on your post", body: "I'm in!" });
+    expect(n.text({}, 3).title).toBe("3 new comments on your post");
+  });
+
+  it("counts comments added and deleted, not edits", () => {
+    expect(commentCountChange(false, true)).toBe(1);
+    expect(commentCountChange(true, false)).toBe(-1);
+    expect(commentCountChange(true, true)).toBe(0);
+    expect(commentCountChange(false, false)).toBe(0);
   });
 });

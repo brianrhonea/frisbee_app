@@ -29,6 +29,22 @@ void main() {
     expect(path('https://frisbee-app-brianrhonea.web.app/join/'), isNull);
   });
 
+  test('post links open the post in the app', () {
+    final link = InviteLinks.post('abc_12');
+    expect(link.toString(), 'https://frisbee-app-brianrhonea.web.app/p/abc_12');
+    expect(InviteLinks.inAppPath(link), '/posts/abc_12');
+    expect(
+      InviteLinks.inAppPath(Uri.parse('stall10://open/p/abc_12')),
+      '/posts/abc_12',
+    );
+    expect(
+      InviteLinks.inAppPath(
+        Uri.parse('https://frisbee-app-brianrhonea.web.app/p/'),
+      ),
+      isNull,
+    );
+  });
+
   test('finds links in message text, leaving trailing punctuation', () {
     final parts = splitLinks(
       'Join Cascades on Stall 10: https://frisbee-app-brianrhonea.web.app/join/ABC234. '

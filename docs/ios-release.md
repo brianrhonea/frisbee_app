@@ -79,8 +79,8 @@ the app's `stall10://` scheme.
 
    Do step 1 first: a build with this entitlement fails to sign until the
    App ID has the capability.
-3. Replace `APPLE_TEAM_ID` in `hosting/.well-known/apple-app-site-association`
-   with your 10-character Team ID (developer.apple.com > Membership), then
+3. `hosting/.well-known/apple-app-site-association` names Team ID
+   `UR7V8Z48NR` (developer.apple.com > Membership). Deploy it with
    `firebase deploy --only hosting`.
 
 Android verifies links with `hosting/.well-known/assetlinks.json`, which

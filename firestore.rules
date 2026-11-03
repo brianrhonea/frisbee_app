@@ -1476,6 +1476,34 @@ service cloud.firestore {
             || (!isRepost(resource.data)
                 && resource.data.authorId != uid()
                 && repostMatches()));
+
+      // Comments (PostComment in lib/domain/models/post_comment.dart).
+      // Anyone signed in comments on a post that isn't a repost (a repost's
+      // comments go on its original). The comment's author or the post's
+      // author deletes it; nobody edits. The post's commentCount is kept by
+      // the follows-commentCount function, so nobody writes it here.
+      match /comments/{commentId} {
+        function post() {
+          return get(/databases/$(database)/documents/posts/$(postId)).data;
+        }
+
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.keys().hasOnly([
+               'body', 'authorId', 'authorName', 'authorPhotoUrl',
+               'createdAt'])
+          && request.resource.data.authorId == uid()
+          && validString(request.resource.data.authorName, 80)
+          && (request.resource.data.get('authorPhotoUrl', null) == null
+              || validString(request.resource.data.authorPhotoUrl, 2000))
+          && validString(request.resource.data.body, 1000)
+          && request.resource.data.body.size() > 0
+          && request.resource.data.createdAt == request.time
+          && exists(/databases/$(database)/documents/posts/$(postId))
+          && post().get('repostOf', null) == null;
+        allow delete: if signedIn()
+          && (resource.data.authorId == uid() || post().authorId == uid());
+      }
     }
 
     // Follower counts per FollowTarget key, plus `following` on user keys.

@@ -129,6 +129,7 @@ class UserPost {
     this.repostOf,
     this.likedBy = const [],
     this.repostedBy = const [],
+    this.commentCount = 0,
     this.tournamentKey,
     this.tournamentName,
     this.createdAt,
@@ -160,6 +161,10 @@ class UserPost {
   /// themselves (firestore.rules); the post's author doesn't edit these.
   final List<String> likedBy;
   final List<String> repostedBy;
+
+  /// Kept by the `follows-commentCount` Cloud Function; nobody writes it
+  /// from the app.
+  final int commentCount;
 
   int get likeCount => likedBy.length;
   int get repostCount => repostedBy.length;
@@ -237,6 +242,7 @@ class UserPost {
     repostOf: repostOf,
     likedBy: likedBy,
     repostedBy: repostedBy,
+    commentCount: commentCount,
     tournamentKey: tournamentKey == null ? this.tournamentKey : tournamentKey(),
     tournamentName: tournamentName == null
         ? this.tournamentName
@@ -275,6 +281,10 @@ class UserPost {
     repostedBy: [
       for (final u in (map['repostedBy'] as List?) ?? const []) '$u',
     ],
+    commentCount: switch (map['commentCount']) {
+      final num n when n > 0 => n.toInt(),
+      _ => 0,
+    },
     tournamentKey: map['tournamentKey'] as String?,
     tournamentName: map['tournamentName'] as String?,
     createdAt: parseDate(map['createdAt']),

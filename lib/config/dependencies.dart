@@ -18,6 +18,8 @@ import '../data/repositories/meeting/meeting_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_settings_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/notification/notification_repository_firebase.dart';
+import '../data/repositories/post_comment/post_comment_repository.dart';
+import '../data/repositories/post_comment/post_comment_repository_firebase.dart';
 import '../data/repositories/profile/profile_repository.dart';
 import '../data/repositories/profile/profile_repository_firebase.dart';
 import '../data/repositories/playbook/play_repository.dart';
@@ -88,6 +90,9 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) => UserPostRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
     ),
+  ),
+  Provider<PostCommentRepository>(
+    create: (_) => PostCommentRepositoryFirebase(),
   ),
   Provider<FollowRepository>(create: (_) => FollowRepositoryFirebase()),
   Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),

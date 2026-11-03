@@ -10,7 +10,8 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
-| 0.0.9   | 2026-11-02 | `feature/gps-workouts`                  | (this branch)       |
+| 0.0.10  | 2026-11-03 | `development`                           | (this branch)       |
+| 0.0.9   | 2026-11-02 | `feature/gps-workouts`                  | `41a03bc`           |
 | 0.0.8   | 2026-10-31 | `feature/follows-feed`                  | `1f81f45` and later |
 | 0.0.7   | 2026-10-31 | `feature/community-groups`              | `9f19c55` and later |
 | 0.0.6   | 2026-10-30 | `feature/team-videos`                   | `d623748` and later |
@@ -20,6 +21,42 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.10 — Comments and sending posts
+
+Straight on `development`; feature branches are retired for the beta.
+
+**Added**
+
+- **Comments** on people's posts. **Comment** under a post (with the
+  count) opens its page at the comment box; comments show oldest first
+  with who and when, and links in them are tappable. Commenting on a
+  repost comments on its original. Delete your own comment, or any
+  comment on your post.
+- The post's author is notified ("Zed commented on your post"; comments
+  on one post fold together), in the **Likes, reposts and followers**
+  category.
+- **Send** under a post: pick someone you've messaged (listed first) or
+  search for anyone, and tap **Send**. It goes as a direct message with a
+  line about the post and its link, which opens the post in the app.
+  **Copy link** and **Share to other apps** are there too.
+- **Post links** (`…web.app/p/<id>`) open the post in Stall 10 on phones
+  with the app, or a page with an **Open in Stall 10** button. Signing in
+  from one returns to the post.
+
+**Infrastructure**
+
+- New Firestore data: `posts/{id}/comments/{commentId}`; rules and rules
+  tests (anyone signed in comments as themselves, up to 1000 characters,
+  not on a repost; the commenter or the post's author deletes; nobody
+  edits; nobody writes `commentCount`). A collection-group exemption on
+  `comments.authorId` for account deletion.
+- New Cloud Functions: `follows-commentCount` keeps each post's
+  `commentCount`; `notifications-postCommented` tells the post's author.
+  `follows-userPostDeleted` now deletes a post's comments too, and
+  `account-deleteAccount` deletes the user's comments.
+- `/p/*` added to the hosting rewrites, the iOS
+  `apple-app-site-association` and the Android App Links filter.
 
 ## 0.0.9 — Record runs and rides with GPS
 

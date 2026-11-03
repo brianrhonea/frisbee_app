@@ -17,6 +17,7 @@ import '../../teams/widgets/team_post_widgets.dart';
 import '../../workouts/widgets/route_widgets.dart';
 import '../view_models/post_actions.dart';
 import 'post_composer.dart';
+import 'send_post_sheet.dart';
 
 export '../../core/ui/layout.dart' show PersonAvatar;
 
@@ -30,9 +31,11 @@ String _when(DateTime? d) =>
 /// the author opens their profile. [onEdit] and [onDelete] are for the
 /// author.
 ///
-/// With [actions], a footer to like and repost it (a repost's original), and
-/// a repost's original is loaded from there. [onRepost] asks how to repost
-/// or takes the repost back (see [repostOrUndo]).
+/// With [actions], a footer to like, repost, comment on and send it (a
+/// repost's original), and a repost's original is loaded from there.
+/// [onRepost] asks how to repost or takes the repost back (see
+/// [repostOrUndo]). Comment opens the post's page at the comment box,
+/// unless [onComment] says otherwise. Send messages it to people.
 class UserPostCard extends StatelessWidget {
   const UserPostCard({
     super.key,
@@ -43,6 +46,7 @@ class UserPostCard extends StatelessWidget {
     this.onOpen,
     this.actions,
     this.onRepost,
+    this.onComment,
   });
 
   final UserPost post;
@@ -55,6 +59,9 @@ class UserPostCard extends StatelessWidget {
 
   final PostActions? actions;
   final VoidCallback? onRepost;
+
+  /// On the post's own page: go to the comment box.
+  final VoidCallback? onComment;
 
   @override
   Widget build(BuildContext context) {
@@ -168,7 +175,12 @@ class UserPostCard extends StatelessWidget {
                       ),
               ),
               if (actions case final a?)
-                _PostFooter(post: post, actions: a, onRepost: onRepost)
+                _PostFooter(
+                  post: post,
+                  actions: a,
+                  onRepost: onRepost,
+                  onComment: onComment,
+                )
               else
                 const SizedBox(height: 8),
             ],
@@ -371,11 +383,17 @@ class _EmbeddedPost extends StatelessWidget {
 /// Like and Repost, with how many of each. For a repost they count toward
 /// its original.
 class _PostFooter extends StatelessWidget {
-  const _PostFooter({required this.post, required this.actions, this.onRepost});
+  const _PostFooter({
+    required this.post,
+    required this.actions,
+    this.onRepost,
+    this.onComment,
+  });
 
   final UserPost post;
   final PostActions actions;
   final VoidCallback? onRepost;
+  final VoidCallback? onComment;
 
   @override
   Widget build(BuildContext context) {
@@ -385,7 +403,12 @@ class _PostFooter extends StatelessWidget {
     final liked = actions.isLiked(post);
     final reposted = actions.isReposted(post);
     final canRepost = actions.canRepost(post) && onRepost != null;
-    String count(String label, int n) => n == 0 ? label : '$n';
+    // Narrow phones drop the words and keep the counts.
+    final narrow = MediaQuery.sizeOf(context).width < 400;
+    String count(String label, int n) => n > 0 ? '$n' : (narrow ? '' : label);
+    final muted = TextButton.styleFrom(
+      foregroundColor: scheme.onSurfaceVariant,
+    );
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
@@ -424,6 +447,25 @@ class _PostFooter extends StatelessWidget {
                   : count('Repost', target.repostCount),
               semanticsLabel: reposted ? 'Undo repost' : 'Repost',
             ),
+          ),
+          const SizedBox(width: 4),
+          TextButton.icon(
+            onPressed:
+                onComment ??
+                () => openPage(context, Routes.post(target.id, comment: true)),
+            style: muted,
+            icon: const Icon(Icons.chat_bubble_outline, size: 20),
+            label: Text(
+              count('Comment', target.commentCount),
+              semanticsLabel: 'Comment',
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: 'Send',
+            onPressed: () => showSendPost(context, target),
+            color: scheme.onSurfaceVariant,
+            icon: const Icon(Icons.send_outlined, size: 20),
           ),
         ],
       ),

@@ -542,6 +542,26 @@ export function likeNotice(a: { postId: string; post: Data; likerName: string })
   };
 }
 
+/** +1 for a new comment, -1 for a deleted one, 0 for an edit. */
+export function commentCountChange(existedBefore: boolean, existsAfter: boolean): number {
+  return existsAfter === existedBefore ? 0 : existsAfter ? 1 : -1;
+}
+
+/** Someone commented on your post; comments on one post fold together. */
+export function commentNotice(a: { postId: string; post: Data; comment: Data }): Notice {
+  const name = String(a.comment.authorName ?? "") || "Someone";
+  const text = String(a.comment.body ?? "").trim().replace(/\s+/g, " ");
+  return {
+    category: "social",
+    route: `/posts/${a.postId}`,
+    collapseId: `comments_${a.postId}`,
+    text: (_, count) => ({
+      title: count > 1 ? `${count} new comments on your post` : `${name} commented on your post`,
+      body: clip(text, 120),
+    }),
+  };
+}
+
 /** Someone reposted your post, with their note. */
 export function repostNotice(a: { repostId: string; repost: Data; original?: Data }): Notice {
   const name = String(a.repost.authorName ?? "") || "Someone";

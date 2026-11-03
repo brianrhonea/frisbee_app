@@ -39,7 +39,10 @@ abstract final class Routes {
 
   /// Records a run or ride with GPS, over the shell; use `context.push`.
   static const recordWorkout = '/record';
-  static String post(String id) => '$postsPath/$id';
+
+  /// A post's page; [comment] puts the cursor in the comment box.
+  static String post(String id, {bool comment = false}) =>
+      '$postsPath/$id${comment ? '?comment=1' : ''}';
 
   // The inbox is a shell tab; a conversation opened on its own (e.g. from a
   // notification or on a phone) opens over the shell, with `context.push`.

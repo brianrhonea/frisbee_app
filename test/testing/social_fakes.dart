@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:frisbee_app/data/repositories/follow/follow_repository.dart';
+import 'package:frisbee_app/data/repositories/post_comment/post_comment_repository.dart';
 import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/follow.dart';
+import 'package:frisbee_app/domain/models/post_comment.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -207,6 +209,7 @@ class FakeUserPostRepository implements UserPostRepository {
     UserPost p, {
     List<String>? likedBy,
     List<String>? repostedBy,
+    int? commentCount,
   }) => UserPost(
     id: p.id,
     authorId: p.authorId,
@@ -220,6 +223,7 @@ class FakeUserPostRepository implements UserPostRepository {
     repostOf: p.repostOf,
     likedBy: likedBy ?? p.likedBy,
     repostedBy: repostedBy ?? p.repostedBy,
+    commentCount: commentCount ?? p.commentCount,
     tournamentKey: p.tournamentKey,
     tournamentName: p.tournamentName,
     createdAt: p.createdAt,
@@ -297,4 +301,79 @@ class FakeUserPostRepository implements UserPostRepository {
   @override
   Future<Result<Uint8List>> downloadImage(ChatAttachment image) async =>
       Result.ok(Uint8List(0));
+}
+
+/// Comments in memory. With [posts], keeps each post's commentCount the
+/// way the Cloud Function does.
+class FakePostCommentRepository implements PostCommentRepository {
+  FakePostCommentRepository({this.posts});
+
+  final FakeUserPostRepository? posts;
+  final comments = <PostComment>[];
+  final _changes = StreamController<void>.broadcast();
+  var _next = 0;
+
+  void changed() => _changes.add(null);
+
+  List<PostComment> _on(String postId, int limit) {
+    final list = comments.where((c) => c.postId == postId).toList()
+      ..sort(PostComment.oldestFirst);
+    return list.length > limit ? list.sublist(list.length - limit) : list;
+  }
+
+  void _count(String postId, int by) {
+    final repo = posts;
+    if (repo == null) return;
+    final i = repo.posts.indexWhere((p) => p.id == postId);
+    if (i < 0) return;
+    final p = repo.posts[i];
+    repo.posts[i] = FakeUserPostRepository._with(
+      p,
+      commentCount: p.commentCount + by,
+    );
+    repo.changed();
+  }
+
+  @override
+  Stream<List<PostComment>> watchComments(
+    String postId, {
+    int limit = 100,
+  }) async* {
+    yield _on(postId, limit);
+    yield* _changes.stream.map((_) => _on(postId, limit));
+  }
+
+  @override
+  Future<Result<String>> addComment(
+    String postId,
+    String body,
+    AppUser author,
+  ) async {
+    final id = 'c${++_next}';
+    comments.add(
+      PostComment(
+        id: id,
+        postId: postId,
+        authorId: author.uid,
+        authorName: author.label,
+        authorPhotoUrl: author.photoUrl,
+        body: body.trim(),
+        createdAt: DateTime(2026, 11, 3, 12, _next),
+      ),
+    );
+    _count(postId, 1);
+    changed();
+    return Result.ok(id);
+  }
+
+  @override
+  Future<Result<void>> deleteComment(PostComment comment) async {
+    final before = comments.length;
+    comments.removeWhere(
+      (c) => c.postId == comment.postId && c.id == comment.id,
+    );
+    if (comments.length < before) _count(comment.postId, -1);
+    changed();
+    return const Result.ok(null);
+  }
 }

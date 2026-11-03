@@ -28,7 +28,7 @@ workflows:
         bundle_identifier: com.brianrhonea.frisbeeApp
       vars:
         # The app's numeric Apple ID from App Store Connect > App Information.
-        APP_STORE_APPLE_ID: "0000000000"
+        APP_STORE_APPLE_ID: "6830314904"
     # Every push to development builds and uploads to TestFlight. A newer
     # push cancels a build still running, to save build minutes.
     triggering:

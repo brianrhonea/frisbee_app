@@ -5,7 +5,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { onDocumentDeleted, onDocumentWritten } from "firebase-functions/v2/firestore";
 
-import { type Data, followCountChanges, followKey } from "../notifications/model";
+import { commentCountChange, type Data, followCountChanges, followKey } from "../notifications/model";
 
 /** Keeps followCounts/{key} in step as people follow and unfollow. */
 export const followCount = onDocumentWritten("users/{uid}/follows/{key}", async (event) => {
@@ -53,13 +53,34 @@ export const groupTournamentDeleted = onDocumentDeleted(
 );
 
 /**
- * A person's post deleted, by them or with their account: its photos go
- * too (the app deletes them itself when it can; this catches the rest).
+ * A person's post deleted, by them or with their account: its photos and
+ * comments go too (the app deletes photos itself when it can; this catches
+ * the rest).
  */
 export const userPostDeleted = onDocumentDeleted("posts/{postId}", async (event) => {
+  const { postId } = event.params;
+  const db = getFirestore();
+  await db.recursiveDelete(db.collection(`posts/${postId}/comments`));
   const authorId = String(event.data?.data()?.authorId ?? "");
   if (!authorId) return;
   await getStorage()
     .bucket()
-    .deleteFiles({ prefix: `users/${authorId}/posts/${event.params.postId}/` });
+    .deleteFiles({ prefix: `users/${authorId}/posts/${postId}/` });
+});
+
+/** Firestore's NOT_FOUND, e.g. updating a post that was deleted. */
+const notFound = (e: unknown) => (e as { code?: number | string }).code === 5 || (e as { code?: string }).code === "not-found";
+
+/**
+ * Keeps a post's commentCount in step as comments are added and deleted.
+ * Comments deleted along with their post have no post left to count on.
+ */
+export const commentCount = onDocumentWritten("posts/{postId}/comments/{commentId}", async (event) => {
+  const by = commentCountChange(event.data?.before.exists ?? false, event.data?.after.exists ?? false);
+  if (by === 0) return;
+  try {
+    await getFirestore().doc(`posts/${event.params.postId}`).update({ commentCount: FieldValue.increment(by) });
+  } catch (e) {
+    if (!notFound(e)) throw e;
+  }
 });

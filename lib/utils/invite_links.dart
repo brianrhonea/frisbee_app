@@ -1,6 +1,6 @@
 /// Links that open Stall 10, for sharing in any app (Messages, WhatsApp,
 /// email). `/join/<code>` joins a team with its invite code; `/g/<id>`
-/// opens a community group's page.
+/// opens a community group's page; `/p/<id>` opens a person's post.
 ///
 /// Firebase Hosting serves them (see `hosting/`): with the app installed,
 /// iOS and Android open it straight away; otherwise the page shows the code
@@ -18,6 +18,9 @@ abstract final class InviteLinks {
   static Uri group(String groupId) =>
       Uri.https(host, '/g/${Uri.encodeComponent(groupId)}');
 
+  static Uri post(String postId) =>
+      Uri.https(host, '/p/${Uri.encodeComponent(postId)}');
+
   /// The in-app route for [uri] if it's one of these links, else null.
   static String? inAppPath(Uri uri) {
     final ours =
@@ -26,6 +29,9 @@ abstract final class InviteLinks {
     final s = uri.pathSegments;
     if (s.length == 2 && (s[0] == 'join' || s[0] == 'g') && s[1].isNotEmpty) {
       return '/${s[0]}/${Uri.encodeComponent(s[1])}';
+    }
+    if (s.length == 2 && s[0] == 'p' && s[1].isNotEmpty) {
+      return '/posts/${Uri.encodeComponent(s[1])}';
     }
     return null;
   }

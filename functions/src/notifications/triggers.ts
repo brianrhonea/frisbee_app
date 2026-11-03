@@ -16,6 +16,7 @@ import { invitees, type MeetingDoc, meetingChange, type MeetingTeam, startedReci
 import { deliver } from "./deliver";
 import {
   chatNotice,
+  commentNotice,
   type Data,
   directMessageNotice,
   eventChange,
@@ -300,6 +301,17 @@ export const newFollower = onDocumentCreated("users/{uid}/follows/{key}", async 
   if (!target || target === followerId) return;
   const follower = await profileOf(followerId);
   await deliver(getFirestore(), getMessaging(), [target], followerNotice({ followerId, ...follower }));
+});
+
+/** Someone commented on a post: its author hears, unless it's their own. */
+export const postCommented = onDocumentCreated("posts/{postId}/comments/{commentId}", async (event) => {
+  const comment = event.data?.data();
+  if (!comment) return;
+  const { postId } = event.params;
+  const post = (await getFirestore().doc(`posts/${postId}`).get()).data();
+  const authorId = String(post?.authorId ?? "");
+  if (!post || !authorId || authorId === String(comment.authorId ?? "")) return;
+  await deliver(getFirestore(), getMessaging(), [authorId], commentNotice({ postId, post, comment }));
 });
 
 /**

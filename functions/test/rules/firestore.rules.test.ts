@@ -2360,6 +2360,56 @@ describe("user posts", () => {
     }
   });
 
+  it("lets anyone comment; the commenter or the post's author deletes", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER), post(PLAYER)));
+    const comment = (uid: string, id = "c1") => doc(db(uid), "posts", "p1", "comments", id);
+    const data = (uid: string, extra: Record<string, unknown> = {}) => ({
+      body: "Nice!",
+      authorId: uid,
+      authorName: "O",
+      authorPhotoUrl: null,
+      createdAt: serverTimestamp(),
+      ...extra,
+    });
+    await assertSucceeds(setDoc(comment(OUTSIDER), data(OUTSIDER)));
+    await assertSucceeds(getDoc(comment(CAPTAIN)));
+    // As themselves, with text, and nothing else.
+    await assertFails(setDoc(comment(OUTSIDER, "c2"), data(PLAYER)));
+    await assertFails(setDoc(comment(OUTSIDER, "c2"), data(OUTSIDER, { body: "" })));
+    await assertFails(setDoc(comment(OUTSIDER, "c2"), data(OUTSIDER, { body: "x".repeat(1001) })));
+    await assertFails(setDoc(comment(OUTSIDER, "c2"), data(OUTSIDER, { pinned: true })));
+    await assertFails(setDoc(comment(OUTSIDER, "c2"), data(OUTSIDER, { createdAt: new Date("2020-01-01") })));
+    // Nobody edits; nobody else deletes.
+    await assertFails(updateDoc(comment(OUTSIDER), { body: "Edited" }));
+    await assertFails(deleteDoc(comment(CAPTAIN)));
+    // The commenter, or the post's author.
+    await assertSucceeds(setDoc(comment(OUTSIDER, "c2"), data(OUTSIDER)));
+    await assertSucceeds(deleteDoc(comment(OUTSIDER)));
+    await assertSucceeds(deleteDoc(comment(PLAYER, "c2")));
+    // Not on a post that doesn't exist, and nobody sets commentCount.
+    await assertFails(setDoc(doc(db(OUTSIDER), "posts", "gone", "comments", "c1"), data(OUTSIDER)));
+    await assertFails(updateDoc(ref(OUTSIDER), { commentCount: 5 }));
+    await assertFails(updateDoc(ref(PLAYER), { commentCount: 5 }));
+  });
+
+  it("comments on a repost go on its original", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "posts", "r_p1_x"), {
+        kind: "repost",
+        authorId: OUTSIDER,
+        repostOf: { postId: "p1", authorId: PLAYER, authorName: "P" },
+      });
+    });
+    await assertFails(
+      setDoc(doc(db(CAPTAIN), "posts", "r_p1_x", "comments", "c1"), {
+        body: "Hi",
+        authorId: CAPTAIN,
+        authorName: "C",
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+
   it("lets only the author edit or delete", async () => {
     await assertSucceeds(setDoc(ref(PLAYER), post(PLAYER)));
     await assertSucceeds(updateDoc(ref(PLAYER), { body: "Great throws today", updatedAt: serverTimestamp() }));

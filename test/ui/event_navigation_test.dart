@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/app_user.dart';
+import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
@@ -37,6 +39,7 @@ import 'package:frisbee_app/ui/teams/widgets/team_section_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:frisbee_app/data/repositories/follow/follow_repository.dart';
 import 'package:frisbee_app/data/repositories/group_tournament/group_tournament_repository.dart';
+import 'package:frisbee_app/data/repositories/post_comment/post_comment_repository.dart';
 import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 
 import '../testing/fakes.dart';
@@ -49,6 +52,8 @@ void main() {
   late FakeTeamRepository teams;
   late FakeEventRepository events;
   late FakeUserPostRepository userPosts;
+  late FakePostCommentRepository comments;
+  late FakeDirectMessageRepository dms;
 
   Future<void> pumpApp(WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
@@ -93,7 +98,7 @@ void main() {
             value: FakeNotificationRepository(),
           ),
           Provider<DirectMessageRepository>.value(
-            value: FakeDirectMessageRepository(),
+            value: dms = FakeDirectMessageRepository(),
           ),
           Provider<ChatRepository>.value(value: FakeChatRepository()),
           Provider<FilePickerService>.value(value: FakeFilePickerService()),
@@ -113,6 +118,9 @@ void main() {
           Provider<FollowRepository>.value(value: FakeFollowRepository()),
           Provider<UserPostRepository>.value(
             value: userPosts = FakeUserPostRepository(),
+          ),
+          Provider<PostCommentRepository>.value(
+            value: comments = FakePostCommentRepository(posts: userPosts),
           ),
           Provider<GroupTournamentRepository>.value(
             value: FakeGroupTournamentRepository(),
@@ -289,6 +297,94 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.byType(PlayerProfileScreen), findsOneWidget);
+  });
+
+  testWidgets('comment on a post from its page, and delete the comment', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    userPosts.posts.add(
+      UserPost(
+        id: 'p1',
+        authorId: 'sam',
+        authorName: 'Sam Lee',
+        body: 'Hello there',
+        createdAt: DateTime(2026, 11, 1),
+      ),
+    );
+    userPosts.changed();
+    // A post link (as sent in a message) opens the post at the comment box.
+    GoRouter.of(
+      tester.element(find.byType(HomeScreen)),
+    ).push('/posts/p1?comment=1');
+    await tester.pumpAndSettle();
+    expect(find.text('No comments yet. Be the first.'), findsOneWidget);
+    final box = find.widgetWithText(TextField, 'Add a comment…');
+    expect(tester.widget<TextField>(box).focusNode!.hasFocus, isTrue);
+
+    await tester.enterText(box, '  See you there!  ');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Post comment'));
+    await tester.pumpAndSettle();
+    expect(find.text('See you there!'), findsOneWidget);
+    expect(find.text('Comments (1)'), findsOneWidget);
+    expect(comments.comments.single.authorId, testUser.uid);
+    expect(userPosts.posts.single.commentCount, 1);
+    // The footer counts it, and the box is empty for the next one.
+    expect(find.text('1'), findsWidgets);
+    expect(tester.widget<TextField>(box).controller!.text, isEmpty);
+
+    // Someone else's comment can't be deleted by the user; their own can.
+    await comments.addComment(
+      'p1',
+      'Me too',
+      const AppUser(uid: 'zed', email: 'z@z.com', displayName: 'Zed'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Delete comment'), findsOneWidget);
+    await tester.tap(find.byTooltip('Delete comment'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(find.text('See you there!'), findsNothing);
+    expect(find.text('Me too'), findsOneWidget);
+    expect(userPosts.posts.single.commentCount, 1);
+  });
+
+  testWidgets('send a post to someone in a message', (tester) async {
+    await pumpApp(tester);
+    dms.profiles.add(const UserProfile(uid: 'jo', name: 'Jo Park'));
+    userPosts.posts.add(
+      UserPost(
+        id: 'p1',
+        authorId: 'sam',
+        authorName: 'Sam Lee',
+        body: 'Pickup tonight at 6',
+        createdAt: DateTime(2026, 11, 1),
+      ),
+    );
+    userPosts.changed();
+    GoRouter.of(tester.element(find.byType(HomeScreen))).push('/p/p1');
+    await tester.pumpAndSettle();
+    expect(find.text('Pickup tonight at 6'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Send'));
+    await tester.pumpAndSettle();
+    expect(find.text('Search for someone to send this post to.'), findsOne);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Search people'),
+      'jo',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Send'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sent'), findsOneWidget);
+
+    final sent = dms.messages[Conversation.idFor(testUser.uid, 'jo')]!.single;
+    expect(sent.text, contains("Sam Lee's post"));
+    expect(sent.text, contains('Pickup tonight at 6'));
+    expect(sent.text, contains('/p/p1'));
   });
 
   testWidgets('a team left on its roster does not hijack event links', (

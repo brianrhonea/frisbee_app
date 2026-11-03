@@ -67,7 +67,7 @@ async function deleteFolder(prefix: string): Promise<void> {
   await bucket().deleteFiles({ prefix, force: true });
 }
 
-/** Posts and messages (team chats, meeting chats, direct messages). */
+/** Posts, comments and messages (team chats, meeting chats, direct messages). */
 async function deleteAuthored(db: Firestore, uid: string): Promise<void> {
   const writer = db.bulkWriter();
   const posts = await db.collectionGroup("posts").where("authorId", "==", uid).get();
@@ -76,6 +76,9 @@ async function deleteAuthored(db: Firestore, uid: string): Promise<void> {
     if (folder) await deleteFolder(folder);
     void writer.delete(d.ref);
   }
+  // Comments on anyone's posts; the posts' counts follow (follows-commentCount).
+  const comments = await db.collectionGroup("comments").where("authorId", "==", uid).get();
+  for (const d of comments.docs) void writer.delete(d.ref);
   const messages = await db.collectionGroup("messages").where("authorId", "==", uid).get();
   const folders = new Set<string>();
   for (const d of messages.docs) {

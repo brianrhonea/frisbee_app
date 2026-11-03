@@ -20,6 +20,10 @@
       {
         "source": "/g/**",
         "destination": "/join.html"
+      },
+      {
+        "source": "/p/**",
+        "destination": "/join.html"
       }
     ],
     "headers": [
