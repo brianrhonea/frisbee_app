@@ -64,6 +64,11 @@ workflows:
       - name: Build IPA
         script: |
           set -euo pipefail
+          if [ "$APP_STORE_APPLE_ID" = "0000000000" ]; then
+            echo "Set APP_STORE_APPLE_ID in codemagic.yaml to the app's numeric Apple ID" \
+              "(App Store Connect > App Information). See docs/ios-release.md." >&2
+            exit 1
+          fi
           LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" || echo 0)
           TESTFLIGHT=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
           BUILD_NUMBER=$(( (LATEST > TESTFLIGHT ? LATEST : TESTFLIGHT) + 1 ))
