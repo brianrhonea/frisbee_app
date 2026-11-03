@@ -87,6 +87,15 @@ your events, playbook and rankings sit beside the feed.
 - **Share a workout**: pick the activity, then add how long it took, an
   optional distance and effort, and any exercises with sets, reps and
   weight. Runs with a distance show your pace.
+- **Record a run or ride** (phones): tap **Record** on Home or your
+  profile. Pick Run, Ride, Walk or Hike, then **Start**. The map draws your
+  route as you go, with your time, distance and pace (speed for rides).
+  Recording keeps going with the screen locked or while you use the rest
+  of the app; the Record button shows the clock so you can get back. Pause,
+  then **Finish** to share it. The post shows the route map, and opening it
+  shows your time for each mile (or km). **Hide your start and finish** is
+  on by default: it cuts the first and last 200 m from the map so it
+  doesn't show where you live. Your stats don't change.
 - **Profiles**: tap a post's author, someone in a team's Members list, or
   **View profile** in New message. You'll see their posts and follower
   counts, and buttons to Follow or Message them. Edit or delete your own

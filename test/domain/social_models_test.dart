@@ -4,6 +4,7 @@ import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/team_post.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/domain/models/workout.dart';
+import 'package:frisbee_app/domain/models/workout_route.dart';
 
 void main() {
   group('FollowTarget', () {
@@ -75,9 +76,17 @@ void main() {
       expect(w.durationLabel, '50 min');
       expect(const Workout(durationMinutes: 90).durationLabel, '1 h 30 min');
       expect(const Workout(durationMinutes: 120).durationLabel, '2 h');
-      expect(w.distanceLabel, '10 km');
-      expect(const Workout(distanceKm: 5.25).distanceLabel, '5.3 km');
-      expect(w.paceLabel, '5:00 /km');
+      expect(w.distanceLabel(), '10 km');
+      expect(const Workout(distanceKm: 5.25).distanceLabel(), '5.25 km');
+      expect(const Workout(distanceKm: 5.2).distanceLabel(), '5.2 km');
+      expect(w.paceLabel(), '5:00 /km');
+      expect(w.distanceLabel(DistanceUnit.mi), '6.21 mi');
+      expect(w.paceLabel(DistanceUnit.mi), '8:03 /mi');
+      expect(w.speedLabel(), '12.0 km/h');
+      expect(
+        const Workout(durationMinutes: 43, durationSeconds: 2537).durationLabel,
+        '42:17',
+      );
       expect(
         const WorkoutExercise(
           name: 'Squat',

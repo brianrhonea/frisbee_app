@@ -15,6 +15,7 @@ import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../../follow/widgets/follow_button.dart';
 import '../../posts/widgets/post_widgets.dart';
+import '../../workouts/widgets/record_button.dart';
 import '../view_models/player_profile_viewmodel.dart';
 import '../view_models/profile_viewmodel.dart';
 import 'delete_account_dialog.dart';
@@ -207,6 +208,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
                 icon: const Icon(Icons.directions_run, size: 18),
                 label: const Text('Log a workout'),
               ),
+              const RecordWorkoutButton(outlined: true),
             ],
           ),
         ),

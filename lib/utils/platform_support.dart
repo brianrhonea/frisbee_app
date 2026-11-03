@@ -18,6 +18,12 @@ abstract final class PlatformSupport {
   /// Google sign-in via the system browser and a loopback redirect.
   static bool get desktopGoogleSignIn => _isWindows;
 
+  /// Recording runs and rides with GPS: phones only.
+  static bool get recordWorkouts =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
   /// Native Google sign-in via the google_sign_in plugin.
   static bool get nativeGoogleSignIn =>
       defaultTargetPlatform == TargetPlatform.android ||

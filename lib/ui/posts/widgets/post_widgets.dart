@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/feed_item.dart';
 import '../../../domain/models/user_post.dart';
 import '../../../domain/models/workout.dart';
+import '../../../domain/models/workout_route.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/layout.dart';
 import '../../teams/widgets/team_post_widgets.dart';
+import '../../workouts/widgets/route_widgets.dart';
 import 'post_composer.dart';
 
 export '../../core/ui/layout.dart' show PersonAvatar;
@@ -192,6 +194,9 @@ class UserPostCard extends StatelessWidget {
 
 IconData workoutIcon(WorkoutActivity a) => switch (a) {
   WorkoutActivity.run => Icons.directions_run,
+  WorkoutActivity.ride => Icons.directions_bike,
+  WorkoutActivity.walk => Icons.directions_walk,
+  WorkoutActivity.hike => Icons.hiking,
   WorkoutActivity.sprints => Icons.bolt,
   WorkoutActivity.throwing => Icons.sports_handball,
   WorkoutActivity.gym => Icons.fitness_center,
@@ -200,94 +205,128 @@ IconData workoutIcon(WorkoutActivity a) => switch (a) {
   WorkoutActivity.other => Icons.sports,
 };
 
-/// A workout's stats as chips, then its exercises.
+/// A workout's route map, its stats, then its exercises.
 class WorkoutSummary extends StatelessWidget {
   const WorkoutSummary({super.key, required this.workout});
 
   final Workout workout;
 
+  static const _paced = {
+    WorkoutActivity.run,
+    WorkoutActivity.walk,
+    WorkoutActivity.hike,
+  };
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final unit = distanceUnitOf(context);
+    final route = workout.route;
+    final gain = route?.elevationGainMeters;
     final stats = <(IconData, String, String)>[
-      (Icons.timer_outlined, 'Time', workout.durationLabel),
-      if (workout.distanceLabel case final d?)
+      if (workout.distanceLabel(unit) case final d?)
         (Icons.straighten, 'Distance', d),
-      if (workout.activity == WorkoutActivity.run)
-        if (workout.paceLabel case final p?) (Icons.speed, 'Pace', p),
+      (Icons.timer_outlined, 'Time', workout.durationLabel),
+      if (workout.activity.showsSpeed)
+        if (workout.speedLabel(unit) case final v?) (Icons.speed, 'Speed', v),
+      if (_paced.contains(workout.activity))
+        if (workout.paceLabel(unit) case final p?) (Icons.speed, 'Pace', p),
+      if (gain != null && gain >= 1)
+        (
+          Icons.terrain_outlined,
+          'Elev gain',
+          unit == DistanceUnit.mi
+              ? '${(gain * 3.28084).round()} ft'
+              : '${gain.round()} m',
+        ),
       if (workout.effort case final e?)
         (Icons.local_fire_department_outlined, 'Effort', '$e/10'),
     ];
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (route != null && route.path.length >= 2)
+            SizedBox(height: 200, child: RouteMap(path: route.path)),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(workoutIcon(workout.activity), color: scheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  workout.activity.label,
-                  style: theme.textTheme.titleMedium,
+                Row(
+                  children: [
+                    Icon(workoutIcon(workout.activity), color: scheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      workout.activity.label,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 20,
-              runSpacing: 8,
-              children: [
-                for (final (icon, label, value) in stats)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 20,
+                  runSpacing: 8,
+                  children: [
+                    for (final (icon, label, value) in stats)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(icon, size: 14, color: scheme.onSurfaceVariant),
-                          const SizedBox(width: 4),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                icon,
+                                size: 14,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                label,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(value, style: theme.textTheme.titleSmall),
+                        ],
+                      ),
+                  ],
+                ),
+                if (workout.exercises.isNotEmpty) ...[
+                  const Divider(height: 20),
+                  for (final e in workout.exercises)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              e.name,
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
                           Text(
-                            label,
-                            style: theme.textTheme.labelSmall?.copyWith(
+                            e.detail,
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               color: scheme.onSurfaceVariant,
                             ),
                           ),
                         ],
                       ),
-                      Text(value, style: theme.textTheme.titleSmall),
-                    ],
-                  ),
+                    ),
+                ],
               ],
             ),
-            if (workout.exercises.isNotEmpty) ...[
-              const Divider(height: 20),
-              for (final e in workout.exercises)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(e.name, style: theme.textTheme.bodyMedium),
-                      ),
-                      Text(
-                        e.detail,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

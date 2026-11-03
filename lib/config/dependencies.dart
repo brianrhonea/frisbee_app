@@ -45,6 +45,8 @@ import '../data/services/attachment_storage.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/file_picker_service.dart';
 import '../data/services/geocoding_service.dart';
+import '../data/services/location_service.dart';
+import '../data/repositories/workout_recorder/workout_recorder.dart';
 import '../data/services/meeting_call.dart';
 import '../data/services/meeting_call_livekit.dart';
 import '../data/services/meeting_presence.dart';
@@ -91,6 +93,12 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),
   Provider<YouTubeInfoService>(create: (_) => YouTubeInfoService()),
   Provider<GeocodingService>(create: (_) => GeocodingService()),
+  Provider<LocationService>(create: (_) => GeolocatorLocationService()),
+  // App-wide so a recording keeps going while the user browses.
+  ChangeNotifierProvider(
+    create: (context) =>
+        WorkoutRecorder(location: context.read<LocationService>()),
+  ),
   Provider<GroupTournamentRepository>(
     create: (_) => GroupTournamentRepositoryFirebase(),
   ),

@@ -2216,6 +2216,44 @@ describe("user posts", () => {
     await assertFails(setDoc(ref(PLAYER, "bad"), post(PLAYER, { kind: "workout", workout: null })));
   });
 
+  it("validates recorded routes", async () => {
+    const route = (extra: Record<string, unknown> = {}) => ({
+      path: "_p~iF~ps|U_ulLnnqC_mqNvxq`@",
+      splitsMi: [512, 498],
+      splitsKm: [318, 310, 305],
+      elevationGainM: 24,
+      ...extra,
+    });
+    const ride = (extra: Record<string, unknown> = {}) => ({
+      activity: "ride",
+      durationMinutes: 17,
+      durationSeconds: 1001,
+      distanceKm: 3.4,
+      exercises: [],
+      route: route(),
+      ...extra,
+    });
+    await assertSucceeds(setDoc(ref(PLAYER, "ride"), post(PLAYER, { kind: "workout", workout: ride() })));
+    for (const activity of ["run", "walk", "hike"]) {
+      await assertSucceeds(
+        setDoc(ref(PLAYER, activity), post(PLAYER, { kind: "workout", workout: ride({ activity }) })),
+      );
+    }
+    for (const bad of [
+      ride({ durationSeconds: 0 }),
+      ride({ durationSeconds: 90000 }),
+      ride({ durationSeconds: 1.5 }),
+      ride({ route: route({ path: "" }) }),
+      ride({ route: route({ path: "a".repeat(80001) }) }),
+      ride({ route: route({ splitsMi: Array(1001).fill(300) }) }),
+      ride({ route: route({ elevationGainM: -5 }) }),
+      ride({ route: route({ heartRate: [140] }) }),
+      ride({ route: "not a map" }),
+    ]) {
+      await assertFails(setDoc(ref(PLAYER, "bad"), post(PLAYER, { kind: "workout", workout: bad })));
+    }
+  });
+
   it("lets only the author edit or delete", async () => {
     await assertSucceeds(setDoc(ref(PLAYER), post(PLAYER)));
     await assertSucceeds(updateDoc(ref(PLAYER), { body: "Great throws today", updatedAt: serverTimestamp() }));

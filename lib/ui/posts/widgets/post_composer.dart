@@ -7,6 +7,7 @@ import '../../../domain/models/chat.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../domain/models/user_post.dart';
 import '../../../domain/models/workout.dart';
+import '../../../domain/models/workout_route.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
@@ -15,23 +16,26 @@ import '../../core/ui/layout.dart' show ScreenSize;
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../../teams/widgets/team_post_widgets.dart';
+import '../../workouts/widgets/route_widgets.dart';
 import '../view_models/post_composer_viewmodel.dart';
 import 'post_widgets.dart';
 
 /// Opens the composer over the current page: a dialog on wide screens, a
 /// bottom sheet on phones. Writes a new post (or, with [workout], starts on
-/// the Workout tab), or edits [postId]. Completes with the saved post's id,
-/// or null if the user closed it.
+/// the Workout tab, or shares a [recorded] GPS workout), or edits [postId].
+/// Completes with the saved post's id, or null if the user closed it.
 Future<String?> showPostComposer(
   BuildContext context, {
   String? postId,
   bool workout = false,
+  Workout? recorded,
 }) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
   Widget composer() => ViewModelHost(
     create: (c) => PostComposerViewModel(
       postId: postId,
-      startWithWorkout: workout,
+      startWithWorkout: workout || recorded != null,
+      recorded: recorded,
       userPostRepository: c.read(),
       followRepository: c.read(),
       authRepository: c.read(),
@@ -130,7 +134,16 @@ class _PostComposerState extends State<PostComposer> {
   final _kept = <ChatAttachment>[];
   final _added = <NewAttachment>[];
   late bool _workout = vm.startWithWorkout;
-  WorkoutActivity _activity = WorkoutActivity.run;
+  late WorkoutActivity _activity = vm.recorded?.activity ?? WorkoutActivity.run;
+
+  /// A recorded workout's route, time and distance, which can't be edited.
+  late WorkoutRoute? _route = vm.recorded?.route;
+  late int? _seconds = vm.recorded?.durationSeconds;
+  late double? _routeKm = vm.recorded?.distanceKm;
+
+  /// Cut the ends of a new route so it doesn't show where the user lives.
+  bool _hideEnds = true;
+  late final DistanceUnit _unit = distanceUnitOf(context);
   int? _effort;
   String? _tagKey;
   String? _tagName;
@@ -138,8 +151,9 @@ class _PostComposerState extends State<PostComposer> {
   bool _picking = false;
   bool _filled = false;
 
-  /// Whether the user has changed anything since the composer opened.
-  bool _changed = false;
+  /// Whether the user has changed anything since the composer opened. A
+  /// recorded workout counts, so closing asks before dropping it.
+  late bool _changed = vm.recorded != null;
 
   /// Applies a change the user made.
   void _edit(VoidCallback fn) {
@@ -202,8 +216,14 @@ class _PostComposerState extends State<PostComposer> {
       _workout = w != null;
       if (w != null) {
         _activity = w.activity;
+        _route = w.route;
+        _seconds = w.durationSeconds;
+        _routeKm = w.route == null ? null : w.distanceKm;
         _minutes.text = '${w.durationMinutes}';
-        _distance.text = w.distanceKm?.toString() ?? '';
+        _distance.text = switch (w.meters) {
+          null => '',
+          final m => _trim(m / _unit.meters),
+        };
         _effort = w.effort;
         _exercises.addAll(w.exercises.map(_ExerciseRow.new));
       }
@@ -260,10 +280,30 @@ class _PostComposerState extends State<PostComposer> {
     }
   }
 
-  Workout get _workoutValue => Workout(
+  static String _trim(double v) =>
+      v.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+
+  Workout get _workoutValue => switch (_route) {
+    final route? => Workout(
+      activity: _activity,
+      durationMinutes: ((_seconds ?? 60) / 60).ceil(),
+      durationSeconds: _seconds,
+      distanceKm: _routeKm,
+      effort: _effort,
+      route: vm.isNew && _hideEnds ? route.withoutEnds() : route,
+    ),
+    null => _manualWorkout,
+  };
+
+  Workout get _manualWorkout => Workout(
     activity: _activity,
     durationMinutes: int.tryParse(_minutes.text.trim()) ?? 0,
-    distanceKm: double.tryParse(_distance.text.trim().replaceAll(',', '.')),
+    distanceKm: switch (double.tryParse(
+      _distance.text.trim().replaceAll(',', '.'),
+    )) {
+      null => null,
+      final d => d * _unit.meters / 1000,
+    },
     effort: _effort,
     exercises: [
       for (final r in _exercises)
@@ -344,7 +384,7 @@ class _PostComposerState extends State<PostComposer> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                 children: [
                   if (vm.save.running) const LinearProgressIndicator(),
-                  if (vm.isNew)
+                  if (vm.isNew && vm.recorded == null)
                     SegmentedButton<bool>(
                       segments: const [
                         ButtonSegment(
@@ -513,6 +553,68 @@ class _PostComposerState extends State<PostComposer> {
     );
   }
 
+  /// A recorded workout's map and stats, which can't be edited.
+  List<Widget> _routeFields(BuildContext context) {
+    final theme = Theme.of(context);
+    final route = _route!;
+    final preview = vm.isNew && _hideEnds ? route.withoutEnds() : route;
+    final meters = (_routeKm ?? 0) * 1000;
+    final secs = (_seconds ?? 0).toDouble();
+    final stats = [
+      ('Distance', formatDistance(meters, _unit)),
+      ('Time', formatClock(Duration(seconds: secs.round()))),
+      if (_activity.showsSpeed)
+        ('Speed', formatSpeed(secs, meters, _unit) ?? '–')
+      else
+        ('Pace', formatPace(secs, meters, _unit) ?? '–'),
+    ];
+    return [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          height: 180,
+          child: RouteMap(
+            // A new map when the trim changes, so it re-frames the path.
+            key: ValueKey(preview.path.length),
+            path: preview.path,
+          ),
+        ),
+      ),
+      const SizedBox(height: 10),
+      Row(
+        children: [
+          for (final (label, value) in stats)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(value, style: theme.textTheme.titleMedium),
+                ],
+              ),
+            ),
+        ],
+      ),
+      if (vm.isNew)
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: _hideEnds,
+          onChanged: (v) => _edit(() => _hideEnds = v),
+          title: const Text('Hide your start and finish'),
+          subtitle: Text(
+            'Cuts the first and last '
+            '${_unit == DistanceUnit.mi ? '650 ft' : '200 m'} from the map '
+            "so it doesn't show where you live. Your stats stay the same.",
+          ),
+        ),
+    ];
+  }
+
   List<Widget> _workoutFields(BuildContext context) {
     final theme = Theme.of(context);
     return [
@@ -522,7 +624,10 @@ class _PostComposerState extends State<PostComposer> {
         spacing: 8,
         runSpacing: 4,
         children: [
-          for (final a in WorkoutActivity.values)
+          for (final a
+              in _route == null
+                  ? WorkoutActivity.values
+                  : WorkoutActivity.tracked)
             ChoiceChip(
               avatar: Icon(
                 workoutIcon(a),
@@ -538,48 +643,53 @@ class _PostComposerState extends State<PostComposer> {
         ],
       ),
       const SizedBox(height: 12),
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: TextFormField(
-              controller: _minutes,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Minutes',
-                prefixIcon: Icon(Icons.timer_outlined),
+      if (_route != null)
+        ..._routeFields(context)
+      else
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _minutes,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Minutes',
+                  prefixIcon: Icon(Icons.timer_outlined),
+                ),
+                validator: (v) {
+                  final n = int.tryParse(v?.trim() ?? '');
+                  return n == null || n < 1 || n > Workout.maxMinutes
+                      ? 'How long, in minutes'
+                      : null;
+                },
               ),
-              validator: (v) {
-                final n = int.tryParse(v?.trim() ?? '');
-                return n == null || n < 1 || n > Workout.maxMinutes
-                    ? 'How long, in minutes'
-                    : null;
-              },
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TextFormField(
-              controller: _distance,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _distance,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Distance, ${_unit.label} (optional)',
+                  prefixIcon: const Icon(Icons.straighten),
+                ),
+                validator: (v) {
+                  final t = v?.trim().replaceAll(',', '.') ?? '';
+                  if (t.isEmpty) return null;
+                  final d = double.tryParse(t);
+                  return d == null ||
+                          d <= 0 ||
+                          d * _unit.meters > Workout.maxDistanceKm * 1000
+                      ? 'Enter a distance in ${_unit.label}'
+                      : null;
+                },
               ),
-              decoration: const InputDecoration(
-                labelText: 'Distance, km (optional)',
-                prefixIcon: Icon(Icons.straighten),
-              ),
-              validator: (v) {
-                final t = v?.trim().replaceAll(',', '.') ?? '';
-                if (t.isEmpty) return null;
-                final d = double.tryParse(t);
-                return d == null || d <= 0 || d > Workout.maxDistanceKm
-                    ? 'Enter a distance in km'
-                    : null;
-              },
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       const SizedBox(height: 12),
       Row(
         children: [
@@ -605,19 +715,20 @@ class _PostComposerState extends State<PostComposer> {
         label: '${_effort ?? 5}',
         onChanged: (v) => _edit(() => _effort = v.round()),
       ),
-      Row(
-        children: [
-          Text('Exercises', style: theme.textTheme.titleSmall),
-          const Spacer(),
-          TextButton.icon(
-            onPressed: _exercises.length >= Workout.maxExercises
-                ? null
-                : () => _edit(() => _exercises.add(_ExerciseRow())),
-            icon: const Icon(Icons.add),
-            label: const Text('Add exercise'),
-          ),
-        ],
-      ),
+      if (_route == null)
+        Row(
+          children: [
+            Text('Exercises', style: theme.textTheme.titleSmall),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _exercises.length >= Workout.maxExercises
+                  ? null
+                  : () => _edit(() => _exercises.add(_ExerciseRow())),
+              icon: const Icon(Icons.add),
+              label: const Text('Add exercise'),
+            ),
+          ],
+        ),
       for (final (i, r) in _exercises.indexed)
         Padding(
           key: ObjectKey(r),

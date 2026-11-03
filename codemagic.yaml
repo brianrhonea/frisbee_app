@@ -29,7 +29,16 @@ workflows:
       vars:
         # The app's numeric Apple ID from App Store Connect > App Information.
         APP_STORE_APPLE_ID: "0000000000"
-    # Manual runs only, so pushes don't use build minutes.
+    # Every push to development builds and uploads to TestFlight. A newer
+    # push cancels a build still running, to save build minutes.
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: development
+          include: true
+          source: true
+      cancel_previous_builds: true
     scripts:
       - name: Write secrets files
         script: |

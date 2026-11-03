@@ -17,6 +17,21 @@ bool debugDisableMapTiles = false;
 
 LatLng latLngOf(GroupLocation l) => LatLng(l.latitude, l.longitude);
 
+/// The map's tiles, or nothing in widget tests.
+List<Widget> osmTileLayers() => [
+  if (!debugDisableMapTiles)
+    TileLayer(urlTemplate: _tileUrl, userAgentPackageName: _packageName),
+];
+
+/// The OpenStreetMap credit their licence asks for. Small type so it fits
+/// narrow cards; it can't wrap.
+Widget osmAttribution() => DefaultTextStyle.merge(
+  style: const TextStyle(fontSize: 10),
+  child: const SimpleAttributionWidget(
+    source: Text('OpenStreetMap contributors'),
+  ),
+);
+
 /// A map centred on [center] with a pin on [pin], if any. Read only
 /// unless [onTap] is given.
 class GroupMap extends StatelessWidget {
@@ -52,8 +67,7 @@ class GroupMap extends StatelessWidget {
         ),
       ),
       children: [
-        if (!debugDisableMapTiles)
-          TileLayer(urlTemplate: _tileUrl, userAgentPackageName: _packageName),
+        ...osmTileLayers(),
         if (pin != null)
           MarkerLayer(
             markers: [
@@ -70,13 +84,7 @@ class GroupMap extends StatelessWidget {
               ),
             ],
           ),
-        // Small type so the attribution fits narrow cards; it can't wrap.
-        DefaultTextStyle.merge(
-          style: const TextStyle(fontSize: 10),
-          child: const SimpleAttributionWidget(
-            source: Text('OpenStreetMap contributors'),
-          ),
-        ),
+        osmAttribution(),
       ],
     );
   }

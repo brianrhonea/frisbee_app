@@ -1312,14 +1312,31 @@ service cloud.firestore {
           && (x.size() < 19 || validExercise(x[18]))
           && (x.size() < 20 || validExercise(x[19]));
       }
+      // A GPS route (WorkoutRoute in lib/domain/models/workout_route.dart):
+      // an encoded polyline of up to 4000 points, and seconds per whole mile
+      // and kilometre.
+      function validRoute(r) {
+        return r is map
+          && r.keys().hasOnly(['path', 'splitsMi', 'splitsKm', 'elevationGainM'])
+          && r.path is string && r.path.size() > 0 && r.path.size() <= 80000
+          && r.splitsMi is list && r.splitsMi.size() <= 1000
+          && r.splitsKm is list && r.splitsKm.size() <= 1000
+          && (!('elevationGainM' in r)
+              || (r.elevationGainM is number
+                  && r.elevationGainM >= 0 && r.elevationGainM <= 20000));
+      }
       function validWorkout(w) {
         return w is map
-          && w.keys().hasOnly(['activity', 'durationMinutes', 'distanceKm',
-                               'effort', 'exercises'])
-          && w.activity in ['run', 'sprints', 'throwing', 'gym', 'agility',
-                            'mobility', 'other']
+          && w.keys().hasOnly(['activity', 'durationMinutes', 'durationSeconds',
+                               'distanceKm', 'effort', 'exercises', 'route'])
+          && w.activity in ['run', 'ride', 'walk', 'hike', 'sprints',
+                            'throwing', 'gym', 'agility', 'mobility', 'other']
           && w.durationMinutes is int
           && w.durationMinutes >= 1 && w.durationMinutes <= 1440
+          && (!('durationSeconds' in w)
+              || (w.durationSeconds is int
+                  && w.durationSeconds >= 1 && w.durationSeconds <= 86400))
+          && (!('route' in w) || validRoute(w.route))
           && (!('distanceKm' in w)
               || (w.distanceKm is number
                   && w.distanceKm > 0 && w.distanceKm <= 1000))

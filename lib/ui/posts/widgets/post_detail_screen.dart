@@ -9,6 +9,7 @@ import '../../core/ui/status_views.dart';
 import '../view_models/post_detail_viewmodel.dart';
 import 'post_widgets.dart';
 import 'post_composer.dart';
+import '../../workouts/widgets/route_widgets.dart';
 
 class PostDetailScreen extends StatefulWidget {
   const PostDetailScreen({super.key, required this.viewModel});
@@ -93,6 +94,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           : null,
                       onDelete: vm.isMine ? _confirmDelete : null,
                     ),
+                    if (post.workout case final w? when w.route != null)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: WorkoutSplits(workout: w),
+                        ),
+                      ),
                   ],
                 ),
               ),

@@ -10,7 +10,8 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
-| 0.0.8   | 2026-10-31 | `feature/follows-feed`                  | (this branch)       |
+| 0.0.9   | 2026-11-02 | `feature/gps-workouts`                  | (this branch)       |
+| 0.0.8   | 2026-10-31 | `feature/follows-feed`                  | `1f81f45` and later |
 | 0.0.7   | 2026-10-31 | `feature/community-groups`              | `9f19c55` and later |
 | 0.0.6   | 2026-10-30 | `feature/team-videos`                   | `d623748` and later |
 | 0.0.5   | 2026-10-30 | `feature/team-meetings`                 | `1b2e424` and later |
@@ -19,6 +20,33 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.9 — Record runs and rides with GPS
+
+Branch `feature/gps-workouts`.
+
+**Added**
+- **Record** (Home and Profile, on phones): record a run, ride, walk or
+  hike with GPS. A live map draws the route, with the time, distance,
+  average pace and current pace (speed for rides). Start, Pause, Resume,
+  Finish or Discard. Recording keeps going with the screen locked (an
+  Android notification; iOS background location) and while you use the
+  rest of the app; the Record button shows the clock.
+- **Finish** opens the composer with the time, distance and route filled
+  in. **Hide your start and finish** (on by default) cuts the first and
+  last 200 m from the posted map; the stats are unchanged.
+- Recorded workouts show the route map on the post. Opening the post
+  shows **splits**: the time for each mile or kilometre, with the part
+  left over, and elevation gain.
+- New activities: Ride, Walk and Hike.
+
+**Changed**
+- Distances, paces and speeds show in miles in the US and UK, kilometres
+  elsewhere. The manual workout distance field uses the same unit.
+- Workouts store `durationSeconds` and a `route` (encoded polyline, splits
+  per mile and per km, elevation gain); `validRoute` in `firestore.rules`.
+- Codemagic builds the iOS app and uploads it to TestFlight on every push
+  to `development`.
 
 ## 0.0.8 — Follows, the home feed and workout posts
 

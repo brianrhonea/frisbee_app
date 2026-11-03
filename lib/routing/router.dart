@@ -93,6 +93,9 @@ import '../ui/videos/widgets/video_screen.dart';
 import '../ui/tournaments/view_models/tournament_detail_viewmodel.dart';
 import '../ui/tournaments/view_models/tournaments_viewmodel.dart';
 import '../ui/tournaments/widgets/tournament_detail_screen.dart';
+import '../ui/workouts/view_models/record_workout_viewmodel.dart';
+import '../ui/workouts/widgets/record_workout_screen.dart';
+import '../ui/workouts/widgets/route_widgets.dart';
 import 'routes.dart';
 
 const _splash = '/splash';
@@ -168,6 +171,17 @@ GoRouter router(AuthRepository auth) => GoRouter(
           },
         ),
       ],
+    ),
+    GoRoute(
+      path: Routes.recordWorkout,
+      builder: (context, _) => ViewModelHost(
+        create: (c) => RecordWorkoutViewModel(
+          recorder: c.read(),
+          location: c.read(),
+          unit: distanceUnitOf(c),
+        ),
+        builder: (_, vm) => RecordWorkoutScreen(viewModel: vm),
+      ),
     ),
     // Opened from the bell on Home, over the shell.
     GoRoute(

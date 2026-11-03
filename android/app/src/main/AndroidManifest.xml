@@ -11,6 +11,12 @@
     <!-- Screen sharing runs in a foreground service (flutter_background). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
+    <!-- Recording runs and rides (geolocator). Its foreground service keeps
+         GPS on while the screen is off. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <!-- flutter_background asks for this; meetings don't need it, and Play
          restricts it. -->
     <uses-permission
@@ -18,6 +24,7 @@
         tools:node="remove"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
+    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
     <application
         android:label="Stall 10"
         android:name="${applicationName}"

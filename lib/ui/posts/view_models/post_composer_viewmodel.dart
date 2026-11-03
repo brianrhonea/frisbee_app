@@ -9,6 +9,7 @@ import '../../../data/services/file_picker_service.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/follow.dart';
 import '../../../domain/models/user_post.dart';
+import '../../../domain/models/workout.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../teams/view_models/team_home_viewmodel.dart' show pickPostImages;
@@ -18,6 +19,7 @@ class PostComposerViewModel extends ChangeNotifier {
   PostComposerViewModel({
     this.postId,
     this.startWithWorkout = false,
+    this.recorded,
     required UserPostRepository userPostRepository,
     required FollowRepository followRepository,
     required AuthRepository authRepository,
@@ -68,6 +70,9 @@ class PostComposerViewModel extends ChangeNotifier {
 
   /// Open on the Workout tab.
   final bool startWithWorkout;
+
+  /// A workout just recorded with GPS, to share.
+  final Workout? recorded;
   final UserPostRepository _posts;
   final AuthRepository _auth;
   final FilePickerService _picker;

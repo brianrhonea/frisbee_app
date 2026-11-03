@@ -36,6 +36,9 @@ abstract final class Routes {
   // People's posts open over the shell; use `context.push`. The composer
   // is an overlay: see `showPostComposer`.
   static const postsPath = '/posts';
+
+  /// Records a run or ride with GPS, over the shell; use `context.push`.
+  static const recordWorkout = '/record';
   static String post(String id) => '$postsPath/$id';
 
   // The inbox is a shell tab; a conversation opened on its own (e.g. from a

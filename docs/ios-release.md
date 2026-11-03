@@ -53,7 +53,8 @@ TestFlight. These are the one-time setup steps, in order.
    | `SECRETS_LOCAL_JSON` | base64 of `secrets.local.json` |
    | `GOOGLE_SERVICE_INFO_PLIST` | base64 of `GoogleService-Info.plist` |
 
-4. Start the **iOS release (TestFlight)** workflow by hand. It runs
+4. Push to `development` (or start the **iOS release (TestFlight)**
+   workflow by hand) to build. It runs
    `flutter analyze` and `flutter test`, builds with the next build number,
    and uploads to TestFlight.
 

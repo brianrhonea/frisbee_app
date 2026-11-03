@@ -22,6 +22,7 @@ import '../../teams/widgets/join_team_dialog.dart';
 import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/home_viewmodel.dart';
 import '../../posts/widgets/post_composer.dart';
+import '../../workouts/widgets/record_button.dart';
 
 enum _Tab { forYou, teams }
 
@@ -439,6 +440,7 @@ class _Composer extends StatelessWidget {
                   icon: const Icon(Icons.directions_run, size: 18),
                   label: const Text('Workout'),
                 ),
+                RecordWorkoutButton(style: compact),
                 if (onTeamPost case final teamPost?)
                   TextButton.icon(
                     style: compact,
