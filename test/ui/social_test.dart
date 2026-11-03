@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
+import 'package:frisbee_app/data/repositories/follow/follow_repository.dart';
+import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
+import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/group_tournament.dart';
 import 'package:frisbee_app/domain/models/notification.dart';
@@ -14,7 +18,7 @@ import 'package:frisbee_app/ui/follow/widgets/follow_button.dart';
 import 'package:frisbee_app/ui/people/view_models/following_viewmodel.dart';
 import 'package:frisbee_app/ui/people/widgets/following_screen.dart';
 import 'package:frisbee_app/ui/posts/view_models/post_composer_viewmodel.dart';
-import 'package:frisbee_app/ui/posts/widgets/post_composer_screen.dart';
+import 'package:frisbee_app/ui/posts/widgets/post_composer.dart';
 import 'package:frisbee_app/ui/profile/view_models/player_profile_viewmodel.dart';
 import 'package:frisbee_app/ui/profile/widgets/profile_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
@@ -176,27 +180,61 @@ void main() {
       vm.dispose();
     });
 
-    testWidgets('shares a workout with exercises', (tester) async {
-      tester.view.physicalSize = const Size(800, 1600);
+    /// A page with an Open button that shows the composer; [onResult] gets
+    /// what it closed with.
+    Future<void> pumpOpener(
+      WidgetTester tester, {
+      required Size size,
+      bool workout = false,
+      void Function(String?)? onResult,
+    }) async {
+      tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      final vm = composer(workout: true);
-      final router = GoRouter(
-        initialLocation: '/compose',
-        routes: [
-          GoRoute(
-            path: '/compose',
-            builder: (_, _) => PostComposerScreen(viewModel: vm),
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<UserPostRepository>.value(value: posts),
+            Provider<FollowRepository>.value(value: follows),
+            ChangeNotifierProvider<AuthRepository>.value(value: auth),
+            Provider<FilePickerService>.value(value: FakeFilePickerService()),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () async {
+                    // Not `onResult?.call(await ...)`: that skips the
+                    // argument when there's no callback.
+                    final id = await showPostComposer(
+                      context,
+                      workout: workout,
+                    );
+                    onResult?.call(id);
+                  },
+                  child: const Text('Open'),
+                ),
+              ),
+            ),
           ),
-          GoRoute(
-            path: '/posts/:id',
-            builder: (_, state) => Text('Opened ${state.pathParameters['id']}'),
-          ),
-        ],
+        ),
       );
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-      await tester.pump();
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('shares a workout from a dialog over the page', (tester) async {
+      String? result;
+      await pumpOpener(
+        tester,
+        size: const Size(1280, 1000),
+        workout: true,
+        onResult: (id) => result = id,
+      );
+      expect(find.byType(Dialog), findsOneWidget);
       expect(find.text('Share a workout'), findsOneWidget);
+      expect(find.text('Open'), findsOneWidget, reason: 'page stays behind');
 
       // Minutes are required.
       await tester.tap(find.widgetWithText(FilledButton, 'Post'));
@@ -221,18 +259,50 @@ void main() {
         'Heavy day',
       );
       await tester.tap(find.widgetWithText(FilledButton, 'Post'));
-      await tester.pump();
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       final saved = posts.posts.single;
       expect(saved.body, 'Heavy day');
       expect(saved.workout!.activity, WorkoutActivity.gym);
       expect(saved.workout!.durationMinutes, 45);
       expect(saved.workout!.exercises.single.detail, '5 × 3');
-      await tester.pumpAndSettle();
-      expect(find.text('Opened ${saved.id}'), findsOneWidget);
+      expect(result, saved.id);
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.text('Posted'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      vm.dispose();
+    });
+
+    testWidgets('on phones it is a sheet that asks before discarding', (
+      tester,
+    ) async {
+      await pumpOpener(tester, size: const Size(400, 800));
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.text('New post'), findsOneWidget);
+
+      // Nothing written yet: closes straight away.
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Post'),
+        'Great layout D today',
+      );
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('Discard this post?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Great layout D today'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(posts.posts, isEmpty);
     });
 
     test('offers followed tournaments as tags', () async {

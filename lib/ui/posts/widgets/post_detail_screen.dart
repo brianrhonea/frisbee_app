@@ -8,6 +8,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/post_detail_viewmodel.dart';
 import 'post_widgets.dart';
+import 'post_composer.dart';
 
 class PostDetailScreen extends StatefulWidget {
   const PostDetailScreen({super.key, required this.viewModel});
@@ -88,7 +89,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       post: post,
                       loadImage: vm.imageData,
                       onEdit: vm.isMine
-                          ? () => context.push(Routes.editPost(post.id))
+                          ? () => showPostComposer(context, postId: post.id)
                           : null,
                       onDelete: vm.isMine ? _confirmDelete : null,
                     ),

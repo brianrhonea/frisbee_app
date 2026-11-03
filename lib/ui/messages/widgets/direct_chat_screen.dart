@@ -26,21 +26,17 @@ class DirectChatScreen extends StatelessWidget {
     return ViewModelHost(
       create: (c) => InboxViewModel(
         directMessageRepository: c.read(),
-        teamRepository: c.read(),
-        chatRepository: c.read(),
         authRepository: c.read(),
       ),
       builder: (context, inbox) {
         // Switching conversations replaces this page, so back still leaves.
-        void open(InboxItem item) => switch (item) {
-          DirectItem(:final conversation)
-              when conversation.id != vm.conversationId =>
-            context.pushReplacement(Routes.conversation(conversation.id)),
-          RoomItem(:final team, :final room) => context.pushReplacement(
-            Routes.chatRoom(team.id, room.id),
-          ),
-          _ => null,
-        };
+        void open(InboxItem item) {
+          final id = item.conversation.id;
+          if (id != vm.conversationId) {
+            context.pushReplacement(Routes.conversation(id));
+          }
+        }
+
         final selectedKey = 'dm:${vm.conversationId}';
 
         return LayoutBuilder(

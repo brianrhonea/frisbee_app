@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../themes/theme.dart';
 
-const appName = 'UltiUP';
+const appName = 'Stall 10';
 
 /// Matches `version:` in pubspec.yaml (checked by test/version_test.dart).
 /// The log of versions is in docs/CHANGELOG.md.
 const appVersion = '0.0.8';
 
-/// The app icon in use.
-const logoAsset = 'assets/brand/ultiup_1b.png';
+/// The app icon: a "10" whose "0" is a flying disc. Drawn, with every
+/// platform's launcher icon, by tool/brand/stall10_logo.py.
+const logoAsset = 'assets/brand/stall10_logo.png';
 
-class UltiUpLogo extends StatelessWidget {
-  const UltiUpLogo({super.key, this.size = 32, this.asset = logoAsset});
+class AppLogo extends StatelessWidget {
+  const AppLogo({super.key, this.size = 32, this.asset = logoAsset});
 
   final double size;
   final String asset;
@@ -32,8 +33,8 @@ class UltiUpLogo extends StatelessWidget {
 }
 
 /// Logo followed by the app name, in [color] (default: the page's ink).
-class UltiUpWordmark extends StatelessWidget {
-  const UltiUpWordmark({super.key, this.size = 28, this.color});
+class AppWordmark extends StatelessWidget {
+  const AppWordmark({super.key, this.size = 28, this.color});
 
   final double size;
   final Color? color;
@@ -44,7 +45,7 @@ class UltiUpWordmark extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        UltiUpLogo(size: size),
+        AppLogo(size: size),
         SizedBox(width: size * 0.32),
         Text(
           appName,

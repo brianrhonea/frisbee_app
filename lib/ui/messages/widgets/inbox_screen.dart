@@ -4,9 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../routing/routes.dart';
-import '../../chat/view_models/chat_room_viewmodel.dart';
 import '../../chat/widgets/chat_layout.dart';
-import '../../chat/widgets/chat_room_screen.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
@@ -18,7 +16,8 @@ import 'direct_chat_screen.dart';
 /// Width of the inbox list beside an open conversation.
 const _listWidth = 300.0;
 
-/// Messages: direct messages and team chats in one inbox. Wide screens
+/// Messages: the user's private conversations. Team chats live on team
+/// pages. Wide screens
 /// list them on the left and open the picked one on the right; phones list
 /// them and slide the picked one in full screen.
 class InboxScreen extends StatelessWidget {
@@ -26,14 +25,8 @@ class InboxScreen extends StatelessWidget {
 
   final InboxViewModel viewModel;
 
-  void _openFullScreen(BuildContext context, InboxItem item) => switch (item) {
-    DirectItem(:final conversation) => context.push(
-      Routes.conversation(conversation.id),
-    ),
-    RoomItem(:final team, :final room) => context.push(
-      Routes.chatRoom(team.id, room.id),
-    ),
-  };
+  void _openFullScreen(BuildContext context, InboxItem item) =>
+      context.push(Routes.conversation(item.conversation.id));
 
   @override
   Widget build(BuildContext context) {
@@ -128,38 +121,23 @@ class InboxScreen extends StatelessWidget {
   }
 }
 
-/// The open conversation or team room, beside the list.
+/// The open conversation, beside the list.
 class _Detail extends StatelessWidget {
   const _Detail({required this.item});
 
   final InboxItem item;
 
   @override
-  Widget build(BuildContext context) => switch (item) {
-    DirectItem(:final conversation) => ViewModelHost(
-      key: ValueKey('dm-pane-${conversation.id}'),
-      create: (c) => DirectChatViewModel(
-        conversationId: conversation.id,
-        directMessageRepository: c.read(),
-        authRepository: c.read(),
-        filePicker: c.read(),
-      ),
-      builder: (_, dmVm) => DirectChatView(viewModel: dmVm),
+  Widget build(BuildContext context) => ViewModelHost(
+    key: ValueKey('dm-pane-${item.conversation.id}'),
+    create: (c) => DirectChatViewModel(
+      conversationId: item.conversation.id,
+      directMessageRepository: c.read(),
+      authRepository: c.read(),
+      filePicker: c.read(),
     ),
-    RoomItem(:final team, :final room) => ViewModelHost(
-      key: ValueKey('room-pane-${team.id}-${room.id}'),
-      create: (c) => ChatRoomViewModel(
-        teamId: team.id,
-        roomId: room.id,
-        teamRepository: c.read(),
-        chatRepository: c.read(),
-        notificationRepository: c.read(),
-        authRepository: c.read(),
-        filePicker: c.read(),
-      ),
-      builder: (_, roomVm) => ChatRoomView(viewModel: roomVm),
-    ),
-  };
+    builder: (_, dmVm) => DirectChatView(viewModel: dmVm),
+  );
 }
 
 /// The inbox: a search box, All / Unread filters and the entries;
@@ -264,9 +242,9 @@ class InboxList extends StatelessWidget {
                               ? 'No messages yet'
                               : 'Nothing here',
                           message: vm.allItems.isEmpty
-                              ? 'Message anyone on UltiUP privately, or '
-                                    'chat with your team. Tap New message '
-                                    'and search by name.'
+                              ? 'Message anyone on Stall 10 privately. Tap '
+                                    'New message and search by name. Team '
+                                    "chats are on each team's page."
                               : null,
                         )
                 : ListView.builder(
@@ -318,16 +296,7 @@ class _InboxTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              switch (item) {
-                DirectItem(:final title) => PersonAvatar(
-                  name: title,
-                  radius: 18,
-                ),
-                RoomItem(:final team) => TeamBadge(
-                  size: 36,
-                  community: team.isCommunity,
-                ),
-              },
+              PersonAvatar(name: item.title, radius: 18),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(

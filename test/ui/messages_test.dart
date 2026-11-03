@@ -98,12 +98,8 @@ void main() {
     child: child,
   );
 
-  InboxViewModel inbox() => InboxViewModel(
-    directMessageRepository: dms,
-    teamRepository: teams,
-    chatRepository: chats,
-    authRepository: auth,
-  );
+  InboxViewModel inbox() =>
+      InboxViewModel(directMessageRepository: dms, authRepository: auth);
 
   test('search finds people by name, not yourself, and opens a chat', () async {
     final vm = PeopleSearchViewModel(
@@ -245,7 +241,7 @@ void main() {
     expect(find.text('Ride at 6?'), findsNWidgets(2));
   });
 
-  test('the inbox lists team chat rooms beside direct messages', () async {
+  test('the inbox lists only private messages, not team chats', () async {
     teams.teams['t1'] = teamWith({
       'owner': TeamRole.owner,
       testUser.uid: TeamRole.player,
@@ -260,16 +256,30 @@ void main() {
         createdAt: DateTime(2026, 10, 2),
       ),
     ];
+    for (final (uid, name) in [('a', 'Avery'), ('b', 'Blake')]) {
+      await dms.openConversation(testUser, UserProfile(uid: uid, name: name));
+    }
+    await dms.sendMessage(
+      'a_u1',
+      author: const AppUser(uid: 'a', displayName: 'Avery'),
+      text: 'Ride at 6?',
+    );
+    await dms.sendMessage('b_u1', author: testUser, text: 'Hi');
     final vm = inbox();
     addTearDown(vm.dispose);
     await pumpEventQueue();
-    final room = vm.allItems.whereType<RoomItem>().single;
-    expect(room.title, endsWith('Team chat'));
-    expect(room.preview, 'Avery: Field 3 at noon');
+    expect(
+      vm.allItems.map((i) => i.title),
+      unorderedEquals(['Avery', 'Blake']),
+    );
+    expect(
+      vm.allItems.map((i) => i.preview),
+      isNot(contains(contains('Field'))),
+    );
     vm.setFilter(InboxFilter.unread);
-    expect(vm.items, isEmpty);
+    expect(vm.items.single.title, 'Avery');
     vm.setFilter(InboxFilter.all);
-    vm.setQuery('team chat');
-    expect(vm.items.single.key, room.key);
+    vm.setQuery('bla');
+    expect(vm.items.single.title, 'Blake');
   });
 }

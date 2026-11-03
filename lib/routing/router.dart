@@ -45,9 +45,7 @@ import '../ui/notifications/widgets/notifications_screen.dart';
 import '../ui/profile/view_models/player_profile_viewmodel.dart';
 import '../ui/people/view_models/following_viewmodel.dart';
 import '../ui/people/widgets/following_screen.dart';
-import '../ui/posts/view_models/post_composer_viewmodel.dart';
 import '../ui/posts/view_models/post_detail_viewmodel.dart';
-import '../ui/posts/widgets/post_composer_screen.dart';
 import '../ui/posts/widgets/post_detail_screen.dart';
 import '../ui/profile/view_models/profile_viewmodel.dart';
 import '../ui/profile/widgets/profile_screen.dart';
@@ -124,20 +122,13 @@ GoRouter router(AuthRepository auth) => GoRouter(
         builder: (_, vm) => SignUpScreen(viewModel: vm),
       ),
     ),
-    // People's posts and the composer, over the shell. `/posts` alone goes
-    // Home, where the feed is.
+    // People's posts, over the shell. `/posts` alone goes Home, where the
+    // feed is. The composer is an overlay, not a route.
     GoRoute(
       path: Routes.postsPath,
       redirect: (_, state) =>
           state.uri.path == Routes.postsPath ? Routes.home : null,
       routes: [
-        GoRoute(
-          path: 'new',
-          builder: (_, state) => _postComposer(
-            null,
-            workout: state.uri.queryParameters['kind'] == 'workout',
-          ),
-        ),
         GoRoute(
           path: ':postId',
           builder: (_, state) {
@@ -152,13 +143,6 @@ GoRouter router(AuthRepository auth) => GoRouter(
               builder: (_, vm) => PostDetailScreen(viewModel: vm),
             );
           },
-          routes: [
-            GoRoute(
-              path: 'edit',
-              builder: (_, state) =>
-                  _postComposer(state.pathParameters['postId']),
-            ),
-          ],
         ),
       ],
     ),
@@ -857,7 +841,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
             ),
           ],
         ),
-        // Messages: direct messages and team chats.
+        // Messages: private conversations. Team chats are on team pages.
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -865,8 +849,6 @@ GoRouter router(AuthRepository auth) => GoRouter(
               builder: (_, _) => ViewModelHost(
                 create: (c) => InboxViewModel(
                   directMessageRepository: c.read(),
-                  teamRepository: c.read(),
-                  chatRepository: c.read(),
                   authRepository: c.read(),
                 ),
                 builder: (_, vm) => InboxScreen(viewModel: vm),
@@ -989,20 +971,6 @@ String? authRedirect(AuthRepository auth, Uri uri) {
   if (public || path == _splash) return from ?? Routes.home;
   return null;
 }
-
-/// Writes a new post (or workout), or edits [postId].
-Widget _postComposer(String? postId, {bool workout = false}) => ViewModelHost(
-  key: ValueKey('post-composer-$postId-$workout'),
-  create: (c) => PostComposerViewModel(
-    postId: postId,
-    startWithWorkout: workout,
-    userPostRepository: c.read(),
-    followRepository: c.read(),
-    authRepository: c.read(),
-    filePicker: c.read(),
-  ),
-  builder: (_, vm) => PostComposerScreen(viewModel: vm),
-);
 
 /// Sets up a new group tournament, or edits [tournamentId].
 Widget _tournamentEditor(GoRouterState state, String? tournamentId) {

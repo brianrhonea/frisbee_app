@@ -21,6 +21,7 @@ import '../../shell/widgets/app_shell.dart';
 import '../../teams/widgets/join_team_dialog.dart';
 import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/home_viewmodel.dart';
+import '../../posts/widgets/post_composer.dart';
 
 enum _Tab { forYou, teams }
 
@@ -171,7 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _newPost() => context.push(Routes.newPost);
+  void _newPost() => showPostComposer(context);
 
   void _newPersonalEvent() => context.push(Routes.newMyEvent());
 
@@ -279,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
         name: vm.user?.label ?? '',
         photoUrl: vm.user?.photoUrl,
         onPost: _newPost,
-        onWorkout: () => context.push(Routes.newWorkout),
+        onWorkout: () => showPostComposer(context, workout: true),
         onTeamPost: vm.postableTeams.isEmpty || vm.savePost.running
             ? null
             : _compose,
@@ -305,7 +306,7 @@ class _HomeScreenState extends State<HomeScreen> {
             loadImage: vm.imageData,
             onOpen: () => context.push(Routes.post(post.id)),
             onEdit: post.authorId == vm.user?.uid
-                ? () => context.push(Routes.editPost(post.id))
+                ? () => showPostComposer(context, postId: post.id)
                 : null,
             onDelete: post.authorId == vm.user?.uid
                 ? () => _deleteUserPost(post.id)

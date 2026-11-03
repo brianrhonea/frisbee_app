@@ -18,6 +18,7 @@ import '../../posts/widgets/post_widgets.dart';
 import '../view_models/player_profile_viewmodel.dart';
 import '../view_models/profile_viewmodel.dart';
 import 'delete_account_dialog.dart';
+import '../../posts/widgets/post_composer.dart';
 
 enum _Tab { overview, posts, stats, teams }
 
@@ -197,12 +198,12 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
             runSpacing: 8,
             children: [
               FilledButton.icon(
-                onPressed: () => context.push(Routes.newPost),
+                onPressed: () => showPostComposer(context),
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: const Text('New post'),
               ),
               OutlinedButton.icon(
-                onPressed: () => context.push(Routes.newWorkout),
+                onPressed: () => showPostComposer(context, workout: true),
                 icon: const Icon(Icons.directions_run, size: 18),
                 label: const Text('Log a workout'),
               ),
@@ -235,7 +236,9 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
             post: p,
             loadImage: vm.imageData,
             onOpen: () => context.push(Routes.post(p.id)),
-            onEdit: vm.isMe ? () => context.push(Routes.editPost(p.id)) : null,
+            onEdit: vm.isMe
+                ? () => showPostComposer(context, postId: p.id)
+                : null,
             onDelete: vm.isMe ? () => _deletePost(p.id) : null,
           ),
     ];
@@ -1116,7 +1119,7 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
                 ),
               ),
               Text(
-                'Anyone on UltiUP can find your profile. Hidden sections '
+                'Anyone on Stall 10 can find your profile. Hidden sections '
                 "aren't shared.",
                 style: TextStyle(fontSize: 11.5, color: c.muted),
               ),

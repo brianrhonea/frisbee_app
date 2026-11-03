@@ -171,6 +171,36 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         )) {
           vm.leaveTeam.execute();
         }
+      case _MenuAction.delete when team.members.length > 1:
+        // Deleting would take everyone else's team away; hand it on or
+        // empty it first.
+        final noun = team.isCommunity ? 'group' : 'team';
+        final others = team.members.length - 1;
+        final goToMembers = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text("Can't delete ${team.name} yet"),
+            content: Text(
+              'It still has $others other '
+              '${others == 1 ? 'member' : 'members'}. To delete the $noun, '
+              'remove everyone else first. Or, to keep it going without '
+              'you, transfer ownership to someone else and then leave.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Go to Members'),
+              ),
+            ],
+          ),
+        );
+        if (goToMembers == true && mounted) {
+          context.go(Routes.teamSection(team.id, TeamSection.members.path));
+        }
       case _MenuAction.delete:
         if (await confirmDialog(
           context,

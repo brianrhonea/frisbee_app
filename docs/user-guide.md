@@ -1,6 +1,6 @@
-# UltiUP user guide
+# Stall 10 user guide
 
-UltiUP keeps your ultimate team in one place: schedule, roster, playbook,
+Stall 10 keeps your ultimate team in one place: schedule, roster, playbook,
 stats, plus USA Ultimate tournaments and rankings. This guide covers
 version 0.0.4.
 
@@ -114,7 +114,7 @@ You aren't notified about things you did yourself.
 Notifications):
 
 - **This device**: tap **Turn on** to get push notifications on your phone,
-  tablet or Mac, even when UltiUP is closed. Windows has no push, but
+  tablet or Mac, even when Stall 10 is closed. Windows has no push, but
   everything still shows under the 🔔.
 - **Notify me about**: turn each kind on or off for all your teams. Your
   choices apply on every device you use.
@@ -127,7 +127,7 @@ Notifications):
 Tap the 💬 icon at the top of Home to open your private messages. A badge
 shows how many conversations have something new.
 
-- **New message**: search for anyone on UltiUP by name, then tap them to
+- **New message**: search for anyone on Stall 10 by name, then tap them to
   start a conversation. You don't need to share a team.
 - Only the two of you can see a conversation. Attach photos or files up to
   10 MB, the same as team chat. You can delete your own messages.
@@ -217,7 +217,7 @@ tournaments) and **Member**.
 4. Check the **schedule preview**. Games are split evenly over the days,
    in bracket order. It warns if games run past the ideal end. Tap
    **Publish schedule**. Teams can still be empty at this point. The first
-   time you publish, UltiUP offers to **post it to the group feed** with
+   time you publish, Stall 10 offers to **post it to the group feed** with
    the dates, format and how to sign up filled in. The post is public, so
    people who haven't joined yet see it too; edit it before posting.
 5. Add players, now or any time before play: **Import RSVPs** brings in
@@ -264,7 +264,7 @@ your team and tap **Videos**.
 - **Add one** (owners, coaches and captains):
   1. Upload the video to YouTube. Set it to **Unlisted** if it's just for
      the team, and leave **Allow embedding** on.
-  2. In **Videos**, tap **Add video** and paste the link. UltiUP checks it
+  2. In **Videos**, tap **Add video** and paste the link. Stall 10 checks it
      with YouTube, shows the thumbnail and fills in the title.
   3. Change the title if you like, add a description, and tap
      **Add video**.
@@ -273,7 +273,7 @@ your team and tap **Videos**.
   all work. Files can be up to 500 MB, and each team has 5 GB in
   all; the bar above the videos shows how much is used. Keep the page
   open until the upload finishes.
-- If UltiUP says YouTube won't play the video here, it's set to Private,
+- If Stall 10 says YouTube won't play the video here, it's set to Private,
   it was deleted, or embedding is turned off. Fix that on YouTube and
   paste the link again.
 - **Folders:** tap a chip above the videos (**All**, a folder, or
@@ -302,11 +302,11 @@ but only to the people invited.
 - **RSVP** on the meeting page: **Attending** or **Not attending**. Admins
   see everyone's answers.
 - **Go to meeting room** opens the lobby. Pick your microphone, speaker
-  and camera, check your camera preview and set the meeting volume. UltiUP
+  and camera, check your camera preview and set the meeting volume. Stall 10
   asks for camera and microphone access the first time.
 - **Starting:** an admin taps **Start meeting** (or **Start meeting early**
   before the start time). Everyone attending who isn't already there gets a
-  notification, or a banner with **Join** if UltiUP is open.
+  notification, or a banner with **Join** if Stall 10 is open.
 - **Getting in:** without approval, tap **Join meeting** once it's started.
   With approval, tap **Ask to join** and wait; admins see the waiting list
   in the lobby and in the call, and tap **Admit** or **Deny**.
@@ -324,12 +324,12 @@ but only to the people invited.
   **Take control** to drive. Everyone hears the video through their own
   device at full quality, so there's no need to share your screen. If it
   says "Tap the video to start it", tap the video once.
-- **Recording:** UltiUP doesn't record meetings yet. Record with OBS (or
+- **Recording:** Stall 10 doesn't record meetings yet. Record with OBS (or
   similar), upload the recording to YouTube, and add the link in
   **Videos** once YouTube has finished processing it.
 - **Volume:** tap a person to make them louder or quieter (0–200%) or mute
   them, just for you. Settings (⚙) changes devices mid-call and the
-  overall volume. UltiUP remembers these on this device.
+  overall volume. Stall 10 remembers these on this device.
 
 ### Events
 
@@ -361,7 +361,7 @@ back returns to the list (or to Home, if you opened it there).
 - **Notifications** and your notification settings are visible only to
   you.
 - **Your posts** (and their photos) are public to anyone signed in to
-  UltiUP. **Who you follow** is private: others see only how many people
+  Stall 10. **Who you follow** is private: others see only how many people
   follow you and how many you follow.
 - **The invite code** is visible only to owners, coaches and captains.
   Anyone with the code can join as a player, so share it only with your team.
@@ -371,7 +371,7 @@ These rules are enforced by the server, not just hidden in the app.
 
 ## USA Ultimate data
 
-USA Ultimate has no public API. UltiUP reads tournaments, rankings and team
+USA Ultimate has no public API. Stall 10 reads tournaments, rankings and team
 pages (including event schedules and brackets) from play.usaultimate.org and
 links back to it. Information may be out of date or incomplete; check USA
 Ultimate for anything official.

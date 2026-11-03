@@ -1,5 +1,5 @@
 name: frisbee_app
-description: "UltiUP: team management, playbooks, events and rankings for ultimate frisbee."
+description: "Stall 10: team management, playbooks, events and rankings for ultimate frisbee."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -107,7 +107,7 @@ flutter:
         - asset: assets/fonts/Inter-ExtraBold.ttf
           weight: 800
 
-  # UltiUP logo variants (see lib/ui/core/ui/brand.dart).
+  # The Stall 10 logo (see lib/ui/core/ui/brand.dart).
   assets:
     - assets/brand/
 

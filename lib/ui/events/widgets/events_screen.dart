@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../routing/routes.dart';
+import '../../core/ui/back_or.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/usau_attribution.dart';
 import '../../tournaments/view_models/tournaments_viewmodel.dart';
@@ -16,7 +18,11 @@ class EventsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     return Scaffold(
-      appBar: AppBar(title: const Text('Events')),
+      appBar: AppBar(
+        // Opened from Explore; back goes there.
+        leading: backOr(context, Routes.explorePath),
+        title: const Text('Events'),
+      ),
       body: ListenableBuilder(
         listenable: vm,
         builder: (context, _) {

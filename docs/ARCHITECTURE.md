@@ -1,4 +1,4 @@
-# UltiUP architecture
+# Stall 10 architecture
 
 How the app is put together as of version 0.0.4 (branch
 `feature/ultiup-schedule`): layers, features, where data lives, how it gets

@@ -62,7 +62,7 @@ class Conversation {
   String otherId(String me) =>
       participants.firstWhere((p) => p != me, orElse: () => me);
 
-  String otherName(String me) => names[otherId(me)] ?? 'UltiUP user';
+  String otherName(String me) => names[otherId(me)] ?? 'Stall 10 user';
 
   bool get hasMessages => lastMessageAt != null;
 

@@ -1,26 +1,90 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../domain/models/user_post.dart';
 import '../../../domain/models/workout.dart';
-import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
+import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart' show ScreenSize;
 import '../../core/ui/status_views.dart';
+import '../../core/ui/view_model_host.dart';
 import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/post_composer_viewmodel.dart';
 import 'post_widgets.dart';
 
-/// Writes a post or shares a workout, full screen.
-class PostComposerScreen extends StatefulWidget {
-  const PostComposerScreen({super.key, required this.viewModel});
+/// Opens the composer over the current page: a dialog on wide screens, a
+/// bottom sheet on phones. Writes a new post (or, with [workout], starts on
+/// the Workout tab), or edits [postId]. Completes with the saved post's id,
+/// or null if the user closed it.
+Future<String?> showPostComposer(
+  BuildContext context, {
+  String? postId,
+  bool workout = false,
+}) async {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  Widget composer() => ViewModelHost(
+    create: (c) => PostComposerViewModel(
+      postId: postId,
+      startWithWorkout: workout,
+      userPostRepository: c.read(),
+      followRepository: c.read(),
+      authRepository: c.read(),
+      filePicker: c.read(),
+    ),
+    builder: (_, vm) => PostComposer(viewModel: vm),
+  );
+  final String? id;
+  if (ScreenSize.of(context).isMobile) {
+    id = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      // Dragging would close it without asking; the close button and the
+      // barrier ask first when there are changes.
+      enableDrag: false,
+      clipBehavior: Clip.antiAlias,
+      builder: (_) =>
+          FractionallySizedBox(heightFactor: 0.92, child: composer()),
+    );
+  } else {
+    id = await showDialog<String>(
+      context: context,
+      builder: (context) => Dialog(
+        clipBehavior: Clip.antiAlias,
+        insetPadding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: SizedBox(
+            height: math.min(MediaQuery.sizeOf(context).height * 0.85, 820),
+            child: composer(),
+          ),
+        ),
+      ),
+    );
+  }
+  if (id != null) {
+    messenger?.showSnackBar(
+      SnackBar(content: Text(postId == null ? 'Posted' : 'Post saved')),
+    );
+  }
+  return id;
+}
+
+/// Writes a post or shares a workout. Shown by [showPostComposer]; closing
+/// it with unsaved changes asks first.
+class PostComposer extends StatefulWidget {
+  const PostComposer({super.key, required this.viewModel});
 
   final PostComposerViewModel viewModel;
 
   @override
-  State<PostComposerScreen> createState() => _PostComposerScreenState();
+  State<PostComposer> createState() => _PostComposerState();
 }
 
 /// One editable exercise row.
@@ -53,7 +117,7 @@ class _ExerciseRow {
   }
 }
 
-class _PostComposerScreenState extends State<PostComposerScreen> {
+class _PostComposerState extends State<PostComposer> {
   PostComposerViewModel get vm => widget.viewModel;
 
   final _formKey = GlobalKey<FormState>();
@@ -73,6 +137,31 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
   String? _linkError;
   bool _picking = false;
   bool _filled = false;
+
+  /// Whether the user has changed anything since the composer opened.
+  bool _changed = false;
+
+  /// Applies a change the user made.
+  void _edit(VoidCallback fn) {
+    _changed = true;
+    setState(fn);
+  }
+
+  /// Closes the composer, first asking to discard any changes.
+  Future<void> _close() async {
+    final nav = Navigator.of(context);
+    if (_changed &&
+        !await confirmDialog(
+          context,
+          title: vm.isNew ? 'Discard this post?' : 'Discard your changes?',
+          message: "What you've written won't be saved.",
+          confirmLabel: 'Discard',
+          destructive: true,
+        )) {
+      return;
+    }
+    if (mounted) nav.pop();
+  }
 
   int get _imageCount => _kept.length + _added.length;
 
@@ -126,11 +215,7 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
     switch (cmd.result) {
       case Ok(:final value):
         cmd.clearResult();
-        if (vm.isNew) {
-          context.pushReplacement(Routes.post(value));
-        } else {
-          context.pop();
-        }
+        Navigator.of(context).pop(value);
       case Error():
         showErrorSnackBar(context, cmd.result);
         cmd.clearResult();
@@ -142,7 +227,7 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
   void _addLink() {
     if (_link.text.trim().isEmpty) return;
     final link = TeamPost.normalizeLink(_link.text);
-    setState(() {
+    _edit(() {
       if (link == null) {
         _linkError = 'Enter a web address, like example.com/video';
       } else if (_links.length >= UserPost.maxLinks) {
@@ -163,7 +248,7 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
     switch (result) {
       case Ok(:final value):
         final room = UserPost.maxImages - _imageCount;
-        setState(() => _added.addAll(value.take(room)));
+        _edit(() => _added.addAll(value.take(room)));
         if (value.length > room) {
           showSnackBar(
             context,
@@ -208,12 +293,20 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
       final title = vm.isNew
           ? (_workout ? 'Share a workout' : 'New post')
           : 'Edit post';
+      final close = IconButton(
+        tooltip: 'Close',
+        onPressed: _close,
+        icon: const Icon(Icons.close),
+      );
       if (!vm.loaded) {
-        return Scaffold(appBar: AppBar(), body: const LoadingView());
+        return Scaffold(
+          appBar: AppBar(leading: close),
+          body: const LoadingView(),
+        );
       }
       if (vm.loadError != null || !vm.canEdit) {
         return Scaffold(
-          appBar: AppBar(),
+          appBar: AppBar(leading: close),
           body: vm.loadError == null
               ? const EmptyView(
                   icon: Icons.edit_off_outlined,
@@ -223,156 +316,165 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
               : ErrorView(error: vm.loadError),
         );
       }
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(title),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: FilledButton(
-                onPressed: vm.save.running ? null : _submit,
-                child: Text(vm.isNew ? 'Post' : 'Save'),
+      return PopScope<String>(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _close();
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            leading: close,
+            title: Text(title),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: FilledButton(
+                  onPressed: vm.save.running ? null : _submit,
+                  child: Text(vm.isNew ? 'Post' : 'Save'),
+                ),
               ),
-            ),
-          ],
-        ),
-        body: Form(
-          key: _formKey,
-          child: ConstrainedContent(
-            maxWidth: 640,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              children: [
-                if (vm.save.running) const LinearProgressIndicator(),
-                if (vm.isNew)
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(
-                        value: false,
-                        icon: Icon(Icons.edit_note),
-                        label: Text('Post'),
-                      ),
-                      ButtonSegment(
-                        value: true,
-                        icon: Icon(Icons.fitness_center),
-                        label: Text('Workout'),
-                      ),
-                    ],
-                    selected: {_workout},
-                    onSelectionChanged: (s) =>
-                        setState(() => _workout = s.first),
-                  ),
-                const SizedBox(height: 12),
-                if (_workout) ..._workoutFields(context),
-                TextFormField(
-                  controller: _body,
-                  minLines: _workout ? 2 : 4,
-                  maxLines: 10,
-                  maxLength: UserPost.maxBody,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    labelText: _workout ? 'Notes (optional)' : 'Post',
-                    hintText: _workout
-                        ? 'How did it go?'
-                        : 'Share a highlight, a question, a result…',
-                    alignLabelWithHint: true,
-                  ),
-                  validator: (v) =>
-                      !_workout &&
-                          (v == null || v.trim().isEmpty) &&
-                          _imageCount == 0
-                      ? 'Write something or add a photo'
-                      : null,
-                ),
-                if (vm.tournaments.isNotEmpty || _tagKey != null) _tagField(),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _link,
-                  keyboardType: TextInputType.url,
-                  enabled: _links.length < UserPost.maxLinks,
-                  decoration: InputDecoration(
-                    labelText: 'Add a link',
-                    hintText: 'example.com/highlights',
-                    prefixIcon: const Icon(Icons.link),
-                    errorText: _linkError,
-                    suffixIcon: IconButton(
-                      tooltip: 'Add link',
-                      icon: const Icon(Icons.add),
-                      onPressed: _addLink,
-                    ),
-                  ),
-                  onChanged: (_) {
-                    if (_linkError != null) setState(() => _linkError = null);
-                  },
-                  onSubmitted: (_) => _addLink(),
-                ),
-                if (_links.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      for (final l in _links)
-                        InputChip(
-                          label: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 360),
-                            child: Text(l, overflow: TextOverflow.ellipsis),
-                          ),
-                          onDeleted: () => setState(() => _links.remove(l)),
+            ],
+          ),
+          body: Form(
+            key: _formKey,
+            onChanged: () => _changed = true,
+            child: ConstrainedContent(
+              maxWidth: 640,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                children: [
+                  if (vm.save.running) const LinearProgressIndicator(),
+                  if (vm.isNew)
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                          value: false,
+                          icon: Icon(Icons.edit_note),
+                          label: Text('Post'),
                         ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text(
-                      'Photos',
-                      style: Theme.of(context).textTheme.titleSmall,
+                        ButtonSegment(
+                          value: true,
+                          icon: Icon(Icons.fitness_center),
+                          label: Text('Workout'),
+                        ),
+                      ],
+                      selected: {_workout},
+                      onSelectionChanged: (s) =>
+                          _edit(() => _workout = s.first),
                     ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: _picking || _imageCount >= UserPost.maxImages
-                          ? null
-                          : _addPhotos,
-                      icon: const Icon(Icons.add_photo_alternate_outlined),
-                      label: Text(
-                        'Add photos ($_imageCount/${UserPost.maxImages})',
+                  const SizedBox(height: 12),
+                  if (_workout) ..._workoutFields(context),
+                  TextFormField(
+                    controller: _body,
+                    minLines: _workout ? 2 : 4,
+                    maxLines: 10,
+                    maxLength: UserPost.maxBody,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: InputDecoration(
+                      labelText: _workout ? 'Notes (optional)' : 'Post',
+                      hintText: _workout
+                          ? 'How did it go?'
+                          : 'Share a highlight, a question, a result…',
+                      alignLabelWithHint: true,
+                    ),
+                    validator: (v) =>
+                        !_workout &&
+                            (v == null || v.trim().isEmpty) &&
+                            _imageCount == 0
+                        ? 'Write something or add a photo'
+                        : null,
+                  ),
+                  if (vm.tournaments.isNotEmpty || _tagKey != null) _tagField(),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _link,
+                    keyboardType: TextInputType.url,
+                    enabled: _links.length < UserPost.maxLinks,
+                    decoration: InputDecoration(
+                      labelText: 'Add a link',
+                      hintText: 'example.com/highlights',
+                      prefixIcon: const Icon(Icons.link),
+                      errorText: _linkError,
+                      suffixIcon: IconButton(
+                        tooltip: 'Add link',
+                        icon: const Icon(Icons.add),
+                        onPressed: _addLink,
                       ),
+                    ),
+                    onChanged: (_) {
+                      _changed = true;
+                      if (_linkError != null) setState(() => _linkError = null);
+                    },
+                    onSubmitted: (_) => _addLink(),
+                  ),
+                  if (_links.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        for (final l in _links)
+                          InputChip(
+                            label: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 360),
+                              child: Text(l, overflow: TextOverflow.ellipsis),
+                            ),
+                            onDeleted: () => _edit(() => _links.remove(l)),
+                          ),
+                      ],
                     ),
                   ],
-                ),
-                if (_imageCount > 0)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  const SizedBox(height: 12),
+                  Row(
                     children: [
-                      for (final i in _kept)
-                        _Removable(
-                          onRemove: () => setState(() => _kept.remove(i)),
-                          child: PostImage(
-                            image: i,
-                            loadImage: vm.imageData,
-                            size: 96,
-                          ),
+                      Text(
+                        'Photos',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: _picking || _imageCount >= UserPost.maxImages
+                            ? null
+                            : _addPhotos,
+                        icon: const Icon(Icons.add_photo_alternate_outlined),
+                        label: Text(
+                          'Add photos ($_imageCount/${UserPost.maxImages})',
                         ),
-                      for (final a in _added)
-                        _Removable(
-                          onRemove: () => setState(() => _added.remove(a)),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.memory(
-                              a.bytes,
-                              width: 96,
-                              height: 96,
-                              fit: BoxFit.cover,
-                              semanticLabel: a.name,
-                            ),
-                          ),
-                        ),
+                      ),
                     ],
                   ),
-              ],
+                  if (_imageCount > 0)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final i in _kept)
+                          _Removable(
+                            onRemove: () => _edit(() => _kept.remove(i)),
+                            child: PostImage(
+                              image: i,
+                              loadImage: vm.imageData,
+                              size: 96,
+                            ),
+                          ),
+                        for (final a in _added)
+                          _Removable(
+                            onRemove: () => _edit(() => _added.remove(a)),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.memory(
+                                a.bytes,
+                                width: 96,
+                                height: 96,
+                                fit: BoxFit.cover,
+                                semanticLabel: a.name,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -403,7 +505,7 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
               child: Text(name, overflow: TextOverflow.ellipsis),
             ),
         ],
-        onChanged: (v) => setState(() {
+        onChanged: (v) => _edit(() {
           _tagKey = v;
           _tagName = options.where((o) => o.$1 == v).firstOrNull?.$2;
         }),
@@ -422,10 +524,16 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
         children: [
           for (final a in WorkoutActivity.values)
             ChoiceChip(
-              avatar: Icon(workoutIcon(a), size: 18),
+              avatar: Icon(
+                workoutIcon(a),
+                size: 18,
+                color: _activity == a
+                    ? AppColors.of(context).onHighlight
+                    : null,
+              ),
               label: Text(a.label),
               selected: _activity == a,
-              onSelected: (_) => setState(() => _activity = a),
+              onSelected: (_) => _edit(() => _activity = a),
             ),
         ],
       ),
@@ -484,7 +592,7 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
           const Spacer(),
           if (_effort != null)
             TextButton(
-              onPressed: () => setState(() => _effort = null),
+              onPressed: () => _edit(() => _effort = null),
               child: const Text('Clear'),
             ),
         ],
@@ -495,7 +603,7 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
         max: 10,
         divisions: 9,
         label: '${_effort ?? 5}',
-        onChanged: (v) => setState(() => _effort = v.round()),
+        onChanged: (v) => _edit(() => _effort = v.round()),
       ),
       Row(
         children: [
@@ -504,7 +612,7 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
           TextButton.icon(
             onPressed: _exercises.length >= Workout.maxExercises
                 ? null
-                : () => setState(() => _exercises.add(_ExerciseRow())),
+                : () => _edit(() => _exercises.add(_ExerciseRow())),
             icon: const Icon(Icons.add),
             label: const Text('Add exercise'),
           ),
@@ -564,7 +672,7 @@ class _PostComposerScreenState extends State<PostComposerScreen> {
               ),
               IconButton(
                 tooltip: 'Remove exercise',
-                onPressed: () => setState(() {
+                onPressed: () => _edit(() {
                   _exercises.remove(r);
                   r.dispose();
                 }),

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/routing/routes.dart';
 import 'package:frisbee_app/ui/core/ui/layout.dart';
 import 'package:frisbee_app/ui/shell/view_models/shell_viewmodel.dart';
 import 'package:frisbee_app/ui/shell/widgets/app_shell.dart';
@@ -8,23 +9,41 @@ import 'package:frisbee_app/ui/shell/widgets/app_shell.dart';
 import '../testing/fakes.dart';
 
 void main() {
-  test('breadcrumbs name the page under the community', () {
+  test('breadcrumbs start at the section and link back up', () {
     String? name(String id) => id == 't1' ? 'Cascades' : null;
-    expect(breadcrumbs('/home', name), ['Your community', 'Community feed']);
-    expect(breadcrumbs('/messages', name), ['Your community', 'Messages']);
-    expect(breadcrumbs('/teams/t1', name), ['Your community', 'Cascades']);
-    expect(breadcrumbs('/teams/t1/roster', name), [
-      'Your community',
+    List<String> labels(String path) => [
+      for (final c in breadcrumbs(path, name)) c.label,
+    ];
+    List<String?> links(String path) => [
+      for (final c in breadcrumbs(path, name)) c.path,
+    ];
+
+    expect(labels('/home'), ['Community']);
+    expect(labels('/messages'), ['Messages']);
+    expect(labels('/explore'), ['Explore']);
+    expect(links('/explore'), [null], reason: "you're already there");
+
+    // Pages opened from Explore lead back to it.
+    expect(labels('/tournaments'), ['Explore', 'Events']);
+    expect(links('/tournaments'), [Routes.explorePath, null]);
+    expect(labels('/tournaments/x1'), ['Explore', 'Events', 'Event']);
+    expect(links('/tournaments/x1'), [
+      Routes.explorePath,
+      Routes.tournaments,
+      null,
+    ]);
+    expect(labels('/rankings/team'), ['Explore', 'Rankings', 'Team']);
+    expect(labels('/players/u2'), ['Explore', 'Player']);
+
+    expect(labels('/teams/t1'), ['My teams', 'Cascades']);
+    expect(labels('/teams/t1/roster'), ['My teams', 'Cascades', 'Roster']);
+    expect(links('/teams/t1/roster'), [Routes.teams, Routes.team('t1'), null]);
+    expect(labels('/teams/t1?section=roster'), [
+      'My teams',
       'Cascades',
       'Roster',
     ]);
-    expect(breadcrumbs('/teams/t1?section=roster', name), [
-      'Your community',
-      'Cascades',
-      'Roster',
-    ]);
-    expect(breadcrumbs('/teams/t9', name), ['Your community', 'Team']);
-    expect(breadcrumbs('/explore', name), ['Your community', 'Explore']);
+    expect(labels('/teams/t9'), ['My teams', 'Team']);
   });
 
   test('screen sizes follow the phone, tablet and desktop breakpoints', () {

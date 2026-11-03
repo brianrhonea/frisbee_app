@@ -475,6 +475,14 @@ class TeamRepositoryFirebase implements TeamRepository {
           t.reference,
         ]);
       }
+      // The tournaments' public listings, so Explore stops showing them.
+      // Queried rather than named: rules refuse deleting one that doesn't
+      // exist, and older tournaments may have none.
+      final listings = await _db
+          .collection('tournamentDirectory')
+          .where('groupId', isEqualTo: team.id)
+          .get();
+      await deleteDocs(_db, [for (final d in listings.docs) d.reference]);
       // Uploaded videos go before the videos that list them.
       for (final video in (await ref.collection('videos').get()).docs) {
         final path = TeamVideo.fromMap(
@@ -505,15 +513,14 @@ class TeamRepositoryFirebase implements TeamRepository {
         'statsTournaments',
         'statsGames',
         'joinRequests',
-        'private',
       ]) {
         final docs = await ref.collection(sub).get();
-        final batch = _db.batch();
-        for (final d in docs.docs) {
-          batch.delete(d.reference);
-        }
-        await batch.commit();
+        await deleteDocs(_db, [for (final d in docs.docs) d.reference]);
       }
+      // Rules let the owner read private/invite but not list private, so
+      // delete the one doc it holds by name. Groups have none; deleting a
+      // missing doc is fine.
+      await _invite(team.id).delete();
     } on Exception {
       // Half-deleted, but still a team: let it notify again.
       await ref.update({'deletingAt': FieldValue.delete()});

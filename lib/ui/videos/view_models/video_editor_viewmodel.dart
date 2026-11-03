@@ -149,7 +149,7 @@ class VideoEditorViewModel extends ChangeNotifier {
     _fileProblem = file.path == null
         ? "This device can't upload files that big."
         : VideoFile.contentTypeFor(file.name) == null
-        ? "UltiUP can't play that kind of file. Use MP4, MOV, MKV, WebM, "
+        ? "Stall 10 can't play that kind of file. Use MP4, MOV, MKV, WebM, "
               'AVI, WMV, MPEG or 3GP.'
         : size == null || size <= 0
         ? "Couldn't read that file."

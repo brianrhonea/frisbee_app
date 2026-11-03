@@ -180,11 +180,15 @@ abstract final class AppTheme {
         selectedColor: c.highlight,
         side: BorderSide.none,
         shape: const StadiumBorder(),
+        // Selected chips sit on the highlight, so their label switches to
+        // its contrasting ink (the plain ink is pale in dark mode).
         labelStyle: TextStyle(
           fontFamily: appFont,
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: c.ink,
+          color: WidgetStateColor.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? c.onHighlight : c.ink,
+          ),
         ),
         checkmarkColor: c.onHighlight,
       ),

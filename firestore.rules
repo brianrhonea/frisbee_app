@@ -284,7 +284,15 @@ service cloud.firestore {
         joinOpenGroup() || approveRequest() || acceptInvite() || markDeleting()
       );
 
-      allow delete: if signedIn() && resource.data.ownerId == uid();
+      // Only once the owner is the last one on it (see soleOwner).
+      allow delete: if signedIn() && resource.data.ownerId == uid()
+        && soleOwner();
+
+      // Deleting is for a team that's the owner's alone: they remove
+      // everyone else or hand it on first, so no one's team vanishes.
+      function soleOwner() {
+        return resource.data.memberIds == [uid()];
+      }
 
       // The kind never changes, and only groups have group fields.
       function editDetails() {
@@ -342,9 +350,12 @@ service cloud.firestore {
 
       // Owner stamps the team just before deleting it, so the notification
       // functions skip the cascade of deletes that follows; the stamp is
-      // cleared again if the delete fails.
+      // cleared again if the delete fails. The delete client runs this
+      // first, so requiring soleOwner() here stops it before any content
+      // is touched.
       function markDeleting() {
         return roleIn(resource.data) == 'owner'
+          && soleOwner()
           && changed().hasOnly(['deletingAt'])
           && request.resource.data.get('deletingAt', request.time) == request.time;
       }

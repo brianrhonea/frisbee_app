@@ -1,4 +1,4 @@
-# UltiUP
+# Stall 10
 
 **Version 0.0.4** · [User guide](docs/user-guide.md) · [Architecture](docs/ARCHITECTURE.md) · [Version log](docs/CHANGELOG.md) · [iOS release](docs/ios-release.md)
 

@@ -356,6 +356,12 @@ class TeamHomeViewModel extends ChangeNotifier {
   Future<Result<void>> _deleteTeam() async {
     final t = _team;
     if (t == null) return Result.error(Exception('Team not loaded'));
+    // The screen asks first; rules refuse it too.
+    if (t.members.length > 1) {
+      return Result.error(
+        Exception('Remove the other members or transfer ownership first.'),
+      );
+    }
     return _teams.deleteTeam(t);
   }
 

@@ -291,6 +291,49 @@ void main() {
       expect(find.byIcon(Icons.lock_outline), findsOneWidget);
     });
 
+    testWidgets('owners empty or hand on the team before deleting it', (
+      tester,
+    ) async {
+      addTeam({testUser.uid: TeamRole.owner, 'p1': TeamRole.player});
+      final vm = homeVm();
+      await pump(tester, vm);
+
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete team'));
+      await tester.pumpAndSettle();
+      expect(find.text("Can't delete Team yet"), findsOneWidget);
+      expect(find.textContaining('1 other member.'), findsOneWidget);
+      expect(find.text('Go to Members'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(teams.teams, contains('t1'), reason: 'not deleted');
+
+      // The view model refuses too, whatever the screen does.
+      await vm.deleteTeam.execute();
+      await tester.pump();
+      expect(
+        find.textContaining('transfer ownership first'),
+        findsOneWidget,
+        reason: 'the screen shows the refusal',
+      );
+      expect(teams.teams, contains('t1'));
+    });
+
+    testWidgets('a sole owner is asked to confirm, then deletes', (
+      tester,
+    ) async {
+      addTeam({testUser.uid: TeamRole.owner});
+      await pump(tester, homeVm());
+
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete team'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete Team?'), findsOneWidget);
+      expect(find.textContaining("Can't delete"), findsNothing);
+    });
+
     testWidgets('others get the public page and can join', (tester) async {
       addTeam({'owner': TeamRole.owner});
       await pump(tester, homeVm());

@@ -8,6 +8,7 @@ import '../../../domain/models/workout.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/layout.dart';
 import '../../teams/widgets/team_post_widgets.dart';
+import 'post_composer.dart';
 
 export '../../core/ui/layout.dart' show PersonAvatar;
 
@@ -317,7 +318,7 @@ class FeedItemCard extends StatelessWidget {
       loadImage: loadImage,
       onOpen: () => context.push(Routes.post(post.id)),
       onEdit: post.authorId == uid
-          ? () => context.push(Routes.editPost(post.id))
+          ? () => showPostComposer(context, postId: post.id)
           : null,
       onDelete: post.authorId == uid && onDeleteUserPost != null
           ? () => onDeleteUserPost!(post)

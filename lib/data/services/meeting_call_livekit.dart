@@ -308,7 +308,7 @@ class LiveKitMeetingCall extends MeetingCall {
     final ready = await FlutterBackground.initialize(
       androidConfig: const FlutterBackgroundAndroidConfig(
         notificationTitle: 'Sharing your screen',
-        notificationText: 'UltiUP is sharing your screen with the meeting.',
+        notificationText: 'Stall 10 is sharing your screen with the meeting.',
         notificationImportance: AndroidNotificationImportance.normal,
         shouldRequestBatteryOptimizationsOff: false,
       ),

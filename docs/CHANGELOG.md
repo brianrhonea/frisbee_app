@@ -1,4 +1,4 @@
-# UltiUP version log
+# Stall 10 version log
 
 Each feature branch bumps the version by one. The version lives in
 `pubspec.yaml` (`version: X.Y.Z+N`, where `N` is the build number) and in
@@ -53,6 +53,10 @@ Branch `feature/follows-feed`.
   Follow.
 
 **Changed**
+- **The app is now Stall 10**, with a new logo: a "10" whose "0" is a
+  flying disc. `tool/brand/stall10_logo.py` draws it and every launcher
+  icon (Android, iOS, macOS, Windows). Bundle ids and the package name
+  are unchanged.
 - **Team pages have tabs.** Home, Team Events, Chat, Roster, Playbook,
   Videos, Stats and Members (groups: Home, Events, Chat, Tournaments,
   Members) sit in a tab bar under the team name. Switching tabs changes

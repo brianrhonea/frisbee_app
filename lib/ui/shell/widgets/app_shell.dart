@@ -140,10 +140,14 @@ class AppShell extends StatelessWidget {
   }
 }
 
-/// The breadcrumb trail for [path], e.g. ["Your community", "Messages"].
-/// [teamName] names the user's teams by id.
-List<String> breadcrumbs(String path, String? Function(String id) teamName) {
-  const root = 'Your community';
+/// One step of the breadcrumb trail; [path] is where tapping it goes, null
+/// for the page you're on.
+typedef Crumb = ({String label, String? path});
+
+/// The breadcrumb trail for [path], starting from its section so the way
+/// back is one tap, e.g. Explore › Events › Event. Every step but the last
+/// links to its page. [teamName] names the user's teams by id.
+List<Crumb> breadcrumbs(String path, String? Function(String id) teamName) {
   final uri = Uri.parse(path);
   final parts = [
     ...uri.pathSegments,
@@ -151,32 +155,55 @@ List<String> breadcrumbs(String path, String? Function(String id) teamName) {
     if (uri.pathSegments.length == 2 && uri.pathSegments.first == 'teams')
       ?uri.queryParameters['section'],
   ];
-  if (parts.isEmpty) return const [root];
-  final page = switch (parts.first) {
-    'home' => ['Community feed'],
-    'schedule' => ['Schedule'],
-    'explore' => ['Explore'],
-    'tournaments' => ['Events', if (parts.length > 1) 'Event'],
-    'rankings' => ['Rankings', if (parts.length > 1) 'Team'],
-    'messages' => ['Messages'],
-    'profile' => ['My profile'],
-    'teams' => switch (parts.length) {
-      1 => ['My teams'],
-      _ when parts[1] == 'new' => ['My teams', 'New'],
-      _ when parts[1] == 'search' => ['My teams', 'Find a team'],
-      _ => [
-        teamName(parts[1]) ?? 'Team',
-        if (parts.length > 2)
-          TeamSection.values
-                  .where((s) => s.path == parts[2])
-                  .firstOrNull
-                  ?.label ??
-              _capitalize(parts[2]),
-      ],
-    },
-    _ => <String>[],
+  const community = (label: 'Community', path: Routes.home);
+  final explore = (label: 'Explore', path: Routes.explorePath);
+  const myTeams = (label: 'My teams', path: Routes.teams);
+  Crumb here(String label) => (label: label, path: null);
+
+  final trail = switch (parts.firstOrNull) {
+    null || 'home' => [community],
+    'schedule' => [community, here('Schedule')],
+    'explore' => [explore],
+    'players' => [explore, here('Player')],
+    'tournaments' => [
+      explore,
+      (label: 'Events', path: Routes.tournaments),
+      if (parts.length > 1) here('Event'),
+    ],
+    'rankings' => [
+      explore,
+      (label: 'Rankings', path: Routes.rankings),
+      if (parts.length > 1) here('Team'),
+    ],
+    'messages' => [(label: 'Messages', path: Routes.messages)],
+    'profile' => [
+      (label: 'My profile', path: Routes.profile),
+      if (parts.length > 1) here(_capitalize(parts[1])),
+    ],
+    'teams' => [
+      myTeams,
+      ...switch (parts.length) {
+        1 => <Crumb>[],
+        _ when parts[1] == 'new' => [here('New')],
+        _ when parts[1] == 'search' => [here('Find a team')],
+        _ => [
+          (label: teamName(parts[1]) ?? 'Team', path: Routes.team(parts[1])),
+          if (parts.length > 2)
+            here(
+              TeamSection.values
+                      .where((s) => s.path == parts[2])
+                      .firstOrNull
+                      ?.label ??
+                  _capitalize(parts[2]),
+            ),
+        ],
+      },
+    ],
+    _ => [community],
   };
-  return [root, ...page];
+  // The page you're on isn't a link.
+  final last = trail.last;
+  return [...trail.take(trail.length - 1), here(last.label)];
 }
 
 String _capitalize(String s) =>
@@ -215,7 +242,7 @@ class _Sidebar extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: InkWell(
                   onTap: () => onSelect(ShellSection.community),
-                  child: UltiUpWordmark(size: 30, color: c.onSidebar),
+                  child: AppWordmark(size: 30, color: c.onSidebar),
                 ),
               ),
             ),
@@ -506,7 +533,7 @@ class _Rail extends StatelessWidget {
             const SizedBox(height: 18),
             InkWell(
               onTap: () => onSelect(ShellSection.community),
-              child: const UltiUpLogo(size: 34),
+              child: const AppLogo(size: 34),
             ),
             const SizedBox(height: 22),
             for (final s in ShellSection.values)
@@ -568,7 +595,7 @@ class _TopBar extends StatelessWidget {
   const _TopBar({required this.viewModel, required this.crumbs});
 
   final ShellViewModel viewModel;
-  final List<String> crumbs;
+  final List<Crumb> crumbs;
 
   @override
   Widget build(BuildContext context) {
@@ -610,40 +637,53 @@ class _TopBar extends StatelessWidget {
 class _Breadcrumbs extends StatelessWidget {
   const _Breadcrumbs({required this.crumbs});
 
-  final List<String> crumbs;
+  final List<Crumb> crumbs;
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     return Row(
       children: [
-        for (var i = 0; i < crumbs.length; i++) ...[
+        for (final (i, crumb) in crumbs.indexed) ...[
           if (i > 0)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Icon(Icons.chevron_right, size: 16, color: c.muted),
             ),
           Flexible(
-            child: i == 0
-                ? InkWell(
-                    onTap: () => context.go(Routes.home),
-                    child: Text(
-                      crumbs[i],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: c.ink,
-                      ),
-                    ),
-                  )
-                : Text(
-                    crumbs[i],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12.5, color: c.muted),
+            child: switch (crumb.path) {
+              final path? => TextButton(
+                onPressed: () => context.go(path),
+                style: TextButton.styleFrom(
+                  foregroundColor: c.ink,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 32),
+                  textStyle: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
                   ),
+                ),
+                child: Text(
+                  crumb.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              null => Padding(
+                padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
+                child: Text(
+                  crumb.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    // Alone, it's the section's name; after links, the page.
+                    fontWeight: i == 0 ? FontWeight.w700 : FontWeight.w400,
+                    color: i == 0 ? c.ink : c.muted,
+                  ),
+                ),
+              ),
+            },
           ),
         ],
       ],
@@ -713,7 +753,7 @@ class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: 16,
       title: InkWell(
         onTap: () => context.go(Routes.home),
-        child: UltiUpWordmark(size: 28, color: c.onSidebar),
+        child: AppWordmark(size: 28, color: c.onSidebar),
       ),
       actions: [
         IconButton(

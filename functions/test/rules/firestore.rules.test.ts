@@ -130,6 +130,29 @@ describe("team read", () => {
   });
 });
 
+describe("team delete", () => {
+  // deleteTeam in team_repository_firebase.dart relies on these: it
+  // deletes private/invite by name because the owner can't list private.
+  it("the owner gets and deletes private/invite but can't list private", async () => {
+    const fs = db(OWNER);
+    await assertSucceeds(getDoc(doc(fs, "teams", TEAM, "private", "invite")));
+    await assertFails(getDocs(collection(fs, "teams", TEAM, "private")));
+    await assertSucceeds(deleteDoc(doc(fs, "teams", TEAM, "private", "invite")));
+  });
+
+  it("only the owner deletes the team, and only once everyone else is gone", async () => {
+    await assertFails(deleteDoc(doc(db(COACH), "teams", TEAM)));
+    await assertFails(deleteDoc(doc(db(OWNER), "teams", TEAM)));
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "teams", TEAM), {
+        members: { [OWNER]: "owner" },
+        memberIds: [OWNER],
+      }),
+    );
+    await assertSucceeds(deleteDoc(doc(db(OWNER), "teams", TEAM)));
+  });
+});
+
 describe("join", () => {
   const joinUpdate = {
     [`members.${OUTSIDER}`]: "player",
@@ -1804,8 +1827,16 @@ describe("notifications", () => {
     await assertFails(setDoc(doc(db(PLAYER), "sentReminders", "x"), {}));
   });
 
-  it("lets only the owner mark a team as being deleted", async () => {
+  it("lets only the owner mark a team as being deleted, once it's theirs alone", async () => {
     await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { deletingAt: serverTimestamp() }));
+    // Others are still on it.
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { deletingAt: serverTimestamp() }));
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "teams", TEAM), {
+        members: { [OWNER]: "owner" },
+        memberIds: [OWNER],
+      }),
+    );
     await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { deletingAt: serverTimestamp(), name: "X" }));
     await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { deletingAt: serverTimestamp() }));
     await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { deletingAt: new Date(2000, 0, 1) }));

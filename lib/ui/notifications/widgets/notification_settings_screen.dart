@@ -128,21 +128,21 @@ class _PushTile extends StatelessWidget {
         title: Text("Push notifications aren't available on Windows"),
         subtitle: Text(
           'You still get everything under the bell on Home, and on your '
-          'phone if UltiUP is installed there.',
+          'phone if Stall 10 is installed there.',
         ),
       ),
       PushStatus.enabled => ListTile(
         leading: Icon(Icons.notifications_active_outlined, color: c.accent),
         title: const Text('Push notifications are on'),
         subtitle: const Text(
-          'Choose what you get below. Turn them off for UltiUP in your '
+          'Choose what you get below. Turn them off for Stall 10 in your '
           "device's settings.",
         ),
       ),
       PushStatus.notDetermined => ListTile(
         leading: const Icon(Icons.notifications_outlined),
         title: const Text('Get push notifications on this device'),
-        subtitle: const Text('Even when UltiUP is closed.'),
+        subtitle: const Text('Even when Stall 10 is closed.'),
         trailing: FilledButton(
           onPressed: busy ? null : vm.enablePush.execute,
           child: const Text('Turn on'),
@@ -152,7 +152,7 @@ class _PushTile extends StatelessWidget {
         leading: const Icon(Icons.notifications_off_outlined),
         title: const Text('Push notifications are off'),
         subtitle: const Text(
-          "Turn on notifications for UltiUP in your device's settings, "
+          "Turn on notifications for Stall 10 in your device's settings, "
           'then come back here.',
         ),
         trailing: TextButton(

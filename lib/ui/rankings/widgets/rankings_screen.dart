@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../domain/models/ranking.dart';
 import '../../../routing/routes.dart';
+import '../../core/ui/back_or.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/usau_attribution.dart';
 import '../view_models/rankings_viewmodel.dart';
@@ -17,7 +18,11 @@ class RankingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     return Scaffold(
-      appBar: AppBar(title: const Text('Rankings')),
+      appBar: AppBar(
+        // Opened from Explore; back goes there.
+        leading: backOr(context, Routes.explorePath),
+        title: const Text('Rankings'),
+      ),
       body: ListenableBuilder(
         listenable: vm,
         builder: (context, _) {
