@@ -11,8 +11,8 @@ TestFlight. These are the one-time setup steps, in order.
    App ID `com.brianrhonea.frisbeeApp` and tick **Sign in with Apple** and
    **Push Notifications**. If the App ID already exists, edit it to add Push
    Notifications; `ios/Runner/Runner.entitlements` asks for it, so signing
-   fails until the App ID has it. Delete any old App Store provisioning
-   profile for the app so Codemagic makes a new one that includes push.
+   fails until the App ID has it. Make the App Store provisioning profile
+   (step 3.3) after this, so it includes push.
 3. In **App Store Connect → Apps → +**, create the app with that bundle ID.
    Copy its numeric **Apple ID** (App Information) into `APP_STORE_APPLE_ID`
    in `codemagic.yaml`. It's an identifier, not a secret.
@@ -40,7 +40,22 @@ TestFlight. These are the one-time setup steps, in order.
    Create the key in App Store Connect → Users and Access → Integrations
    → App Store Connect API (role: App Manager). Upload the `.p8` file only
    to Codemagic, never to the repo.
-3. **App → Environment variables**: create group **`frisbee_secrets`** with
+3. **Signing** (Codemagic finds these by bundle ID; it doesn't create
+   them, and the build fails with "No matching profiles found" until they
+   exist):
+   1. Codemagic → **Team settings → codemagic.yaml settings → Code signing
+      identities → iOS certificates → Generate certificate**: type
+      **Apple Distribution**, with the Frisbee App Store Connect key.
+      Codemagic keeps it (download the `.p12` and its password somewhere
+      safe, never the repo).
+   2. Apple Developer → **Profiles → +** → **App Store Connect** (under
+      Distribution) → App ID `com.brianrhonea.frisbeeApp` → that
+      certificate → name it `Stall 10 App Store` → **Generate**. Turn on
+      the App ID's capabilities (step 1) first; changing them later makes
+      the profile invalid, so edit and regenerate it.
+   3. Codemagic → **iOS provisioning profiles → Fetch profiles** → pick
+      `Stall 10 App Store` → **Download selected**.
+4. **App → Environment variables**: create group **`frisbee_secrets`** with
    two **Secure** variables (base64-encode each file in PowerShell):
 
    ```powershell
@@ -53,7 +68,7 @@ TestFlight. These are the one-time setup steps, in order.
    | `SECRETS_LOCAL_JSON` | base64 of `secrets.local.json` |
    | `GOOGLE_SERVICE_INFO_PLIST` | base64 of `GoogleService-Info.plist` |
 
-4. Push to `development` (or start the **iOS release (TestFlight)**
+5. Push to `development` (or start the **iOS release (TestFlight)**
    workflow by hand) to build. It runs
    `flutter analyze` and `flutter test`, builds with the next build number,
    and uploads to TestFlight.
@@ -67,7 +82,8 @@ the app's `stall10://` scheme.
 
 1. In the Apple Developer portal, open the App ID
    `com.brianrhonea.frisbeeApp` and turn on **Associated Domains**. Then
-   let Codemagic make a new provisioning profile (or delete the old one).
+   edit the App Store profile so it's valid again (Profiles → Stall 10
+   App Store → Edit → Save) and fetch it again in Codemagic.
 2. Add to `ios/Runner/Runner.entitlements`:
 
    ```xml

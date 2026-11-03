@@ -22,8 +22,9 @@ workflows:
       groups:
         - frisbee_secrets
       ios_signing:
-        # Codemagic creates/fetches the distribution certificate and
-        # App Store provisioning profile through the API key.
+        # Uses the Apple Distribution certificate and App Store profile in
+        # Codemagic > Team settings > codemagic.yaml settings > Code signing
+        # identities (see docs/ios-release.md); Codemagic doesn't make them.
         distribution_type: app_store
         bundle_identifier: com.brianrhonea.frisbeeApp
       vars:
