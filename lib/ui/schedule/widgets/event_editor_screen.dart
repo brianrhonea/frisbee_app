@@ -6,16 +6,94 @@ import 'package:uuid/uuid.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import 'package:provider/provider.dart';
+
 import '../../core/ui/back_or.dart';
+import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/overlay_panel.dart';
 import '../../core/ui/status_views.dart';
+import '../../core/ui/view_model_host.dart';
+import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../view_models/event_editor_viewmodel.dart';
 import 'event_style.dart';
 
+/// Opens the event editor over the current page, like the post composer:
+/// a card on wide screens, a bottom sheet on phones. Adds an event to
+/// [teamId]'s schedule (or the user's own), starting on [day]. When it's
+/// created, says so with a View button that opens it. Completes with the
+/// new event's id, or null if the user closed it.
+Future<String?> showEventEditor(
+  BuildContext context, {
+  String? teamId,
+  DateTime? day,
+}) async {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  final router = GoRouter.of(context);
+  final created = await showOverlayPanel<_Created>(
+    context,
+    builder: (_, fit) => ViewModelHost(
+      create: (c) => EventEditorViewModel(
+        teamId: teamId,
+        eventId: null,
+        initialDay: day,
+        eventRepository: c.read(),
+        teamRepository: c.read(),
+        authRepository: c.read(),
+        postRepository: c.read<UserPostRepository?>(),
+      ),
+      builder: (_, vm) =>
+          EventEditorScreen(viewModel: vm, inPanel: true, fitContent: fit),
+    ),
+  );
+  if (created == null) return null;
+  final detail = switch (created.teamId) {
+    null => Routes.myEvent(created.id),
+    final t => Routes.event(t, created.id),
+  };
+  messenger
+    ?..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(_createdMessage(created.shared)),
+        action: SnackBarAction(
+          label: 'View',
+          onPressed: () => router.push(detail),
+        ),
+      ),
+    );
+  return created.id;
+}
+
+/// What the panel closes with when an event is created.
+typedef _Created = ({String id, String? teamId, bool? shared});
+
+/// [shared]: posted for followers (true), asked to but couldn't (false), or
+/// not asked (null).
+String _createdMessage(bool? shared) => switch (shared) {
+  true => 'Event created and shared with your followers',
+  false => "Event created, but it couldn't be shared. Try posting it.",
+  null => 'Event created',
+};
+
+/// Creates or edits an event: on a page of its own (from a link), or in a
+/// panel over the page ([inPanel], see [showEventEditor]).
 class EventEditorScreen extends StatefulWidget {
-  const EventEditorScreen({super.key, required this.viewModel});
+  const EventEditorScreen({
+    super.key,
+    required this.viewModel,
+    this.inPanel = false,
+    this.fitContent = false,
+  });
 
   final EventEditorViewModel viewModel;
+
+  /// Shown by [showEventEditor]: closes when saved instead of going to the
+  /// event, and asks before throwing away changes.
+  final bool inPanel;
+
+  /// In the wide-screen card: only as tall as the form.
+  final bool fitContent;
 
   @override
   State<EventEditorScreen> createState() => _EventEditorScreenState();
@@ -36,12 +114,47 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
     super.dispose();
   }
 
+  /// Whether the user has changed anything since the editor opened.
+  bool _changed = false;
+
+  /// Closes the panel, first asking to discard any changes.
+  Future<void> _close() async {
+    final nav = Navigator.of(context);
+    if (_changed &&
+        !await confirmDialog(
+          context,
+          title: vm.isNew ? 'Discard this event?' : 'Discard your changes?',
+          message: "What you've entered won't be saved.",
+          confirmLabel: 'Discard',
+          destructive: true,
+        )) {
+      return;
+    }
+    if (mounted) nav.pop();
+  }
+
   void _onSave() {
     final cmd = vm.save;
     switch (cmd.result) {
+      case Ok<String>(:final value) when widget.inPanel:
+        cmd.clearResult();
+        // The opener says it's done and offers to open it.
+        final _Created created = (
+          id: value,
+          teamId: vm.teamId,
+          shared: vm.shared ? true : (vm.shareFailed ? false : null),
+        );
+        Navigator.of(context).pop(created);
       case Ok<String>(:final value):
         cmd.clearResult();
-        showSnackBar(context, vm.isNew ? 'Event created' : 'Event saved');
+        showSnackBar(
+          context,
+          vm.isNew
+              ? _createdMessage(
+                  vm.shared ? true : (vm.shareFailed ? false : null),
+                )
+              : 'Event saved',
+        );
         final teamId = vm.teamId;
         final detail = teamId == null
             ? Routes.myEvent(value)
@@ -67,34 +180,72 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([vm, vm.load, vm.save]),
-    builder: (context, _) => Scaffold(
-      appBar: AppBar(
-        leading: backOr(context, Routes.home),
-        title: Text(vm.isNew ? 'New event' : 'Edit event'),
-      ),
-      body: vm.load.running
-          ? const LoadingView()
-          : vm.load.error
-          ? ErrorView(error: vm.load.result, onRetry: vm.load.execute)
-          : Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: _EventForm(
-                  initial: vm.initial,
-                  saving: vm.save.running,
-                  submitLabel: vm.isNew ? 'Create event' : 'Save',
-                  allowPoll: !vm.isPersonal,
-                  allowPublic: !vm.isPrivateGroup,
-                  types: vm.types,
-                  schedulePicker: vm.canChooseSchedule
-                      ? _SchedulePicker(viewModel: vm)
-                      : null,
-                  onSubmit: vm.save.execute,
-                ),
-              ),
-            ),
-    ),
+    builder: (context, _) {
+      final title = vm.isNew ? 'New event' : 'Edit event';
+      Widget body(bool fit) {
+        if (vm.load.running) {
+          return PanelFrame.status(fit, const LoadingView());
+        }
+        if (vm.load.error) {
+          return PanelFrame.status(
+            fit,
+            ErrorView(error: vm.load.result, onRetry: vm.load.execute),
+          );
+        }
+        final form = _EventForm(
+          initial: vm.initial,
+          saving: vm.save.running,
+          submitLabel: vm.isNew ? 'Create event' : 'Save',
+          allowPoll: !vm.isPersonal,
+          allowPublic: !vm.isPrivateGroup,
+          types: vm.types,
+          schedulePicker: vm.canChooseSchedule
+              ? _SchedulePicker(viewModel: vm)
+              : null,
+          allowShare: vm.canShare,
+          onSubmit: (event, share) {
+            vm.shareWith(share);
+            vm.save.execute(event);
+          },
+          shrinkWrap: fit,
+          onChanged: () => _changed = true,
+        );
+        if (fit) return form;
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: form,
+          ),
+        );
+      }
+
+      if (!widget.inPanel) {
+        return Scaffold(
+          appBar: AppBar(
+            leading: backOr(context, Routes.home),
+            title: Text(title),
+          ),
+          body: body(false),
+        );
+      }
+      return PopScope<Object?>(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _close();
+        },
+        child: PanelFrame(
+          fitContent: widget.fitContent,
+          close: IconButton(
+            tooltip: 'Close',
+            onPressed: _close,
+            icon: const Icon(Icons.close),
+          ),
+          title: title,
+          body: body,
+        ),
+      );
+    },
   );
 }
 
@@ -108,7 +259,19 @@ class _EventForm extends StatefulWidget {
     this.allowPoll = true,
     this.allowPublic = true,
     this.schedulePicker,
+    this.allowShare = false,
+    this.shrinkWrap = false,
+    this.onChanged,
   });
+
+  /// Offer to post the new event for the user's followers.
+  final bool allowShare;
+
+  /// Only as tall as the fields (in the wide-screen panel).
+  final bool shrinkWrap;
+
+  /// Called whenever the user changes something.
+  final VoidCallback? onChanged;
 
   /// Offer the Public switch; a private group's events are members-only.
   final bool allowPublic;
@@ -119,7 +282,9 @@ class _EventForm extends StatefulWidget {
   final TeamEvent initial;
   final bool saving;
   final String submitLabel;
-  final ValueChanged<TeamEvent> onSubmit;
+
+  /// The event, and the message to share it with (null not to).
+  final void Function(TeamEvent event, String? share) onSubmit;
 
   /// Polls, and showing the event on the public team page, are for team
   /// events only.
@@ -155,6 +320,8 @@ class _EventFormState extends State<_EventForm> {
       : TimeOfDay.fromDateTime(widget.initial.endsAt!);
 
   late bool _public = widget.initial.isPublic;
+  bool _share = false;
+  final _shareMessage = TextEditingController();
   late bool _hasPoll = widget.initial.poll != null;
   late final _question = TextEditingController(
     text: widget.initial.poll?.question ?? '',
@@ -165,9 +332,16 @@ class _EventFormState extends State<_EventForm> {
       (id: o.id, text: TextEditingController(text: o.text)),
   ];
 
+  // Every setState here is the user changing something.
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    widget.onChanged?.call();
+  }
+
   @override
   void dispose() {
-    for (final c in [_title, _location, _notes, _question]) {
+    for (final c in [_title, _location, _notes, _question, _shareMessage]) {
       c.dispose();
     }
     for (final o in _options) {
@@ -248,6 +422,7 @@ class _EventFormState extends State<_EventForm> {
               )
             : null,
       ),
+      _share && widget.allowShare ? _shareMessage.text.trim() : null,
     );
   }
 
@@ -257,8 +432,10 @@ class _EventFormState extends State<_EventForm> {
     final loc = MaterialLocalizations.of(context);
     return Form(
       key: _formKey,
+      onChanged: widget.onChanged,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        shrinkWrap: widget.shrinkWrap,
+        padding: EdgeInsets.all(widget.shrinkWrap ? 20 : 16),
         children: [
           if (widget.schedulePicker case final picker?) ...[
             picker,
@@ -437,6 +614,36 @@ class _EventFormState extends State<_EventForm> {
                   style: theme.textTheme.bodySmall,
                 ),
             ],
+          ],
+          if (widget.allowShare) ...[
+            const Divider(height: 32),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              secondary: const Icon(Icons.campaign_outlined),
+              title: const Text('Share with followers'),
+              subtitle: Text(
+                widget.allowPoll
+                    ? 'Posts it on your profile, so the people who follow '
+                          "you and the team's members see it in their feed. "
+                          'RSVPs and notes stay here.'
+                    : 'Posts it on your profile, so the people who follow '
+                          'you see it in their feed. RSVPs and notes stay '
+                          'here.',
+              ),
+              value: _share,
+              onChanged: (v) => setState(() => _share = v),
+            ),
+            if (_share)
+              TextFormField(
+                controller: _shareMessage,
+                minLines: 1,
+                maxLines: 4,
+                maxLength: 1000,
+                decoration: const InputDecoration(
+                  labelText: 'Say something (optional)',
+                  hintText: 'Come out and play!',
+                ),
+              ),
           ],
           const SizedBox(height: 24),
           FilledButton(

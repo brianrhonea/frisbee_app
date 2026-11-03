@@ -93,6 +93,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           ? () => showPostComposer(context, postId: post.id)
                           : null,
                       onDelete: vm.isMine ? _confirmDelete : null,
+                      actions: vm.actions,
+                      onRepost: () => repostOrUndo(context, vm.actions, post),
                     ),
                     if (post.workout case final w? when w.route != null)
                       Card(

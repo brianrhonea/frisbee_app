@@ -8,6 +8,7 @@ import '../../../domain/models/chat.dart';
 import '../../../domain/models/user_post.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import 'post_actions.dart';
 
 /// One person's post on its own page, where post notifications lead.
 class PostDetailViewModel extends ChangeNotifier {
@@ -18,12 +19,17 @@ class PostDetailViewModel extends ChangeNotifier {
   }) : _posts = userPostRepository,
        _auth = authRepository {
     delete = Command0<void>(() => _posts.deletePost(postId));
+    actions = PostActions(
+      userPostRepository: userPostRepository,
+      authRepository: authRepository,
+    )..addListener(notifyListeners);
     _sub = _posts
         .watchPost(postId)
         .listen(
           (p) {
             _post = p;
             _loaded = true;
+            actions.track([?p]);
             notifyListeners();
           },
           onError: (Object e) {
@@ -51,6 +57,9 @@ class PostDetailViewModel extends ChangeNotifier {
 
   late final Command0<void> delete;
 
+  /// Likes and reposts, and the post a repost shows.
+  late final PostActions actions;
+
   Future<Result<Uint8List>> imageData(ChatAttachment image) =>
       _downloads[image.path] ??= _posts.downloadImage(image).then((r) {
         if (r is Error) _downloads.remove(image.path);
@@ -61,6 +70,9 @@ class PostDetailViewModel extends ChangeNotifier {
   void dispose() {
     _sub.cancel();
     delete.dispose();
+    actions
+      ..removeListener(notifyListeners)
+      ..dispose();
     super.dispose();
   }
 }

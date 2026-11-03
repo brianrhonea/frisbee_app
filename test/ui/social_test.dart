@@ -232,7 +232,9 @@ void main() {
         workout: true,
         onResult: (id) => result = id,
       );
-      expect(find.byType(Dialog), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      final composer = find.byType(PostComposer);
+      expect(tester.widget<PostComposer>(composer).fitContent, isTrue);
       expect(find.text('Share a workout'), findsOneWidget);
       expect(find.text('Open'), findsOneWidget, reason: 'page stays behind');
 
@@ -267,9 +269,29 @@ void main() {
       expect(saved.workout!.durationMinutes, 45);
       expect(saved.workout!.exercises.single.detail, '5 × 3');
       expect(result, saved.id);
-      expect(find.byType(Dialog), findsNothing);
+      expect(find.byType(PostComposer), findsNothing);
       expect(find.text('Posted'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('on desktop the card fits a short post', (tester) async {
+      await pumpOpener(tester, size: const Size(1280, 1000));
+      final card = tester.getRect(find.byType(PostComposer));
+      expect(card.width, lessThanOrEqualTo(640));
+      expect(card.height, lessThan(500), reason: 'no empty space below');
+
+      // Clicking outside closes it; with changes, it asks first.
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Post'),
+        'Zone D at practice',
+      );
+      await tester.tapAt(const Offset(20, 980));
+      await tester.pumpAndSettle();
+      expect(find.text('Discard this post?'), findsOneWidget);
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+      expect(find.byType(PostComposer), findsNothing);
+      expect(posts.posts, isEmpty);
     });
 
     testWidgets('on phones it is a sheet that asks before discarding', (

@@ -3,8 +3,10 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
+import '../../../domain/models/user_post.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
@@ -13,6 +15,7 @@ import '../../../utils/result.dart';
 ///
 /// A new event can go on the user's personal schedule or on any team
 /// schedule they may edit ([setSchedule]); an existing one stays where it is.
+/// A new one can also be posted for the user's followers ([shareWith]).
 class EventEditorViewModel extends ChangeNotifier {
   EventEditorViewModel({
     required String? teamId,
@@ -20,11 +23,13 @@ class EventEditorViewModel extends ChangeNotifier {
     required EventRepository eventRepository,
     required TeamRepository teamRepository,
     required AuthRepository authRepository,
+    UserPostRepository? postRepository,
     DateTime? initialDay,
   }) : _teamId = teamId,
        _events = eventRepository,
        _teams = teamRepository,
        _auth = authRepository,
+       _posts = postRepository,
        _initialDay = initialDay {
     load = Command0<void>(_load)..execute();
     save = Command1<String, TeamEvent>(_save);
@@ -35,7 +40,28 @@ class EventEditorViewModel extends ChangeNotifier {
   final EventRepository _events;
   final TeamRepository _teams;
   final AuthRepository _auth;
+  final UserPostRepository? _posts;
   final DateTime? _initialDay;
+
+  /// A new event can be posted for followers, unless it's on a private
+  /// group's schedule (members only).
+  bool get canShare => isNew && _posts != null && !isPrivateGroup;
+
+  String? _shareMessage;
+
+  /// Whether the next [save] also posts the event, with [message] (which may
+  /// be empty), for the user's followers to see. Null doesn't post it.
+  void shareWith(String? message) => _shareMessage = message;
+
+  bool _shared = false;
+
+  /// Whether the last [save] posted the event for followers.
+  bool get shared => _shared;
+
+  bool _shareFailed = false;
+
+  /// The last [save] saved the event but couldn't post it.
+  bool get shareFailed => _shareFailed;
 
   late final Command0<void> load;
 
@@ -138,18 +164,47 @@ class EventEditorViewModel extends ChangeNotifier {
     return const Result.ok(null);
   }
 
-  Future<Result<String>> _save(TeamEvent draft) {
+  Future<Result<String>> _save(TeamEvent draft) async {
+    _shared = false;
+    _shareFailed = false;
     final event = draft.copyWith(id: eventId ?? '');
     final teamId = _teamId;
-    if (teamId == null) {
-      return _events.saveMyEvent(_uid, event.copyWith(poll: () => null));
+    final saved = teamId == null
+        ? await _events.saveMyEvent(_uid, event.copyWith(poll: () => null))
+        : await _events.saveEvent(
+            teamId,
+            event,
+            _uid,
+            clearVotes: _pollChanged(_original?.poll, event.poll),
+          );
+    if (saved case Ok(:final value) when canShare && _shareMessage != null) {
+      await _share(event.copyWith(id: value), _shareMessage!);
     }
-    return _events.saveEvent(
-      teamId,
-      event,
-      _uid,
-      clearVotes: _pollChanged(_original?.poll, event.poll),
+    return saved;
+  }
+
+  /// Posts [event] on the user's profile, so their followers see it. The
+  /// event is already saved, so a failure here only says it wasn't posted.
+  Future<void> _share(TeamEvent event, String message) async {
+    final me = _auth.currentUser;
+    final posts = _posts;
+    if (me == null || posts == null) {
+      _shareFailed = true;
+      return;
+    }
+    final teamId = _teamId;
+    final post = UserPost(
+      id: '',
+      body: message.trim(),
+      event: SharedEvent.of(
+        event,
+        teamId: teamId,
+        teamName: _editableTeams.where((t) => t.id == teamId).firstOrNull?.name,
+      ),
     );
+    final result = await posts.savePost(UserPostDraft(post: post), me);
+    _shared = result is Ok;
+    _shareFailed = !_shared;
   }
 
   /// Votes are cleared when the poll is removed or its options change, so

@@ -7,6 +7,7 @@ import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 import {
   onDocumentCreated,
+  onDocumentUpdated,
   onDocumentWrittenWithAuthContext,
 } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -26,8 +27,13 @@ import {
   meetingStartedNotice,
   millis,
   followKeys,
+  followerNotice,
+  likeNotice,
+  newLikers,
   playNotice,
   postRecipients,
+  repostNotice,
+  repostOf,
   reminderNotice,
   reminderRecipients,
   type RoomDoc,
@@ -239,18 +245,61 @@ async function notifyingFollowers(keys: string[]): Promise<string[]> {
   return snap.docs.map((d) => d.ref.parent.parent?.id).filter((uid): uid is string => !!uid);
 }
 
-/** A person's post: followers of them, or of the tournament it's tagged with. */
+/** A person's name and photo from their public profile. */
+async function profileOf(uid: string): Promise<{ name: string; photoUrl?: string | null }> {
+  const p = (await getFirestore().doc(`profiles/${uid}`).get()).data();
+  return { name: String(p?.name ?? ""), photoUrl: (p?.photoUrl as string | undefined) ?? null };
+}
+
+/**
+ * A person's post: followers of them, or of the tournament it's tagged with.
+ * A repost also tells the original's author (who isn't told twice).
+ */
 export const userPost = onDocumentCreated("posts/{postId}", async (event) => {
   const post = event.data?.data();
   if (!post) return;
+  const { postId } = event.params;
   const authorId = String(post.authorId ?? "");
+  const reposted = repostOf(post);
   const followers = await notifyingFollowers(followKeys({ authorId, post }));
   await deliver(
     getFirestore(),
     getMessaging(),
-    postRecipients(followers, authorId),
-    userPostNotice({ postId: event.params.postId, post }),
+    postRecipients(followers, authorId).filter((uid) => uid !== reposted?.authorId),
+    userPostNotice({ postId, post }),
   );
+  if (reposted && reposted.authorId && reposted.authorId !== authorId) {
+    const original = (await getFirestore().doc(`posts/${reposted.postId}`).get()).data();
+    await deliver(getFirestore(), getMessaging(), [reposted.authorId], repostNotice({ repostId: postId, repost: post, original }));
+  }
+});
+
+/** Someone liked a post: its author hears, likes on one post folded together. */
+export const postLiked = onDocumentUpdated("posts/{postId}", async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!after) return;
+  const authorId = String(after.authorId ?? "");
+  for (const uid of newLikers(before, after)) {
+    const liker = await profileOf(uid);
+    await deliver(
+      getFirestore(),
+      getMessaging(),
+      [authorId],
+      likeNotice({ postId: event.params.postId, post: after, likerName: liker.name }),
+    );
+  }
+});
+
+/** Someone followed a person: they hear, with a way to follow back. */
+export const newFollower = onDocumentCreated("users/{uid}/follows/{key}", async (event) => {
+  const follow = event.data?.data();
+  if (!follow || follow.type !== "user") return;
+  const target = String(follow.targetId ?? "");
+  const followerId = event.params.uid;
+  if (!target || target === followerId) return;
+  const follower = await profileOf(followerId);
+  await deliver(getFirestore(), getMessaging(), [target], followerNotice({ followerId, ...follower }));
 });
 
 /**

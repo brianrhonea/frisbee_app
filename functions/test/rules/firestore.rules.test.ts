@@ -2140,7 +2140,7 @@ describe("follows", () => {
   it("accepts the posts notification category", async () => {
     await assertSucceeds(
       setDoc(doc(db(PLAYER), "users", PLAYER, "settings", "notifications"), {
-        categories: { posts: false },
+        categories: { posts: false, social: false },
         updatedAt: serverTimestamp(),
       }),
     );
@@ -2251,6 +2251,112 @@ describe("user posts", () => {
       ride({ route: "not a map" }),
     ]) {
       await assertFails(setDoc(ref(PLAYER, "bad"), post(PLAYER, { kind: "workout", workout: bad })));
+    }
+  });
+
+  it("validates shared events", async () => {
+    const event = (extra: Record<string, unknown> = {}) => ({
+      eventId: "e1",
+      title: "Pickup at the park",
+      type: "pickup",
+      startsAt: new Date("2026-11-07T18:00:00Z"),
+      endsAt: new Date("2026-11-07T20:00:00Z"),
+      location: "City Park",
+      teamId: TEAM,
+      teamName: "Northside Flyers",
+      ...extra,
+    });
+    const shared = (e: unknown, extra: Record<string, unknown> = {}) =>
+      post(PLAYER, { kind: "event", body: "", event: e, ...extra });
+    // A team event goes to its members' feeds, so only someone who runs
+    // that schedule may share it.
+    await assertFails(setDoc(ref(PLAYER, "ev"), shared(event())));
+    await assertFails(setDoc(ref(PLAYER, "ev"), shared(event({ teamId: "no-such-team" }))));
+    await assertSucceeds(
+      setDoc(doc(db(COACH), "posts", "ev"), { ...shared(event()), authorId: COACH }),
+    );
+    await assertFails(
+      updateDoc(doc(db(COACH), "posts", "ev"), { event: event({ teamId: "other" }), updatedAt: serverTimestamp() }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db(COACH), "posts", "ev"), { body: "See you there", updatedAt: serverTimestamp() }),
+    );
+    await assertSucceeds(setDoc(ref(PLAYER, "ev"), shared(event({ teamId: null, teamName: null }))));
+    // A personal event: no team, no end, no place.
+    await assertSucceeds(
+      setDoc(ref(PLAYER, "mine"), shared({ eventId: "m1", title: "Tempo run", type: "workout", startsAt: new Date() })),
+    );
+    for (const bad of [
+      null,
+      event({ title: "" }),
+      event({ eventId: "" }),
+      event({ type: "meeting" }),
+      event({ startsAt: "tomorrow" }),
+      event({ endsAt: 5 }),
+      event({ location: "x".repeat(201) }),
+      event({ rsvps: {} }),
+    ]) {
+      await assertFails(setDoc(ref(PLAYER, "bad"), shared(bad)));
+    }
+    // Only an event post carries an event, and not with a workout.
+    await assertFails(setDoc(ref(PLAYER, "bad"), post(PLAYER, { event: event() })));
+    await assertFails(setDoc(ref(PLAYER, "bad"), shared(event(), { workout: workout() })));
+    await assertFails(
+      setDoc(ref(PLAYER, "bad"), post(PLAYER, { kind: "workout", workout: workout(), event: event() })),
+    );
+    // Old posts without an event field can still be edited.
+    await assertSucceeds(setDoc(ref(PLAYER), post(PLAYER)));
+    await assertSucceeds(updateDoc(ref(PLAYER), { body: "Edited", event: null, updatedAt: serverTimestamp() }));
+  });
+
+  it("lets anyone like a post, toggling only themselves", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER), post(PLAYER)));
+    const as = (uid: string) => doc(db(uid), "posts", "p1");
+    await assertSucceeds(updateDoc(as(OUTSIDER), { likedBy: arrayUnion(OUTSIDER) }));
+    await assertSucceeds(updateDoc(as(PLAYER), { likedBy: arrayUnion(PLAYER) }));
+    await assertSucceeds(updateDoc(as(OUTSIDER), { likedBy: arrayRemove(OUTSIDER) }));
+    // Not someone else, and nothing else at the same time.
+    await assertFails(updateDoc(as(OUTSIDER), { likedBy: arrayRemove(PLAYER) }));
+    await assertFails(updateDoc(as(OUTSIDER), { likedBy: [OUTSIDER, "fake"] }));
+    await assertFails(updateDoc(as(OUTSIDER), { likedBy: arrayUnion(OUTSIDER), body: "Hijack" }));
+    // repostedBy only comes with a repost.
+    await assertFails(updateDoc(as(OUTSIDER), { repostedBy: arrayUnion(OUTSIDER) }));
+  });
+
+  it("lets people repost someone's post, once, with a note", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER, "orig"), post(PLAYER)));
+    const repostRef = (uid: string, id = `r_orig_${uid}`) => doc(db(uid), "posts", id);
+    const repost = (uid: string, extra: Record<string, unknown> = {}) => ({
+      ...post(uid, { kind: "repost", body: "Look!" }),
+      repostOf: { postId: "orig", authorId: PLAYER, authorName: "P" },
+      ...extra,
+    });
+    const doRepost = (uid: string, data: Record<string, unknown>, id?: string) => {
+      const batch = writeBatch(db(uid));
+      batch.set(repostRef(uid, id), data);
+      batch.update(doc(db(uid), "posts", "orig"), { repostedBy: arrayUnion(uid) });
+      return batch.commit();
+    };
+    // The repost alone, without counting it, fails; so does the reverse.
+    await assertFails(setDoc(repostRef(OUTSIDER), repost(OUTSIDER)));
+    await assertSucceeds(doRepost(OUTSIDER, repost(OUTSIDER)));
+    // Only the note can change.
+    await assertSucceeds(updateDoc(repostRef(OUTSIDER), { body: "Carpool?", updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(repostRef(OUTSIDER), { repostOf: null }));
+    // Undo: delete it and drop yourself together.
+    const undo = writeBatch(db(OUTSIDER));
+    undo.delete(repostRef(OUTSIDER));
+    undo.update(doc(db(OUTSIDER), "posts", "orig"), { repostedBy: arrayRemove(OUTSIDER) });
+    await assertSucceeds(undo.commit());
+
+    for (const [uid, data, id] of [
+      [OUTSIDER, repost(OUTSIDER), "r_orig_someone"],
+      [OUTSIDER, repost(OUTSIDER, { repostOf: { postId: "orig", authorId: OUTSIDER, authorName: "P" } }), undefined],
+      [OUTSIDER, repost(OUTSIDER, { images: [{ path: "x" }] }), undefined],
+      [OUTSIDER, repost(OUTSIDER, { kind: "text" }), undefined],
+      [PLAYER, repost(PLAYER), undefined],
+    ] as const) {
+      await assertFails(doRepost(uid, data, id));
     }
   });
 

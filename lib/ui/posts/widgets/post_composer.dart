@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -12,7 +10,7 @@ import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
-import '../../core/ui/layout.dart' show ScreenSize;
+import '../../core/ui/overlay_panel.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../../teams/widgets/team_post_widgets.dart';
@@ -31,7 +29,7 @@ Future<String?> showPostComposer(
   Workout? recorded,
 }) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
-  Widget composer() => ViewModelHost(
+  Widget composer({bool fit = false}) => ViewModelHost(
     create: (c) => PostComposerViewModel(
       postId: postId,
       startWithWorkout: workout || recorded != null,
@@ -41,37 +39,12 @@ Future<String?> showPostComposer(
       authRepository: c.read(),
       filePicker: c.read(),
     ),
-    builder: (_, vm) => PostComposer(viewModel: vm),
+    builder: (_, vm) => PostComposer(viewModel: vm, fitContent: fit),
   );
-  final String? id;
-  if (ScreenSize.of(context).isMobile) {
-    id = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      // Dragging would close it without asking; the close button and the
-      // barrier ask first when there are changes.
-      enableDrag: false,
-      clipBehavior: Clip.antiAlias,
-      builder: (_) =>
-          FractionallySizedBox(heightFactor: 0.92, child: composer()),
-    );
-  } else {
-    id = await showDialog<String>(
-      context: context,
-      builder: (context) => Dialog(
-        clipBehavior: Clip.antiAlias,
-        insetPadding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: SizedBox(
-            height: math.min(MediaQuery.sizeOf(context).height * 0.85, 820),
-            child: composer(),
-          ),
-        ),
-      ),
-    );
-  }
+  final id = await showOverlayPanel<String>(
+    context,
+    builder: (_, fit) => composer(fit: fit),
+  );
   if (id != null) {
     messenger?.showSnackBar(
       SnackBar(content: Text(postId == null ? 'Posted' : 'Post saved')),
@@ -83,9 +56,16 @@ Future<String?> showPostComposer(
 /// Writes a post or shares a workout. Shown by [showPostComposer]; closing
 /// it with unsaved changes asks first.
 class PostComposer extends StatefulWidget {
-  const PostComposer({super.key, required this.viewModel});
+  const PostComposer({
+    super.key,
+    required this.viewModel,
+    this.fitContent = false,
+  });
 
   final PostComposerViewModel viewModel;
+
+  /// In a dialog: only as tall as the form, rather than filling a page.
+  final bool fitContent;
 
   @override
   State<PostComposer> createState() => _PostComposerState();
@@ -339,21 +319,25 @@ class _PostComposerState extends State<PostComposer> {
         icon: const Icon(Icons.close),
       );
       if (!vm.loaded) {
-        return Scaffold(
-          appBar: AppBar(leading: close),
-          body: const LoadingView(),
+        return PanelFrame(
+          fitContent: widget.fitContent,
+          close: close,
+          body: (_) => _status(const LoadingView()),
         );
       }
       if (vm.loadError != null || !vm.canEdit) {
-        return Scaffold(
-          appBar: AppBar(leading: close),
-          body: vm.loadError == null
-              ? const EmptyView(
-                  icon: Icons.edit_off_outlined,
-                  title: "Can't edit this post",
-                  message: "It's been deleted, or it isn't yours.",
-                )
-              : ErrorView(error: vm.loadError),
+        return PanelFrame(
+          fitContent: widget.fitContent,
+          close: close,
+          body: (_) => _status(
+            vm.loadError == null
+                ? const EmptyView(
+                    icon: Icons.edit_off_outlined,
+                    title: "Can't edit this post",
+                    message: "It's been deleted, or it isn't yours.",
+                  )
+                : ErrorView(error: vm.loadError),
+          ),
         );
       }
       return PopScope<String>(
@@ -361,166 +345,176 @@ class _PostComposerState extends State<PostComposer> {
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) _close();
         },
-        child: Scaffold(
-          appBar: AppBar(
-            leading: close,
-            title: Text(title),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: FilledButton(
-                  onPressed: vm.save.running ? null : _submit,
-                  child: Text(vm.isNew ? 'Post' : 'Save'),
-                ),
+        child: PanelFrame(
+          fitContent: widget.fitContent,
+          close: close,
+          title: title,
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: FilledButton(
+                onPressed: vm.save.running ? null : _submit,
+                child: Text(vm.isNew ? 'Post' : 'Save'),
               ),
-            ],
-          ),
-          body: Form(
+            ),
+          ],
+          body: (fit) => Form(
             key: _formKey,
             onChanged: () => _changed = true,
-            child: ConstrainedContent(
-              maxWidth: 640,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                children: [
-                  if (vm.save.running) const LinearProgressIndicator(),
-                  if (vm.isNew && vm.recorded == null)
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(
-                          value: false,
-                          icon: Icon(Icons.edit_note),
-                          label: Text('Post'),
-                        ),
-                        ButtonSegment(
-                          value: true,
-                          icon: Icon(Icons.fitness_center),
-                          label: Text('Workout'),
-                        ),
-                      ],
-                      selected: {_workout},
-                      onSelectionChanged: (s) =>
-                          _edit(() => _workout = s.first),
-                    ),
-                  const SizedBox(height: 12),
-                  if (_workout) ..._workoutFields(context),
-                  TextFormField(
-                    controller: _body,
-                    minLines: _workout ? 2 : 4,
-                    maxLines: 10,
-                    maxLength: UserPost.maxBody,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      labelText: _workout ? 'Notes (optional)' : 'Post',
-                      hintText: _workout
-                          ? 'How did it go?'
-                          : 'Share a highlight, a question, a result…',
-                      alignLabelWithHint: true,
-                    ),
-                    validator: (v) =>
-                        !_workout &&
-                            (v == null || v.trim().isEmpty) &&
-                            _imageCount == 0
-                        ? 'Write something or add a photo'
-                        : null,
-                  ),
-                  if (vm.tournaments.isNotEmpty || _tagKey != null) _tagField(),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _link,
-                    keyboardType: TextInputType.url,
-                    enabled: _links.length < UserPost.maxLinks,
-                    decoration: InputDecoration(
-                      labelText: 'Add a link',
-                      hintText: 'example.com/highlights',
-                      prefixIcon: const Icon(Icons.link),
-                      errorText: _linkError,
-                      suffixIcon: IconButton(
-                        tooltip: 'Add link',
-                        icon: const Icon(Icons.add),
-                        onPressed: _addLink,
+            child: _scroll(
+              fit,
+              children: [
+                if (vm.save.running) const LinearProgressIndicator(),
+                if (vm.isNew && vm.recorded == null)
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                        value: false,
+                        icon: Icon(Icons.edit_note),
+                        label: Text('Post'),
                       ),
-                    ),
-                    onChanged: (_) {
-                      _changed = true;
-                      if (_linkError != null) setState(() => _linkError = null);
-                    },
-                    onSubmitted: (_) => _addLink(),
-                  ),
-                  if (_links.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        for (final l in _links)
-                          InputChip(
-                            label: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 360),
-                              child: Text(l, overflow: TextOverflow.ellipsis),
-                            ),
-                            onDeleted: () => _edit(() => _links.remove(l)),
-                          ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Text(
-                        'Photos',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: _picking || _imageCount >= UserPost.maxImages
-                            ? null
-                            : _addPhotos,
-                        icon: const Icon(Icons.add_photo_alternate_outlined),
-                        label: Text(
-                          'Add photos ($_imageCount/${UserPost.maxImages})',
-                        ),
+                      ButtonSegment(
+                        value: true,
+                        icon: Icon(Icons.fitness_center),
+                        label: Text('Workout'),
                       ),
                     ],
+                    selected: {_workout},
+                    onSelectionChanged: (s) => _edit(() => _workout = s.first),
                   ),
-                  if (_imageCount > 0)
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final i in _kept)
-                          _Removable(
-                            onRemove: () => _edit(() => _kept.remove(i)),
-                            child: PostImage(
-                              image: i,
-                              loadImage: vm.imageData,
-                              size: 96,
-                            ),
-                          ),
-                        for (final a in _added)
-                          _Removable(
-                            onRemove: () => _edit(() => _added.remove(a)),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.memory(
-                                a.bytes,
-                                width: 96,
-                                height: 96,
-                                fit: BoxFit.cover,
-                                semanticLabel: a.name,
-                              ),
-                            ),
-                          ),
-                      ],
+                const SizedBox(height: 12),
+                if (_workout) ..._workoutFields(context),
+                TextFormField(
+                  controller: _body,
+                  minLines: _workout ? 2 : 4,
+                  maxLines: 10,
+                  maxLength: UserPost.maxBody,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: _workout ? 'Notes (optional)' : 'Post',
+                    hintText: _workout
+                        ? 'How did it go?'
+                        : 'Share a highlight, a question, a result…',
+                    alignLabelWithHint: true,
+                  ),
+                  validator: (v) =>
+                      !_workout &&
+                          (v == null || v.trim().isEmpty) &&
+                          _imageCount == 0
+                      ? 'Write something or add a photo'
+                      : null,
+                ),
+                if (vm.tournaments.isNotEmpty || _tagKey != null) _tagField(),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _link,
+                  keyboardType: TextInputType.url,
+                  enabled: _links.length < UserPost.maxLinks,
+                  decoration: InputDecoration(
+                    labelText: 'Add a link',
+                    hintText: 'example.com/highlights',
+                    prefixIcon: const Icon(Icons.link),
+                    errorText: _linkError,
+                    suffixIcon: IconButton(
+                      tooltip: 'Add link',
+                      icon: const Icon(Icons.add),
+                      onPressed: _addLink,
                     ),
+                  ),
+                  onChanged: (_) {
+                    _changed = true;
+                    if (_linkError != null) setState(() => _linkError = null);
+                  },
+                  onSubmitted: (_) => _addLink(),
+                ),
+                if (_links.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      for (final l in _links)
+                        InputChip(
+                          label: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 360),
+                            child: Text(l, overflow: TextOverflow.ellipsis),
+                          ),
+                          onDeleted: () => _edit(() => _links.remove(l)),
+                        ),
+                    ],
+                  ),
                 ],
-              ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text(
+                      'Photos',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: _picking || _imageCount >= UserPost.maxImages
+                          ? null
+                          : _addPhotos,
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                      label: Text(
+                        'Add photos ($_imageCount/${UserPost.maxImages})',
+                      ),
+                    ),
+                  ],
+                ),
+                if (_imageCount > 0)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final i in _kept)
+                        _Removable(
+                          onRemove: () => _edit(() => _kept.remove(i)),
+                          child: PostImage(
+                            image: i,
+                            loadImage: vm.imageData,
+                            size: 96,
+                          ),
+                        ),
+                      for (final a in _added)
+                        _Removable(
+                          onRemove: () => _edit(() => _added.remove(a)),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.memory(
+                              a.bytes,
+                              width: 96,
+                              height: 96,
+                              fit: BoxFit.cover,
+                              semanticLabel: a.name,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+              ],
             ),
           ),
         ),
       );
     },
   );
+
+  /// Loading and error views, given some height in the dialog.
+  Widget _status(Widget child) => PanelFrame.status(widget.fitContent, child);
+
+  /// The form's fields, scrolling once they outgrow the space.
+  Widget _scroll(bool fit, {required List<Widget> children}) {
+    final list = ListView(
+      shrinkWrap: fit,
+      padding: fit
+          ? const EdgeInsets.all(20)
+          : const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      children: children,
+    );
+    return fit ? list : ConstrainedContent(maxWidth: 640, child: list);
+  }
 
   Widget _tagField() {
     final options = [

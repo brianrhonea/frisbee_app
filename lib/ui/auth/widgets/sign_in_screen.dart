@@ -87,6 +87,7 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return AuthLayout(
       title: 'Sign in',
+      subtitle: 'Good to see you again.',
       child: ListenableBuilder(
         listenable: Listenable.merge([
           vm.signIn,

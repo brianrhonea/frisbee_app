@@ -21,6 +21,7 @@ import '../../../domain/models/tournament.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../posts/view_models/home_feed.dart';
+import '../../posts/view_models/post_actions.dart';
 import '../../schedule/view_models/my_schedule.dart';
 import '../../teams/view_models/team_home_viewmodel.dart' show pickPostImages;
 
@@ -55,13 +56,17 @@ class HomeViewModel extends ChangeNotifier {
       (p) => _posts.deletePost(p.teamId, p.post.id),
     );
     deleteUserPost = Command1<void, String>(_userPosts.deletePost);
+    actions = PostActions(
+      userPostRepository: userPostRepository,
+      authRepository: authRepository,
+    )..addListener(notifyListeners);
     feed = HomeFeed(
       uid: _auth.currentUser?.uid ?? '',
       followRepository: followRepository,
       teamRepository: teamRepository,
       teamPostRepository: teamPostRepository,
       userPostRepository: userPostRepository,
-    )..addListener(notifyListeners);
+    )..addListener(_onPosts);
     _feed = MySchedule(
       teamRepository: teamRepository,
       eventRepository: eventRepository,
@@ -100,6 +105,9 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Deletes one of the user's own posts, by id.
   late final Command1<void, String> deleteUserPost;
+
+  /// Likes and reposts, and the posts reposts show.
+  late final PostActions actions;
 
   AppUser? get user => _auth.currentUser;
 
@@ -207,13 +215,21 @@ class HomeViewModel extends ChangeNotifier {
     return _tournaments.where((t) => t.isUpcoming(now)).firstOrNull;
   }
 
+  void _onPosts() {
+    actions.track([
+      for (final item in feed.items)
+        if (item case UserPostItem(:final post)) post,
+    ]);
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _feed
       ..removeListener(_onFeed)
       ..dispose();
     feed
-      ..removeListener(notifyListeners)
+      ..removeListener(_onPosts)
       ..dispose();
     for (final s in _subs) {
       s.cancel();
@@ -222,6 +238,9 @@ class HomeViewModel extends ChangeNotifier {
     savePost.dispose();
     deletePost.dispose();
     deleteUserPost.dispose();
+    actions
+      ..removeListener(notifyListeners)
+      ..dispose();
     super.dispose();
   }
 }

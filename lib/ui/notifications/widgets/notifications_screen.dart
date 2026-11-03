@@ -20,6 +20,7 @@ IconData categoryIcon(NotificationCategory c) => switch (c) {
   NotificationCategory.teamActivity => Icons.sports_outlined,
   NotificationCategory.meetings => Icons.videocam_outlined,
   NotificationCategory.posts => Icons.dynamic_feed_outlined,
+  NotificationCategory.social => Icons.favorite_border,
 };
 
 /// The in-app feed: everything the Cloud Functions sent, including what
@@ -38,6 +39,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   late final List<Command<void>> _commands = [
     vm.open,
+    vm.followBack,
     vm.markAllRead,
     vm.clearAll,
   ];
@@ -87,7 +89,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: vm,
+      listenable: Listenable.merge([vm, vm.followBack]),
       builder: (context, _) => Scaffold(
         appBar: AppBar(
           title: const Text('Notifications'),
@@ -150,18 +152,43 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         padding: const EdgeInsets.only(bottom: 24),
         itemCount: items.length,
         separatorBuilder: (_, _) => const Divider(height: 1),
-        itemBuilder: (_, i) =>
-            _NotificationTile(item: items[i], onTap: () => _open(items[i])),
+        itemBuilder: (_, i) => _NotificationTile(
+          item: items[i],
+          onTap: () => _open(items[i]),
+          following: switch (items[i].followBack) {
+            final f? => vm.isFollowing(f.uid),
+            null => false,
+          },
+          onFollowBack: vm.canFollowBack(items[i])
+              ? () => vm.followBack.execute(items[i])
+              : null,
+          followingBack: vm.followBack.running,
+        ),
       ),
     );
   }
 }
 
 class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({required this.item, required this.onTap});
+  const _NotificationTile({
+    required this.item,
+    required this.onTap,
+    this.onFollowBack,
+    this.following = false,
+    this.followingBack = false,
+  });
 
   final AppNotification item;
   final VoidCallback onTap;
+
+  /// For a new follower the user doesn't follow yet.
+  final VoidCallback? onFollowBack;
+
+  /// For a new follower the user already follows.
+  final bool following;
+
+  /// A follow back is being saved.
+  final bool followingBack;
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +212,25 @@ class _NotificationTile extends StatelessWidget {
           color: c.ink,
         ),
       ),
-      subtitle: item.body.isEmpty
+      subtitle: item.followBack != null
+          ? Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: following
+                    ? OutlinedButton.icon(
+                        onPressed: null,
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('Following'),
+                      )
+                    : FilledButton.icon(
+                        onPressed: followingBack ? null : onFollowBack,
+                        icon: const Icon(Icons.person_add_alt_1, size: 18),
+                        label: const Text('Follow back'),
+                      ),
+              ),
+            )
+          : item.body.isEmpty
           ? null
           : Text(
               item.body,

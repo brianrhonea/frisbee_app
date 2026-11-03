@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
@@ -12,6 +13,8 @@ import 'package:frisbee_app/data/repositories/meeting/meeting_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
+import 'package:frisbee_app/data/repositories/profile/profile_repository.dart';
+import 'package:frisbee_app/ui/profile/widgets/profile_screen.dart';
 import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
@@ -45,6 +48,7 @@ import '../testing/meeting_fakes.dart';
 void main() {
   late FakeTeamRepository teams;
   late FakeEventRepository events;
+  late FakeUserPostRepository userPosts;
 
   Future<void> pumpApp(WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
@@ -96,6 +100,7 @@ void main() {
           Provider<EventRepository>.value(value: events),
           Provider<MeetingRepository>.value(value: FakeMeetingRepository()),
           Provider<TeamPostRepository>.value(value: FakeTeamPostRepository()),
+          Provider<ProfileRepository>.value(value: FakeProfileRepository()),
           Provider<StatsRepository>.value(
             value: MockStatsRepository(teamRepository: teams),
           ),
@@ -106,7 +111,9 @@ void main() {
             value: FakeRankingRepository(const []),
           ),
           Provider<FollowRepository>.value(value: FakeFollowRepository()),
-          Provider<UserPostRepository>.value(value: FakeUserPostRepository()),
+          Provider<UserPostRepository>.value(
+            value: userPosts = FakeUserPostRepository(),
+          ),
           Provider<GroupTournamentRepository>.value(
             value: FakeGroupTournamentRepository(),
           ),
@@ -146,19 +153,53 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
   });
 
-  testWidgets('new event has a way back', (tester) async {
+  testWidgets('new event opens over home; closing asks before discarding', (
+    tester,
+  ) async {
     await pumpApp(tester);
     await tapText(tester, 'Add event');
+    // They run a team, so Add event asks where it goes.
+    await tapText(tester, 'My schedule');
+    // A panel over home, not a page of its own.
     expect(find.byType(EventEditorScreen), findsOneWidget);
-    await tester.pageBack();
-    await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
+    final close = find.descendant(
+      of: find.byType(EventEditorScreen),
+      matching: find.byTooltip('Close'),
+    );
+
+    // Nothing typed: closes straight away.
+    await tester.tap(close);
+    await tester.pumpAndSettle();
+    expect(find.byType(EventEditorScreen), findsNothing);
+
+    // Something typed: asks first.
+    await tapText(tester, 'Add event');
+    await tapText(tester, 'My schedule');
+    await tester.enterText(find.byType(TextFormField).first, 'Pickup');
+    await tester.tap(close);
+    await tester.pumpAndSettle();
+    expect(find.text('Discard this event?'), findsOneWidget);
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EventEditorScreen), findsNothing);
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(events.mine[testUser.uid]!.values.map((e) => e.title), [
+      'Tempo run',
+    ]);
   });
 
-  testWidgets('saving a new event shows it; back returns home', (tester) async {
+  testWidgets('saving a new event offers to view it; back returns home', (
+    tester,
+  ) async {
     await pumpApp(tester);
     await tapText(tester, 'Add event');
+    // They run a team, so Add event asks where it goes.
+    await tapText(tester, 'My schedule');
     await tester.enterText(find.byType(TextFormField).first, 'Pickup');
+    // Done typing: otherwise the focused field keeps scrolling back into view.
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('Create event'),
       300,
@@ -170,10 +211,84 @@ void main() {
           .first,
     );
     await tapText(tester, 'Create event');
+    // The panel closes and says so, with a way to open it.
+    expect(find.byType(EventEditorScreen), findsNothing);
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(find.text('Event created'), findsOneWidget);
+    await tester.tap(find.text('View'));
+    await tester.pumpAndSettle();
     expect(find.byType(MyEventDetailScreen), findsOneWidget);
+    expect(find.text('Pickup'), findsWidgets);
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
+  });
+
+  testWidgets('a new event can be shared with followers', (tester) async {
+    await pumpApp(tester);
+    await tapText(tester, 'Add event');
+    await tapText(tester, 'My schedule');
+    await tester.enterText(find.byType(TextFormField).first, 'Pickup');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    final form = find
+        .descendant(
+          of: find.byType(EventEditorScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.text('Share with followers'),
+      300,
+      scrollable: form,
+    );
+    await tapText(tester, 'Share with followers');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Say something (optional)'),
+      'Bring a light and a dark',
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Create event'),
+      300,
+      scrollable: form,
+    );
+    await tapText(tester, 'Create event');
+
+    expect(find.byType(EventEditorScreen), findsNothing);
+    expect(
+      find.text('Event created and shared with your followers'),
+      findsOneWidget,
+    );
+    final post = userPosts.posts.single;
+    expect(post.body, 'Bring a light and a dark');
+    expect(post.event!.title, 'Pickup');
+    expect(post.event!.teamId, isNull);
+  });
+
+  testWidgets('from a post page, the author opens their profile', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    userPosts.posts.add(
+      UserPost(
+        id: 'p1',
+        authorId: 'sam',
+        authorName: 'Sam Lee',
+        body: 'Hello there',
+        createdAt: DateTime(2026, 11, 1),
+      ),
+    );
+    userPosts.changed();
+    GoRouter.of(tester.element(find.byType(HomeScreen))).push('/posts/p1');
+    await tester.pumpAndSettle();
+    expect(find.text('Hello there'), findsOneWidget);
+    // The post page sits over the tabs; the profile lives in one.
+    await tester.tap(find.text('Sam Lee').last);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(PlayerProfileScreen), findsOneWidget);
   });
 
   testWidgets('a team left on its roster does not hijack event links', (

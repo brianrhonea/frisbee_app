@@ -18,6 +18,7 @@ import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/stats.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/user_post.dart';
+import '../../posts/view_models/post_actions.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
@@ -69,12 +70,17 @@ class PlayerProfileViewModel extends ChangeNotifier {
           Result.error(Exception('Posts are unavailable')),
     );
     if (_userPosts case final posts?) {
+      actions = PostActions(
+        userPostRepository: posts,
+        authRepository: authRepository,
+      )..addListener(notifyListeners);
       _subs.add(
         posts
             .watchPostsBy(uid)
             .listen(
               (p) {
                 _posts = p;
+                actions?.track(p);
                 _postsLoaded = true;
                 notifyListeners();
               },
@@ -433,6 +439,9 @@ class PlayerProfileViewModel extends ChangeNotifier {
 
   /// The player's posts, newest first.
   List<UserPost> get posts => _posts;
+
+  /// Likes and reposts, and the posts reposts show; null without posts.
+  PostActions? actions;
   bool get postsLoaded => _postsLoaded;
   Object? get postsError => _postsError;
   int get followers => _counts.followers;
@@ -500,6 +509,9 @@ class PlayerProfileViewModel extends ChangeNotifier {
     unclaim.dispose();
     message.dispose();
     deletePost.dispose();
+    actions
+      ?..removeListener(notifyListeners)
+      ..dispose();
     _followSlot.dispose();
     super.dispose();
   }

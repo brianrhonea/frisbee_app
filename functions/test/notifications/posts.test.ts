@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   followCountChanges,
+  followerNotice,
   followKeys,
+  likeNotice,
+  newLikers,
+  repostNotice,
+  repostOf,
   postPreview,
   postRecipients,
   teamPostNotice,
@@ -86,5 +91,58 @@ describe("followCountChanges", () => {
 
   it("ignores turning the bell on or off", () => {
     expect(followCountChanges("me", "team_t1", { notify: false }, { notify: true })).toEqual([]);
+  });
+});
+
+describe("likes, reposts and followers", () => {
+  it("finds who newly liked a post, not its author", () => {
+    expect(newLikers({ likedBy: ["a"] }, { authorId: "me", likedBy: ["a", "b", "me", "b"] })).toEqual(["b"]);
+    expect(newLikers(undefined, { authorId: "me", likedBy: ["a"] })).toEqual(["a"]);
+    expect(newLikers({ likedBy: ["a", "b"] }, { authorId: "me", likedBy: ["a"] })).toEqual([]);
+  });
+
+  it("folds likes on one post together", () => {
+    const n = likeNotice({ postId: "p1", post: { body: "Good throws" }, likerName: "Sam" });
+    expect(n.category).toBe("social");
+    expect(n.route).toBe("/posts/p1");
+    expect(n.collapseId).toBe("likes_p1");
+    expect(n.text({}, 1)).toEqual({ title: "Sam liked your post", body: "Good throws" });
+    expect(n.text({}, 3).title).toBe("3 new likes on your post");
+  });
+
+  it("tells the original's author about a repost", () => {
+    const repost = { kind: "repost", authorName: "Zed", body: "Look!", repostOf: { postId: "p1", authorId: "sam", authorName: "Sam" } };
+    expect(repostOf(repost)).toEqual({ postId: "p1", authorId: "sam", authorName: "Sam" });
+    expect(repostOf({ kind: "text", repostOf: { postId: "p1" } })).toBeUndefined();
+    const n = repostNotice({ repostId: "r_p1_zed", repost, original: { body: "Pickup tonight" } });
+    expect(n.route).toBe("/posts/r_p1_zed");
+    expect(n.text({}, 1)).toEqual({ title: "Zed reposted your post", body: "Look!" });
+    expect(repostNotice({ repostId: "r", repost: { ...repost, body: "" }, original: { body: "Pickup tonight" } }).text({}, 1).body).toBe(
+      "Pickup tonight",
+    );
+    // Followers of the reposter.
+    expect(userPostNotice({ postId: "r_p1_zed", post: repost }).text({}, 1)).toEqual({
+      title: "Zed reposted Sam's post",
+      body: "Look!",
+    });
+  });
+
+  it("offers to follow a new follower back", () => {
+    const n = followerNotice({ followerId: "u9", name: "Riley", photoUrl: "https://x/p.png" });
+    expect(n.category).toBe("social");
+    expect(n.route).toBe("/players/u9");
+    expect(n.collapseId).toBeUndefined();
+    expect(n.text({}, 1).title).toBe("Riley started following you");
+    expect(n.extra).toEqual({ followBack: { uid: "u9", name: "Riley", photoUrl: "https://x/p.png" } });
+  });
+
+  it("previews event and repost posts", () => {
+    expect(postPreview({ kind: "event", event: { title: "Showcase" } })).toBe("Showcase");
+    expect(postPreview({ kind: "repost" })).toBe("A repost");
+  });
+
+  it("can be turned off", () => {
+    expect(wants({ categories: { social: false } }, "social")).toBe(false);
+    expect(wants({}, "social")).toBe(true);
   });
 });

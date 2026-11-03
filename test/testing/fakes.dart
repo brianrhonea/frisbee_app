@@ -1280,6 +1280,7 @@ class FakeNotificationRepository implements NotificationRepository {
         createdAt: n.createdAt,
         read: true,
         count: n.count,
+        followBack: n.followBack,
       );
     }
     emit();

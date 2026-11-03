@@ -16,6 +16,7 @@ import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../posts/widgets/post_widgets.dart';
+import '../../schedule/widgets/event_editor_screen.dart';
 import '../../schedule/widgets/event_style.dart';
 import '../../shell/widgets/app_shell.dart';
 import '../../teams/widgets/join_team_dialog.dart';
@@ -175,22 +176,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _newPost() => showPostComposer(context);
 
-  void _newPersonalEvent() => context.push(Routes.newMyEvent());
-
   /// A team event for a team the user runs, or a personal one.
   Future<void> _newEvent() async {
     final teams = vm.postableTeams;
     if (teams.isEmpty) {
-      context.push(Routes.newMyEvent());
+      await showEventEditor(context);
       return;
     }
-    final choice = await showDialog<Team?>(
+    // `team` is null for My schedule; the whole choice is null when the
+    // dialog is dismissed, which adds nothing.
+    final choice = await showDialog<({Team? team})>(
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('Add an event to'),
         children: [
           SimpleDialogOption(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, (team: null)),
             child: const Row(
               children: [
                 Icon(Icons.person_outline),
@@ -201,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           for (final t in teams)
             SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, t),
+              onPressed: () => Navigator.pop(context, (team: t)),
               child: Row(
                 children: [
                   TeamBadge(size: 26, community: t.isCommunity),
@@ -213,10 +214,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-    if (!mounted) return;
-    context.push(
-      choice == null ? Routes.newMyEvent() : Routes.newEvent(choice.id),
-    );
+    if (!mounted || choice == null) return;
+    await showEventEditor(context, teamId: choice.team?.id);
   }
 
   @override
@@ -249,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _NextEventStrip(entry: next),
                     _ComingUpCard(
                       events: vm.upcomingEvents.take(2).toList(),
-                      onAdd: _newPersonalEvent,
+                      onAdd: _newEvent,
                     ),
                   ],
                   ..._main(),
@@ -272,7 +271,6 @@ class _HomeScreenState extends State<HomeScreen> {
         onTeamPost: vm.postableTeams.isEmpty || vm.savePost.running
             ? null
             : _compose,
-        onEvent: _newEvent,
       ),
       if (vm.teamsLoaded && vm.teams.isEmpty)
         _JoinCard(
@@ -299,6 +297,8 @@ class _HomeScreenState extends State<HomeScreen> {
             onDelete: post.authorId == vm.user?.uid
                 ? () => _deleteUserPost(post.id)
                 : null,
+            actions: vm.actions,
+            onRepost: () => repostOrUndo(context, vm.actions, post),
           ),
           final TeamPostItem p => TeamPostCard(
             key: ValueKey(item.id),
@@ -341,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Widget> _side() => [
     if (vm.nextTeamEvent case final next?) _UpNextCard(entry: next),
-    _ComingUpCard(events: vm.upcomingEvents, onAdd: _newPersonalEvent),
+    _ComingUpCard(events: vm.upcomingEvents, onAdd: _newEvent),
     if (vm.nextTournament case final t?) _AroundTheLeague(tournament: t),
     const _Footer(),
   ];
@@ -372,7 +372,6 @@ class _Composer extends StatelessWidget {
     required this.onPost,
     required this.onWorkout,
     required this.onTeamPost,
-    required this.onEvent,
   });
 
   final String name;
@@ -382,7 +381,6 @@ class _Composer extends StatelessWidget {
 
   /// Posts to one of the user's teams; null if they run none.
   final VoidCallback? onTeamPost;
-  final VoidCallback onEvent;
 
   @override
   Widget build(BuildContext context) {
@@ -448,12 +446,6 @@ class _Composer extends StatelessWidget {
                     icon: const Icon(Icons.campaign_outlined, size: 18),
                     label: const Text('Team post'),
                   ),
-                TextButton.icon(
-                  style: compact,
-                  onPressed: onEvent,
-                  icon: const Icon(Icons.event_outlined, size: 18),
-                  label: const Text('Event'),
-                ),
               ],
             ),
           ),

@@ -102,7 +102,9 @@ class HomeFeed extends ChangeNotifier {
   }
 
   static bool _limited(String sourceKey) =>
-      sourceKey.startsWith('authors:') || sourceKey.startsWith('tags:');
+      sourceKey.startsWith('authors:') ||
+      sourceKey.startsWith('tags:') ||
+      sourceKey.startsWith('teamEvents:');
 
   void _sync() {
     final myTeams = {for (final t in _teams) t.id: t};
@@ -126,6 +128,22 @@ class HomeFeed extends ChangeNotifier {
       wanted['tags:${tags.join(',')}:$_limit'] = () => _userPosts
           .watchPostsForTournaments(tags, limit: _limit)
           .map((p) => [for (final post in p) UserPostItem(post)]);
+    }
+
+    // Events shared from the schedules of the user's teams, by anyone
+    // (not only people they follow).
+    final teamIds = [for (final t in _teams) t.id]..sort();
+    if (teamIds.isNotEmpty) {
+      wanted['teamEvents:${teamIds.join(',')}:$_limit'] = () => _userPosts
+          .watchPostsForTeamEvents(teamIds, limit: _limit)
+          // Reposts reach the reposter's followers, not the whole team
+          // again.
+          .map(
+            (p) => [
+              for (final post in p)
+                if (!post.isRepost) UserPostItem(post),
+            ],
+          );
     }
 
     // Each source loads at most a page more than is shown; the keys carry

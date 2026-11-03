@@ -50,6 +50,12 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     int limit = 50,
   }) => _watchIn('tournamentKey', tournamentKeys, limit);
 
+  @override
+  Stream<List<UserPost>> watchPostsForTeamEvents(
+    List<String> teamIds, {
+    int limit = 50,
+  }) => _watchIn('event.teamId', teamIds, limit);
+
   /// Newest [limit] posts whose [field] is one of [values], querying in
   /// chunks of [inLimit] and merging.
   Stream<List<UserPost>> _watchIn(
@@ -161,6 +167,49 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     if (removed.isNotEmpty) await _files.delete(removed);
     return ref.id;
   });
+
+  @override
+  Future<Result<void>> setLiked(String postId, String uid, bool liked) => guard(
+    () => _posts.doc(postId).update({
+      'likedBy': liked
+          ? FieldValue.arrayUnion([uid])
+          : FieldValue.arrayRemove([uid]),
+    }),
+  );
+
+  @override
+  Future<Result<String>> repost(UserPost original, String note, AppUser me) =>
+      guard(() async {
+        final post = UserPost.repost(original, note: note);
+        final originalId = post.originalId;
+        final id = UserPost.repostId(originalId, me.uid);
+        // Both or neither, so the count matches the reposts.
+        final batch = _db.batch()
+          ..set(_posts.doc(id), {
+            ...post.toEditableMap(),
+            'authorId': me.uid,
+            'authorName': me.label,
+            'authorPhotoUrl': me.photoUrl,
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          })
+          ..update(_posts.doc(originalId), {
+            'repostedBy': FieldValue.arrayUnion([me.uid]),
+          });
+        await batch.commit();
+        return id;
+      });
+
+  @override
+  Future<Result<void>> undoRepost(String originalId, String uid) =>
+      guard(() async {
+        final batch = _db.batch()
+          ..delete(_posts.doc(UserPost.repostId(originalId, uid)))
+          ..update(_posts.doc(originalId), {
+            'repostedBy': FieldValue.arrayRemove([uid]),
+          });
+        await batch.commit();
+      });
 
   @override
   Future<Result<void>> deletePost(String id) => guard(() async {

@@ -37,6 +37,11 @@ enum NotificationCategory {
     'Posts you follow',
     'New posts from people, teams and tournaments whose bell you turned on',
     perTeam: true,
+  ),
+  social(
+    'Likes, reposts and followers',
+    'When someone likes or reposts your post, or starts following you',
+    perTeam: false,
   );
 
   const NotificationCategory(
@@ -118,7 +123,11 @@ class AppNotification {
     this.createdAt,
     this.read = false,
     this.count = 1,
+    this.followBack,
   });
+
+  /// For a new follower: who, so they can be followed back from the feed.
+  final ({String uid, String name, String? photoUrl})? followBack;
 
   final String id;
   final NotificationCategory category;
@@ -147,6 +156,16 @@ class AppNotification {
         createdAt: parseDate(map['createdAt']),
         read: map['read'] as bool? ?? false,
         count: (map['count'] as num?)?.toInt() ?? 1,
+        followBack: switch (map['followBack']) {
+          {'uid': final String uid} && final Map<dynamic, dynamic> f
+              when uid.isNotEmpty =>
+            (
+              uid: uid,
+              name: f['name'] as String? ?? '',
+              photoUrl: f['photoUrl'] as String?,
+            ),
+          _ => null,
+        },
       );
 }
 

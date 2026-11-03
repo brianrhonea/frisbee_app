@@ -25,11 +25,25 @@ void main() {
     expect(redirect(auth, Routes.signUp), isNull);
   });
 
-  test('signed-in users leave auth screens for their destination', () {
+  test('signing in always lands on Community', () {
     final auth = FakeAuthRepository(user: testUser);
     expect(redirect(auth, Routes.signIn), Routes.home);
-    expect(redirect(auth, '/sign-in?from=/teams/t1'), '/teams/t1');
-    expect(redirect(auth, '/splash'), Routes.home);
+    expect(redirect(auth, '/sign-in?from=/teams/t1'), Routes.home);
+    expect(redirect(auth, '/sign-in?from=/rankings'), Routes.home);
+    expect(redirect(auth, '/sign-up?from=/teams/t1'), Routes.home);
     expect(redirect(auth, '/rankings'), isNull);
+  });
+
+  test('except from an invite link, to finish joining', () {
+    final auth = FakeAuthRepository(user: testUser);
+    expect(redirect(auth, '/sign-in?from=/join/ABC123'), '/join/ABC123');
+    expect(redirect(auth, '/sign-up?from=/join/ABC123'), '/join/ABC123');
+    expect(redirect(auth, '/sign-in?from=/g/grp1'), '/g/grp1');
+  });
+
+  test('opening the app signed in carries on where it was headed', () {
+    final auth = FakeAuthRepository(user: testUser);
+    expect(redirect(auth, '/splash'), Routes.home);
+    expect(redirect(auth, '/splash?from=/teams/t1'), '/teams/t1');
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
@@ -11,6 +12,7 @@ import 'package:frisbee_app/ui/profile/view_models/profile_viewmodel.dart';
 import 'package:go_router/go_router.dart';
 
 import '../testing/fakes.dart';
+import '../testing/social_fakes.dart';
 
 AppNotification note(String id, {bool read = false, String? route}) =>
     AppNotification(
@@ -79,12 +81,14 @@ void main() {
   group('NotificationsScreen', () {
     Future<FakeNotificationRepository> pump(
       WidgetTester tester,
-      List<AppNotification> feed,
-    ) async {
+      List<AppNotification> feed, {
+      FakeFollowRepository? follows,
+    }) async {
       final repo = FakeNotificationRepository(feed: feed);
       final vm = NotificationsViewModel(
         notificationRepository: repo,
         authRepository: FakeAuthRepository(user: testUser),
+        followRepository: follows,
       );
       addTearDown(vm.dispose);
       final router = GoRouter(
@@ -107,6 +111,48 @@ void main() {
       await tester.pumpAndSettle();
       return repo;
     }
+
+    testWidgets('a new follower can be followed back', (tester) async {
+      final follows = FakeFollowRepository();
+      final repo = await pump(tester, [
+        AppNotification.fromMap('f1', {
+          'category': 'social',
+          'title': 'Riley started following you',
+          'route': '/target',
+          'read': false,
+          'followBack': {'uid': 'u9', 'name': 'Riley', 'photoUrl': null},
+        }),
+      ], follows: follows);
+      expect(find.text('Riley started following you'), findsOneWidget);
+      await tester.tap(find.text('Follow back'));
+      await tester.pumpAndSettle();
+      // Followed, still on the list, and read.
+      final mine = await follows.watchFollows(testUser.uid).first;
+      expect(mine.map((f) => f.key), [FollowTarget.userKey('u9')]);
+      expect(mine.single.target.name, 'Riley');
+      await tester.pumpAndSettle();
+      expect(find.text('Following'), findsOneWidget);
+      expect(find.text('Follow back'), findsNothing);
+      expect(find.text('Target page'), findsNothing);
+      expect(repo.feed.single.read, isTrue);
+    });
+
+    testWidgets('no Follow back for someone already followed', (tester) async {
+      final follows = FakeFollowRepository();
+      await follows.follow(
+        testUser.uid,
+        const FollowTarget.user('u9', 'Riley'),
+      );
+      await pump(tester, [
+        AppNotification.fromMap('f1', {
+          'category': 'social',
+          'title': 'Riley started following you',
+          'followBack': {'uid': 'u9', 'name': 'Riley'},
+        }),
+      ], follows: follows);
+      expect(find.text('Follow back'), findsNothing);
+      expect(find.text('Following'), findsOneWidget);
+    });
 
     testWidgets('shows an empty state', (tester) async {
       await pump(tester, const []);

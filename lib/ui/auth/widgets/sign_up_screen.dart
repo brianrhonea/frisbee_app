@@ -57,6 +57,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     return AuthLayout(
       title: 'Create your account',
+      subtitle: 'Join your team on Stall 10.',
       child: ListenableBuilder(
         listenable: widget.viewModel.signUp,
         builder: (context, _) {

@@ -242,6 +242,11 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
                 ? () => showPostComposer(context, postId: p.id)
                 : null,
             onDelete: vm.isMe ? () => _deletePost(p.id) : null,
+            actions: vm.actions,
+            onRepost: switch (vm.actions) {
+              final a? => () => repostOrUndo(context, a, p),
+              null => null,
+            },
           ),
     ];
   }

@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../domain/models/feed_item.dart';
 import '../../../domain/models/user_post.dart';
 import '../../../domain/models/workout.dart';
 import '../../../domain/models/workout_route.dart';
+import '../../../routing/open_link.dart';
 import '../../../routing/routes.dart';
+import '../../../utils/result.dart';
 import '../../core/ui/layout.dart';
+import '../../schedule/widgets/event_style.dart';
 import '../../teams/widgets/team_post_widgets.dart';
 import '../../workouts/widgets/route_widgets.dart';
+import '../view_models/post_actions.dart';
 import 'post_composer.dart';
 
 export '../../core/ui/layout.dart' show PersonAvatar;
@@ -19,9 +25,14 @@ enum _PostAction { edit, delete }
 String _when(DateTime? d) =>
     d == null ? 'Just now' : DateFormat.MMMd().add_jm().format(d);
 
-/// A post someone wrote: who and when, text, a workout, photos and links.
-/// Tapping the author opens their profile. [onEdit] and [onDelete] are for
-/// the author.
+/// A post someone wrote: who and when, text, a workout, an event, photos
+/// and links. A repost shows the reposter's note over the original. Tapping
+/// the author opens their profile. [onEdit] and [onDelete] are for the
+/// author.
+///
+/// With [actions], a footer to like and repost it (a repost's original), and
+/// a repost's original is loaded from there. [onRepost] asks how to repost
+/// or takes the repost back (see [repostOrUndo]).
 class UserPostCard extends StatelessWidget {
   const UserPostCard({
     super.key,
@@ -30,6 +41,8 @@ class UserPostCard extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onOpen,
+    this.actions,
+    this.onRepost,
   });
 
   final UserPost post;
@@ -40,21 +53,32 @@ class UserPostCard extends StatelessWidget {
   /// Opens the post on its own page; null when already there.
   final VoidCallback? onOpen;
 
+  final PostActions? actions;
+  final VoidCallback? onRepost;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final workout = post.workout;
+    final repostOf = post.repostOf;
     final subtitle = [
+      switch (post.kind) {
+        UserPostKind.workout => 'Shared a workout',
+        UserPostKind.event => 'Shared an event',
+        UserPostKind.repost =>
+          'Reposted '
+              '${repostOf!.authorName.isEmpty ? 'a post' : "${repostOf.authorName}'s post"}',
+        UserPostKind.text => null,
+      },
       _when(post.createdAt),
       if (post.edited) 'edited',
-    ].join(' · ');
+    ].nonNulls.join(' · ');
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 4, 14),
+          padding: const EdgeInsets.fromLTRB(12, 10, 4, 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -62,7 +86,8 @@ class UserPostCard extends StatelessWidget {
                 children: [
                   InkWell(
                     borderRadius: BorderRadius.circular(24),
-                    onTap: () => context.push(Routes.player(post.authorId)),
+                    onTap: () =>
+                        openPage(context, Routes.player(post.authorId)),
                     child: Padding(
                       padding: const EdgeInsets.all(2),
                       child: PersonAvatar(
@@ -78,7 +103,7 @@ class UserPostCard extends StatelessWidget {
                       children: [
                         InkWell(
                           onTap: () =>
-                              context.push(Routes.player(post.authorId)),
+                              openPage(context, Routes.player(post.authorId)),
                           child: Text(
                             post.authorName.isEmpty
                                 ? 'Someone'
@@ -87,9 +112,7 @@ class UserPostCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          workout == null
-                              ? subtitle
-                              : 'Shared a workout · $subtitle',
+                          subtitle,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
@@ -123,67 +146,547 @@ class UserPostCard extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 12, left: 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (post.tournamentName case final t?
-                        when t.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Row(
+                child: repostOf == null
+                    ? _PostContent(post: post, loadImage: loadImage)
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Icon(
-                            Icons.emoji_events_outlined,
-                            size: 16,
-                            color: scheme.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              'At $t',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: scheme.primary,
-                              ),
+                          if (post.body.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            SelectableText(
+                              post.body,
+                              style: theme.textTheme.bodyMedium,
                             ),
+                          ],
+                          const SizedBox(height: 10),
+                          _EmbeddedPost(
+                            loaded: actions?.originalLoaded(post) ?? false,
+                            original: actions?.originalOf(post),
+                            loadImage: loadImage,
                           ),
                         ],
                       ),
-                    ],
-                    if (post.body.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      SelectableText(
-                        post.body,
+              ),
+              if (actions case final a?)
+                _PostFooter(post: post, actions: a, onRepost: onRepost)
+              else
+                const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A post's text, workout, event, photos and links.
+class _PostContent extends StatelessWidget {
+  const _PostContent({required this.post, required this.loadImage});
+
+  final UserPost post;
+  final ImageLoader loadImage;
+
+  /// Where tapping a shared event goes: the event itself for its author,
+  /// otherwise the team's page (which shows it if the event is public, and
+  /// to members); nowhere for someone else's personal event.
+  String? _eventLink(BuildContext context, SharedEvent e) {
+    final me = context.read<AuthRepository?>()?.currentUser?.uid;
+    final teamId = e.teamId;
+    if (me != null && me == post.authorId) {
+      return teamId == null
+          ? Routes.myEvent(e.eventId)
+          : Routes.event(teamId, e.eventId);
+    }
+    return teamId == null ? null : Routes.team(teamId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final workout = post.workout;
+    final event = post.event;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (post.tournamentName case final t? when t.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.emoji_events_outlined,
+                size: 16,
+                color: scheme.primary,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'At $t',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (post.body.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          SelectableText(post.body, style: theme.textTheme.bodyMedium),
+        ],
+        if (workout != null) ...[
+          const SizedBox(height: 10),
+          WorkoutSummary(workout: workout),
+        ],
+        if (event != null) ...[
+          const SizedBox(height: 10),
+          SharedEventCard(
+            event: event,
+            onTap: switch (_eventLink(context, event)) {
+              final link? => () => openPage(context, link),
+              null => null,
+            },
+          ),
+        ],
+        if (post.images.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final i in post.images)
+                PostImage(
+                  image: i,
+                  loadImage: loadImage,
+                  size: post.images.length == 1 ? 320 : 156,
+                ),
+            ],
+          ),
+        ],
+        for (final l in post.links)
+          PostLinkRow(
+            icon: Icons.link,
+            text: shortLink(l),
+            tooltip: l,
+            onTap: () => openPostLink(context, Uri.parse(l)),
+          ),
+      ],
+    );
+  }
+}
+
+/// The original inside a repost: its author and content, opening on its
+/// own page. Says so when it has been deleted.
+class _EmbeddedPost extends StatelessWidget {
+  const _EmbeddedPost({
+    required this.loaded,
+    required this.original,
+    required this.loadImage,
+  });
+
+  final bool loaded;
+  final UserPost? original;
+  final ImageLoader loadImage;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final post = original;
+    Widget box(Widget child, {VoidCallback? onTap}) => Material(
+      color: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(padding: const EdgeInsets.all(12), child: child),
+      ),
+    );
+    if (!loaded) {
+      return box(
+        const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (post == null) {
+      return box(
+        Row(
+          children: [
+            Icon(Icons.info_outline, size: 18, color: scheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'This post is no longer available.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return box(
+      onTap: () => context.push(Routes.post(post.id)),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              PersonAvatar(
+                name: post.authorName,
+                photoUrl: post.authorPhotoUrl,
+                radius: 12,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  post.authorName.isEmpty ? 'Someone' : post.authorName,
+                  style: theme.textTheme.labelLarge,
+                ),
+              ),
+              Text(
+                _when(post.createdAt),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          _PostContent(post: post, loadImage: loadImage),
+        ],
+      ),
+    );
+  }
+}
+
+/// Like and Repost, with how many of each. For a repost they count toward
+/// its original.
+class _PostFooter extends StatelessWidget {
+  const _PostFooter({required this.post, required this.actions, this.onRepost});
+
+  final UserPost post;
+  final PostActions actions;
+  final VoidCallback? onRepost;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final target = actions.target(post);
+    if (target == null) return const SizedBox(height: 8);
+    final liked = actions.isLiked(post);
+    final reposted = actions.isReposted(post);
+    final canRepost = actions.canRepost(post) && onRepost != null;
+    String count(String label, int n) => n == 0 ? label : '$n';
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          TextButton.icon(
+            onPressed: () => actions.toggleLike.execute(post),
+            style: TextButton.styleFrom(
+              foregroundColor: liked
+                  ? Colors.red.shade400
+                  : scheme.onSurfaceVariant,
+            ),
+            icon: Icon(
+              liked ? Icons.favorite : Icons.favorite_border,
+              size: 20,
+            ),
+            label: Text(
+              count('Like', target.likeCount),
+              semanticsLabel: liked ? 'Unlike' : 'Like',
+            ),
+          ),
+          const SizedBox(width: 4),
+          TextButton.icon(
+            // Your own posts show how often they were reposted.
+            onPressed: canRepost ? onRepost : null,
+            style: TextButton.styleFrom(
+              foregroundColor: reposted
+                  ? scheme.primary
+                  : scheme.onSurfaceVariant,
+            ),
+            icon: Icon(reposted ? Icons.repeat_on : Icons.repeat, size: 20),
+            label: Text(
+              reposted
+                  ? (target.repostCount > 1
+                        ? '${target.repostCount}'
+                        : 'Reposted')
+                  : count('Repost', target.repostCount),
+              semanticsLabel: reposted ? 'Undo repost' : 'Repost',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Reposts [post] (a repost's original) after asking for an optional note,
+/// or, when already reposted, asks to take it back.
+Future<void> repostOrUndo(
+  BuildContext context,
+  PostActions actions,
+  UserPost post,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  void say(String text) => messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(text)));
+  String problem(Result<void>? r) => r is Error<void>
+      ? r.error.toString().replaceFirst('Exception: ', '')
+      : '';
+
+  if (actions.isReposted(post)) {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Undo your repost?'),
+        content: const Text("Your followers won't see it from you any more."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Undo repost'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await actions.undoRepost.execute(post);
+    final r = actions.undoRepost.result;
+    say(r is Error ? "Couldn't undo it. ${problem(r)}" : 'Repost removed');
+    return;
+  }
+  final original = actions.target(post);
+  if (original == null || !context.mounted) return;
+  final note = await showDialog<String>(
+    context: context,
+    builder: (context) => _RepostDialog(original: original),
+  );
+  if (note == null) return;
+  await actions.repost.execute((post: post, note: note));
+  final r = actions.repost.result;
+  say(
+    r is Error
+        ? "Couldn't repost it. ${problem(r)}"
+        : 'Reposted to your followers',
+  );
+}
+
+/// Shows what's being reposted and asks for an optional note. Pops with the
+/// note (maybe empty), or null when cancelled.
+class _RepostDialog extends StatefulWidget {
+  const _RepostDialog({required this.original});
+
+  final UserPost original;
+
+  @override
+  State<_RepostDialog> createState() => _RepostDialogState();
+}
+
+class _RepostDialogState extends State<_RepostDialog> {
+  final _note = TextEditingController();
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final o = widget.original;
+    final theme = Theme.of(context);
+    final preview = [
+      if (o.event case final e?) e.title,
+      if (o.workout case final w?) w.activity.label,
+      if (o.body.isNotEmpty) o.body,
+      if (o.images.isNotEmpty)
+        o.images.length == 1 ? 'A photo' : '${o.images.length} photos',
+    ].join(' · ');
+    return AlertDialog(
+      title: const Text('Repost to your followers?'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (o.event case final e?)
+              SharedEventCard(event: e)
+            else
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        o.authorName.isEmpty ? 'Someone' : o.authorName,
+                        style: theme.textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        preview.isEmpty ? 'A post' : preview,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium,
                       ),
                     ],
-                    if (workout != null) ...[
-                      const SizedBox(height: 10),
-                      WorkoutSummary(workout: workout),
-                    ],
-                    if (post.images.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final i in post.images)
-                            PostImage(
-                              image: i,
-                              loadImage: loadImage,
-                              size: post.images.length == 1 ? 320 : 156,
-                            ),
-                        ],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _note,
+              autofocus: true,
+              minLines: 1,
+              maxLines: 4,
+              maxLength: 1000,
+              decoration: const InputDecoration(
+                labelText: 'Add a note (optional)',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          onPressed: () => Navigator.pop(context, _note.text.trim()),
+          icon: const Icon(Icons.repeat),
+          label: const Text('Repost'),
+        ),
+      ],
+    );
+  }
+}
+
+/// An event shared in a post: its date, type, title, time, place and team.
+class SharedEventCard extends StatelessWidget {
+  const SharedEventCard({super.key, required this.event, this.onTap});
+
+  final SharedEvent event;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final color = event.type.color(scheme);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+    Widget detail(IconData icon, String text) => Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              text,
+              style: muted,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+    return Material(
+      color: scheme.surfaceContainerLow,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // A calendar page: month over day.
+              Container(
+                width: 52,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      DateFormat.MMM().format(event.startsAt).toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w700,
                       ),
-                    ],
-                    for (final l in post.links)
-                      PostLinkRow(
-                        icon: Icons.link,
-                        text: shortLink(l),
-                        tooltip: l,
-                        onTap: () => openPostLink(context, Uri.parse(l)),
+                    ),
+                    Text(
+                      DateFormat.d().format(event.startsAt),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
+                    ),
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(event.type.icon, size: 16, color: color),
+                        const SizedBox(width: 4),
+                        Text(
+                          event.type.label,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(event.title, style: theme.textTheme.titleSmall),
+                    detail(
+                      Icons.schedule,
+                      '${DateFormat.EEEE().format(event.startsAt)} · '
+                      '${eventTimeRange(event.asEvent)}',
+                    ),
+                    if (event.location.isNotEmpty)
+                      detail(Icons.place_outlined, event.location),
+                    if (event.teamName case final t? when t.isNotEmpty)
+                      detail(Icons.groups_outlined, t),
+                  ],
+                ),
+              ),
+              if (onTap != null)
+                Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
             ],
           ),
         ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:frisbee_app/domain/models/feed_item.dart';
 import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/team.dart';
@@ -10,6 +12,10 @@ import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/home/view_models/home_viewmodel.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
+import 'package:frisbee_app/ui/schedule/widgets/event_editor_screen.dart';
+import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
+import 'package:frisbee_app/data/repositories/event/event_repository.dart';
+import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 
 import '../testing/fakes.dart';
 import '../testing/social_fakes.dart';
@@ -237,6 +243,70 @@ void main() {
       expect(vm.posts.map((i) => i.id), ['team/t1/p1', 'user/mine']);
     });
 
+    test("teammates see events shared from the team's schedule", () async {
+      final vm = await load();
+      SharedEvent shared(String teamId) => SharedEvent(
+        eventId: 'e-$teamId',
+        title: 'Showcase',
+        startsAt: DateTime(2026, 11, 7, 18),
+        teamId: teamId,
+      );
+      userPosts.posts.addAll([
+        // By a coach I don't follow, from my team's schedule.
+        userPost(
+          'coach',
+          'coach',
+          DateTime(2026, 10, 28),
+        ).copyWith(event: () => shared('t1')),
+        // From a team I'm not on.
+        userPost(
+          'other',
+          'zed',
+          DateTime(2026, 10, 28, 1),
+        ).copyWith(event: () => shared('other')),
+      ]);
+      userPosts.changed();
+      await pumpEventQueue();
+      expect(vm.posts.map((i) => i.id), contains('user/coach'));
+      expect(vm.posts.map((i) => i.id), isNot(contains('user/other')));
+
+      // Following the coach as well doesn't show it twice.
+      await follows.follow(
+        testUser.uid,
+        const FollowTarget.user('coach', 'Coach'),
+      );
+      await pumpEventQueue();
+      expect(vm.posts.where((i) => i.id == 'user/coach'), hasLength(1));
+    });
+
+    test("teammates don't get reposts of the team's events", () async {
+      final vm = await load();
+      final shared = SharedEvent(
+        eventId: 'e1',
+        title: 'Showcase',
+        startsAt: DateTime(2026, 11, 7, 18),
+        teamId: 't1',
+      );
+      userPosts.posts.addAll([
+        userPost(
+          'coach',
+          'coach',
+          DateTime(2026, 10, 28),
+        ).copyWith(event: () => shared),
+        UserPost(
+          id: 'echo',
+          authorId: 'zed',
+          event: shared,
+          repostOf: const RepostOf(postId: 'coach', authorId: 'coach'),
+          createdAt: DateTime(2026, 10, 28, 2),
+        ),
+      ]);
+      userPosts.changed();
+      await pumpEventQueue();
+      expect(vm.posts.map((i) => i.id), contains('user/coach'));
+      expect(vm.posts.map((i) => i.id), isNot(contains('user/echo')));
+    });
+
     test('followed teams I am not on show only their public posts', () async {
       final vm = await load();
       posts.posts['other'] = [
@@ -366,5 +436,62 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Invite code'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Add event in Coming up asks where; closing adds nothing', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final vm = await tester.runAsync(() => load());
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, _) => HomeScreen(viewModel: vm!),
+        ),
+      ],
+      // Every other page: say where we went.
+      errorBuilder: (_, state) => Text('Went to ${state.uri.path}'),
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthRepository>.value(
+            value: FakeAuthRepository(user: testUser),
+          ),
+          Provider<TeamRepository>.value(value: teams),
+          Provider<EventRepository>.value(value: events),
+        ],
+        child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+      ),
+    );
+    await tester.pump();
+
+    // Events are added from Coming up, not the post composer.
+    expect(find.widgetWithText(TextButton, 'Event'), findsNothing);
+    expect(find.text('Coming up'), findsOneWidget);
+
+    Future<void> openPicker() async {
+      await tester.ensureVisible(find.widgetWithText(TextButton, 'Add event'));
+      await tester.tap(find.widgetWithText(TextButton, 'Add event'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add an event to'), findsOneWidget);
+    }
+
+    // Clicking outside closes it and stays put.
+    await openPicker();
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.text('Add an event to'), findsNothing);
+    expect(find.textContaining('Went to'), findsNothing);
+
+    // Picking My schedule opens a new personal event over home.
+    await openPicker();
+    await tester.tap(find.text('My schedule'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EventEditorScreen), findsOneWidget);
+    expect(find.textContaining('Went to'), findsNothing);
   });
 }

@@ -7,6 +7,7 @@ import 'package:frisbee_app/ui/schedule/view_models/my_event_detail_viewmodel.da
 import 'package:frisbee_app/ui/teams/view_models/team_detail_viewmodel.dart';
 
 import '../testing/fakes.dart';
+import '../testing/social_fakes.dart';
 
 void main() {
   late FakeTeamRepository teams;
@@ -152,14 +153,76 @@ void main() {
       String? id, {
       DateTime? day,
       String? teamId = 't1',
+      FakeUserPostRepository? posts,
     }) => EventEditorViewModel(
       teamId: teamId,
       eventId: id,
       eventRepository: events,
       teamRepository: teams,
       authRepository: auth,
+      postRepository: posts,
       initialDay: day,
     );
+
+    test('a new event can be shared with followers', () async {
+      teams.teams['t2'] = teamWith({
+        'owner': TeamRole.owner,
+        'u1': TeamRole.coach,
+      }, id: 't2');
+      final posts = FakeUserPostRepository();
+      final vm = editor(null, teamId: 't2', posts: posts);
+      await pumpEventQueue();
+      expect(vm.canShare, isTrue);
+
+      // Not asked: nothing posted.
+      vm.shareWith(null);
+      await vm.save.execute(vm.initial.copyWith(title: 'Scrimmage'));
+      expect(posts.posts, isEmpty);
+      expect(vm.shared, isFalse);
+
+      vm.shareWith('  Come watch!  ');
+      await vm.save.execute(
+        vm.initial.copyWith(
+          title: 'Showcase',
+          type: EventType.game,
+          location: 'City Park',
+        ),
+      );
+      expect(vm.shared, isTrue);
+      expect(vm.shareFailed, isFalse);
+      final post = posts.posts.single;
+      final saved = events.events.values.firstWhere(
+        (e) => e.title == 'Showcase',
+      );
+      expect(post.authorId, 'u1');
+      expect(post.body, 'Come watch!');
+      expect(post.kind.name, 'event');
+      expect(post.event!.eventId, saved.id);
+      expect(post.event!.title, 'Showcase');
+      expect(post.event!.type, EventType.game);
+      expect(post.event!.location, 'City Park');
+      expect(post.event!.teamId, 't2');
+      expect(post.event!.teamName, 'Team');
+
+      // A personal one, with no message.
+      vm.setSchedule(null);
+      vm.shareWith('');
+      await vm.save.execute(vm.initial.copyWith(title: 'Pickup'));
+      final mine = posts.posts.firstWhere((p) => p.event!.title == 'Pickup');
+      expect(mine.body, isEmpty);
+      expect(mine.event!.teamId, isNull);
+      expect(mine.event!.eventId, events.mine['u1']!.keys.single);
+    });
+
+    test('edits are never shared', () async {
+      final posts = FakeUserPostRepository();
+      final vm = editor('e1', posts: posts);
+      await pumpEventQueue();
+      expect(vm.canShare, isFalse);
+      vm.shareWith('Updated!');
+      await vm.save.execute(vm.initial.copyWith(title: 'Track'));
+      expect(posts.posts, isEmpty);
+    });
 
     test('players can only add events to their own schedule', () async {
       final vm = editor(null);

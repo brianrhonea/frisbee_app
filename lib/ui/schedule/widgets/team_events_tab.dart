@@ -7,6 +7,7 @@ import '../../../routing/routes.dart';
 import '../../core/ui/status_views.dart';
 import '../../teams/view_models/team_detail_viewmodel.dart';
 import 'event_detail_screen.dart';
+import 'event_editor_screen.dart';
 import 'event_style.dart';
 
 /// Opens [e] over the current page: an event's details and RSVP in a
@@ -61,7 +62,12 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
         ),
       ),
     );
-    if (route != null && mounted) context.push(route);
+    if (route == null || !mounted) return;
+    if (route == Routes.newEvent(vm.teamId)) {
+      await showEventEditor(context, teamId: vm.teamId);
+    } else {
+      context.push(route);
+    }
   }
 
   /// [events] as cards under a heading for each month.

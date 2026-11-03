@@ -51,6 +51,7 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
       createdAt: FieldValue.serverTimestamp(),
       read: false,
       count,
+      ...(notice.extra ?? {}),
     });
     return text;
   });

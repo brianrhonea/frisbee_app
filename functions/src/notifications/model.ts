@@ -10,6 +10,7 @@ export const categories = [
   "teamActivity",
   "meetings",
   "posts",
+  "social",
 ] as const;
 export type Category = (typeof categories)[number];
 
@@ -173,6 +174,8 @@ export interface Notice {
   collapseId?: string;
   /** Worded per recipient: their time zone, and how many are unread. */
   text(prefs: Prefs, count: number): Text;
+  /** More fields for the feed entry, e.g. followBack. */
+  extra?: Data;
 }
 
 const eventTypes: Record<string, string> = {
@@ -470,16 +473,41 @@ export function postPreview(post: Data): string {
   const title = String(post.title ?? "").trim();
   const line = [title, text].filter(Boolean).join(": ");
   if (line) return clip(line, 120);
+  if (post.kind === "repost") return "A repost";
+  const event = post.kind === "event" ? (post.event as Data | undefined) : undefined;
+  if (event) return clip(eventTitle(event), 120);
   const images = Array.isArray(post.images) ? post.images.length : 0;
   return images > 1 ? `📷 ${images} photos` : "📷 Photo";
 }
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
+/** The original a repost points at (RepostOf in user_post.dart). */
+export function repostOf(post: Data): { postId: string; authorId: string; authorName: string } | undefined {
+  const r = post.kind === "repost" ? (post.repostOf as Data | undefined) : undefined;
+  const postId = String(r?.postId ?? "");
+  if (!r || !postId) return undefined;
+  return { postId, authorId: String(r.authorId ?? ""), authorName: String(r.authorName ?? "") };
+}
+
 /** A person someone follows posted. */
 export function userPostNotice(a: { postId: string; post: Data }): Notice {
   const author = String(a.post.authorName ?? "") || "Someone";
   const workout = a.post.kind === "workout";
+  const reposted = repostOf(a.post);
+  if (reposted) {
+    const whose = reposted.authorName ? `${reposted.authorName}'s post` : "a post";
+    const note = String(a.post.body ?? "").trim().replace(/\s+/g, " ");
+    return {
+      category: "posts",
+      route: `/posts/${a.postId}`,
+      collapseId: `posts_user_${String(a.post.authorId ?? "")}`,
+      text: (_, count) => ({
+        title: count > 1 ? `${author}: ${count} new posts` : `${author} reposted ${whose}`,
+        body: clip(note, 120),
+      }),
+    };
+  }
   const preview = postPreview(a.post);
   return {
     category: "posts",
@@ -489,6 +517,53 @@ export function userPostNotice(a: { postId: string; post: Data }): Notice {
       title: count > 1 ? `${author}: ${count} new posts` : `${author} ${workout ? "shared a workout" : "posted"}`,
       body: preview,
     }),
+  };
+}
+
+/** People who liked [after] since [before], other than its author. */
+export function newLikers(before: Data | undefined, after: Data | undefined): string[] {
+  const list = (d?: Data) => (Array.isArray(d?.likedBy) ? (d.likedBy as unknown[]).map(String) : []);
+  const had = new Set(list(before));
+  const authorId = String(after?.authorId ?? "");
+  return [...new Set(list(after))].filter((uid) => !had.has(uid) && uid !== authorId);
+}
+
+/** Someone liked your post; likes on one post fold into one entry. */
+export function likeNotice(a: { postId: string; post: Data; likerName: string }): Notice {
+  const name = a.likerName || "Someone";
+  return {
+    category: "social",
+    route: `/posts/${a.postId}`,
+    collapseId: `likes_${a.postId}`,
+    text: (_, count) => ({
+      title: count > 1 ? `${count} new likes on your post` : `${name} liked your post`,
+      body: postPreview(a.post),
+    }),
+  };
+}
+
+/** Someone reposted your post, with their note. */
+export function repostNotice(a: { repostId: string; repost: Data; original?: Data }): Notice {
+  const name = String(a.repost.authorName ?? "") || "Someone";
+  const note = String(a.repost.body ?? "").trim().replace(/\s+/g, " ");
+  return {
+    category: "social",
+    route: `/posts/${a.repostId}`,
+    text: () => ({
+      title: `${name} reposted your post`,
+      body: note ? clip(note, 120) : a.original ? postPreview(a.original) : "",
+    }),
+  };
+}
+
+/** Someone started following you, with a way to follow them back. */
+export function followerNotice(a: { followerId: string; name: string; photoUrl?: string | null }): Notice {
+  const name = a.name || "Someone";
+  return {
+    category: "social",
+    route: `/players/${a.followerId}`,
+    text: () => ({ title: `${name} started following you`, body: "" }),
+    extra: { followBack: { uid: a.followerId, name, photoUrl: a.photoUrl ?? null } },
   };
 }
 

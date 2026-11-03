@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/schedule_viewmodel.dart';
+import 'event_editor_screen.dart';
 import 'schedule_widgets.dart';
 
 /// Schedule tab: a week of personal and team events, day by day.
@@ -93,7 +92,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'new-schedule-event',
-        onPressed: () => context.push(Routes.newMyEvent(day: vm.selectedDay)),
+        onPressed: () => showEventEditor(context, day: vm.selectedDay),
         icon: const Icon(Icons.add),
         label: const Text('New event'),
       ),

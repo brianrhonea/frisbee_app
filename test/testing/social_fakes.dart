@@ -95,6 +95,9 @@ class FakeUserPostRepository implements UserPostRepository {
   /// Photos uploaded by [savePost], by name.
   final uploaded = <String>[];
 
+  /// Tells watchers that [posts] changed (after editing it directly).
+  void changed() => _changes.add(null);
+
   List<UserPost> _where(bool Function(UserPost) test, int limit) =>
       (posts.where(test).toList()..sort(UserPost.newestFirst))
           .take(limit)
@@ -127,6 +130,14 @@ class FakeUserPostRepository implements UserPostRepository {
   }) => tournamentKeys.isEmpty
       ? Stream.value(const [])
       : _watch((p) => tournamentKeys.contains(p.tournamentKey), limit);
+
+  @override
+  Stream<List<UserPost>> watchPostsForTeamEvents(
+    List<String> teamIds, {
+    int limit = 50,
+  }) => teamIds.isEmpty
+      ? Stream.value(const [])
+      : _watch((p) => teamIds.contains(p.event?.teamId), limit);
 
   UserPost? _find(String id) => posts.where((p) => p.id == id).firstOrNull;
 
@@ -161,6 +172,8 @@ class FakeUserPostRepository implements UserPostRepository {
           links: post.links,
           images: images,
           workout: post.workout,
+          event: post.event,
+          repostOf: post.repostOf,
           tournamentKey: post.tournamentKey,
           tournamentName: post.tournamentName,
           createdAt: DateTime.now(),
@@ -174,6 +187,104 @@ class FakeUserPostRepository implements UserPostRepository {
     posts[i] = post.copyWith(images: images);
     _changes.add(null);
     return Result.ok(post.id);
+  }
+
+  void _setList(
+    String postId,
+    String uid,
+    bool on,
+    UserPost Function(UserPost p, List<String> uids) apply,
+    List<String> Function(UserPost p) of,
+  ) {
+    final i = posts.indexWhere((p) => p.id == postId);
+    if (i < 0) return;
+    final uids = [...of(posts[i])]..remove(uid);
+    if (on) uids.add(uid);
+    posts[i] = apply(posts[i], uids);
+  }
+
+  static UserPost _with(
+    UserPost p, {
+    List<String>? likedBy,
+    List<String>? repostedBy,
+  }) => UserPost(
+    id: p.id,
+    authorId: p.authorId,
+    authorName: p.authorName,
+    authorPhotoUrl: p.authorPhotoUrl,
+    body: p.body,
+    links: p.links,
+    images: p.images,
+    workout: p.workout,
+    event: p.event,
+    repostOf: p.repostOf,
+    likedBy: likedBy ?? p.likedBy,
+    repostedBy: repostedBy ?? p.repostedBy,
+    tournamentKey: p.tournamentKey,
+    tournamentName: p.tournamentName,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+  );
+
+  @override
+  Future<Result<void>> setLiked(String postId, String uid, bool liked) async {
+    if (_find(postId) == null) return Result.error(Exception('No post'));
+    _setList(
+      postId,
+      uid,
+      liked,
+      (p, u) => _with(p, likedBy: u),
+      (p) => p.likedBy,
+    );
+    _changes.add(null);
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<String>> repost(
+    UserPost original,
+    String note,
+    AppUser me,
+  ) async {
+    final post = UserPost.repost(original, note: note);
+    final id = UserPost.repostId(post.originalId, me.uid);
+    if (_find(post.originalId) == null) {
+      return Result.error(Exception('No post'));
+    }
+    if (_find(id) != null) return Result.error(Exception('Already reposted'));
+    posts.add(
+      UserPost(
+        id: id,
+        authorId: me.uid,
+        authorName: me.label,
+        body: post.body,
+        repostOf: post.repostOf,
+        createdAt: DateTime.now(),
+      ),
+    );
+    _setList(
+      post.originalId,
+      me.uid,
+      true,
+      (p, u) => _with(p, repostedBy: u),
+      (p) => p.repostedBy,
+    );
+    _changes.add(null);
+    return Result.ok(id);
+  }
+
+  @override
+  Future<Result<void>> undoRepost(String originalId, String uid) async {
+    posts.removeWhere((p) => p.id == UserPost.repostId(originalId, uid));
+    _setList(
+      originalId,
+      uid,
+      false,
+      (p, u) => _with(p, repostedBy: u),
+      (p) => p.repostedBy,
+    );
+    _changes.add(null);
+    return const Result.ok(null);
   }
 
   @override

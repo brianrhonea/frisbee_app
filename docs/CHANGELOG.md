@@ -40,7 +40,34 @@ Branch `feature/gps-workouts`.
   left over, and elevation gain.
 - New activities: Ride, Walk and Hike.
 
+- **New sign-in and sign-up screens.** A disc is thrown across an ultimate
+  field while the wordmark counts the stall (Stall 1… 9) and is caught as
+  the "0" of the logo: Stall 10. Then the form slides up. Plays once per
+  launch, not at all with reduced motion; tap the field to throw again. The
+  field sits above the form on phones and beside it on wide screens.
+- **Share an event with followers.** A switch on new events posts the
+  event (date, time, place, team) to your profile with an optional note.
+  A shared team event also shows in the feed of everyone on that team.
+- **Likes and reposts** on people's posts, with counts. A repost shows
+  your note over the original, which stays live (edits show; a deleted
+  original says so). One repost per person per post; tap **Reposted** to
+  take it back.
+- **Notifications** when someone likes or reposts your post (likes on a
+  post fold together) or starts following you, with **Follow back** right
+  in the list. A new **Likes, reposts and followers** category turns them
+  off.
+
 **Changed**
+- **Add event** moved from the post composer to **Coming up**, asks which
+  schedule first, and opens over the page like the composer instead of on
+  a page of its own. Saving offers **View**; closing with changes asks
+  first.
+- The post composer on wide screens is only as tall as its content.
+- From a post's own page, tapping a person or team switches to their tab
+  instead of crashing with duplicate page keys.
+- Signing in or up always lands on **Community**, instead of the page you
+  were on. Invite links (`/join/…`, `/g/…`) still return to the link so
+  you can finish joining.
 - Distances, paces and speeds show in miles in the US and UK, kilometres
   elsewhere. The manual workout distance field uses the same unit.
 - Workouts store `durationSeconds` and a `route` (encoded polyline, splits

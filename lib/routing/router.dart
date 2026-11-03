@@ -190,6 +190,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
         create: (c) => NotificationsViewModel(
           notificationRepository: c.read(),
           authRepository: c.read(),
+          followRepository: c.read(),
         ),
         builder: (_, vm) => NotificationsScreen(viewModel: vm),
       ),
@@ -230,6 +231,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 eventRepository: c.read(),
                 teamRepository: c.read(),
                 authRepository: c.read(),
+                postRepository: c.read(),
               ),
               builder: (_, vm) => EventEditorScreen(viewModel: vm),
             );
@@ -469,6 +471,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 eventRepository: c.read(),
                 teamRepository: c.read(),
                 authRepository: c.read(),
+                postRepository: c.read(),
               ),
               builder: (_, vm) => EventEditorScreen(viewModel: vm),
             );
@@ -983,7 +986,8 @@ PlayerProfileViewModel _playerProfile(BuildContext c, String uid) =>
     );
 
 /// Sends signed-out users to sign-in (remembering where they were headed)
-/// and signed-in users away from the auth screens.
+/// and signed-in users away from the auth screens: to Community, or back to
+/// the invite link they opened so they can finish joining.
 String? authRedirect(AuthRepository auth, Uri uri) {
   final path = uri.path;
   final from = uri.queryParameters['from'];
@@ -1005,8 +1009,16 @@ String? authRedirect(AuthRepository auth, Uri uri) {
           : {'from': target},
     ).toString();
   }
-  if (public || path == _splash) return from ?? Routes.home;
+  if (public) return _isInviteLink(from) ? from : Routes.home;
+  // Already signed in when the app opened: carry on where it was headed.
+  if (path == _splash) return from ?? Routes.home;
   return null;
+}
+
+/// Team invite links (`/join/CODE`) and group links (`/g/ID`).
+bool _isInviteLink(String? location) {
+  final path = location == null ? null : Uri.tryParse(location)?.path;
+  return path != null && (path.startsWith('/join/') || path.startsWith('/g/'));
 }
 
 /// Sets up a new group tournament, or edits [tournamentId].

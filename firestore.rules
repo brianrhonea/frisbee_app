@@ -172,7 +172,7 @@ service cloud.firestore {
           let d = request.resource.data;
           let categories = ['chat', 'directMessages', 'eventChanges',
                             'eventReminders', 'teamActivity', 'meetings',
-                            'posts'];
+                            'posts', 'social'];
           return d.keys().hasOnly(['categories', 'teams', 'mutedRooms',
                                    'utcOffsetMinutes', 'updatedAt'])
             && (!('categories' in d)
@@ -1344,11 +1344,57 @@ service cloud.firestore {
               || (w.effort is int && w.effort >= 1 && w.effort <= 10))
           && validExercises(w.get('exercises', []));
       }
+      // SharedEvent in lib/domain/models/user_post.dart: a copy of an
+      // event's details, so followers who can't open the event see them.
+      function validSharedEvent(e) {
+        return e is map
+          && e.keys().hasOnly(['eventId', 'title', 'type', 'startsAt',
+                               'endsAt', 'location', 'teamId', 'teamName'])
+          && validString(e.eventId, 200) && e.eventId.size() > 0
+          && validString(e.title, 100) && e.title.size() > 0
+          && e.type in ['practice', 'game', 'tournament', 'scrimmage',
+                        'workout', 'social', 'other', 'pickup']
+          && e.startsAt is timestamp
+          && (e.get('endsAt', null) == null || e.endsAt is timestamp)
+          && validString(e.get('location', ''), 200)
+          && (e.get('teamId', null) == null || validString(e.teamId, 200))
+          && (e.get('teamName', null) == null || validString(e.teamName, 100));
+      }
+      // A post may share an event from a team's schedule (so the team's
+      // members see it) only if the author runs that schedule.
+      function sharesOwnTeamEvent(p) {
+        let e = p.get('event', null);
+        return e == null || e.get('teamId', null) == null
+          || isEditor(get(teamPath(e.teamId)).data);
+      }
+      // A repost (RepostOf in user_post.dart) points at someone else's
+      // original post and adds only a note. Its id is r_{original}_{uid}, one
+      // per person, and it's written in the same batch that adds the
+      // reposter to the original's repostedBy.
+      function isRepost(p) { return p.get('repostOf', null) != null; }
+      function repostPath(originalId, reposter) {
+        return /databases/$(database)/documents/posts/$('r_' + originalId + '_' + reposter);
+      }
+      function validRepost(p) {
+        let r = p.repostOf;
+        let original = get(/databases/$(database)/documents/posts/$(r.postId)).data;
+        return r is map
+          && r.keys().hasOnly(['postId', 'authorId', 'authorName'])
+          && validString(r.postId, 200) && r.postId.size() > 0
+          && validString(r.authorName, 80)
+          && postId == 'r_' + r.postId + '_' + uid()
+          && r.authorId != uid()
+          && original.authorId == r.authorId
+          && original.get('repostOf', null) == null
+          && uid() in getAfter(/databases/$(database)/documents/posts/$(r.postId))
+                        .data.get('repostedBy', []);
+      }
       function validUserPost(p) {
         let links = p.get('links', []);
         let images = p.get('images', []);
         let workout = p.get('workout', null);
-        return p.kind in ['text', 'workout']
+        let event = p.get('event', null);
+        return p.kind in ['text', 'workout', 'event', 'repost']
           && validString(p.body, 5000)
           && links is list && links.size() <= 5
           && (links.size() < 1 || validLink(links[0]))
@@ -1357,8 +1403,14 @@ service cloud.firestore {
           && (links.size() < 4 || validLink(links[3]))
           && (links.size() < 5 || validLink(links[4]))
           && images is list && images.size() <= 4
-          && ((p.kind == 'workout' && validWorkout(workout))
-              || (p.kind == 'text' && workout == null
+          && ((p.kind == 'workout' && validWorkout(workout) && event == null
+                && !isRepost(p))
+              || (p.kind == 'event' && workout == null
+                  && validSharedEvent(event) && !isRepost(p))
+              || (p.kind == 'repost' && isRepost(p) && workout == null
+                  && event == null && images.size() == 0 && links.size() == 0)
+              || (p.kind == 'text' && workout == null && event == null
+                  && !isRepost(p)
                   && (p.body.size() > 0 || images.size() > 0)))
           && (p.get('tournamentKey', null) == null
               || (validString(p.tournamentKey, 300)
@@ -1367,24 +1419,63 @@ service cloud.firestore {
               || validString(p.tournamentName, 100));
       }
 
+      // likedBy and repostedBy: anyone signed in adds or removes only
+      // themselves (UserPost.likedBy / repostedBy).
+      function onlySelfToggled(field) {
+        let before = resource.data.get(field, []).toSet();
+        let after = request.resource.data.get(field, []);
+        return after is list
+          && after.size() <= 20000
+          && after.toSet().size() == after.size()
+          && after.toSet().difference(before)
+               .union(before.difference(after.toSet())).hasOnly([uid()]);
+      }
+      // Adding yourself to repostedBy comes with your repost; removing
+      // yourself, with deleting it.
+      function repostMatches() {
+        let added = uid() in request.resource.data.get('repostedBy', []);
+        return !('repostedBy' in changed())
+          || (added == existsAfter(repostPath(postId, uid())));
+      }
+
       allow read: if signedIn();
       allow delete: if signedIn() && resource.data.authorId == uid();
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
-             'kind', 'body', 'links', 'images', 'workout', 'tournamentKey',
-             'tournamentName', 'authorId', 'authorName', 'authorPhotoUrl',
-             'createdAt', 'updatedAt'])
+             'kind', 'body', 'links', 'images', 'workout', 'event',
+             'repostOf', 'tournamentKey', 'tournamentName', 'authorId',
+             'authorName', 'authorPhotoUrl', 'createdAt', 'updatedAt'])
         && request.resource.data.authorId == uid()
         && validString(request.resource.data.authorName, 80)
         && (request.resource.data.get('authorPhotoUrl', null) == null
             || validString(request.resource.data.authorPhotoUrl, 2000))
         && request.resource.data.createdAt == request.time
-        && validUserPost(request.resource.data);
+        && validUserPost(request.resource.data)
+        && (isRepost(request.resource.data)
+            ? validRepost(request.resource.data)
+            : sharesOwnTeamEvent(request.resource.data));
+      // The author edits their post.
       allow update: if signedIn() && resource.data.authorId == uid()
         && changed().hasOnly([
-             'kind', 'body', 'links', 'images', 'workout', 'tournamentKey',
-             'tournamentName', 'updatedAt'])
-        && validUserPost(request.resource.data);
+             'kind', 'body', 'links', 'images', 'workout', 'event',
+             'repostOf', 'tournamentKey', 'tournamentName', 'updatedAt'])
+        && validUserPost(request.resource.data)
+        // A repost keeps pointing at its original: only its note changes.
+        && (!('repostOf' in changed())
+            || (!isRepost(resource.data) && !isRepost(request.resource.data)))
+        && (!('event' in changed())
+            || (!isRepost(request.resource.data)
+                && sharesOwnTeamEvent(request.resource.data)));
+      // Anyone likes it or reposts it (reposts of reposts go to the
+      // original, so a repost's own repostedBy never changes).
+      allow update: if signedIn()
+        && changed().hasOnly(['likedBy', 'repostedBy'])
+        && onlySelfToggled('likedBy')
+        && onlySelfToggled('repostedBy')
+        && (!('repostedBy' in changed())
+            || (!isRepost(resource.data)
+                && resource.data.authorId != uid()
+                && repostMatches()));
     }
 
     // Follower counts per FollowTarget key, plus `following` on user keys.
