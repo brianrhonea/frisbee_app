@@ -9,6 +9,7 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/linkified_text.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/message_thread_viewmodel.dart';
 
@@ -261,7 +262,7 @@ class _MessageBubble extends StatelessWidget {
                   : _FileAttachment(attachment: a, viewModel: viewModel),
             ),
           if (m.text.isNotEmpty)
-            SelectableText(
+            LinkifiedText(
               m.text,
               style: TextStyle(color: ink, fontSize: 13.5, height: 1.4),
             ),

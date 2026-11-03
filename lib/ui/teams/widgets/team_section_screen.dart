@@ -96,7 +96,6 @@ class _TeamSectionBodyState extends State<TeamSectionBody> {
   late final List<Command<void>> _commands = [
     vm.savePlayer,
     vm.deletePlayer,
-    vm.regenerateInviteCode,
     vm.setMemberRole,
     vm.transferOwnership,
     vm.setStatKeeper,

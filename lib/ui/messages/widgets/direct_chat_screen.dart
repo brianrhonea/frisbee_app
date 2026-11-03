@@ -47,7 +47,6 @@ class DirectChatScreen extends StatelessWidget {
                 body: ChatSplit(
                   list: InboxList(
                     viewModel: inbox,
-                    showHeader: false,
                     selectedKey: selectedKey,
                     onOpen: open,
                   ),
@@ -62,7 +61,6 @@ class DirectChatScreen extends StatelessWidget {
                 title: 'Messages',
                 list: InboxList(
                   viewModel: inbox,
-                  showHeader: false,
                   selectedKey: selectedKey,
                   onOpen: (item) {
                     Navigator.pop(context); // close the panel

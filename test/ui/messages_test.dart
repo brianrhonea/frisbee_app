@@ -239,6 +239,9 @@ void main() {
     expect(vm.selectedId, 'a_u1');
     // The preview in the list and the message in the open pane.
     expect(find.text('Ride at 6?'), findsNWidgets(2));
+    // One New message button, in the page header; none on the list.
+    expect(find.text('New message'), findsOneWidget);
+    expect(find.byTooltip('New message'), findsNothing);
   });
 
   test('the inbox lists only private messages, not team chats', () async {

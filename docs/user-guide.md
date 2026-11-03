@@ -10,9 +10,13 @@ version 0.0.4.
    aren't available on Windows.)
 2. **Join or create a team.** On Home or the Teams tab:
    - **Join with code**: enter the 6-character invite code your team admin
-     gave you. You join as a player.
-   - **Create team**: you become its owner. Share the invite code from the
-     team's **Members** page.
+     shows you. Codes change every 30 seconds, so enter it while they have
+     it up. You join as a player.
+   - **Invite link**: tap a link someone sent you (in Messages, WhatsApp,
+     email or a Stall 10 message). It opens Stall 10 and shows the team;
+     tap **Join**. Links expire (1 hour to 30 days, the sender picks).
+   - **Create team**: you become its owner. Show the invite code or share
+     an invite link from the team's **Members** page.
 3. **Profile** opens from your avatar at the top of Home. Change your
    display name, pick a theme (System, Light or Dark), sign out or delete
    your account there.
@@ -35,11 +39,11 @@ team card in the Teams tab.
 | Create chat rooms and set who can read/write    | ✓     | ✓               |        |
 | Read every chat room, delete any message or room | ✓    |                 |        |
 | Keep stats                                      | ✓     | ✓               | with stats access |
-| See and share the invite code                   | ✓     | ✓               |        |
+| Show invite codes, share invite links           | ✓     | ✓               |        |
 | Remove players                                  | ✓     | ✓               |        |
 | Remove coaches and captains, set roles          | ✓     |                 |        |
 | Give a player stats access                      | ✓     |                 |        |
-| Make a new invite code, transfer or delete team | ✓     |                 |        |
+| Transfer or delete the team                     | ✓     |                 |        |
 
 Anyone can leave a team from the ⋮ menu on its home page (the owner must transfer
 ownership first).
@@ -169,13 +173,19 @@ page; back takes you out of the team. The tabs:
 - **Stats**: tournaments and games. Stat keepers track points live (lines,
   O/D, pull timer, subs, timeouts); everyone can view stat sheets and
   season stats.
-- **Members**: who's on the team and their roles. Admins find the invite
-  code here.
+- **Members**: who's on the team and their roles. Admins tap **Show
+  code** for the invite code: a new one every 30 seconds, each working for
+  45, with a countdown. **Hide** stops it. **Invite** players: pick how
+  long the link works (1 hour, 1 day, 7 days or 30 days; 7 days unless you
+  change it), then copy or **Share** it to any app, or search for someone
+  on Stall 10 to send them an in-app invite plus the link in a message.
+  Anyone with a live link can join as a player. A group's link opens its
+  page, where people join or ask to, and doesn't expire.
 
 **Find a team**: tap 🔍 at the top of the Teams tab and type part of a
 team's name or city. Tap a team to see its public page: name, division and
 city, plus any public events and posts. Members, rosters and chat stay
-private. Tap **Join** and enter the invite code to join.
+private. Tap **Join** and enter the invite code an admin shows you.
 
 **Search USA Ultimate rankings**: at the bottom of Find a team. Type a
 team name and filter by ranking list (for example, Club Mixed). Tap a team
@@ -363,9 +373,11 @@ back returns to the list (or to Home, if you opened it there).
 - **Your posts** (and their photos) are public to anyone signed in to
   Stall 10. **Who you follow** is private: others see only how many people
   follow you and how many you follow.
-- **The invite code** is visible only to owners, coaches and captains.
-  Anyone with the code can join as a player, so share it only with your team.
-  The owner can make a new code at any time; the old one stops working.
+- **Invite codes and links** come only from owners, coaches and
+  captains. Anyone with a live code or link can join as a player, so share
+  them only with your team. Codes stop working 45 seconds after they
+  appear; links when their time is up. Codes from before codes rotated no
+  longer work.
 
 These rules are enforced by the server, not just hidden in the app.
 

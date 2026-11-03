@@ -51,6 +51,22 @@ Branch `feature/follows-feed`.
 - Group pages list the group's tournaments for people outside the group.
   Someone who isn't playing in a tournament sees a public summary with
   Follow.
+- **Invite links.** The invite dialog (team Members) shows the team's link
+  to copy or **Share** to any app: Messages, WhatsApp, email. Tapping it
+  opens Stall 10 at a Join screen naming the team; without the app, a page
+  on Firebase Hosting (`hosting/`) has an Open in Stall 10 button.
+  Inviting someone found by search also sends them the link as a direct
+  message. Groups' links open their page. Links in messages are now
+  tappable, and Stall 10's own open in the app.
+- **Invite codes rotate; links expire.** Admins tap **Show code** on
+  Members for a code that changes every 30 seconds (each works for 45).
+  Team links last 1 hour, 1 day, 7 days (default) or 30 days, picked in
+  the invite dialog. Codes and link tokens are `inviteCodes` docs with
+  `createdAt` + `ttl`, checked by `join()` in `firestore.rules` on the
+  server's clock; a TTL policy on `expiresAt` (`firestore.indexes.json`)
+  deletes them. Coaches and captains can now mint codes, not just the
+  owner. Permanent codes (`private/invite`, team-doc `inviteCode`) no
+  longer work, and new teams get none.
 
 **Changed**
 - **The app is now Stall 10**, with a new logo: a "10" whose "0" is a

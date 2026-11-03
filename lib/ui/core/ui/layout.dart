@@ -138,7 +138,7 @@ class Eyebrow extends StatelessWidget {
 }
 
 /// A page's title block: eyebrow, big title, subtitle, and [action]
-/// (e.g. "Create post") on the right.
+/// (e.g. "New message") on the right.
 class PageHeader extends StatelessWidget {
   const PageHeader({
     super.key,

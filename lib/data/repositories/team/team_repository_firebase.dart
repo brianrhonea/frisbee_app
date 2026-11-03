@@ -6,6 +6,7 @@ import 'package:logging/logging.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/invite_code.dart';
 import '../../../domain/models/model_utils.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
@@ -23,6 +24,13 @@ class InviteCodeNotFoundException implements Exception {
 
   @override
   String toString() => 'No team found for that invite code.';
+}
+
+class InviteCodeExpiredException implements Exception {
+  const InviteCodeExpiredException();
+
+  @override
+  String toString() => 'That invite has expired. Ask for a new code or link.';
 }
 
 /// Team data lives in `teams/{teamId}` with `roster` and `plays`
@@ -61,6 +69,8 @@ class TeamRepositoryFirebase implements TeamRepository {
   // No 0/O/1/I to keep codes easy to read aloud.
   static const _codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   static const _codeLength = 6;
+  // Link tokens are only ever tapped, never typed, so they're long.
+  static const _tokenLength = 20;
 
   CollectionReference<Map<String, dynamic>> get _teams =>
       _db.collection('teams');
@@ -88,9 +98,9 @@ class TeamRepositoryFirebase implements TeamRepository {
   /// Older roster entries kept paid/onUsau on the entry itself.
   static const _legacyStatusKeys = ['onUsau', 'paid'];
 
-  String _newCode() => String.fromCharCodes(
+  String _newCode(int length) => String.fromCharCodes(
     List.generate(
-      _codeLength,
+      length,
       (_) => _codeAlphabet.codeUnitAt(_random.nextInt(_codeAlphabet.length)),
     ),
   );
@@ -143,13 +153,8 @@ class TeamRepositoryFirebase implements TeamRepository {
 
   @override
   Future<Result<String>> createTeam(NewTeam team, AppUser owner) =>
-      team.kind == TeamKind.community
-      ? _createGroup(team, owner)
-      : _createTeam(team, owner);
-
-  /// Groups are joined from the directory, so they get no invite code.
-  Future<Result<String>> _createGroup(NewTeam team, AppUser owner) =>
       guard(() async {
+        // No invite code: admins mint short-lived ones when they share.
         final ref = _teams.doc();
         await (_db.batch()
               ..set(ref, _teamDoc(team, owner))
@@ -162,41 +167,33 @@ class TeamRepositoryFirebase implements TeamRepository {
         return ref.id;
       });
 
-  Future<Result<String>> _createTeam(NewTeam team, AppUser owner) =>
-      guard(() async {
-        // Retry on the (unlikely) event of an invite code collision, which
-        // surfaces as permission-denied because codes can't be overwritten.
-        for (var attempt = 0; ; attempt++) {
-          final ref = _teams.doc();
-          final code = _newCode();
-          final batch = _db.batch()
-            ..set(ref, _teamDoc(team, owner))
-            ..set(_directory.doc(ref.id), team.listing(ref.id).toMap())
-            ..set(_invite(ref.id), {'code': code})
-            ..set(_codes.doc(code), {'teamId': ref.id})
-            ..set(
-              chatRooms(_db, ref.id).doc(ChatRoom.generalId),
-              newRoomData(ChatRoom.general(), owner.uid),
-            );
-          try {
-            await batch.commit();
-            return ref.id;
-          } on FirebaseException catch (e) {
-            if (e.code != 'permission-denied' || attempt >= 2) rethrow;
-          }
-        }
-      });
+  @override
+  Future<Result<String>> resolveInviteCode(String inviteCode) =>
+      guard(() => _teamIdForCode(normalizeCode(inviteCode)));
+
+  Future<String> _teamIdForCode(String code) async {
+    if (code.isEmpty) throw const InviteCodeNotFoundException();
+    final data = (await _codes.doc(code).get()).data();
+    final teamId = data?['teamId'] as String?;
+    if (teamId == null) throw const InviteCodeNotFoundException();
+    // The rules check createdAt + ttl on the server's clock; expiresAt is
+    // the minter's estimate, close enough to explain a failure up front.
+    // Codes from before rotation have neither and no longer work.
+    final expiresAt = data?['expiresAt'];
+    if (expiresAt is! Timestamp ||
+        !DateTime.now().isBefore(expiresAt.toDate())) {
+      throw const InviteCodeExpiredException();
+    }
+    return teamId;
+  }
 
   @override
   Future<Result<String>> joinTeam(String inviteCode, AppUser user) =>
       guard(() async {
         final code = normalizeCode(inviteCode);
-        if (code.isEmpty) throw const InviteCodeNotFoundException();
-        final codeDoc = await _codes.doc(code).get();
-        final teamId = codeDoc.data()?['teamId'] as String?;
-        if (teamId == null) throw const InviteCodeNotFoundException();
+        final teamId = await _teamIdForCode(code);
         // joins/{uid} proves to the security rules that the caller knows
-        // the team's current invite code, without putting it on the team.
+        // a live invite code, without putting it on the team.
         await (_db.batch()
               ..set(_join(teamId, user.uid), {'code': code})
               ..update(_teams.doc(teamId), _newMember(user)))
@@ -347,59 +344,41 @@ class TeamRepositoryFirebase implements TeamRepository {
       guard(() => _directory.doc(team.id).set(TeamListing.of(team).toMap()));
 
   @override
-  Stream<String?> watchInviteCode(String teamId) =>
-      _invite(teamId).snapshots().asyncMap(
-        (d) async =>
-            d.data()?['code'] as String? ?? await _moveLegacyCode(teamId),
-      );
-
-  /// Older teams kept the code on the team doc, readable by every member.
-  /// Moves it to private/invite and clears it (and the old join proof).
-  /// Runs when an admin first watches the code.
-  Future<String?> _moveLegacyCode(String teamId) async {
-    final team = (await _teams.doc(teamId).get()).data() ?? const {};
-    final code = team['inviteCode'] as String?;
-    if (code == null) return null;
-    try {
-      await (_db.batch()
-            ..set(_invite(teamId), {'code': code})
-            ..update(_teams.doc(teamId), {
-              'inviteCode': FieldValue.delete(),
-              'joinCode': FieldValue.delete(),
-            }))
-          .commit();
-    } on FirebaseException catch (e) {
-      _log.warning('Invite code move failed', e);
-    }
-    return code;
-  }
-
-  /// The current code, from private/invite or an older team doc.
-  Future<String?> _currentCode(String teamId) async {
-    final invite = (await _invite(teamId).get()).data();
-    if (invite != null) return invite['code'] as String?;
-    return (await _teams.doc(teamId).get()).data()?['inviteCode'] as String?;
-  }
+  Future<Result<InviteCode>> createInviteCode(String teamId, String uid) =>
+      guard(() => _mint(teamId, uid, InviteCode.codeLifetime, _codeLength));
 
   @override
-  Future<Result<void>> regenerateInviteCode(String teamId) => guard(() async {
-    final old = await _currentCode(teamId);
-    final legacy = (await _teams.doc(teamId).get()).data()?.containsKey(
-      'inviteCode',
-    );
-    final code = _newCode();
-    final batch = _db.batch()
-      ..set(_invite(teamId), {'code': code})
-      ..set(_codes.doc(code), {'teamId': teamId});
-    if (old != null) batch.delete(_codes.doc(old));
-    if (legacy ?? false) {
-      batch.update(_teams.doc(teamId), {
-        'inviteCode': FieldValue.delete(),
-        'joinCode': FieldValue.delete(),
-      });
+  Future<Result<InviteCode>> createInviteLink(
+    String teamId,
+    String uid,
+    InviteLinkExpiry expiry,
+  ) => guard(() => _mint(teamId, uid, expiry.duration, _tokenLength));
+
+  Future<InviteCode> _mint(
+    String teamId,
+    String uid,
+    Duration ttl,
+    int length,
+  ) async {
+    // Codes can't be overwritten, so a collision with an existing one
+    // surfaces as permission-denied: try a fresh code.
+    for (var attempt = 0; ; attempt++) {
+      final code = _newCode(length);
+      final expiresAt = DateTime.now().add(ttl);
+      try {
+        await _codes.doc(code).set({
+          'teamId': teamId,
+          'createdBy': uid,
+          'createdAt': FieldValue.serverTimestamp(),
+          'ttl': ttl.inSeconds,
+          'expiresAt': Timestamp.fromDate(expiresAt),
+        });
+        return InviteCode(code: code, teamId: teamId, expiresAt: expiresAt);
+      } on FirebaseException catch (e) {
+        if (e.code != 'permission-denied' || attempt >= 2) rethrow;
+      }
     }
-    await batch.commit();
-  });
+  }
 
   @override
   Future<Result<void>> setMemberRole(
@@ -447,13 +426,11 @@ class TeamRepositoryFirebase implements TeamRepository {
   @override
   Future<Result<void>> deleteTeam(Team team) => guard(() async {
     final ref = _teams.doc(team.id);
-    final code = await _currentCode(team.id);
     // Tells the notification functions not to announce the cascade below
     // (every event "cancelled", and so on).
     await ref.update({'deletingAt': FieldValue.serverTimestamp()});
     try {
       // Firestore doesn't cascade deletes; clear subcollections first.
-      // private (the invite code) goes last: code deletes check the owner.
       for (final room in (await chatRooms(_db, team.id).get()).docs) {
         await deleteChatRoom(_db, _files, room.reference);
       }
@@ -517,21 +494,19 @@ class TeamRepositoryFirebase implements TeamRepository {
         final docs = await ref.collection(sub).get();
         await deleteDocs(_db, [for (final d in docs.docs) d.reference]);
       }
-      // Rules let the owner read private/invite but not list private, so
-      // delete the one doc it holds by name. Groups have none; deleting a
-      // missing doc is fine.
+      // Older teams kept a permanent invite code in private/invite. Rules
+      // don't let the owner list private, so delete it by name; deleting a
+      // missing doc is fine. Invite codes expire on their own.
       await _invite(team.id).delete();
     } on Exception {
       // Half-deleted, but still a team: let it notify again.
       await ref.update({'deletingAt': FieldValue.delete()});
       rethrow;
     }
-    final batch = _db.batch();
-    if (code != null) batch.delete(_codes.doc(code));
-    batch
-      ..delete(_directory.doc(team.id))
-      ..delete(ref);
-    await batch.commit();
+    await (_db.batch()
+          ..delete(_directory.doc(team.id))
+          ..delete(ref))
+        .commit();
   });
 
   @override

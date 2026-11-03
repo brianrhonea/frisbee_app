@@ -57,6 +57,35 @@ TestFlight. These are the one-time setup steps, in order.
    `flutter analyze` and `flutter test`, builds with the next build number,
    and uploads to TestFlight.
 
+### Invite links (Universal Links)
+
+Invite links (`https://frisbee-app-brianrhonea.web.app/join/<code>`) open
+the app on Android already. On iPhone they open the web page until these
+are done; the page's **Open in Stall 10** button works meanwhile, through
+the app's `stall10://` scheme.
+
+1. In the Apple Developer portal, open the App ID
+   `com.brianrhonea.frisbeeApp` and turn on **Associated Domains**. Then
+   let Codemagic make a new provisioning profile (or delete the old one).
+2. Add to `ios/Runner/Runner.entitlements`:
+
+   ```xml
+   <key>com.apple.developer.associated-domains</key>
+   <array>
+     <string>applinks:frisbee-app-brianrhonea.web.app</string>
+   </array>
+   ```
+
+   Do step 1 first: a build with this entitlement fails to sign until the
+   App ID has the capability.
+3. Replace `APPLE_TEAM_ID` in `hosting/.well-known/apple-app-site-association`
+   with your 10-character Team ID (developer.apple.com > Membership), then
+   `firebase deploy --only hosting`.
+
+Android verifies links with `hosting/.well-known/assetlinks.json`, which
+lists the signing key's SHA-256. It holds the debug key's for now (release
+builds are signed with it too); add the release key's when there is one.
+
 ## 4. Before submitting for review
 
 - **Version**: bump `version:` in `pubspec.yaml` (e.g. `1.0.0`) for each

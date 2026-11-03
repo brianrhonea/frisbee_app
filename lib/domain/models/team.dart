@@ -4,10 +4,10 @@ import 'model_utils.dart';
 /// access ([Team.statKeepers]). firestore.rules enforces the same
 /// permissions; keep the two in step.
 enum TeamRole {
-  /// Everything, including roles, ownership and new invite codes.
+  /// Everything, including roles and ownership.
   owner,
 
-  /// Team admin and stats. Can share, not regenerate, the invite code.
+  /// Team admin and stats, including invite codes and links.
   coach,
 
   /// Same as coach.
@@ -23,8 +23,6 @@ enum TeamRole {
   bool get canKeepStats => canEdit;
 
   bool get canSetRoles => this == owner;
-
-  bool get canRegenerateCode => this == owner;
 
   bool get canShareCode => canEdit;
 
@@ -79,7 +77,7 @@ enum TeamRole {
 
   /// What the role can do, for the role picker.
   String get summary => switch (this) {
-    owner => 'Everything, including roles and new invite codes',
+    owner => 'Everything, including roles and ownership',
     coach => 'Manage the team and keep stats',
     captain => 'Manage the team and keep stats',
     player => 'View only, unless given stats access',

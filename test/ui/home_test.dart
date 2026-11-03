@@ -257,9 +257,8 @@ void main() {
       expect(vm.canEditPost(pub), isFalse);
     });
 
-    test('names the home city and the next tournament', () async {
+    test('names the next tournament', () async {
       final vm = await load();
-      expect(vm.homeCity, 'Denver');
       expect(vm.nextTournament?.id, 'next');
     });
 
@@ -292,8 +291,8 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Good things fly together.'), findsOneWidget);
-      expect(find.text('DENVER / YOUR ULTIMATE COMMUNITY'), findsOneWidget);
+      // No page header; the composer is the way to post.
+      expect(find.text('Good things fly together.'), findsNothing);
       // The next event sits above the feed in place of the side column.
       expect(find.text('Thursday practice'), findsOneWidget);
       expect(find.text('Coming up'), findsOneWidget);
@@ -342,7 +341,8 @@ void main() {
     expect(upNext.dx, greaterThan(feed.dx + 400));
     expect(find.text('Coming up'), findsOneWidget);
     expect(find.text('Fall Classic'), findsOneWidget);
-    expect(find.text('Create post'), findsOneWidget);
+    // One way to post: the composer, not a second header button.
+    expect(find.text('Create post'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

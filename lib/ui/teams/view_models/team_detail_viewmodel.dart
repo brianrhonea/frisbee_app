@@ -14,7 +14,6 @@ import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../utils/command.dart';
-import '../../../utils/result.dart';
 
 typedef RoleChange = ({String uid, TeamRole role});
 typedef StatsAccess = ({String uid, bool on});
@@ -41,7 +40,6 @@ class TeamDetailViewModel extends ChangeNotifier {
     deletePlayer = Command1<void, String>(
       (id) => _teams.deletePlayer(teamId, id),
     );
-    regenerateInviteCode = Command0<void>(_regenerateInviteCode);
     setMemberRole = Command1<void, RoleChange>(
       (c) => _teams.setMemberRole(teamId, c.uid, c.role),
     );
@@ -71,7 +69,6 @@ class TeamDetailViewModel extends ChangeNotifier {
         _team = t;
         _teamLoaded = true;
         _watchRoster();
-        _watchInviteCode();
         _watchJoinRequests();
         _watchMeetings();
         notifyListeners();
@@ -95,29 +92,8 @@ class TeamDetailViewModel extends ChangeNotifier {
   final DateTime Function() _clock;
   late final List<StreamSubscription<Object?>> _subs;
   StreamSubscription<List<RosterPlayer>>? _rosterSub;
-  StreamSubscription<String?>? _inviteSub;
   StreamSubscription<List<TeamMeeting>>? _meetingSub;
   TeamRole? _meetingRole;
-
-  String? _inviteCode;
-
-  /// Shown to owners, coaches and captains only; null for everyone else.
-  String? get inviteCode => _inviteCode;
-
-  /// Only admins may read the code, so watch it only while the role allows.
-  void _watchInviteCode() {
-    // Groups are joined from the directory; they have no code.
-    if (_team != null && canShareCode && !_team!.isCommunity) {
-      _inviteSub ??= _teams.watchInviteCode(teamId).listen((c) {
-        _inviteCode = c;
-        notifyListeners();
-      }, onError: (Object _) => _inviteCode = null);
-    } else if (_inviteSub != null) {
-      _inviteSub?.cancel();
-      _inviteSub = null;
-      _inviteCode = null;
-    }
-  }
 
   StreamSubscription<List<GroupJoinRequest>>? _requestSub;
   List<GroupJoinRequest> _joinRequests = const [];
@@ -267,8 +243,12 @@ class TeamDetailViewModel extends ChangeNotifier {
   bool get canSeeRosterStatus => canEdit;
   bool get isOwner => myRole == TeamRole.owner;
   bool get canSetRoles => myRole?.canSetRoles ?? false;
-  bool get canShareCode => myRole?.canShareCode ?? false;
-  bool get canRegenerateCode => myRole?.canRegenerateCode ?? false;
+
+  /// Owners, coaches and captains show the team's rotating invite code
+  /// (InviteCodeViewModel). Groups have none: they're joined from the
+  /// directory.
+  bool get canShareCode =>
+      (myRole?.canShareCode ?? false) && !(_team?.isCommunity ?? true);
 
   /// Whether the member menu applies to [memberUid]: the owner manages
   /// anyone but themself; coaches and captains remove players.
@@ -289,7 +269,6 @@ class TeamDetailViewModel extends ChangeNotifier {
 
   late final Command1<void, RosterPlayer> savePlayer;
   late final Command1<void, String> deletePlayer;
-  late final Command0<void> regenerateInviteCode;
   late final Command1<void, RoleChange> setMemberRole;
 
   /// Gives a player stats access, or takes it away. Owner only.
@@ -305,16 +284,12 @@ class TeamDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Result<void>> _regenerateInviteCode() =>
-      _teams.regenerateInviteCode(teamId);
-
   @override
   void dispose() {
     for (final s in _subs) {
       s.cancel();
     }
     _rosterSub?.cancel();
-    _inviteSub?.cancel();
     _requestSub?.cancel();
     _meetingSub?.cancel();
     super.dispose();

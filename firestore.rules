@@ -14,10 +14,6 @@ service cloud.firestore {
     function codePath(code) {
       return /databases/$(database)/documents/inviteCodes/$(code);
     }
-    // The team's current invite code, readable by admins only.
-    function invitePath(teamId) {
-      return /databases/$(database)/documents/teams/$(teamId)/private/invite;
-    }
     // An invitation to join a team, sent to someone found in the directory.
     function teamInvitePath(userId, teamId) {
       return /databases/$(database)/documents/users/$(userId)/teamInvites/$(teamId);
@@ -30,11 +26,9 @@ service cloud.firestore {
     function joinPath(teamId, userId) {
       return /databases/$(database)/documents/teams/$(teamId)/joins/$(userId);
     }
-    // Older teams kept the code on the team doc until an admin opened them.
-    function currentCode(teamId, team) {
-      return exists(invitePath(teamId))
-        ? get(invitePath(teamId)).data.code
-        : team.get('inviteCode', '');
+    // An invite code (or link token) still works until createdAt + ttl.
+    function liveCode(invite) {
+      return request.time < invite.createdAt + duration.value(invite.ttl, 's');
     }
 
     // Roles (TeamRole in lib/domain/models/team.dart):
@@ -250,9 +244,8 @@ service cloud.firestore {
     match /teams/{teamId} {
       allow read: if signedIn() && isMember(resource.data);
 
-      // Creator becomes sole owner and must create the private invite code
-      // and its lookup in the same batch. The code isn't on the team doc,
-      // which every member can read.
+      // Creator becomes sole owner. Invite codes are minted later, and
+      // only for as long as an admin shows or shares one (inviteCodes).
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
@@ -261,8 +254,7 @@ service cloud.firestore {
         && request.resource.data.ownerId == uid()
         && request.resource.data.members == {(uid()): 'owner'}
         && request.resource.data.memberIds == [uid()]
-        && request.resource.data.memberNames.keys().hasOnly([uid()])
-        && getAfter(codePath(getAfter(invitePath(teamId)).data.code)).data.teamId == teamId;
+        && request.resource.data.memberNames.keys().hasOnly([uid()]);
 
       // A community group: same owner checks, plus its group fields, and
       // no invite code since anyone can find and join it.
@@ -451,13 +443,16 @@ service cloud.firestore {
                   && resource.data.members[target] in ['player', 'stats']));
       }
 
-      // Non-member joins as a player by proving they know the invite code,
-      // written to joins/{uid} in the same batch.
+      // Non-member joins as a player by proving they know a live invite
+      // code or link token for this team, written to joins/{uid} in the
+      // same batch.
       function join() {
         let diff = request.resource.data.members.diff(resource.data.members);
+        let invite = get(codePath(getAfter(joinPath(teamId, uid())).data.code)).data;
         return !isMember(resource.data)
           && changed().hasOnly(['members', 'memberIds', 'memberNames'])
-          && getAfter(joinPath(teamId, uid())).data.code == currentCode(teamId, resource.data)
+          && invite.teamId == teamId
+          && liveCode(invite)
           && diff.addedKeys() == [uid()].toSet()
           && diff.changedKeys().size() == 0
           && diff.removedKeys().size() == 0
@@ -469,18 +464,9 @@ service cloud.firestore {
           && validString(request.resource.data.memberNames[uid()], 80);
       }
 
-      // Current invite code. Owners, coaches and captains can read it; only
-      // the owner can change it (coaches and captains may move an older
-      // team's code here, keeping its existing lookup).
+      // Where older teams kept their permanent invite code. Codes now
+      // rotate (inviteCodes); the owner clears the old one with the team.
       match /private/{docId} {
-        allow read: if signedIn() && docId == 'invite'
-          && isEditor(get(teamPath(teamId)).data);
-        allow create, update: if signedIn() && docId == 'invite'
-          && request.resource.data.keys().hasOnly(['code'])
-          && request.resource.data.code is string
-          && isEditor(getAfter(teamPath(teamId)).data)
-          && getAfter(codePath(request.resource.data.code)).data.teamId == teamId
-          && (request.method == 'create' || isOwner(get(teamPath(teamId)).data));
         allow delete: if signedIn() && isOwner(get(teamPath(teamId)).data);
       }
 
@@ -491,7 +477,7 @@ service cloud.firestore {
           && (uid() == userId || isOwner(get(teamPath(teamId)).data));
         allow create, update: if signedIn() && uid() == userId
           && request.resource.data.keys().hasOnly(['code'])
-          && validString(request.resource.data.code, 12);
+          && validString(request.resource.data.code, 32);
         allow delete: if signedIn() && isOwner(get(teamPath(teamId)).data);
       }
 
@@ -1507,16 +1493,35 @@ service cloud.firestore {
 
     // ---- Invite codes -----------------------------------------------------
 
+    // Short codes rotate: the app shows each for 30 seconds and it works
+    // for 45 (ttl 45). Links carry a longer token that lasts 1 hour, 1, 7
+    // or 30 days. Expiry is createdAt + ttl on the server's clock;
+    // expiresAt is the same moment by the client's, for the TTL policy
+    // that deletes old codes (firestore.indexes.json).
     match /inviteCodes/{code} {
       // Single-document lookups only; codes can't be listed.
       allow get: if signedIn();
-      // Only the owner mints codes, alongside the team's private/invite.
+      // Owners, coaches and captains of a team (not a group) mint codes.
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['teamId'])
-        && getAfter(invitePath(request.resource.data.teamId)).data.code == code
-        && getAfter(teamPath(request.resource.data.teamId)).data.members
-             .get(uid(), '') == 'owner';
-      allow delete: if signedIn() && isOwner(get(teamPath(resource.data.teamId)).data);
+        && request.resource.data.keys().hasOnly(
+             ['teamId', 'createdBy', 'createdAt', 'ttl', 'expiresAt'])
+        && request.resource.data.teamId is string
+        && isEditor(get(teamPath(request.resource.data.teamId)).data)
+        && get(teamPath(request.resource.data.teamId)).data.get('kind', 'team') != 'community'
+        && request.resource.data.createdBy == uid()
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.ttl in [45, 3600, 86400, 604800, 2592000]
+        && (request.resource.data.ttl == 45
+            ? code.matches('[A-Z0-9]{6}')
+            : code.matches('[A-Za-z0-9]{20}'))
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt < request.time
+             + duration.value(request.resource.data.ttl + 86400, 's');
+      // The creator or the team's owner revokes one early.
+      allow delete: if signedIn()
+        && (resource.data.get('createdBy', '') == uid()
+            || isOwner(get(teamPath(resource.data.teamId)).data));
     }
 
     // ---- USA Ultimate cache (written by Cloud Functions only) -------------

@@ -1,0 +1,63 @@
+/* Stall 10's palette (lib/ui/core/themes/theme.dart, dark). */
+:root {
+  --bg: #0e1310;
+  --card: #161d18;
+  --ink: #e7ece4;
+  --muted: #98a399;
+  --lime: #c9e36b;
+  --on-lime: #142019;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 0%, #1c2b22, var(--bg) 70%);
+  color: var(--ink);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+    sans-serif;
+}
+
+main {
+  width: min(420px, 100% - 32px);
+  padding: 32px 24px;
+  text-align: center;
+  background: var(--card);
+  border-radius: 20px;
+}
+
+.logo { border-radius: 22px; }
+
+h1 {
+  margin: 20px 0 8px;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.muted { color: var(--muted); }
+
+.button {
+  display: block;
+  margin: 24px 0 8px;
+  padding: 14px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--on-lime);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.code {
+  margin: 4px 0 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--lime);
+}
+
+[hidden] { display: none !important; }

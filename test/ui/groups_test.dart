@@ -184,7 +184,7 @@ void main() {
       await pumpEventQueue();
       expect(vm.joinRequests.map((r) => r.name), ['Ann', 'Bo']);
       // Groups have no invite code.
-      expect(teams.inviteWatches, isEmpty);
+      expect(vm.canShareCode, isFalse);
 
       await vm.approveJoinRequest.execute(vm.joinRequests.first);
       await vm.declineJoinRequest.execute('b');

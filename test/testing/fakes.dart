@@ -21,6 +21,7 @@ import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
+import 'package:frisbee_app/domain/models/invite_code.dart';
 import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/player_profile.dart';
@@ -145,13 +146,46 @@ class FakeTeamRepository implements TeamRepository {
   final _teamsController = StreamController<void>.broadcast();
   String? joinedCode;
 
-  /// teamId → invite code; unlisted teams use `CODE` plus the team id.
-  final codes = <String, String>{};
+  /// Minted codes and link tokens by code. Every team also takes `CODE`
+  /// plus its id, which never expires, so join tests needn't mint one.
+  final inviteCodes = <String, InviteCode>{};
 
-  /// Teams whose invite code was watched, to check who may read it.
-  final inviteWatches = <String>[];
+  /// Links minted, with how long each lasts.
+  final linkExpiries = <String, InviteLinkExpiry>{};
 
-  String _codeOf(String teamId) => codes[teamId] ?? 'CODE$teamId';
+  /// Set to fail minting, e.g. for someone the rules would refuse.
+  Exception? mintError;
+
+  var _minted = 0;
+
+  /// The team [code] joins, or an error if it's unknown or expired.
+  Result<String> _teamForCode(String code) {
+    final minted = inviteCodes[code];
+    if (minted != null) {
+      return DateTime.now().isBefore(minted.expiresAt)
+          ? Result.ok(minted.teamId)
+          : Result.error(Exception('That invite has expired.'));
+    }
+    final team = teams.values.where((t) => 'CODE${t.id}' == code).firstOrNull;
+    return team == null
+        ? Result.error(Exception('No team found for that invite code.'))
+        : Result.ok(team.id);
+  }
+
+  Future<Result<InviteCode>> _mint(
+    String teamId,
+    String code,
+    Duration ttl,
+  ) async {
+    if (mintError case final e?) return Result.error(e);
+    final minted = InviteCode(
+      code: code,
+      teamId: teamId,
+      expiresAt: DateTime.now().add(ttl),
+    );
+    inviteCodes[code] = minted;
+    return Result.ok(minted);
+  }
 
   void _emit() => _teamsController.add(null);
 
@@ -306,11 +340,15 @@ class FakeTeamRepository implements TeamRepository {
   }
 
   @override
+  Future<Result<String>> resolveInviteCode(String inviteCode) async =>
+      _teamForCode(inviteCode);
+
+  @override
   Future<Result<String>> joinTeam(String inviteCode, AppUser user) async {
     joinedCode = inviteCode;
-    final team = teams.values
-        .where((t) => _codeOf(t.id) == inviteCode)
-        .firstOrNull;
+    final found = _teamForCode(inviteCode);
+    if (found case Error(:final error)) return Result.error(error);
+    final team = teams[(found as Ok<String>).value];
     if (team == null) return Result.error(Exception('No team'));
     teams[team.id] = Team(
       id: team.id,
@@ -360,17 +398,18 @@ class FakeTeamRepository implements TeamRepository {
   }
 
   @override
-  Stream<String?> watchInviteCode(String teamId) async* {
-    inviteWatches.add(teamId);
-    yield _codeOf(teamId);
-    yield* _teamsController.stream.map((_) => _codeOf(teamId));
-  }
+  Future<Result<InviteCode>> createInviteCode(String teamId, String uid) =>
+      _mint(teamId, 'C${++_minted}$teamId', InviteCode.codeLifetime);
 
   @override
-  Future<Result<void>> regenerateInviteCode(String teamId) async {
-    codes[teamId] = 'NEW$teamId';
-    _emit();
-    return const Result.ok(null);
+  Future<Result<InviteCode>> createInviteLink(
+    String teamId,
+    String uid,
+    InviteLinkExpiry expiry,
+  ) {
+    final token = 'L${++_minted}$teamId';
+    linkExpiries[token] = expiry;
+    return _mint(teamId, token, expiry.duration);
   }
 
   @override

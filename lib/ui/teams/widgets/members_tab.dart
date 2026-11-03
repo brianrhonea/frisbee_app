@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/confirm_dialog.dart';
-import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
+import '../../core/ui/view_model_host.dart';
+import '../view_models/invite_code_viewmodel.dart';
 import '../view_models/team_detail_viewmodel.dart';
+import 'invite_code_card.dart';
 import 'invite_members_dialog.dart';
 
 class MembersTab extends StatelessWidget {
@@ -42,9 +44,15 @@ class MembersTab extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ],
-          if (viewModel.inviteCode case final code?
-              when viewModel.canShareCode) ...[
-            _InviteCard(viewModel: viewModel, code: code),
+          if (viewModel.canShareCode) ...[
+            ViewModelHost(
+              create: (c) => InviteCodeViewModel(
+                teamId: team.id,
+                teamRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, vm) => InviteCodeCard(viewModel: vm),
+            ),
             const SizedBox(height: 16),
           ],
           if (team.isCommunity && viewModel.joinRequests.isNotEmpty) ...[
@@ -139,72 +147,6 @@ class _JoinRequests extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InviteCard extends StatelessWidget {
-  const _InviteCard({required this.viewModel, required this.code});
-
-  final TeamDetailViewModel viewModel;
-  final String code;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      color: theme.colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Invite code', style: theme.textTheme.labelLarge),
-                  SelectableText(
-                    code,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      letterSpacing: 4,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    'Share this code so teammates can join as players.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: 'Copy',
-              icon: const Icon(Icons.copy),
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: code));
-                if (context.mounted) {
-                  showSnackBar(context, 'Invite code copied');
-                }
-              },
-            ),
-            if (viewModel.canRegenerateCode)
-              IconButton(
-                tooltip: 'New code',
-                icon: const Icon(Icons.refresh),
-                onPressed: () async {
-                  if (await confirmDialog(
-                    context,
-                    title: 'Generate a new code?',
-                    message: 'The current code will stop working.',
-                    confirmLabel: 'Generate',
-                  )) {
-                    viewModel.regenerateInviteCode.execute();
-                  }
-                },
               ),
           ],
         ),

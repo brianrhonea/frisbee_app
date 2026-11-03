@@ -1,4 +1,5 @@
 import '../../../domain/models/app_user.dart';
+import '../../../domain/models/invite_code.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
@@ -15,6 +16,10 @@ abstract class TeamRepository {
 
   /// Joins the team with [inviteCode] as a player. Returns the team id.
   Future<Result<String>> joinTeam(String inviteCode, AppUser user);
+
+  /// The id of the team [inviteCode] joins, without joining it (for invite
+  /// links). Fails if no team has that code, or it has expired.
+  Future<Result<String>> resolveInviteCode(String inviteCode);
 
   /// Joins an open community group as a member, no code needed.
   Future<Result<void>> joinGroup(String teamId, AppUser user);
@@ -65,12 +70,18 @@ abstract class TeamRepository {
   /// created before the directory existed. Owners, coaches and captains.
   Future<Result<void>> publishListing(Team team);
 
-  /// The code other users enter to join as a player. Kept off the team so
-  /// only owners, coaches and captains can read it; others get an error.
-  Stream<String?> watchInviteCode(String teamId);
+  /// Mints a short code that joins [teamId] as a player for
+  /// [InviteCode.codeLifetime]. Owners, coaches and captains of a team (not
+  /// a group); [uid] is theirs.
+  Future<Result<InviteCode>> createInviteCode(String teamId, String uid);
 
-  /// Replaces the invite code; the old one stops working. Owner only.
-  Future<Result<void>> regenerateInviteCode(String teamId);
+  /// Mints a token for an invite link that joins [teamId] as a player
+  /// until [expiry] passes. Same people as [createInviteCode].
+  Future<Result<InviteCode>> createInviteLink(
+    String teamId,
+    String uid,
+    InviteLinkExpiry expiry,
+  );
 
   Future<Result<void>> setMemberRole(String teamId, String uid, TeamRole role);
 

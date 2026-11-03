@@ -46,7 +46,6 @@ class InboxScreen extends StatelessWidget {
         ),
         body: InboxList(
           viewModel: vm,
-          showHeader: false,
           onOpen: (item) => _openFullScreen(context, item),
         ),
       );
@@ -141,22 +140,19 @@ class _Detail extends StatelessWidget {
 }
 
 /// The inbox: a search box, All / Unread filters and the entries;
-/// [selectedKey] is highlighted.
+/// [selectedKey] is highlighted. The page around it has the one New
+/// message button.
 class InboxList extends StatelessWidget {
   const InboxList({
     super.key,
     required this.viewModel,
     required this.onOpen,
     this.selectedKey,
-    this.showHeader = true,
   });
 
   final InboxViewModel viewModel;
   final ValueChanged<InboxItem> onOpen;
   final String? selectedKey;
-
-  /// The "Messages" title with a new-message button.
-  final bool showHeader;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -170,32 +166,8 @@ class InboxList extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (showHeader)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 8, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Messages',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.4,
-                        color: c.ink,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'New message',
-                    onPressed: () => context.push(Routes.newMessage),
-                    icon: Icon(Icons.edit_square, size: 20, color: c.ink),
-                  ),
-                ],
-              ),
-            ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
             child: SizedBox(
               height: 38,
               child: TextField(

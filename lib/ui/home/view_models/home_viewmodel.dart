@@ -129,19 +129,6 @@ class HomeViewModel extends ChangeNotifier {
   /// Teams the user may post on: those they own, coach or captain.
   List<Team> get postableTeams => teams.where(canEdit).toList();
 
-  /// The city most of the user's teams play in, for the page's eyebrow.
-  String? get homeCity {
-    final counts = <String, int>{};
-    for (final t in teams) {
-      if (t.city.trim().isEmpty) continue;
-      counts.update(t.city.trim(), (n) => n + 1, ifAbsent: () => 1);
-    }
-    if (counts.isEmpty) return null;
-    return (counts.entries.toList()..sort((a, b) => b.value - a.value))
-        .first
-        .key;
-  }
-
   void _onFeed() => notifyListeners();
 
   Future<Result<String>> _joinTeam(String code) async {

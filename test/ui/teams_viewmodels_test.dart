@@ -99,11 +99,11 @@ void main() {
       expect(vm.canManage('coach'), isFalse);
     });
 
-    test('owner sets roles, regenerates codes and can transfer', () async {
+    test('owner sets roles, shares codes and can transfer', () async {
       final vm = detailFor(TeamRole.owner);
       await pumpEventQueue();
       expect(vm.canSetRoles, isTrue);
-      expect(vm.canRegenerateCode, isTrue);
+      expect(vm.canShareCode, isTrue);
       expect(vm.canRemove('coach'), isTrue);
       await vm.transferOwnership.execute('coach');
       await pumpEventQueue();
@@ -130,8 +130,6 @@ void main() {
       await pumpEventQueue();
       expect(vm.canEdit, isTrue);
       expect(vm.canShareCode, isTrue);
-      expect(vm.inviteCode, 'CODEt1');
-      expect(vm.canRegenerateCode, isFalse);
       expect(vm.canSetRoles, isFalse);
       expect(vm.team!.canKeepStats('u1'), isTrue);
       expect(vm.canManage('player'), isTrue);
@@ -139,12 +137,10 @@ void main() {
       expect(vm.canManage('coach'), isFalse);
     });
 
-    test('coach shares the code and keeps stats, but no new codes', () async {
+    test('coach shares the code and keeps stats, but sets no roles', () async {
       final vm = detailFor(TeamRole.coach);
       await pumpEventQueue();
       expect(vm.canShareCode, isTrue);
-      expect(vm.inviteCode, 'CODEt1');
-      expect(vm.canRegenerateCode, isFalse);
       expect(vm.canSetRoles, isFalse);
       expect(vm.team!.canKeepStats('u1'), isTrue);
     });
@@ -154,8 +150,6 @@ void main() {
       await pumpEventQueue();
       expect(vm.canEdit, isFalse);
       expect(vm.canShareCode, isFalse);
-      expect(vm.inviteCode, isNull);
-      expect(teams.inviteWatches, isEmpty);
       expect(vm.canManage('player'), isFalse);
       expect(vm.team!.canKeepStats('u1'), isTrue);
     });
@@ -167,25 +161,19 @@ void main() {
       expect(vm.canManage('player'), isFalse);
       expect(vm.canShareCode, isFalse);
       expect(vm.team!.canKeepStats('u1'), isFalse);
-      // Players never even ask for the code; the rules would refuse.
-      expect(vm.inviteCode, isNull);
-      expect(teams.inviteWatches, isEmpty);
     });
 
-    test('owner regenerates the code; losing admin hides it', () async {
+    test('losing admin stops showing the code', () async {
       final vm = detailFor(TeamRole.owner);
       await pumpEventQueue();
-      expect(vm.inviteCode, 'CODEt1');
-      await vm.regenerateInviteCode.execute();
-      await pumpEventQueue();
-      expect(vm.inviteCode, 'NEWt1');
+      expect(vm.canShareCode, isTrue);
 
       final t = teams.teams['t1']!;
       await teams.updateTeam(
         t.copyWith(members: {...t.members, 'u1': TeamRole.player}),
       );
       await pumpEventQueue();
-      expect(vm.inviteCode, isNull);
+      expect(vm.canShareCode, isFalse);
     });
   });
 

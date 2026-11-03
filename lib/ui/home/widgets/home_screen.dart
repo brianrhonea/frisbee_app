@@ -226,22 +226,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.savePost, vm.joinTeam]),
         builder: (context, _) {
-          final city = vm.homeCity;
+          // No page header: the composer below is where posts start.
           return PageScroll(
             children: [
-              PageHeader(
-                eyebrow:
-                    '${city == null ? '' : '$city / '}Your ultimate community',
-                title: 'Good things fly together.',
-                subtitle: 'Your people. Your teams. Your next point.',
-                action: mobile
-                    ? null
-                    : FilledButton.icon(
-                        onPressed: _newPost,
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Create post'),
-                      ),
-              ),
               _TabRow(
                 selected: _tab,
                 onSelect: (t) => setState(() => _tab = t),

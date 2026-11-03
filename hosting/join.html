@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join on Stall 10</title>
+  <meta name="description" content="You're invited to join a team on Stall 10.">
+  <meta property="og:title" content="You're invited to join a team on Stall 10">
+  <meta property="og:description" content="Tap to open the invite in the Stall 10 app.">
+  <meta property="og:image" content="https://frisbee-app-brianrhonea.web.app/logo.png">
+  <link rel="icon" href="/favicon.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!--
+    Served for /join/<code> and /g/<groupId> (see firebase.json). With the
+    app installed, iOS and Android open it before this page loads; this is
+    the fallback: other devices, in-app browsers, and pasted links.
+  -->
+  <main>
+    <img class="logo" src="/logo.png" alt="Stall 10" width="96" height="96">
+    <h1 id="title">You're invited to join a team on Stall 10</h1>
+    <p id="lead" class="muted">Open the invite in the Stall 10 app.</p>
+    <a id="open" class="button" href="#">Open in Stall 10</a>
+    <p id="expiry" class="muted" hidden>Invite links expire. If this one
+      has, ask whoever sent it for a new one.</p>
+    <p id="bad" hidden>This link doesn't look right. Ask whoever sent it for
+      a new one.</p>
+  </main>
+  <script>
+    (function () {
+      var parts = location.pathname.split('/').filter(Boolean);
+      var kind = parts[0], id = parts[1] ? decodeURIComponent(parts[1]) : '';
+      var ok = (kind === 'join' || kind === 'g') && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+      if (!ok) {
+        document.getElementById('open').hidden = true;
+        document.getElementById('lead').hidden = true;
+        document.getElementById('bad').hidden = false;
+        return;
+      }
+      // The app's own scheme (InviteLinks.scheme); the path is its route.
+      document.getElementById('open').href =
+        'stall10://open/' + kind + '/' + encodeURIComponent(id);
+      if (kind === 'join') {
+        document.getElementById('expiry').hidden = false;
+      } else {
+        document.getElementById('title').textContent =
+          "You're invited to a group on Stall 10";
+      }
+    })();
+  </script>
+</body>
+</html>

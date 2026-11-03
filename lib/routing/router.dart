@@ -53,6 +53,8 @@ import '../ui/rankings/view_models/rankings_viewmodel.dart';
 import '../ui/rankings/view_models/usau_team_viewmodel.dart';
 import '../ui/rankings/widgets/rankings_screen.dart';
 import '../ui/rankings/widgets/usau_team_screen.dart';
+import '../ui/teams/view_models/join_link_viewmodel.dart';
+import '../ui/teams/widgets/join_link_screen.dart';
 import '../ui/schedule/view_models/event_detail_viewmodel.dart';
 import '../ui/schedule/view_models/event_editor_viewmodel.dart';
 import '../ui/schedule/view_models/schedule_viewmodel.dart';
@@ -121,6 +123,27 @@ GoRouter router(AuthRepository auth) => GoRouter(
         create: (c) => SignUpViewModel(authRepository: c.read()),
         builder: (_, vm) => SignUpScreen(viewModel: vm),
       ),
+    ),
+    // Invite links (InviteLinks), opened from other apps: join a team by
+    // its code, or open a group's page, where people join or ask to.
+    GoRoute(
+      path: '/join/:code',
+      builder: (_, state) {
+        final code = state.pathParameters['code']!;
+        return ViewModelHost(
+          key: ValueKey('join-$code'),
+          create: (c) => JoinLinkViewModel(
+            code: code,
+            teamRepository: c.read(),
+            authRepository: c.read(),
+          ),
+          builder: (_, vm) => JoinLinkScreen(viewModel: vm),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/g/:groupId',
+      redirect: (_, state) => Routes.team(state.pathParameters['groupId']!),
     ),
     // People's posts, over the shell. `/posts` alone goes Home, where the
     // feed is. The composer is an overlay, not a route.

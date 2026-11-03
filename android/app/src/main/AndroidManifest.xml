@@ -43,6 +43,24 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Invite links (lib/utils/invite_links.dart) open the app.
+                 Verified by hosting/.well-known/assetlinks.json. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"/>
+                <data android:host="frisbee-app-brianrhonea.web.app"/>
+                <data android:pathPrefix="/join/"/>
+                <data android:pathPrefix="/g/"/>
+            </intent-filter>
+            <!-- stall10://open/join/CODE, from the invite page's Open button. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="stall10"/>
+            </intent-filter>
         </activity>
         <!-- Foreground service that lets meetings share the screen. -->
         <service

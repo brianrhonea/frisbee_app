@@ -39,6 +39,19 @@ const OUTSIDER = "outsider";
 
 const db = (uid: string) => env.authenticatedContext(uid).firestore();
 
+// An inviteCodes doc as the app mints it (InviteCode in
+// lib/domain/models/invite_code.dart): a 6-character code that works for
+// 45 seconds, or a 20-character link token for 1 hour to 30 days.
+const SECOND = 1000;
+const liveCode = (teamId = TEAM, ttl = 45, createdAt = new Date()) => ({
+  teamId,
+  createdBy: COACH,
+  createdAt,
+  ttl,
+  expiresAt: new Date(createdAt.getTime() + ttl * SECOND),
+});
+const TOKEN = "ABCDEFGHJKLMNPQRSTUV";
+
 beforeAll(async () => {
   env = await initializeTestEnvironment({
     projectId: "demo-frisbee",
@@ -71,55 +84,29 @@ beforeEach(async () => {
       memberIds: [OWNER, COACH, CAPTAIN, STATS, PLAYER],
       memberNames: { [OWNER]: "O", [COACH]: "C", [CAPTAIN]: "K", [STATS]: "S", [PLAYER]: "P" },
     });
-    await setDoc(doc(fs, "teams", TEAM, "private", "invite"), { code: CODE });
-    await setDoc(doc(fs, "inviteCodes", CODE), { teamId: TEAM });
+    await setDoc(doc(fs, "inviteCodes", CODE), liveCode());
   });
 });
 
 describe("team create", () => {
-  it("allows creating a team with a matching invite code", async () => {
-    const fs = db(OUTSIDER);
-    const batch = writeBatch(fs);
-    batch.set(doc(fs, "teams", "t2"), {
-      name: "New",
-      division: "open",
-      level: "college",
-      city: "Denver",
-      ownerId: OUTSIDER,
-      members: { [OUTSIDER]: "owner" },
-      memberIds: [OUTSIDER],
-      memberNames: { [OUTSIDER]: "Me" },
-    });
-    batch.set(doc(fs, "teams", "t2", "private", "invite"), { code: "ZZZ999" });
-    batch.set(doc(fs, "inviteCodes", "ZZZ999"), { teamId: "t2" });
-    await assertSucceeds(batch.commit());
+  const newTeam = (extra: Record<string, unknown> = {}) => ({
+    name: "New",
+    division: "open",
+    level: "college",
+    city: "Denver",
+    ownerId: OUTSIDER,
+    members: { [OUTSIDER]: "owner" },
+    memberIds: [OUTSIDER],
+    memberNames: { [OUTSIDER]: "Me" },
+    ...extra,
   });
 
-  it("rejects a team that keeps its invite code on the team doc", async () => {
-    const fs = db(OUTSIDER);
-    const batch = writeBatch(fs);
-    batch.set(doc(fs, "teams", "t2"), {
-      name: "New", division: "open", level: "college", city: "",
-      ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" },
-      memberIds: [OUTSIDER], memberNames: { [OUTSIDER]: "Me" },
-      inviteCode: "ZZZ999",
-    });
-    batch.set(doc(fs, "teams", "t2", "private", "invite"), { code: "ZZZ999" });
-    batch.set(doc(fs, "inviteCodes", "ZZZ999"), { teamId: "t2" });
-    await assertFails(batch.commit());
+  it("allows creating a team, with no invite code", async () => {
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam()));
   });
 
-  it("rejects reusing an existing invite code", async () => {
-    const fs = db(OUTSIDER);
-    const batch = writeBatch(fs);
-    batch.set(doc(fs, "teams", "t2"), {
-      name: "New", division: "open", level: "college", city: "",
-      ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" },
-      memberIds: [OUTSIDER], memberNames: { [OUTSIDER]: "Me" },
-    });
-    batch.set(doc(fs, "teams", "t2", "private", "invite"), { code: CODE });
-    batch.set(doc(fs, "inviteCodes", CODE), { teamId: "t2" });
-    await assertFails(batch.commit());
+  it("rejects a team that keeps an invite code on the team doc", async () => {
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam({ inviteCode: "ZZZ999" })));
   });
 });
 
@@ -131,13 +118,18 @@ describe("team read", () => {
 });
 
 describe("team delete", () => {
-  // deleteTeam in team_repository_firebase.dart relies on these: it
-  // deletes private/invite by name because the owner can't list private.
-  it("the owner gets and deletes private/invite but can't list private", async () => {
-    const fs = db(OWNER);
-    await assertSucceeds(getDoc(doc(fs, "teams", TEAM, "private", "invite")));
-    await assertFails(getDocs(collection(fs, "teams", TEAM, "private")));
-    await assertSucceeds(deleteDoc(doc(fs, "teams", TEAM, "private", "invite")));
+  // deleteTeam in team_repository_firebase.dart deletes an older team's
+  // private/invite by name because the owner can't list private.
+  it("the owner deletes an older team's private/invite; nobody reads it", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "private", "invite"), { code: "OLD234" }),
+    );
+    for (const uid of [OWNER, COACH, CAPTAIN, PLAYER]) {
+      await assertFails(getDoc(doc(db(uid), "teams", TEAM, "private", "invite")));
+    }
+    await assertFails(getDocs(collection(db(OWNER), "teams", TEAM, "private")));
+    await assertFails(deleteDoc(doc(db(COACH), "teams", TEAM, "private", "invite")));
+    await assertSucceeds(deleteDoc(doc(db(OWNER), "teams", TEAM, "private", "invite")));
   });
 
   it("only the owner deletes the team, and only once everyone else is gone", async () => {
@@ -167,8 +159,28 @@ describe("join", () => {
       .commit();
   };
 
-  it("allows joining with the current code", async () => {
+  const seedCode = (code: string, data: Record<string, unknown>) =>
+    env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "inviteCodes", code), data));
+
+  it("allows joining with a live code", async () => {
     await assertSucceeds(join(CODE));
+  });
+
+  it("allows joining with a live link token", async () => {
+    await seedCode(TOKEN, liveCode(TEAM, 604800));
+    await assertSucceeds(join(TOKEN));
+  });
+
+  it("rejects an expired code or link", async () => {
+    await seedCode("OLD234", liveCode(TEAM, 45, new Date(Date.now() - 46 * SECOND)));
+    await assertFails(join("OLD234"));
+    await seedCode(TOKEN, liveCode(TEAM, 3600, new Date(Date.now() - 3601 * SECOND)));
+    await assertFails(join(TOKEN));
+  });
+
+  it("rejects another team's code", async () => {
+    await seedCode("OTH234", liveCode("t2"));
+    await assertFails(join("OTH234"));
   });
 
   it("rejects a wrong code or no proof", async () => {
@@ -192,13 +204,16 @@ describe("join", () => {
     await assertFails(setDoc(doc(db(PLAYER), "teams", TEAM, "joins", OUTSIDER), { code: "X" }));
   });
 
-  it("older teams with the code on the team doc still accept joins", async () => {
+  it("permanent codes from before rotation no longer work", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
-      await deleteDoc(doc(ctx.firestore(), "teams", TEAM, "private", "invite"));
-      await updateDoc(doc(ctx.firestore(), "teams", TEAM), { inviteCode: CODE });
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", TEAM, "private", "invite"), { code: "OLD234" });
+      await setDoc(doc(fs, "inviteCodes", "OLD234"), { teamId: TEAM });
+      await setDoc(doc(fs, "inviteCodes", "OLD777"), { teamId: TEAM });
+      await updateDoc(doc(fs, "teams", TEAM), { inviteCode: "OLD777" });
     });
-    await assertFails(join("WRONG1"));
-    await assertSucceeds(join(CODE));
+    await assertFails(join("OLD234"));
+    await assertFails(join("OLD777"));
   });
 });
 
@@ -727,51 +742,79 @@ describe("roles and removal", () => {
 });
 
 describe("invite codes and admin", () => {
-  const invite = (uid: string) => doc(db(uid), "teams", TEAM, "private", "invite");
-  const regenerate = (uid: string) => {
-    const fs = db(uid);
-    return writeBatch(fs)
-      .set(doc(fs, "teams", TEAM, "private", "invite"), { code: "NEW777" })
-      .set(doc(fs, "inviteCodes", "NEW777"), { teamId: TEAM })
-      .delete(doc(fs, "inviteCodes", CODE))
-      .commit();
-  };
-
-  it("only owners, coaches and captains can read the invite code", async () => {
-    for (const uid of [OWNER, COACH, CAPTAIN]) {
-      await assertSucceeds(getDoc(invite(uid)));
-    }
-    for (const uid of [PLAYER, STATS, OUTSIDER]) {
-      await assertFails(getDoc(invite(uid)));
-    }
-  });
-
-  it("only the owner generates a new invite code", async () => {
-    await assertFails(regenerate(COACH));
-    await assertFails(regenerate(CAPTAIN));
-    await assertFails(regenerate(PLAYER));
-    await assertSucceeds(regenerate(OWNER));
-  });
-
-  it("codes can't point at a code the team doesn't own", async () => {
-    await assertFails(setDoc(invite(OWNER), { code: "NOPE22" }));
-    await assertFails(setDoc(doc(db(OWNER), "inviteCodes", "NOPE22"), { teamId: TEAM }));
-  });
-
-  it("admins move an older team's code off the team doc", async () => {
-    await env.withSecurityRulesDisabled(async (ctx) => {
-      await deleteDoc(doc(ctx.firestore(), "teams", TEAM, "private", "invite"));
-      await updateDoc(doc(ctx.firestore(), "teams", TEAM), { inviteCode: CODE, joinCode: CODE });
+  const mint = (uid: string, code = "NEW234", extra: Record<string, unknown> = {}) =>
+    setDoc(doc(db(uid), "inviteCodes", code), {
+      teamId: TEAM,
+      createdBy: uid,
+      createdAt: serverTimestamp(),
+      ttl: 45,
+      expiresAt: new Date(Date.now() + 45 * SECOND),
+      ...extra,
     });
-    const move = (uid: string) => {
-      const fs = db(uid);
-      return writeBatch(fs)
-        .set(doc(fs, "teams", TEAM, "private", "invite"), { code: CODE })
-        .update(doc(fs, "teams", TEAM), { inviteCode: deleteField(), joinCode: deleteField() })
-        .commit();
-    };
-    await assertFails(move(PLAYER));
-    await assertSucceeds(move(CAPTAIN));
+  const link = (uid: string, ttl: number, code = TOKEN) =>
+    mint(uid, code, { ttl, expiresAt: new Date(Date.now() + ttl * SECOND) });
+
+  it("owners, coaches and captains mint codes; players and outsiders cannot", async () => {
+    await assertSucceeds(mint(OWNER, "OWN234"));
+    await assertSucceeds(mint(COACH, "COA234"));
+    await assertSucceeds(mint(CAPTAIN, "CAP234"));
+    await assertFails(mint(STATS, "STA234"));
+    await assertFails(mint(PLAYER, "PLA234"));
+    await assertFails(mint(OUTSIDER, "OUT234"));
+  });
+
+  it("codes last 45 seconds; links 1 hour, 1, 7 or 30 days", async () => {
+    await assertFails(mint(COACH, "NEW234", { ttl: 3600 }), "a short code that lasts an hour");
+    await assertFails(mint(COACH, "NEW234", { ttl: 60 }));
+    await assertFails(link(COACH, 45), "a link token that lasts 45 seconds");
+    await assertFails(link(COACH, 365 * 86400));
+    await assertFails(link(COACH, 3600, "SHORT"));
+    for (const [i, ttl] of [3600, 86400, 604800, 2592000].entries()) {
+      await assertSucceeds(link(COACH, ttl, TOKEN.slice(0, 19) + i));
+    }
+  });
+
+  it("codes are stamped by the server, for their minter, and never reused", async () => {
+    await assertFails(mint(COACH, "NEW234", { createdAt: new Date(Date.now() + 3600 * SECOND) }));
+    await assertFails(mint(COACH, "NEW234", { createdBy: OWNER }));
+    await assertFails(mint(COACH, "NEW234", { expiresAt: new Date(Date.now() - SECOND) }));
+    await assertFails(mint(COACH, "NEW234", { expiresAt: new Date(Date.now() + 3 * 86400 * SECOND) }));
+    await assertFails(mint(COACH, "NEW234", { note: "hi" }));
+    await assertFails(mint(COACH, CODE), "overwriting a live code");
+  });
+
+  it("groups have no codes", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", "g1"), {
+        name: "Group", ownerId: OWNER, kind: "community",
+        members: { [OWNER]: "owner" }, memberIds: [OWNER],
+      }),
+    );
+    await assertFails(mint(OWNER, "GRP234", { teamId: "g1" }));
+  });
+
+  it("anyone signed in looks a code up; nobody lists them", async () => {
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "inviteCodes", CODE)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "inviteCodes", CODE)));
+    await assertFails(getDocs(query(collection(db(OWNER), "inviteCodes"), where("teamId", "==", TEAM))));
+  });
+
+  it("the minter or the owner revokes a code early", async () => {
+    await assertFails(deleteDoc(doc(db(PLAYER), "inviteCodes", CODE)));
+    await assertFails(deleteDoc(doc(db(CAPTAIN), "inviteCodes", CODE)));
+    await assertSucceeds(deleteDoc(doc(db(COACH), "inviteCodes", CODE)));
+    await assertSucceeds(mint(CAPTAIN, "CAP234"));
+    await assertSucceeds(deleteDoc(doc(db(OWNER), "inviteCodes", "CAP234")));
+  });
+
+  it("admins clear an older team's code off the team doc", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "teams", TEAM), { inviteCode: CODE, joinCode: CODE }),
+    );
+    const clear = (uid: string) =>
+      updateDoc(doc(db(uid), "teams", TEAM), { inviteCode: deleteField(), joinCode: deleteField() });
+    await assertFails(clear(PLAYER));
+    await assertSucceeds(clear(CAPTAIN));
   });
 
   it("captains and coaches manage the team; stats keepers and players cannot", async () => {
@@ -1397,8 +1440,6 @@ describe("team directory", () => {
       ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" },
       memberIds: [OUTSIDER], memberNames: { [OUTSIDER]: "Me" },
     });
-    batch.set(doc(fs, "teams", "t2", "private", "invite"), { code: "ZZZ999" });
-    batch.set(doc(fs, "inviteCodes", "ZZZ999"), { teamId: "t2" });
     batch.set(
       doc(fs, "teamDirectory", "t2"),
       listing({ name: "New", division: "open", level: "college", city: "Denver" }),
@@ -1548,8 +1589,6 @@ describe("chat", () => {
       ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" }, memberIds: [OUTSIDER],
       memberNames: { [OUTSIDER]: "X" }, createdAt: serverTimestamp(),
     });
-    batch.set(doc(fs, "teams", "t2", "private", "invite"), { code: "NEW234" });
-    batch.set(doc(fs, "inviteCodes", "NEW234"), { teamId: "t2" });
     batch.set(doc(fs, "teams", "t2", "chats", "general"), {
       name: "General",
       readRoles: ["owner", "coach", "captain", "player"],
@@ -1626,7 +1665,7 @@ describe("chat", () => {
   it("admins change access; only the owner deletes rooms", async () => {
     await assertSucceeds(updateDoc(roomRef(COACH), { readUsers: [STATS, PLAYER] }));
     await assertFails(updateDoc(roomRef(PLAYER), { readUsers: [PLAYER] }));
-    await assertFails(updateDoc(roomRef(COACH), { createdBy: COACH }));
+    await assertFails(updateDoc(roomRef(COACH), { createdBy: OWNER }));
     await assertFails(deleteDoc(roomRef(COACH)));
     await assertSucceeds(deleteDoc(roomRef(OWNER)));
   });
