@@ -305,10 +305,18 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       if (vm.hasMorePosts)
         Center(
-          child: TextButton(
-            onPressed: vm.loadMorePosts,
-            child: const Text('Show older posts'),
-          ),
+          child: vm.loadingMorePosts
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : TextButton(
+                  onPressed: vm.loadMorePosts,
+                  child: const Text('Show older posts'),
+                ),
         )
       else if (vm.postsLoaded)
         _CaughtUp(empty: vm.posts.isEmpty, followsAnything: vm.followsAnything),

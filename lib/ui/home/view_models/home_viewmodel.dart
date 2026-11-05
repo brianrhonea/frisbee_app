@@ -164,6 +164,7 @@ class HomeViewModel extends ChangeNotifier {
   bool get postsLoaded => feed.loaded;
   List<FeedItem> get posts => removals.visible(feed.items);
   bool get hasMorePosts => feed.hasMore;
+  bool get loadingMorePosts => feed.loadingMore;
   void loadMorePosts() => feed.loadMore();
 
   /// Whether the user follows anything yet, for the empty feed's advice.

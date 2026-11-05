@@ -30,6 +30,15 @@ abstract class UserPostRepository {
     int limit = 50,
   });
 
+  /// One page of older posts for the home feed: up to [limit] posts made
+  /// before [before] matching [filter] on any of [values], newest first.
+  Future<Result<List<UserPost>>> fetchPostsBefore(
+    UserPostFilter filter,
+    List<String> values, {
+    required DateTime before,
+    int limit = 20,
+  });
+
   /// Null once deleted.
   Stream<UserPost?> watchPost(String id);
 
@@ -54,3 +63,8 @@ abstract class UserPostRepository {
 
   Future<Result<Uint8List>> downloadImage(ChatAttachment image);
 }
+
+/// Which posts [UserPostRepository.fetchPostsBefore] pages through; the
+/// same sets as watchPostsByAuthors, watchPostsForTournaments and
+/// watchPostsForTeamEvents.
+enum UserPostFilter { authors, tournaments, teamEvents }

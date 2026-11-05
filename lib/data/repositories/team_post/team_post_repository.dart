@@ -15,6 +15,15 @@ abstract class TeamPostRepository {
     int? limit,
   });
 
+  /// One page of older posts: up to [limit] made before [before], newest
+  /// first ([publicOnly] as for [watchPosts]).
+  Future<Result<List<TeamPost>>> fetchPostsBefore(
+    String teamId, {
+    bool publicOnly = false,
+    required DateTime before,
+    int limit = 20,
+  });
+
   /// Public posts about one of the group's tournaments ([tournamentKey] is
   /// a FollowTarget key), for people following it from outside the group.
   Stream<List<TeamPost>> watchTournamentPosts(

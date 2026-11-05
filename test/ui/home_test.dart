@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/ui/posts/view_models/home_feed.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:frisbee_app/domain/models/feed_item.dart';
@@ -241,6 +242,37 @@ void main() {
       await follows.unfollow(testUser.uid, FollowTarget.userKey('sam'));
       await pumpEventQueue();
       expect(vm.posts.map((i) => i.id), ['team/t1/p1', 'user/mine']);
+    });
+
+    test('older posts load a page at a time, with no gaps', () async {
+      final vm = await load();
+      // Newer than the team post, so my posts fill the first pages.
+      userPosts.posts.addAll([
+        for (var i = 0; i < 45; i++)
+          userPost(
+            'm$i',
+            testUser.uid,
+            DateTime(2026, 11, 1).add(Duration(hours: i)),
+          ),
+      ]);
+      userPosts.changed();
+      await pumpEventQueue();
+      expect(vm.posts, hasLength(HomeFeed.pageSize));
+      expect(vm.posts.first.id, 'user/m44');
+      expect(vm.hasMorePosts, isTrue);
+
+      vm.loadMorePosts();
+      await pumpEventQueue();
+      expect(userPosts.fetches, 1, reason: 'one page read, not a re-read');
+      expect(vm.posts, hasLength(40));
+      expect(vm.posts.last.id, 'user/m5');
+
+      vm.loadMorePosts();
+      await pumpEventQueue();
+      // All 45 and then the older team post, in order.
+      expect(vm.posts.map((i) => i.id).take(46).last, 'team/t1/p1');
+      expect(vm.posts.map((i) => i.id).toSet(), hasLength(vm.posts.length));
+      expect(vm.hasMorePosts, isFalse);
     });
 
     test("teammates see events shared from the team's schedule", () async {

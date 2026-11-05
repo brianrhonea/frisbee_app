@@ -56,6 +56,33 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     int limit = 50,
   }) => _watchIn('event.teamId', teamIds, limit);
 
+  @override
+  Future<Result<List<UserPost>>> fetchPostsBefore(
+    UserPostFilter filter,
+    List<String> values, {
+    required DateTime before,
+    int limit = 20,
+  }) => guard(() async {
+    final field = switch (filter) {
+      UserPostFilter.authors => 'authorId',
+      UserPostFilter.tournaments => 'tournamentKey',
+      UserPostFilter.teamEvents => 'event.teamId',
+    };
+    final unique = values.toSet().toList();
+    final snaps = await Future.wait([
+      for (var i = 0; i < unique.length; i += inLimit)
+        _posts
+            .where(field, whereIn: unique.skip(i).take(inLimit).toList())
+            .where('createdAt', isLessThan: Timestamp.fromDate(before))
+            .orderBy('createdAt', descending: true)
+            .limit(limit)
+            .get(),
+    ]);
+    final all = [for (final s in snaps) ..._list(s)]
+      ..sort(UserPost.newestFirst);
+    return all.take(limit).toList();
+  });
+
   /// Newest [limit] posts whose [field] is one of [values], querying in
   /// chunks of [inLimit] and merging.
   Stream<List<UserPost>> _watchIn(

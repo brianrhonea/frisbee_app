@@ -213,6 +213,31 @@ class FakeUserPostRepository implements UserPostRepository {
       ? Stream.value(const [])
       : _watch((p) => teamIds.contains(p.event?.teamId), limit);
 
+  /// Calls to [fetchPostsBefore], for checking reads stay paged.
+  int fetches = 0;
+
+  @override
+  Future<Result<List<UserPost>>> fetchPostsBefore(
+    UserPostFilter filter,
+    List<String> values, {
+    required DateTime before,
+    int limit = 20,
+  }) async {
+    fetches++;
+    bool matches(UserPost p) => switch (filter) {
+      UserPostFilter.authors => values.contains(p.authorId),
+      UserPostFilter.tournaments => values.contains(p.tournamentKey),
+      UserPostFilter.teamEvents => values.contains(p.event?.teamId),
+    };
+    return Result.ok(
+      _where(
+        (p) =>
+            matches(p) && p.createdAt != null && p.createdAt!.isBefore(before),
+        limit,
+      ),
+    );
+  }
+
   UserPost? _find(String id) => posts.where((p) => p.id == id).firstOrNull;
 
   @override

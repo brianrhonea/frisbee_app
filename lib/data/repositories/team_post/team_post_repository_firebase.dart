@@ -60,6 +60,29 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
   });
 
   @override
+  Future<Result<List<TeamPost>>> fetchPostsBefore(
+    String teamId, {
+    bool publicOnly = false,
+    required DateTime before,
+    int limit = 20,
+  }) => guard(() async {
+    Query<Map<String, dynamic>> q = publicOnly
+        ? _posts(teamId).where('public', isEqualTo: true)
+        : _posts(teamId);
+    final snap = await q
+        .where('createdAt', isLessThan: Timestamp.fromDate(before))
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .get();
+    if (!snap.metadata.isFromCache) {
+      FirestoreReads.add('teamPosts', snap.docs.length);
+    }
+    return [
+      for (final d in snap.docs) TeamPost.fromMap(d.id, plainData(d.data())),
+    ]..sort(TeamPost.newestFirst);
+  });
+
+  @override
   Stream<List<TeamPost>> watchTournamentPosts(
     String groupId,
     String tournamentKey,

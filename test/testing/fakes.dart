@@ -1834,6 +1834,19 @@ class FakeTeamPostRepository implements TeamPostRepository {
   }
 
   @override
+  Future<Result<List<TeamPost>>> fetchPostsBefore(
+    String teamId, {
+    bool publicOnly = false,
+    required DateTime before,
+    int limit = 20,
+  }) async => Result.ok(
+    _of(teamId, publicOnly)
+        .where((p) => p.createdAt != null && p.createdAt!.isBefore(before))
+        .take(limit)
+        .toList(),
+  );
+
+  @override
   Stream<List<TeamPost>> watchTournamentPosts(
     String groupId,
     String tournamentKey,
