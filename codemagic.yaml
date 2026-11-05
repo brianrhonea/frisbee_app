@@ -22,7 +22,9 @@ workflows:
       # Codemagic > Team settings > Integrations > Developer Portal.
       app_store_connect: Frisbee App Store Connect
     environment: &environment
-      flutter: stable
+      # Pinned to the version the app is developed and tested on; "stable"
+      # moved on and broke compiling the tests. Bump with local Flutter.
+      flutter: 3.41.2
       xcode: latest
       cocoapods: default
       groups:
