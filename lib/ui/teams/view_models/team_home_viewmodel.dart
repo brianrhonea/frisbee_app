@@ -115,9 +115,9 @@ class TeamHomeViewModel extends ChangeNotifier {
   StreamSubscription<List<TeamEvent>>? _eventsSub;
   StreamSubscription<List<TeamPost>>? _postsSub;
 
-  /// Whether the event and post streams are the members' (true) or the
-  /// public ones (false); null before either is watched.
-  bool? _watchingAsMember;
+  /// Whose event and post streams are watched: the public ones, or a
+  /// member's (with what a community lets them see); null before either.
+  String? _watchingAsMember;
   bool _published = false;
 
   Team? _team;
@@ -210,8 +210,14 @@ class TeamHomeViewModel extends ChangeNotifier {
   void _watchContent() {
     if (!loaded || summary == null) return;
     final member = isMember;
-    if (_watchingAsMember == member) return;
-    _watchingAsMember = member;
+    final audience = _team?.eventAudienceOf(uid);
+    final key = !member
+        ? 'public'
+        : audience == null
+        ? 'member'
+        : 'member:${(audience.toList()..sort()).join(',')}';
+    if (_watchingAsMember == key) return;
+    _watchingAsMember = key;
     _eventsSub?.cancel();
     _postsSub?.cancel();
     _contentError = null;
@@ -227,7 +233,7 @@ class TeamHomeViewModel extends ChangeNotifier {
     final since = _clock().subtract(const Duration(days: 1));
     _eventsSub =
         (member
-                ? _events.watchEvents(teamId, since: since)
+                ? _events.watchEvents(teamId, since: since, audience: audience)
                 : _events.watchPublicEvents(teamId, since: since))
             .listen((e) {
               _eventList = e;

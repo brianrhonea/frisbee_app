@@ -43,7 +43,8 @@ class _TeamFormState extends State<TeamForm> {
   late bool _requiresApproval = widget.initial?.requiresApproval ?? false;
   late GroupLocation? _location = widget.initial?.location;
 
-  bool get _isGroup => _kind == TeamKind.community;
+  bool get _isGroup => _kind.isGroupLike;
+  bool get _isOrg => _kind == TeamKind.organization;
 
   @override
   void dispose() {
@@ -76,7 +77,7 @@ class _TeamFormState extends State<TeamForm> {
 
   @override
   Widget build(BuildContext context) {
-    final noun = _isGroup ? 'group' : 'team';
+    final noun = _kind.noun;
     return Form(
       key: _formKey,
       child: Column(
@@ -85,7 +86,11 @@ class _TeamFormState extends State<TeamForm> {
           TextFormField(
             controller: _name,
             decoration: InputDecoration(
-              labelText: _isGroup ? 'Group name' : 'Team name',
+              labelText: _isOrg
+                  ? 'School or club name'
+                  : _isGroup
+                  ? 'Group name'
+                  : 'Team name',
             ),
             textCapitalization: TextCapitalization.words,
             maxLength: 80,
@@ -96,9 +101,11 @@ class _TeamFormState extends State<TeamForm> {
           if (_isGroup) ...[
             TextFormField(
               controller: _description,
-              decoration: const InputDecoration(
-                labelText: 'About the group (optional)',
-                hintText: 'When and where you play, skill level, what to bring',
+              decoration: InputDecoration(
+                labelText: 'About the $noun (optional)',
+                hintText: _isOrg
+                    ? 'Who it is for, how to get on a team, tryouts'
+                    : 'When and where you play, skill level, what to bring',
               ),
               minLines: 2,
               maxLines: 5,
@@ -135,6 +142,7 @@ class _TeamFormState extends State<TeamForm> {
           if (_isGroup) ...[
             const SizedBox(height: 16),
             _LocationField(
+              noun: noun,
               location: _location,
               onPick: _pickLocation,
               onClear: () => setState(() => _location = null),
@@ -146,7 +154,7 @@ class _TeamFormState extends State<TeamForm> {
               subtitle: Text(
                 _requiresApproval
                     ? 'People ask to join; the owner, or a role with Manage members, approves them.'
-                    : 'Anyone can join from the group page.',
+                    : 'Anyone can join from the $noun page.',
               ),
               value: _requiresApproval,
               onChanged: (v) => setState(() => _requiresApproval = v),
@@ -170,11 +178,13 @@ class _TeamFormState extends State<TeamForm> {
 
 class _LocationField extends StatelessWidget {
   const _LocationField({
+    required this.noun,
     required this.location,
     required this.onPick,
     required this.onClear,
   });
 
+  final String noun;
   final GroupLocation? location;
   final VoidCallback onPick;
   final VoidCallback onClear;
@@ -183,9 +193,9 @@ class _LocationField extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = location;
     return InputDecorator(
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
         labelText: 'Location (optional)',
-        helperText: 'Shown on a map on the group page',
+        helperText: 'Shown on a map on the $noun page',
       ),
       child: Row(
         children: [

@@ -27,10 +27,11 @@ import 'invite_members_dialog.dart';
 import 'join_team_dialog.dart';
 import 'team_form.dart';
 import 'team_post_widgets.dart';
+import 'team_community_sheet.dart';
 import 'team_section_screen.dart';
 import 'team_usau_card.dart';
 
-enum _MenuAction { edit, leave, delete }
+enum _MenuAction { edit, community, leave, delete }
 
 /// A team's home page. Members see a summary, tabs for each section, what's
 /// coming up and the team's posts; anyone else sees the public page. The
@@ -118,11 +119,13 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
 
   Future<void> _onMenu(_MenuAction action, Team team) async {
     switch (action) {
+      case _MenuAction.community:
+        await showTeamCommunity(context, team);
       case _MenuAction.edit:
         final updated = await showDialog<NewTeam>(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text(team.isCommunity ? 'Edit group' : 'Edit team'),
+            title: Text('Edit ${team.kind.noun}'),
             content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
@@ -164,7 +167,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           message: switch ((team.isCommunity, team.requiresApproval)) {
             (false, _) => 'You will need a new invite code to rejoin.',
             (true, true) => 'To rejoin, you will need to ask again.',
-            (true, false) => 'You can rejoin from the group page any time.',
+            (true, false) =>
+              'You can rejoin from the ${team.kind.noun} page any time.',
           },
           confirmLabel: 'Leave',
           destructive: true,
@@ -174,7 +178,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       case _MenuAction.delete when team.members.length > 1:
         // Deleting would take everyone else's team away; hand it on or
         // empty it first.
-        final noun = team.isCommunity ? 'group' : 'team';
+        final noun = team.kind.noun;
         final others = team.members.length - 1;
         final goToMembers = await showDialog<bool>(
           context: context,
@@ -401,7 +405,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
   }
 
   Widget _menu(Team team) {
-    final noun = team.isCommunity ? 'group' : 'team';
+    final noun = team.kind.noun;
     return PopupMenuButton<_MenuAction>(
       tooltip: 'More',
       icon: const Icon(Icons.more_horiz),
@@ -409,6 +413,11 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       itemBuilder: (_) => [
         if (vm.canEdit)
           PopupMenuItem(value: _MenuAction.edit, child: Text('Edit $noun')),
+        if (vm.canEdit && !team.isCommunity)
+          const PopupMenuItem(
+            value: _MenuAction.community,
+            child: Text('School or club'),
+          ),
         if (!vm.isOwner)
           PopupMenuItem(value: _MenuAction.leave, child: Text('Leave $noun')),
         if (vm.isOwner)
@@ -436,7 +445,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
             summary.description.isEmpty
                 ? (vm.canEdit
                       ? 'Add a description so people know what the '
-                            '${summary.isCommunity ? 'group' : 'team'} is '
+                            '${summary.kind.noun} is '
                             'about.'
                       : 'No description yet.')
                 : summary.description,
@@ -506,7 +515,11 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     final location = summary.location;
     final role = vm.myRole;
     return SectionCard(
-      title: summary.isCommunity ? 'Group details' : 'Club details',
+      title: summary.isOrganization
+          ? 'Community details'
+          : summary.isCommunity
+          ? 'Group details'
+          : 'Club details',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -734,7 +747,9 @@ class _Hero extends StatelessWidget {
     final founded = vm.team?.createdAt?.year;
     final banner = [
       if (summary.city.isNotEmpty) summary.city,
-      if (summary.isCommunity)
+      if (summary.isOrganization)
+        'school or club'
+      else if (summary.isCommunity)
         'pickup group'
       else
         '${summary.division.label} ${summary.level.label}',
@@ -745,6 +760,13 @@ class _Hero extends StatelessWidget {
       null => null,
     };
     final actions = <Widget>[
+      if (vm.team case final team? when team.inCommunity)
+        ActionChip(
+          avatar: const Icon(Icons.account_balance_outlined, size: 18),
+          label: Text(team.orgName.isEmpty ? 'Community' : team.orgName),
+          tooltip: 'Open the community',
+          onPressed: () => context.push(Routes.team(team.orgId!)),
+        ),
       if (!mobile) ?follow,
       if (vm.isMember)
         OutlinedButton.icon(

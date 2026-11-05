@@ -35,6 +35,7 @@ import '../ui/events/widgets/events_screen.dart';
 import '../ui/explore/view_models/player_search_viewmodel.dart';
 import '../ui/explore/widgets/explore_screen.dart';
 import '../ui/core/ui/slide_over_page.dart';
+import '../ui/settings/widgets/follow_requests_screen.dart';
 import '../ui/settings/widgets/settings_screen.dart';
 import '../ui/shell/view_models/shell_viewmodel.dart';
 import '../ui/shell/widgets/app_shell.dart';
@@ -223,6 +224,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
               ('general', (vm) => GeneralSettingsScreen(viewModel: vm)),
               ('privacy', (vm) => PrivacySettingsScreen(viewModel: vm)),
               ('account', (vm) => AccountSettingsScreen(viewModel: vm)),
+              ('follow-requests', (vm) => FollowRequestsScreen(viewModel: vm)),
             ])
           GoRoute(
             path: path,
@@ -234,6 +236,23 @@ GoRouter router(AuthRepository auth) => GoRouter(
               dim: false,
             ),
           ),
+        GoRoute(
+          path: 'following',
+          pageBuilder: (context, state) => slideOverPage(
+            context,
+            state.pageKey,
+            ViewModelHost(
+              create: (c) => FollowingViewModel(
+                followRepository: c.read(),
+                notificationRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, vm) => FollowingScreen(viewModel: vm),
+            ),
+            panelOnWide: true,
+            dim: false,
+          ),
+        ),
       ],
     ),
     // Opened from the bell on Home, over the shell.
@@ -1075,6 +1094,8 @@ Widget _settings(Widget Function(ProfileViewModel vm) screen) => ViewModelHost(
     themeRepository: c.read(),
     notificationRepository: c.read(),
     directMessageRepository: c.read(),
+    profileRepository: c.read(),
+    followRepository: c.read(),
   ),
   builder: (_, vm) => screen(vm),
 );

@@ -120,6 +120,52 @@ abstract class TeamRepository {
 
   Future<Result<void>> deleteTeam(Team team);
 
+  // ---- School and club communities -------------------------------------
+  // A team is in a community once both agree: the team names it (orgId)
+  // and the community lists it (linkedTeams). The communities Cloud
+  // Functions then add and remove members by role (Team.orgMembers).
+
+  /// Creates a team inside [org] (whose admin [owner] is), listed at once
+  /// with the community [roles] that get on it. Returns the team id.
+  Future<Result<String>> createTeamInCommunity(
+    NewTeam team,
+    AppUser owner,
+    Team org,
+    Set<String> roles,
+  );
+
+  /// Asks to put [team] in community [org]; its admins answer.
+  Future<Result<void>> requestCommunityLink(
+    Team team,
+    TeamListing org,
+    AppUser by,
+  );
+
+  /// Takes [team] out of its community, or withdraws its request. People
+  /// the community added leave it.
+  Future<Result<void>> leaveCommunity(Team team);
+
+  /// Whether [teamId]'s request to join [orgId] is still waiting.
+  Stream<bool> watchLinkRequested(String orgId, String teamId);
+
+  /// Teams asking to join community [orgId], oldest first.
+  Stream<List<TeamLinkRequest>> watchLinkRequests(String orgId);
+
+  /// Lists the asking team in [org], with the [roles] that get on it.
+  Future<Result<void>> acceptLinkRequest(
+    Team org,
+    TeamLinkRequest request,
+    Set<String> roles,
+  );
+
+  Future<Result<void>> declineLinkRequest(String orgId, String teamId);
+
+  /// Changes which community roles get on a listed team.
+  Future<Result<void>> saveLinkedTeam(String orgId, LinkedTeam team);
+
+  /// Drops a team from the community; people it added leave the team.
+  Future<Result<void>> unlinkTeam(String orgId, String teamId);
+
   /// Links the team to its USA Ultimate page, or unlinks it when [url] is
   /// null.
   Future<Result<void>> linkUsauTeam(String teamId, {String? url, String? name});

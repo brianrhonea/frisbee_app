@@ -19,11 +19,14 @@ import '../../stats/widgets/stats_tab.dart';
 import '../../videos/view_models/team_videos_viewmodel.dart';
 import '../../videos/widgets/videos_tab.dart';
 import '../view_models/team_detail_viewmodel.dart';
+import '../view_models/community_teams_viewmodel.dart';
+import 'community_teams_tab.dart';
 import 'members_tab.dart';
 import 'roster_tab.dart';
 
 /// The parts of a team members open from its home page, in display order.
 enum TeamSection {
+  teams('Teams', Icons.shield_outlined, 'teams'),
   events('Team Events', Icons.event_outlined, 'events'),
   chat('Chat', Icons.chat_bubble_outline, 'chat'),
   roster('Roster', Icons.badge_outlined, 'roster'),
@@ -41,6 +44,7 @@ enum TeamSection {
   final String path;
 
   String route(String teamId) => switch (this) {
+    teams => Routes.teamSection(teamId, path),
     events => Routes.teamEvents(teamId),
     chat => Routes.teamChat(teamId),
     roster => Routes.teamRoster(teamId),
@@ -55,13 +59,15 @@ enum TeamSection {
   /// don't keep a roster, plays, videos or stats; only they run
   /// tournaments.
   static List<TeamSection> forKind(TeamKind kind) => switch (kind) {
-    TeamKind.team => values.where((s) => s != tournaments).toList(),
+    TeamKind.team =>
+      values.where((s) => s != tournaments && s != teams).toList(),
     TeamKind.community => const [events, chat, tournaments, members],
+    TeamKind.organization => const [teams, events, chat, members],
   };
 
-  /// "Team Events" is just "Events" in a group.
+  /// "Team Events" is just "Events" in a group or community.
   String labelFor(TeamKind kind) =>
-      this == events && kind == TeamKind.community ? 'Events' : label;
+      this == events && kind.isGroupLike ? 'Events' : label;
 
   /// The section named [path] (e.g. `?section=events`), if any.
   static TeamSection? fromPath(String? path) =>
@@ -173,6 +179,14 @@ class _TeamSectionBodyState extends State<TeamSectionBody> {
       builder: (_, tvm) => GroupTournamentsTab(viewModel: tvm),
     ),
     TeamSection.members => MembersTab(viewModel: vm),
+    TeamSection.teams => ViewModelHost(
+      create: (c) => CommunityTeamsViewModel(
+        orgId: vm.teamId,
+        teamRepository: c.read(),
+        authRepository: c.read(),
+      ),
+      builder: (_, teamsVm) => CommunityTeamsTab(viewModel: teamsVm),
+    ),
   };
 
   @override
@@ -222,10 +236,9 @@ class TeamSectionScreen extends StatelessWidget {
             appBar: AppBar(leading: leading),
             body: EmptyView(
               icon: section.icon,
-              title: 'Not in community groups',
+              title: 'Not here',
               message:
-                  'Groups have events, chat, tournaments and members. '
-                  '${section.label} is for teams.',
+                  "A ${team.kind.noun} doesn't have ${section.label.toLowerCase()}.",
             ),
           );
         }

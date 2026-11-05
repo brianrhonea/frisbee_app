@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "test": "vitest run test/parse test/notifications test/meetings test/account test/discord",
+    "test": "vitest run test/parse test/notifications test/meetings test/account test/discord test/communities",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-frisbee \"vitest run test/rules --no-file-parallelism\"",
     "serve": "npm run build && firebase emulators:start --only functions,firestore,auth",
     "deploy": "firebase deploy --only functions"

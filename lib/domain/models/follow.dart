@@ -132,3 +132,39 @@ class Follow {
     };
   }
 }
+
+/// Someone asking to follow a private profile, at
+/// `profiles/{owner}/followRequests/{uid}`. The owner accepts (which
+/// creates the follow for them) or declines (deletes it).
+class FollowRequest {
+  const FollowRequest({
+    required this.uid,
+    required this.name,
+    this.username,
+    this.photoUrl,
+    this.createdAt,
+  });
+
+  /// Who's asking.
+  final String uid;
+  final String name;
+  final String? username;
+  final String? photoUrl;
+  final DateTime? createdAt;
+
+  factory FollowRequest.fromMap(String uid, Map<String, dynamic> map) =>
+      FollowRequest(
+        uid: uid,
+        name: map['name'] as String? ?? '',
+        username: map['username'] as String?,
+        photoUrl: map['photoUrl'] as String?,
+        createdAt: parseDate(map['createdAt']),
+      );
+
+  /// Everything but `createdAt`, which the repository stamps.
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'username': username,
+    'photoUrl': photoUrl,
+  };
+}

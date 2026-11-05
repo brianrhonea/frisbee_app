@@ -7,6 +7,7 @@ import 'package:logging/logging.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/username.dart';
+import '../../../utils/password_policy.dart';
 import '../../../utils/result.dart';
 import '../../services/account_service.dart';
 import '../../services/auth_service.dart';
@@ -89,7 +90,11 @@ class AuthRepositoryFirebase extends AuthRepository {
             // A missing profile in the cache may just not be synced yet.
             if (!snap.exists && snap.metadata.isFromCache) return;
             _profileTimeout?.cancel();
-            final username = snap.data()?['username'] as String?;
+            // A username is set once and never removed (firestore.rules),
+            // so keep the one we know: a snapshot without it is a local
+            // write half applied (the Windows SDK sends one while the
+            // privacy switch's batch goes out), not the user losing it.
+            final username = snap.data()?['username'] as String? ?? _username;
             final changed = username != _username || !_profileKnown;
             _username = username;
             _profileKnown = true;
@@ -168,6 +173,16 @@ class AuthRepositoryFirebase extends AuthRepository {
       guard(() => _authService.signInWithEmail(email.trim(), password));
 
   @override
+  Future<Result<void>> signIn(String emailOrUsername, String password) =>
+      guard(() async {
+        final id = emailOrUsername.trim();
+        final email = isEmail(id)
+            ? id
+            : await _accounts.emailForUsername(id, password);
+        await _authService.signInWithEmail(email, password);
+      });
+
+  @override
   Future<Result<void>> signUpWithEmail({
     required String email,
     required String password,
@@ -206,8 +221,17 @@ class AuthRepositoryFirebase extends AuthRepository {
     }
   });
 
-  Future<bool> _available(String username) async =>
-      !(await _firestore.collection('usernames').doc(username).get()).exists;
+  Future<bool> _available(String username) async {
+    try {
+      return !(await _firestore.collection('usernames').doc(username).get())
+          .exists;
+    } on FirebaseException catch (e) {
+      // Signed out (the sign-up form), the rules only let you read a name
+      // nobody has, so a refusal means it's taken.
+      if (e.code == 'permission-denied' && _currentUser == null) return false;
+      rethrow;
+    }
+  }
 
   @override
   Future<Result<bool>> isUsernameAvailable(String username) => guard(() async {
@@ -278,6 +302,17 @@ class AuthRepositoryFirebase extends AuthRepository {
   @override
   Future<Result<void>> reauthenticate({String? password}) =>
       guard(() => _authService.reauthenticate(password: password));
+
+  @override
+  Future<Result<void>> changePassword({
+    required String current,
+    required String next,
+  }) => guard(() async {
+    if (PasswordPolicy.problem(next) case final problem?) {
+      throw ArgumentError(problem);
+    }
+    await _authService.changePassword(current: current, next: next);
+  });
 
   /// The `account-deleteAccount` function deletes the user's data across
   /// every team and conversation, then the login; then sign out here.

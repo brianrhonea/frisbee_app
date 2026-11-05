@@ -336,7 +336,18 @@ void main() {
     );
   });
 
-  testWidgets('edit profile saves details and visibility', (tester) async {
+  testWidgets('edit profile saves details and keeps visibility', (
+    tester,
+  ) async {
+    profiles.put(
+      PlayerProfile(
+        uid: testUser.uid,
+        name: 'Test User',
+        details: const ProfileDetails(
+          visibility: ProfileVisibility(stats: false),
+        ),
+      ),
+    );
     tester.view.physicalSize = const Size(1400, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -355,7 +366,7 @@ void main() {
       'Deep cutter.',
     );
     await tester.enterText(find.widgetWithText(TextField, 'School'), 'State');
-    await tester.tap(find.widgetWithText(SwitchListTile, 'Stats'));
+    expect(find.widgetWithText(SwitchListTile, 'Stats'), findsNothing);
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 

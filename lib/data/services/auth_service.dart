@@ -88,6 +88,20 @@ class AuthService {
     }
   }
 
+  /// Confirms [current] and sets [next] as the password. Firebase wants a
+  /// recent sign-in for this, so it signs in again with [current] first.
+  Future<void> changePassword({
+    required String current,
+    required String next,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('Not signed in.');
+    await user.reauthenticateWithCredential(
+      EmailAuthProvider.credential(email: user.email ?? '', password: current),
+    );
+    await user.updatePassword(next);
+  }
+
   Future<OAuthCredential> _googleCredential() async {
     if (PlatformSupport.desktopGoogleSignIn) {
       final tokens = await _googleDesktopOAuth.signIn();

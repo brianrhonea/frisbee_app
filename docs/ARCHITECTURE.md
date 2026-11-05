@@ -178,6 +178,7 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
 | Team meetings: invite roles or people, RSVP, lobby with admin approval, video calls (camera, screen share, chat, per-person volume, watch team videos together) | `ui/meetings` | `MeetingEditorViewModel`, `MeetingDetailViewModel`, `MeetingRoomViewModel`, `MeetingChatViewModel`, `WatchTogetherViewModel`, `MeetingAlertsViewModel` | Meeting, MeetingSettings, Team, Video |
 | Videos: YouTube links or uploaded video files shared with the team, in folders, thumbnails, embedded player (WebView2 on Windows), media_kit for uploads | `ui/videos` | `TeamVideosViewModel`, `VideoViewModel`, `VideoEditorViewModel` | Video, Team (`YouTubeInfoService` for link checks) |
 | Community groups: open or approval join, description, location map (flutter_map + Nominatim), pickup events | `ui/teams`, `ui/groups` | `TeamsViewModel`, `TeamSearchViewModel`, `TeamHomeViewModel`, `TeamDetailViewModel`, `LocationPickerViewModel` | Team (`GeocodingService`) |
+| School and club communities: linked teams joined by role, team link requests, role-gated events | `ui/teams`, `ui/schedule` | `CommunityTeamsViewModel`, `TeamCommunityViewModel`, `EventEditorViewModel` | Team, Event |
 | Group tournaments: teams from RSVPs, generated schedule (round robin, pools + single elim, single elim, double elim), captain-reported scores, bracket | `ui/group_tournaments` | `GroupTournamentsViewModel`, `TournamentEditorViewModel`, `GroupTournamentViewModel` | GroupTournament, Team, Event |
 | Playbook: draw plays, animate steps, play back | `ui/playbook` | `PlayEditorViewModel` | Play, Team |
 | Stats: tournaments, live game tracking (lines, pull timer, timeouts), stat sheets, season stats | `ui/stats` | `StatsViewModel`, `TournamentViewModel`, `GameTrackerViewModel` | Stats, Event, Team |
@@ -335,7 +336,12 @@ teamDirectory/{teamId}          public listing for team search: name, division, 
                                 city, keywords (copied from the team; editors write)
 teams/{teamId}                  name, division, level, city, ownerId,
                                 members {uid: role}, memberIds [], memberNames {},
-                                statKeepers [], USAU link fields
+                                statKeepers [], USAU link fields; a school or club
+                                (kind 'organization') adds linkedTeams {teamId: {name,
+                                division, roles []}}; a team in one has orgId, orgName,
+                                orgLinked and orgMembers [] (the last two: Functions only)
+  linkRequests/{teamId}         a team asking to join a school or club: teamName,
+                                division, requestedBy, requestedByName, createdAt
   private/invite                current invite code (editors read, owner changes)
   joins/{uid}                   proof a joiner knew the code (rules check it)
   roster/{playerId}             name, number, position, userId (all members)
@@ -514,14 +520,24 @@ Cloud Functions in `functions/src/notifications`, exported as the
 - **Delivery** (`deliver.ts`): for each recipient, read their preferences
   (`wants()`: room mute, then team override, then category; everything is
   on by default), write the feed entry, then send to each device by FID
-  with `sendEach`. FIDs FCM no longer knows are deleted.
+  with `sendEach`. FIDs FCM no longer knows are deleted; other send
+  failures are logged as "Push failed" with the FCM code (e.g.
+  `messaging/third-party-auth-error` when the project has no APNs key).
 - **Folding:** chat, DMs, event changes and plays fold into one feed entry
   per room, conversation, event or play (`collapseId`). Repeats while it's
   unread count up ("3 new messages"); the same id groups pushes on the device.
+  A repeat within 10 minutes of the last push while still unread updates
+  the feed without pushing (`shouldPush`, `pushedAt` on the entry), so a
+  busy chat is one push, not one per message.
 - **Times** are worded in the recipient's offset (`utcOffsetMinutes`, written
   at each sign-in), since Functions run in UTC.
 - **Client:** `_FrisbeeAppState` calls `syncDevice` when someone signs in,
-  which registers the device if push is already allowed. Tapped pushes carry
+  which registers the device if push is already allowed. While the app is
+  open, iOS shows no system banner; `InAppNoticesViewModel` watches the
+  feed and `InAppNoticeBubble` drops a small bubble at the top for anything
+  new (updated in place for repeats, skipped for the page you're on). With
+  push off on a phone, notification settings show the categories off and
+  disabled until it's turned on. Tapped pushes carry
   a `route` and are opened with `router.push` once auth is ready. Signing
   out (or deleting the account) unregisters the device first.
 - **Platforms:** Android and iOS get push (iOS needs the APNs key in
@@ -696,6 +712,59 @@ Organizer and player as Member. Groups have no invite code: open groups
 are joined directly (`joinGroup`), approval groups through
 `joinRequests/{uid}` (`requestToJoin`, `approveJoinRequest`).
 
+## School and club communities
+
+A school or club (e.g. a college with Woof and Whiplash) is a team doc
+with `kind: 'organization'` (`TeamKind.organization`, `Team.isOrganization`).
+It joins and behaves like a group (`isCommunity` is true for both): open
+or approval joins, invites, and invite codes too. Its sections are Teams,
+Events, Chat and Members, and its roles work as on any team: role-gated
+chat rooms, and Discord-style permissions.
+
+- **Linked teams.** Each team stays a full team (roster, playbook, stats,
+  USAU link, its own events and chats). A team is in a community once
+  both sides agree:
+  - the team names it, `orgId`/`orgName`, set by its admins;
+  - the community lists it, `linkedTeams.{teamId}: {name, division,
+    roles}`, set by its admins (Manage team).
+  Admins create a team inside the community (`createTeamInCommunity`
+  writes both in one batch), or a team asks from its menu (School or club,
+  `requestCommunityLink`, which writes `teams/{orgId}/linkRequests/{teamId}`)
+  and the community accepts (`acceptLinkRequest`) or declines.
+- **Roles decide membership.** `communities-sync` (Cloud Functions,
+  `functions/src/communities/`) runs on every team doc write. When the
+  community's `memberRoles` or `linkedTeams` change, members who gain one
+  of a team's roles join it as players, and those who lose it leave. It
+  only removes people it added (`orgMembers` on the team), never the
+  owner or people the team added itself. It sets `orgLinked` once both
+  sides agree, and a team that clears its `orgId` (Leave community) loses
+  those members and its listing. The app's test fake (`FakeTeamRepository
+  ._syncCommunities`) mirrors it.
+- **Copies of community roles.** A linked team may hold copies of the
+  community roles that get on it (`Team.orgRoles`: team role id →
+  community role id, written by the team's owner with its roles). The same
+  function gives each copy to exactly the team members holding the
+  community role and recomputes `memberPerms` (`mirrorUpdate`), so a Woof
+  Captain in the community is one on Woof. The Roles screen marks them
+  "given out by" the community. A team that leaves keeps them as plain
+  roles (`orgRoles` is cleared).
+- **Discord import into a community.** In a community with teams, the
+  import sorts rooms (`DiscordTeamSplit`): a room only one team's roles
+  read goes to that team's chat; roles that get on no team (Admin) don't
+  count, and rooms anyone reads or two teams share stay in the community.
+  The owner can change any room's destination. Each team's share
+  (`TeamChatImport`) adds copies of its roles; a room every one of them
+  reads is open to the whole team. Rooms already in the community chat
+  from an earlier import are deleted there once their team has them
+  (after a confirm). Only teams the owner also owns get rooms.
+- **Community events say who sees them.** `audience` holds `everyone` or
+  role ids (`TeamEvent.audience`, the "Who sees it" chips in the event
+  editor). Rules let a member read one only when they hold an id in it,
+  or manage events. So members who don't manage events query once per id
+  they hold (`Team.eventAudienceOf`, `watchEvents(audience:)`), which needs
+  the `events` (audience, startsAt) index. Event notices and reminders go
+  to the same people (`eventViewers`).
+
 ## Group tournaments
 
 The engine in `lib/domain/tournament_engine/` is pure Dart and unit
@@ -754,6 +823,8 @@ cd functions && npm run test:rules               # Firestore + Storage rules (em
 | Storage rules | Deployed (`firebase deploy --only storage`); Blaze plan and Storage enabled |
 | Meeting functions | Deployed (`firebase deploy --only functions:meetings`); LiveKit secrets set |
 | Notification functions | Deployed (`firebase deploy --only functions:notifications`) |
+| Account functions | `account-deleteAccount`, `account-signInEmail` (username sign-in; `WEB_API_KEY` secret, set on dev and prod); deployed to dev |
+| Community functions | `communities-sync`; deploy with `firebase deploy --only functions:communities` |
 | USA Ultimate functions | Not deployed, on purpose, until there are more users |
 | Firestore indexes | Collection-group overrides for reminders and pruning; deploy with `firebase deploy --only firestore:indexes` |
 | iOS builds | Codemagic (`codemagic.yaml`, `docs/ios-release.md`) |

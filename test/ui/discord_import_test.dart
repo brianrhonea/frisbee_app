@@ -123,12 +123,20 @@ class FakeDiscordImportRepository implements DiscordImportRepository {
     );
     for (final f in import.folders) {
       chats.folders[f.id] = f;
+      chats.teamOf['f:${f.id}'] = team.id;
     }
     for (final r in import.rooms) {
       await chats.saveRoom(team.id, r, uid);
     }
     chats.emit();
     return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> applyToTeam(TeamChatImport import, String uid) async {
+    final team = teams.teams[import.team.id]!;
+    teams.teams[team.id] = team.copyWith(orgRoles: import.orgRoles);
+    return apply(teams.teams[team.id]!, import.import, uid);
   }
 }
 
@@ -301,4 +309,93 @@ void main() {
       vm.dispose();
     });
   });
+
+  test(
+    'a community sends team rooms to its teams and moves old copies',
+    () async {
+      final teams = FakeTeamRepository();
+      final chats = FakeChatRepository();
+      final discord = FakeDiscordImportRepository(teams, chats);
+      teams.teams['org'] = Team(
+        id: 'org',
+        name: 'Rockets',
+        division: Division.mixed,
+        level: CompetitionLevel.club,
+        ownerId: 'u1',
+        kind: TeamKind.organization,
+        members: const {'u1': TeamRole.owner, 'p': TeamRole.player},
+        roles: const {
+          'a': CustomRole(id: 'a', name: 'Admin'),
+          'h': CustomRole(id: 'h', name: 'Handlers', position: 1),
+        },
+        memberRoles: const {
+          'p': {'h'},
+        },
+        linkedTeams: const {
+          'woof': LinkedTeam(id: 'woof', name: 'Woof', roles: {'h'}),
+        },
+      );
+      teams.teams['woof'] = const Team(
+        id: 'woof',
+        name: 'Woof',
+        division: Division.open,
+        level: CompetitionLevel.club,
+        ownerId: 'u1',
+        members: {'u1': TeamRole.owner, 'p': TeamRole.player},
+        orgId: 'org',
+        orgLinked: true,
+        orgMembers: {'p'},
+      );
+      // An earlier import put everything in the community chat.
+      chats.folders['fT'] = const ChatFolder(id: 'fT', name: 'Team');
+      chats.teamOf['f:fT'] = 'org';
+      for (final (id, name) in [('old', 'handlers-only'), ('gen', 'general')]) {
+        chats.rooms[id] = ChatRoom(id: id, name: name, folderId: 'fT');
+        chats.teamOf['r:$id'] = 'org';
+      }
+
+      final vm = DiscordImportViewModel(
+        teamId: 'org',
+        teamRepository: teams,
+        chatRepository: chats,
+        discordImportRepository: discord,
+        authRepository: FakeAuthRepository(user: testUser),
+      );
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      vm.setLink('https://discord.new/abc');
+      await vm.preview.execute();
+
+      expect(vm.split!.destinations, [null, null, 'woof', null]);
+      expect(vm.moving.map((r) => r.id), ['old']);
+      expect(vm.emptied, isEmpty);
+      final woofImport = vm.teamImports.single;
+      expect(woofImport.import.rooms.single.name, 'handlers-only');
+      // Handlers is the only role that gets on Woof: the whole team reads it.
+      expect(woofImport.import.rooms.single.readRoles, {ChatAudience.everyone});
+
+      await vm.apply.execute();
+      expect(vm.apply.error, isFalse);
+      expect(vm.done, isTrue);
+      final woof = teams.teams['woof']!;
+      final copy = woof.roles.values.single;
+      expect(copy.name, 'Handlers');
+      expect(woof.orgRoles, {copy.id: 'h'});
+      // p holds Handlers in the community, so they hold the copy on Woof.
+      expect(woof.memberRoles['p'], {copy.id});
+      expect(
+        chats.roomsOf('woof').map((r) => r.name),
+        contains('handlers-only'),
+      );
+      expect(chats.rooms.containsKey('old'), isFalse);
+      expect(
+        chats.roomsOf('org').map((r) => r.name),
+        isNot(contains('handlers-only')),
+      );
+
+      // Sending it back to the community instead is up to the owner.
+      vm.setDestination(2, null);
+      expect(vm.split!.destinations[2], isNull);
+    },
+  );
 }

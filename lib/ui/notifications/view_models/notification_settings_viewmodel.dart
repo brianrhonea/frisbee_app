@@ -85,6 +85,13 @@ class NotificationSettingsViewModel extends ChangeNotifier {
   /// Null until the platform has answered.
   PushStatus? get pushStatus => _pushStatus;
 
+  /// This phone could get push but doesn't (never allowed, "Not now", or
+  /// turned off in the system settings). The choices below then don't
+  /// apply, so they're shown off until push is turned on.
+  bool get pushOff =>
+      _pushStatus == PushStatus.notDetermined ||
+      _pushStatus == PushStatus.denied;
+
   late final Command0<PushStatus> enablePush;
   late final Command1<void, (NotificationCategory, bool)> setCategory;
   late final Command1<void, (String, NotificationCategory, bool)>

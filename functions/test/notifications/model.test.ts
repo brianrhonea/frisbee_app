@@ -4,6 +4,7 @@ import {
   chatNotice,
   directMessageNotice,
   eventChange,
+  eventViewers,
   eventChangeNotice,
   formatWhen,
   messagePreview,
@@ -13,7 +14,9 @@ import {
   reminderNotice,
   reminderRecipients,
   roomReaders,
+  quietRepeatMs,
   same,
+  shouldPush,
   wants,
 } from "../../src/notifications/model";
 
@@ -189,5 +192,45 @@ describe("teamInviteNotice", () => {
       body: "Ana invited you to their group. Tap to accept or decline.",
     });
     expect(n.route).toBe("/teams");
+  });
+});
+
+describe("shouldPush", () => {
+  const now = 1_000_000_000;
+  const at = (ms: number) => ({ toMillis: () => ms });
+
+  it("pushes something new, or a repeat of one already read", () => {
+    expect(shouldPush(undefined, now)).toBe(true);
+    expect(shouldPush({ read: true, pushedAt: at(now - 1000) }, now)).toBe(true);
+  });
+
+  it("keeps quick repeats of an unread one quiet, then pushes again", () => {
+    expect(shouldPush({ read: false, pushedAt: at(now - 60_000) }, now)).toBe(false);
+    expect(shouldPush({ read: false, pushedAt: at(now - quietRepeatMs) }, now)).toBe(true);
+  });
+
+  it("pushes unread entries from before push times were kept", () => {
+    expect(shouldPush({ read: false }, now)).toBe(true);
+    expect(shouldPush({ read: false, pushedAt: null }, now)).toBe(true);
+  });
+});
+
+describe("who sees a community event", () => {
+  const team = {
+    kind: "organization",
+    members: { o: "owner", a: "player", b: "player", m: "player" },
+    memberIds: ["o", "a", "b", "m"],
+    memberRoles: { a: ["woof"], b: ["whip"] },
+    memberPerms: { m: ["manageEvents"] },
+  };
+
+  it("is its audience, the owner and event managers", () => {
+    expect(eventViewers(team, { audience: ["woof"] })).toEqual(["o", "a", "m"]);
+    expect(eventViewers(team, { audience: ["everyone"] })).toEqual(["o", "a", "b", "m"]);
+    expect(eventViewers({ ...team, kind: undefined }, { audience: ["woof"] })).toEqual(["o", "a", "b", "m"]);
+  });
+
+  it("lets custom roles read chat rooms", () => {
+    expect(roomReaders(team, { readRoles: ["whip"] })).toEqual(["o", "b"]);
   });
 });

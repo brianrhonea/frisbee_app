@@ -2,7 +2,7 @@
 
 Stall 10 keeps your ultimate team in one place: schedule, roster, playbook,
 stats, plus USA Ultimate tournaments and rankings. This guide covers
-version 0.0.11. What changed in each version is in
+version 0.0.12. What changed in each version is in
 [release-notes.md](release-notes.md).
 
 ## Getting started
@@ -28,6 +28,7 @@ version 0.0.11. What changed in each version is in
      tap **Join**. Links expire (1 hour to 30 days, the sender picks).
    - **Create team**: you become its owner. Show the invite code or share
      an invite link from the team's **Members** page.
+   Sign in later with your email **or** your @username.
 3. **Profile** is the last tab. **Edit profile** changes what others
    see; the **gear** at the top right opens [Settings](#settings).
 
@@ -57,7 +58,9 @@ permission, the first time the owner opens the team, and chat rooms that
 were open to them stay open.
 
 You can also **import roles and channels from a Discord server template**
-link.
+link. In a school or club community with teams, see
+[Schools and clubs](#schools-and-clubs) for how rooms are sorted into
+teams.
 
 Anyone can leave a team from the ⋮ menu on its home page (the owner must
 transfer ownership first). If an owner deletes their account, the team
@@ -156,7 +159,8 @@ You're notified about:
 - **Meetings**: meetings you're invited to, cancellations, and a heads-up
   when one you're attending starts.
 
-You aren't notified about things you did yourself.
+You aren't notified about things you did yourself. While Stall 10 is
+open, new ones also pop up as a small bubble at the top.
 
 **Settings** (the ⋮ menu on the notifications page, or Settings →
 Notifications):
@@ -292,6 +296,33 @@ score. Once a score is final, winners (and losers, in double elimination)
 move on in the bracket. With pool play, organizers tap **Pools are done:
 seed the bracket** when every pool game is final.
 
+### Schools and clubs
+
+A **School or club** community holds several full teams, like a college
+with a men's team and a women's team. Start one from Teams → **New** →
+**School or club**. Its **Teams** tab lists its teams.
+
+- **Add teams**: tap **New team** to make one inside the community, or
+  have an existing team's owner open its ⋮ menu → **School or club** and
+  ask to join; accept the request on the community's Teams tab.
+- **Who's on each team**: for each team pick the community roles that get
+  onto it (say Woof Captain, Woof Coach, Woof Player for Woof). People
+  with one of those roles join the team automatically, and leave it when
+  the role is taken away. Teams show **Joining…** for a moment while
+  that happens.
+- **Events**: a community event can be for everyone or only some roles
+  (**Who sees it** in the event editor).
+- **Discord import**: importing a server into the community sorts its
+  rooms. A room only one team's roles can read goes to that team's chat;
+  rooms everyone or several teams read stay in the community chat. Change
+  any room with its dropdown before importing. Each team gets copies of
+  its community roles (marked "given out by" the community on the Roles
+  page), and who holds them follows the community. Rooms only go to teams
+  you own. Rooms already in the community chat from an earlier import
+  are moved, after asking.
+- A team can leave its community from ⋮ → **School or club**; people the
+  community added leave with it.
+
 ### Schedule
 
 Your whole week in one place: personal events plus every team you're on.
@@ -414,11 +445,12 @@ from the right (on a computer, as a panel; click outside to close it).
   **Dark**.
 - **Notifications**: push on this device, and which notifications you get
   (see [Notifications](#notifications)).
-- **Privacy**: **Read receipts**, and a link to choose what others see on
-  your profile (stats, teams, games) with **Edit profile**.
+- **Privacy**: **Private profile**, **Read receipts**, and what others
+  see on your profile (stats, teams, games). **Follow requests** lists
+  people asking to follow a private profile: **Accept** or **Decline**.
 - **People you follow**.
 - **Account**: change your **display name**; see your **@username** and
-  **email**; **Delete account** (it asks you to type DELETE and confirm
+  **email**; **Change password** (or "Forgot it?" for a reset link); **Delete account** (it asks you to type DELETE and confirm
   your password, or sign in with Google or Apple again).
 - **Sign out**, and the app version at the bottom.
 
@@ -437,6 +469,8 @@ from the right (on a computer, as a panel; click outside to close it).
   people the room gives access to (and the team owner).
 - **Notifications** and your notification settings are visible only to
   you.
+- **Private profile**: others see only your name, @username and photo
+  until you accept their follow request.
 - **Your posts** (and their photos) are public to anyone signed in to
   Stall 10. **Who you follow** is private: others see only how many people
   follow you and how many you follow.

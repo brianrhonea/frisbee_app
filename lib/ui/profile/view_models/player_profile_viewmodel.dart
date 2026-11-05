@@ -100,23 +100,7 @@ class PlayerProfileViewModel extends ChangeNotifier {
         }, onError: (Object _) {}),
       );
     }
-    _subs.add(
-      _profiles
-          .watchProfile(uid)
-          .listen(
-            (p) {
-              _profile = p;
-              _profileLoaded = true;
-              _maybePublish();
-              notifyListeners();
-            },
-            onError: (Object e) {
-              _error = e;
-              _profileLoaded = true;
-              notifyListeners();
-            },
-          ),
-    );
+    _watchProfile();
     if (isMe) {
       _subs.add(
         _teamRepo.watchMyTeams(uid).listen(_onTeams, onError: (Object _) {}),
@@ -144,6 +128,61 @@ class PlayerProfileViewModel extends ChangeNotifier {
   PlayerProfile? _profile;
   bool _profileLoaded = false;
   Object? _error;
+  StreamSubscription<PlayerProfile?>? _profileSub;
+
+  void _watchProfile() {
+    _profileSub?.cancel();
+    _profileSub = _profiles
+        .watchProfile(uid)
+        .listen(
+          (p) {
+            _profile = p;
+            _profileLoaded = true;
+            _syncFollow();
+            _maybePublish();
+            notifyListeners();
+          },
+          onError: (Object e) {
+            _error = e;
+            _profileLoaded = true;
+            notifyListeners();
+          },
+        );
+  }
+
+  FollowViewModel? _followed;
+  bool _wasFollowing = false;
+
+  /// Tells the Follow button whether it sends a request, and watches it so
+  /// the profile opens up once the player accepts.
+  void _syncFollow() {
+    final p = _profile;
+    if (isMe || p == null) return;
+    final f = follow;
+    if (f == null) return;
+    if (_followed != f) {
+      _followed?.removeListener(_onFollowChanged);
+      _followed = f..addListener(_onFollowChanged);
+      _wasFollowing = f.following;
+    }
+    f.requiresApproval = p.isPrivate;
+  }
+
+  void _onFollowChanged() {
+    final now = _followed?.following ?? false;
+    final became = now && !_wasFollowing;
+    _wasFollowing = now;
+    // Accepted: the private details are readable now (the rules check
+    // the follow), so read them again.
+    if (became && (_profile?.locked ?? false)) _watchProfile();
+  }
+
+  /// A private profile this user may not see beyond the name, username
+  /// and photo.
+  bool get locked => !isMe && (_profile?.locked ?? false);
+
+  /// The profile is private (only accepted followers see more).
+  bool get isPrivate => _profile?.isPrivate ?? false;
 
   bool get loaded => _profileLoaded && (!isMe || _teamsLoaded);
   Object? get error => _error;
@@ -441,8 +480,8 @@ class PlayerProfileViewModel extends ChangeNotifier {
   Object? _postsError;
   FollowCounts _counts = const FollowCounts();
 
-  /// The player's posts, newest first.
-  List<UserPost> get posts => _posts;
+  /// The player's posts, newest first; none on a locked profile.
+  List<UserPost> get posts => locked ? const [] : _posts;
 
   /// Likes and reposts, and the posts reposts show; null without posts.
   PostActions? actions;
@@ -505,6 +544,8 @@ class PlayerProfileViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _publishLater?.cancel();
+    _profileSub?.cancel();
+    _followed?.removeListener(_onFollowChanged);
     for (final s in [..._subs, ..._rosterSubs.values, ..._gameSubs.values]) {
       s.cancel();
     }

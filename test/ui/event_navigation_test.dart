@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/follow.dart';
+import 'package:frisbee_app/routing/routes.dart';
+import 'package:frisbee_app/ui/people/widgets/following_screen.dart';
+import 'package:frisbee_app/ui/settings/widgets/settings_screen.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
@@ -56,6 +60,7 @@ void main() {
   late FakeUserPostRepository userPosts;
   late FakePostCommentRepository comments;
   late FakeDirectMessageRepository dms;
+  late FakeFollowRepository follows;
 
   Future<void> pumpApp(WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
@@ -117,7 +122,9 @@ void main() {
           Provider<RankingRepository>.value(
             value: FakeRankingRepository(const []),
           ),
-          Provider<FollowRepository>.value(value: FakeFollowRepository()),
+          Provider<FollowRepository>.value(
+            value: follows = FakeFollowRepository(),
+          ),
           Provider<UserPostRepository>.value(
             value: userPosts = FakeUserPostRepository(),
           ),
@@ -485,5 +492,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.byType(TeamEventsTab), findsOneWidget);
+  });
+
+  testWidgets('People you follow returns to Settings', (tester) async {
+    await pumpApp(tester);
+    // Wide, where Settings is a side panel.
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    await tester.pumpAndSettle();
+    // Home's top bar is a little tight at this size in the test font.
+    tester.takeException();
+    final router = GoRouter.of(tester.element(find.byType(HomeScreen)));
+    router.go(Routes.profile);
+    await tester.pumpAndSettle();
+    unawaited(router.push(Routes.settings));
+    await tester.pumpAndSettle();
+    await tapText(tester, 'People you follow');
+    expect(find.byType(FollowingScreen), findsOneWidget);
+
+    // Its own back arrow, not one on the page behind.
+    final back = find.descendant(
+      of: find.byType(FollowingScreen),
+      matching: find.byType(BackButton),
+    );
+    expect(back, findsOneWidget);
+    await tester.tap(back);
+    await tester.pumpAndSettle();
+    expect(find.byType(FollowingScreen), findsNothing);
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // Opening someone from there goes to their profile, without the
+    // duplicate-page crash pushing a tab page over Settings caused.
+    await follows.follow(testUser.uid, const FollowTarget.user('p2', 'Pat'));
+    await tapText(tester, 'People you follow');
+    await tapText(tester, 'Pat');
+    expect(tester.takeException(), isNull);
+    expect(find.byType(PlayerProfileScreen), findsOneWidget);
   });
 }

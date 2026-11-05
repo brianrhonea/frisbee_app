@@ -19,6 +19,7 @@ import 'package:frisbee_app/data/repositories/tournament/tournament_repository.d
 import 'package:frisbee_app/data/repositories/usau_schedule/usau_schedule_repository.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
+import 'package:frisbee_app/data/services/account_service.dart';
 import 'package:frisbee_app/domain/models/username.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
@@ -76,6 +77,24 @@ class FakeAuthRepository extends AuthRepository {
   @override
   Future<Result<void>> signInWithEmail(String email, String password) =>
       _run(() => setUser(AppUser(uid: 'u1', email: email)));
+
+  /// Username → email, for signing in with a username.
+  final emailsByUsername = <String, String>{};
+
+  @override
+  Future<Result<void>> signIn(String emailOrUsername, String password) {
+    final id = emailOrUsername.trim();
+    if (isEmail(id)) return signInWithEmail(id, password);
+    final email = emailsByUsername[Username.normalize(id)];
+    if (email == null) {
+      return Future.value(
+        const Result.error(
+          UsernameSignInException('Incorrect username or password.'),
+        ),
+      );
+    }
+    return signInWithEmail(email, password);
+  }
 
   @override
   Future<Result<void>> signUpWithEmail({
@@ -166,6 +185,15 @@ class FakeAuthRepository extends AuthRepository {
   SignInMethod? get reauthMethod => currentUser == null ? null : method;
 
   @override
+  Future<Result<void>> changePassword({
+    required String current,
+    required String next,
+  }) => _run(() {
+    if (current != password) throw Exception('Incorrect email or password.');
+    password = next;
+  });
+
+  @override
   Future<Result<void>> reauthenticate({String? password}) => _run(() {
     if (method == SignInMethod.password && password != this.password) {
       throw Exception('Incorrect email or password.');
@@ -229,7 +257,213 @@ class FakeTeamRepository implements TeamRepository {
     return Result.ok(minted);
   }
 
-  void _emit() => _teamsController.add(null);
+  void _emit() {
+    _syncCommunities();
+    _teamsController.add(null);
+  }
+
+  /// teamId → community id → waiting link request.
+  final linkRequests = <String, Map<String, TeamLinkRequest>>{};
+
+  /// What the communities Cloud Functions do: link teams both sides agree
+  /// on, and keep their members in step with the community's roles.
+  void _syncCommunities() {
+    for (final org in teams.values.where((t) => t.isOrganization).toList()) {
+      for (final t in teams.values.where((t) => t.orgId == org.id).toList()) {
+        final link = org.linkedTeams[t.id];
+        final cur = teams[t.id]!;
+        if (link == null) {
+          if (!cur.orgLinked) continue;
+          teams[t.id] = _without(cur, cur.orgMembers).copyWith(
+            orgId: () => null,
+            orgName: '',
+            orgLinked: false,
+            orgMembers: const {},
+          );
+          continue;
+        }
+        final want = {
+          for (final e in org.memberRoles.entries)
+            if (org.members.containsKey(e.key) &&
+                e.value.any(link.roles.contains))
+              e.key,
+        };
+        final add = want.where((u) => !cur.members.containsKey(u));
+        final drop = cur.orgMembers.where((u) => !want.contains(u)).toSet();
+        final next = _without(cur, drop);
+        teams[t.id] = next.copyWith(
+          members: {...next.members, for (final u in add) u: TeamRole.player},
+          memberNames: {
+            ...next.memberNames,
+            for (final u in add) u: org.nameOf(u),
+          },
+          orgLinked: true,
+          orgName: org.name,
+          orgMembers: {...cur.orgMembers.difference(drop), ...add},
+        );
+        _mirror(t.id, org);
+      }
+    }
+  }
+
+  /// Team copies of community roles go to exactly the members holding
+  /// the community role (communities functions' mirrorUpdate).
+  void _mirror(String teamId, Team org) {
+    final t = teams[teamId]!;
+    if (t.orgRoles.isEmpty) return;
+    final copies = t.orgRoles.keys.toSet();
+    final memberRoles = <String, Set<String>>{};
+    for (final uid in t.members.keys) {
+      final held = org.members.containsKey(uid)
+          ? org.memberRoles[uid] ?? const <String>{}
+          : const <String>{};
+      final roles = {
+        for (final r in t.memberRoles[uid] ?? const <String>{})
+          if (!copies.contains(r)) r,
+        for (final e in t.orgRoles.entries)
+          if (held.contains(e.value) && t.roles.containsKey(e.key)) e.key,
+      };
+      if (roles.isNotEmpty) memberRoles[uid] = roles;
+    }
+    teams[teamId] = t.copyWith(
+      memberRoles: memberRoles,
+      memberPerms: memberPermsFor(memberRoles, t.roles),
+    );
+  }
+
+  Team _without(Team t, Set<String> uids) => t.copyWith(
+    members: {
+      for (final e in t.members.entries)
+        if (!uids.contains(e.key) || e.value == TeamRole.owner) e.key: e.value,
+    },
+    memberRoles: {
+      for (final e in t.memberRoles.entries)
+        if (!uids.contains(e.key)) e.key: e.value,
+    },
+  );
+
+  @override
+  Future<Result<String>> createTeamInCommunity(
+    NewTeam team,
+    AppUser owner,
+    Team org,
+    Set<String> roles,
+  ) async {
+    final made = await createTeam(team.inCommunity(org), owner);
+    final id = (made as Ok<String>).value;
+    final o = teams[org.id]!;
+    teams[org.id] = o.copyWith(
+      linkedTeams: {
+        ...o.linkedTeams,
+        id: LinkedTeam(
+          id: id,
+          name: team.name,
+          division: team.division,
+          roles: roles,
+        ),
+      },
+    );
+    _emit();
+    return made;
+  }
+
+  @override
+  Future<Result<void>> requestCommunityLink(
+    Team team,
+    TeamListing org,
+    AppUser by,
+  ) async {
+    teams[team.id] = teams[team.id]!.copyWith(
+      orgId: () => org.id,
+      orgName: org.name,
+    );
+    (linkRequests[org.id] ??= {})[team.id] = TeamLinkRequest(
+      teamId: team.id,
+      teamName: team.name,
+      division: team.division,
+      requestedBy: by.uid,
+      requestedByName: by.label,
+    );
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> leaveCommunity(Team team) async {
+    final cur = teams[team.id]!;
+    if (cur.orgId case final orgId?) linkRequests[orgId]?.remove(team.id);
+    final org = teams[cur.orgId];
+    if (org != null) {
+      teams[org.id] = org.copyWith(
+        linkedTeams: {...org.linkedTeams}..remove(team.id),
+      );
+    }
+    teams[team.id] = _without(cur, cur.orgMembers).copyWith(
+      orgId: () => null,
+      orgName: '',
+      orgLinked: false,
+      orgMembers: const {},
+    );
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<bool> watchLinkRequested(String orgId, String teamId) async* {
+    yield linkRequests[orgId]?.containsKey(teamId) ?? false;
+    yield* _teamsController.stream.map(
+      (_) => linkRequests[orgId]?.containsKey(teamId) ?? false,
+    );
+  }
+
+  @override
+  Stream<List<TeamLinkRequest>> watchLinkRequests(String orgId) async* {
+    yield [...?linkRequests[orgId]?.values];
+    yield* _teamsController.stream.map(
+      (_) => [...?linkRequests[orgId]?.values],
+    );
+  }
+
+  @override
+  Future<Result<void>> acceptLinkRequest(
+    Team org,
+    TeamLinkRequest request,
+    Set<String> roles,
+  ) async {
+    linkRequests[org.id]?.remove(request.teamId);
+    return saveLinkedTeam(
+      org.id,
+      LinkedTeam(
+        id: request.teamId,
+        name: request.teamName,
+        division: request.division,
+        roles: roles,
+      ),
+    );
+  }
+
+  @override
+  Future<Result<void>> declineLinkRequest(String orgId, String teamId) async {
+    linkRequests[orgId]?.remove(teamId);
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> saveLinkedTeam(String orgId, LinkedTeam team) async {
+    final o = teams[orgId]!;
+    teams[orgId] = o.copyWith(linkedTeams: {...o.linkedTeams, team.id: team});
+    _emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> unlinkTeam(String orgId, String teamId) async {
+    final o = teams[orgId]!;
+    teams[orgId] = o.copyWith(linkedTeams: {...o.linkedTeams}..remove(teamId));
+    _emit();
+    return const Result.ok(null);
+  }
 
   @override
   Stream<List<Team>> watchMyTeams(String uid) async* {
@@ -260,8 +494,10 @@ class FakeTeamRepository implements TeamRepository {
       description: team.description,
       requiresApproval: team.requiresApproval,
       location: team.location,
+      orgId: team.orgId,
+      orgName: team.orgName,
     );
-    if (team.kind == TeamKind.community) {
+    if (team.kind.isGroupLike) {
       listings[id] = team.listing(id);
     }
     _emit();
@@ -779,11 +1015,23 @@ class FakeEventRepository implements EventRepository {
         ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
   @override
-  Stream<List<TeamEvent>> watchEvents(String teamId, {DateTime? since}) async* {
+  Stream<List<TeamEvent>> watchEvents(
+    String teamId, {
+    DateTime? since,
+    Set<String>? audience,
+  }) async* {
     sinceRequests.add(since);
-    yield _since(_sorted(teamId), since);
-    yield* _changes.stream.map((_) => _since(_sorted(teamId), since));
+    audienceRequests.add(audience);
+    List<TeamEvent> seen() => [
+      for (final e in _since(_sorted(teamId), since))
+        if (audience == null || e.audience.any(audience.contains)) e,
+    ];
+    yield seen();
+    yield* _changes.stream.map((_) => seen());
   }
+
+  /// The `audience` each watchEvents call asked with.
+  final audienceRequests = <Set<String>?>[];
 
   /// The `since` each watchEvents call asked for.
   final sinceRequests = <DateTime?>[];
@@ -1005,20 +1253,35 @@ class FakeChatRepository implements ChatRepository {
     return controller.stream;
   }
 
+  /// Room ('r:id') and folder ('f:id') → the team it was saved to. Ones
+  /// put straight into [rooms] and [folders] belong to every team.
+  final teamOf = <String, String>{};
+  var _made = 0;
+
+  bool _on(String key, String teamId) => (teamOf[key] ?? teamId) == teamId;
+
   @override
   Stream<List<ChatRoom>> watchRooms(Team team, String uid) => _watch(
     () => sortRooms(
       rooms.values.where(
         (r) =>
-            team.has(uid, TeamPermission.manageChats) ||
-            r.accessFor(team, uid).canRead,
+            _on('r:${r.id}', team.id) &&
+            (team.has(uid, TeamPermission.manageChats) ||
+                r.accessFor(team, uid).canRead),
       ),
     ),
   );
 
+  /// [teamId]'s rooms, whoever may read them.
+  List<ChatRoom> roomsOf(String teamId) => [
+    for (final r in rooms.values)
+      if (_on('r:${r.id}', teamId)) r,
+  ];
+
   @override
-  Stream<List<ChatFolder>> watchFolders(String teamId) =>
-      _watch(() => sortFolders(folders.values));
+  Stream<List<ChatFolder>> watchFolders(String teamId) => _watch(
+    () => sortFolders(folders.values.where((f) => _on('f:${f.id}', teamId))),
+  );
 
   @override
   Future<Result<String>> saveFolder(
@@ -1028,6 +1291,7 @@ class FakeChatRepository implements ChatRepository {
   ) async {
     final id = folder.isNew ? 'folder${folders.length + 1}' : folder.id;
     folders[id] = ChatFolder.fromMap(id, folder.toMap());
+    teamOf['f:$id'] = teamId;
     emit();
     return Result.ok(id);
   }
@@ -1074,8 +1338,9 @@ class FakeChatRepository implements ChatRepository {
     ChatRoom room,
     String uid,
   ) async {
-    final id = room.isNew ? 'room${rooms.length + 1}' : room.id;
+    final id = room.isNew ? 'room${rooms.length + 1}_${_made++}' : room.id;
     rooms[id] = ChatRoom.fromMap(id, {...room.toMap(), 'createdBy': uid});
+    teamOf['r:$id'] = teamId;
     emit();
     return Result.ok(id);
   }
@@ -1696,13 +1961,90 @@ class FakeProfileRepository implements ProfileRepository {
 
   @override
   Stream<PlayerProfile?> watchProfile(String uid) async* {
-    yield profiles[uid];
-    yield* _changes.stream.where((id) => id == uid).map((_) => profiles[uid]);
+    yield _asSeen(uid);
+    yield* _changes.stream.where((id) => id == uid).map((_) => _asSeen(uid));
   }
 
   void put(PlayerProfile p) {
     profiles[p.uid] = p;
     _changes.add(p.uid);
+  }
+
+  /// Who's looking, and whose private profiles they may see (accepted
+  /// follows); others come back locked, like the rules make them.
+  String? viewer;
+  final allowed = <String>{};
+
+  PlayerProfile? _asSeen(String uid) {
+    final p = profiles[uid];
+    if (p == null || !p.isPrivate || uid == viewer || allowed.contains(uid)) {
+      return p;
+    }
+    return PlayerProfile(
+      uid: p.uid,
+      name: p.name,
+      photoUrl: p.photoUrl,
+      username: p.username,
+      isPrivate: true,
+      locked: true,
+    );
+  }
+
+  /// Lets [viewer] see [uid]'s private profile, as accepting them does.
+  void allow(String uid) {
+    allowed.add(uid);
+    _changes.add(uid);
+  }
+
+  @override
+  Future<Result<void>> saveVisibility(AppUser user, ProfileVisibility v) async {
+    final p =
+        profiles[user.uid] ?? PlayerProfile(uid: user.uid, name: user.label);
+    final d = p.details;
+    final s = p.summary;
+    put(
+      PlayerProfile(
+        uid: p.uid,
+        name: p.name,
+        photoUrl: p.photoUrl,
+        username: p.username,
+        isPrivate: p.isPrivate,
+        details: ProfileDetails(
+          bio: d.bio,
+          pronouns: d.pronouns,
+          hometown: d.hometown,
+          school: d.school,
+          throwingHand: d.throwingHand,
+          playingSince: d.playingSince,
+          visibility: v,
+        ),
+        summary: ProfileSummary(
+          teams: v.teams ? s.teams : const [],
+          seasons: v.stats ? s.seasons : const {},
+          games: v.games ? s.games : const [],
+          updatedAt: s.updatedAt,
+        ),
+      ),
+    );
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> setPrivate(AppUser user, bool private) async {
+    final p =
+        profiles[user.uid] ?? PlayerProfile(uid: user.uid, name: user.label);
+    put(
+      PlayerProfile(
+        uid: p.uid,
+        name: p.name,
+        photoUrl: p.photoUrl,
+        username: p.username,
+        details: p.details,
+        summary: p.summary,
+        isPrivate: private,
+      ),
+    );
+    return const Result.ok(null);
   }
 
   @override
@@ -1718,6 +2060,7 @@ class FakeProfileRepository implements ProfileRepository {
         name: user.label,
         details: details,
         summary: old?.summary ?? const ProfileSummary(),
+        isPrivate: old?.isPrivate ?? false,
       ),
     );
     return const Result.ok(null);
@@ -1737,6 +2080,7 @@ class FakeProfileRepository implements ProfileRepository {
         name: user.label,
         details: old?.details ?? const ProfileDetails(),
         summary: summary,
+        isPrivate: old?.isPrivate ?? false,
       ),
     );
     return const Result.ok(null);

@@ -6,6 +6,8 @@ import {
   nextOwner,
   postFolder,
   signedInRecently,
+  signInFailure,
+  signInHandle,
   tournamentWithout,
 } from "../../src/account/model";
 
@@ -84,5 +86,26 @@ describe("storage folders", () => {
   it("finds a post's photos", () => {
     expect(postFolder("teams/t1/posts/p1")).toBe("teams/t1/posts/p1/");
     expect(postFolder("teams/t1/plays/p1")).toBeUndefined();
+  });
+});
+
+describe("signing in with a username", () => {
+  it("takes the username as typed, with or without @", () => {
+    expect(signInHandle("  Pat.Lee ")).toBe("pat.lee");
+    expect(signInHandle("@pat_9")).toBe("pat_9");
+    for (const bad of ["pa", "pat lee", ".pat", "pat.", "pa..t", "a".repeat(21), "pat@x.org", 7, null]) {
+      expect(signInHandle(bad)).toBeNull();
+    }
+  });
+
+  it("reads an unknown account and a wrong password the same", () => {
+    const wrong = { code: "unauthenticated", message: "Incorrect username or password." };
+    expect(signInFailure("INVALID_PASSWORD")).toEqual(wrong);
+    expect(signInFailure("INVALID_LOGIN_CREDENTIALS")).toEqual(wrong);
+    expect(signInFailure("EMAIL_NOT_FOUND")).toEqual(wrong);
+    expect(signInFailure(undefined)).toEqual(wrong);
+    expect(signInFailure("TOO_MANY_ATTEMPTS_TRY_LATER : Access disabled").code).toBe("resource-exhausted");
+    expect(signInFailure("USER_DISABLED").message).toBe("This account has been disabled.");
+    expect(signInFailure("INTERNAL_ERROR").code).toBe("unavailable");
   });
 });

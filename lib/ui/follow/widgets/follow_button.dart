@@ -33,7 +33,8 @@ class _FollowControlState extends State<FollowControl> {
   bool _following = false;
 
   void _toggleFollow() {
-    _following = !vm.following;
+    // A request isn't a follow yet, so there's nothing to offer.
+    _following = !vm.following && !vm.requiresApproval;
     vm.toggleFollow.execute();
   }
 
@@ -135,11 +136,21 @@ class _FollowControlState extends State<FollowControl> {
             label: const Text('Following'),
           ),
         );
+      } else if (vm.requested) {
+        button = OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(visualDensity: density),
+          onPressed: busy ? null : _toggleFollow,
+          icon: const Icon(Icons.schedule, size: 18),
+          label: const Text('Requested'),
+        );
       } else {
         button = FilledButton.icon(
           style: FilledButton.styleFrom(visualDensity: density),
           onPressed: busy ? null : _toggleFollow,
-          icon: const Icon(Icons.add, size: 18),
+          icon: Icon(
+            vm.requiresApproval ? Icons.lock_outline : Icons.add,
+            size: 18,
+          ),
           label: const Text('Follow'),
         );
       }
@@ -151,7 +162,11 @@ class _FollowControlState extends State<FollowControl> {
             button
           else
             Tooltip(
-              message: 'Follow ${vm.target.name} to see their posts on Home',
+              message: vm.requested
+                  ? 'Waiting for ${vm.target.name} to accept. Tap to cancel.'
+                  : vm.requiresApproval
+                  ? 'Ask ${vm.target.name} to let you follow them'
+                  : 'Follow ${vm.target.name} to see their posts on Home',
               child: button,
             ),
         ],

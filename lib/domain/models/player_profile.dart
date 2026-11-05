@@ -366,7 +366,12 @@ class ProfileSummary {
       _listEquals(games, o.games);
 }
 
-/// A player's public profile, from `profiles/{uid}`.
+/// A player's profile, from `profiles/{uid}`.
+///
+/// A private profile keeps only the name, username and photo there; its
+/// details, teams, stats, games and search tags are in
+/// `profiles/{uid}/private/details`, which only the player and the people
+/// whose follow they accepted can read.
 class PlayerProfile {
   const PlayerProfile({
     required this.uid,
@@ -375,7 +380,33 @@ class PlayerProfile {
     this.username,
     this.details = const ProfileDetails(),
     this.summary = const ProfileSummary(),
+    this.isPrivate = false,
+    this.locked = false,
   });
+
+  /// Fields that move to the private doc when the profile is private.
+  static const privateFields = [
+    'bio',
+    'pronouns',
+    'hometown',
+    'school',
+    'throwingHand',
+    'playingSince',
+    'visibility',
+    'teams',
+    'stats',
+    'games',
+    'summaryUpdatedAt',
+    'tags',
+  ];
+
+  /// Only people the player accepted see more than the name, username and
+  /// photo.
+  final bool isPrivate;
+
+  /// Private and this viewer isn't allowed to see the rest, so [details]
+  /// and [summary] are empty.
+  final bool locked;
 
   final String uid;
   final String name;
@@ -386,7 +417,11 @@ class PlayerProfile {
   final ProfileDetails details;
   final ProfileSummary summary;
 
-  factory PlayerProfile.fromMap(String uid, Map<String, dynamic> m) {
+  factory PlayerProfile.fromMap(
+    String uid,
+    Map<String, dynamic> m, {
+    bool locked = false,
+  }) {
     List<Map<String, dynamic>> maps(Object? raw) => [
       for (final e in (raw as List?) ?? const [])
         if (e is Map) Map<String, dynamic>.from(e),
@@ -397,6 +432,8 @@ class PlayerProfile {
       name: m['name'] as String? ?? '',
       photoUrl: m['photoUrl'] as String?,
       username: m['username'] as String?,
+      isPrivate: m['private'] == true,
+      locked: locked,
       details: ProfileDetails.fromMap(m),
       summary: ProfileSummary(
         teams: [for (final t in maps(m['teams'])) ProfileTeam.fromMap(t)],

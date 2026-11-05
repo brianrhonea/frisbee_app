@@ -173,7 +173,7 @@ void main() {
   group('NotificationSettingsScreen', () {
     Future<FakeNotificationRepository> pump(
       WidgetTester tester, {
-      PushStatus status = PushStatus.notDetermined,
+      PushStatus status = PushStatus.enabled,
     }) async {
       final repo = FakeNotificationRepository(status: status);
       final teams = FakeTeamRepository()
@@ -195,10 +195,28 @@ void main() {
     }
 
     testWidgets('turns on push for this device', (tester) async {
-      await pump(tester);
-      await tester.tap(find.text('Turn on'));
+      await pump(tester, status: PushStatus.notDetermined);
+      await tester.tap(find.text('Turn on notifications'));
       await tester.pumpAndSettle();
       expect(find.text('Push notifications are on'), findsOneWidget);
+    });
+
+    testWidgets('with push off, the choices are off until it is on', (
+      tester,
+    ) async {
+      for (final status in [PushStatus.notDetermined, PushStatus.denied]) {
+        final repo = await pump(tester, status: status);
+        expect(find.text('Notifications are off on this phone'), findsOne);
+        expect(find.textContaining('Turn on notifications above'), findsOne);
+        final chat = tester.widget<SwitchListTile>(
+          find.widgetWithText(SwitchListTile, 'Team chat'),
+        );
+        expect(chat.value, isFalse);
+        expect(chat.onChanged, isNull);
+        // Nothing is changed: they come back as they were once it's on.
+        expect(repo.prefs.isOn(NotificationCategory.chat), isTrue);
+        expect(find.text('Using your defaults'), findsNothing);
+      }
     });
 
     testWidgets('explains that Windows has no push', (tester) async {

@@ -66,6 +66,32 @@ class FollowViewModel extends ChangeNotifier {
 
   bool get loaded => _loaded || isSelf;
   bool get following => _follow != null;
+
+  bool _requiresApproval = false;
+  bool _requested = false;
+  StreamSubscription<bool>? _requestSub;
+
+  /// The target is a private profile: Follow sends a request instead.
+  bool get requiresApproval => _requiresApproval;
+
+  set requiresApproval(bool value) {
+    if (value == _requiresApproval) return;
+    _requiresApproval = value;
+    _requestSub?.cancel();
+    _requestSub = null;
+    _requested = false;
+    final uid = _uid;
+    if (value && uid.isNotEmpty && !isSelf) {
+      _requestSub = _follows.watchFollowRequested(uid, target.id).listen((r) {
+        _requested = r;
+        notifyListeners();
+      }, onError: (Object _) {});
+    }
+    notifyListeners();
+  }
+
+  /// Asked to follow a private profile and waiting for an answer.
+  bool get requested => _requested && !following;
   bool get notifying => _follow?.notify ?? false;
   int get followers => _counts.followers;
 
@@ -81,15 +107,26 @@ class FollowViewModel extends ChangeNotifier {
   Future<Result<void>> _toggleFollow() async {
     final uid = _uid;
     if (uid.isEmpty) return Result.error(Exception('Not signed in'));
-    return following
-        ? _follows.unfollow(uid, target.key)
-        : _follows.follow(uid, target);
+    if (following) return _follows.unfollow(uid, target.key);
+    if (requiresApproval) {
+      final me = _auth.currentUser;
+      if (me == null) return Result.error(Exception('Not signed in'));
+      return _requested
+          ? _follows.cancelFollowRequest(uid, target.id)
+          : _follows.requestFollow(me, target.id);
+    }
+    return _follows.follow(uid, target);
   }
 
   Future<Result<PushStatus?>> _toggleNotify() async {
     final uid = _uid;
     if (uid.isEmpty) return Result.error(Exception('Not signed in'));
     final on = !notifying;
+    if (!following && requiresApproval) {
+      return Result.error(
+        Exception('You can turn this on once ${target.name} accepts you.'),
+      );
+    }
     final Result<void> saved = following
         ? await _follows.setNotify(uid, target.key, on)
         : await _follows.follow(uid, target, notify: true);
@@ -107,6 +144,7 @@ class FollowViewModel extends ChangeNotifier {
     for (final s in _subs) {
       s.cancel();
     }
+    _requestSub?.cancel();
     toggleFollow.dispose();
     toggleNotify.dispose();
     super.dispose();

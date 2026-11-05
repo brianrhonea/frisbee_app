@@ -29,6 +29,11 @@ abstract class AuthRepository extends ChangeNotifier {
 
   Future<Result<void>> signInWithEmail(String email, String password);
 
+  /// Signs in with an email or a username (with or without "@") and the
+  /// account's password. A username fails just like a wrong password if
+  /// nobody has it.
+  Future<Result<void>> signIn(String emailOrUsername, String password);
+
   /// Creates an email account named "[firstName] [lastName]" and claims
   /// [username] for it. If the username was taken in the meantime, the
   /// account is still made and the app asks for another
@@ -57,6 +62,13 @@ abstract class AuthRepository extends ChangeNotifier {
 
   /// Signs the user in again; [password] for [SignInMethod.password].
   Future<Result<void>> reauthenticate({String? password});
+
+  /// For accounts with a password: checks [current], then sets [next]
+  /// (already checked against the password policy).
+  Future<Result<void>> changePassword({
+    required String current,
+    required String next,
+  });
 
   /// Deletes the account and everything the user created, then signs out.
   /// Needs a recent [reauthenticate]. Sets [signedOutNotice].

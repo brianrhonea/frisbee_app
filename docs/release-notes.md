@@ -10,7 +10,45 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
-## 0.0.11 (in TestFlight from `development`)
+## 0.0.12 (in TestFlight from `development`)
+
+**Schools and clubs**
+- Make a **School or club** community (Teams → New → School or club) and
+  put several teams in it, like a men's and a women's team.
+- The community decides which roles get onto each team. Give someone
+  "Woof Captain" and they're on Woof; take it away and they're off.
+- Teams can ask to join a community, or the community can make a new
+  team inside itself.
+- Community events can be shown to just some roles (**Who sees it**).
+
+**Discord import sorts rooms into teams**
+- Importing a Discord server into a community puts each team's channels
+  in that team's chat, and keeps shared channels in the community chat.
+  You can change where any room goes before importing.
+- Team versions of roles like Woof Captain follow the community, so
+  captains-only rooms stay captains-only.
+- If you imported before, those rooms move to their team (you're asked
+  first, and their old messages go with the old room).
+
+**Sign-in and privacy**
+- Sign in with your **@username** or your email.
+- **Private profile** (Settings → Privacy): people must ask to follow you,
+  and only people you accept see your stats, teams and games. Answer in
+  Settings → **Follow requests**.
+- **Change password** in Settings → Account.
+
+**Notifications**
+- While the app is open, new messages and activity show as a small bubble
+  at the top.
+- If notifications are off on your phone, Settings tells you and offers
+  to turn them on.
+
+**Playbook**
+- Players and the disc are easier to grab and drag with a finger.
+
+---
+
+## 0.0.11
 
 **Usernames and a better sign-up**
 - Everyone has a unique **@username**. Sign-up asks for your first and

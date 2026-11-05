@@ -202,15 +202,26 @@ class _TeamsScreenState extends State<TeamsScreen> {
               ),
               onTap: () => Navigator.pop(context, TeamKind.community),
             ),
+            ListTile(
+              leading: const Icon(Icons.account_balance_outlined),
+              title: const Text('School or club'),
+              subtitle: const Text(
+                'A community with several teams, roles that decide who is on '
+                'each, and shared chats and events',
+              ),
+              onTap: () => Navigator.pop(context, TeamKind.organization),
+            ),
             const SizedBox(height: 8),
           ],
         ),
       ),
     );
     if (!mounted || kind == null) return;
-    context.go(
-      kind == TeamKind.community ? Routes.createGroup : Routes.createTeam,
-    );
+    context.go(switch (kind) {
+      TeamKind.team => Routes.createTeam,
+      TeamKind.community => Routes.createGroup,
+      TeamKind.organization => Routes.createCommunity,
+    });
   }
 }
 
@@ -272,7 +283,7 @@ class _InviteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final what = invite.isCommunity ? 'group' : 'team';
+    final what = invite.kind.noun;
     final from = invite.invitedByName.isEmpty
         ? 'You were invited to join this $what.'
         : '${invite.invitedByName} invited you to join this $what.';

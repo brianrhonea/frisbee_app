@@ -21,6 +21,7 @@ import {
   directMessageNotice,
   eventChange,
   eventChangeNotice,
+  eventViewers,
   joinRequestNotice,
   teamInviteNotice,
   meetingCancelledNotice,
@@ -29,6 +30,8 @@ import {
   millis,
   followKeys,
   followerNotice,
+  followAcceptedNotice,
+  followRequestNotice,
   likeNotice,
   newLikers,
   playNotice,
@@ -114,7 +117,7 @@ export const teamEvent = onDocumentWrittenWithAuthContext(
     await deliver(
       getFirestore(),
       getMessaging(),
-      (team.memberIds ?? []).filter((uid) => uid !== event.authId),
+      eventViewers(team, after ?? before).filter((uid) => uid !== event.authId),
       eventChangeNotice({ change, teamId, eventId, teamName: teamName(team), before, after }),
     );
   },
@@ -299,9 +302,31 @@ export const newFollower = onDocumentCreated("users/{uid}/follows/{key}", async 
   const target = String(follow.targetId ?? "");
   const followerId = event.params.uid;
   if (!target || target === followerId) return;
+  // Accepted by the target (a private profile): they chose this, so the
+  // asker hears instead.
+  if (follow.approved === true) {
+    const owner = await profileOf(target);
+    await deliver(getFirestore(), getMessaging(), [followerId], followAcceptedNotice({ ownerId: target, ...owner }));
+    return;
+  }
   const follower = await profileOf(followerId);
   await deliver(getFirestore(), getMessaging(), [target], followerNotice({ followerId, ...follower }));
 });
+
+/** Someone asked to follow a private profile. */
+export const followRequest = onDocumentCreated(
+  "profiles/{uid}/followRequests/{requesterId}",
+  async (event) => {
+    const request = event.data?.data();
+    if (!request) return;
+    await deliver(
+      getFirestore(),
+      getMessaging(),
+      [event.params.uid],
+      followRequestNotice({ requesterId: event.params.requesterId, name: String(request.name ?? "") }),
+    );
+  },
+);
 
 /** Someone commented on a post: its author hears, unless it's their own. */
 export const postCommented = onDocumentCreated("posts/{postId}/comments/{commentId}", async (event) => {

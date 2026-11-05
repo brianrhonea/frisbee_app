@@ -88,7 +88,7 @@ void main() {
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.pump();
-    expect(find.text('Enter a valid email'), findsOneWidget);
+    expect(find.text('Enter your email or username'), findsOneWidget);
 
     await tester.enterText(find.byType(TextFormField).at(0), 'a@b.com');
     await tester.enterText(find.byType(TextFormField).at(1), 'secret');

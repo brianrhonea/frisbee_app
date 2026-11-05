@@ -142,7 +142,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
                 onTab: (t) => setState(() => _tab = t),
               ),
               const SizedBox(height: 16),
-              ..._body(),
+              if (vm.locked) _PrivateNotice(name: vm.name) else ..._body(),
             ],
           );
         },
@@ -436,6 +436,7 @@ class _Hero extends StatelessWidget {
                                 ),
                               if (primary?.role case final role?)
                                 Tag(role.toUpperCase()),
+                              if (vm.isPrivate) const Tag('PRIVATE'),
                             ],
                           ),
                         ],
@@ -485,13 +486,50 @@ class _Hero extends StatelessWidget {
                   SizedBox(width: double.infinity, child: button),
                 ],
                 const SizedBox(height: 8),
-                UnderlineTabs(
-                  labels: [for (final t in tabs) t.label],
-                  selected: tabs.contains(tab) ? tabs.indexOf(tab) : 0,
-                  onSelect: (i) => onTab(tabs[i]),
-                ),
+                if (!vm.locked)
+                  UnderlineTabs(
+                    labels: [for (final t in tabs) t.label],
+                    selected: tabs.contains(tab) ? tabs.indexOf(tab) : 0,
+                    onSelect: (i) => onTab(tabs[i]),
+                  ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// In place of a private profile's posts, stats and teams.
+class _PrivateNotice extends StatelessWidget {
+  const _PrivateNotice({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+      child: Column(
+        children: [
+          Icon(Icons.lock_outline, size: 40, color: c.muted),
+          const SizedBox(height: 12),
+          Text(
+            'This profile is private',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: c.ink,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "Follow $name to see their posts, teams and stats. They'll "
+            'get a request to accept.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: c.muted),
           ),
         ],
       ),
@@ -513,7 +551,7 @@ class _HiddenTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-    message: 'Only you can see this. Change it in Edit profile.',
+    message: 'Only you can see this. Change it in Settings → Privacy.',
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1038,7 +1076,6 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
     text: widget.initial.playingSince?.toString() ?? '',
   );
   late ThrowingHand? _hand = widget.initial.throwingHand;
-  late ProfileVisibility _visibility = widget.initial.visibility;
 
   @override
   void dispose() {
@@ -1060,7 +1097,8 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
         school: _school.text,
         throwingHand: _hand,
         playingSince: year != null && year >= 1960 && year <= now ? year : null,
-        visibility: _visibility,
+        // Set in Settings → Privacy.
+        visibility: widget.initial.visibility,
       ),
     );
   }
@@ -1125,42 +1163,10 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Show on my profile',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: c.ink,
-                ),
-              ),
-              Text(
-                'Anyone on Stall 10 can find your profile. Hidden sections '
-                "aren't shared.",
+                'Choose who sees your stats, games and teams in Settings → '
+                'Privacy.',
                 style: TextStyle(fontSize: 11.5, color: c.muted),
               ),
-              for (final (label, value, update) in [
-                (
-                  'Stats',
-                  _visibility.stats,
-                  (bool v) => _visibility.copyWith(stats: v),
-                ),
-                (
-                  'Recent games',
-                  _visibility.games,
-                  (bool v) => _visibility.copyWith(games: v),
-                ),
-                (
-                  'Teams',
-                  _visibility.teams,
-                  (bool v) => _visibility.copyWith(teams: v),
-                ),
-              ])
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  title: Text(label),
-                  value: value,
-                  onChanged: (v) => setState(() => _visibility = update(v)),
-                ),
             ],
           ),
         ),

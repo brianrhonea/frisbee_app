@@ -36,31 +36,46 @@ class DiscordImportRepositoryFirebase implements DiscordImportRepository {
 
   @override
   Future<Result<void>> apply(Team team, DiscordImport import, String uid) =>
-      guard(() async {
-        final batch = _db.batch()
-          ..update(
-            _db.collection('teams').doc(team.id),
-            rolesData(
-              import.roles,
-              cleanMemberRoles(
-                team.memberRoles,
-                import.roles,
-                team.members.keys,
-              ),
-            ),
-          );
-        final folders = chatFolders(_db, team.id);
-        for (final f in import.folders) {
-          batch.set(folders.doc(f.id), {
-            ...f.toMap(),
-            'createdBy': uid,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        }
-        final rooms = chatRooms(_db, team.id);
-        for (final r in import.rooms) {
-          batch.set(rooms.doc(), newRoomData(r, uid));
-        }
-        await batch.commit();
-      });
+      guard(() => _batch(team, import, uid).commit());
+
+  @override
+  Future<Result<void>> applyToTeam(TeamChatImport import, String uid) => guard(
+    () => _batch(
+      import.team,
+      import.import,
+      uid,
+      orgRoles: import.orgRoles,
+    ).commit(),
+  );
+
+  WriteBatch _batch(
+    Team team,
+    DiscordImport import,
+    String uid, {
+    Map<String, String>? orgRoles,
+  }) {
+    {
+      final batch = _db.batch()
+        ..update(_db.collection('teams').doc(team.id), {
+          ...rolesData(
+            import.roles,
+            cleanMemberRoles(team.memberRoles, import.roles, team.members.keys),
+          ),
+          'orgRoles': ?orgRoles,
+        });
+      final folders = chatFolders(_db, team.id);
+      for (final f in import.folders) {
+        batch.set(folders.doc(f.id), {
+          ...f.toMap(),
+          'createdBy': uid,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+      final rooms = chatRooms(_db, team.id);
+      for (final r in import.rooms) {
+        batch.set(rooms.doc(), newRoomData(r, uid));
+      }
+      return batch;
+    }
+  }
 }

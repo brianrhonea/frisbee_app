@@ -25,6 +25,8 @@ import 'ui/core/ui/brand.dart';
 import 'ui/meetings/view_models/meeting_alerts_viewmodel.dart';
 import 'ui/meetings/widgets/meeting_alerts.dart';
 import 'routing/open_link.dart';
+import 'ui/notifications/view_models/in_app_notices_viewmodel.dart';
+import 'ui/notifications/widgets/in_app_notice_bubble.dart';
 
 /// Run with `--dart-define=USE_EMULATORS=true` to use local Firebase emulators.
 const _useEmulators = bool.fromEnvironment('USE_EMULATORS');
@@ -101,6 +103,12 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
   late final NotificationRepository _notifications = context.read();
   late final GoRouter _router = router(_auth);
   late final MeetingAlertsViewModel _meetingAlerts;
+  late final InAppNoticesViewModel _notices = InAppNoticesViewModel(
+    authRepository: _auth,
+    notificationRepository: _notifications,
+    currentLocation: () =>
+        _router.routerDelegate.currentConfiguration.uri.toString(),
+  );
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
   StreamSubscription<String>? _opened;
   String? _syncedUid;
@@ -149,6 +157,7 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
     _auth.removeListener(_onAuth);
     _opened?.cancel();
     _meetingAlerts.dispose();
+    _notices.dispose();
     _router.dispose();
     super.dispose();
   }
@@ -166,7 +175,11 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
       viewModel: _meetingAlerts,
       router: _router,
       messengerKey: _messengerKey,
-      child: child ?? const SizedBox.shrink(),
+      child: InAppNoticeBubble(
+        viewModel: _notices,
+        onOpen: _router.openLink,
+        child: child ?? const SizedBox.shrink(),
+      ),
     ),
   );
 }

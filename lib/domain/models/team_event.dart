@@ -122,7 +122,13 @@ class TeamEvent {
     this.votes = const {},
     this.createdBy,
     this.isPublic = false,
+    this.audience = const {},
   });
+
+  /// Who sees it in a school or club community: `everyone`, or community
+  /// role ids (like chat rooms). Empty on teams and groups, where every
+  /// member does.
+  final Set<String> audience;
 
   /// Empty id means the event has not been saved yet.
   final String id;
@@ -186,6 +192,7 @@ class TeamEvent {
     String? notes,
     EventPoll? Function()? poll,
     bool? isPublic,
+    Set<String>? audience,
   }) => TeamEvent(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -200,6 +207,7 @@ class TeamEvent {
     votes: votes,
     createdBy: createdBy,
     isPublic: isPublic ?? this.isPublic,
+    audience: audience ?? this.audience,
   );
 
   factory TeamEvent.fromMap(String id, Map<String, dynamic> map) {
@@ -240,6 +248,7 @@ class TeamEvent {
       },
       createdBy: map['createdBy'] as String?,
       isPublic: map['public'] as bool? ?? false,
+      audience: {for (final a in (map['audience'] as List?) ?? const []) '$a'},
     );
   }
 
@@ -252,6 +261,7 @@ class TeamEvent {
     'location': location,
     'notes': notes,
     'poll': poll?.toMap(),
+    if (audience.isNotEmpty) 'audience': audience.toList()..sort(),
   };
 
   /// The copy in `publicEvents` that non-members read: details only, no

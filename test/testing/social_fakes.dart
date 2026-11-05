@@ -41,6 +41,9 @@ class FakeFollowRepository implements FollowRepository {
     FollowTarget target, {
     bool notify = false,
   }) async {
+    if (target.type == FollowType.user && privateOwners.contains(target.id)) {
+      return Result.error(Exception("You don't have permission to do that."));
+    }
     final mine = follows.putIfAbsent(uid, () => {});
     if (!mine.containsKey(target.key)) {
       _bump(target.key, followers: 1);
@@ -86,6 +89,75 @@ class FakeFollowRepository implements FollowRepository {
   Stream<FollowCounts> watchCounts(String key) async* {
     yield counts[key] ?? const FollowCounts();
     yield* _changes.stream.map((_) => counts[key] ?? const FollowCounts());
+  }
+
+  /// owner → requester uid → request.
+  final requests = <String, Map<String, FollowRequest>>{};
+
+  /// Owners whose profile is private, so [follow] is refused, as the rules
+  /// refuse it.
+  final privateOwners = <String>{};
+
+  List<FollowRequest> _requestsOf(String owner) => [
+    ...?requests[owner]?.values,
+  ];
+
+  @override
+  Stream<bool> watchFollowRequested(String uid, String owner) async* {
+    yield requests[owner]?.containsKey(uid) ?? false;
+    yield* _changes.stream.map(
+      (_) => requests[owner]?.containsKey(uid) ?? false,
+    );
+  }
+
+  @override
+  Future<Result<void>> requestFollow(AppUser me, String owner) async {
+    requests.putIfAbsent(owner, () => {})[me.uid] = FollowRequest(
+      uid: me.uid,
+      name: me.label,
+      username: me.username,
+      photoUrl: me.photoUrl,
+      createdAt: DateTime.now(),
+    );
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> cancelFollowRequest(String uid, String owner) async {
+    requests[owner]?.remove(uid);
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<List<FollowRequest>> watchFollowRequests(String owner) async* {
+    yield _requestsOf(owner);
+    yield* _changes.stream.map((_) => _requestsOf(owner));
+  }
+
+  @override
+  Future<Result<void>> acceptFollowRequest(
+    AppUser owner,
+    FollowRequest request,
+  ) async {
+    if (requests[owner.uid]?.remove(request.uid) == null) {
+      return Result.error(Exception('No such request'));
+    }
+    final wasPrivate = privateOwners.remove(owner.uid);
+    await follow(request.uid, FollowTarget.user(owner.uid, owner.label));
+    if (wasPrivate) privateOwners.add(owner.uid);
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> declineFollowRequest(
+    String owner,
+    String requester,
+  ) async {
+    requests[owner]?.remove(requester);
+    _changed();
+    return const Result.ok(null);
   }
 }
 

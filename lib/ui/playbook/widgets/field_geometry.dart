@@ -26,6 +26,10 @@ class FieldGeometry {
 
   double get elementRadius => math.max(9, shortSide * 0.04);
 
+  /// Minimum grab radius, so a fingertip (about 44 px) can pick up a dot
+  /// even on a phone, where the dots are small.
+  static const minHitRadius = 22.0;
+
   Offset toCanvas(FieldPoint p) => horizontal
       ? Offset(p.y * size.width, p.x * size.height)
       : Offset(p.x * size.width, p.y * size.height);
@@ -34,13 +38,21 @@ class FieldGeometry {
       ? FieldPoint(o.dy / size.height, o.dx / size.width)
       : FieldPoint(o.dx / size.width, o.dy / size.height);
 
-  /// Id of the element or arrow under [o], elements first.
+  /// Id of the element or arrow under [o], elements first. Of several
+  /// elements in reach, the nearest wins (the top one on a tie).
   String? hitTest(Play play, Offset o) {
-    final r = elementRadius * 1.3;
+    final r = math.max(minHitRadius, elementRadius * 1.3);
+    String? nearest;
+    var best = double.infinity;
     for (final e in play.elements.reversed) {
-      if ((toCanvas(e.position) - o).distance <= r) return e.id;
+      final d = (toCanvas(e.position) - o).distance;
+      if (d <= r && d < best) {
+        nearest = e.id;
+        best = d;
+      }
     }
-    final tolerance = math.max(10.0, elementRadius * 0.8);
+    if (nearest != null) return nearest;
+    final tolerance = math.max(14.0, elementRadius * 0.8);
     for (final a in play.arrows.reversed) {
       for (var i = 0; i < a.points.length - 1; i++) {
         final d = _distanceToSegment(

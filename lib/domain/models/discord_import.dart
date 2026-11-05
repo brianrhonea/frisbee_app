@@ -138,7 +138,11 @@ class DiscordImport {
     required this.rooms,
     required this.alreadyHere,
     required this.tooManyRoles,
+    this.roleIdsByKey = const {},
   });
+
+  /// The plan's role keys → this team's role ids (new or reused).
+  final Map<String, String> roleIdsByKey;
 
   /// Every custom role the team will have: its own plus the new ones.
   final Map<String, CustomRole> roles;
@@ -275,6 +279,192 @@ class DiscordImport {
       rooms: newRooms,
       alreadyHere: alreadyHere,
       tooManyRoles: tooMany,
+      roleIdsByKey: roleIds,
+    );
+  }
+}
+
+/// Where each room of a Discord template goes when it's imported into a
+/// school or club community: the community's chat (null) or one of its
+/// teams' (a team id). Rooms only a single team's roles can read go to
+/// that team; roles that get on no team (like Admin) don't count, and
+/// rooms anyone can read, or that two teams' roles read, stay in the
+/// community. The owner can override any room ([overrides]).
+class DiscordTeamSplit {
+  const DiscordTeamSplit._(this.plan, this.suggested, this.destinations);
+
+  final DiscordImportPlan plan;
+
+  /// Room index → where the rule above sends it.
+  final List<String?> suggested;
+
+  /// Room index → where it goes, overrides applied.
+  final List<String?> destinations;
+
+  /// [roleIds]: the plan's role keys → [org]'s role ids
+  /// ([DiscordImport.roleIdsByKey]).
+  factory DiscordTeamSplit.of(
+    DiscordImportPlan plan, {
+    required Team org,
+    required Map<String, String> roleIds,
+    Map<int, String?> overrides = const {},
+  }) {
+    Set<String> teamsOf(String key) => {
+      for (final t in org.linkedTeams.values)
+        if (roleIds[key] case final id? when t.roles.contains(id)) t.id,
+    };
+    String? suggest(PlannedRoom r) {
+      if (r.readRoles.contains(ChatAudience.everyone)) return null;
+      final teams = <String>{};
+      for (final key in r.readRoles) {
+        final of = teamsOf(key);
+        if (of.length > 1) return null;
+        teams.addAll(of);
+      }
+      return teams.length == 1 ? teams.single : null;
+    }
+
+    final suggested = [for (final r in plan.rooms) suggest(r)];
+    return DiscordTeamSplit._(plan, suggested, [
+      for (var i = 0; i < plan.rooms.length; i++)
+        overrides.containsKey(i) &&
+                (overrides[i] == null ||
+                    org.linkedTeams.containsKey(overrides[i]))
+            ? overrides[i]
+            : suggested[i],
+    ]);
+  }
+
+  /// Teams at least one room goes to.
+  Set<String> get teams => {...destinations.whereType<String>()};
+
+  /// The rooms going to [teamId] (null: the community), with the folders
+  /// they're in. Roles are all kept: they're the community's.
+  DiscordImportPlan planFor(String? teamId) {
+    final rooms = [
+      for (var i = 0; i < plan.rooms.length; i++)
+        if (destinations[i] == teamId) plan.rooms[i],
+    ];
+    final used = {for (final r in rooms) ?r.folderKey};
+    // Folders with no rooms at all stay with the community.
+    final roomless = {
+      for (final f in plan.folders)
+        if (!plan.rooms.any((r) => r.folderKey == f.key)) f.key,
+    };
+    return DiscordImportPlan(
+      serverName: plan.serverName,
+      roles: plan.roles,
+      folders: [
+        for (final f in plan.folders)
+          if (used.contains(f.key) ||
+              (teamId == null && roomless.contains(f.key)))
+            f,
+      ],
+      rooms: rooms,
+      skippedChannels: teamId == null ? plan.skippedChannels : const [],
+      skippedRoles: teamId == null ? plan.skippedRoles : const [],
+    );
+  }
+}
+
+/// A linked team's share of a Discord import: its rooms and folders, and
+/// copies of the community roles that get on it (Woof Captain…), which
+/// the communities Cloud Functions keep in step with the community
+/// ([orgRoles]). A room every one of those roles reads is open to the
+/// whole team.
+class TeamChatImport {
+  const TeamChatImport({
+    required this.team,
+    required this.import,
+    required this.orgRoles,
+  });
+
+  final Team team;
+  final DiscordImport import;
+
+  /// Team role id → the community role it copies.
+  final Map<String, String> orgRoles;
+
+  bool get isEmpty =>
+      import.isEmpty &&
+      orgRoles.entries.every((e) => team.orgRoles[e.key] == e.value);
+
+  /// [teamPlan]: the rooms going to [team] ([DiscordTeamSplit.planFor]);
+  /// [roleIds]: the plan's role keys → [org]'s role ids.
+  factory TeamChatImport.of(
+    DiscordImportPlan teamPlan, {
+    required Team org,
+    required Team team,
+    required Map<String, String> roleIds,
+    required List<ChatFolder> folders,
+    required List<ChatRoom> rooms,
+    String Function() newId = newRoleId,
+  }) {
+    final link = org.linkedTeams[team.id];
+    final granting = [
+      for (final r in org.sortedRoles)
+        if (link?.roles.contains(r.id) ?? false) r,
+    ];
+    final grantingIds = {for (final r in granting) r.id};
+
+    // Access in community role ids, narrowed to this team's roles; all of
+    // them means the whole team.
+    List<String> access(List<String> keys) {
+      if (keys.contains(ChatAudience.everyone)) return [ChatAudience.everyone];
+      final ids = {for (final k in keys) ?roleIds[k]}..retainAll(grantingIds);
+      if (grantingIds.isNotEmpty && ids.containsAll(grantingIds)) {
+        return [ChatAudience.everyone];
+      }
+      return ids.toList();
+    }
+
+    // A role already copying a community role keeps its id, whatever it's
+    // called now.
+    final copies = {for (final e in team.orgRoles.entries) e.value: e.key};
+    final named = DiscordImportPlan(
+      serverName: teamPlan.serverName,
+      roles: [
+        for (final r in granting)
+          PlannedRole(
+            key: r.id,
+            name: team.roles[copies[r.id]]?.name ?? r.name,
+            color: r.color,
+            permissions: r.permissions,
+          ),
+      ],
+      folders: [
+        for (final f in teamPlan.folders)
+          PlannedFolder(
+            key: f.key,
+            name: f.name,
+            readRoles: access(f.readRoles),
+            writeRoles: access(f.writeRoles),
+          ),
+      ],
+      rooms: [
+        for (final r in teamPlan.rooms)
+          PlannedRoom(
+            name: r.name,
+            folderKey: r.folderKey,
+            readRoles: access(r.readRoles),
+            writeRoles: access(r.writeRoles),
+          ),
+      ],
+    );
+    final import = DiscordImport.of(
+      named,
+      team: team,
+      folders: folders,
+      rooms: rooms,
+      newId: newId,
+    );
+    return TeamChatImport(
+      team: team,
+      import: import,
+      orgRoles: {
+        ...team.orgRoles,
+        for (final e in import.roleIdsByKey.entries) e.value: e.key,
+      },
     );
   }
 }

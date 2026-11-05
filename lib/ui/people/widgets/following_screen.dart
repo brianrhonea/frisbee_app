@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/follow.dart';
+import '../../../routing/open_link.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
@@ -23,13 +24,14 @@ String followRoute(FollowTarget t) => switch (t.type) {
   FollowType.event => Routes.tournament(t.id),
 };
 
-/// Opens a follow's target: tab pages with `go`, pages over the tabs with
-/// `push`.
+/// Opens a follow's target: a team with `go` (its tab), the rest with
+/// [openPage], which pushes where it can and switches tab where pushing
+/// would stack the tabs twice (from Settings, which is over them).
 void openFollow(BuildContext context, FollowTarget t) => switch (t.type) {
   FollowType.team => context.go(followRoute(t)),
   FollowType.user ||
   FollowType.tournament ||
-  FollowType.event => context.push(followRoute(t)),
+  FollowType.event => openPage(context, followRoute(t)),
 };
 
 class FollowingScreen extends StatefulWidget {

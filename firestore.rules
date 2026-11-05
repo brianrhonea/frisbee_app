@@ -8,6 +8,24 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function uid() { return request.auth.uid; }
 
+    // Private profiles (PlayerProfile in lib/domain/models/player_profile.dart):
+    // only people whose follow the player accepted see past the name,
+    // username and photo.
+    function profilePath(userId) {
+      return /databases/$(database)/documents/profiles/$(userId);
+    }
+    function followRequestPath(owner, requester) {
+      return /databases/$(database)/documents/profiles/$(owner)/followRequests/$(requester);
+    }
+    function isPrivateProfile(userId) {
+      return exists(profilePath(userId))
+        && get(profilePath(userId)).data.get('private', false) == true;
+    }
+    // The signed-in user follows [userId] (their own follow doc).
+    function followsUser(userId) {
+      return exists(/databases/$(database)/documents/users/$(uid())/follows/$('user_' + userId));
+    }
+
     function teamPath(teamId) {
       return /databases/$(database)/documents/teams/$(teamId);
     }
@@ -104,9 +122,15 @@ service cloud.firestore {
         && (!isGroup(t) || validGroupFields(t));
     }
 
-    // Community groups (kind 'community'): open to anyone, no invite code,
-    // no roster or stats. Teams have no kind field.
-    function isGroup(t) { return t.get('kind', 'team') == 'community'; }
+    // Community groups (kind 'community') and school or club communities
+    // (kind 'organization'): joined openly or with approval, no roster or
+    // stats. Teams have no kind field.
+    function isGroup(t) {
+      return t.get('kind', 'team') in ['community', 'organization'];
+    }
+    // A school or club community: its teams (linkedTeams) are full teams
+    // that asked to join (their orgId), and its events say who sees them.
+    function isOrg(t) { return t.get('kind', 'team') == 'organization'; }
     // A group that needs approval is private: outsiders see its name, city
     // and description in search, never its location, posts or events.
     function isPrivateGroup(t) {
@@ -249,7 +273,8 @@ service cloud.firestore {
         function validFollow() {
           let d = request.resource.data;
           return d.keys().hasOnly(['key', 'type', 'targetId', 'groupId',
-                                   'name', 'photoUrl', 'notify', 'createdAt'])
+                                   'name', 'photoUrl', 'notify', 'createdAt',
+                                   'approved'])
             && d.type in ['user', 'team', 'tournament', 'event']
             && validString(d.targetId, 300) && d.targetId.size() > 0
             && d.key == key
@@ -264,9 +289,23 @@ service cloud.firestore {
             && d.notify is bool;
         }
 
-        allow read, delete: if signedIn() && uid() == userId;
-        allow create: if signedIn() && uid() == userId && validFollow()
-          && request.resource.data.createdAt == request.time;
+        allow read: if signedIn() && uid() == userId;
+        // The follower unfollows, or the person followed removes them.
+        allow delete: if signedIn()
+          && (uid() == userId || key == 'user_' + uid());
+        // Following a private profile needs its owner's OK: the owner
+        // writes the follow in the same batch that removes the request.
+        allow create: if signedIn() && validFollow()
+          && request.resource.data.createdAt == request.time
+          && ((uid() == userId
+               && request.resource.data.get('approved', false) == false
+               && (request.resource.data.type != 'user'
+                   || !isPrivateProfile(request.resource.data.targetId)))
+              || (request.resource.data.type == 'user'
+                  && request.resource.data.targetId == uid()
+                  && request.resource.data.get('approved', false) == true
+                  && exists(followRequestPath(uid(), userId))
+                  && !existsAfter(followRequestPath(uid(), userId))));
         allow update: if signedIn() && uid() == userId
           && changed().hasOnly(['notify', 'name', 'photoUrl'])
           && validFollow();
@@ -292,8 +331,9 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
-             'memberIds', 'memberNames', 'createdAt'])
+             'memberIds', 'memberNames', 'createdAt', 'orgId', 'orgName'])
         && validTeamFields(request.resource.data)
+        && validOrgRef(request.resource.data)
         && request.resource.data.ownerId == uid()
         && request.resource.data.members == {(uid()): 'owner'}
         && request.resource.data.memberIds == [uid()]
@@ -306,7 +346,7 @@ service cloud.firestore {
              'name', 'division', 'level', 'city', 'ownerId', 'members',
              'memberIds', 'memberNames', 'createdAt', 'kind', 'description',
              'requiresApproval', 'location'])
-        && request.resource.data.kind == 'community'
+        && request.resource.data.kind in ['community', 'organization']
         && validTeamFields(request.resource.data)
         && request.resource.data.ownerId == uid()
         && request.resource.data.members == {(uid()): 'owner'}
@@ -317,8 +357,34 @@ service cloud.firestore {
         editDetails() || linkUsau() || dropLegacyCode() || changeRole() ||
         setStatKeepers() || transferOwnership() || removeMember() || join() ||
         joinOpenGroup() || approveRequest() || acceptInvite() || markDeleting() ||
-        setRoles()
+        setRoles() || setOrg() || editLinks()
       );
+
+      // The community a team asks to join (or leaves). Only Cloud Functions
+      // set orgLinked and orgMembers, once the community lists the team.
+      function validOrgRef(t) {
+        return t.get('orgId', null) == null
+          || (t.orgId is string && t.orgId.size() > 0 && t.orgId.size() <= 40
+              && t.orgId != teamId && validString(t.get('orgName', ''), 80));
+      }
+      function setOrg() {
+        return can(resource.data, 'manageTeam')
+          && !isGroup(resource.data)
+          && changed().hasOnly(['orgId', 'orgName'])
+          && validOrgRef(request.resource.data);
+      }
+
+      // A community's admins list its teams and which roles get on each.
+      // Listing a team does nothing until the team names this community
+      // (orgId); the communities functions check both sides.
+      function editLinks() {
+        let links = request.resource.data.linkedTeams;
+        return isOrg(resource.data)
+          && can(resource.data, 'manageTeam')
+          && changed().hasOnly(['linkedTeams'])
+          && links is map
+          && links.size() <= 20;
+      }
 
       // Only once the owner is the last one on it (see soleOwner).
       allow delete: if signedIn() && resource.data.ownerId == uid()
@@ -454,9 +520,14 @@ service cloud.firestore {
         let ids = resource.data.memberIds.toSet();
         let diff = t.members.diff(resource.data.members);
         return isOwner(resource.data)
-          && changed().hasOnly(['roles', 'memberRoles', 'memberPerms', 'members'])
+          && changed().hasOnly(['roles', 'memberRoles', 'memberPerms', 'members',
+                                'orgRoles'])
           && t.get('roles', {}) is map
           && t.get('roles', {}).size() <= 50
+          // Team roles copying a community role (Team.orgRoles); the
+          // communities functions give them out.
+          && t.get('orgRoles', {}) is map
+          && t.get('orgRoles', {}).size() <= 50
           && t.get('memberRoles', {}) is map
           && t.get('memberRoles', {}).keys().toSet().difference(ids).size() == 0
           && t.get('memberPerms', {}) is map
@@ -505,8 +576,13 @@ service cloud.firestore {
         let gone = resource.data.memberIds.removeAll(request.resource.data.memberIds);
         let target = gone[0];
         return changed().hasOnly(['members', 'memberIds', 'memberNames',
-                                  'statKeepers', 'memberRoles', 'memberPerms'])
+                                  'statKeepers', 'memberRoles', 'memberPerms',
+                                  'orgMembers'])
           && gone.size() == 1
+          && !(target in request.resource.data.get('orgMembers', []))
+          && request.resource.data.get('orgMembers', []).toSet()
+               == resource.data.get('orgMembers', []).toSet()
+                    .difference([target].toSet())
           && !(target in request.resource.data.get('statKeepers', []))
           && !(target in request.resource.data.get('memberRoles', {}))
           && !(target in request.resource.data.get('memberPerms', {}))
@@ -581,6 +657,30 @@ service cloud.firestore {
           && validString(request.resource.data.name, 80)
           && request.resource.data.createdAt == request.time;
         allow delete: if signedIn() && (uid() == userId || can(team(), 'manageMembers'));
+      }
+
+      // Teams asking to join this school or club community, keyed by team
+      // id. The team's admins write it with the team's orgId in one batch;
+      // the community's admins accept (listing the team in linkedTeams) or
+      // decline, and either side may delete it.
+      match /linkRequests/{reqTeamId} {
+        function org() { return get(teamPath(teamId)).data; }
+        function asker() { return get(teamPath(reqTeamId)).data; }
+
+        allow read, delete: if signedIn()
+          && (can(org(), 'manageTeam') || can(asker(), 'manageTeam'));
+        allow create: if signedIn()
+          && isOrg(org())
+          && can(getAfter(teamPath(reqTeamId)).data, 'manageTeam')
+          && getAfter(teamPath(reqTeamId)).data.get('orgId', null) == teamId
+          && request.resource.data.keys().hasOnly([
+               'teamName', 'division', 'requestedBy', 'requestedByName',
+               'createdAt'])
+          && validString(request.resource.data.teamName, 80)
+          && request.resource.data.division in ['mixed', 'open', 'women', 'masters']
+          && request.resource.data.requestedBy == uid()
+          && validString(request.resource.data.requestedByName, 80)
+          && request.resource.data.createdAt == request.time;
       }
 
       // What every member sees: name, number, position. Payment and USA
@@ -662,9 +762,25 @@ service cloud.firestore {
             .hasOnly([uid()]);
         }
 
+        // A community's events say who sees them (audience: 'everyone' or
+        // role ids, like chat rooms); event managers see them all. The app
+        // queries with array-contains on each id it holds, which rules can
+        // prove. Teams' and groups' events go to every member.
+        function sees(e) {
+          return !isOrg(team())
+            || can(team(), 'manageEvents')
+            || inAudience(team(), e.audience, []);
+        }
+        function validAudience(e) {
+          return !isOrg(team())
+            || (e.audience is list && e.audience.size() > 0
+                && e.audience.size() <= 20);
+        }
+
         function respond() {
           let d = request.resource.data;
           return isMember(team())
+            && sees(resource.data)
             && changed().hasOnly(['rsvps', 'reactions', 'votes'])
             && onlyMine('rsvps') && onlyMine('reactions') && onlyMine('votes')
             && (d.rsvps.get(uid(), '') == 'going'
@@ -686,19 +802,21 @@ service cloud.firestore {
           return can(team(), 'manageEvents')
             && changed().hasOnly([
                  'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
-                 'poll', 'public', 'votes', 'updatedAt'])
+                 'poll', 'public', 'votes', 'updatedAt', 'audience'])
             && (!('votes' in changed()) || request.resource.data.votes == {})
-            && validEvent(request.resource.data);
+            && validEvent(request.resource.data)
+            && validAudience(request.resource.data);
         }
 
-        allow read: if signedIn() && isMember(team());
+        allow read: if signedIn() && isMember(team()) && sees(resource.data);
         allow delete: if signedIn() && can(team(), 'manageEvents');
         allow create: if signedIn()
           && can(team(), 'manageEvents')
           && request.resource.data.keys().hasOnly([
                'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
                'poll', 'public', 'rsvps', 'reactions', 'votes', 'createdBy',
-               'createdAt', 'updatedAt'])
+               'createdAt', 'updatedAt', 'audience'])
+          && validAudience(request.resource.data)
           && request.resource.data.createdBy == uid()
           && request.resource.data.rsvps == {}
           && request.resource.data.reactions == {}
@@ -1661,7 +1779,9 @@ service cloud.firestore {
             'name', 'keywords', 'photoUrl', 'updatedAt', 'tags',
             'bio', 'pronouns', 'hometown', 'school', 'throwingHand',
             'playingSince', 'visibility',
-            'teams', 'stats', 'games', 'summaryUpdatedAt', 'username'])
+            'teams', 'stats', 'games', 'summaryUpdatedAt', 'username',
+            'private'])
+          && p.get('private', false) is bool
           && p.name is string
           && p.name.size() > 0
           && p.name.size() <= 80
@@ -1704,15 +1824,65 @@ service cloud.firestore {
               == resource.data.get('username', null)
             || (resource.data.get('username', null) == null
                 && usernameClaimed(request.resource.data.username)));
+
+      // A private profile's details, summary and search tags: the player,
+      // and people they let follow them.
+      match /private/{doc} {
+        allow read: if signedIn() && (uid() == userId || followsUser(userId));
+        allow delete: if signedIn() && uid() == userId;
+        allow create, update: if signedIn() && uid() == userId
+          && doc == 'details'
+          && request.resource.data.keys().hasOnly([
+               'bio', 'pronouns', 'hometown', 'school', 'throwingHand',
+               'playingSince', 'visibility', 'teams', 'stats', 'games',
+               'summaryUpdatedAt', 'tags', 'updatedAt'])
+          && request.resource.data.get('tags', []) is list
+          && request.resource.data.get('tags', []).size() <= 100
+          && validString(request.resource.data.get('bio', ''), 280)
+          && validString(request.resource.data.get('pronouns', ''), 30)
+          && validString(request.resource.data.get('hometown', ''), 60)
+          && validString(request.resource.data.get('school', ''), 60)
+          && request.resource.data.get('throwingHand', null)
+               in [null, 'right', 'left', 'both']
+          && request.resource.data.get('visibility', {}) is map
+          && request.resource.data.get('teams', []) is list
+          && request.resource.data.get('teams', []).size() <= 50
+          && request.resource.data.get('stats', {}) is map
+          && request.resource.data.get('stats', {}).size() <= 50
+          && request.resource.data.get('games', []) is list
+          && request.resource.data.get('games', []).size() <= 5;
+      }
+
+      // Someone asking to follow this private profile (FollowRequest in
+      // lib/domain/models/follow.dart). The owner accepts (see the follows
+      // rule) or declines by deleting it; the asker can take it back.
+      match /followRequests/{requesterId} {
+        allow read, delete: if signedIn()
+          && (uid() == userId || uid() == requesterId);
+        allow create: if signedIn()
+          && uid() == requesterId && requesterId != userId
+          && isPrivateProfile(userId)
+          && !followsUser(userId)
+          && request.resource.data.keys().hasOnly([
+               'name', 'username', 'photoUrl', 'createdAt'])
+          && validString(request.resource.data.name, 80)
+          && (request.resource.data.get('username', null) == null
+              || validString(request.resource.data.username, 20))
+          && (request.resource.data.get('photoUrl', null) == null
+              || validString(request.resource.data.photoUrl, 2000))
+          && request.resource.data.createdAt == request.time;
+      }
     }
 
     // Unique usernames (Username in lib/domain/models/username.dart): the
     // doc id is the lowercase name, holding who has it. Claimed in the same
     // write that puts it on the claimer's profile, once per account; anyone
-    // signed in checks whether a name is free. Deleting an account frees
-    // it (the account-deleteAccount function).
+    // signed in checks whether a name is free. Signed out (the sign-up form)
+    // may only get a name nobody has: a taken one is refused, which says
+    // it's taken without saying whose. Deleting an account frees it (the
+    // account-deleteAccount function).
     match /usernames/{name} {
-      allow get: if signedIn();
+      allow get: if signedIn() || resource == null;
       allow create: if signedIn()
         && name.matches('^[a-z0-9_.]{3,20}$')
         && !name.matches('^[.].*|.*[.]$|.*[.][.].*')

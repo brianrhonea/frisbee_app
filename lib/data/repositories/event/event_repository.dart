@@ -5,7 +5,15 @@ abstract class EventRepository {
   /// Events for a team, sorted by start time; with [since], only those
   /// starting on or after that day (reads far fewer documents than the
   /// team's whole history).
-  Stream<List<TeamEvent>> watchEvents(String teamId, {DateTime? since});
+  ///
+  /// In a school or club community, a member who doesn't manage events
+  /// passes [audience] (Team.eventAudienceOf): the ids they hold, so they
+  /// get only events shown to them, as firestore.rules requires.
+  Stream<List<TeamEvent>> watchEvents(
+    String teamId, {
+    DateTime? since,
+    Set<String>? audience,
+  });
 
   /// Emits null if the event is deleted.
   Stream<TeamEvent?> watchEvent(String teamId, String eventId);

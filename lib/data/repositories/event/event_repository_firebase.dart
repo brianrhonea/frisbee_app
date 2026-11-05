@@ -23,7 +23,7 @@ class EventRepositoryFirebase implements EventRepository {
       since == null ? null : DateTime(since.year, since.month, since.day);
 
   static Query<Map<String, dynamic>> _from(
-    CollectionReference<Map<String, dynamic>> col,
+    Query<Map<String, dynamic>> col,
     DateTime? since,
   ) =>
       (since == null
@@ -54,11 +54,33 @@ class EventRepositoryFirebase implements EventRepository {
       d.exists ? TeamEvent.fromMap(d.id, plainData(d.data())) : null;
 
   @override
-  Stream<List<TeamEvent>> watchEvents(String teamId, {DateTime? since}) {
+  Stream<List<TeamEvent>> watchEvents(
+    String teamId, {
+    DateTime? since,
+    Set<String>? audience,
+  }) {
     final day = _day(since);
+    final when = day?.toIso8601String() ?? 'all';
+    if (audience == null) {
+      return _shared.get(
+        'events/$teamId/$when',
+        () =>
+            countedSnapshots(_from(_events(teamId), day), 'events').map(_parse),
+      );
+    }
+    final ids = audience.toList()..sort();
     return _shared.get(
-      'events/$teamId/${day?.toIso8601String() ?? 'all'}',
-      () => countedSnapshots(_from(_events(teamId), day), 'events').map(_parse),
+      'events/$teamId/$when/${ids.join(',')}',
+      () => mergeLatest<TeamEvent>(
+        [
+          for (final id in ids)
+            countedSnapshots(
+              _from(_events(teamId).where('audience', arrayContains: id), day),
+              'events',
+            ).map(_parse),
+        ],
+        key: (e) => e.id,
+      ).map((l) => l..sort((a, b) => a.startsAt.compareTo(b.startsAt))),
     );
   }
 

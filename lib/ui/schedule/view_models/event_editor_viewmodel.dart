@@ -4,6 +4,7 @@ import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/user_post/user_post_repository.dart';
+import '../../../domain/models/chat.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../domain/models/user_post.dart';
@@ -88,23 +89,38 @@ class EventEditorViewModel extends ChangeNotifier {
 
   bool get canChooseSchedule => isNew && _editableTeams.isNotEmpty;
 
-  /// The event is on a community group's schedule.
-  bool get isCommunity =>
-      _editableTeams.where((t) => t.id == _teamId).firstOrNull?.isCommunity ??
-      false;
+  /// The team whose schedule the event is on: one of [editableTeams]
+  /// for a new event, or the event's own team when editing.
+  Team? get scheduleTeam =>
+      _editableTeams.where((t) => t.id == _teamId).firstOrNull ??
+      (_team?.id == _teamId ? _team : null);
+  Team? _team;
+
+  /// The event is on a community group's (or school or club's) schedule.
+  bool get isCommunity => scheduleTeam?.isCommunity ?? false;
+
+  /// The event is on a school or club community's schedule, so it says
+  /// which roles see it ([audienceChoices]).
+  bool get isOrganization => scheduleTeam?.isOrganization ?? false;
+
+  /// Who a community event can be shown to, id → label: everyone, then
+  /// each role. Empty for other schedules.
+  Map<String, String> get audienceChoices => switch (scheduleTeam) {
+    final t? when t.isOrganization => {
+      for (final id in ChatAudience.choicesFor(t))
+        id: ChatAudience.labelOf(t, id),
+    },
+    _ => const {},
+  };
 
   /// The event is on a private group's schedule, so it can't be public.
-  bool get isPrivateGroup =>
-      _editableTeams
-          .where((t) => t.id == _teamId)
-          .firstOrNull
-          ?.isPrivateGroup ??
-      false;
+  bool get isPrivateGroup => scheduleTeam?.isPrivateGroup ?? false;
 
-  /// Event types the chosen schedule offers.
+  /// Event types the chosen schedule offers. A school or club's events are
+  /// like a team's (practices, games, socials).
   List<EventType> get types => isPersonal
       ? EventType.editableFor(community: false)
-      : EventType.editableFor(community: isCommunity);
+      : EventType.editableFor(community: isCommunity && !isOrganization);
 
   /// Moves a new event to [teamId]'s schedule, or the personal one if null.
   void setSchedule(String? teamId) {
@@ -142,6 +158,13 @@ class EventEditorViewModel extends ChangeNotifier {
     }
     if (_original == null) {
       return Result.error(Exception('Event not found.'));
+    }
+    if (teamId != null) {
+      try {
+        _team = await _teams.watchTeam(teamId).first;
+      } on Exception {
+        _team = null;
+      }
     }
     notifyListeners();
     return const Result.ok(null);

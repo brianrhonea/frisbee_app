@@ -5,13 +5,14 @@ import '../../../utils/command.dart';
 import '../../../utils/platform_support.dart';
 import '../../../utils/result.dart';
 
+/// [email] may be a username too.
 typedef Credentials = ({String email, String password});
 
 class SignInViewModel extends ChangeNotifier {
   SignInViewModel({required AuthRepository authRepository})
     : _auth = authRepository {
     signIn = Command1<void, Credentials>(
-      (c) => _auth.signInWithEmail(c.email, c.password),
+      (c) => _auth.signIn(c.email, c.password),
     );
     signInWithGoogle = Command0<void>(_auth.signInWithGoogle);
     signInWithApple = Command0<void>(_auth.signInWithApple);

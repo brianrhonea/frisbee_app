@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../domain/models/chat.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
@@ -198,6 +199,7 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
           submitLabel: vm.isNew ? 'Create event' : 'Save',
           allowPoll: !vm.isPersonal,
           allowPublic: !vm.isPrivateGroup,
+          audienceChoices: vm.audienceChoices,
           types: vm.types,
           schedulePicker: vm.canChooseSchedule
               ? _SchedulePicker(viewModel: vm)
@@ -258,6 +260,7 @@ class _EventForm extends StatefulWidget {
     required this.types,
     this.allowPoll = true,
     this.allowPublic = true,
+    this.audienceChoices = const {},
     this.schedulePicker,
     this.allowShare = false,
     this.shrinkWrap = false,
@@ -293,6 +296,10 @@ class _EventForm extends StatefulWidget {
   /// Shown above the title when the event can go on more than one schedule.
   final Widget? schedulePicker;
 
+  /// For a school or club community's event: who it can be shown to,
+  /// id → label (everyone, then roles). Empty elsewhere.
+  final Map<String, String> audienceChoices;
+
   @override
   State<_EventForm> createState() => _EventFormState();
 }
@@ -320,6 +327,9 @@ class _EventFormState extends State<_EventForm> {
       : TimeOfDay.fromDateTime(widget.initial.endsAt!);
 
   late bool _public = widget.initial.isPublic;
+  late Set<String> _audience = widget.initial.audience.isEmpty
+      ? {ChatAudience.everyone}
+      : {...widget.initial.audience};
   bool _share = false;
   final _shareMessage = TextEditingController();
   late bool _hasPoll = widget.initial.poll != null;
@@ -414,6 +424,7 @@ class _EventFormState extends State<_EventForm> {
         location: _location.text.trim(),
         notes: _notes.text.trim(),
         isPublic: _public && widget.allowPoll && widget.allowPublic,
+        audience: widget.audienceChoices.isEmpty ? const {} : _audience,
         poll: () => _hasPoll && widget.allowPoll
             ? EventPoll(
                 question: _question.text.trim(),
@@ -533,6 +544,14 @@ class _EventFormState extends State<_EventForm> {
               alignLabelWithHint: true,
             ),
           ),
+          if (widget.audienceChoices.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _AudiencePicker(
+              choices: widget.audienceChoices,
+              picked: _audience,
+              onChanged: (a) => setState(() => _audience = a),
+            ),
+          ],
           if (widget.allowPoll) ...[
             if (widget.allowPublic)
               SwitchListTile(
@@ -737,10 +756,64 @@ class _SchedulePicker extends StatelessWidget {
         Text(
           vm.isPersonal
               ? 'Only you will see this event.'
+              : vm.isOrganization
+              ? 'Choose below who in the community sees it and can RSVP.'
               : vm.isCommunity
               ? 'Everyone in the group will see this event and can RSVP.'
               : 'Everyone on the team will see this event and can RSVP.',
           style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+/// Who sees a school or club community's event: everyone, or members with
+/// any of the picked roles. Picking a role drops everyone, and the last
+/// role off brings it back, so the event always has an audience.
+class _AudiencePicker extends StatelessWidget {
+  const _AudiencePicker({
+    required this.choices,
+    required this.picked,
+    required this.onChanged,
+  });
+
+  final Map<String, String> choices;
+  final Set<String> picked;
+  final ValueChanged<Set<String>> onChanged;
+
+  void _toggle(String id, bool on) {
+    const everyone = ChatAudience.everyone;
+    if (id == everyone) return onChanged(const {everyone});
+    final next = {...picked}..remove(everyone);
+    on ? next.add(id) : next.remove(id);
+    onChanged(next.isEmpty ? const {everyone} : next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Who sees it', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Text(
+          'Admins who manage events always see it.',
+          style: theme.textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            for (final e in choices.entries)
+              FilterChip(
+                label: Text(e.value),
+                selected: picked.contains(e.key),
+                onSelected: (on) => _toggle(e.key, on),
+              ),
+          ],
         ),
       ],
     );

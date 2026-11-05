@@ -36,17 +36,18 @@ class PushService {
   /// Shows the system prompt the first time; later calls just report.
   Future<PushStatus> requestPermission() async {
     if (!isSupported) return PushStatus.unsupported;
-    final status = _status(await _fcm.requestPermission());
-    if (status == PushStatus.enabled) {
-      // Banners while the app is open (iOS and macOS; Android shows none).
-      await _fcm.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-    }
-    return status;
+    return _status(await _fcm.requestPermission());
   }
+
+  /// While the app is open, iOS and macOS show no banner or sound: the app
+  /// shows its own small bubble from the feed instead. (Android never shows
+  /// one in the foreground.)
+  Future<void> _quietInForeground() =>
+      _fcm.setForegroundNotificationPresentationOptions(
+        alert: false,
+        badge: true,
+        sound: false,
+      );
 
   static PushStatus _status(NotificationSettings s) =>
       switch (s.authorizationStatus) {
@@ -62,6 +63,7 @@ class PushService {
   Future<String?> register() async {
     if (!isSupported) return null;
     try {
+      await _quietInForeground();
       final fid = _fcm.onRegistered.first.timeout(const Duration(seconds: 30));
       await _fcm.register();
       return await fid;

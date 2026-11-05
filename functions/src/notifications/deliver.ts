@@ -2,7 +2,7 @@ import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import type { Message, Messaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 
-import { type Notice, type Prefs, type Text, wants } from "./model";
+import { type Notice, type Prefs, type Text, shouldPush, wants } from "./model";
 
 // FIDs FCM no longer knows; their device docs are deleted.
 const goneCodes = new Set([
@@ -37,11 +37,13 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
   const feed = user.collection("notifications");
   const entry = notice.collapseId ? feed.doc(notice.collapseId) : feed.doc();
   // Repeats fold into the unread entry and count up; a read one starts over.
-  const text: Text = await db.runTransaction(async (tx) => {
+  // A repeat soon after the last push only updates the feed (shouldPush).
+  const { text, push } = await db.runTransaction(async (tx) => {
     const previous = notice.collapseId ? await tx.get(entry) : undefined;
-    const count =
-      previous?.exists && previous.get("read") === false ? Number(previous.get("count") ?? 1) + 1 : 1;
-    const text = notice.text(prefs, count);
+    const before = previous?.exists ? previous.data() : undefined;
+    const count = before?.read === false ? Number(before.count ?? 1) + 1 : 1;
+    const push = shouldPush(before, Date.now());
+    const text: Text = notice.text(prefs, count);
     tx.set(entry, {
       category: notice.category,
       title: text.title,
@@ -51,10 +53,12 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
       createdAt: FieldValue.serverTimestamp(),
       read: false,
       count,
+      pushedAt: push ? FieldValue.serverTimestamp() : (before?.pushedAt ?? null),
       ...(notice.extra ?? {}),
     });
-    return text;
+    return { text, push };
   });
+  if (!push) return;
 
   const devices = await user.collection("devices").get();
   if (devices.empty) return;
@@ -70,8 +74,17 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
   }));
   const result = await messaging.sendEach(messages);
   await Promise.all(
-    result.responses.map((r, i) =>
-      r.error && goneCodes.has(r.error.code) ? devices.docs[i].ref.delete() : undefined,
-    ),
+    result.responses.map((r, i) => {
+      if (!r.error) return undefined;
+      if (goneCodes.has(r.error.code)) return devices.docs[i].ref.delete();
+      // E.g. messaging/third-party-auth-error: the project has no APNs key.
+      logger.warn("Push failed", {
+        uid,
+        platform: devices.docs[i].get("platform"),
+        code: r.error.code,
+        error: r.error.message,
+      });
+      return undefined;
+    }),
   );
 }

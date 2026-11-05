@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/app_user.dart';
+import '../../../domain/models/player_profile.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../core/themes/theme.dart';
@@ -10,6 +12,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../profile/view_models/profile_viewmodel.dart';
 import '../../profile/widgets/delete_account_dialog.dart';
+import 'change_password_dialog.dart';
 import 'settings_widgets.dart';
 
 /// Names for the appearance choices.
@@ -93,7 +96,7 @@ class SettingsScreen extends StatelessWidget {
                   SettingsTile(
                     icon: Icons.people_outline,
                     title: 'People you follow',
-                    onTap: () => context.push(Routes.following),
+                    onTap: () => context.push(Routes.settingsFollowing),
                   ),
                   SettingsTile(
                     icon: Icons.person_outline,
@@ -196,12 +199,41 @@ class PrivacySettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     return _CommandErrors(
-      commands: [vm.setReadReceipts],
+      commands: [vm.setReadReceipts, vm.setPrivate, vm.setVisibility],
       child: ListenableBuilder(
-        listenable: vm,
+        listenable: Listenable.merge([vm, vm.setPrivate]),
         builder: (context, _) => SettingsPage(
           title: 'Privacy',
           children: [
+            SettingsGroup(
+              title: 'Account privacy',
+              footer:
+                  'Off: anyone on Stall 10 can see your profile. On: people '
+                  'ask to follow you, and only those you accept see your '
+                  'posts, bio and what you show below. Everyone still sees '
+                  'your name, @username and photo. People who already '
+                  'follow you stay.',
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.lock_outline),
+                  title: const Text('Private profile'),
+                  value: vm.isPrivate ?? false,
+                  onChanged: vm.isPrivate == null || vm.setPrivate.running
+                      ? null
+                      : vm.setPrivate.execute,
+                ),
+                if ((vm.isPrivate ?? false) || vm.followRequests.isNotEmpty)
+                  SettingsTile(
+                    icon: Icons.person_add_alt,
+                    title: 'Follow requests',
+                    value: switch (vm.followRequests.length) {
+                      0 => 'None',
+                      final n => '$n',
+                    },
+                    onTap: () => context.push(Routes.followRequests),
+                  ),
+              ],
+            ),
             SettingsGroup(
               title: 'Messages',
               footer:
@@ -217,16 +249,49 @@ class PrivacySettingsScreen extends StatelessWidget {
               ],
             ),
             SettingsGroup(
-              title: 'Profile',
+              title: 'Show on my profile',
               footer:
-                  'Choose whether others see your stats, teams and games '
-                  'with Edit profile on your profile.',
+                  "Turn a section off and it's hidden from everyone, "
+                  'followers included. Sections that are on are seen by '
+                  '${(vm.isPrivate ?? false) ? 'the followers you accept' : 'anyone on Stall 10'}.',
               children: [
-                SettingsTile(
-                  icon: Icons.visibility_outlined,
-                  title: 'What others see',
-                  onTap: () => context.go(Routes.profile),
-                ),
+                for (final (icon, label, on, update)
+                    in <
+                      (
+                        IconData,
+                        String,
+                        bool?,
+                        ProfileVisibility Function(ProfileVisibility, bool),
+                      )
+                    >[
+                      (
+                        Icons.bar_chart,
+                        'Stats',
+                        vm.visibility?.stats,
+                        (v, x) => v.copyWith(stats: x),
+                      ),
+                      (
+                        Icons.scoreboard_outlined,
+                        'Recent games',
+                        vm.visibility?.games,
+                        (v, x) => v.copyWith(games: x),
+                      ),
+                      (
+                        Icons.groups_outlined,
+                        'Teams',
+                        vm.visibility?.teams,
+                        (v, x) => v.copyWith(teams: x),
+                      ),
+                    ])
+                  SwitchListTile(
+                    secondary: Icon(icon),
+                    title: Text(label),
+                    value: on ?? true,
+                    onChanged: switch (vm.visibility) {
+                      final v? => (x) => vm.setVisibility.execute(update(v, x)),
+                      null => null,
+                    },
+                  ),
               ],
             ),
           ],
@@ -272,6 +337,19 @@ class AccountSettingsScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _changePassword(BuildContext context) async {
+    final changed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ChangePasswordDialog(viewModel: viewModel),
+    );
+    if (changed == true && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Password changed')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
@@ -310,6 +388,23 @@ class AccountSettingsScreen extends StatelessWidget {
                       icon: Icons.mail_outline,
                       title: 'Email',
                       value: email,
+                      opensPage: false,
+                    ),
+                  if (vm.hasPassword)
+                    SettingsTile(
+                      icon: Icons.password,
+                      title: 'Change password',
+                      onTap: () => _changePassword(context),
+                    )
+                  else if (vm.reauthMethod case final method?)
+                    SettingsTile(
+                      icon: Icons.password,
+                      title: 'Password',
+                      value: switch (method) {
+                        SignInMethod.google => 'You sign in with Google',
+                        SignInMethod.apple => 'You sign in with Apple',
+                        SignInMethod.password => '',
+                      },
                       opensPage: false,
                     ),
                 ],

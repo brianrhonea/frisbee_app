@@ -1,3 +1,4 @@
+import '../../../domain/models/app_user.dart';
 import '../../../domain/models/follow.dart';
 import '../../../utils/result.dart';
 
@@ -25,6 +26,28 @@ abstract class FollowRepository {
   /// How many people follow [key], and, for a user key, how many targets
   /// that user follows.
   Stream<FollowCounts> watchCounts(String key);
+
+  // Private profiles ------------------------------------------------------
+
+  /// Whether [uid] has asked to follow the private profile [owner].
+  Stream<bool> watchFollowRequested(String uid, String owner);
+
+  /// Asks to follow [owner]'s private profile.
+  Future<Result<void>> requestFollow(AppUser me, String owner);
+
+  Future<Result<void>> cancelFollowRequest(String uid, String owner);
+
+  /// People asking to follow [owner], oldest first.
+  Stream<List<FollowRequest>> watchFollowRequests(String owner);
+
+  /// Lets [request]'s sender follow [owner]: creates their follow and
+  /// removes the request, together.
+  Future<Result<void>> acceptFollowRequest(
+    AppUser owner,
+    FollowRequest request,
+  );
+
+  Future<Result<void>> declineFollowRequest(String owner, String requester);
 }
 
 class FollowCounts {

@@ -17,6 +17,50 @@ export interface TeamMembers {
 export const recentSignInSeconds = 5 * 60;
 
 /** Whether `authTime` (seconds since epoch) is recent enough at `now` (ms). */
+/**
+ * A typed username as stored (Username in lib/domain/models/username.dart:
+ * lowercase, an optional leading "@" dropped), or null if it can't be one.
+ */
+export function signInHandle(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const handle = input.trim().replace(/^@/, "").toLowerCase();
+  if (!/^[a-z0-9_.]{3,20}$/.test(handle)) return null;
+  if (handle.startsWith(".") || handle.endsWith(".") || handle.includes("..")) return null;
+  return handle;
+}
+
+/** What the sign-in form shows for a failed username sign-in. */
+export type SignInFailure = { code: "unauthenticated" | "resource-exhausted" | "unavailable"; message: string };
+
+/**
+ * The Identity Toolkit error for a password check, as the form should see
+ * it. An unknown username and a wrong password read the same, so the form
+ * can't be used to find out who has an account.
+ */
+export function signInFailure(identityToolkitMessage: string | undefined): SignInFailure {
+  const m = identityToolkitMessage ?? "";
+  if (m.startsWith("TOO_MANY_ATTEMPTS_TRY_LATER")) {
+    return { code: "resource-exhausted", message: "Too many attempts. Wait a few minutes, or reset your password." };
+  }
+  if (m.startsWith("USER_DISABLED")) {
+    return { code: "unauthenticated", message: "This account has been disabled." };
+  }
+  if (
+    m.startsWith("INVALID_PASSWORD") ||
+    m.startsWith("INVALID_LOGIN_CREDENTIALS") ||
+    m.startsWith("EMAIL_NOT_FOUND") ||
+    m === ""
+  ) {
+    return wrongCredentials;
+  }
+  return { code: "unavailable", message: "Couldn't sign in right now. Try again." };
+}
+
+export const wrongCredentials: SignInFailure = {
+  code: "unauthenticated",
+  message: "Incorrect username or password.",
+};
+
 export function signedInRecently(authTime: unknown, now: number): boolean {
   return typeof authTime === "number" && now / 1000 - authTime <= recentSignInSeconds;
 }

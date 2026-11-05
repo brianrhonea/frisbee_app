@@ -6,7 +6,7 @@ const appName = 'Stall 10';
 
 /// Matches `version:` in pubspec.yaml (checked by test/version_test.dart).
 /// The log of versions is in docs/CHANGELOG.md.
-const appVersion = '0.0.11';
+const appVersion = '0.0.12';
 
 /// The app icon: a "10" whose "0" is a flying disc. Drawn, with every
 /// platform's launcher icon, by tool/brand/stall10_logo.py.

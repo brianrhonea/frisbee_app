@@ -152,10 +152,130 @@ class TeamRepositoryFirebase implements TeamRepository {
   };
 
   @override
-  Future<Result<String>> createTeam(NewTeam team, AppUser owner) => guard(
-    () async {
-      // No invite code: admins mint short-lived ones when they share.
-      final ref = _teams.doc();
+  Future<Result<String>> createTeam(NewTeam team, AppUser owner) =>
+      guard(() async {
+        final ref = _teams.doc();
+        await _newTeamBatch(ref, team, owner).commit();
+        return ref.id;
+      });
+
+  @override
+  Future<Result<String>> createTeamInCommunity(
+    NewTeam team,
+    AppUser owner,
+    Team org,
+    Set<String> roles,
+  ) => guard(() async {
+    final ref = _teams.doc();
+    final linked = LinkedTeam(
+      id: ref.id,
+      name: team.name,
+      division: team.division,
+      roles: roles,
+    );
+    await (_newTeamBatch(ref, team.inCommunity(org), owner)..update(
+          _teams.doc(org.id),
+          {'linkedTeams.${ref.id}': linked.toMap()},
+        ))
+        .commit();
+    return ref.id;
+  });
+
+  @override
+  Future<Result<void>> requestCommunityLink(
+    Team team,
+    TeamListing org,
+    AppUser by,
+  ) => guard(
+    () =>
+        (_db.batch()
+              ..update(_teams.doc(team.id), {
+                'orgId': org.id,
+                'orgName': org.name,
+              })
+              ..set(_linkRequests(org.id).doc(team.id), {
+                'teamName': team.name,
+                'division': team.division.name,
+                'requestedBy': by.uid,
+                'requestedByName': by.label,
+                'createdAt': FieldValue.serverTimestamp(),
+              }))
+            .commit(),
+  );
+
+  @override
+  Future<Result<void>> leaveCommunity(Team team) => guard(() async {
+    final orgId = team.orgId;
+    final batch = _db.batch()
+      ..update(_teams.doc(team.id), {'orgId': null, 'orgName': ''});
+    if (orgId != null && !team.orgLinked) {
+      batch.delete(_linkRequests(orgId).doc(team.id));
+    }
+    await batch.commit();
+  });
+
+  @override
+  Stream<bool> watchLinkRequested(String orgId, String teamId) =>
+      _linkRequests(orgId).doc(teamId).snapshots().map((d) => d.exists);
+
+  @override
+  Stream<List<TeamLinkRequest>> watchLinkRequests(String orgId) =>
+      _linkRequests(orgId)
+          .orderBy('createdAt')
+          .snapshots()
+          .map(
+            (snap) => [
+              for (final d in snap.docs)
+                TeamLinkRequest.fromMap(d.id, plainData(d.data())),
+            ],
+          );
+
+  @override
+  Future<Result<void>> acceptLinkRequest(
+    Team org,
+    TeamLinkRequest request,
+    Set<String> roles,
+  ) => guard(
+    () =>
+        (_db.batch()
+              ..update(_teams.doc(org.id), {
+                'linkedTeams.${request.teamId}': LinkedTeam(
+                  id: request.teamId,
+                  name: request.teamName,
+                  division: request.division,
+                  roles: roles,
+                ).toMap(),
+              })
+              ..delete(_linkRequests(org.id).doc(request.teamId)))
+            .commit(),
+  );
+
+  @override
+  Future<Result<void>> declineLinkRequest(String orgId, String teamId) =>
+      guard(() => _linkRequests(orgId).doc(teamId).delete());
+
+  @override
+  Future<Result<void>> saveLinkedTeam(String orgId, LinkedTeam team) => guard(
+    () => _teams.doc(orgId).update({'linkedTeams.${team.id}': team.toMap()}),
+  );
+
+  @override
+  Future<Result<void>> unlinkTeam(String orgId, String teamId) => guard(
+    () =>
+        _teams.doc(orgId).update({'linkedTeams.$teamId': FieldValue.delete()}),
+  );
+
+  CollectionReference<Map<String, dynamic>> _linkRequests(String orgId) =>
+      _teams.doc(orgId).collection('linkRequests');
+
+  /// A new team's doc, directory listing and starting chat rooms. No
+  /// invite code: admins mint short-lived ones when they share.
+  WriteBatch _newTeamBatch(
+    DocumentReference<Map<String, dynamic>> ref,
+    NewTeam team,
+    AppUser owner,
+  ) {
+    {
       // Every team starts with General and a few voice channels.
       final batch = _db.batch()
         ..set(ref, _teamDoc(team, owner))
@@ -171,10 +291,9 @@ class TeamRepositoryFirebase implements TeamRepository {
       for (final r in ChatRoom.defaultVoiceRooms()) {
         batch.set(chatRooms(_db, ref.id).doc(r.id), newRoomData(r, owner.uid));
       }
-      await batch.commit();
-      return ref.id;
-    },
-  );
+      return batch;
+    }
+  }
 
   @override
   Future<Result<String>> resolveInviteCode(String inviteCode) =>

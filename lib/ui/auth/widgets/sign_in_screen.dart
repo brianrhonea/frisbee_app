@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/username.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/error_message.dart';
 import '../view_models/sign_in_viewmodel.dart';
@@ -77,8 +78,8 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   void _forgotPassword() {
-    if (_email.text.trim().isEmpty) {
-      showSnackBar(context, 'Enter your email first.');
+    if (!isEmail(_email.text)) {
+      showSnackBar(context, 'Enter your email to reset your password.');
       return;
     }
     vm.sendPasswordReset.execute(_email.text);
@@ -105,12 +106,18 @@ class _SignInScreenState extends State<SignInScreen> {
                 children: [
                   TextFormField(
                     controller: _email,
-                    decoration: const InputDecoration(labelText: 'Email'),
+                    decoration: const InputDecoration(
+                      labelText: 'Email or username',
+                    ),
                     keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
+                    autocorrect: false,
+                    autofillHints: const [
+                      AutofillHints.username,
+                      AutofillHints.email,
+                    ],
                     textInputAction: TextInputAction.next,
-                    validator: (v) => (v == null || !v.contains('@'))
-                        ? 'Enter a valid email'
+                    validator: (v) => (v == null || v.trim().length < 3)
+                        ? 'Enter your email or username'
                         : null,
                   ),
                   const SizedBox(height: 12),

@@ -58,21 +58,25 @@ enum TeamRole {
   /// Community groups call players members. Captains in a group are
   /// organizers from before custom roles, until the owner's app moves them
   /// into an "Organizer" role ([Team.needsOrganizerMigration]).
-  String labelFor(TeamKind kind) => switch ((kind, this)) {
-    (TeamKind.community, captain) => 'Organizer',
-    (TeamKind.community, player) => 'Member',
+  String labelFor(TeamKind kind) => switch ((kind.isGroupLike, this)) {
+    (true, captain) => 'Organizer',
+    (true, player) => 'Member',
     _ => label,
   };
 
-  String pluralLabelFor(TeamKind kind) => switch ((kind, this)) {
-    (TeamKind.community, captain) => 'Organizers',
-    (TeamKind.community, player) => 'Members',
+  String pluralLabelFor(TeamKind kind) => switch ((kind.isGroupLike, this)) {
+    (true, captain) => 'Organizers',
+    (true, player) => 'Members',
     _ => pluralLabel,
   };
 
   String summaryFor(TeamKind kind) => switch ((kind, this)) {
-    (TeamKind.community, owner) => 'Everything, including roles',
-    (TeamKind.community, captain) =>
+    (TeamKind.organization, owner) => 'Everything, including roles and teams',
+    (TeamKind.organization, player) =>
+      'Roles decide which teams, chats and events they get',
+    (TeamKind.community || TeamKind.organization, owner) =>
+      'Everything, including roles',
+    (TeamKind.community || TeamKind.organization, captain) =>
       'Manage events, tournaments and join requests',
     (TeamKind.community, player) => 'Join events; roles can grant more',
     (TeamKind.team, player) => 'View the team; roles can grant more',
@@ -92,14 +96,25 @@ enum TeamRole {
   };
 }
 
-/// A closed team (invite code, roster, stats) or an open community group
-/// anyone can join, with pickup events and tournaments instead.
+/// A closed team (invite code, roster, stats), an open community group
+/// anyone can join, with pickup events and tournaments instead, or a
+/// school or club community: members, roles, chats and events like a
+/// group, plus the teams it links (each still a full team), which members
+/// join by holding the roles each team asks for.
 enum TeamKind {
-  team('Team'),
-  community('Community group');
+  team('Team', 'team'),
+  community('Community group', 'group'),
+  organization('School or club', 'community');
 
-  const TeamKind(this.label);
+  const TeamKind(this.label, this.noun);
   final String label;
+
+  /// What the app calls one in a sentence: "team", "group", "community".
+  final String noun;
+
+  /// Joined like a group (openly or with approval) and has a description
+  /// and location, no roster or stats of its own.
+  bool get isGroupLike => this != team;
 }
 
 /// Where a community group plays, shown on a map on its home page.
@@ -150,7 +165,7 @@ Map<String, dynamic> communityFields({
   required String description,
   required bool requiresApproval,
   required GroupLocation? location,
-}) => kind == TeamKind.community
+}) => kind.isGroupLike
     ? {
         'kind': kind.name,
         'description': description,
@@ -202,7 +217,18 @@ class Team {
     this.roles = const {},
     this.memberRoles = const {},
     this.memberPerms = const {},
+    this.linkedTeams = const {},
+    this.orgId,
+    this.orgName = '',
+    this.orgLinked = false,
+    this.orgMembers = const {},
+    this.orgRoles = const {},
   });
+
+  /// Team roles that copy a community role (team role id → community role
+  /// id), e.g. Woof Captain. Who has them follows the community: the
+  /// communities Cloud Functions give and take them away.
+  final Map<String, String> orgRoles;
 
   final String id;
   final String name;
@@ -211,6 +237,47 @@ class Team {
   final String city;
   final String ownerId;
   final TeamKind kind;
+
+  /// A community's teams, by team id (organizations only). Its admins
+  /// write them; a team is only really in the community once its own
+  /// admins asked to be ([orgId]).
+  final Map<String, LinkedTeam> linkedTeams;
+
+  /// The community this team asked to join or is part of, if any. Team
+  /// admins set it; the community accepts by listing the team.
+  final String? orgId;
+  final String orgName;
+
+  /// Whether the community accepted the team. Cloud Functions set it,
+  /// along with [orgMembers].
+  final bool orgLinked;
+
+  /// Members the community added because they hold one of the team's
+  /// roles there. They leave again when they lose it; members added on the
+  /// team itself never do. Cloud Functions keep it.
+  final Set<String> orgMembers;
+
+  bool get isOrganization => kind == TeamKind.organization;
+
+  /// Part of a community that accepted it.
+  bool get inCommunity => orgLinked && orgId != null;
+
+  /// Asked to join a community that hasn't answered yet.
+  bool get communityPending => orgId != null && !orgLinked;
+
+  /// Linked teams, by name.
+  List<LinkedTeam> get sortedLinkedTeams =>
+      linkedTeams.values.toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+  /// The linked teams [uid]'s roles let into.
+  Set<String> teamsFor(String uid) {
+    final mine = memberRoles[uid] ?? const <String>{};
+    return {
+      for (final t in linkedTeams.values)
+        if (t.roles.any(mine.contains)) t.id,
+    };
+  }
 
   /// Custom roles by id. Only the owner edits them.
   final Map<String, CustomRole> roles;
@@ -233,11 +300,23 @@ class Team {
   /// Where the group plays. Groups only.
   final GroupLocation? location;
 
-  bool get isCommunity => kind == TeamKind.community;
+  /// A community group or a school or club community: joined openly or
+  /// with approval, no roster or stats of its own.
+  bool get isCommunity => kind.isGroupLike;
 
   /// A group that needs approval to join. Its location, posts and events are
   /// for members only; search shows just its name, city and description.
   bool get isPrivateGroup => isCommunity && requiresApproval;
+
+  /// Who [uid] counts as when an event or room lists who sees it, or null
+  /// if they see everything: on a team or group, and for a community's
+  /// owner and event managers.
+  Set<String>? eventAudienceOf(String uid) {
+    if (!isOrganization || has(uid, TeamPermission.manageEvents)) return null;
+    final role = roleOf(uid);
+    if (role == null) return const {};
+    return {'everyone', role.name, ...?memberRoles[uid]};
+  }
 
   /// uid → role.
   final Map<String, TeamRole> members;
@@ -408,6 +487,17 @@ class Team {
       roles: parseCustomRoles(map['roles']),
       memberRoles: parseMemberLists(map['memberRoles'], (s) => s),
       memberPerms: parseMemberLists(map['memberPerms'], permissionByName),
+      linkedTeams: LinkedTeam.parse(map['linkedTeams']),
+      orgId: map['orgId'] as String?,
+      orgName: map['orgName'] as String? ?? '',
+      orgLinked: map['orgLinked'] == true,
+      orgMembers: {
+        for (final u in (map['orgMembers'] as List?) ?? const []) '$u',
+      },
+      orgRoles: {
+        if (map['orgRoles'] case final Map m)
+          for (final e in m.entries) '${e.key}': '${e.value}',
+      },
     );
   }
 
@@ -441,6 +531,12 @@ class Team {
     Map<String, CustomRole>? roles,
     Map<String, Set<String>>? memberRoles,
     Map<String, Set<TeamPermission>>? memberPerms,
+    Map<String, LinkedTeam>? linkedTeams,
+    String? Function()? orgId,
+    String? orgName,
+    bool? orgLinked,
+    Set<String>? orgMembers,
+    Map<String, String>? orgRoles,
   }) => Team(
     id: id,
     name: name ?? this.name,
@@ -462,7 +558,96 @@ class Team {
     roles: roles ?? this.roles,
     memberRoles: memberRoles ?? this.memberRoles,
     memberPerms: memberPerms ?? this.memberPerms,
+    linkedTeams: linkedTeams ?? this.linkedTeams,
+    orgId: orgId != null ? orgId() : this.orgId,
+    orgName: orgName ?? this.orgName,
+    orgLinked: orgLinked ?? this.orgLinked,
+    orgMembers: orgMembers ?? this.orgMembers,
+    orgRoles: orgRoles ?? this.orgRoles,
   );
+}
+
+/// A team in a school or club community (`linkedTeams.{teamId}` on the
+/// community's doc): its name for the community's Teams list, and the
+/// community roles that make someone a member of it.
+class LinkedTeam {
+  const LinkedTeam({
+    required this.id,
+    required this.name,
+    this.division = Division.mixed,
+    this.roles = const {},
+  });
+
+  /// Most teams a community links; firestore.rules agrees.
+  static const max = 20;
+
+  final String id;
+  final String name;
+  final Division division;
+
+  /// Community role ids; holding any of them puts you on the team.
+  final Set<String> roles;
+
+  static Map<String, LinkedTeam> parse(Object? raw) => {
+    if (raw is Map)
+      for (final e in raw.entries)
+        if (e.value is Map)
+          '${e.key}': LinkedTeam.fromMap(
+            '${e.key}',
+            Map<String, dynamic>.from(e.value as Map),
+          ),
+  };
+
+  factory LinkedTeam.fromMap(String id, Map<String, dynamic> map) => LinkedTeam(
+    id: id,
+    name: map['name'] as String? ?? '',
+    division: enumByName(Division.values, map['division'], Division.mixed),
+    roles: {for (final r in (map['roles'] as List?) ?? const []) '$r'},
+  );
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'division': division.name,
+    'roles': roles.toList()..sort(),
+  };
+
+  LinkedTeam copyWith({String? name, Set<String>? roles}) => LinkedTeam(
+    id: id,
+    name: name ?? this.name,
+    division: division,
+    roles: roles ?? this.roles,
+  );
+}
+
+/// A team asking to join a school or club community
+/// (`teams/{orgId}/linkRequests/{teamId}`). The community's admins accept
+/// it (choosing which roles get on the team) or decline it.
+class TeamLinkRequest {
+  const TeamLinkRequest({
+    required this.teamId,
+    required this.teamName,
+    this.division = Division.mixed,
+    this.requestedBy = '',
+    this.requestedByName = '',
+    this.createdAt,
+  });
+
+  final String teamId;
+  final String teamName;
+  final Division division;
+  final String requestedBy;
+  final String requestedByName;
+  final DateTime? createdAt;
+
+  factory TeamLinkRequest.fromMap(String teamId, Map<String, dynamic> map) =>
+      TeamLinkRequest(
+        teamId: teamId,
+        teamName: map['teamName'] as String? ?? '',
+        division: enumByName(Division.values, map['division'], Division.mixed),
+        requestedBy: map['requestedBy'] as String? ?? '',
+        requestedByName: map['requestedByName'] as String? ?? '',
+        createdAt: parseDate(map['createdAt']),
+      );
 }
 
 /// Input for creating a team or community group.
@@ -476,6 +661,8 @@ class NewTeam {
     this.description = '',
     this.requiresApproval = false,
     this.location,
+    this.orgId,
+    this.orgName = '',
   });
 
   final String name;
@@ -486,6 +673,10 @@ class NewTeam {
   final String description;
   final bool requiresApproval;
   final GroupLocation? location;
+
+  /// The community it's made in, if any (a team only).
+  final String? orgId;
+  final String orgName;
 
   Map<String, dynamic> toMap() => {
     'name': name,
@@ -498,7 +689,17 @@ class NewTeam {
       requiresApproval: requiresApproval,
       location: location,
     ),
+    if (orgId case final id?) ...{'orgId': id, 'orgName': orgName},
   };
+
+  NewTeam inCommunity(Team org) => NewTeam(
+    name: name,
+    division: division,
+    level: level,
+    city: city,
+    orgId: org.id,
+    orgName: org.name,
+  );
 
   /// The directory listing for the new team, once it has [id].
   TeamListing listing(String id) => TeamListing(
@@ -563,7 +764,9 @@ class TeamListing {
   /// Team name as USA Ultimate shows it.
   final String? usauName;
 
-  bool get isCommunity => kind == TeamKind.community;
+  bool get isCommunity => kind.isGroupLike;
+
+  bool get isOrganization => kind == TeamKind.organization;
 
   /// A group that needs approval to join. Its location, posts and events are
   /// for members only; search shows just its name, city and description.
@@ -669,7 +872,7 @@ class TeamInvite {
   final String invitedByName;
   final DateTime? createdAt;
 
-  bool get isCommunity => kind == TeamKind.community;
+  bool get isCommunity => kind.isGroupLike;
 
   factory TeamInvite.fromMap(String teamId, Map<String, dynamic> map) =>
       TeamInvite(

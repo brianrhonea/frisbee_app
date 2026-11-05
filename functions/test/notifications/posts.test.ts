@@ -5,7 +5,9 @@ import {
   commentNotice,
   followCountChanges,
   followerNotice,
+  followAcceptedNotice,
   followKeys,
+  followRequestNotice,
   likeNotice,
   newLikers,
   repostNotice,
@@ -136,6 +138,17 @@ describe("likes, reposts and followers", () => {
     expect(n.collapseId).toBeUndefined();
     expect(n.text({}, 1).title).toBe("Riley started following you");
     expect(n.extra).toEqual({ followBack: { uid: "u9", name: "Riley", photoUrl: "https://x/p.png" } });
+  });
+
+  it("tells a private profile about requests, folded, and the asker when accepted", () => {
+    const r = followRequestNotice({ requesterId: "u9", name: "Riley" });
+    expect(r.route).toBe("/settings/follow-requests");
+    expect(r.collapseId).toBe("followRequests");
+    expect(r.text({}, 1).title).toBe("Riley wants to follow you");
+    expect(r.text({}, 3).title).toBe("3 people want to follow you");
+    const a = followAcceptedNotice({ ownerId: "u1", name: "Pat" });
+    expect(a.route).toBe("/players/u1");
+    expect(a.text({}, 1).title).toBe("Pat accepted your follow request");
   });
 
   it("previews event and repost posts", () => {

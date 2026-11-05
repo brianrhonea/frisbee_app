@@ -6,6 +6,7 @@ import '../../../domain/models/discord_import.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/discord_import_viewmodel.dart';
@@ -37,6 +38,26 @@ class _DiscordImportScreenState extends State<DiscordImportScreen> {
     vm.apply.removeListener(_onApply);
     _link.dispose();
     super.dispose();
+  }
+
+  Future<void> _import() async {
+    final moving = vm.moving;
+    if (moving.isNotEmpty) {
+      final ok = await confirmDialog(
+        context,
+        title:
+            'Move ${moving.length} room${moving.length == 1 ? '' : 's'} '
+            'to teams?',
+        message:
+            'These are in the community chat now and will be deleted there '
+            'once their team has them, with any messages in them: '
+            '${moving.map((r) => '#${r.name}').join(', ')}.',
+        confirmLabel: 'Move and import',
+        destructive: true,
+      );
+      if (!ok || !mounted) return;
+    }
+    vm.apply.execute();
   }
 
   void _onApply() {
@@ -116,7 +137,16 @@ class _DiscordImportScreenState extends State<DiscordImportScreen> {
                       ),
                     ],
                     if (vm.plan case final plan? when import != null) ...[
+                      if (vm.split case final split?) ...[
+                        const SizedBox(height: 24),
+                        _TeamSorting(viewModel: vm, plan: plan, split: split),
+                      ],
                       const SizedBox(height: 24),
+                      if (vm.split != null)
+                        Text(
+                          'Community chat',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       _Preview(
                         plan: plan,
                         import: import,
@@ -138,10 +168,10 @@ class _DiscordImportScreenState extends State<DiscordImportScreen> {
                         )
                       else
                         FilledButton.icon(
-                          onPressed: vm.canApply ? vm.apply.execute : null,
+                          onPressed: vm.canApply ? _import : null,
                           icon: const Icon(Icons.download_done),
                           label: Text(
-                            import.isEmpty ? 'Nothing new to import' : 'Import',
+                            vm.canApply ? 'Import' : 'Nothing new to import',
                           ),
                         ),
                     ],
@@ -235,6 +265,109 @@ class _Preview extends StatelessWidget {
           note('Already here: ${import.alreadyHere.join(', ')}'),
         if (plan.skippedChannels.isNotEmpty)
           note('Not imported: ${plan.skippedChannels.join(', ')}'),
+      ],
+    );
+  }
+}
+
+/// In a community with teams: where each room goes, what each team gets,
+/// and which community rooms move.
+class _TeamSorting extends StatelessWidget {
+  const _TeamSorting({
+    required this.viewModel,
+    required this.plan,
+    required this.split,
+  });
+
+  final DiscordImportViewModel viewModel;
+  final DiscordImportPlan plan;
+  final DiscordTeamSplit split;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final theme = Theme.of(context);
+    final c = AppColors.of(context);
+    final folders = {for (final f in plan.folders) f.key: f.name};
+    Widget note(String text) => Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text(text, style: TextStyle(color: c.muted, fontSize: 13)),
+    );
+    final moving = vm.moving;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Where rooms go', style: theme.textTheme.titleMedium),
+        note(
+          "Rooms only one team's roles can read go to that team's chat; "
+          'the rest stay in the community. Change any of them here.',
+        ),
+        if (vm.otherTeams.isNotEmpty)
+          note(
+            "Only a team's owner can add rooms to it, so rooms for "
+            '${vm.otherTeams.map((t) => t.name).join(', ')} stay in the '
+            'community.',
+          ),
+        const SizedBox(height: 8),
+        for (var i = 0; i < plan.rooms.length; i++)
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.tag, size: 18),
+            title: Text(
+              [
+                ?folders[plan.rooms[i].folderKey],
+                plan.rooms[i].name,
+              ].join(' / '),
+            ),
+            trailing: DropdownButton<String?>(
+              value: split.destinations[i],
+              onChanged: (v) => vm.setDestination(i, v),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Community')),
+                for (final t in vm.teamChoices)
+                  DropdownMenuItem(value: t.id, child: Text(t.name)),
+              ],
+            ),
+          ),
+        for (final t in vm.teamImports)
+          Card(
+            margin: const EdgeInsets.only(top: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${t.team.name} chat',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  note(
+                    t.isEmpty
+                        ? 'Already has everything.'
+                        : '${t.import.rooms.length} new room'
+                              '${t.import.rooms.length == 1 ? '' : 's'}'
+                              '${t.import.folders.isEmpty ? '' : ' in ${t.import.folders.map((f) => f.name).join(', ')}'}'
+                              '${t.import.alreadyHere.isEmpty ? '' : '; already there: ${t.import.alreadyHere.join(', ')}'}.',
+                  ),
+                  note(
+                    'Team roles kept in step with the community: '
+                    '${[for (final id in t.orgRoles.keys) ?t.import.roles[id]?.name].join(', ')}.',
+                  ),
+                  for (final r in t.import.rooms)
+                    note(
+                      '#${r.name}: '
+                      '${r.readRoles.contains(ChatAudience.everyone) ? 'the whole team' : r.readRoles.map((id) => t.import.roles[id]?.name ?? 'owner only').join(', ')}',
+                    ),
+                ],
+              ),
+            ),
+          ),
+        if (moving.isNotEmpty)
+          note(
+            'Moving out of the community chat: '
+            '${moving.map((r) => '#${r.name}').join(', ')}.',
+          ),
       ],
     );
   }

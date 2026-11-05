@@ -2754,6 +2754,16 @@ describe("usernames", () => {
     await assertSucceeds(claim(OWNER, "olive_o"));
   });
 
+  it("signed out, you can only see that a name is free", async () => {
+    const anon = env.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(anon, "usernames", "pat.player")));
+    await assertSucceeds(claim(PLAYER, "pat.player"));
+    // Taken: refused, so whose it is never leaks.
+    await assertFails(getDoc(doc(anon, "usernames", "pat.player")));
+    await assertSucceeds(getDoc(doc(db(OWNER), "usernames", "pat.player")));
+    await assertFails(setDoc(doc(anon, "usernames", "olive"), { uid: OWNER, createdAt: serverTimestamp() }));
+  });
+
   it("rejects bad names and claims that don't match the profile", async () => {
     for (const bad of ["Pat", "pa", "a".repeat(21), ".pat", "pat.", "pa..t", "pat lee", "pat!"]) {
       await assertFails(claim(PLAYER, bad));
@@ -2777,5 +2787,258 @@ describe("usernames", () => {
     await assertSucceeds(setDoc(doc(fs, "profiles", PLAYER), profile({ bio: "Cutter" }), { merge: true }));
     await assertFails(deleteDoc(doc(fs, "usernames", "pat")));
     await assertFails(setDoc(doc(db(OWNER), "usernames", "pat"), { uid: OWNER, createdAt: serverTimestamp() }));
+  });
+});
+
+describe("private profiles", () => {
+  const followDoc = (follower: string, target: string, as = follower) =>
+    doc(db(as), "users", follower, "follows", `user_${target}`);
+  const userFollow = (target: string, extra: Record<string, unknown> = {}) => ({
+    key: `user_${target}`,
+    type: "user",
+    targetId: target,
+    name: "Pat Player",
+    photoUrl: null,
+    notify: false,
+    createdAt: serverTimestamp(),
+    ...extra,
+  });
+  const request = (requester: string, owner = PLAYER, as = requester) =>
+    doc(db(as), "profiles", owner, "followRequests", requester);
+  const requestData = { name: "Olive Owner", username: "olive", photoUrl: null, createdAt: serverTimestamp() };
+  const details = (as: string) => doc(db(as), "profiles", PLAYER, "private", "details");
+
+  beforeEach(async () => {
+    const fs = db(PLAYER);
+    await assertSucceeds(
+      writeBatch(fs)
+        .set(doc(fs, "profiles", PLAYER), {
+          name: "Pat Player", keywords: ["pat"], photoUrl: null, tags: [], updatedAt: serverTimestamp(), private: true,
+        })
+        .set(doc(fs, "profiles", PLAYER, "private", "details"), {
+          bio: "Handler", tags: ["hawks"], teams: [], updatedAt: serverTimestamp(),
+        })
+        .commit(),
+    );
+  });
+
+  it("shows strangers only the public doc, and won't let them just follow", async () => {
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "profiles", PLAYER)));
+    await assertFails(getDoc(details(OUTSIDER)));
+    await assertFails(setDoc(followDoc(OUTSIDER, PLAYER), userFollow(PLAYER)));
+    // Nor approve themselves.
+    await assertFails(setDoc(followDoc(OUTSIDER, PLAYER), userFollow(PLAYER, { approved: true })));
+    await assertSucceeds(getDoc(details(PLAYER)));
+  });
+
+  it("an accepted request lets them follow and see everything", async () => {
+    await assertSucceeds(setDoc(request(OUTSIDER), requestData));
+    await assertSucceeds(getDoc(request(OUTSIDER)));
+    await assertFails(getDoc(request(OUTSIDER, PLAYER, OWNER)));
+    await assertSucceeds(getDocs(collection(db(PLAYER), "profiles", PLAYER, "followRequests")));
+
+    // Without removing the request, or for someone who didn't ask: no.
+    await assertFails(setDoc(followDoc(OUTSIDER, PLAYER, PLAYER), userFollow(PLAYER, { approved: true })));
+    const fs = db(PLAYER);
+    await assertFails(
+      writeBatch(fs)
+        .set(doc(fs, "users", OWNER, "follows", `user_${PLAYER}`), userFollow(PLAYER, { approved: true }))
+        .delete(doc(fs, "profiles", PLAYER, "followRequests", OUTSIDER))
+        .commit(),
+    );
+    await assertSucceeds(
+      writeBatch(fs)
+        .set(doc(fs, "users", OUTSIDER, "follows", `user_${PLAYER}`), userFollow(PLAYER, { approved: true }))
+        .delete(doc(fs, "profiles", PLAYER, "followRequests", OUTSIDER))
+        .commit(),
+    );
+    await assertSucceeds(getDoc(details(OUTSIDER)));
+    // Already following: no second request.
+    await assertFails(setDoc(request(OUTSIDER), requestData));
+    // The player can remove them again.
+    await assertSucceeds(deleteDoc(followDoc(OUTSIDER, PLAYER, PLAYER)));
+    await assertFails(getDoc(details(OUTSIDER)));
+  });
+
+  it("requests are well-formed, and declined or taken back by deleting", async () => {
+    await assertFails(setDoc(request(OUTSIDER, PLAYER, OWNER), requestData));
+    await assertFails(setDoc(request(PLAYER), requestData));
+    await assertFails(setDoc(request(OUTSIDER), { ...requestData, uid: OWNER }));
+    await assertFails(setDoc(request(OUTSIDER), { ...requestData, createdAt: new Date("2020-01-01") }));
+    await assertSucceeds(setDoc(request(OUTSIDER), requestData));
+    await assertFails(deleteDoc(request(OUTSIDER, PLAYER, OWNER)));
+    await assertSucceeds(deleteDoc(request(OUTSIDER, PLAYER, PLAYER)));
+    await assertSucceeds(setDoc(request(OUTSIDER), requestData));
+    await assertSucceeds(deleteDoc(request(OUTSIDER)));
+  });
+
+  it("public profiles take no requests and are followed directly", async () => {
+    await assertSucceeds(
+      setDoc(doc(db(PLAYER), "profiles", PLAYER), { private: false }, { merge: true }),
+    );
+    await assertFails(setDoc(request(OUTSIDER), requestData));
+    await assertSucceeds(setDoc(followDoc(OUTSIDER, PLAYER), userFollow(PLAYER)));
+  });
+
+  it("only the player writes the private doc, with profile fields only", async () => {
+    await assertFails(setDoc(details(OUTSIDER), { bio: "hacked" }));
+    await assertFails(setDoc(details(PLAYER), { email: "x@y.z" }));
+    await assertFails(setDoc(doc(db(PLAYER), "profiles", PLAYER, "private", "other"), { bio: "x" }));
+    await assertFails(setDoc(doc(db(PLAYER), "profiles", PLAYER), { private: "yes" }, { merge: true }));
+  });
+});
+
+describe("school and club communities", () => {
+  const ORG = "org1";
+  const ADMIN = "orgAdmin";
+  const WOOF = "woofer";
+  const OTHER = "otherMember";
+
+  beforeEach(() =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", ORG), {
+        name: "Tech Ultimate",
+        division: "mixed",
+        level: "college",
+        city: "",
+        kind: "organization",
+        description: "",
+        requiresApproval: true,
+        location: null,
+        ownerId: OWNER,
+        members: { [OWNER]: "owner", [ADMIN]: "player", [WOOF]: "player", [OTHER]: "player" },
+        memberIds: [OWNER, ADMIN, WOOF, OTHER],
+        memberNames: { [OWNER]: "O", [ADMIN]: "A", [WOOF]: "W", [OTHER]: "X" },
+        roles: {
+          admins: { name: "Officers", color: 0, position: 0, perms: ["manageTeam", "manageEvents"] },
+          woof: { name: "Woof", color: 0, position: 1, perms: [] },
+        },
+        memberRoles: { [ADMIN]: ["admins"], [WOOF]: ["woof"] },
+        memberPerms: { [ADMIN]: ["manageTeam", "manageEvents"] },
+        linkedTeams: {},
+      });
+    }),
+  );
+
+  const event = (audience: string[]) => ({
+    title: "Woof practice",
+    type: "practice",
+    startsAt: new Date("2026-11-02T18:00:00Z"),
+    endsAt: null,
+    location: "",
+    notes: "",
+    poll: null,
+    rsvps: {},
+    reactions: {},
+    votes: {},
+    createdBy: ADMIN,
+    audience,
+  });
+
+  it("can be created like a group", async () => {
+    await assertSucceeds(
+      setDoc(doc(db(OUTSIDER), "teams", "org2"), {
+        name: "State U",
+        division: "mixed",
+        level: "college",
+        city: "",
+        kind: "organization",
+        description: "",
+        requiresApproval: false,
+        location: null,
+        ownerId: OUTSIDER,
+        members: { [OUTSIDER]: "owner" },
+        memberIds: [OUTSIDER],
+        memberNames: { [OUTSIDER]: "Me" },
+      }),
+    );
+  });
+
+  it("a team asks to join with its orgId and a request, in one batch", async () => {
+    const fs = db(OWNER);
+    const batch = writeBatch(fs);
+    batch.update(doc(fs, "teams", TEAM), { orgId: ORG, orgName: "Tech Ultimate" });
+    batch.set(doc(fs, "teams", ORG, "linkRequests", TEAM), {
+      teamName: "Team",
+      division: "mixed",
+      requestedBy: OWNER,
+      requestedByName: "O",
+      createdAt: serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+    // Its players can't, and only Cloud Functions mark it linked.
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), { orgId: null }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { orgLinked: true }));
+  });
+
+  it("a request needs the team to name the community", async () => {
+    await assertFails(
+      setDoc(doc(db(OWNER), "teams", ORG, "linkRequests", TEAM), {
+        teamName: "Team",
+        division: "mixed",
+        requestedBy: OWNER,
+        requestedByName: "O",
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("community admins list teams; plain members can't", async () => {
+    const links = { linkedTeams: { [TEAM]: { name: "Team", division: "mixed", roles: ["woof"] } } };
+    await assertSucceeds(updateDoc(doc(db(ADMIN), "teams", ORG), links));
+    await assertFails(updateDoc(doc(db(WOOF), "teams", ORG), links));
+  });
+
+  it("a community event shows only to its audience and event managers", async () => {
+    await assertSucceeds(
+      setDoc(doc(db(ADMIN), "teams", ORG, "events", "e1"), event(["woof"])),
+    );
+    await assertSucceeds(getDoc(doc(db(WOOF), "teams", ORG, "events", "e1")));
+    await assertSucceeds(getDoc(doc(db(OWNER), "teams", ORG, "events", "e1")));
+    await assertFails(getDoc(doc(db(OTHER), "teams", ORG, "events", "e1")));
+    // The app's queries: one per id the member holds.
+    const events = collection(db(WOOF), "teams", ORG, "events");
+    await assertSucceeds(getDocs(query(events, where("audience", "array-contains", "woof"))));
+    await assertSucceeds(getDocs(query(events, where("audience", "array-contains", "everyone"))));
+    await assertFails(getDocs(events));
+    await assertSucceeds(getDocs(collection(db(ADMIN), "teams", ORG, "events")));
+    // Those outside it can't answer either.
+    await assertFails(
+      updateDoc(doc(db(OTHER), "teams", ORG, "events", "e1"), { [`rsvps.${OTHER}`]: "going" }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db(WOOF), "teams", ORG, "events", "e1"), { [`rsvps.${WOOF}`]: "going" }),
+    );
+  });
+
+  it("a community event must say who sees it", async () => {
+    const { audience: _, ...noAudience } = event([]);
+    await assertFails(setDoc(doc(db(ADMIN), "teams", ORG, "events", "e2"), noAudience));
+    await assertFails(setDoc(doc(db(ADMIN), "teams", ORG, "events", "e2"), event([])));
+  });
+
+  it("only a team's owner marks its roles as copies of community roles", async () => {
+    const copies = {
+      roles: { cap: { name: "Woof Captain", color: 0, position: 0, perms: [] } },
+      orgRoles: { cap: "woof" },
+    };
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), copies));
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { orgRoles: { x: "y" } }));
+  });
+
+  it("removing a member also drops them from orgMembers", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "teams", TEAM), { orgMembers: [PLAYER] }),
+    );
+    const leave = {
+      [`members.${PLAYER}`]: deleteField(),
+      memberIds: arrayRemove(PLAYER),
+      [`memberNames.${PLAYER}`]: deleteField(),
+    };
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), leave));
+    await assertSucceeds(
+      updateDoc(doc(db(PLAYER), "teams", TEAM), { ...leave, orgMembers: arrayRemove(PLAYER) }),
+    );
   });
 });

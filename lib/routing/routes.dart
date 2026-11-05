@@ -12,6 +12,7 @@ abstract final class Routes {
   static const teams = '/teams';
   static const createTeam = '/teams/new';
   static const createGroup = '/teams/new?kind=community';
+  static const createCommunity = '/teams/new?kind=organization';
   static const searchTeams = '/teams/search';
   static const searchUsauTeams = '/teams/search/usau';
   static const schedule = '/schedule';
@@ -23,6 +24,11 @@ abstract final class Routes {
   static const settings = '/settings';
   static const settingsGeneral = '/settings/general';
   static const settingsPrivacy = '/settings/privacy';
+  static const followRequests = '/settings/follow-requests';
+
+  /// What the user follows, from Settings (sliding over it, so back
+  /// returns there). [following] is the same list from the profile.
+  static const settingsFollowing = '/settings/following';
   static const settingsAccount = '/settings/account';
 
   /// Another player's profile.

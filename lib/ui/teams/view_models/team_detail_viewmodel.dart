@@ -33,6 +33,7 @@ class TeamDetailViewModel extends ChangeNotifier {
     DateTime Function()? clock,
   }) : _teams = teamRepository,
        _plays = playRepository,
+       _events = eventRepository,
        _meetings = meetingRepository,
        _auth = authRepository,
        _clock = clock ?? DateTime.now {
@@ -82,6 +83,7 @@ class TeamDetailViewModel extends ChangeNotifier {
         _watchRoster();
         _watchJoinRequests();
         _watchMeetings();
+        _watchEvents();
         _migrateRoles();
         notifyListeners();
       }, onError: _onError),
@@ -89,11 +91,27 @@ class TeamDetailViewModel extends ChangeNotifier {
         _playList = p;
         notifyListeners();
       }, onError: _onError),
-      eventRepository.watchEvents(teamId).listen((e) {
-        _teamEvents = e;
-        notifyListeners();
-      }, onError: _onError),
     ];
+  }
+
+  final EventRepository _events;
+  StreamSubscription<List<TeamEvent>>? _eventSub;
+  String? _eventKey;
+
+  /// (Re)subscribes to events when what the member may see changes: in a
+  /// community, its events say which roles see them.
+  void _watchEvents() {
+    final team = _team;
+    if (team == null) return;
+    final audience = team.eventAudienceOf(uid);
+    final key = audience == null ? '*' : (audience.toList()..sort()).join(',');
+    if (key == _eventKey) return;
+    _eventKey = key;
+    _eventSub?.cancel();
+    _eventSub = _events.watchEvents(teamId, audience: audience).listen((e) {
+      _teamEvents = e;
+      notifyListeners();
+    }, onError: _onError);
   }
 
   final String teamId;
@@ -285,7 +303,12 @@ class TeamDetailViewModel extends ChangeNotifier {
   /// Members who can manage members show the team's rotating invite code
   /// (InviteCodeViewModel). Groups have none: they're joined from the
   /// directory.
-  bool get canShareCode => canManageMembers && !(_team?.isCommunity ?? true);
+  /// Teams and school or club communities share invite codes; community
+  /// groups are joined from their page instead.
+  bool get canShareCode =>
+      canManageMembers &&
+      _team != null &&
+      (!_team!.isCommunity || _team!.isOrganization);
 
   /// Whether the member menu applies to [memberUid]: the owner manages
   /// anyone but themself; others with Manage members remove plain members.
@@ -321,6 +344,7 @@ class TeamDetailViewModel extends ChangeNotifier {
     _rosterSub?.cancel();
     _requestSub?.cancel();
     _meetingSub?.cancel();
+    _eventSub?.cancel();
     super.dispose();
   }
 }

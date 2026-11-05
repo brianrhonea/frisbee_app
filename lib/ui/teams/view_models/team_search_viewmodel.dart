@@ -33,7 +33,8 @@ class TeamSearchViewModel extends ChangeNotifier {
   String _query = '';
   String get query => _query;
 
-  /// Teams and groups, or only one kind; null shows both.
+  /// Teams and groups, or only one kind; null shows both. Groups include
+  /// school and club communities.
   TeamKind? _kind;
   TeamKind? get kind => _kind;
 
@@ -45,7 +46,10 @@ class TeamSearchViewModel extends ChangeNotifier {
   List<TeamListing> get results => switch (search.result) {
     Ok(:final value) => [
       for (final t in value)
-        if (_kind == null || t.kind == _kind) t,
+        if (_kind == null ||
+            t.kind == _kind ||
+            (_kind == TeamKind.community && t.kind.isGroupLike))
+          t,
     ],
     _ => const [],
   };

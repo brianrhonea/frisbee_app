@@ -8,6 +8,7 @@ import { getAuth } from "firebase-admin/auth";
 import { FieldPath, FieldValue, type Firestore, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { logger } from "firebase-functions";
+import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import {
@@ -18,9 +19,61 @@ import {
   nextOwner,
   postFolder,
   signedInRecently,
+  signInFailure,
+  signInHandle,
+  wrongCredentials,
   type TeamMembers,
   tournamentWithout,
 } from "./model";
+
+// The project's web API key, for checking a password with Identity
+// Toolkit (the Admin SDK can't). Set with
+//   firebase functions:secrets:set WEB_API_KEY
+const webApiKey = defineSecret("WEB_API_KEY");
+
+/**
+ * Signing in with a username: checks the password for the account that
+ * owns [username], then returns its email so the app signs in with email
+ * and password as usual. The email is only ever given to someone who
+ * proved the password, and an unknown username fails exactly like a wrong
+ * password, so this can't be used to look people up.
+ */
+export const signInEmail = onCall({ secrets: [webApiKey] }, async (req) => {
+  const data = (req.data ?? {}) as { username?: unknown; password?: unknown };
+  const handle = signInHandle(data.username);
+  const password = typeof data.password === "string" ? data.password : "";
+  const fail = (f = wrongCredentials) => new HttpsError(f.code, f.message);
+  if (!handle || !password || password.length > 128) throw fail();
+
+  const claim = await getFirestore().doc(`usernames/${handle}`).get();
+  const uid = claim.get("uid");
+  if (typeof uid !== "string") throw fail();
+  let email: string | undefined;
+  try {
+    email = (await getAuth().getUser(uid)).email;
+  } catch {
+    throw fail();
+  }
+  if (!email) throw fail();
+
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${webApiKey.value()}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, returnSecureToken: false }),
+    },
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+    const failure = signInFailure(body.error?.message);
+    if (failure.code === "unavailable") {
+      logger.warn("Username sign-in check failed", { status: response.status, error: body.error?.message });
+    }
+    throw fail(failure);
+  }
+  return { email };
+});
 
 /**
  * Deletes the caller's account and everything they put in the app: their
@@ -193,7 +246,7 @@ async function deleteTeam(db: Firestore, teamId: string): Promise<void> {
 async function deleteJoinRequests(db: Firestore, uid: string): Promise<void> {
   const groups = await db
     .collection("teams")
-    .where("kind", "==", "community")
+    .where("kind", "in", ["community", "organization"])
     .where("requiresApproval", "==", true)
     .select()
     .get();

@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/play.dart';
@@ -78,6 +79,16 @@ class _PlayCanvasState extends State<PlayCanvas> {
   String? _dragging;
   List<FieldPoint> _draft = const [];
 
+  /// Where the current pan went down, and how far it has gone since.
+  Offset? _panFrom;
+  double _panDistance = 0;
+
+  /// Drags start after this much movement, for touch as for a mouse.
+  /// Flutter's default for touch is 36 px, measured from where the finger
+  /// went down, so a finger on a small dot had left it before the drag
+  /// began.
+  static const _dragSlop = 4.0;
+
   PlayEditorViewModel get vm => widget.viewModel;
 
   bool get _drawing =>
@@ -98,6 +109,9 @@ class _PlayCanvasState extends State<PlayCanvas> {
   }
 
   void _onPanStart(FieldGeometry g, Offset local) {
+    _dismissKeyboard();
+    _panFrom = local;
+    _panDistance = 0;
     if (_drawing) {
       setState(() => _draft = [g.toField(local)]);
       return;
@@ -113,6 +127,9 @@ class _PlayCanvasState extends State<PlayCanvas> {
   }
 
   void _onPanUpdate(FieldGeometry g, Offset local) {
+    if (_panFrom case final from?) {
+      _panDistance = (local - from).distance;
+    }
     final p = g.toField(local);
     if (_drawing && _draft.isNotEmpty) {
       final last = _draft.last;
@@ -123,12 +140,29 @@ class _PlayCanvasState extends State<PlayCanvas> {
     }
   }
 
-  void _onPanEnd() {
+  void _onPanEnd(FieldGeometry g) {
     if (_drawing && _draft.isNotEmpty) vm.addArrow(_draft);
+    // With the lower drag threshold, a slightly shaky tap can become a pan.
+    // Treat one that didn't grab anything and barely moved as the tap.
+    final from = _panFrom;
+    if (!_drawing &&
+        _dragging == null &&
+        from != null &&
+        _panDistance < kTouchSlop) {
+      _onTap(g, from);
+    }
     setState(() {
       _draft = const [];
       _dragging = null;
+      _panFrom = null;
     });
+  }
+
+  /// Touching the field puts away the step-note keyboard, which otherwise
+  /// covers the bottom of the field.
+  void _dismissKeyboard() {
+    final focused = FocusManager.instance.primaryFocus?.context?.widget;
+    if (focused is EditableText) FocusManager.instance.primaryFocus?.unfocus();
   }
 
   @override
@@ -142,28 +176,38 @@ class _PlayCanvasState extends State<PlayCanvas> {
             cursor: vm.tool == EditorTool.select
                 ? SystemMouseCursors.basic
                 : SystemMouseCursors.precise,
-            child: GestureDetector(
-              onTapUp: (d) => _onTap(g, d.localPosition),
-              onPanStart: (d) => _onPanStart(g, d.localPosition),
-              onPanUpdate: (d) => _onPanUpdate(g, d.localPosition),
-              onPanEnd: (_) => _onPanEnd(),
-              onPanCancel: _onPanEnd,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: CustomPaint(
-                  size: size,
-                  painter: FieldPainter(
-                    play: vm.displayed,
-                    horizontal: horizontal,
-                    selectedId: vm.selectedId,
-                    trails: vm.trails,
-                    ghosts: vm.ghosts,
-                    draft: _draft,
-                    draftKind: switch (vm.tool) {
-                      EditorTool.cut => ArrowKind.cut,
-                      EditorTool.throw_ => ArrowKind.throw_,
-                      _ => null,
-                    },
+            // A small touch slop here only; the tap keeps its own tolerance.
+            child: MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                gestureSettings: const DeviceGestureSettings(
+                  touchSlop: _dragSlop / 2,
+                ),
+              ),
+              child: GestureDetector(
+                dragStartBehavior: DragStartBehavior.down,
+                onTapDown: (_) => _dismissKeyboard(),
+                onTapUp: (d) => _onTap(g, d.localPosition),
+                onPanStart: (d) => _onPanStart(g, d.localPosition),
+                onPanUpdate: (d) => _onPanUpdate(g, d.localPosition),
+                onPanEnd: (_) => _onPanEnd(g),
+                onPanCancel: () => _onPanEnd(g),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CustomPaint(
+                    size: size,
+                    painter: FieldPainter(
+                      play: vm.displayed,
+                      horizontal: horizontal,
+                      selectedId: vm.selectedId,
+                      trails: vm.trails,
+                      ghosts: vm.ghosts,
+                      draft: _draft,
+                      draftKind: switch (vm.tool) {
+                        EditorTool.cut => ArrowKind.cut,
+                        EditorTool.throw_ => ArrowKind.throw_,
+                        _ => null,
+                      },
+                    ),
                   ),
                 ),
               ),

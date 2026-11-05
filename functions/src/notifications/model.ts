@@ -24,9 +24,12 @@ export interface Prefs {
 
 export interface TeamDoc {
   name?: string;
+  kind?: string;
   ownerId?: string;
   members?: Record<string, string>;
   memberIds?: string[];
+  memberRoles?: Record<string, string[]>;
+  memberPerms?: Record<string, string[]>;
   deletingAt?: unknown;
 }
 
@@ -64,10 +67,38 @@ export function roomReaders(team: TeamDoc, room: RoomDoc): string[] {
   const members = team.members ?? {};
   return Object.keys(members).filter((uid) => {
     const role = members[uid] === "stats" ? "player" : members[uid];
+    return role === "owner" || inAudience(team, uid, room.readRoles ?? [], room.readUsers ?? []);
+  });
+}
+
+/** Whether [uid] is in an access list of ids (as firestore.rules' inAudience). */
+function inAudience(team: TeamDoc, uid: string, ids: string[], users: string[] = []): boolean {
+  const tier = team.members?.[uid] === "stats" ? "player" : team.members?.[uid];
+  return (
+    ids.includes("everyone") ||
+    (tier !== undefined && ids.includes(tier)) ||
+    (team.memberRoles?.[uid] ?? []).some((r) => ids.includes(r)) ||
+    users.includes(uid)
+  );
+}
+
+/**
+ * Members who see a team event: everyone on a team or group; in a school
+ * or club community, its audience and whoever manages events (as
+ * firestore.rules' sees()).
+ */
+export function eventViewers(team: TeamDoc, event: Data | undefined): string[] {
+  const ids = team.memberIds ?? [];
+  if (team.kind !== "organization") return ids;
+  const audience = Array.isArray(event?.audience) ? (event.audience as unknown[]).map(String) : [];
+  return ids.filter((uid) => {
+    const tier = team.members?.[uid];
     return (
-      role === "owner" ||
-      (room.readRoles ?? []).includes(role) ||
-      (room.readUsers ?? []).includes(uid)
+      tier === "owner" ||
+      tier === "coach" ||
+      tier === "captain" ||
+      (team.memberPerms?.[uid] ?? []).includes("manageEvents") ||
+      inAudience(team, uid, audience)
     );
   });
 }
@@ -113,6 +144,20 @@ export function millis(v: unknown): number | undefined {
 }
 
 /** Deep equality for Firestore values; null and missing are the same. */
+/** How long repeats of an unread notification stay off the lock screen. */
+export const quietRepeatMs = 10 * 60 * 1000;
+
+/**
+ * Whether a notice should buzz the phone, or only update the feed: a repeat
+ * (same collapse id) of one still unread that already pushed in the last
+ * [quietRepeatMs] stays quiet, so a busy chat is one push, not fifty.
+ */
+export function shouldPush(previous: { read?: unknown; pushedAt?: unknown } | undefined, nowMs: number): boolean {
+  if (!previous || previous.read !== false) return true;
+  const last = millis(previous.pushedAt);
+  return last === undefined || nowMs - last >= quietRepeatMs;
+}
+
 export function same(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return a == null && b == null;
@@ -356,7 +401,7 @@ export function teamInviteNotice(a: { teamId: string; invite: Data }): Notice {
 /** Team members a reminder goes to: everyone who hasn't said they can't go. */
 export function reminderRecipients(team: TeamDoc, event: Data): string[] {
   const rsvps = (event.rsvps ?? {}) as Record<string, unknown>;
-  return (team.memberIds ?? []).filter((uid) => rsvps[uid] !== "notGoing");
+  return eventViewers(team, event).filter((uid) => rsvps[uid] !== "notGoing");
 }
 
 /** Meeting notices go to the meeting page, or straight to its room. */
@@ -584,6 +629,31 @@ export function followerNotice(a: { followerId: string; name: string; photoUrl?:
     route: `/players/${a.followerId}`,
     text: () => ({ title: `${name} started following you`, body: "" }),
     extra: { followBack: { uid: a.followerId, name, photoUrl: a.photoUrl ?? null } },
+  };
+}
+
+/** Someone asked to follow a private profile: its owner hears. */
+export function followRequestNotice(a: { requesterId: string; name: string }): Notice {
+  const name = a.name || "Someone";
+  return {
+    category: "social",
+    route: "/settings/follow-requests",
+    // Several waiting fold into one entry.
+    collapseId: "followRequests",
+    text: (_, count) =>
+      count > 1
+        ? { title: `${count} people want to follow you`, body: "Accept or decline in Settings." }
+        : { title: `${name} wants to follow you`, body: "Accept or decline in Settings." },
+  };
+}
+
+/** A private profile's owner accepted a follow request: the asker hears. */
+export function followAcceptedNotice(a: { ownerId: string; name: string }): Notice {
+  const name = a.name || "Someone";
+  return {
+    category: "social",
+    route: `/players/${a.ownerId}`,
+    text: () => ({ title: `${name} accepted your follow request`, body: "" }),
   };
 }
 

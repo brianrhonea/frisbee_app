@@ -13,7 +13,8 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
-| 0.0.11  | 2026-11-04 | `development`                           | (this commit)       |
+| 0.0.12  | 2026-11-05 | `development`                           | (this commit)       |
+| 0.0.11  | 2026-11-04 | `development`                           | `6d50dc5`–`ea081ac` |
 | 0.0.10  | 2026-11-03 | `development`                           | `bfcf7f4`–`b80e854` |
 | 0.0.9   | 2026-11-02 | `feature/gps-workouts`                  | `41a03bc`           |
 | 0.0.8   | 2026-10-31 | `feature/follows-feed`                  | `1f81f45` and later |
@@ -25,6 +26,66 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.12 — School and club communities, private profiles, username sign-in
+
+Straight on `development`.
+
+**Added**
+- **School or club communities** (`TeamKind.organization`, noun
+  "community"): one community with several full teams (e.g. Woof and
+  Whiplash). Teams link both ways: the team sets `orgId`/`orgName`, the
+  community lists it in `linkedTeams.{teamId}` `{name, division, roles}`.
+  A team asks to join (`teams/{orgId}/linkRequests/{teamId}`) and the
+  community accepts, or the community creates the team inside itself.
+  The admin picks which community roles get onto each team; holders join
+  it automatically and leave when the role is taken away (only people the
+  community added, tracked in `orgMembers`). **Teams** tab on the
+  community; **School or club** in the team ⋮ menu and a chip on the team
+  home.
+- **Community events by role**: an organization's event has an `audience`
+  (role ids / `everyone`); only those roles see it. Queries use
+  array-contains per held id (`Team.eventAudienceOf`), with a composite
+  index (audience CONTAINS, startsAt ASC). Event editor: **Who sees it**.
+- **Discord import into teams**: on a community with teams, rooms only one
+  team's roles read go to that team's chat (`DiscordTeamSplit`), shared
+  rooms stay in the community, each room can be overridden. Each team
+  gets copies of the community roles that grant it (`Team.orgRoles`,
+  team role → community role) and the community function keeps who holds
+  them in step. Rooms already in the community chat from an earlier
+  import are moved (deleted there after a confirm).
+- **Sign in with username or email** (`account-signInEmail` callable,
+  checks the password through the Identity Toolkit REST API with the
+  `WEB_API_KEY` secret, then returns the email).
+- **Private profiles**: Settings → Privacy → **Private profile**. Only
+  name, username and photo stay in `profiles/{uid}`; the rest moves to
+  `profiles/{uid}/private/details`, readable by the owner and accepted
+  followers. Following one sends a request
+  (`profiles/{owner}/followRequests/{uid}`); **Follow requests** in
+  Settings accepts or declines.
+- **Change password** in Settings → Account (current, new, confirm;
+  "Forgot it?" sends a reset link).
+- **In-app notification bubble** while the app is open, from the feed, on
+  every platform; repeats in the same chat update it in place. iOS and
+  macOS no longer show a system banner in the foreground.
+
+**Changed**
+- Playbook on phones: a 44 px minimum grab radius and a small drag
+  threshold so fingers pick up dots; touching the field hides the step
+  note keyboard.
+- Notification settings explain when push is off on the phone, with
+  **Turn on notifications** / **Check again**.
+
+**Infrastructure**
+- New Cloud Function `communities-sync` (`onDocumentWritten teams/{id}`):
+  membership by role, catch-up for teams linked earlier, role copies
+  (`mirrorUpdate`). `notifications` use `eventViewers` (audience) and
+  honor custom roles in `roomReaders`; `account-signInEmail` added and
+  join-request cleanup covers both group kinds. All deployed to dev.
+- Rules: organizations, `validOrgRef`, `linkRequests`, `orgMembers`,
+  `orgRoles` (map ≤ 50), event `audience`, private profiles and follow
+  requests, with rules tests. Rules and indexes deployed to dev.
+- Secret `WEB_API_KEY` set on dev and prod.
 
 ## 0.0.11 — Usernames, Settings, search everywhere and polish
 

@@ -1,3 +1,7 @@
+/// Whether a sign-in name is an email rather than a username: usernames
+/// can't hold "@" except at the start.
+bool isEmail(String emailOrUsername) => emailOrUsername.trim().indexOf('@') > 0;
+
 /// A user's unique handle, shown as `@name`. Stored lowercase; one account
 /// per username, which firestore.rules enforces with `usernames/{name}`.
 abstract final class Username {

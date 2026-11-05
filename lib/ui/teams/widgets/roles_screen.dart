@@ -132,6 +132,11 @@ class _RolesScreenState extends State<RolesScreen> {
                         role: r,
                         summary: vm.summaryOf(r),
                         members: vm.memberCount(r.id),
+                        // Who has a copy of a community role follows the
+                        // community.
+                        from: team.orgRoles.containsKey(r.id)
+                            ? team.orgName
+                            : null,
                         menu: vm.isOwner
                             ? PopupMenuButton<String>(
                                 tooltip: 'Role options',
@@ -198,12 +203,16 @@ class _RoleTile extends StatelessWidget {
     required this.role,
     required this.summary,
     required this.members,
+    this.from,
     this.menu,
   });
 
   final CustomRole role;
   final String summary;
   final int members;
+
+  /// The community that gives this role out, for a copy of its role.
+  final String? from;
   final Widget? menu;
 
   @override
@@ -218,7 +227,12 @@ class _RoleTile extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.w700, color: c.ink),
         ),
         subtitle: Text(
-          '$summary · $members ${members == 1 ? 'member' : 'members'}',
+          [
+            summary,
+            '$members ${members == 1 ? 'member' : 'members'}',
+            if (from case final f?)
+              'given out by ${f.isEmpty ? 'the community' : f}',
+          ].join(' · '),
           style: TextStyle(color: c.muted),
         ),
         trailing: menu,

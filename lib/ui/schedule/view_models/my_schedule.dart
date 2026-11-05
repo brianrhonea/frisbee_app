@@ -94,6 +94,9 @@ class MySchedule extends ChangeNotifier {
   StreamSubscription<List<TeamEvent>>? _mineSub;
   List<TeamEvent> _mine = const [];
   final Map<String, StreamSubscription<List<TeamEvent>>> _eventSubs = {};
+
+  /// What each team's event stream was asked to show (see [_onTeams]).
+  final Map<String, String> _eventKeys = {};
   final Map<String, List<TeamEvent>> _byTeam = {};
 
   /// Meeting listeners per team, keyed by the role they were opened with:
@@ -134,15 +137,27 @@ class MySchedule extends ChangeNotifier {
     for (final team in teams) {
       _watchMeetings(team);
     }
-    for (final id in ids) {
-      _eventSubs[id] ??= _events.watchEvents(id, since: _since).listen(
-        (e) {
-          _byTeam[id] = e;
-          notifyListeners();
-        },
-        onError: (Object e) =>
-            _log.warning('Events for team $id failed to load', e),
-      );
+    for (final team in teams) {
+      final id = team.id;
+      // A community's events say which roles see them.
+      final me = _uid;
+      final audience = me == null ? null : team.eventAudienceOf(me);
+      final key = audience == null
+          ? '*'
+          : (audience.toList()..sort()).join(',');
+      if (_eventSubs.containsKey(id) && _eventKeys[id] == key) continue;
+      _eventSubs.remove(id)?.cancel();
+      _eventKeys[id] = key;
+      _eventSubs[id] = _events
+          .watchEvents(id, since: _since, audience: audience)
+          .listen(
+            (e) {
+              _byTeam[id] = e;
+              notifyListeners();
+            },
+            onError: (Object e) =>
+                _log.warning('Events for team $id failed to load', e),
+          );
     }
     notifyListeners();
   }

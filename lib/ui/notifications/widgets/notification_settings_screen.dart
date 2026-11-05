@@ -70,6 +70,7 @@ class _NotificationSettingsScreenState
             child: Text(text, style: theme.textTheme.titleSmall),
           );
           final prefs = vm.prefs;
+          final off = vm.pushOff;
           return ConstrainedContent(
             maxWidth: 600,
             child: ListView(
@@ -78,15 +79,26 @@ class _NotificationSettingsScreenState
                 heading('This device'),
                 _PushTile(viewModel: vm),
                 heading('Notify me about'),
+                if (off)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Text(
+                      'Turn on notifications above to choose what you get. '
+                      'Everything still shows under the bell in the app.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
                 for (final category in NotificationCategory.values)
                   SwitchListTile(
                     secondary: Icon(categoryIcon(category)),
                     title: Text(category.label),
                     subtitle: Text(category.description),
-                    value: prefs.isOn(category),
-                    onChanged: (on) => vm.setCategory.execute((category, on)),
+                    value: !off && prefs.isOn(category),
+                    onChanged: off
+                        ? null
+                        : (on) => vm.setCategory.execute((category, on)),
                   ),
-                if (vm.teams.isNotEmpty) ...[
+                if (vm.teams.isNotEmpty && !off) ...[
                   heading('Teams'),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -139,28 +151,74 @@ class _PushTile extends StatelessWidget {
           "device's settings.",
         ),
       ),
-      PushStatus.notDetermined => ListTile(
-        leading: const Icon(Icons.notifications_outlined),
-        title: const Text('Get push notifications on this device'),
-        subtitle: const Text('Even when Stall 10 is closed.'),
-        trailing: FilledButton(
+      PushStatus.notDetermined => _OffCard(
+        title: 'Notifications are off on this phone',
+        body:
+            'Turn them on to hear about messages, events and your teams '
+            'when Stall 10 is closed. Busy chats send one notification, '
+            'not one per message.',
+        action: FilledButton(
           onPressed: busy ? null : vm.enablePush.execute,
-          child: const Text('Turn on'),
+          child: const Text('Turn on notifications'),
         ),
       ),
-      PushStatus.denied => ListTile(
-        leading: const Icon(Icons.notifications_off_outlined),
-        title: const Text('Push notifications are off'),
-        subtitle: const Text(
-          "Turn on notifications for Stall 10 in your device's settings, "
-          'then come back here.',
-        ),
-        trailing: TextButton(
+      PushStatus.denied => _OffCard(
+        title: 'Notifications are off on this phone',
+        body:
+            "Turn on notifications for Stall 10 in your phone's Settings "
+            'app, then come back here.',
+        action: OutlinedButton(
           onPressed: busy ? null : vm.enablePush.execute,
-          child: const Text('Try again'),
+          child: const Text('Check again'),
         ),
       ),
     };
+  }
+}
+
+/// The push tile when push is off: says so plainly, with the way to fix it.
+class _OffCard extends StatelessWidget {
+  const _OffCard({
+    required this.title,
+    required this.body,
+    required this.action,
+  });
+
+  final String title;
+  final String body;
+  final Widget action;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Card.filled(
+        color: theme.colorScheme.secondaryContainer,
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.notifications_off_outlined),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(title, style: theme.textTheme.titleSmall),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(body, style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 12),
+              action,
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

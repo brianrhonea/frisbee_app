@@ -53,11 +53,11 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.kind == TeamKind.community
-              ? 'New community group'
-              : 'New team',
-        ),
+        title: Text(switch (widget.kind) {
+          TeamKind.team => 'New team',
+          TeamKind.community => 'New community group',
+          TeamKind.organization => 'New school or club',
+        }),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -68,9 +68,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
               listenable: widget.viewModel.create,
               builder: (context, _) => TeamForm(
                 kind: widget.kind,
-                submitLabel: widget.kind == TeamKind.community
-                    ? 'Create group'
-                    : 'Create team',
+                submitLabel: 'Create ${widget.kind.noun}',
                 busy: widget.viewModel.create.running,
                 onSubmit: widget.viewModel.create.execute,
               ),
