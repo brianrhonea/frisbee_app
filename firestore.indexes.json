@@ -245,6 +245,71 @@
       "fieldPath": "expiresAt",
       "ttl": true,
       "indexes": []
+    },
+    {
+      "collectionGroup": "messages",
+      "fieldPath": "text",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "messages",
+      "fieldPath": "attachments",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "posts",
+      "fieldPath": "body",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "posts",
+      "fieldPath": "images",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "posts",
+      "fieldPath": "links",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "posts",
+      "fieldPath": "workout",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "comments",
+      "fieldPath": "body",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "profiles",
+      "fieldPath": "bio",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "profiles",
+      "fieldPath": "stats",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "profiles",
+      "fieldPath": "games",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "profiles",
+      "fieldPath": "teams",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "profiles",
+      "fieldPath": "photoUrl",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "teamDirectory",
+      "fieldPath": "description",
+      "indexes": []
     }
   ]
 }
