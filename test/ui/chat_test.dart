@@ -697,7 +697,11 @@ void main() {
       );
     });
 
-    for (final size in const [Size(390, 844), Size(1024, 768), Size(1600, 900)])
+    for (final size in const [
+      Size(390, 844),
+      Size(1024, 768),
+      Size(1600, 900),
+    ]) {
       testWidgets('the Send button shows and sends at ${size.width}px wide', (
         tester,
       ) async {
@@ -728,6 +732,7 @@ void main() {
           isEmpty,
         );
       });
+    }
 
     testWidgets('read-only members see a notice instead of the composer', (
       tester,
