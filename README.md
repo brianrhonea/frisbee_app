@@ -1,6 +1,6 @@
 # Stall 10
 
-**Version 0.0.4** · [User guide](docs/user-guide.md) · [Architecture](docs/ARCHITECTURE.md) · [Version log](docs/CHANGELOG.md) · [iOS release](docs/ios-release.md)
+**Version 0.0.4** · [User guide](docs/user-guide.md) · [Architecture](docs/ARCHITECTURE.md) · [Version log](docs/CHANGELOG.md) · [iOS release](docs/ios-release.md) · [Cloud limits](docs/cloud-limits.md)
 
 An ultimate frisbee team app built with Flutter + Firebase for Android, iOS, macOS and Windows. The website is a separate project. (The Dart package is still named `frisbee_app`.)
 

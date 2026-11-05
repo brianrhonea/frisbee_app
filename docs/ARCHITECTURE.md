@@ -1,842 +1,826 @@
 # Stall 10 architecture
 
-How the app is put together as of version 0.0.4 (branch
-`feature/ultiup-schedule`): layers, features, where data lives, how it gets
-to the screen, and who can see what. For setup see `README.md`; for what
-users see, `docs/user-guide.md`.
+How the app is put together as of version 0.0.12 (plus the
+`hardening/scale-and-abuse` branch). It starts with what the app is and
+how data moves through it, then the core architecture every feature
+shares, then each feature's workflows and subfeatures. For setup see
+`README.md`; for what users see, `docs/user-guide.md`; for operations,
+`docs/rollback.md`, `docs/monitoring.md` and `docs/app-check.md`; for quotas
+and costs, `docs/cloud-limits.md`.
 
-## At a glance
+**Contents**
+1. [App overview](#1-app-overview)
+2. [Core features](#2-core-features)
+3. [Data flow diagram](#3-data-flow-diagram)
+4. [Core architecture](#4-core-architecture)
+5. [Feature workflows and subfeatures](#5-feature-workflows-and-subfeatures)
+6. [Operations](#6-operations)
 
-- **Client:** one Flutter app for Android, iOS, macOS and Windows.
-- **Backend:** Firebase only. Auth for sign-in, Cloud Firestore for app
-  data, Cloud Storage for chat photos and files, Cloud Messaging for push.
-  There's no app server. Every read and write goes straight from the app to
-  Firebase, and `firestore.rules` and `storage.rules` are the security
-  boundary. The only server code that runs is the `notifications` group of
-  Cloud Functions, which reacts to writes and sends notifications.
-- **USA Ultimate data:** scraped on-device from play.usaultimate.org and
-  held in memory. Cloud Functions that would do this on a schedule exist in
-  `functions/`, but are deliberately not deployed yet.
-- **Architecture:** the official Flutter MVVM guide. Services → repositories
-  → view models (`ChangeNotifier` + `Command`) → widgets. Dependency
-  injection uses `provider` (no Riverpod) and routing uses `go_router`.
+---
 
-```mermaid
-flowchart LR
-  subgraph UI
-    W[Widgets<br/>no logic] -->|read state, call commands| VM[View models<br/>ChangeNotifier + Command]
-  end
-  VM -->|Stream / Future&lt;Result&gt;| R[Repositories<br/>abstract + impl]
-  R --> S[Services<br/>AuthService, UsauClient,<br/>AttachmentStorage, FilePickerService,<br/>SharedPreferencesService]
-  R --> FS[(Cloud Firestore)]
-  S --> ST[(Cloud Storage)]
-  S --> AU[(Firebase Auth)]
-  S --> USAU[(play.usaultimate.org)]
-  FS -. rules .- FR[firestore.rules]
-  ST -. rules .- SR[storage.rules<br/>reads Firestore]
-```
+## 1. App overview
 
-## Source layout
+Stall 10 is an ultimate frisbee app for teams, community groups, schools
+and clubs, and the players in them. It's one Flutter app for Android, iOS,
+macOS and Windows on a Firebase backend.
+
+| | |
+|---|---|
+| **Client** | Flutter, following the official Flutter MVVM guide: services → repositories → view models (`ChangeNotifier` + `Command`) → widgets. DI with `provider` (no Riverpod); routing with `go_router`. |
+| **Backend** | Firebase: Auth, Cloud Firestore (app data), Cloud Storage (photos, files, videos), Cloud Messaging (push), Cloud Functions v2 (TypeScript), App Check, Hosting (invite and join pages). |
+| **Trust boundary** | Hybrid. Most reads and writes go straight from the app to Firestore and Storage, checked by `firestore.rules` and `storage.rules`. Cloud Functions sit beside the database for what rules can't do: rate limits and flood control, server-side search, third-party tokens (LiveKit), notifications, counters and cascades. |
+| **Third parties** | LiveKit Cloud (meetings and voice channels), YouTube (video embeds and oEmbed), OpenStreetMap and Nominatim (group maps), Discord server templates (import), play.usaultimate.org (scraped on-device). |
+| **Environments** | `frisbee-app-brianrhonea-dev` (dev, default; TestFlight from `development`) and `frisbee-app-brianrhonea` (prod; App Store from `main`). |
+
+### Source layout
 
 ```
 lib/
-  main.dart                 Firebase init, emulators, providers, MaterialApp.router
+  main.dart                 Firebase + App Check init, emulators, providers, MaterialApp.router
   config/dependencies.dart  Every service and repository, provided app-wide
   routing/                  routes.dart (paths), router.dart (GoRouter tree, auth redirect)
   domain/models/            Plain Dart models; no Firebase types
-  data/services/            Thin wrappers over platform/SDK/HTTP
+  domain/tournament_engine/ Pure-Dart bracket and schedule generation
+  data/services/            Thin wrappers over platform, SDK and HTTP
   data/repositories/<x>/    <x>_repository.dart (abstract) + implementation(s)
-  ui/core/                  Theme, adaptive shell, shared widgets (status views, dialogs)
+  ui/core/                  Theme, adaptive shell, shared widgets
   ui/<feature>/view_models/ ChangeNotifiers that own state and Commands
   ui/<feature>/widgets/     Screens and widgets; render view-model state only
   utils/                    Result, Command, platform support flags
-functions/                  Cloud Functions (USAU scraping), parser tests, rules tests
+functions/src/              Cloud Functions, one folder per deploy group
+  account/ api/ communities/ discord/ follows/ meetings/ notifications/
+  usau/                     USA Ultimate scrapers (deliberately not deployed)
+functions/test/             Unit tests and rules tests (emulators)
+hosting/                    Join and invite pages (Firebase Hosting)
+scripts/monitoring/         Text-alert setup (Cloud Monitoring)
+.github/workflows/          Deploy and roll back the backend
 firestore.rules, storage.rules, firestore.indexes.json, firebase.json
 ```
 
-### The pieces each layer uses
+---
+
+## 2. Core features
+
+| Area | What people can do |
+|---|---|
+| **Accounts** | Sign up and sign in with email, username, Google or Apple (browser OAuth for Google on Windows); pick a unique @username; delete the account. |
+| **Home** | This week's events, your team, a playbook preview, coming-up events, a rankings podium and a feed of posts from people, teams and tournaments you follow. |
+| **Teams** | Create a team, join by invite code, link or invite; custom roles with Discord-style permissions; roster imported and synced from USA Ultimate; team home page and public page. |
+| **Community groups, schools and clubs** | Open or approval-only groups with a map location; schools and clubs that link several teams and hand out membership by role. |
+| **Chat** | Team text rooms in folders with per-role and per-person access, photos and files; drop-in voice channels; 1:1 direct messages; Discord server import. |
+| **Schedule** | Team and personal events, RSVPs, reactions, polls, public events, community events limited to roles, reminders. |
+| **Meetings** | Scheduled team video calls with invites, lobby approval, screen share, in-call chat and watch-together video. |
+| **Playbook** | Draw plays on a field and animate them step by step. |
+| **Videos** | Team film: YouTube links or uploaded files, in folders. |
+| **Stats** | Live game tracking (lines, O/D, pull timer, timeouts), stat sheets, season stats. |
+| **Group tournaments** | Teams built from RSVPs, generated schedules and brackets, captain-reported scores. |
+| **Social** | Profiles (public or private), follows and follow requests, posts with photos, links and workouts, likes, reposts, comments; GPS run and ride recording. |
+| **USA Ultimate** | Tournaments, schedules, brackets, rankings and team pages. |
+| **Search** | Explore and the Ctrl/⌘ K command menu over players, teams, groups and USAU events. |
+| **Notifications** | Feed, push on phones, in-app bubbles, per-category, per-team and per-room settings. |
+| **Settings** | Theme, privacy (read receipts, profile visibility), account. |
+
+---
+
+## 3. Data flow diagram
+
+### Whole system
+
+```mermaid
+flowchart LR
+  subgraph Device["Flutter app (Android, iOS, macOS, Windows)"]
+    W[Widgets] -->|commands| VM[View models]
+    VM -->|Stream / Future&lt;Result&gt;| R[Repositories]
+    R --> SS[SharedStreams<br/>one listener per query]
+    R --> SV[Services<br/>Auth, AttachmentStorage,<br/>ImageCompressor, CallableClient,<br/>ApiSearch, FeatureFlags, AppCheck,<br/>UsauClient, PushService]
+  end
+
+  SS -->|listeners, reads, writes| FS[(Cloud Firestore)]
+  SV -->|uploads, downloads| ST[(Cloud Storage)]
+  SV --> AU[(Firebase Auth)]
+  SV -->|HTTPS callables + App Check token| CF[Cloud Functions]
+  SV -->|HTML scraping| USAU[(play.usaultimate.org)]
+  SV -->|WebRTC| LK[(LiveKit Cloud)]
+
+  FS -. every request checked .- FR[firestore.rules]
+  ST -. every request checked .- SR[storage.rules]
+  FS -->|document triggers| CF
+  CF -->|Admin SDK| FS
+  CF -->|tokens| LK
+  CF -->|push| FCM[(Cloud Messaging)]
+  FCM --> Device
+  FS -->|meta/flags| SV
+```
+
+### A write, end to end (sending a chat message)
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant VM as MessageThreadViewModel
+  participant R as ChatRepository
+  participant IC as ImageCompressor
+  participant ST as Cloud Storage
+  participant FS as Firestore + rules
+  participant F as Functions (api, notifications)
+  U->>VM: type, attach photo, tap Send
+  VM->>IC: shrink photo (isolate)
+  VM->>R: sendMessage
+  R->>ST: upload attachment (storage.rules: room writer, ≤ 10 MB)
+  R->>FS: create message (rules: can write room, not muted)
+  FS-->>VM: live snapshot shows it ("Sending…" until server time)
+  FS->>F: onDocumentCreated
+  F->>F: teamMessageFlood: count in limits/{uid}; over 20/min → delete + mute 10 min
+  F->>F: chatMessage: feed entries + push to readers
+```
+
+### A read, end to end (opening a list)
+
+```mermaid
+sequenceDiagram
+  participant S as Screen
+  participant VM as View model
+  participant R as Repository
+  participant SS as SharedStreams
+  participant FS as Firestore
+  S->>VM: ViewModelHost creates it
+  VM->>R: watchX() (newest page only)
+  R->>SS: get(key, open)
+  alt query already open
+    SS-->>VM: latest value at once (no new reads)
+  else first subscriber
+    SS->>FS: snapshots() of orderBy … limit(page)
+    FS-->>SS: documents (counted by FirestoreReads)
+    SS-->>VM: value
+  end
+  S->>VM: scroll to the end → loadMore()
+  VM->>R: fetchOlder(before: oldest, limit: page)
+  R->>FS: get() with startAfter(oldest) — reads one page only
+```
+
+---
+
+## 4. Core architecture
+
+### 4.1 Layers and building blocks
 
 | Piece | What it does |
 |---|---|
 | `Result<T>` (`utils/result.dart`) | Every fallible repository call returns `Ok(value)` or `Error(exception)`. `guard()` wraps a body and catches `Exception`s. |
 | `Command0` / `Command1` (`utils/command.dart`) | A view-model action with `running`, `completed`, `error` and `result`. It can't run twice at once. Screens listen to commands to show snackbars or navigate. |
-| `ViewModelHost` (`ui/core/ui/view_model_host.dart`) | Creates a view model once per route (or per tab) and disposes it when that route leaves. Router rebuilds don't reset state. |
-| `plainData()` (`data/services/firestore_utils.dart`) | Converts Firestore `Timestamp`s to `DateTime` so domain models stay Firebase-free. |
-| `ConstrainedContent` | Caps content width on wide screens. |
+| `ViewModelHost` (`ui/core/ui/view_model_host.dart`) | Creates a view model once per route (or tab) and disposes it when the route leaves. Router rebuilds don't reset state. |
+| `SharedStreams` (`data/services/shared_streams.dart`) | One upstream Firestore listener per query key for the whole app. Late subscribers get the latest value at once; the listener stays open 5 minutes after the last one leaves, so moving between screens doesn't re-read. |
+| `countedSnapshots` / `FirestoreReads` (`firestore_utils.dart`) | Wraps queries so debug builds log how many documents each label reads. |
+| `pageAfter()` (`firestore_utils.dart`) | Cursor query for the next older page: `orderBy(field).startAfter([value, id]).limit(n)`. |
+| `muteAware()` / `RateLimitedException` | Turns a rules denial caused by a flood mute into "You're going too fast…". |
+| `plainData()` | Converts Firestore `Timestamp`s to `DateTime` so domain models stay Firebase-free. |
 
-## Dependency injection
+### 4.2 Dependency injection
 
-`config/dependencies.dart` builds `firebaseProviders`, which `main.dart`
-installs with `MultiProvider` above the app. Everything is a single
-instance for the app's lifetime:
+`config/dependencies.dart` builds `firebaseProviders`, installed by
+`main.dart` with `MultiProvider`. Everything is one instance for the
+app's lifetime. View models are not provided globally: each route makes
+its own through `ViewModelHost(create: (c) => XViewModel(repo: c.read(), …))`,
+and tests swap in the fakes in `test/testing/`.
 
 | Provided | Implementation | Depends on |
 |---|---|---|
-| `AuthService` | Firebase Auth + Google/Apple sign-in, browser OAuth on Windows | – |
-| `AuthRepository` (`ChangeNotifier`) | `AuthRepositoryFirebase` | `AuthService` |
-| `AttachmentStorage` | Cloud Storage uploads, downloads and deletes | – |
-| `TeamRepository` | `TeamRepositoryFirebase` | `AttachmentStorage` (deletes chat files with a team) |
-| `PlayRepository` | `PlayRepositoryFirebase` | – |
-| `EventRepository` | `EventRepositoryFirebase` | – |
-| `ChatRepository` | `ChatRepositoryFirebase` | `AttachmentStorage` |
-| `DirectMessageRepository` | `DirectMessageRepositoryFirebase` | `AttachmentStorage` |
-| `FilePickerService` | `file_picker` open/save dialogs | – |
-| `StatsRepository` | `StatsRepositoryFirebase` | `TeamRepository` (stats players are the roster) |
-| `UsauClient` | HTTP + HTML parsing for play.usaultimate.org | – |
-| `TournamentRepository` | `TournamentRepositoryUsau` (the alternative is `…Firebase`) | `UsauClient` |
-| `RankingRepository` | `RankingRepositoryUsau` (the alternative is `…Firebase`) | `UsauClient` |
-| `UsauTeamRepository` | `UsauTeamRepositoryUsau` | `UsauClient` |
-| `UsauScheduleRepository` | `UsauScheduleRepositoryUsau` | `UsauClient` |
-| `PushService` | `firebase_messaging` permission, FID registration, tapped-notification routes; no-op on Windows | – |
-| `NotificationRepository` | `NotificationRepositoryFirebase` | `PushService` |
-| `ThemeRepository` (`ChangeNotifier`) | `ThemeRepositoryPrefs` (shared_preferences), loaded before `runApp` | – |
+| `FeatureFlags` (`ChangeNotifier`) | Live `meta/flags` doc (kill switches) | – |
+| `CallableClient` | Callables over raw HTTPS (no `cloud_functions` plugin on Windows), adds ID and App Check tokens | – |
+| `ApiSearch` | `api-search` callable | `CallableClient`, `FeatureFlags` |
+| `AuthService`, `AccountService` | Firebase Auth + Google/Apple; `account-*` functions | – |
+| `AuthRepository` (`ChangeNotifier`) | `AuthRepositoryFirebase` | `AuthService`, `AccountService` |
+| `AttachmentStorage` | Storage uploads (year-long `Cache-Control`), downloads, deletes | – |
+| `TeamRepository` | `TeamRepositoryFirebase` | `AttachmentStorage`, `ApiSearch` |
+| `ProfileRepository` | `ProfileRepositoryFirebase` | `ApiSearch` |
+| `PlayRepository`, `EventRepository`, `FollowRepository`, `VideoRepository`, `GroupTournamentRepository`, `PostCommentRepository` | Firebase implementations | – |
+| `TeamPostRepository`, `UserPostRepository` | Firebase implementations | `AttachmentStorage` |
+| `ChatRepository`, `DirectMessageRepository` | Firebase implementations | `AttachmentStorage` (DMs also `ApiSearch`) |
+| `FilePickerService` | `file_picker` + `ImageCompressor` | `FeatureFlags` (`compress_images`) |
+| `MeetingTokenService`, `MeetingRepository` | `meetings-joinToken` over HTTPS; Firebase | – |
+| `MeetingMediaService`, `MeetingPresence`, `MeetingSettingsRepository` | LiveKit; in-memory; SharedPreferences | – |
+| `VoiceRepository` (`ChangeNotifier`) | `VoiceRepositoryLiveKit`, one voice channel for the whole app | `meetings-voiceToken` |
+| `DiscordImportRepository` | `discord-previewTemplate`, then client writes | `CallableClient` |
+| `YouTubeInfoService`, `GeocodingService`, `LocationService` | oEmbed, Nominatim, geolocator | – |
+| `WorkoutRecorder` (`ChangeNotifier`) | GPS run/ride recording, app-wide | `LocationService` |
+| `PushService`, `NotificationRepository` | `firebase_messaging` (no-op on Windows); Firebase | – |
+| `StatsRepository` | `StatsRepositoryFirebase` | `TeamRepository` |
+| `UsauClient` + `Tournament`, `Ranking`, `UsauTeam`, `UsauSchedule` repositories | On-device scraping (`…Usau` implementations) | `UsauClient` |
+| `ThemeRepository` (`ChangeNotifier`) | `ThemeRepositoryPrefs`, loaded before `runApp` | – |
 
-View models are **not** provided globally. Each route creates its own
-through `ViewModelHost(create: (c) => XViewModel(repo: c.read(), …))`.
-Tests swap in the fakes from `test/testing/fakes.dart` the same way.
+### 4.3 Navigation
 
-## Navigation
+- `GoRouter` (`routing/router.dart`) refreshes on auth. `authRedirect()`
+  holds users on a splash until auth is ready, sends signed-out users to
+  sign-in (remembering `from`), sends users without a username to
+  `/welcome/username`, and keeps signed-in users off the auth pages.
+- **Shell:** a `StatefulShellRoute.indexedStack` with five tabs (Home,
+  Teams, Schedule, Events, Rankings), each with its own stack.
+  `AdaptiveShell` shows a bottom bar under 720 px and a rail above.
+- **Full-screen pages** (events, USAU tournaments and teams, plays, stats,
+  chat rooms, DMs, profiles, posts, the composer) use the root navigator
+  and `context.push`, so back returns where you were. Path helpers are in
+  `routing/routes.dart` (`Routes.teamChat(id)`, `Routes.conversation(id)`…).
+- **Team pages:** one page with a tab bar of `TeamSection`s. Section
+  routes are siblings of `:teamId` that build the same page key, so
+  switching tabs updates the page in place.
+- **Responsive:** Home is a two-column dashboard at 960 px; chat and
+  Messages split list and conversation at 840 px; Settings pages slide in
+  as a 440 px panel on wide windows.
+- **Shortcuts:** `AppShortcuts` handles Ctrl/⌘ K (command menu) and
+  Ctrl/⌘ 1–5 with a `HardwareKeyboard` handler, so they work whatever has
+  focus.
 
-- `GoRouter` in `routing/router.dart` uses `refreshListenable: auth`.
-  `authRedirect()` holds users on a splash page until auth is ready, sends
-  signed-out users to sign-in (remembering `from`), and sends signed-in
-  users away from the auth pages.
-- **Shell:** a `StatefulShellRoute.indexedStack` with five branches: Home,
-  Teams, Schedule, Events, Rankings. Each tab keeps its own navigation
-  stack. `AdaptiveShell` shows a bottom `NavigationBar` under 720 px and a
-  `NavigationRail` above.
-- **Full-screen pages** sit outside the shell, or use
-  `parentNavigatorKey: _rootKey`, and are opened with `context.push` so back
-  returns where you were:
-  - team events (`/team-events/…`) and personal events (`/my-events/…`)
-    (team sections like `/teams/:id/events` stay in the Teams tab)
-  - USA Ultimate tournaments (`/tournaments/:id`) and teams
-    (`/rankings/team?url=…`), so Home, Events, Rankings and Following all
-    return to where you were instead of switching tabs. These routes are
-    listed before the shell so they win over the `/tournaments` and
-    `/rankings` tabs.
-  - plays, stats screens and the USA Ultimate roster import
-  - chat rooms and room settings (`/teams/:id/chats/…`)
-  - direct messages (`/messages`, `/messages/new`, `/messages/:conversationId`)
-  - people's profiles (`/people/:uid`), their posts (`/posts/:id`, where
-    post notifications lead), the composer (`/posts/new`, `?kind=workout`,
-    `/posts/:id/edit`) and Following (`/profile/following`)
-- **Path helpers** are all in `routing/routes.dart`, for example
-  `Routes.teamChat(id)` and `Routes.conversation(id)`.
-- **Team pages:** one page with a tab bar for members: Home, then each
-  `TeamSection` (Team Events, Chat, Roster, Playbook, Videos, Stats,
-  Members; groups have Events, Chat, Tournaments, Members). `/teams/:id`
-  is the Home tab and `/teams/:id/events` etc. select a section. The
-  section routes are *siblings* of `:teamId`, not children, and every tab
-  builds the same page key (`_teamPage` in `router.dart`). Switching tabs
-  with `go` updates that page in place: no transition, `TeamHomeScreen`
-  and its view model are kept, and back leaves the team. The tab content
-  is a `TeamSectionView`, whose `TeamDetailViewModel` is only created once
-  a member opens a section. Old `?tab=` links redirect to the matching
-  section.
-- **Responsive layouts:** Home becomes a two-column dashboard when its
-  content area is at least 960 px wide (`HomeScreen.dashboardBreakpoint`):
-  the week and the feed on the left, then team, events, playbook and
-  rankings on the right. Below that it's one column: the week, the team,
-  then the feed.
-- **Chat layout** (`ui/chat/widgets/chat_layout.dart`):
-  - At 840 px or wider (`chatSplitBreakpoint`), team chat and Messages show
-    the list on the left and the open conversation on the right.
-  - Picking a chat changes the selection held in `ChatListViewModel` or
-    `InboxViewModel`. The right pane is a `ViewModelHost` keyed by that
-    chat, so switching disposes the old thread's subscriptions.
-  - On phones, picking a chat pushes its route with a slide-in transition
-    (`chatPage`). In team chat, the page's top-left Chats button opens a
-    `Drawer` holding the room list; picking another room replaces the
-    page. Direct messages have a plain back arrow to Messages instead
-    (`backOr`), so leaving is one slide.
-- **Settings** (`/settings`, `/settings/general|privacy|account`, and
-  `/notifications/settings`) are root routes built with `slideOverPage`
-  (`ui/core/ui/slide_over_page.dart`): a slide from the right with an edge
-  shadow, `CupertinoPage` on iOS/macOS phones, and on windows at least
-  704 logical px wide a 440 px panel over the dimmed page
-  (`barrierDismissible`). Each page hosts its own `ProfileViewModel`.
-- **Shortcuts**: `AppShortcuts` (`ui/shell/widgets/command_palette.dart`)
-  registers a `HardwareKeyboard` handler, not a focus-based `Shortcuts`,
-  so Ctrl/⌘ K (command menu) and Ctrl/⌘ 1–5 work whatever has focus and
-  on pages pushed over the shell.
-- **Username gate**: `authRedirect` sends a signed-in user whose profile
-  has no username to `/welcome/username?from=…`, then on to `from`.
+### 4.4 How data reaches the screen
 
-## Core features
+1. **Repositories** expose `Stream`s for live data and `Future<Result<T>>`
+   for one-off reads and writes. Firebase implementations map
+   `snapshots()` to sorted domain models through `SharedStreams`.
+2. **View models** subscribe in their constructor, store the latest
+   value, call `notifyListeners()`, record errors for the screen, and
+   cancel everything in `dispose()`.
+3. **Widgets** rebuild with `ListenableBuilder(listenable: vm)` and act
+   through `vm.someCommand.execute(arg)`.
 
-| Feature | Screens | View models | Repositories |
-|---|---|---|---|
-| Sign-in (email, Google, Apple; browser OAuth on Windows) | `ui/auth` | `SignInViewModel`, `SignUpViewModel` | Auth |
-| Home: this week, my team, playbook preview, coming up, rankings podium, inbox badge | `ui/home` | `HomeViewModel` (composes `MySchedule`) | Auth, Team, Play, Event, Tournament, Ranking, DirectMessage |
-| Teams: create, join by invite code, roles, members, roster | `ui/teams` | `TeamsViewModel`, `CreateTeamViewModel`, `TeamDetailViewModel` (sections) | Team, Play, Event |
-| Team home: summary, section links, upcoming events, posts; public page for non-members; team search | `ui/teams` | `TeamHomeViewModel`, `TeamSearchViewModel` | Team, Event, TeamPost |
-| USA Ultimate roster import and sync, USAU team search | `ui/teams` | `UsauRosterViewModel`, `UsauTeamSearchViewModel` | Team, UsauTeam, Ranking |
-| Team chat: rooms with per-role and per-person read/write access, photos and files | `ui/chat` | `ChatListViewModel`, `ChatRoomViewModel`, `ChatRoomSettingsViewModel` | Chat, Team |
-| Direct messages: search people by name, 1:1 conversations, unread tracking | `ui/messages` | `InboxViewModel`, `PeopleSearchViewModel`, `DirectChatViewModel` | DirectMessage |
-| Schedule: team and personal events, RSVP, reactions, polls | `ui/schedule` | `ScheduleViewModel` (`MySchedule`), `EventEditorViewModel`, `EventDetailViewModel`, `MyEventDetailViewModel` | Event, Team |
-| Team meetings: invite roles or people, RSVP, lobby with admin approval, video calls (camera, screen share, chat, per-person volume, watch team videos together) | `ui/meetings` | `MeetingEditorViewModel`, `MeetingDetailViewModel`, `MeetingRoomViewModel`, `MeetingChatViewModel`, `WatchTogetherViewModel`, `MeetingAlertsViewModel` | Meeting, MeetingSettings, Team, Video |
-| Videos: YouTube links or uploaded video files shared with the team, in folders, thumbnails, embedded player (WebView2 on Windows), media_kit for uploads | `ui/videos` | `TeamVideosViewModel`, `VideoViewModel`, `VideoEditorViewModel` | Video, Team (`YouTubeInfoService` for link checks) |
-| Community groups: open or approval join, description, location map (flutter_map + Nominatim), pickup events | `ui/teams`, `ui/groups` | `TeamsViewModel`, `TeamSearchViewModel`, `TeamHomeViewModel`, `TeamDetailViewModel`, `LocationPickerViewModel` | Team (`GeocodingService`) |
-| School and club communities: linked teams joined by role, team link requests, role-gated events | `ui/teams`, `ui/schedule` | `CommunityTeamsViewModel`, `TeamCommunityViewModel`, `EventEditorViewModel` | Team, Event |
-| Group tournaments: teams from RSVPs, generated schedule (round robin, pools + single elim, single elim, double elim), captain-reported scores, bracket | `ui/group_tournaments` | `GroupTournamentsViewModel`, `TournamentEditorViewModel`, `GroupTournamentViewModel` | GroupTournament, Team, Event |
-| Playbook: draw plays, animate steps, play back | `ui/playbook` | `PlayEditorViewModel` | Play, Team |
-| Stats: tournaments, live game tracking (lines, pull timer, timeouts), stat sheets, season stats | `ui/stats` | `StatsViewModel`, `TournamentViewModel`, `GameTrackerViewModel` | Stats, Event, Team |
-| Events: USA Ultimate tournaments, schedules and brackets | `ui/tournaments`, `ui/events` | `TournamentsViewModel`, `TournamentDetailViewModel` | Tournament, UsauSchedule |
-| Rankings: every USAU ranking list, team pages | `ui/rankings` | `RankingsViewModel`, `UsauTeamViewModel` | Ranking, UsauTeam |
-| Notifications: feed with unread badge on Home, push on this device, per-category and per-team settings, per-room mute | `ui/notifications` | `NotificationsViewModel`, `NotificationSettingsViewModel` (mute lives in `ChatRoomViewModel`) | Notification, Team |
-| Profile: details, visibility, stats, teams, posts; @username | `ui/profile` | `PlayerProfileViewModel` | Profile, Auth, Team, Stats, Follow, UserPost |
-| Settings: General (theme), Privacy (read receipts), Account (name, username, delete), sign out | `ui/settings` | `ProfileViewModel` | Auth, Theme, Notification, DirectMessage |
-| Usernames and sign-up: availability check, claim, pick-a-username gate | `ui/auth` | `SignUpViewModel`, `ChooseUsernameViewModel` (`UsernameChecker`) | Auth |
-| Search and command menu: Explore over players, teams, groups and USAU events; Ctrl K | `ui/explore`, `ui/shell` | `TeamSearchViewModel`, `PlayerSearchViewModel`, `TournamentsViewModel` | Team, Profile, Tournament |
+**Paging.** Long lists show a live first page and fetch older pages one
+at a time with cursors (`fetchOlderMessages`, `fetchPostsBefore`). Items a
+new arrival pushes out of the live page are kept, and items pulled back
+in are de-duplicated. Chat history, DMs, meeting chat and the home feed
+page this way. Notifications and comments stop at the newest 100; team
+lists (rooms, roster, plays, folders, roles) are bounded by team size.
 
-### Roles
+**Role-dependent listeners.** Some queries change with the user's role
+because rules would deny them otherwise: roster status and the invite
+code only for admins; chat rooms as the whole collection for editors,
+or merged `readRoles`/`readUsers` queries for players; meetings and
+community events per invited role.
 
-Built-in roles are **owner** and **player** (`TeamRole`,
-`domain/models/team.dart`). Everything else is a custom role
-(`CustomRole`, `domain/models/team_role.dart`) the owner creates, granting
-`TeamPermission`s: manageTeam, manageMembers, manageChats, manageEvents,
-moderate and keepStats. The team doc holds `roles`, `memberRoles
-{uid: [roleId]}` and the flattened `memberPerms {uid: [perm]}` that
-`firestore.rules` checks with `can(team, perm)`; `statKeepers` still grants
-keepStats. Legacy **coach** and **captain** tiers still read as having
-every permission, but none can be assigned; `migrateTiersToRoles` turns
-them into custom roles (and adds the roles to rooms that admitted the
-tier) when the owner opens the team. Membership writes are validated only
-by the rules, so the client and the rules must change together.
+**Pending writes and offline.** Firestore's cache shows a user's own
+writes at once; messages show "Sending…" until `createdAt` arrives.
+Attachments upload before the message is written and are deleted again
+if the write fails; they aren't offline-capable.
 
-### Shared message thread
+**USA Ultimate caches.** The USAU repositories are app-wide singletons
+with in-memory caches (one tournaments future, ranking divisions as they
+parse, one future per team page and schedule key). `UsauClient` sends
+requests one at a time, about a second apart, with a 30-second timeout.
+Nothing from USAU is stored on disk.
 
-Team rooms and direct messages share one implementation:
+### 4.5 Server layer (Cloud Functions)
 
-- `MessageThreadViewModel` handles paging (50 at a time), draft
-  attachments, the 10 MB check, sending, deleting, saving files, and
-  per-attachment download caching.
-- `MessageThreadView` is the message list, day separators, photo and file
-  bubbles, and the composer (Enter sends, Shift+Enter adds a line).
-- `ChatRoomViewModel` and `DirectChatViewModel` only supply where messages
-  come from and go, plus who can post or moderate.
+Functions are deployed by group, never all at once (the USAU scrapers
+stay undeployed). Every group runs under `setGlobalOptions({maxInstances: 10})`
+so a flood can't scale the bill, and every callable sets
+`enforceAppCheck` (on when `ENFORCE_APP_CHECK=true`).
 
-## How data reaches the screen
-
-### Pattern
-
-1. **Repositories expose `Stream`s for live data and `Future<Result<T>>`
-   for one-off reads and writes.**
-   - Firebase repositories return `query.snapshots().map(parse)`. Each
-     snapshot becomes a fresh, sorted list of domain models, so view
-     models never see Firestore types.
-   - Writes go through `guard()` and return `Result`.
-2. **View models subscribe in their constructor** and keep the
-   `StreamSubscription`s.
-   - Each update stores the latest value and calls `notifyListeners()`.
-   - Each subscription has an `onError` that records an error for the
-     screen to show.
-   - Everything is cancelled in `dispose()`, which `ViewModelHost` calls
-     when the route leaves.
-3. **Widgets rebuild with `ListenableBuilder(listenable: vm)`.** They act
-   by calling `vm.someCommand.execute(arg)` and listen to that command for
-   the result.
-
-### Are streams shared?
-
-Not at the app level. Every `watchX()` call creates a new stream and its
-own subscription. There's no repository-level fan-out (no `shareReplay`,
-broadcast cache or global store). Sharing happens in three other places:
-
-- **Firestore SDK.** All listeners run over one connection and one local
-  cache per app. When two view models listen to the same query, the
-  SDK de-duplicates them into one server target and serves both from the
-  same cached view. So `watchTeam(id)` used by `TeamDetailViewModel`,
-  `ChatListViewModel` and `StatsViewModel` at the same time costs one
-  listener on the server.
-- **Within a view model.** A view model may compose others:
-  - `MySchedule` is a helper `ChangeNotifier` that merges
-    `watchMyTeams(uid)` with every team's `watchEvents(teamId)` and the
-    user's `watchMyEvents(uid)`. It also re-listens with backoff if
-    personal events fail. `HomeViewModel` and `ScheduleViewModel` each
-    create their own `MySchedule`, so Home and the Schedule tab hold
-    separate subscriptions; Firestore still de-duplicates them.
-  - `ChatRepositoryFirebase.watchRooms` for a player merges two queries
-    (`readRoles array-contains <role>` and `readUsers array-contains <uid>`)
-    into one stream, because the rules only allow queries that prove access.
-- **USA Ultimate repositories** are app-wide singletons with in-memory
-  caches. These are shared on purpose, because each fetch is slow and hits
-  a third-party site:
-
-| Repository | Cache | Shared how |
+| Group | Functions | Kind |
 |---|---|---|
-| `TournamentRepositoryUsau` | One `Future<List<Tournament>>` per app session | Every `watchTournaments()` awaits the same future; a failure clears it so a retry refetches |
-| `RankingRepositoryUsau` | Divisions list plus one load future | The first listener starts the load; every open listener gets each division as it's parsed, and later listeners get the cached list immediately |
-| `UsauTeamRepositoryUsau` | `Map<url, Future<UsauTeam>>` | One fetch per team page; dropped on failure |
-| `UsauScheduleRepositoryUsau` | Maps keyed by event URL and (event, division) | One fetch per key; `refresh: true` refetches, reusing the schedule's own URL to skip a postback |
+| `account` | `signInEmail` (username sign-in, rate limited 10 per 15 min per name), `deleteAccount` | HTTPS |
+| `api` | `search` (people, players, teams; 50 results; rate limited), `health` (uptime check) | Callable, HTTP |
+| `api` | `teamMessageFlood`, `directMessageFlood`, `meetingMessageFlood`, `postFlood`, `commentFlood`, `followFlood`, `joinRequestFlood`, `teamFlood` | Firestore create triggers |
+| `communities` | `sync` (school/club membership by role) | Firestore trigger |
+| `discord` | `previewTemplate` (reads a public Discord server template) | Callable |
+| `follows` | `followCount`, `commentCount`, `profileDeleted`, `teamDeleted`, `groupTournamentDeleted`, `userPostDeleted` | Firestore triggers |
+| `meetings` | `joinToken`, `voiceToken` (LiveKit tokens), `closeRoom` | HTTPS, trigger |
+| `notifications` | `chatMessage`, `directMessage`, `teamEvent`, `teamMeeting`, `teamPlay`, `groupJoinRequest`, `teamInvite`, `userPost`, `postLiked`, `newFollower`, `followRequest`, `postCommented`, `teamPost`, `eventReminders` (hourly) | Triggers, schedule |
 
-`UsauClient` sends requests one after another, about a second apart, with a
-30-second timeout, to stay polite. The app never caches USA Ultimate data
-on disk.
+**Flood control.** Each trigger counts the author's creates per action in
+a fixed window, in a transaction on `limits/{uid}`. Limits are in
+`functions/src/api/model.ts` (for example 20 messages a minute). Past the
+limit the extra document is deleted and `mutedUntil` is set 10 minutes
+ahead. `firestore.rules` checks `notMuted()` on every create of those
+kinds, so a muted client is refused at the database. Clients can read
+their own `limits` doc but never write it.
 
-### Role-dependent subscriptions
+**App Check.** `AppCheck.activate()` runs at startup: Play Integrity on
+Android, App Attest (DeviceCheck fallback) on Apple, debug providers in
+debug builds and a debug token (`APP_CHECK_DEBUG_TOKEN`) on Windows. HTTP
+calls carry the `X-Firebase-AppCheck` header. Enforcement rolls out as
+described in `docs/app-check.md`.
 
-Some listeners change with the user's role, because the rules would deny
-them otherwise:
+### 4.6 Data storage
 
-- `TeamDetailViewModel` watches `rosterStatus` (paid, USA Ultimate status)
-  and the invite code only while the role is owner, coach or captain. It
-  resubscribes when the role changes.
-- `ChatListViewModel` resubscribes to rooms when the role changes. Editors
-  get every room; players get the merged by-role and by-name queries. When
-  an editor finds a team with no General room, they create it.
-
-### Pending writes and offline
-
-Firestore's local cache shows a user's own writes immediately. A message
-stamped with `FieldValue.serverTimestamp()` arrives with a null
-`createdAt` until the server confirms it; the UI shows "Sending…" for
-those.
-
-Chat attachments are not offline-capable. They upload to Storage before
-the message document is written. If the message write fails, the uploaded
-files are deleted again. If a Storage step fails partway, the file being
-uploaded is removed too.
-
-### Unread messages
-
-Unread state is computed client-side from each conversation document. It
-holds `lastMessageAt` and `lastSenderId`, plus `readAt[uid]` for each
-person. Opening a conversation writes the opener's `readAt`. Home counts
-conversations where someone else posted after the user last read.
-
-## Storage
-
-### Cloud Firestore
+#### Cloud Firestore
 
 ```
-users/{uid}                     private profile: email, displayName, firstName, lastName,
-                                photoUrl, readReceipts (owner only)
-  dmReads/{conversationId}      readAt: own read time; the conversation's readAt is the
-                                shared receipt, set only with receipts on (owner only)
-  events/{eventId}              personal schedule (owner only)
-  settings/notifications        categories {}, teams {teamId: {}}, mutedRooms [], utcOffsetMinutes
-  devices/{fid}                 push targets: platform (owner writes, Functions send)
-  notifications/{id}            feed: category, title, body, route, read, count (Functions write)
-  follows/{type_targetId}       key, type (user/team/tournament/event), targetId, groupId?,
-                                name, photoUrl?, notify (owner only; Functions query them)
-profiles/{uid}                  public directory: name, username (set once), keywords
-                                (search prefixes of name and username), photoUrl
-usernames/{name}                → {uid, createdAt}; one per account, claimed with the profile
-                                in one transaction; never updated (Functions free it on delete)
-posts/{postId}                  people's own posts: kind (text/workout), body, links [],
-                                images [], workout {}?, tournamentKey?, tournamentName?,
-                                authorId, authorName, authorPhotoUrl (anyone signed in reads)
-followCounts/{key}              followers, and following on user keys (Functions only)
-tournamentDirectory/{g_t}       group tournaments' public summary: groupId, tournamentId,
-                                name, startsAt, endsOn, status, format (organizers write)
-inviteCodes/{code}              → { teamId }; single lookups only, never listed
-teamDirectory/{teamId}          public listing for team search: name, division, level,
-                                city, keywords (copied from the team; editors write)
-teams/{teamId}                  name, division, level, city, ownerId,
-                                members {uid: role}, memberIds [], memberNames {},
-                                statKeepers [], USAU link fields; a school or club
-                                (kind 'organization') adds linkedTeams {teamId: {name,
-                                division, roles []}}; a team in one has orgId, orgName,
-                                orgLinked and orgMembers [] (the last two: Functions only)
-  linkRequests/{teamId}         a team asking to join a school or club: teamName,
-                                division, requestedBy, requestedByName, createdAt
-  private/invite                current invite code (editors read, owner changes)
-  joins/{uid}                   proof a joiner knew the code (rules check it)
-  roster/{playerId}             name, number, position, userId (all members)
-  rosterStatus/{playerId}       paid, onUsau (editors only)
-  plays/{playId}                elements, arrows, animation steps
-  events/{eventId}              team event, plus rsvps {uid}, reactions {uid}, votes {uid}, poll, public
-  publicEvents/{eventId}        details of events marked public, no responses (anyone signed in reads)
-  posts/{postId}                title, body, public, tournamentKey?, authorId, authorName
-                                (public ones: anyone reads)
-  videos/{videoId}              youtubeId (11 chars, never a URL; '' for uploads), file? {path, name,
-                                size, contentType}, folderId ('' = unsorted), title, description,
-                                authorId, authorName, createdAt, updatedAt
-  videoFolders/{folderId}       name (1–40), createdAt
-  joinRequests/{uid}            community groups needing approval: name, createdAt
-  groupTournaments/{id}         community groups: name, eventId, settings {}, status, teams [],
-                                participantIds [], captains {teamId: uid}, createdBy
-    games/{gameId}              order, stage, round, pool, field, startsAt, teamA, teamB,
-                                sourceA, sourceB, status, scoreA, scoreB, report {}, ifNeeded
-  statsTournaments/{id}         tournament with roster and lines
-  statsGames/{id}               one game: points, lines, timeouts, all in one doc
-  chats/{roomId}                name, readRoles, writeRoles, readUsers, writeUsers
-  meetings/{meetingId}          title, startsAt, endsAt, notes, inviteRoles [], inviteUsers [],
-                                requireApproval, status (scheduled/live/ended), startedBy,
-                                startedAt, endedAt, rsvps {uid}, createdBy
-    requests/{uid}              join request: status (pending/admitted/denied), decidedBy
-    messages/{messageId}        in-call chat: authorId, authorName, text, createdAt
-    playback/current            watch together: videoId, playing, positionMs, presenterId,
-                                presenterName, updatedAt
-    messages/{messageId}        authorId, authorName, text, attachments [], createdAt
-conversations/{uidA_uidB}       participants [a,b] (sorted), names {}, lastMessage,
-                                lastMessageAt, lastSenderId, readAt {}
-  messages/{messageId}          same shape as chat messages
-usau_tournaments/{id}           written by Cloud Functions only (not deployed)
-usau_rankings/{key}             written by Cloud Functions only (not deployed)
-meta/usau                       last sync times (Functions only)
-sentReminders/{key}             one per event and start time, so reminders go once (Functions only)
+users/{uid}                     private profile, readReceipts (owner only)
+  dmReads/{conversationId}      own read time per conversation
+  events/{eventId}              personal schedule
+  teamInvites/{teamId}          invites to join a team (team admins write)
+  settings/notifications        categories, team overrides, mutedRooms, utcOffsetMinutes
+  devices/{fid}                 push targets
+  notifications/{id}            feed entries (Functions write)
+  follows/{type_targetId}       what the user follows, with a notify bell
+profiles/{uid}                  public directory: name, username, keywords, photo, private flag,
+                                and public details unless the profile is private
+  private/details               details of a private profile (followers read)
+  followRequests/{uid}          asking to follow a private profile
+usernames/{name}                → {uid}; claimed once, freed by Functions on delete
+posts/{postId}                  people's posts: text, photos, links, workouts, tags, likes, reposts
+  comments/{commentId}          comments (capped at the newest 100 on screen)
+followCounts/{key}              followers / following (Functions only)
+limits/{uid}                    flood counters and mutedUntil (Functions only; owner reads)
+inviteCodes/{code}              → {teamId}; single lookups only
+teamDirectory/{teamId}          public team search listing
+tournamentDirectory/{g_t}       public group-tournament listing
+teams/{teamId}                  team, group, school or club: members, roles, memberPerms, links
+  private/invite, joins/{uid}   invite code and proof of knowing it
+  joinRequests/{uid}            approval-group requests
+  linkRequests/{teamId}         a team asking to join a school or club
+  roster/{id}, rosterStatus/{id}
+  plays/{id}, events/{id}, publicEvents/{id}, posts/{id}
+  videos/{id}, videoFolders/{id}
+  chats/{roomId}                text or voice room with access lists
+    messages/{id}
+  chatFolders/{id}
+  meetings/{id}                 + requests/{uid}, messages/{id}, playback/current
+  groupTournaments/{id}         + games/{id}
+  statsTournaments/{id}, statsGames/{id}
+conversations/{uidA_uidB}       DM header: participants, names, last message, readAt
+  messages/{id}
+usau_tournaments, usau_rankings Functions only (scrapers not deployed)
+meta/{id}                       flags (kill switches), health, usau (Admin SDK writes)
+sentReminders/{key}             reminder de-duplication (Functions only)
 ```
 
-- **Denormalisation.**
-  - `memberIds` duplicates `members`' keys so `watchMyTeams` can use
-    `array-contains`.
-  - `memberNames` and the conversation `names` avoid extra profile reads.
-  - A chat room's read lists already include its writers, so the stored
-    lists alone answer "who can read".
-- **Cascades.** Firestore doesn't delete subcollections, so
-  `TeamRepositoryFirebase.deleteTeam` clears every subcollection first:
-  chat rooms (attachments, then messages, then the room), meetings
-  (messages and requests, then the meeting), roster, plays,
-  events, videos, stats, joins and the invite code. `AuthRepositoryFirebase
-  .deleteAccount` removes personal events, notification settings, devices,
-  feed, follows and posts, `users/{uid}` and `profiles/{uid}`. Functions in
-  the `follows` group drop everyone's follows of a deleted person, team or
-  group tournament, and a deleted post's photos. Conversations stay for the
-  other person. `deleteTeam` first stamps `deletingAt` on the team, so the
-  notification functions don't announce every event the cascade removes.
-- **Indexes.** All current queries use single-field indexes:
-  `array-contains` on members, room access and participants;
-  `orderBy createdAt / startDate / date`. Inbox order and people-search
-  ranking are sorted client-side to avoid composite indexes. The
-  reminder job and feed pruning need collection-group indexes on
-  `events.startsAt` and `notifications.createdAt` (`firestore.indexes.json`).
-  The feed's `posts` queries (`authorId in […]` or `tournamentKey in […]`,
-  newest first) need composite indexes, and so does the post triggers'
-  collection-group query on `follows` (`key in […]`, `notify == true`).
+- **Denormalisation:** `memberIds` mirrors `members` for `array-contains`;
+  `memberNames` and conversation `names` avoid profile reads; room read
+  lists include writers.
+- **Cascades:** Firestore doesn't delete subcollections, so
+  `deleteTeam` (after stamping `deletingAt` so notifications stay quiet)
+  and `deleteAccount` clear them; the `follows` functions remove follows
+  of deleted people, teams and tournaments and a deleted post's photos.
+- **Indexes** (`firestore.indexes.json`): composite indexes for every
+  multi-field query (feed `authorId in`/`tournamentKey in` + `createdAt`,
+  community events `audience` + `startsAt`, collection-group `follows`,
+  `events.startsAt`, `notifications.createdAt`). `fieldOverrides` turn
+  indexing off for large fields that are never queried (message text and
+  attachments, post body, images, links and workout, comment body,
+  profile bio and stats, directory descriptions), which makes writes
+  cheaper.
 
-### Cloud Storage
+#### Cloud Storage
 
 ```
-teams/{teamId}/chats/{roomId}/{uid}/{messageId}/{i}-{fileName}   team chat attachments
-conversations/{uidA_uidB}/{uid}/{messageId}/{i}-{fileName}       direct-message attachments
-teams/{teamId}/posts/{postId}/{upload}/{i}-{fileName}            team post photos
-users/{uid}/posts/{postId}/{upload}/{i}-{fileName}               people's post photos (anyone signed in reads)
+teams/{teamId}/chats/{roomId}/{uid}/{messageId}/{i}-{name}   team chat attachments
+conversations/{uidA_uidB}/{uid}/{messageId}/{i}-{name}       DM attachments
+teams/{teamId}/posts/{postId}/{upload}/{i}-{name}            team post photos
+users/{uid}/posts/{postId}/{upload}/{i}-{name}               people's post photos
+teams/{teamId}/videos/{videoId}/{name}                       uploaded team videos (≤ 500 MB)
 ```
 
-- **Size cap:** 10 MB per file (`maxAttachmentBytes`), checked in the
-  picker, the view model and `storage.rules`.
-- **File names:** sanitised. Messages store each attachment's path, name,
-  content type and size.
-- **Downloads:** go through the SDK (`getData`), so the rules apply to
-  every read. The app never uses public download URLs.
-- **Windows:** the desktop SDK uploads the bytes and then sets the content
-  type as a separate update, so the rules allow authors to create *and*
-  update their own files.
+- **Images** are shrunk on the device before upload (`ImageCompressor`):
+  at most 1920 px on the long side, JPEG quality 80, EXIF orientation
+  baked in, transparent PNGs kept as PNG, GIF/HEIC untouched, and the
+  original kept if the result isn't smaller. Picks up to 50 MB are
+  allowed because they shrink under the 10 MB upload cap.
+  `functions/scripts/compress-existing-images.ts` does the same to old
+  uploads.
+- **Paths are unique,** so uploads are marked `public, max-age=31536000, immutable`.
+- **Downloads** go through the SDK, so rules apply to every read.
 
-### On-device
+#### On device
 
-- `shared_preferences`: theme mode.
-- Firestore's offline cache, which the SDK manages.
-- USA Ultimate data and chat image bytes are held in memory only.
+`shared_preferences` (theme, meeting devices and volumes), Firestore's
+offline cache, `SharedStreams` in memory, USAU data and image bytes in
+memory only.
 
-## Security model
+### 4.7 Security model
 
-The rules are the security boundary. The UI hides actions people can't
-take, but the server enforces every one.
+The rules are the security boundary; the UI only hides what people can't
+do. Team membership is validated only by `firestore.rules`, so client and
+rules change together (with tests in `functions/test/rules`).
 
 | Data | Read | Write |
 |---|---|---|
-| `users/{uid}`, personal events | That user | That user |
-| `profiles/{uid}` | Any signed-in user | That user; name, keywords and photo only (no email) |
-| Team doc | Members | Field-by-field paths: editors edit details; the owner sets roles, stats access and ownership; joining needs the code proof; removals follow the role matrix |
-| Invite code | Editors | The owner, plus a matching `inviteCodes` lookup in the same batch |
-| Roster | Members | Editors |
-| Roster status | Editors | Editors |
-| Plays, team events | Members | Editors; members write only their own RSVP, reactions and votes, and only when going |
-| Stats | Members | Editors and stats keepers |
-| Meetings | Admins, plus invited roles and people | Create, edit, delete: admins. Start: admins (scheduled → live). End: admins. Invitees write only their own RSVP |
-| Meeting join requests | The requester and admins | The invitee creates or renews their own pending request (approval meetings, not ended); admins admit or deny |
-| Meeting chat | Admins and invitees allowed in the call (admitted, if approval is on) | Same people, while live, text only (4000 chars). Delete: author or admins |
-| Meeting playback (watch together) | Same people as the chat | Admins, while live, as themselves (`presenterId`), and only a video on the team. Delete: admins |
-| Team videos | Members | Owners, coaches and captains; `youtubeId` or a video `file` (MP4, MOV, MKV, WebM, AVI, WMV, MPEG or 3GP; ≤ 500 MB, under the video's own Storage path, fixed once created), `title` (1–100) and `description` (≤ 2000). Delete: same |
-| Community group (team doc with `kind: 'community'`) | Members (listing: anyone signed in) | Created without an invite code; anyone adds themselves as a member when approval is off; organizers add a requester only while their `joinRequests` doc exists, deleting it in the same batch; no coach role |
-| Group join requests | The requester and editors | The requester creates or deletes their own; editors delete |
-| Group tournaments | Editors, and players on its teams (`participantIds`) | Editors; players must be group members and captains must be players |
-| Tournament games | Same as the tournament | Editors write anything valid. A captain of either team writes a `report` for their own team; the other captain confirms it (scores must match). Anyone who can read may fill an empty team slot, only with the winner or loser `getAfter` shows on the source game |
-| Video folders | Members | Owners, coaches and captains; only `name` (1–40). Delete: same |
-| Uploaded video files (Storage `teams/{id}/videos/{videoId}/{name}`) | Members | Owners, coaches and captains; `video/*`, ≤ 500 MB. Delete: same |
-| Chat room details | Editors (to manage access); others only rooms they can read | Create and update: editors. Delete: owner |
-| Chat messages | The owner, plus roles and people the room lets read | Create: the owner, plus roles and people the room lets write, posting as themselves. Delete: author or owner. No edits |
-| Chat attachments | Same as messages (Storage rules read the room from Firestore) | Room writers, into their own folder, 10 MB max. Delete: author or owner |
-| Conversations | The two uids in the id | Create: a participant, with the other person listed in `profiles`. Update: the preview or your own `readAt` only. No deletes |
-| DM messages and attachments | The two participants | Your own only; delete your own |
-| Follows | That user | That user; key must be `{type}_{targetId}`, known types, no self-follow; after creating, only the bell and name change |
-| People's posts (`posts`) | Any signed-in user | The author, as themselves; text needs a body or photo, workouts are checked field by field (≤ 20 exercises); a tag must be a tournament or event key. Edit and delete: the author |
-| `followCounts` | Any signed-in user | Nobody from clients (Functions only) |
-| `tournamentDirectory` | Any signed-in user | Organizers of that group, with the id `{groupId}_{tournamentId}` |
-| Notification settings, devices | That user | That user; known fields and categories only |
-| Notification feed | That user | Functions create; the user marks entries read or deletes them |
-| `usau_*`, `meta` | Signed-in users | Nobody from clients (Admin SDK only) |
-| `sentReminders` | Nobody | Nobody from clients (Admin SDK only) |
+| `users/{uid}` and its subcollections | That user | That user (feed: Functions create; the user marks read or deletes) |
+| `profiles/{uid}` | Signed-in users; `private/details` only followers of a private profile | That user, known fields only |
+| `usernames` | Signed-in users | Claimed once with the profile, never updated |
+| Team doc | Members (groups: anyone signed in can list) | Field-by-field: details by `manageTeam`; roles and ownership by the owner; joining needs the invite-code proof, an open group, or an approved request |
+| Invite code | `manageMembers` | Owner, with the matching `inviteCodes` lookup |
+| Roster / roster status | Members / admins | Admins |
+| Plays, events | Members (community events: the roles in `audience`) | `manageEvents`; members write only their own RSVP, reaction and vote |
+| Chat rooms and messages | Roles and people the room lets read | Room writers, as themselves, not muted; delete: author or `moderate` |
+| Chat attachments | Same as messages (Storage reads the room) | Room writers, own folder, 10 MB |
+| Meetings | Admins and invitees | Admins create, start, end; invitees RSVP and request to join; chat while live |
+| Videos, folders | Members | Admins; links stored as 11-char YouTube ids only |
+| Group tournaments and games | Editors and players on its teams | Editors; captains report and confirm scores |
+| Conversations and DMs | The two participants | Participants; your own messages only; not muted |
+| Posts, comments | Signed-in users (private authors: followers) | The author, validated field by field; not muted |
+| Follows, follow requests | That user / the two people | That user; private profiles need an accepted request |
+| `followCounts`, `limits`, `sentReminders`, `usau_*`, `meta` | Signed-in (limits: owner; reminders: nobody) | Admin SDK only |
 
-Storage rules use `firestore.get()` to check team and room access. That
-needs the Storage service agent to hold the **Firebase Rules Firestore
-Service Agent** role on the project.
+Storage rules use `firestore.get()`, which needs the Storage service
+agent to hold the *Firebase Rules Firestore Service Agent* role.
 
-## External APIs
+### 4.8 External APIs
 
 | API | Used for | Called from |
 |---|---|---|
-| Firebase Auth | Sign-in (email, Google, Apple), display name, delete account | `AuthService` |
-| Google OAuth (system browser + loopback) | Google sign-in on Windows | `GoogleDesktopOAuth` |
-| Cloud Firestore | All app data, real-time listeners | Firebase repositories |
-| Cloud Storage | Chat and DM attachments | `AttachmentStorage` |
-| LiveKit Cloud (WebRTC SFU) | Meeting audio, video and screen share | `LiveKitMeetingCall` (`livekit_client`); tokens from the `meetings-joinToken` function via `MeetingTokenService` |
-| YouTube oEmbed (`youtube.com/oembed`, no key) | Video title and whether it can be embedded, when a link is pasted | `YouTubeInfoService` |
-| YouTube embedded player | Playing team videos (`youtube_player_iframe`; on Windows the embed in WebView2 via `webview_windows`) | `youTubePlayer()` |
-| Cloud Storage + media_kit | Uploaded team video files | `VideoRepositoryFirebase`, `fileVideoPlayer()` |
-| OpenStreetMap tiles (`tile.openstreetmap.org`, no key) | Group location maps | `GroupMap` (`flutter_map`) |
-| Nominatim (`nominatim.openstreetmap.org`, no key, app User-Agent) | Address search for group locations | `GeocodingService` |
-| play.usaultimate.org (HTML scraping, ASP.NET postbacks) | Tournaments, rankings, team pages and rosters, event schedules and brackets | `UsauClient` + `UsauParser` |
+| Firebase Auth | Sign-in, account deletion | `AuthService` |
+| Google OAuth (browser + loopback) | Google sign-in on Windows | `GoogleDesktopOAuth` |
+| Firestore, Storage, FCM, App Check | App data, files, push, attestation | Repositories, `AttachmentStorage`, `PushService`, `AppCheck` |
+| Cloud Functions (HTTPS) | Search, sign-in, tokens, Discord preview | `CallableClient`, `AccountService`, `MeetingTokenService` |
+| LiveKit Cloud | Meeting and voice-channel audio, video, screen share | `meeting_call_livekit.dart` |
+| YouTube oEmbed and embed | Link checks and playback | `YouTubeInfoService`, `youTubePlayer()` |
+| OpenStreetMap tiles, Nominatim | Group maps and address search | `GroupMap`, `GeocodingService` |
+| Discord templates (`discord.new`) | Server import | `discord-previewTemplate` |
+| play.usaultimate.org | Tournaments, rankings, teams, rosters, schedules | `UsauClient` + `UsauParser` |
 
-Notes on USA Ultimate data:
+The USAU site's `robots.txt` disallows AI agents; development uses the
+fixtures in `functions/test/fixtures/`.
 
-- The site's `robots.txt` disallows AI agents. Development work uses the
-  fixtures in `functions/test/fixtures/`; the app itself fetches only the
-  pages a user opens.
-- When the user base grows, deploy `functions/` (scheduled
-  `scrapeUsauTournaments` and `scrapeUsauRankings`, every two months to
-  start). Then switch `dependencies.dart` to `TournamentRepositoryFirebase`
-  and `RankingRepositoryFirebase`, which read `usau_*` from Firestore.
+---
 
-## Notifications
+## 5. Feature workflows and subfeatures
 
-Cloud Functions in `functions/src/notifications`, exported as the
-`notifications` group (`firebase deploy --only functions:notifications`):
+Each feature lists its main workflows (what happens, in order, across the
+layers) and its subfeatures.
 
-| Function | Trigger | Who's notified |
-|---|---|---|
-| `chatMessage` | Team chat message created | Everyone who can read the room (`roomReaders` mirrors `canReadRoom`), except the author |
-| `directMessage` | DM created | The other participant |
-| `teamEvent` | Team event written | Every member but whoever did it (auth context), when an editable field changed; never for past events |
-| `teamPlay` | Play created or saved | Every member but whoever saved it |
-| `userPost` | Person's post created | Followers of the author, or of the tournament it's tagged with, who turned the bell on |
-| `teamPost` | Team or group post created | Followers of the team, or of the tournament it's about, who turned the bell on; members-only posts reach only followers who are members |
-| `eventReminders` | Hourly | Events starting 23–24 h out: team members who haven't said they can't go, or the personal event's owner. Also prunes feed entries over 60 days old |
+### 5.1 Accounts and sign-in
 
-- **Delivery** (`deliver.ts`): for each recipient, read their preferences
-  (`wants()`: room mute, then team override, then category; everything is
-  on by default), write the feed entry, then send to each device by FID
-  with `sendEach`. FIDs FCM no longer knows are deleted; other send
-  failures are logged as "Push failed" with the FCM code (e.g.
-  `messaging/third-party-auth-error` when the project has no APNs key).
-- **Folding:** chat, DMs, event changes and plays fold into one feed entry
-  per room, conversation, event or play (`collapseId`). Repeats while it's
-  unread count up ("3 new messages"); the same id groups pushes on the device.
-  A repeat within 10 minutes of the last push while still unread updates
-  the feed without pushing (`shouldPush`, `pushedAt` on the entry), so a
-  busy chat is one push, not one per message.
-- **Times** are worded in the recipient's offset (`utcOffsetMinutes`, written
-  at each sign-in), since Functions run in UTC.
-- **Client:** `_FrisbeeAppState` calls `syncDevice` when someone signs in,
-  which registers the device if push is already allowed. While the app is
-  open, iOS shows no system banner; `InAppNoticesViewModel` watches the
-  feed and `InAppNoticeBubble` drops a small bubble at the top for anything
-  new (updated in place for repeats, skipped for the page you're on). With
-  push off on a phone, notification settings show the categories off and
-  disabled until it's turned on. Tapped pushes carry
-  a `route` and are opened with `router.push` once auth is ready. Signing
-  out (or deleting the account) unregisters the device first.
-- **Platforms:** Android and iOS get push (iOS needs the APNs key in
-  Firebase and Push on the App ID). macOS needs the Push capability added
-  when its signing is set up. Windows has no FCM plugin, so it shows the
-  feed only.
-- **Logic** that decides recipients and wording is pure (`model.ts`) and
-  unit-tested in `functions/test/notifications`.
+**Workflows**
+- **Sign up:** `SignUpViewModel` checks the username live
+  (`UsernameChecker` → `usernames/{name}`), creates the Auth user, then
+  claims `usernames/{name}` and writes `profiles/{uid}` in one transaction.
+- **Sign in with a username:** the app posts the username and password to
+  `account-signInEmail`, which rate-limits per username, looks up the
+  email server-side (so emails are never public) and returns a custom
+  token.
+- **Username gate:** `authRedirect` sends a signed-in user with no
+  username to `/welcome/username?from=…` (`ChooseUsernameViewModel`).
+- **Delete account:** the app removes its own data (events, settings,
+  devices, feed, follows, posts, profile), then `account-deleteAccount`
+  frees the username and deletes the Auth user; `follows` functions clean
+  up others' follows.
 
-## Meetings
+**Subfeatures:** email/password, Google, Apple (Google and Apple hidden
+on Windows except browser Google), sign-out unregisters the device first.
 
-Meetings live in `teams/{teamId}/meetings`, not `events`, because
-non-admins may only see the ones they're invited to and Firestore queries
-must be provably limited to readable documents. Admins query the whole
-collection; everyone else merges `inviteRoles array-contains <role>` and
-`inviteUsers array-contains <uid>`, sorted on the device (no composite
-index). `TeamMeeting.toEvent()` puts them on the schedule as
-`EventType.meeting`, and `Routes.teamEvent` sends those to the meeting
-page.
+### 5.2 Home and the feed
 
-- **Calls** run on LiveKit Cloud. The `meetings` functions group
-  (`functions/src/meetings`) holds:
-  - `joinToken` (callable): repeats the rules' checks (member, invited, live,
-    admitted when approval is on) and returns a 6-hour token. The identity
-    is the uid; the photo goes in metadata. The app calls it over plain
-    HTTPS (`MeetingTokenService`) so it works on Windows, which has no
-    `cloud_functions` plugin.
-  - `closeRoom`: deletes the LiveKit room when a meeting ends or is
-    deleted, so nobody stays connected.
-- **Media** sits behind `MeetingMediaService` / `MeetingCall`
-  (`data/services/meeting_call.dart`); `meeting_call_livekit.dart` is the
-  only file that knows LiveKit, and tests use fakes. Screen share works on
-  Windows, macOS and Android (a `mediaProjection` foreground service via
-  `flutter_background`). iOS would need a broadcast upload extension.
-- **Per-user settings** (`MeetingSettings`, in SharedPreferences): chosen
-  mic, speaker and camera, mic and camera on at join, meeting volume, and
-  each person's volume (0–200%, applied with `Helper.setVolume`).
-- **Watch together** replaces screen-sharing a video: an admin picks a
-  team video and everyone plays it on their own device, in sync, at full
-  quality. See [Watch together](#watch-together).
-- **Started alerts:** the `teamMeeting` trigger notifies invitees who said
-  they're attending, except whoever started it and anyone already waiting
-  or let in. The feed entry id starts `meetingStarted_`, and
-  `MeetingAlertsViewModel` turns a fresh unread one into an in-app banner
-  with **Join**, unless `MeetingPresence` says that room is already open.
-
-### Watch together
-
-`WatchTogetherViewModel` (created with the call, like the chat) follows
-one doc, `meetings/{id}/playback/current` (`MeetingPlayback`): which video,
-playing or paused, the position at `updatedAt` (server time), and who's
-presenting.
-
-- **Players** sit behind `SyncedVideoController`
-  (`data/services/synced_video.dart`): play, pause, seek, volume, status.
-  `syncedVideoPlayer()` (`ui/videos/widgets/synced_video_player.dart`)
-  builds one with no controls of its own: media_kit for uploads,
-  `youtube_player_iframe` on Android, iOS and macOS, and on Windows a
-  WebView2 page (`synced.html`) using YouTube's IFrame Player API, driven
-  with `executeScript`. WebView2 starts with
-  `--autoplay-policy=no-user-gesture-required` (`ensureWebViewEnvironment`)
-  so videos start from code.
-- **Sync:** while a video is up, each player is checked once a second.
-  Viewers play or pause to match and seek when more than 1.5 s off the
-  expected position (`position` plus the time since `updatedAt` while
-  playing; device clocks are trusted). The presenter's player is the
-  truth: its play, pause and seek are written straight away, and while it
-  plays it rewrites its real position every 10 s (a heartbeat) and writes
-  paused at the end. If a viewer's player won't start after three tries,
-  it shows "Tap the video to start it".
-- **Control:** only admins write (`presenterId` must be them), so another
-  admin can **Take control**. **Stop** deletes the doc; ending or deleting
-  the meeting does too.
-- **Layout:** the video takes the stage, ahead of any shared screen, with
-  the tiles in a strip. Its audio follows the meeting volume and mute.
-
-## Videos
-
-A team video is either a YouTube link or an uploaded video file: MP4,
-M4V, MOV, MKV, WebM, AVI, WMV, MPEG or 3GP (`VideoFile.types`, matched
-by `validFile` in `firestore.rules`). media_kit (libmpv) plays them all.
-
-For links, you upload to YouTube (Unlisted works) and paste the link.
-`TeamVideo.youtubeIdFrom` reads the 11-character id from any common link
-shape; only that id is saved, and the rules accept nothing else, so a
-stored video can't point off YouTube.
-
-For uploads, `VideoRepositoryFirebase.uploadVideo` puts the file in Cloud
-Storage at `teams/{teamId}/videos/{videoId}/{name}` and then writes the
-video doc with `file {path, name, size, contentType}`. If the doc write
-fails, the file is deleted. The download URL isn't stored; the video page
-asks Storage for it each time (`fileUrl`).
-
-- **Limits:** 500 MB per file (`TeamVideo.maxFileBytes`), enforced by the
-  app, `firestore.rules` and `storage.rules`. 5 GB per team
-  (`TeamVideo.teamQuotaBytes`) is checked by the app only, from the sum
-  of the team's file sizes, since rules can't add files up. Admins see
-  **Uploads: X of 5 GB used** above the grid.
-- **Removing** an upload deletes its file; deleting a team deletes them
-  all.
-- **Folders** (`VideoFolder`, `teams/{id}/videoFolders`) are just names.
-  A video points at one with `folderId`; empty, or a folder that's gone,
-  means unsorted. Deleting a folder first sets `folderId: ''` on its
-  videos (batched), then deletes it, so no video is lost.
-  `TeamVideosViewModel.filter` is All, one folder, or Unsorted; a new
-  video starts in the folder being viewed (`?folder=` on the new-video
-  route).
-
-- **Checking links:** `YouTubeInfoService` asks YouTube's public oEmbed
-  endpoint for the title and channel. It answers for public and unlisted
-  videos that allow embedding, so the editor warns about private videos
-  or ones with embedding turned off before they're shared.
-- **Thumbnails** come from `i.ytimg.com/vi/<id>/hqdefault.jpg`.
-- **Playback** uses YouTube's own embedded player (`youtubePlayer()` in
-  `ui/videos/widgets/youtube_player_view.dart`):
-  - Android, iOS, macOS: `youtube_player_iframe`.
-  - Windows: the same embed in an Edge WebView2 (`webview_windows`). YouTube's
-    embed won't play from a page with no origin, so a small player page is
-    written to a temp folder and served from the virtual host
-    `https://player.ultiup.app`. If WebView2 is missing or fails, the
-    page falls back to the thumbnail with **Watch on YouTube**.
-  - Building on Windows needs NuGet; the plugin downloads it if it isn't
-    on the PATH.
-- Uploads play in `media_kit` (`fileVideoPlayer()` in
-  `ui/videos/widgets/file_video_player.dart`); `MediaKit.ensureInitialized()`
-  runs in `main`.
-- Screens take the players as parameters, so widget tests swap in
-  stand-ins (`fakePlayer` and `fakeFilePlayer` in
-  `test/testing/video_fakes.dart`).
-
-## Follows and the feed
-
-- **Keys.** Everything followable has a `FollowTarget` key
-  (`lib/domain/models/follow.dart`): `user_{uid}`, `team_{teamId}` (teams
-  and groups), `tournament_{groupId}_{tournamentId}` and `event_{usauId}`.
-  The same key is the follow doc's id, the `followCounts` doc, and what
-  posts are tagged with. `firestore.rules` and `functions/src/notifications
-  /model.ts` (`followKey`, `followKeys`) build the same strings.
-- **Follow buttons.** `FollowViewModel` + `FollowControl`
-  (`lib/ui/follow`). Page view models own one through `FollowSlot`, made
-  once the page knows its target's name. The slot's repositories are
-  optional, so tests that don't pass them get no button.
-- **Feed.** `HomeFeed` (`lib/ui/posts/view_models/home_feed.dart`), owned
-  by `HomeViewModel`, watches the user's follows and teams. It keeps one
-  subscription per source and adds and drops them as those change:
+**Workflows**
+- **Open Home:** `HomeViewModel` composes `MySchedule` (team events +
+  personal events), the user's teams, a playbook preview, USAU
+  tournaments and rankings, the DM unread badge and `HomeFeed`.
+- **Build the feed:** `HomeFeed` keeps one source per kind and adds or
+  drops them as follows and teams change:
   - people (the user plus everyone followed): `posts where authorId in`,
     in chunks of 30
   - followed tournaments and events: `posts where tournamentKey in`
   - each team the user is on: all its posts
   - each followed team they're not on: its public posts
-  - each followed group tournament outside their groups: the group's
-    public posts with that `tournamentKey`
+  - followed group tournaments outside the user's groups: that group's
+    public posts with the tag
 
-  `mergeFeed()` dedupes by id and sorts newest first. **Show older posts**
-  raises the limit and re-queries the people and tournament sources.
-- **Notifications.** The post triggers query `collectionGroup('follows')`
-  for the post's keys with `notify == true`. The follower's uid is the
-  doc's grandparent. `deliver()` then applies the usual preference gates
-  under the new `posts` category, which teams can override like the
-  others.
-- **Counts.** `followCount` adds or takes one off `followCounts/{key}
-  .followers` and the follower's `followCounts/user_{uid}.following`
-  whenever a follow is created or deleted.
+  Each source has a live page of 20; `mergeFeed()` de-duplicates and
+  sorts newest first.
+- **Scroll for older posts:** `loadMore()` finds the cutoff (the newest of
+  the sources' oldest dates), fetches the next page from the sources at
+  the cutoff with `fetchPostsBefore`, and repeats up to 5 rounds, so the
+  merged feed has no gaps and each load reads about one page.
 
-## Community groups
+**Subfeatures:** two-column dashboard at 960 px, rankings podium, this
+week strip, inbox badge, in-app notice bubbles.
 
-A group is a team doc with `kind: 'community'` (`TeamKind`), so chat,
-events, posts, members, the directory and notifications all work
-unchanged. `TeamSection.forKind` picks a group's sections (Events, Chat,
-Tournaments, Members); `TeamRole.labelFor(kind)` shows captain as
-Organizer and player as Member. Groups have no invite code: open groups
-are joined directly (`joinGroup`), approval groups through
-`joinRequests/{uid}` (`requestToJoin`, `approveJoinRequest`).
+### 5.3 Teams
 
-## School and club communities
+**Workflows**
+- **Create a team:** `CreateTeamViewModel` writes the team, its invite
+  code (`private/invite` + `inviteCodes/{code}`), `teamDirectory` listing
+  and default rooms (General, voice channels) in one batch. `teamFlood`
+  counts team creation.
+- **Join by code or link:** the joiner writes `joins/{uid}` with the code
+  and adds themselves as a player in the same batch; rules check the
+  code matches. Join links open `hosting/join.html`, which deep-links into
+  the app.
+- **Invite people:** admins write `users/{uid}/teamInvites/{teamId}`;
+  `teamInvite` notifies them; accepting joins the team.
+- **Roles and permissions:** owners create custom roles granting
+  `TeamPermission`s (manageTeam, manageMembers, manageChats, manageEvents,
+  moderate, keepStats). The team doc holds `roles`, `memberRoles` and the
+  flattened `memberPerms` that rules check with `can(team, perm)`. Legacy
+  coach and captain tiers are migrated to custom roles
+  (`migrateTiersToRoles`) when the owner opens the team.
+- **USA Ultimate roster:** `UsauRosterViewModel` finds the team on USAU,
+  imports the roster, and later syncs changes; `rosterStatus` (paid, on
+  USAU) is admin-only.
+- **Team search and public page:** search goes to `teamDirectory`
+  keywords (or `api-search` when `use_api_search` is on); non-members see
+  the public page with public events and posts.
 
-A school or club (e.g. a college with Woof and Whiplash) is a team doc
-with `kind: 'organization'` (`TeamKind.organization`, `Team.isOrganization`).
-It joins and behaves like a group (`isCommunity` is true for both): open
-or approval joins, invites, and invite codes too. Its sections are Teams,
-Events, Chat and Members, and its roles work as on any team: role-gated
-chat rooms, and Discord-style permissions.
+**Subfeatures:** team home (summary, upcoming events, posts), sections
+(Events, Chat, Roster, Playbook, Videos, Stats, Members), member removal
+by role matrix, transfer ownership, delete team (full cascade).
 
-- **Linked teams.** Each team stays a full team (roster, playbook, stats,
-  USAU link, its own events and chats). A team is in a community once
-  both sides agree:
-  - the team names it, `orgId`/`orgName`, set by its admins;
-  - the community lists it, `linkedTeams.{teamId}: {name, division,
-    roles}`, set by its admins (Manage team).
-  Admins create a team inside the community (`createTeamInCommunity`
-  writes both in one batch), or a team asks from its menu (School or club,
-  `requestCommunityLink`, which writes `teams/{orgId}/linkRequests/{teamId}`)
-  and the community accepts (`acceptLinkRequest`) or declines.
-- **Roles decide membership.** `communities-sync` (Cloud Functions,
-  `functions/src/communities/`) runs on every team doc write. When the
-  community's `memberRoles` or `linkedTeams` change, members who gain one
-  of a team's roles join it as players, and those who lose it leave. It
-  only removes people it added (`orgMembers` on the team), never the
-  owner or people the team added itself. It sets `orgLinked` once both
-  sides agree, and a team that clears its `orgId` (Leave community) loses
-  those members and its listing. The app's test fake (`FakeTeamRepository
-  ._syncCommunities`) mirrors it.
-- **Copies of community roles.** A linked team may hold copies of the
-  community roles that get on it (`Team.orgRoles`: team role id →
-  community role id, written by the team's owner with its roles). The same
-  function gives each copy to exactly the team members holding the
-  community role and recomputes `memberPerms` (`mirrorUpdate`), so a Woof
-  Captain in the community is one on Woof. The Roles screen marks them
-  "given out by" the community. A team that leaves keeps them as plain
-  roles (`orgRoles` is cleared).
-- **Discord import into a community.** In a community with teams, the
-  import sorts rooms (`DiscordTeamSplit`): a room only one team's roles
-  read goes to that team's chat; roles that get on no team (Admin) don't
-  count, and rooms anyone reads or two teams share stay in the community.
-  The owner can change any room's destination. Each team's share
-  (`TeamChatImport`) adds copies of its roles; a room every one of them
-  reads is open to the whole team. Rooms already in the community chat
-  from an earlier import are deleted there once their team has them
-  (after a confirm). Only teams the owner also owns get rooms.
-- **Community events say who sees them.** `audience` holds `everyone` or
-  role ids (`TeamEvent.audience`, the "Who sees it" chips in the event
-  editor). Rules let a member read one only when they hold an id in it,
-  or manage events. So members who don't manage events query once per id
-  they hold (`Team.eventAudienceOf`, `watchEvents(audience:)`), which needs
-  the `events` (audience, startsAt) index. Event notices and reminders go
-  to the same people (`eventViewers`).
+### 5.4 Community groups
 
-## Group tournaments
+A group is a team doc with `kind: 'community'`, so chat, events, posts,
+members, the directory and notifications work unchanged.
 
-The engine in `lib/domain/tournament_engine/` is pure Dart and unit
-tested (`test/domain/tournament_engine_test.dart`):
+**Workflows**
+- **Join an open group:** `joinGroup` adds the user as a member directly.
+- **Join an approval group:** `requestToJoin` writes `joinRequests/{uid}`
+  (`groupJoinRequest` notifies organizers; `joinRequestFlood` limits it);
+  `approveJoinRequest` adds the member and deletes the request in one
+  batch.
+- **Set a location:** `LocationPickerViewModel` searches Nominatim and
+  saves coordinates; the group page shows an OpenStreetMap map.
 
-- `team_builder.dart`: deals players into teams of a size, random captain.
-- `generator.dart`: round robin (circle method), snake-seeded pools,
-  cross-seeded single elimination with byes, double elimination with a
-  losers' bracket and an if-needed final, then a slot × field scheduler
-  that respects game dependencies and never double-books a team.
-- `standings.dart`: wins, then head to head, then point difference, then
-  points for.
-- `progress.dart`: which slots fill once a game is final (`fillsAfter`),
-  bracket seeds from pools, the champion.
+**Subfeatures:** sections Events, Chat, Tournaments, Members; captain
+shown as Organizer and player as Member; pickup events; group tournaments.
 
-Bracket games store where their teams come from (`sourceA`/`sourceB`:
-winner or loser of a game, or a pool rank). There's no Cloud Function:
-confirming a score writes the game and the filled slots in one batch, and
-the rules check each fill against the source game with `getAfter`.
-`GroupTournamentViewModel` also applies any fills that didn't land
-(`pendingFills`).
+### 5.5 Schools and clubs
 
-## Secrets and configuration
+A school or club is a team doc with `kind: 'organization'`.
 
-- Firebase API keys come from `secrets.local.json` at build time, via
-  `--dart-define-from-file`. `lib/firebase_options.dart` only reads
-  `String.fromEnvironment`.
-- Native Firebase config files and iOS Google IDs are gitignored. Codemagic
-  injects them for iOS builds.
+**Workflows**
+- **Link a team:** admins create a team inside the community
+  (`createTeamInCommunity`, both sides in one batch), or a team asks from
+  its menu (`requestCommunityLink` → `teams/{orgId}/linkRequests/{teamId}`)
+  and the community accepts or declines.
+- **Membership by role:** `communities-sync` runs on every team write.
+  Members who gain a role a linked team admits join it as players; those
+  who lose it leave. It only removes people it added (`orgMembers`), sets
+  `orgLinked` once both sides agree, and mirrors community roles onto
+  teams that hold copies (`orgRoles`).
+- **Role-gated events:** `audience` holds `everyone` or role ids; members
+  who don't manage events query once per id they hold
+  (`watchEvents(audience:)`). Notices and reminders go to the same people.
+
+**Subfeatures:** Teams section, invite codes, Discord import split by
+team, leaving a community.
+
+### 5.6 Team chat and voice channels
+
+**Workflows**
+- **Open chat:** `ChatListViewModel` lists rooms and folders the user can
+  read (editors: all rooms; players: merged `readRoles`/`readUsers`
+  queries) and creates General if it's missing.
+- **Read a room:** `MessageThreadViewModel` (shared by team rooms, DMs and
+  meeting chat) shows a live newest page and fetches older pages one at
+  a time as the user scrolls up (auto-load, with a spinner; falls back to
+  a larger live window if a page fetch fails).
+- **Send:** the composer always shows a Send button (Enter sends,
+  Shift+Enter adds a line on keyboards). Photos are compressed, files
+  checked against 10 MB, uploaded, then the message is written. See the
+  [sequence diagram](#a-write-end-to-end-sending-a-chat-message).
+- **Flood:** more than 20 messages a minute deletes the extras and mutes
+  the sender for 10 minutes; the composer shows "You're going too fast".
+- **Manage rooms:** `ChatRoomSettingsViewModel` sets name, folder and
+  read/write access by role or person; `moderate` can delete others'
+  messages.
+- **Voice channels:** voice rooms are drop-in calls. `VoiceRepository`
+  gets a token from `meetings-voiceToken`, joins the LiveKit room and
+  stays connected while the user moves around the app, one channel at a
+  time.
+- **Discord import:** the owner pastes a server template link;
+  `discord-previewTemplate` returns the roles, folders and rooms it would
+  create; after a preview the app writes them under the rules. In a
+  community, rooms are split between linked teams (`DiscordTeamSplit`).
+
+**Subfeatures:** folders, day separators, photo and file bubbles, saving
+files, per-room mute, notifications folded per room.
+
+### 5.7 Direct messages
+
+**Workflows**
+- **Start a conversation:** `PeopleSearchViewModel` searches `profiles`
+  keywords (or `api-search`), debounced; opening a person creates
+  `conversations/{uidA_uidB}` if needed.
+- **Chat:** same thread as team chat (paging, compression, flood limit via
+  `directMessageFlood`).
+- **Unread and receipts:** each conversation holds `lastMessageAt`,
+  `lastSenderId` and `readAt`. Opening writes the user's own
+  `dmReads` time, and the shared `readAt` only with read receipts on.
+  Home counts conversations where someone else posted after the user read.
+
+**Subfeatures:** split view at 840 px, read receipts setting,
+notifications per conversation.
+
+### 5.8 Schedule and events
+
+**Workflows**
+- **See the schedule:** `MySchedule` merges `watchMyTeams`, every team's
+  events and personal events (re-listening with backoff on failure).
+- **Create or edit an event:** `EventEditorViewModel` writes
+  `teams/{id}/events/{id}` (and `publicEvents/{id}` when public);
+  `teamEvent` notifies members when an editable field changes.
+- **RSVP, react, vote:** members write only their own entries in `rsvps`,
+  `reactions` and `votes`.
+- **Reminders:** `eventReminders` runs hourly and notifies people about
+  events 23–24 hours out who haven't said they can't go.
+
+**Subfeatures:** personal events, polls, public events, swipe-to-delete by
+role, community event audiences, meetings shown as events.
+
+### 5.9 Meetings
+
+Meetings live in `teams/{teamId}/meetings` (not `events`), because
+non-admins may only see the ones they're invited to.
+
+**Workflows**
+- **Schedule:** `MeetingEditorViewModel` sets invited roles and people,
+  times and whether approval is required. Invitees RSVP.
+- **Start and join:** an admin starts it (`scheduled → live`);
+  `teamMeeting` alerts invitees who said they're going, and
+  `MeetingAlertsViewModel` shows a **Join** banner. Joining calls
+  `meetings-joinToken`, which repeats the rules' checks and returns a
+  6-hour LiveKit token.
+- **Lobby:** with approval on, invitees write `requests/{uid}` and admins
+  admit or deny.
+- **Watch together:** an admin picks a team video; everyone plays it on
+  their own device, synced through `playback/current` (seek when more
+  than 1.5 s off; the presenter writes a heartbeat every 10 s). Another
+  admin can take control; Stop deletes the doc.
+- **End:** an admin ends it; `closeRoom` deletes the LiveKit room.
+
+**Subfeatures:** camera, mic, screen share (Windows, macOS, Android),
+device choice and per-person volume (`MeetingSettings`), in-call chat
+(paged, flood-limited).
+
+### 5.10 Playbook
+
+**Workflow:** `PlayEditorViewModel` edits a play's elements, arrows and
+animation steps on a drawable field and saves it to
+`teams/{id}/plays/{id}`; `teamPlay` notifies members. Playback animates
+the steps.
+
+**Subfeatures:** Home preview, admins edit, members view.
+
+### 5.11 Videos
+
+**Workflows**
+- **Add a YouTube link:** `VideoEditorViewModel` extracts the 11-char id
+  (`TeamVideo.youtubeIdFrom`), checks it with YouTube oEmbed (warns about
+  private or non-embeddable videos) and saves only the id.
+- **Upload a file:** `uploadVideo` puts it at
+  `teams/{teamId}/videos/{videoId}/{name}`, then writes the doc; the file
+  is deleted if the write fails. 500 MB per file (app, Firestore and
+  Storage rules) and 5 GB per team (app only).
+- **Watch:** YouTube embed (`youtube_player_iframe`; WebView2 on Windows
+  from a virtual host) or media_kit for uploads.
+
+**Subfeatures:** folders (deleting one moves its videos to Unsorted),
+thumbnails, quota display, watch together in meetings.
+
+### 5.12 Stats
+
+**Workflows**
+- **Track a game:** `GameTrackerViewModel` records lines, O/D, points,
+  the pull timer and timeouts into one `statsGames/{id}` doc.
+- **Tournaments and season:** `TournamentViewModel` and `StatsViewModel`
+  roll games up into stat sheets and season stats; the roster comes from
+  the team.
+
+**Subfeatures:** stats access via `keepStats` or `statKeepers`, profile
+stats summary.
+
+### 5.13 Group tournaments
+
+**Workflows**
+- **Build teams:** `team_builder.dart` deals the event's RSVPs into teams
+  of a chosen size with a random captain.
+- **Generate a schedule:** `generator.dart` makes round robin, pools +
+  single elimination, single or double elimination (with an if-needed
+  final), then fits games to time slots and fields without double-booking.
+- **Report scores:** a captain reports, the other captain confirms (scores
+  must match); confirming writes the game and the bracket slots it fills
+  in one batch, and rules check each fill with `getAfter`.
+
+**Subfeatures:** standings (wins, head to head, point difference, points
+for), public listing in `tournamentDirectory`, follow a tournament.
+
+### 5.14 Profiles, follows and posts
+
+**Workflows**
+- **Profile:** `PlayerProfileViewModel` shows details, teams, stats and
+  posts. A private profile keeps its details in `profiles/{uid}/private/details`,
+  readable only by followers.
+- **Follow:** following writes `users/{uid}/follows/{type_targetId}`;
+  `followCount` updates counts and `newFollower` notifies. A private
+  profile needs a `followRequests/{uid}` the owner accepts
+  (`followRequest` notifies). `followFlood` limits follows.
+- **Post:** `PostComposerViewModel` writes `posts/{id}` with text,
+  compressed photos, links, a workout or a tournament/event tag;
+  `userPost` notifies followers with the bell on; `postFlood` limits it.
+- **Interact:** likes (`postLiked`), reposts with a note (once per
+  person), comments (`postCommented`, `commentCount`, `commentFlood`).
+- **Record a workout:** `WorkoutRecorder` tracks a GPS run or ride across
+  the app; finishing posts it as a workout with its route.
+
+**Subfeatures:** username, pronouns, bio, visibility settings, Following
+page, follow bells, follow buttons on teams, tournaments and events.
+
+### 5.15 USA Ultimate events and rankings
+
+**Workflows**
+- **Tournaments:** `TournamentsViewModel` reads the cached tournaments
+  list; `TournamentDetailViewModel` fetches schedules and brackets per
+  event and division (`UsauScheduleRepository`).
+- **Rankings:** the first listener starts the load; divisions arrive as
+  they parse; later listeners get the cache.
+- **Team pages:** one fetch per USAU team URL.
+
+**Subfeatures:** follow a USAU event, tag posts with it, podium on Home.
+When the user base grows, deploy the scrapers and switch to the
+`…Firebase` repositories (see `functions/src/usau`).
+
+### 5.16 Search and command menu
+
+**Workflow:** the Explore page and Ctrl/⌘ K debounce input, then search
+players and people (`profiles` keywords), teams and groups
+(`teamDirectory` keywords) and USAU events. When `use_api_search` is on,
+people and team searches go through `api-search`, which validates the
+keyword, rate-limits per user and returns at most 50 results.
+
+### 5.17 Notifications
+
+**Workflows**
+- **Deliver:** a trigger decides recipients (pure logic in `model.ts`),
+  then `deliver()` checks each recipient's preferences (room mute, team
+  override, category), writes a feed entry and pushes to each device by
+  FID. Dead FIDs are deleted.
+- **Fold:** chat, DMs, event changes and plays fold into one entry per
+  room, conversation, event or play; repeats within 10 minutes while
+  unread update the feed without pushing again.
+- **Client:** `syncDevice` registers the device at sign-in; tapped pushes
+  open their `route`; `InAppNoticesViewModel` shows a bubble for new
+  entries while the app is open.
+
+**Subfeatures:** per-category and per-team settings, per-room mute,
+times in the recipient's UTC offset, feed pruned after 60 days. Windows
+has the feed only (no FCM plugin).
+
+### 5.18 Settings
+
+**Workflow:** `ProfileViewModel` backs General (theme), Privacy (read
+receipts, profile visibility) and Account (name, username, delete,
+sign out), each a slide-over page.
+
+---
+
+## 6. Operations
+
+### Secrets and configuration
+- Firebase keys come from `secrets.local.json` / `secrets.prod.local.json`
+  via `--dart-define-from-file`; native config files are gitignored;
+  Codemagic injects them for iOS. Full rules are in `CLAUDE.md`.
+- LiveKit and `WEB_API_KEY` are Cloud Functions secrets.
 - `USE_EMULATORS=true` points Auth, Firestore and Storage at local
-  emulators (ports 9099, 8080 and 9199).
-- LiveKit's `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` are
-  Cloud Functions secrets (`firebase functions:secrets:set …`). The app
-  never sees the key; it gets per-meeting tokens from `joinToken`.
-- Full rules are in `CLAUDE.md`.
+  emulators.
 
-## Testing and checks
+### Kill switches (`meta/flags`)
+Read live by every running app (`FeatureFlags`):
+
+| Flag | Default | Off means |
+|---|---|---|
+| `use_api_search` | `false` | Search queries Firestore directly |
+| `compress_images` | `true` | Photos upload as picked |
+
+### Caching
+- On device: `SharedStreams` (one listener per query, 5-minute grace) and
+  the Firestore cache.
+- Hosting: images and CSS `max-age=86400, stale-while-revalidate=604800`;
+  HTML `max-age=300, s-maxage=3600` at the CDN.
+- Storage uploads: `max-age=31536000, immutable`.
+
+### Deploy, roll back, monitor
+- **Deploy and roll back:** GitHub Actions **Deploy backend** and **Roll
+  back backend** (`docs/rollback.md`). Deploys tag `release-<env>-<time>`;
+  rollback redeploys the previous tag. The USAU scrapers are never
+  deployed by these workflows.
+- **Text alerts:** `scripts/monitoring/setup-alerts.sh` creates SMS alerts
+  for site and API downtime (`api-health`), function errors, traffic
+  floods, Firestore read spikes and mass mutes (`docs/monitoring.md`).
+
+### Testing and checks
 
 ```
 flutter analyze && flutter test                 # unit, view-model and widget tests with fakes
-cd functions && npm run build && npm test        # USAU parser and notification logic tests
+cd functions && npm run build && npm test        # functions logic (USAU parser, notifications, api)
 cd functions && npm run test:rules               # Firestore + Storage rules (emulators; needs Java)
 ```
 
-- The fakes in `test/testing/fakes.dart` implement every repository in
-  memory. Stream fakes subscribe to their change feed before emitting the
-  first value, so updates made in reaction to that value aren't lost.
-- Rules tests are in `functions/test/rules/`. Run them before deploying
-  rules.
+Fakes in `test/testing/` implement every repository in memory. Run the
+rules tests before deploying rules.
 
-## Deployment status
+### Deployment status (dev)
 
 | Piece | Status |
 |---|---|
-| Firestore rules | Deployed to dev and prod (`firebase deploy --only firestore:rules`, `--project prod` for production); 0.0.11's usernames, read receipts and role migration are on dev only so far |
-| Storage rules | Deployed (`firebase deploy --only storage`); Blaze plan and Storage enabled |
-| Meeting functions | Deployed (`firebase deploy --only functions:meetings`); LiveKit secrets set |
-| Notification functions | Deployed (`firebase deploy --only functions:notifications`) |
-| Account functions | `account-deleteAccount`, `account-signInEmail` (username sign-in; `WEB_API_KEY` secret, set on dev and prod); deployed to dev |
-| Community functions | `communities-sync`; deploy with `firebase deploy --only functions:communities` |
-| USA Ultimate functions | Not deployed, on purpose, until there are more users |
-| Firestore indexes | Collection-group overrides for reminders and pruning; deploy with `firebase deploy --only firestore:indexes` |
+| Firestore rules and indexes | Deployed to dev with the flood mutes and index exemptions; prod has the earlier version |
+| Storage rules | Deployed |
+| Functions | `account`, `api`, `communities`, `discord`, `follows`, `meetings`, `notifications` on dev |
+| USAU functions | Not deployed, on purpose |
+| Hosting | Deployed to dev with CDN cache headers |
+| App Check | In the app; enforcement off until rolled out |
 | iOS builds | Codemagic (`codemagic.yaml`, `docs/ios-release.md`) |
 
-## Known gaps
-
-- Meetings: no screen share on iOS, no mic input level, no reminders
-  before a meeting. Without approval, the started alert can't tell who's
-  sitting in the lobby, so lobby users may get it too.
+### Known gaps
+- Meetings: no screen share on iOS, no mic level, no reminders before a
+  meeting.
 - Direct messages have no blocking or reporting yet.
-- Messages can't be edited.
-- Chat attachments aren't available offline.
-- Each Home and Schedule visit opens its own `MySchedule` listeners; the
-  Firestore SDK de-duplicates them, but a shared app-level schedule store
-  would cut setup work if those screens get heavier.
+- Messages can't be edited; attachments aren't available offline.
+- USAU data is fetched per device; the server-side cache (scrapers) is
+  waiting for a bigger user base.
