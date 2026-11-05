@@ -143,9 +143,25 @@ class _PushTile extends StatelessWidget {
           'phone if Stall 10 is installed there.',
         ),
       ),
+      PushStatus.enabled when vm.deviceError != null => _OffCard(
+        title: "Notifications can't reach this phone yet",
+        body:
+            "Notifications are allowed, but this phone couldn't be "
+            'registered to receive them:\n${vm.deviceError}',
+        action: OutlinedButton(
+          onPressed: vm.registerDevice.running
+              ? null
+              : vm.registerDevice.execute,
+          child: const Text('Try again'),
+        ),
+      ),
       PushStatus.enabled => ListTile(
         leading: Icon(Icons.notifications_active_outlined, color: c.accent),
-        title: const Text('Push notifications are on'),
+        title: Text(
+          vm.deviceRegistered
+              ? 'Push notifications are on'
+              : 'Connecting this phone for notifications…',
+        ),
         subtitle: const Text(
           'Choose what you get below. Turn them off for Stall 10 in your '
           "device's settings.",

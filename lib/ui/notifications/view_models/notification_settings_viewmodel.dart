@@ -20,12 +20,20 @@ class NotificationSettingsViewModel extends ChangeNotifier {
        uid = authRepository.currentUser?.uid ?? '' {
     enablePush = Command0<PushStatus>(() async {
       final result = await _repo.enablePush(uid);
-      if (result case Ok(:final value)) {
-        _pushStatus = value;
-        notifyListeners();
+      switch (result) {
+        case Ok(:final value):
+          _pushStatus = value;
+          _deviceError = null;
+          _deviceRegistered = value == PushStatus.enabled;
+        case Error(:final error):
+          // Allowed, but this device couldn't be registered.
+          _pushStatus = await _repo.pushStatus();
+          _deviceError = error;
       }
+      if (!_disposed) notifyListeners();
       return result;
     });
+    registerDevice = Command0<void>(_registerDevice);
     setCategory = Command1<void, (NotificationCategory, bool)>(
       (a) => _repo.setCategory(uid, a.$1, on: a.$2),
     );
@@ -93,6 +101,36 @@ class NotificationSettingsViewModel extends ChangeNotifier {
       _pushStatus == PushStatus.denied;
 
   late final Command0<PushStatus> enablePush;
+
+  /// Registers this device again, e.g. after fixing what [deviceError]
+  /// said.
+  late final Command0<void> registerDevice;
+
+  bool _deviceRegistered = false;
+  Object? _deviceError;
+
+  /// Push is allowed and this device is registered to receive it.
+  bool get deviceRegistered => _deviceRegistered;
+
+  /// Push is allowed but this device couldn't be registered, and why.
+  /// Without registering, nothing reaches it while the app is closed.
+  Object? get deviceError => _deviceError;
+
+  Future<Result<void>> _registerDevice() async {
+    final result = await _repo.registerDevice(uid);
+    if (_disposed) return result;
+    switch (result) {
+      case Ok():
+        _deviceRegistered = true;
+        _deviceError = null;
+      case Error(:final error):
+        _deviceRegistered = false;
+        _deviceError = error;
+    }
+    notifyListeners();
+    return result;
+  }
+
   late final Command1<void, (NotificationCategory, bool)> setCategory;
   late final Command1<void, (String, NotificationCategory, bool)>
   setTeamCategory;
@@ -103,6 +141,9 @@ class NotificationSettingsViewModel extends ChangeNotifier {
     if (_disposed) return;
     _pushStatus = status;
     notifyListeners();
+    // Check this device is really registered, so a failure shows here
+    // instead of push silently never arriving.
+    if (status == PushStatus.enabled) await registerDevice.execute();
   }
 
   @override
@@ -112,6 +153,7 @@ class NotificationSettingsViewModel extends ChangeNotifier {
       s.cancel();
     }
     enablePush.dispose();
+    registerDevice.dispose();
     setCategory.dispose();
     setTeamCategory.dispose();
     resetTeam.dispose();

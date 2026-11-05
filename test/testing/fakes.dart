@@ -1794,6 +1794,17 @@ class FakeNotificationRepository implements NotificationRepository {
     return Result.ok(status);
   }
 
+  /// What [registerDevice] fails with, if anything.
+  Exception? registerError;
+  final registered = <String>[];
+
+  @override
+  Future<Result<void>> registerDevice(String uid) async {
+    if (registerError case final e?) return Result.error(e);
+    registered.add(uid);
+    return const Result.ok(null);
+  }
+
   @override
   Future<void> syncDevice(String uid) async => synced.add(uid);
 

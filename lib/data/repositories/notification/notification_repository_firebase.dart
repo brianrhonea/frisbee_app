@@ -166,6 +166,10 @@ class NotificationRepositoryFirebase implements NotificationRepository {
   });
 
   @override
+  Future<Result<void>> registerDevice(String uid) =>
+      guard(() => _register(uid));
+
+  @override
   Future<bool> shouldOfferPush() async {
     if (!_push.isSupported) return false;
     try {

@@ -13,7 +13,8 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
-| 0.0.12  | 2026-11-05 | `development`                           | (this commit)       |
+| 0.0.13  | 2026-11-05 | `hardening/scale-and-abuse`             | `09d17af` and later |
+| 0.0.12  | 2026-11-05 | `development`                           |                     |
 | 0.0.11  | 2026-11-04 | `development`                           | `6d50dc5`–`ea081ac` |
 | 0.0.10  | 2026-11-03 | `development`                           | `bfcf7f4`–`b80e854` |
 | 0.0.9   | 2026-11-02 | `feature/gps-workouts`                  | `41a03bc`           |
@@ -26,6 +27,54 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.13 — Flood protection, paging, smaller photos, push fix
+
+Branch `hardening/scale-and-abuse`, merged into `development`.
+
+**Added**
+- **Flood control** (`functions/src/api`, deployed as `api`): create
+  triggers count each person's messages, posts, comments, follows, join
+  requests and new teams in `limits/{uid}`; past the limit the extra item
+  is deleted and `mutedUntil` set 10 minutes ahead. `firestore.rules`
+  checks `notMuted()` on those creates. The app shows "You're going too
+  fast". Username sign-in is limited to 10 tries per 15 minutes.
+- **`api-search`** callable (people, players, teams; rate limited), off
+  until `meta/flags.use_api_search` is true. **`api-health`** for uptime
+  checks.
+- **App Check** in the app (`AppCheck.activate()`, `X-Firebase-AppCheck`
+  on HTTPS calls); callables enforce it when `ENFORCE_APP_CHECK=true`.
+  `APP_CHECK_DEBUG_TOKEN` added to the secrets files.
+- **Kill switches** in `meta/flags` (`FeatureFlags`): `use_api_search`,
+  `compress_images`.
+- **Photo compression** (`ImageCompressor`): ≤ 1920 px, JPEG 80, EXIF
+  baked in, before upload; picks up to 50 MB. Uploads get a year-long
+  `Cache-Control`. `functions/scripts/compress-existing-images.ts` for
+  old uploads.
+- **Cursor paging** for chat, DMs, meeting chat (`fetchOlderMessages`)
+  and the home feed (`fetchPostsBefore`): older pages load one at a time.
+- **Deploy / Roll back backend** GitHub Actions workflows, and
+  `scripts/monitoring/setup-alerts.sh` for SMS alerts.
+- Docs: `ARCHITECTURE.md` restructured, `cloud-limits.md`, `rollback.md`,
+  `monitoring.md`, `app-check.md`.
+
+**Changed**
+- The chat Send button shows at every width (it was hidden at 720 px and
+  up, so tablets couldn't send).
+- Notification rows are compact (no category icons; one line each for
+  title and message); the notifications button is a flying disc
+  (`DiscIcon`) instead of a bell.
+- `fieldOverrides` stop indexing large unqueried fields; hosting sends CDN
+  cache headers; `maxInstances: 10` for every function.
+
+**Fixed**
+- **iPhone push never registering**: `PushService.register` waited for
+  `onRegistered`, which iOS can fire at launch before anything listens,
+  so it timed out and no device was saved. It now waits for the APNs
+  token, registers, and reads the FID from Firebase Installations
+  (`firebase_app_installations`). Failures throw
+  `PushRegistrationException` and show in Notification settings with
+  **Try again**; the server logs "Push sent" / "No push devices".
 
 ## 0.0.12 — School and club communities, private profiles, username sign-in
 

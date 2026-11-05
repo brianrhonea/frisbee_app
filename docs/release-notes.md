@@ -10,7 +10,32 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
-## 0.0.12 (in TestFlight from `development`)
+## 0.0.13 (in TestFlight from `development`)
+
+**Notifications on iPhone**
+- Fixed: notifications could fail to reach iPhones while the app was
+  closed. Open **Notification settings** once after updating. If your
+  phone still can't get notifications, that page now says why, with
+  **Try again**.
+- The notifications list is more compact, and its button is now a
+  flying disc.
+
+**Chat**
+- The green **Send** button now shows on tablets and wide windows too.
+- Older messages load as you scroll up.
+- Sending lots of messages very fast pauses you for 10 minutes ("You're
+  going too fast"). Normal chatting is never affected.
+
+**Photos**
+- Photos are shrunk before uploading, so they send faster and use less
+  data. You can pick photos up to 50 MB.
+
+**Home**
+- Older posts load as you scroll, a page at a time.
+
+---
+
+## 0.0.12
 
 **Schools and clubs**
 - Make a **School or club** community (Teams → New → School or club) and

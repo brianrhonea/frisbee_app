@@ -47,6 +47,10 @@ abstract class NotificationRepository {
   /// Asks for permission if needed and registers this device for [uid].
   Future<Result<PushStatus>> enablePush(String uid);
 
+  /// Registers this device for [uid]'s push when push is allowed, and
+  /// says why if it can't be (e.g. no APNs token on an iPhone).
+  Future<Result<void>> registerDevice(String uid);
+
   /// Whether to offer push after sign-in: this device supports it, the
   /// user hasn't been asked by the system yet, and they haven't said
   /// "Not now" to the offer on this device.

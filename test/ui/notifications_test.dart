@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/notification.dart';
+import 'package:frisbee_app/data/services/push_service.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/core/ui/disc_icon.dart';
@@ -206,8 +207,10 @@ void main() {
     Future<FakeNotificationRepository> pump(
       WidgetTester tester, {
       PushStatus status = PushStatus.enabled,
+      Exception? registerError,
     }) async {
-      final repo = FakeNotificationRepository(status: status);
+      final repo = FakeNotificationRepository(status: status)
+        ..registerError = registerError;
       final teams = FakeTeamRepository()
         ..teams['t1'] = teamWith({'u1': TeamRole.owner});
       final vm = NotificationSettingsViewModel(
@@ -225,6 +228,34 @@ void main() {
       await tester.pumpAndSettle();
       return repo;
     }
+
+    testWidgets('checks this device is registered when push is on', (
+      tester,
+    ) async {
+      final repo = await pump(tester);
+      expect(repo.registered, [testUser.uid]);
+      expect(find.text('Push notifications are on'), findsOneWidget);
+    });
+
+    testWidgets('says why this device could not be registered, and retries', (
+      tester,
+    ) async {
+      final repo = await pump(
+        tester,
+        registerError: const PushRegistrationException('No APNs token.'),
+      );
+      expect(
+        find.text("Notifications can't reach this phone yet"),
+        findsOneWidget,
+      );
+      expect(find.textContaining('No APNs token.'), findsOneWidget);
+
+      repo.registerError = null;
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      expect(find.text('Push notifications are on'), findsOneWidget);
+      expect(repo.registered, [testUser.uid]);
+    });
 
     testWidgets('turns on push for this device', (tester) async {
       await pump(tester, status: PushStatus.notDetermined);

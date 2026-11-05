@@ -61,7 +61,12 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
   if (!push) return;
 
   const devices = await user.collection("devices").get();
-  if (devices.empty) return;
+  if (devices.empty) {
+    // Feed only: they've never turned push on, or their phone couldn't
+    // register (Notification settings on the phone says why).
+    logger.info("No push devices", { uid, category: notice.category });
+    return;
+  }
   const messages: Message[] = devices.docs.map((d) => ({
     fid: d.id,
     notification: { title: text.title, body: text.body },
@@ -73,6 +78,13 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
     apns: { payload: { aps: { sound: "default", threadId: notice.collapseId } } },
   }));
   const result = await messaging.sendEach(messages);
+  logger.info("Push sent", {
+    uid,
+    category: notice.category,
+    devices: devices.docs.map((d) => d.get("platform")),
+    delivered: result.successCount,
+    failed: result.failureCount,
+  });
   await Promise.all(
     result.responses.map((r, i) => {
       if (!r.error) return undefined;
