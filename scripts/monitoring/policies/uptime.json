@@ -1,0 +1,30 @@
+{
+  "displayName": "${NAME}",
+  "documentation": {
+    "content": "An uptime check has failed from more than one region for several minutes. See docs/monitoring.md; roll back with Actions → Roll back backend.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "${NAME}",
+      "conditionThreshold": {
+        "filter": "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND metric.label.check_id=\"${CHECK}\" AND resource.type=\"uptime_url\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "600s",
+            "perSeriesAligner": "ALIGN_NEXT_OLDER",
+            "crossSeriesReducer": "REDUCE_COUNT_FALSE",
+            "groupByFields": ["resource.label.*"]
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 1,
+        "duration": "300s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": ["${CHANNEL}"],
+  "alertStrategy": { "autoClose": "1800s" }
+}

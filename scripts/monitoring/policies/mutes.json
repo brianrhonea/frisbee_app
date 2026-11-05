@@ -1,0 +1,29 @@
+{
+  "displayName": "Many users muted for flooding",
+  "documentation": {
+    "content": "More than ${THRESHOLD} rate-limit mutes in an hour (functions/src/api). Someone may be spamming, or a limit is too tight for real use.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Mutes",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/rate_limit_mutes\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "3600s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": ${THRESHOLD},
+        "duration": "0s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": ["${CHANNEL}"],
+  "alertStrategy": { "autoClose": "3600s" }
+}

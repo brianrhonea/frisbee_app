@@ -22,8 +22,6 @@ class FeatureFlags extends ChangeNotifier {
     'use_api_search': false,
     // Shrink photos before upload (ImageCompressor).
     'compress_images': true,
-    // Load long lists a page at a time with cursors (PagedQuery).
-    'paged_lists': true,
   };
 
   /// Flags fixed in code, for tests.
@@ -39,7 +37,6 @@ class FeatureFlags extends ChangeNotifier {
 
   bool get useApiSearch => _flag('use_api_search');
   bool get compressImages => _flag('compress_images');
-  bool get pagedLists => _flag('paged_lists');
 
   bool _flag(String key) => _values[key] ?? defaults[key] ?? false;
 

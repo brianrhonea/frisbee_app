@@ -1,0 +1,71 @@
+# One-click rollback: Actions → "Roll back backend" → Run workflow.
+# Leave "release" empty to go back to the release before the latest one, or
+# name any release-<env>-<time> tag. Redeploys rules, indexes, hosting and
+# functions exactly as they were in that release.
+#
+# Data written since isn't touched. For the app itself, use the kill
+# switches in meta/flags (docs/rollback.md).
+
+name: Roll back backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Firebase project
+        type: choice
+        options: [dev, prod]
+        default: dev
+      release:
+        description: Release tag to restore (empty = the one before the latest)
+        type: string
+        default: ""
+      reason:
+        description: Why (shown in the run summary)
+        type: string
+        default: ""
+
+concurrency:
+  group: backend-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.pick.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: pick
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          RELEASE: ${{ inputs.release }}
+        run: |
+          if [ -n "$RELEASE" ]; then
+            tag="$RELEASE"
+          else
+            # Tags sort by time: the newest is live, take the one before.
+            tag=$(git tag --list "release-$ENVIRONMENT-*" --sort=-refname | sed -n 2p)
+          fi
+          if [ -z "$tag" ] || ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::No release to roll back to (looked for '$tag')."
+            exit 1
+          fi
+          case "$tag" in release-$ENVIRONMENT-*) ;; *)
+            echo "::error::$tag isn't a $ENVIRONMENT release."; exit 1;;
+          esac
+          echo "Rolling $ENVIRONMENT back to $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  rollback:
+    needs: pick
+    uses: ./.github/workflows/_deploy-backend.yml
+    with:
+      environment: ${{ inputs.environment }}
+      ref: ${{ needs.pick.outputs.tag }}
+      tag: false
+      reason: "Rollback to ${{ needs.pick.outputs.tag }}. ${{ inputs.reason }}"
+    secrets:
+      FIREBASE_SERVICE_ACCOUNT: ${{ inputs.environment == 'prod' && secrets.FIREBASE_SA_PROD || secrets.FIREBASE_SA_DEV }}

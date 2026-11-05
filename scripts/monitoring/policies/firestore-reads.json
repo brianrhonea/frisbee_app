@@ -1,0 +1,29 @@
+{
+  "displayName": "Firestore read spike",
+  "documentation": {
+    "content": "More than ${THRESHOLD} Firestore document reads in 5 minutes. Usually a scraper or a listener loop; check App Check metrics and recent deploys.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Document reads",
+      "conditionThreshold": {
+        "filter": "metric.type=\"firestore.googleapis.com/document/read_count\" AND resource.type=\"firestore_instance\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": ${THRESHOLD},
+        "duration": "0s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": ["${CHANNEL}"],
+  "alertStrategy": { "autoClose": "3600s" }
+}

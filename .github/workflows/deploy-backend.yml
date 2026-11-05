@@ -1,0 +1,32 @@
+# One-click backend deploy: Actions → "Deploy backend" → Run workflow.
+# Each deploy is tagged release-<env>-<time>, so rollback-backend.yml can
+# put any earlier one back.
+
+name: Deploy backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Firebase project
+        type: choice
+        options: [dev, prod]
+        default: dev
+      ref:
+        description: Branch, tag or commit (dev usually deploys development, prod deploys main)
+        type: string
+        default: development
+
+concurrency:
+  group: backend-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-backend.yml
+    with:
+      environment: ${{ inputs.environment }}
+      ref: ${{ inputs.ref }}
+      tag: true
+    secrets:
+      FIREBASE_SERVICE_ACCOUNT: ${{ inputs.environment == 'prod' && secrets.FIREBASE_SA_PROD || secrets.FIREBASE_SA_DEV }}
