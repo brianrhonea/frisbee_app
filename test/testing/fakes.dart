@@ -18,6 +18,7 @@ import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/data/repositories/usau_schedule/usau_schedule_repository.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
+import 'package:frisbee_app/data/services/image_compressor.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/data/services/account_service.dart';
 import 'package:frisbee_app/domain/models/username.dart';
@@ -1446,6 +1447,9 @@ class FakeFilePickerService implements FilePickerService {
   /// Returned by the next [pick].
   List<PickedFile> next = const [];
   final saved = <String>[];
+
+  @override
+  ImageCompressor compressor = const ImageCompressor();
 
   static PickedFile file(String name, int size) =>
       PickedFile(name: name, size: size, read: () async => Uint8List(size));

@@ -416,8 +416,9 @@ class TeamHomeViewModel extends ChangeNotifier {
   }
 }
 
-/// Picks photos for a post; empty when cancelled. Photos over
-/// [maxAttachmentBytes] are left out and reported as an error.
+/// Picks photos for a post; empty when cancelled. Photos are shrunk first;
+/// ones still over [maxAttachmentBytes] are left out and reported as an
+/// error.
 Future<Result<List<NewAttachment>>> pickPostImages(
   FilePickerService picker,
 ) async {
@@ -430,12 +431,8 @@ Future<Result<List<NewAttachment>>> pickPostImages(
   final images = <NewAttachment>[];
   final tooLarge = <String>[];
   for (final f in picked) {
-    if ((f.size ?? 0) > maxAttachmentBytes) {
-      tooLarge.add(f.name);
-      continue;
-    }
-    final a = NewAttachment(name: f.name, bytes: await f.read());
-    if (a.tooLarge || !a.isImage) {
+    final a = await readAttachment(picker, f);
+    if (a == null || a.tooLarge || !a.isImage) {
       tooLarge.add(f.name);
     } else {
       images.add(a);

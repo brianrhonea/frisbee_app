@@ -34,12 +34,7 @@ const _plan = DiscordImportPlan(
   ],
 );
 
-const _roleIds = {
-  'r1': 'admin',
-  'r2': 'woofCap',
-  'r3': 'woofP',
-  'r4': 'whipC',
-};
+const _roleIds = {'r1': 'admin', 'r2': 'woofCap', 'r3': 'woofP', 'r4': 'whipC'};
 
 final _org = Team(
   id: 'org',

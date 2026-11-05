@@ -159,12 +159,8 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     }
     final tooLarge = <String>[];
     for (final f in picked) {
-      if ((f.size ?? 0) > maxAttachmentBytes) {
-        tooLarge.add(f.name);
-        continue;
-      }
-      final a = NewAttachment(name: f.name, bytes: await f.read());
-      if (a.tooLarge) {
+      final a = await readAttachment(_picker, f);
+      if (a == null || a.tooLarge) {
         tooLarge.add(f.name);
       } else {
         _drafts.add(a);

@@ -27,7 +27,14 @@ class AttachmentStorage {
         final path = current = '$folder/$i-${_safeName(a.name)}';
         await _storage
             .ref(path)
-            .putData(a.bytes, SettableMetadata(contentType: a.contentType));
+            .putData(
+              a.bytes,
+              SettableMetadata(
+                contentType: a.contentType,
+                // Each path is written once, so caches never go stale.
+                cacheControl: 'public, max-age=31536000, immutable',
+              ),
+            );
         uploaded.add(
           ChatAttachment(
             path: path,
