@@ -7,6 +7,7 @@ import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/disc_icon.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/notifications_viewmodel.dart';
@@ -135,7 +136,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (items.isEmpty) {
       if (vm.error != null) return ErrorView(error: vm.error);
       return EmptyView(
-        icon: Icons.notifications_none,
+        art: const DiscIcon(),
         title: 'No notifications',
         message:
             'Team chat, messages, event changes, reminders and playbook '
@@ -151,7 +152,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.only(bottom: 24),
         itemCount: items.length,
-        separatorBuilder: (_, _) => const Divider(height: 1),
+        separatorBuilder: (_, _) =>
+            const Divider(height: 1, indent: 16, endIndent: 16),
         itemBuilder: (_, i) => _NotificationTile(
           item: items[i],
           onTap: () => _open(items[i]),
@@ -194,70 +196,109 @@ class _NotificationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final unread = !item.read;
-    return ListTile(
+    final at = item.createdAt;
+    return InkWell(
       onTap: onTap,
-      leading: CircleAvatar(
-        backgroundColor: unread ? c.accentSoft : null,
-        child: Icon(
-          categoryIcon(item.category),
-          color: unread ? c.accent : c.muted,
-        ),
-      ),
-      title: Text(
-        item.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontWeight: unread ? FontWeight.w800 : FontWeight.w600,
-          color: c.ink,
-        ),
-      ),
-      subtitle: item.followBack != null
-          ? Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: following
-                    ? OutlinedButton.icon(
-                        onPressed: null,
-                        icon: const Icon(Icons.check, size: 18),
-                        label: const Text('Following'),
-                      )
-                    : FilledButton.icon(
-                        onPressed: followingBack ? null : onFollowBack,
-                        icon: const Icon(Icons.person_add_alt_1, size: 18),
-                        label: const Text('Follow back'),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Unread: a small dot, in a fixed gutter so titles line up.
+            SizedBox(
+              width: 14,
+              height: 18,
+              child: unread
+                  ? Align(
+                      alignment: Alignment.centerLeft,
+                      child: Icon(Icons.circle, size: 8, color: c.accent),
+                    )
+                  : null,
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.3,
+                            fontWeight: unread
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: c.ink,
+                          ),
+                        ),
                       ),
+                      if (at != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          _when(at),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: unread ? c.accent : c.muted,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (item.followBack != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: following
+                          ? OutlinedButton.icon(
+                              onPressed: null,
+                              style: _compactButton,
+                              icon: const Icon(Icons.check, size: 16),
+                              label: const Text('Following'),
+                            )
+                          : FilledButton.icon(
+                              onPressed: followingBack ? null : onFollowBack,
+                              style: _compactButton,
+                              icon: const Icon(
+                                Icons.person_add_alt_1,
+                                size: 16,
+                              ),
+                              label: const Text('Follow back'),
+                            ),
+                    )
+                  else if (item.body.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Text(
+                        item.body,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.3,
+                          color: c.muted,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            )
-          : item.body.isEmpty
-          ? null
-          : Text(
-              item.body,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: unread ? c.ink : c.muted),
             ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (item.createdAt case final at?)
-            Text(
-              _when(at),
-              style: TextStyle(
-                fontSize: 12,
-                color: unread ? c.accent : c.muted,
-              ),
-            ),
-          if (unread) ...[
-            const SizedBox(height: 4),
-            Icon(Icons.circle, size: 10, color: c.accent),
           ],
-        ],
+        ),
       ),
     );
   }
+
+  static final _compactButton = ButtonStyle(
+    visualDensity: VisualDensity.compact,
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 12)),
+    textStyle: const WidgetStatePropertyAll(
+      TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+    ),
+  );
 
   static String _when(DateTime d) {
     final now = DateTime.now();

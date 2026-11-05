@@ -4,11 +4,13 @@ import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
+import 'package:frisbee_app/ui/core/ui/disc_icon.dart';
 import 'package:frisbee_app/ui/notifications/view_models/notification_settings_viewmodel.dart';
 import 'package:frisbee_app/ui/notifications/view_models/notifications_viewmodel.dart';
 import 'package:frisbee_app/ui/notifications/widgets/notification_settings_screen.dart';
 import 'package:frisbee_app/ui/notifications/widgets/notifications_screen.dart';
 import 'package:frisbee_app/ui/profile/view_models/profile_viewmodel.dart';
+import 'package:frisbee_app/ui/shell/widgets/app_shell.dart';
 import 'package:go_router/go_router.dart';
 
 import '../testing/fakes.dart';
@@ -157,6 +159,36 @@ void main() {
     testWidgets('shows an empty state', (tester) async {
       await pump(tester, const []);
       expect(find.text('No notifications'), findsOneWidget);
+      expect(find.byType(DiscIcon), findsOneWidget);
+    });
+
+    testWidgets('entries are compact rows, without category icons', (
+      tester,
+    ) async {
+      await pump(tester, [note('a'), note('b', read: true)]);
+      expect(find.text('Title a'), findsOneWidget);
+      expect(find.text('Body a'), findsOneWidget);
+      expect(find.byType(CircleAvatar), findsNothing);
+      expect(
+        find.byIcon(categoryIcon(NotificationCategory.eventChanges)),
+        findsNothing,
+      );
+      // One unread dot, for the unread entry.
+      expect(find.byIcon(Icons.circle), findsOneWidget);
+      final row = tester.getSize(find.byType(InkWell).first);
+      expect(row.height, lessThan(64));
+    });
+
+    testWidgets('the top bar button is a disc, with an unread dot', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: NotificationsButton(count: 2))),
+      );
+      expect(find.byTooltip('Notifications'), findsOneWidget);
+      expect(find.byType(DiscIcon), findsOneWidget);
+      expect(find.byIcon(Icons.notifications_none_rounded), findsNothing);
+      expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
     });
 
     testWidgets('tapping an entry marks it read and opens it', (tester) async {

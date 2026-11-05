@@ -7,6 +7,7 @@ import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/app_search_field.dart';
 import '../../core/ui/brand.dart';
+import '../../core/ui/disc_icon.dart';
 import '../../core/ui/key_hint.dart';
 import '../../core/ui/layout.dart';
 import '../../teams/widgets/team_section_screen.dart';
@@ -726,7 +727,8 @@ class SearchField extends StatelessWidget {
   );
 }
 
-/// The bell, with a dot when there are unread notifications.
+/// The notifications button: a flying disc, with a dot when there are
+/// unread notifications.
 class NotificationsButton extends StatelessWidget {
   const NotificationsButton({super.key, required this.count, this.color});
 
@@ -740,7 +742,7 @@ class NotificationsButton extends StatelessWidget {
     icon: Badge(
       isLabelVisible: count > 0,
       smallSize: 8,
-      child: Icon(Icons.notifications_none_rounded, color: color),
+      child: DiscIcon(color: color),
     ),
   );
 }

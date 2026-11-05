@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/disc_icon.dart';
 import '../../core/ui/key_hint.dart';
 import '../../core/ui/layout.dart' show TeamBadge;
 import '../../posts/widgets/post_composer.dart';
@@ -19,10 +20,14 @@ class PaletteCommand {
     this.keywords = '',
     this.shortcut,
     this.team,
+    this.art,
   });
 
   final String label;
   final IconData icon;
+
+  /// Drawn instead of [icon], e.g. the notifications disc.
+  final Widget? art;
   final String group;
 
   /// Other words it's found by, e.g. "settings" for Profile.
@@ -95,7 +100,8 @@ List<PaletteCommand> paletteCommands({
   PaletteCommand(
     label: 'Notifications',
     icon: Icons.notifications_none_rounded,
-    keywords: 'alerts bell',
+    art: const DiscIcon(),
+    keywords: 'alerts bell inbox',
     run: (c) => c.push(Routes.notifications),
   ),
   PaletteCommand(
@@ -367,7 +373,10 @@ class _Row extends StatelessWidget {
                   if (cmd.team case final team?)
                     TeamBadge(size: 22, community: team.isCommunity)
                   else
-                    Icon(cmd.icon, size: 20, color: c.ink),
+                    IconTheme(
+                      data: IconThemeData(size: 20, color: c.ink),
+                      child: cmd.art ?? Icon(cmd.icon),
+                    ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(

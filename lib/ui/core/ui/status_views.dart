@@ -45,13 +45,18 @@ class ErrorView extends StatelessWidget {
 class EmptyView extends StatelessWidget {
   const EmptyView({
     super.key,
-    required this.icon,
+    this.icon,
+    this.art,
     required this.title,
     this.message,
     this.action,
-  });
+  }) : assert(icon != null || art != null);
 
-  final IconData icon;
+  final IconData? icon;
+
+  /// Drawn in place of [icon], e.g. a `DiscIcon`; sized and coloured
+  /// like the icon.
+  final Widget? art;
   final String title;
   final String? message;
   final Widget? action;
@@ -65,7 +70,10 @@ class EmptyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: theme.colorScheme.outline),
+            IconTheme(
+              data: IconThemeData(size: 56, color: theme.colorScheme.outline),
+              child: art ?? Icon(icon),
+            ),
             const SizedBox(height: 12),
             Text(title, style: theme.textTheme.titleMedium),
             if (message != null) ...[
