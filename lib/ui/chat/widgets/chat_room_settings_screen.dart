@@ -104,7 +104,13 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
         final busy = vm.save.running || vm.delete.running;
         return Scaffold(
           appBar: AppBar(
-            title: Text(vm.isNew ? 'New room' : 'Room settings'),
+            title: Text(
+              vm.isNew
+                  ? 'New channel'
+                  : room.isVoice
+                  ? 'Voice channel settings'
+                  : 'Channel settings',
+            ),
             actions: [
               if (vm.canDelete)
                 IconButton(
@@ -127,27 +133,68 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 if (busy) const LinearProgressIndicator(),
+                if (vm.isNew) ...[
+                  SegmentedButton<ChatRoomKind>(
+                    segments: const [
+                      ButtonSegment(
+                        value: ChatRoomKind.text,
+                        icon: Icon(Icons.tag),
+                        label: Text('Text'),
+                      ),
+                      ButtonSegment(
+                        value: ChatRoomKind.voice,
+                        icon: Icon(Icons.volume_up_rounded),
+                        label: Text('Voice'),
+                      ),
+                    ],
+                    selected: {room.kind},
+                    onSelectionChanged: busy
+                        ? null
+                        : (k) => vm.setKind(k.first),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 TextField(
                   controller: name,
                   enabled: !room.isGeneral,
                   maxLength: 60,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Room name',
-                    hintText: 'e.g. Coaches, Handlers, Carpool',
+                  decoration: InputDecoration(
+                    labelText: 'Channel name',
+                    hintText: room.isVoice
+                        ? 'e.g. Lounge, Film Room'
+                        : 'e.g. Coaches, Handlers, Carpool',
                   ),
                   onChanged: vm.setName,
                 ),
+                if (vm.folders.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String?>(
+                    initialValue: vm.folders.any((f) => f.id == room.folderId)
+                        ? room.folderId
+                        : null,
+                    decoration: const InputDecoration(labelText: 'Folder'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('None')),
+                      for (final f in vm.folders)
+                        DropdownMenuItem(value: f.id, child: Text(f.name)),
+                    ],
+                    onChanged: busy ? null : vm.setFolder,
+                  ),
+                ],
                 const SizedBox(height: 16),
                 _SectionTitle(
                   title: 'Access by role',
-                  subtitle: 'The owner can always read and post in every room.',
+                  subtitle: room.isVoice
+                      ? 'Read lets people join and listen; Read & write lets '
+                            'them talk too. The owner can always do both.'
+                      : 'The owner can always read and post in every room.',
                 ),
-                for (final role in vm.roles)
-                  _AccessRow(
-                    title: role.pluralLabel,
-                    value: room.roleAccess(role),
-                    onChanged: (a) => vm.setRoleAccess(role, a),
+                for (final id in vm.audiences)
+                  ChatAccessRow(
+                    title: vm.audienceLabel(id),
+                    value: room.roleAccess(id),
+                    onChanged: (a) => vm.setRoleAccess(id, a),
                   ),
                 const SizedBox(height: 24),
                 _SectionTitle(
@@ -165,11 +212,11 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
                     ),
                   ),
                 for (final m in vm.members)
-                  _AccessRow(
+                  ChatAccessRow(
                     title: m.name,
-                    subtitle: switch (room.roleAccess(m.role)) {
-                      ChatAccess.none => m.role.label,
-                      final a => '${m.role.label} · ${a.label} by role',
+                    subtitle: switch (vm.accessByRole(m.uid)) {
+                      ChatAccess.none => vm.rolesLabel(m.uid),
+                      final a => '${vm.rolesLabel(m.uid)} · ${a.label} by role',
                     },
                     value: room.userAccess(m.uid),
                     onChanged: (a) => vm.setUserAccess(m.uid, a),
@@ -211,8 +258,9 @@ class _SectionTitle extends StatelessWidget {
 }
 
 /// A row with a None / Read / Read & write picker.
-class _AccessRow extends StatelessWidget {
-  const _AccessRow({
+class ChatAccessRow extends StatelessWidget {
+  const ChatAccessRow({
+    super.key,
     required this.title,
     required this.value,
     required this.onChanged,

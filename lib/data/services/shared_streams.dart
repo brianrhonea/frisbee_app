@@ -123,3 +123,44 @@ class _Entry<T> {
     _listeners.clear();
   }
 }
+
+/// Merges the latest lists from [sources] into one, deduplicated by [key]
+/// (later sources win), once every source has emitted. For Firestore
+/// queries that rules make the app split up, like "rooms my role can read"
+/// plus "rooms I was added to".
+Stream<List<T>> mergeLatest<T>(
+  List<Stream<List<T>>> sources, {
+  required Object Function(T) key,
+}) {
+  final latest = List<List<T>?>.filled(sources.length, null);
+  late StreamController<List<T>> controller;
+  final subs = <StreamSubscription<List<T>>>[];
+  void emit() {
+    if (latest.any((l) => l == null)) return;
+    controller.add(
+      {
+        for (final list in latest)
+          for (final item in list!) key(item): item,
+      }.values.toList(),
+    );
+  }
+
+  controller = StreamController(
+    onListen: () {
+      for (var i = 0; i < sources.length; i++) {
+        subs.add(
+          sources[i].listen((items) {
+            latest[i] = items;
+            emit();
+          }, onError: controller.addError),
+        );
+      }
+    },
+    onCancel: () async {
+      for (final s in subs) {
+        await s.cancel();
+      }
+    },
+  );
+  return controller.stream;
+}

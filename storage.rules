@@ -18,24 +18,51 @@ service firebase.storage {
     }
     function isMember(t) { return request.auth.uid in t.memberIds; }
 
+    // Same as can() in firestore.rules: owners, coaches and captains have
+    // every permission; others what their custom roles grant.
+    function can(t, perm) {
+      return role(t) in ['owner', 'coach', 'captain']
+        || (isMember(t)
+            && perm in t.get('memberPerms', {}).get(request.auth.uid, []));
+    }
+
+    // Same as inAudience() in firestore.rules: "everyone", the member's
+    // tier, one of their (first 10) custom roles, or them by uid.
+    function anyIn(mine, ids) {
+      return (mine.size() > 0 && mine[0] in ids)
+        || (mine.size() > 1 && mine[1] in ids)
+        || (mine.size() > 2 && mine[2] in ids)
+        || (mine.size() > 3 && mine[3] in ids)
+        || (mine.size() > 4 && mine[4] in ids)
+        || (mine.size() > 5 && mine[5] in ids)
+        || (mine.size() > 6 && mine[6] in ids)
+        || (mine.size() > 7 && mine[7] in ids)
+        || (mine.size() > 8 && mine[8] in ids)
+        || (mine.size() > 9 && mine[9] in ids);
+    }
+    function inAudience(t, ids, users) {
+      return 'everyone' in ids
+        || role(t) in ids
+        || anyIn(t.get('memberRoles', {}).get(request.auth.uid, []), ids)
+        || request.auth.uid in users;
+    }
     function canRead(teamId, roomId) {
       let t = team(teamId);
-      return isMember(t) && (
-        role(t) == 'owner'
-        || role(t) in room(teamId, roomId).readRoles
-        || request.auth.uid in room(teamId, roomId).readUsers);
+      let r = room(teamId, roomId);
+      return isMember(t)
+        && (role(t) == 'owner' || inAudience(t, r.readRoles, r.readUsers));
     }
     function canWrite(teamId, roomId) {
       let t = team(teamId);
-      return isMember(t) && (
-        role(t) == 'owner'
-        || role(t) in room(teamId, roomId).writeRoles
-        || request.auth.uid in room(teamId, roomId).writeUsers);
+      let r = room(teamId, roomId);
+      return isMember(t)
+        && (role(t) == 'owner' || inAudience(t, r.writeRoles, r.writeUsers));
     }
 
     // Photos and files up to 10 MB (maxAttachmentBytes in
     // lib/domain/models/chat.dart), uploaded by their author into their
-    // own folder. Authors delete their own; the owner deletes any.
+    // own folder. Authors delete their own; the owner, and moderators and
+    // chat managers who can read the room, delete any.
     match /teams/{teamId}/chats/{roomId}/{userId}/{messageId}/{fileName} {
       allow get: if request.auth != null && canRead(teamId, roomId);
       // The desktop SDK uploads the bytes, then sets the content type as an
@@ -45,16 +72,17 @@ service firebase.storage {
         && request.resource.size <= 10 * 1024 * 1024
         && canWrite(teamId, roomId);
       allow delete: if request.auth != null
-        && (request.auth.uid == userId || role(team(teamId)) == 'owner');
+        && (request.auth.uid == userId
+            || role(team(teamId)) == 'owner'
+            || ((can(team(teamId), 'moderate')
+                 || can(team(teamId), 'manageChats'))
+                && canRead(teamId, roomId)));
     }
 
-    // Team post photos, uploaded by owners, coaches and captains before the
-    // post is saved. Visible like the post (see posts in firestore.rules):
+    // Team post photos, uploaded by members who can manage the team
+    // before the post is saved. Visible like the post (see posts in firestore.rules):
     // to anyone signed in once it's public, otherwise to members.
     match /teams/{teamId}/posts/{postId}/{upload}/{fileName} {
-      function isEditor(t) {
-        return role(t) in ['owner', 'coach', 'captain'];
-      }
       function postPath() {
         return /databases/(default)/documents/teams/$(teamId)/posts/$(postId);
       }
@@ -64,29 +92,26 @@ service firebase.storage {
           && firestore.get(postPath()).data.public == true)
         || isMember(team(teamId)));
       allow create, update: if request.auth != null
-        && isEditor(team(teamId))
+        && can(team(teamId), 'manageTeam')
         && request.resource.size <= 10 * 1024 * 1024
         && (request.resource.contentType == null
             || request.resource.contentType.matches('image/.*'));
-      allow delete: if request.auth != null && isEditor(team(teamId));
+      allow delete: if request.auth != null && can(team(teamId), 'manageTeam');
     }
 
     // Uploaded team videos (TeamVideo.file in firestore.rules): video
-    // files up to 500 MB, uploaded by owners, coaches and captains; members
-    // watch. The desktop SDK sets the content type as a second write, so
+    // files up to 500 MB, uploaded by members who can manage the team;
+    // members watch. The desktop SDK sets the content type as a second write, so
     // it may be missing on create.
     match /teams/{teamId}/videos/{videoId}/{fileName} {
-      function isEditor(t) {
-        return role(t) in ['owner', 'coach', 'captain'];
-      }
 
       allow get: if request.auth != null && isMember(team(teamId));
       allow create, update: if request.auth != null
-        && isEditor(team(teamId))
+        && can(team(teamId), 'manageTeam')
         && request.resource.size <= 500 * 1024 * 1024
         && (request.resource.contentType == null
             || request.resource.contentType.matches('video/.*'));
-      allow delete: if request.auth != null && isEditor(team(teamId));
+      allow delete: if request.auth != null && can(team(teamId), 'manageTeam');
     }
 
     // Photos on people's own posts (posts in firestore.rules), uploaded

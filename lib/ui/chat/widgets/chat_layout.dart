@@ -1,3 +1,5 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -120,7 +122,16 @@ class ChatDrawer extends StatelessWidget {
 }
 
 /// Slides a chat in from the right, the way a phone opens a conversation.
-CustomTransitionPage<void> chatPage(LocalKey key, Widget child) =>
+/// iOS and macOS get the native page, so swiping from the left edge goes
+/// back, following the finger.
+Page<void> chatPage(LocalKey key, Widget child) =>
+    switch (defaultTargetPlatform) {
+      TargetPlatform.iOS ||
+      TargetPlatform.macOS => CupertinoPage(key: key, child: child),
+      _ => _slidePage(key, child),
+    };
+
+CustomTransitionPage<void> _slidePage(LocalKey key, Widget child) =>
     CustomTransitionPage(
       key: key,
       child: child,

@@ -145,7 +145,7 @@ class _TeamFormState extends State<TeamForm> {
               title: const Text('Approve new members'),
               subtitle: Text(
                 _requiresApproval
-                    ? 'People ask to join; owners and organizers approve them.'
+                    ? 'People ask to join; the owner, or a role with Manage members, approves them.'
                     : 'Anyone can join from the group page.',
               ),
               value: _requiresApproval,

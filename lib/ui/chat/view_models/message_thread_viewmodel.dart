@@ -64,6 +64,10 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   /// Whether messages can carry photos and files.
   bool get canAttach => true;
 
+  /// The color (0xAARRGGBB) to show [uid]'s name in, from their top
+  /// colored role, or null for the default.
+  int? nameColorOf(String uid) => null;
+
   /// Who may delete [m] besides its author.
   @protected
   bool get canModerate => false;

@@ -31,35 +31,67 @@ service cloud.firestore {
       return request.time < invite.createdAt + duration.value(invite.ttl, 's');
     }
 
-    // Roles (TeamRole in lib/domain/models/team.dart):
+    // Tiers (TeamRole in lib/domain/models/team.dart):
     //   owner   everything: roles, ownership, new invite codes
-    //   coach   team admin + stats
-    //   captain team admin + stats
-    //   player  read only; the owner can add stats access (statKeepers)
+    //   coach   every permission below (teams only)
+    //   captain every permission below; in a group, an organizer from
+    //           before custom roles, until the owner's app migrates them
+    //   player  read only, plus whatever custom roles grant; the owner can
+    //           add stats access (statKeepers)
     // "stats" was briefly a role and still counts as a player with stats.
+    //
+    // Custom roles (CustomRole in lib/domain/models/team_role.dart) live in
+    // the team's `roles`; `memberRoles` says who has which, and
+    // `memberPerms` is the union of each member's role permissions, which
+    // only the owner writes (setRoles). Permissions (TeamPermission):
+    // manageTeam, manageMembers, manageChats, manageEvents, moderate,
+    // keepStats.
     function roleIn(team) { return team.members.get(uid(), ''); }
     function isOwner(team) { return roleIn(team) == 'owner'; }
     function isEditor(team) { return roleIn(team) in ['owner', 'coach', 'captain']; }
+    function isMember(team) { return uid() in team.memberIds; }
+    function permsOf(team) { return team.get('memberPerms', {}).get(uid(), []); }
+    function can(team, perm) {
+      return isEditor(team) || (isMember(team) && perm in permsOf(team));
+    }
     function canKeepStats(team) {
-      return isEditor(team)
+      return can(team, 'keepStats')
         || roleIn(team) == 'stats'
         || (isMember(team) && uid() in team.get('statKeepers', []));
     }
-    function isMember(team) { return uid() in team.memberIds; }
 
-    // Chat rooms grant access by role; a legacy "stats" member is a player.
+    // Chat rooms and folders grant access by audience id: "everyone", a
+    // tier (a legacy "stats" member is a player) or a custom role id. A
+    // member has at most 10 custom roles. Each check is a plain
+    // `x in list`, which rules can prove for the app's array-contains
+    // room queries.
     function chatRole(team) {
       return roleIn(team) == 'stats' ? 'player' : roleIn(team);
     }
+    function rolesOf(team) { return team.get('memberRoles', {}).get(uid(), []); }
+    function anyIn(ids, list) {
+      return (ids.size() > 0 && ids[0] in list)
+        || (ids.size() > 1 && ids[1] in list)
+        || (ids.size() > 2 && ids[2] in list)
+        || (ids.size() > 3 && ids[3] in list)
+        || (ids.size() > 4 && ids[4] in list)
+        || (ids.size() > 5 && ids[5] in list)
+        || (ids.size() > 6 && ids[6] in list)
+        || (ids.size() > 7 && ids[7] in list)
+        || (ids.size() > 8 && ids[8] in list)
+        || (ids.size() > 9 && ids[9] in list);
+    }
+    function inAudience(team, ids, users) {
+      return 'everyone' in ids
+        || chatRole(team) in ids
+        || anyIn(rolesOf(team), ids)
+        || uid() in users;
+    }
     function canReadRoom(team, room) {
-      return roleIn(team) == 'owner'
-        || chatRole(team) in room.readRoles
-        || uid() in room.readUsers;
+      return isOwner(team) || inAudience(team, room.readRoles, room.readUsers);
     }
     function canWriteRoom(team, room) {
-      return roleIn(team) == 'owner'
-        || chatRole(team) in room.writeRoles
-        || uid() in room.writeUsers;
+      return isOwner(team) || inAudience(team, room.writeRoles, room.writeUsers);
     }
 
     function validString(v, max) { return v is string && v.size() <= max; }
@@ -152,9 +184,9 @@ service cloud.firestore {
         function team() { return get(teamPath(teamId)).data; }
 
         allow read, delete: if signedIn()
-          && (uid() == userId || isEditor(team()));
+          && (uid() == userId || can(team(), 'manageMembers'));
         allow create, update: if signedIn()
-          && isEditor(team())
+          && can(team(), 'manageMembers')
           && !(userId in team().memberIds)
           && request.resource.data.keys().hasOnly([
                'teamName', 'kind', 'invitedBy', 'invitedByName', 'createdAt'])
@@ -273,7 +305,8 @@ service cloud.firestore {
       allow update: if signedIn() && (
         editDetails() || linkUsau() || dropLegacyCode() || changeRole() ||
         setStatKeepers() || transferOwnership() || removeMember() || join() ||
-        joinOpenGroup() || approveRequest() || acceptInvite() || markDeleting()
+        joinOpenGroup() || approveRequest() || acceptInvite() || markDeleting() ||
+        setRoles()
       );
 
       // Only once the owner is the last one on it (see soleOwner).
@@ -288,7 +321,7 @@ service cloud.firestore {
 
       // The kind never changes, and only groups have group fields.
       function editDetails() {
-        return isEditor(resource.data)
+        return can(resource.data, 'manageTeam')
           && changed().hasOnly(isGroup(resource.data)
                ? ['name', 'division', 'level', 'city', 'description',
                   'requiresApproval', 'location']
@@ -333,7 +366,7 @@ service cloud.firestore {
         let added = request.resource.data.memberIds
           .removeAll(resource.data.memberIds);
         return isGroup(resource.data)
-          && isEditor(resource.data)
+          && can(resource.data, 'manageMembers')
           && added.size() == 1
           && addsOnly(added[0])
           && exists(requestPath(teamId, added[0]))
@@ -355,7 +388,7 @@ service cloud.firestore {
             // Admins link the team's USA Ultimate page and stamp roster syncs.
       function linkUsau() {
         let t = request.resource.data;
-        return isEditor(resource.data)
+        return can(resource.data, 'manageTeam')
           && changed().hasOnly(['usauUrl', 'usauName', 'usauSyncedAt'])
           && (t.get('usauUrl', null) == null
               || (t.usauUrl is string && t.usauUrl.size() <= 300
@@ -367,7 +400,7 @@ service cloud.firestore {
       // Admins move an older team's code off the team doc (into
       // private/invite) and clear the old join proof.
       function dropLegacyCode() {
-        return isEditor(resource.data)
+        return can(resource.data, 'manageTeam')
           && changed().hasOnly(['inviteCode', 'joinCode'])
           && request.resource.data.get('inviteCode', null) == null
           && request.resource.data.get('joinCode', null) == null;
@@ -386,12 +419,45 @@ service cloud.firestore {
           && diff.changedKeys().size() == 1
           && !(resource.data.ownerId in diff.changedKeys())
           && roles.hasOnly(['owner', 'coach', 'captain', 'stats', 'player'])
-          // Groups have organizers (captain) and members, no coaches.
-          && (!isGroup(resource.data) || !('coach' in roles))
+          // Groups have only an owner and members; custom roles do the
+          // rest. Legacy organizers (captain) may stay until migrated, but
+          // nobody new becomes one.
+          && (!isGroup(resource.data)
+              || roles.removeAll(['owner', 'player', 'stats']).size()
+                   < resource.data.members.values()
+                       .removeAll(['owner', 'player', 'stats']).size()
+              || roles.removeAll(['owner', 'player', 'stats']).size() == 0)
           && roles.removeAll(['coach', 'captain', 'stats', 'player']).size() == 1
           // No new "stats" roles; that's statKeepers now.
           && roles.removeAll(['stats']).size()
                >= resource.data.members.values().removeAll(['stats']).size();
+      }
+
+      // The owner edits custom roles and who has them, with each member's
+      // permissions denormalized into memberPerms (see CustomRole). Only
+      // the owner writes these, so a wrong memberPerms can only shortchange
+      // or overgrant on the owner's own team. In a group, the same write may
+      // move legacy organizers (captain) to members, so the owner's app
+      // can turn them into an "Organizer" role.
+      function setRoles() {
+        let t = request.resource.data;
+        let ids = resource.data.memberIds.toSet();
+        let diff = t.members.diff(resource.data.members);
+        return isOwner(resource.data)
+          && changed().hasOnly(['roles', 'memberRoles', 'memberPerms', 'members'])
+          && t.get('roles', {}) is map
+          && t.get('roles', {}).size() <= 50
+          && t.get('memberRoles', {}) is map
+          && t.get('memberRoles', {}).keys().toSet().difference(ids).size() == 0
+          && t.get('memberPerms', {}) is map
+          && t.get('memberPerms', {}).keys().toSet().difference(ids).size() == 0
+          && diff.addedKeys().size() == 0
+          && diff.removedKeys().size() == 0
+          && (diff.changedKeys().size() == 0
+              || (isGroup(resource.data)
+                  && t.members[resource.data.ownerId] == 'owner'
+                  && t.members.values().hasOnly(['owner', 'player', 'stats'])
+                  && t.members.values().removeAll(['player', 'stats']).size() == 1));
       }
 
       // Owner gives members stats access or takes it away.
@@ -420,16 +486,25 @@ service cloud.firestore {
           && request.resource.data.members[uid()] == 'player';
       }
 
-      // Member leaves, owner removes anyone but themself, coaches and
-      // captains remove players. Stats access goes with them.
+      // Member leaves, owner removes anyone but themself, coaches, captains
+      // and members with manageMembers remove players who have no
+      // permissions of their own. Stats access and custom roles go with
+      // them.
       function removeMember() {
         let diff = request.resource.data.members.diff(resource.data.members);
         // Lists (unlike sets) can be indexed, so find who left via memberIds.
         let gone = resource.data.memberIds.removeAll(request.resource.data.memberIds);
         let target = gone[0];
-        return changed().hasOnly(['members', 'memberIds', 'memberNames', 'statKeepers'])
+        return changed().hasOnly(['members', 'memberIds', 'memberNames',
+                                  'statKeepers', 'memberRoles', 'memberPerms'])
           && gone.size() == 1
           && !(target in request.resource.data.get('statKeepers', []))
+          && !(target in request.resource.data.get('memberRoles', {}))
+          && !(target in request.resource.data.get('memberPerms', {}))
+          && request.resource.data.get('memberRoles', {}).diff(
+               resource.data.get('memberRoles', {})).affectedKeys().hasOnly([target])
+          && request.resource.data.get('memberPerms', {}).diff(
+               resource.data.get('memberPerms', {})).affectedKeys().hasOnly([target])
           && diff.removedKeys() == [target].toSet()
           && diff.addedKeys().size() == 0
           && diff.changedKeys().size() == 0
@@ -439,8 +514,9 @@ service cloud.firestore {
           && !(target in request.resource.data.memberNames)
           && (target == uid()
               || roleIn(resource.data) == 'owner'
-              || (roleIn(resource.data) in ['coach', 'captain']
-                  && resource.data.members[target] in ['player', 'stats']));
+              || (can(resource.data, 'manageMembers')
+                  && resource.data.members[target] in ['player', 'stats']
+                  && resource.data.get('memberPerms', {}).get(target, []).size() == 0));
       }
 
       // Non-member joins as a player by proving they know a live invite
@@ -487,7 +563,7 @@ service cloud.firestore {
       match /joinRequests/{userId} {
         function team() { return get(teamPath(teamId)).data; }
 
-        allow read: if signedIn() && (uid() == userId || isEditor(team()));
+        allow read: if signedIn() && (uid() == userId || can(team(), 'manageMembers'));
         allow create: if signedIn() && uid() == userId
           && isGroup(team())
           && team().requiresApproval
@@ -495,7 +571,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['name', 'createdAt'])
           && validString(request.resource.data.name, 80)
           && request.resource.data.createdAt == request.time;
-        allow delete: if signedIn() && (uid() == userId || isEditor(team()));
+        allow delete: if signedIn() && (uid() == userId || can(team(), 'manageMembers'));
       }
 
       // What every member sees: name, number, position. Payment and USA
@@ -515,9 +591,9 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && isMember(get(teamPath(teamId)).data);
-        allow delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
+        allow delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageTeam');
         allow create, update: if signedIn()
-          && isEditor(get(teamPath(teamId)).data)
+          && can(get(teamPath(teamId)).data, 'manageTeam')
           && validLink(get(teamPath(teamId)).data)
           && request.resource.data.keys().hasOnly(['name', 'number', 'position', 'userId'])
           && request.resource.data.name is string
@@ -537,9 +613,9 @@ service cloud.firestore {
       // Per-player paid mark and USA Ultimate status, keyed like roster.
       // Owners, coaches and captains only; players can't read it.
       match /rosterStatus/{playerId} {
-        allow read, delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
+        allow read, delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageTeam');
         allow create, update: if signedIn()
-          && isEditor(get(teamPath(teamId)).data)
+          && can(get(teamPath(teamId)).data, 'manageTeam')
           && request.resource.data.keys().hasOnly(['onUsau', 'paid'])
           && (request.resource.data.get('onUsau', null) == null || request.resource.data.onUsau is bool)
           && request.resource.data.get('paid', false) is bool;
@@ -547,9 +623,9 @@ service cloud.firestore {
 
       match /plays/{playId} {
         allow read: if signedIn() && isMember(get(teamPath(teamId)).data);
-        allow delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
+        allow delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageTeam');
         allow create, update: if signedIn()
-          && isEditor(get(teamPath(teamId)).data)
+          && can(get(teamPath(teamId)).data, 'manageTeam')
           && request.resource.data.keys().hasOnly([
                'name', 'category', 'notes', 'elements', 'arrows', 'steps',
                'updatedAt', 'updatedBy'])
@@ -598,7 +674,7 @@ service cloud.firestore {
 
         // Editors change details; they may only reset votes, never forge them.
         function editDetails() {
-          return isEditor(team())
+          return can(team(), 'manageEvents')
             && changed().hasOnly([
                  'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
                  'poll', 'public', 'votes', 'updatedAt'])
@@ -607,9 +683,9 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && isMember(team());
-        allow delete: if signedIn() && isEditor(team());
+        allow delete: if signedIn() && can(team(), 'manageEvents');
         allow create: if signedIn()
-          && isEditor(team())
+          && can(team(), 'manageEvents')
           && request.resource.data.keys().hasOnly([
                'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
                'poll', 'public', 'rsvps', 'reactions', 'votes', 'createdBy',
@@ -627,9 +703,9 @@ service cloud.firestore {
       // Editors write them alongside the event.
       match /publicEvents/{eventId} {
         allow read: if signedIn() && showsPublic(get(teamPath(teamId)).data);
-        allow delete: if signedIn() && isEditor(get(teamPath(teamId)).data);
+        allow delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageEvents');
         allow create, update: if signedIn()
-          && isEditor(get(teamPath(teamId)).data)
+          && can(get(teamPath(teamId)).data, 'manageEvents')
           && request.resource.data.keys().hasOnly([
                'title', 'type', 'startsAt', 'endsAt', 'location', 'notes',
                'updatedAt'])
@@ -653,7 +729,7 @@ service cloud.firestore {
         }
 
         function invited(m) {
-          return isEditor(team())
+          return can(team(), 'manageEvents')
             || chatRole(team()) in m.inviteRoles
             || uid() in m.inviteUsers;
         }
@@ -661,7 +737,7 @@ service cloud.firestore {
         // In the call, or allowed to be: admins, and invitees who were let
         // in when the meeting needs approval.
         function inCall(m) {
-          return isEditor(team())
+          return can(team(), 'manageEvents')
             || (invited(m)
                 && (m.requireApproval != true
                     || (exists(requestPath(uid()))
@@ -688,7 +764,7 @@ service cloud.firestore {
         }
 
         function editDetails() {
-          return isEditor(team())
+          return can(team(), 'manageEvents')
             && changed().hasOnly([
                  'title', 'startsAt', 'endsAt', 'notes', 'inviteRoles',
                  'inviteUsers', 'requireApproval', 'updatedAt'])
@@ -697,7 +773,7 @@ service cloud.firestore {
 
         function start() {
           let d = request.resource.data;
-          return isEditor(team())
+          return can(team(), 'manageEvents')
             && resource.data.status == 'scheduled'
             && changed().hasOnly(['status', 'startedAt', 'startedBy'])
             && d.status == 'live'
@@ -707,7 +783,7 @@ service cloud.firestore {
 
         function end() {
           let d = request.resource.data;
-          return isEditor(team())
+          return can(team(), 'manageEvents')
             && resource.data.status != 'ended'
             && changed().hasOnly(['status', 'endedAt'])
             && d.status == 'ended'
@@ -716,7 +792,7 @@ service cloud.firestore {
 
         allow read: if signedIn() && isMember(team()) && invited(resource.data);
         allow create: if signedIn()
-          && isEditor(team())
+          && can(team(), 'manageEvents')
           && request.resource.data.keys().hasOnly([
                'title', 'startsAt', 'endsAt', 'notes', 'inviteRoles',
                'inviteUsers', 'requireApproval', 'status', 'rsvps',
@@ -727,7 +803,7 @@ service cloud.firestore {
           && validMeeting(request.resource.data);
         allow update: if signedIn() && isMember(team())
           && (respond() || editDetails() || start() || end());
-        allow delete: if signedIn() && isEditor(team());
+        allow delete: if signedIn() && can(team(), 'manageEvents');
 
         // Asking to join a meeting that needs approval, keyed by uid.
         // Invitees ask (or ask again) for themselves; admins let them in
@@ -735,7 +811,7 @@ service cloud.firestore {
         match /requests/{userId} {
           function meeting() { return get(meetingPath()).data; }
 
-          allow read: if signedIn() && (uid() == userId || isEditor(team()));
+          allow read: if signedIn() && (uid() == userId || can(team(), 'manageEvents'));
           allow create, update: if signedIn() && uid() == userId
             && isMember(team())
             && invited(meeting())
@@ -745,13 +821,13 @@ service cloud.firestore {
             && request.resource.data.status == 'pending'
             && validString(request.resource.data.name, 80)
             && request.resource.data.requestedAt == request.time;
-          allow update: if signedIn() && isEditor(team())
+          allow update: if signedIn() && can(team(), 'manageEvents')
             && request.resource.data.diff(resource.data).affectedKeys()
                  .hasOnly(['status', 'decidedBy', 'decidedAt'])
             && request.resource.data.status in ['admitted', 'denied']
             && request.resource.data.decidedBy == uid()
             && request.resource.data.decidedAt == request.time;
-          allow delete: if signedIn() && (uid() == userId || isEditor(team()));
+          allow delete: if signedIn() && (uid() == userId || can(team(), 'manageEvents'));
         }
 
         // Watch together (MeetingPlayback in
@@ -777,10 +853,10 @@ service cloud.firestore {
 
           allow read: if signedIn() && isMember(team()) && inCall(meeting());
           allow create, update: if signedIn() && docId == 'current'
-            && isEditor(team())
+            && can(team(), 'manageEvents')
             && meeting().status == 'live'
             && validPlayback(request.resource.data);
-          allow delete: if signedIn() && isEditor(team());
+          allow delete: if signedIn() && can(team(), 'manageEvents');
         }
 
         // The chat inside the call: text only, for people in the call.
@@ -802,7 +878,7 @@ service cloud.firestore {
             && request.resource.data.text.size() <= 4000
             && request.resource.data.createdAt == request.time;
           allow delete: if signedIn()
-            && (resource.data.authorId == uid() || isEditor(team()));
+            && (resource.data.authorId == uid() || can(team(), 'manageEvents'));
         }
       }
 
@@ -844,9 +920,9 @@ service cloud.firestore {
         allow read: if signedIn()
           && (isMember(team())
               || (resource.data.public == true && showsPublic(team())));
-        allow delete: if signedIn() && isEditor(team());
+        allow delete: if signedIn() && can(team(), 'manageTeam');
         allow create: if signedIn()
-          && isEditor(team())
+          && can(team(), 'manageTeam')
           && request.resource.data.keys().hasOnly([
                'title', 'body', 'location', 'links', 'images', 'public',
                'tournamentKey', 'authorId', 'authorName', 'createdAt',
@@ -855,7 +931,7 @@ service cloud.firestore {
           && validString(request.resource.data.authorName, 80)
           && request.resource.data.createdAt == request.time
           && validPost(request.resource.data);
-        allow update: if signedIn() && isEditor(team())
+        allow update: if signedIn() && can(team(), 'manageTeam')
           && changed().hasOnly([
                'title', 'body', 'location', 'links', 'images', 'public',
                'tournamentKey', 'updatedAt'])
@@ -896,9 +972,9 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && isMember(team());
-        allow delete: if signedIn() && isEditor(team());
+        allow delete: if signedIn() && can(team(), 'manageTeam');
         allow create: if signedIn()
-          && isEditor(team())
+          && can(team(), 'manageTeam')
           && request.resource.data.keys().hasOnly([
                'youtubeId', 'file', 'folderId', 'title', 'description',
                'authorId', 'authorName', 'createdAt', 'updatedAt'])
@@ -907,7 +983,7 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time
           && request.resource.data.updatedAt == request.time
           && validVideo(request.resource.data);
-        allow update: if signedIn() && isEditor(team())
+        allow update: if signedIn() && can(team(), 'manageTeam')
           && changed().hasOnly([
                'youtubeId', 'folderId', 'title', 'description', 'updatedAt'])
           && request.resource.data.updatedAt == request.time
@@ -926,12 +1002,12 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && isMember(team());
-        allow delete: if signedIn() && isEditor(team());
-        allow create: if signedIn() && isEditor(team())
+        allow delete: if signedIn() && can(team(), 'manageTeam');
+        allow create: if signedIn() && can(team(), 'manageTeam')
           && request.resource.data.keys().hasOnly(['name', 'createdAt'])
           && request.resource.data.createdAt == request.time
           && validFolder(request.resource.data);
-        allow update: if signedIn() && isEditor(team())
+        allow update: if signedIn() && can(team(), 'manageTeam')
           && changed().hasOnly(['name'])
           && validFolder(request.resource.data);
       }
@@ -964,15 +1040,15 @@ service cloud.firestore {
         }
 
         allow read: if signedIn()
-          && (isEditor(team()) || uid() in resource.data.participantIds);
-        allow create: if signedIn() && isGroup(team()) && isEditor(team())
+          && (can(team(), 'manageEvents') || uid() in resource.data.participantIds);
+        allow create: if signedIn() && isGroup(team()) && can(team(), 'manageEvents')
           && request.resource.data.createdBy == uid()
           && request.resource.data.createdAt == request.time
           && validTournament(request.resource.data);
-        allow update: if signedIn() && isGroup(team()) && isEditor(team())
+        allow update: if signedIn() && isGroup(team()) && can(team(), 'manageEvents')
           && !('createdBy' in changed()) && !('createdAt' in changed())
           && validTournament(request.resource.data);
-        allow delete: if signedIn() && isEditor(team());
+        allow delete: if signedIn() && can(team(), 'manageEvents');
 
         // Games (GroupGame). Organizers write anything. A team's captain
         // reports a score, the other captain confirms it (or reports their
@@ -1061,52 +1137,65 @@ service cloud.firestore {
           }
 
           allow read: if signedIn()
-            && (isEditor(team()) || uid() in tournament().participantIds);
-          allow create, delete: if signedIn() && isEditor(team());
+            && (can(team(), 'manageEvents') || uid() in tournament().participantIds);
+          allow create, delete: if signedIn() && can(team(), 'manageEvents');
           allow update: if signedIn() && (
-            (isEditor(team()) && validGame(request.resource.data))
+            (can(team(), 'manageEvents') && validGame(request.resource.data))
             || report() || confirm() || advance()
           );
         }
       }
 
-      // Chat rooms (ChatRoom in lib/domain/models/chat.dart). Each room
-      // lists the roles and members who can read and who can write; write
-      // lists are subsets of read lists. The owner can read and post in
-      // every room. Owners, coaches and captains create rooms and set their
-      // access, so they can see every room's details; only the owner, who
-      // can read every message, deletes rooms. storage.rules guards
-      // attachments with the same checks.
+      // Access lists shared by chat rooms and folders (ChatAccessLists in
+      // lib/domain/models/chat.dart): audience ids ("everyone", a tier or a
+      // custom role id) and uids; write lists are subsets of read lists.
+      function validChatName(n) { return n is string && n.size() > 0 && n.size() <= 60; }
+      function validAccess(r) {
+        return r.readRoles is list && r.readRoles.size() <= 60
+          && r.writeRoles is list && r.writeRoles.size() <= 60
+          && r.readUsers is list && r.readUsers.size() <= 200
+          && r.writeUsers is list && r.writeUsers.size() <= 200
+          && r.writeRoles.toSet().difference(r.readRoles.toSet()).size() == 0
+          && r.writeUsers.toSet().difference(r.readUsers.toSet()).size() == 0;
+      }
+
+      // Chat rooms (ChatRoom in lib/domain/models/chat.dart), optionally in
+      // a folder. The owner can read and post in every room. Members who
+      // can manage chats create rooms and set their access, so they can
+      // see every room's details; deleting a room also deletes its
+      // messages, so they can only delete rooms they can read.
+      // storage.rules guards attachments with the same checks.
       match /chats/{roomId} {
         function team() { return get(teamPath(teamId)).data; }
 
+        // kind: 'text' (or missing, for rooms from before voice) or
+        // 'voice'; set when the room is made and never changed.
         function validRoom(r) {
-          let roles = ['owner', 'coach', 'captain', 'player'];
-          return r.name is string && r.name.size() > 0 && r.name.size() <= 60
-            && r.readRoles is list && r.readRoles.hasOnly(roles)
-            && r.writeRoles is list && r.writeRoles.hasOnly(roles)
-            && r.readUsers is list && r.readUsers.size() <= 200
-            && r.writeUsers is list && r.writeUsers.size() <= 200
-            && r.writeRoles.toSet().difference(r.readRoles.toSet()).size() == 0
-            && r.writeUsers.toSet().difference(r.readUsers.toSet()).size() == 0;
+          return validChatName(r.name) && validAccess(r)
+            && r.get('kind', 'text') in ['text', 'voice']
+            && (r.get('folderId', null) == null
+                || (r.folderId is string && r.folderId.size() <= 40))
+            && r.get('position', 0) is int;
         }
 
         allow read: if signedIn() && isMember(team())
-          && (isEditor(team()) || canReadRoom(team(), resource.data));
+          && (can(team(), 'manageChats') || canReadRoom(team(), resource.data));
         // getAfter: General is created in the same batch as its team.
         allow create: if signedIn()
-          && isEditor(getAfter(teamPath(teamId)).data)
+          && can(getAfter(teamPath(teamId)).data, 'manageChats')
           && request.resource.data.keys().hasOnly([
-               'name', 'readRoles', 'writeRoles', 'readUsers', 'writeUsers',
-               'createdBy', 'createdAt'])
+               'name', 'kind', 'readRoles', 'writeRoles', 'readUsers',
+               'writeUsers', 'folderId', 'position', 'createdBy', 'createdAt'])
           && validRoom(request.resource.data)
           && request.resource.data.createdBy == uid()
           && request.resource.data.createdAt == request.time;
-        allow update: if signedIn() && isEditor(team())
+        allow update: if signedIn() && can(team(), 'manageChats')
           && changed().hasOnly([
-               'name', 'readRoles', 'writeRoles', 'readUsers', 'writeUsers'])
+               'name', 'readRoles', 'writeRoles', 'readUsers', 'writeUsers',
+               'folderId', 'position'])
           && validRoom(request.resource.data);
-        allow delete: if signedIn() && isOwner(team());
+        allow delete: if signedIn() && can(team(), 'manageChats')
+          && canReadRoom(team(), resource.data);
 
         match /messages/{messageId} {
           function room() {
@@ -1127,10 +1216,47 @@ service cloud.firestore {
             && (request.resource.data.text.size() > 0
                 || request.resource.data.attachments.size() > 0)
             && request.resource.data.createdAt == request.time;
-          // Authors delete their own; the owner moderates.
+          // Authors delete their own; the owner and moderators who can
+          // read the room moderate, and chat managers clear a room they
+          // delete.
           allow delete: if signedIn()
-            && (resource.data.authorId == uid() || isOwner(team()));
+            && (resource.data.authorId == uid()
+                || isOwner(team())
+                || ((can(team(), 'moderate') || can(team(), 'manageChats'))
+                    && canReadRoom(team(), room())));
         }
+      }
+
+      // Chat folders (ChatFolder in lib/domain/models/chat.dart), like
+      // Discord categories, one level deep. Their access lists are only the
+      // defaults new rooms copy, so every member can read them; the app
+      // hides folders with no room the member can read. Deleting one moves
+      // its rooms out of it.
+      match /chatFolders/{folderId} {
+        function team() { return get(teamPath(teamId)).data; }
+
+        function validFolder(f) {
+          return validChatName(f.name) && validAccess(f)
+            && f.position is int;
+        }
+
+        allow read: if signedIn() && isMember(team());
+        // getAfter: new teams get a Voice Channels folder in the batch
+        // that creates them.
+        allow create: if signedIn()
+          && can(getAfter(teamPath(teamId)).data, 'manageChats')
+          && request.resource.data.keys().hasOnly([
+               'name', 'position', 'readRoles', 'writeRoles', 'readUsers',
+               'writeUsers', 'createdBy', 'createdAt'])
+          && validFolder(request.resource.data)
+          && request.resource.data.createdBy == uid()
+          && request.resource.data.createdAt == request.time;
+        allow update: if signedIn() && can(team(), 'manageChats')
+          && changed().hasOnly([
+               'name', 'position', 'readRoles', 'writeRoles', 'readUsers',
+               'writeUsers'])
+          && validFolder(request.resource.data);
+        allow delete: if signedIn() && can(team(), 'manageChats');
       }
 
       // Stats: owners, coaches, captains and players with stats access
@@ -1225,7 +1351,7 @@ service cloud.firestore {
 
       allow read: if signedIn();
       allow create, update: if signedIn()
-        && isEditor(getAfter(teamPath(teamId)).data)
+        && can(getAfter(teamPath(teamId)).data, 'manageTeam')
         && validListing(request.resource.data, getAfter(teamPath(teamId)).data);
       // The owner deletes it with the team; a listing left without a team
       // is anyone's to clear.
@@ -1251,7 +1377,7 @@ service cloud.firestore {
       function organizes(groupId) {
         let path = teamPath(groupId);
         return exists(path) && isGroup(get(path).data)
-          && isEditor(get(path).data);
+          && can(get(path).data, 'manageEvents');
       }
 
       allow read: if signedIn();
@@ -1365,7 +1491,7 @@ service cloud.firestore {
       function sharesOwnTeamEvent(p) {
         let e = p.get('event', null);
         return e == null || e.get('teamId', null) == null
-          || isEditor(get(teamPath(e.teamId)).data);
+          || can(get(teamPath(e.teamId)).data, 'manageEvents');
       }
       // A repost (RepostOf in user_post.dart) points at someone else's
       // original post and adds only a note. Its id is r_{original}_{uid}, one
@@ -1642,7 +1768,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(
              ['teamId', 'createdBy', 'createdAt', 'ttl', 'expiresAt'])
         && request.resource.data.teamId is string
-        && isEditor(get(teamPath(request.resource.data.teamId)).data)
+        && can(get(teamPath(request.resource.data.teamId)).data, 'manageMembers')
         && get(teamPath(request.resource.data.teamId)).data.get('kind', 'team') != 'community'
         && request.resource.data.createdBy == uid()
         && request.resource.data.createdAt == request.time

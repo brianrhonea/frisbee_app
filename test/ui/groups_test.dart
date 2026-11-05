@@ -93,12 +93,13 @@ void main() {
       expect(TeamListing.of(team).toMap().containsKey('kind'), isFalse);
     });
 
-    test('group roles are owner, organizer and member', () {
+    test('group tiers are owner and member; custom roles do the rest', () {
       expect(TeamRole.rolesFor(TeamKind.community), [
         TeamRole.owner,
-        TeamRole.captain,
         TeamRole.player,
       ]);
+      // Organizers from before custom roles keep their label until the
+      // owner's app migrates them.
       expect(TeamRole.captain.labelFor(TeamKind.community), 'Organizer');
       expect(TeamRole.player.labelFor(TeamKind.community), 'Member');
       expect(TeamRole.captain.labelFor(TeamKind.team), 'Captain');

@@ -1,6 +1,11 @@
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
+import '../data/repositories/discord/discord_import_repository.dart';
+import '../data/repositories/discord/discord_import_repository_firebase.dart';
+import '../data/repositories/voice/voice_repository.dart';
+import '../data/repositories/voice/voice_repository_livekit.dart';
+import '../data/services/callable_client.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/auth/auth_repository_firebase.dart';
 import '../data/repositories/chat/chat_repository.dart';
@@ -126,10 +131,27 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) =>
         MeetingRepositoryFirebase(tokens: context.read<MeetingTokenService>()),
   ),
+  Provider(
+    create: (_) => CallableClient(
+      projectId: DefaultFirebaseOptions.currentPlatform.projectId,
+    ),
+  ),
+  Provider<DiscordImportRepository>(
+    create: (context) => DiscordImportRepositoryFirebase(
+      functions: context.read<CallableClient>(),
+    ),
+  ),
   Provider<MeetingMediaService>(create: (_) => LiveKitMediaService()),
   Provider(create: (_) => MeetingPresence()),
   Provider<MeetingSettingsRepository>(
     create: (_) => MeetingSettingsRepositoryPrefs(SharedPreferencesService()),
+  ),
+  ChangeNotifierProvider<VoiceRepository>(
+    create: (context) => VoiceRepositoryLiveKit(
+      functions: context.read(),
+      media: context.read(),
+      settings: context.read(),
+    ),
   ),
   Provider(create: (_) => PushService()),
   Provider<NotificationRepository>(

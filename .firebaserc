@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "frisbee-app-brianrhonea"
+    "default": "frisbee-app-brianrhonea-dev",
+    "dev": "frisbee-app-brianrhonea-dev",
+    "prod": "frisbee-app-brianrhonea"
   }
 }

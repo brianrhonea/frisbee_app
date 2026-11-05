@@ -30,56 +30,71 @@ class AttachmentTooLargeException implements Exception {
       '$name is larger than ${formatFileSize(maxAttachmentBytes)}.';
 }
 
-/// A team chat room. Access is granted per role and per member; write
-/// access always includes read. The team owner can read and write every
-/// room. firestore.rules enforces the same; keep the two in step.
-class ChatRoom {
-  const ChatRoom({
-    required this.id,
-    required this.name,
-    this.readRoles = const {},
-    this.writeRoles = const {},
-    this.readUsers = const {},
-    this.writeUsers = const {},
-    this.createdBy = '',
-    this.createdAt,
-  });
+//// Who a room or folder lets in: the ids that can go in its access lists.
+/// [everyone] is every member; the team tiers (`coach`, `captain`,
+/// `player`) are their own ids; anything else is a custom role id
+/// ([Team.roles]). firestore.rules reads the same ids.
+abstract final class ChatAudience {
+  static const everyone = 'everyone';
 
-  /// A room every member can read and write; each team gets one.
-  factory ChatRoom.general() => const ChatRoom(
-    id: generalId,
-    name: 'General',
-    readRoles: {...TeamRole.values},
-    writeRoles: {...TeamRole.values},
-  );
+  /// The ids [uid] counts as on [team]: everyone, their tier and their
+  /// custom roles. Empty for non-members.
+  static Set<String> idsFor(Team team, String uid) {
+    final role = team.roleOf(uid);
+    if (role == null) return const {};
+    return {everyone, role.name, ...?team.memberRoles[uid]};
+  }
 
-  static const generalId = 'general';
+  /// Ids an access editor offers on [team], in order: everyone, the tiers
+  /// below owner (teams only), then custom roles.
+  static List<String> choicesFor(Team team) => [
+    everyone,
+    if (!team.isCommunity)
+      for (final r in TeamRole.values)
+        if (r != TeamRole.owner) r.name,
+    for (final r in team.sortedRoles) r.id,
+  ];
 
-  /// Empty for a room that hasn't been saved yet.
-  final String id;
-  final String name;
+  /// Display name of [id] on [team].
+  static String labelOf(Team team, String id) {
+    if (id == everyone) return 'Everyone';
+    if (team.roles[id] case final r?) return r.name;
+    for (final r in TeamRole.values) {
+      if (r.name == id) return team.roleLabel(r);
+    }
+    return 'Deleted role';
+  }
 
-  /// Roles that can read; includes [writeRoles].
-  final Set<TeamRole> readRoles;
-  final Set<TeamRole> writeRoles;
+  /// Plural display name of [id], for room lists.
+  static String pluralLabelOf(Team team, String id) {
+    for (final r in TeamRole.values) {
+      if (r.name == id) return r.pluralLabelFor(team.kind);
+    }
+    return labelOf(team, id);
+  }
+}
 
-  /// Members (uids) who can read whatever their role; includes [writeUsers].
-  final Set<String> readUsers;
-  final Set<String> writeUsers;
-  final String createdBy;
-  final DateTime? createdAt;
+/// Access to a room, or the default for new rooms in a folder: per
+/// audience id ([ChatAudience]) and per member. Write access always
+/// includes read.
+mixin ChatAccessLists {
+  /// Ids that can read; includes [writeRoles].
+  Set<String> get readRoles;
+  Set<String> get writeRoles;
 
-  bool get isNew => id.isEmpty;
-  bool get isGeneral => id == generalId;
+  /// Members (uids) who can read whatever their roles; includes
+  /// [writeUsers].
+  Set<String> get readUsers;
+  Set<String> get writeUsers;
 
-  /// Access for role [role], ignoring per-member grants.
-  ChatAccess roleAccess(TeamRole role) => writeRoles.contains(role)
+  /// Access for audience [id], ignoring per-member grants.
+  ChatAccess roleAccess(String id) => writeRoles.contains(id)
       ? ChatAccess.write
-      : readRoles.contains(role)
+      : readRoles.contains(id)
       ? ChatAccess.read
       : ChatAccess.none;
 
-  /// Access granted to member [uid] directly, on top of their role.
+  /// Access granted to member [uid] directly, on top of their roles.
   ChatAccess userAccess(String uid) => writeUsers.contains(uid)
       ? ChatAccess.write
       : readUsers.contains(uid)
@@ -91,29 +106,177 @@ class ChatRoom {
     final role = team.roleOf(uid);
     if (role == null) return ChatAccess.none;
     if (role == TeamRole.owner) return ChatAccess.write;
-    final byRole = roleAccess(role);
-    final byUser = userAccess(uid);
-    return byRole.index >= byUser.index ? byRole : byUser;
+    var best = userAccess(uid);
+    for (final id in ChatAudience.idsFor(team, uid)) {
+      final a = roleAccess(id);
+      if (a.index > best.index) best = a;
+    }
+    return best;
   }
 
-  /// One-line description of who's in the room, for room lists.
-  String get audience {
-    final roles = readRoles.where((r) => r != TeamRole.owner).toList();
-    if (roles.length == TeamRole.values.length - 1) return 'Everyone';
-    final people = readUsers.length;
-    final parts = [
-      if (roles.isNotEmpty)
-        roles.map((r) => r.pluralLabel).join(', ')
-      else
-        'Owner',
-      if (people > 0) '$people ${people == 1 ? 'person' : 'people'}',
+  /// One-line description of who's in, for room lists.
+  String audienceOn(Team team) {
+    if (readRoles.contains(ChatAudience.everyone)) return 'Everyone';
+    final tiers = [
+      for (final r in TeamRole.rolesFor(team.kind))
+        if (r != TeamRole.owner) r.name,
     ];
-    return parts.join(' + ');
+    // Rooms from before "everyone" list every tier instead.
+    if (tiers.every(readRoles.contains)) return 'Everyone';
+    final people = readUsers.length;
+    final names = [
+      for (final id in ChatAudience.choicesFor(team))
+        if (readRoles.contains(id)) ChatAudience.pluralLabelOf(team, id),
+    ];
+    return [
+      if (names.isNotEmpty) names.join(', ') else 'Owner',
+      if (people > 0) '$people ${people == 1 ? 'person' : 'people'}',
+    ].join(' + ');
   }
 
-  ChatRoom withRoleAccess(TeamRole role, ChatAccess access) => _copy(
-    readRoles: _apply(readRoles, role, access.canRead),
-    writeRoles: _apply(writeRoles, role, access.canWrite),
+  /// The access lists as stored. Write access is folded into read so the
+  /// stored lists alone answer "who can read".
+  Map<String, dynamic> accessMap() => {
+    'readRoles': ({...readRoles, ...writeRoles}.toList()..sort()),
+    'writeRoles': (writeRoles.toList()..sort()),
+    'readUsers': ({...readUsers, ...writeUsers}.toList()..sort()),
+    'writeUsers': (writeUsers.toList()..sort()),
+  };
+}
+
+Set<T> _apply<T>(Set<T> set, T value, bool on) =>
+    on ? {...set, value} : ({...set}..remove(value));
+
+Set<String> _strings(Object? raw) => {
+  for (final u in (raw as List?) ?? const []) '$u',
+};
+
+/// Access ids from a stored list. Rooms from before custom roles stored
+/// `owner`, which the owner has anyway, so it's dropped.
+Set<String> _roleIds(Object? raw) => _strings(raw)..remove('owner');
+
+/// A team chat room, optionally in a folder ([ChatFolder]). Access is
+/// granted per audience id and per member; see [ChatAccessLists]. The
+/// owner can read and write every room. firestore.rules enforces the same;
+/// keep the two in step.
+/// Text rooms hold messages; voice rooms are drop-in calls, like Discord
+/// voice channels. A room's kind is set when it's made.
+enum ChatRoomKind {
+  text,
+  voice;
+
+  static ChatRoomKind parse(Object? v) => v == 'voice' ? voice : text;
+}
+
+class ChatRoom with ChatAccessLists {
+  const ChatRoom({
+    required this.id,
+    required this.name,
+    this.kind = ChatRoomKind.text,
+    this.readRoles = const {},
+    this.writeRoles = const {},
+    this.readUsers = const {},
+    this.writeUsers = const {},
+    this.folderId,
+    this.position = 0,
+    this.createdBy = '',
+    this.createdAt,
+  });
+
+  /// A room every member can read and write; each team gets one.
+  factory ChatRoom.general() => const ChatRoom(
+    id: generalId,
+    name: 'General',
+    readRoles: {ChatAudience.everyone},
+    writeRoles: {ChatAudience.everyone},
+  );
+
+  /// A new room in [folder] (or no folder), starting with its access.
+  factory ChatRoom.newIn(ChatFolder? folder) => folder == null
+      ? const ChatRoom(
+          id: '',
+          name: '',
+          readRoles: {ChatAudience.everyone},
+          writeRoles: {ChatAudience.everyone},
+        )
+      : ChatRoom(
+          id: '',
+          name: '',
+          folderId: folder.id,
+          readRoles: folder.readRoles,
+          writeRoles: folder.writeRoles,
+          readUsers: folder.readUsers,
+          writeUsers: folder.writeUsers,
+        );
+
+  static const generalId = 'general';
+  static const maxNameLength = 60;
+
+  /// The folder new teams get their voice channels in.
+  static const voiceFolderId = 'voice';
+
+  /// The voice channels every team starts with, in [voiceFolderId]. Every
+  /// member can join and talk.
+  static List<ChatRoom> defaultVoiceRooms() => [
+    for (final (i, (id, name)) in const [
+      ('voice-lounge', 'Lounge'),
+      ('voice-sideline', 'Sideline'),
+      ('voice-film', 'Film Room'),
+    ].indexed)
+      ChatRoom(
+        id: id,
+        name: name,
+        kind: ChatRoomKind.voice,
+        folderId: voiceFolderId,
+        position: i,
+        readRoles: const {ChatAudience.everyone},
+        writeRoles: const {ChatAudience.everyone},
+      ),
+  ];
+
+  /// The folder [defaultVoiceRooms] go in.
+  static ChatFolder defaultVoiceFolder() => const ChatFolder(
+    id: voiceFolderId,
+    name: 'Voice Channels',
+    position: 1000,
+    readRoles: {ChatAudience.everyone},
+    writeRoles: {ChatAudience.everyone},
+  );
+
+  /// Empty for a room that hasn't been saved yet.
+  final String id;
+  final String name;
+  final ChatRoomKind kind;
+
+  bool get isVoice => kind == ChatRoomKind.voice;
+
+  /// The name as Discord writes channels: lowercase, dashes for spaces.
+  String get handle =>
+      name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '-');
+
+  @override
+  final Set<String> readRoles;
+  @override
+  final Set<String> writeRoles;
+  @override
+  final Set<String> readUsers;
+  @override
+  final Set<String> writeUsers;
+
+  /// The folder it's in; null for rooms outside any folder.
+  final String? folderId;
+
+  /// Order within its folder (or among unfiled rooms), lowest first.
+  final int position;
+  final String createdBy;
+  final DateTime? createdAt;
+
+  bool get isNew => id.isEmpty;
+  bool get isGeneral => id == generalId;
+
+  ChatRoom withRoleAccess(String roleId, ChatAccess access) => _copy(
+    readRoles: _apply(readRoles, roleId, access.canRead),
+    writeRoles: _apply(writeRoles, roleId, access.canWrite),
   );
 
   ChatRoom withUserAccess(String uid, ChatAccess access) => _copy(
@@ -123,68 +286,195 @@ class ChatRoom {
 
   ChatRoom withName(String name) => _copy(name: name);
 
-  /// Drops per-member grants for people no longer on [team].
-  ChatRoom forMembersOf(Team team) => _copy(
-    readUsers: readUsers.where(team.members.containsKey).toSet(),
-    writeUsers: writeUsers.where(team.members.containsKey).toSet(),
-  );
+  /// Only while the room is new; a saved room keeps its kind.
+  ChatRoom withKind(ChatRoomKind kind) => isNew
+      ? ChatRoom(
+          id: id,
+          name: name,
+          kind: kind,
+          readRoles: readRoles,
+          writeRoles: writeRoles,
+          readUsers: readUsers,
+          writeUsers: writeUsers,
+          folderId: folderId,
+          position: position,
+        )
+      : this;
 
-  static Set<T> _apply<T>(Set<T> set, T value, bool on) =>
-      on ? {...set, value} : ({...set}..remove(value));
+  ChatRoom withFolder(String? folderId) => _copy(folderId: () => folderId);
+
+  ChatRoom withPosition(int position) => _copy(position: position);
+
+  /// Drops per-member grants for people no longer on [team], and grants
+  /// for custom roles it no longer has.
+  ChatRoom forMembersOf(Team team) {
+    bool live(String id) =>
+        team.roles.containsKey(id) ||
+        id == ChatAudience.everyone ||
+        TeamRole.values.any((r) => r.name == id);
+    return _copy(
+      readRoles: readRoles.where(live).toSet(),
+      writeRoles: writeRoles.where(live).toSet(),
+      readUsers: readUsers.where(team.members.containsKey).toSet(),
+      writeUsers: writeUsers.where(team.members.containsKey).toSet(),
+    );
+  }
 
   ChatRoom _copy({
     String? name,
-    Set<TeamRole>? readRoles,
-    Set<TeamRole>? writeRoles,
+    Set<String>? readRoles,
+    Set<String>? writeRoles,
     Set<String>? readUsers,
     Set<String>? writeUsers,
+    String? Function()? folderId,
+    int? position,
   }) => ChatRoom(
     id: id,
     name: name ?? this.name,
+    kind: kind,
     readRoles: readRoles ?? this.readRoles,
     writeRoles: writeRoles ?? this.writeRoles,
     readUsers: readUsers ?? this.readUsers,
     writeUsers: writeUsers ?? this.writeUsers,
+    folderId: folderId != null ? folderId() : this.folderId,
+    position: position ?? this.position,
     createdBy: createdBy,
     createdAt: createdAt,
   );
 
-  factory ChatRoom.fromMap(String id, Map<String, dynamic> map) {
-    Set<TeamRole> roles(Object? raw) => {
-      for (final r in (raw as List?) ?? const [])
-        enumByName(TeamRole.values, r, TeamRole.player),
-    };
-    Set<String> users(Object? raw) => {
-      for (final u in (raw as List?) ?? const []) '$u',
-    };
-    return ChatRoom(
-      id: id,
-      name: map['name'] as String? ?? '',
-      readRoles: roles(map['readRoles']),
-      writeRoles: roles(map['writeRoles']),
-      readUsers: users(map['readUsers']),
-      writeUsers: users(map['writeUsers']),
-      createdBy: map['createdBy'] as String? ?? '',
-      createdAt: parseDate(map['createdAt']),
-    );
-  }
+  factory ChatRoom.fromMap(String id, Map<String, dynamic> map) => ChatRoom(
+    id: id,
+    name: map['name'] as String? ?? '',
+    kind: ChatRoomKind.parse(map['kind']),
+    readRoles: _roleIds(map['readRoles']),
+    writeRoles: _roleIds(map['writeRoles']),
+    readUsers: _strings(map['readUsers']),
+    writeUsers: _strings(map['writeUsers']),
+    folderId: map['folderId'] as String?,
+    position: (map['position'] as num?)?.toInt() ?? 0,
+    createdBy: map['createdBy'] as String? ?? '',
+    createdAt: parseDate(map['createdAt']),
+  );
 
-  /// Name and access lists. Write access is folded into read so the
-  /// stored lists alone answer "who can read".
-  Map<String, dynamic> toMap() {
-    List<String> names(Iterable<TeamRole> r) =>
-        TeamRole.values.where(r.contains).map((r) => r.name).toList();
-    return {
-      'name': name.trim(),
-      'readRoles': names({...readRoles, ...writeRoles}),
-      'writeRoles': names(writeRoles),
-      'readUsers': ({...readUsers, ...writeUsers}.toList()..sort()),
-      'writeUsers': (writeUsers.toList()..sort()),
-    };
-  }
+  /// Name, place and access lists.
+  Map<String, dynamic> toMap() => {
+    'name': name.trim(),
+    ...accessMap(),
+    'folderId': folderId,
+    'position': position,
+  };
 }
 
-/// A file or photo on a message. [path] is its Cloud Storage path.
+/// A folder of chat rooms, like a Discord category. One level only. Its
+/// access lists are what new rooms in it start with; each room keeps its
+/// own. Every member can see folder names, but the app hides a folder with
+/// no room they can read.
+class ChatFolder with ChatAccessLists {
+  const ChatFolder({
+    required this.id,
+    required this.name,
+    this.position = 0,
+    this.readRoles = const {ChatAudience.everyone},
+    this.writeRoles = const {ChatAudience.everyone},
+    this.readUsers = const {},
+    this.writeUsers = const {},
+  });
+
+  static const maxNameLength = 60;
+
+  /// Empty for a folder that hasn't been saved yet.
+  final String id;
+  final String name;
+  final int position;
+  @override
+  final Set<String> readRoles;
+  @override
+  final Set<String> writeRoles;
+  @override
+  final Set<String> readUsers;
+  @override
+  final Set<String> writeUsers;
+
+  bool get isNew => id.isEmpty;
+
+  ChatFolder copyWith({
+    String? id,
+    String? name,
+    int? position,
+    Set<String>? readRoles,
+    Set<String>? writeRoles,
+  }) => ChatFolder(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    position: position ?? this.position,
+    readRoles: readRoles ?? this.readRoles,
+    writeRoles: writeRoles ?? this.writeRoles,
+    readUsers: readUsers,
+    writeUsers: writeUsers,
+  );
+
+  ChatFolder withRoleAccess(String roleId, ChatAccess access) => copyWith(
+    readRoles: _apply(readRoles, roleId, access.canRead),
+    writeRoles: _apply(writeRoles, roleId, access.canWrite),
+  );
+
+  factory ChatFolder.fromMap(String id, Map<String, dynamic> map) => ChatFolder(
+    id: id,
+    name: map['name'] as String? ?? '',
+    position: (map['position'] as num?)?.toInt() ?? 0,
+    readRoles: _roleIds(map['readRoles']),
+    writeRoles: _roleIds(map['writeRoles']),
+    readUsers: _strings(map['readUsers']),
+    writeUsers: _strings(map['writeUsers']),
+  );
+
+  Map<String, dynamic> toMap() => {
+    'name': name.trim(),
+    'position': position,
+    ...accessMap(),
+  };
+}
+
+int _byPosition(int ap, String an, int bp, String bn) =>
+    ap != bp ? ap.compareTo(bp) : an.toLowerCase().compareTo(bn.toLowerCase());
+
+/// Folders ordered by position, then name.
+List<ChatFolder> sortFolders(Iterable<ChatFolder> folders) =>
+    folders.toList()
+      ..sort((a, b) => _byPosition(a.position, a.name, b.position, b.name));
+
+/// Rooms ordered General first, then by position, then name.
+List<ChatRoom> sortRooms(Iterable<ChatRoom> rooms) =>
+    rooms.toList()..sort((a, b) {
+      if (a.isGeneral != b.isGeneral) return a.isGeneral ? -1 : 1;
+      return _byPosition(a.position, a.name, b.position, b.name);
+    });
+
+/// A folder (null for rooms outside any folder) and its rooms, in order.
+typedef RoomGroup = ({ChatFolder? folder, List<ChatRoom> rooms});
+
+/// Rooms grouped for a sidebar: rooms outside any folder first, then each
+/// folder with its rooms. Folders without a room in [rooms] are left out
+/// unless [keepEmpty] (for people who manage chats).
+List<RoomGroup> groupRooms(
+  Iterable<ChatRoom> rooms,
+  Iterable<ChatFolder> folders, {
+  bool keepEmpty = false,
+}) {
+  final known = {for (final f in folders) f.id};
+  final unfiled = sortRooms(
+    rooms.where((r) => r.folderId == null || !known.contains(r.folderId)),
+  );
+  return [
+    if (unfiled.isNotEmpty) (folder: null, rooms: unfiled),
+    for (final f in sortFolders(folders))
+      if (sortRooms(rooms.where((r) => r.folderId == f.id)) case final inFolder
+          when inFolder.isNotEmpty || keepEmpty)
+        (folder: f, rooms: inFolder),
+  ];
+}
+
+// A file or photo on a message. [path] is its Cloud Storage path.
 class ChatAttachment {
   const ChatAttachment({
     required this.path,

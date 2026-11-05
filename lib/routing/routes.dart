@@ -70,11 +70,18 @@ abstract final class Routes {
   static String teamMembers(String teamId) => teamSection(teamId, 'members');
   static String teamVideos(String teamId) => teamSection(teamId, 'videos');
   static String newPlay(String teamId) => '/teams/$teamId/plays/new';
+
+  /// The owner's custom roles.
+  static String teamRoles(String teamId) => '/teams/$teamId/roles';
+
+  /// Imports roles and channels from a Discord server template.
+  static String discordImport(String teamId) => '/teams/$teamId/discord';
   // Chat pages open over the team; use `context.push` so back returns to
   // the chat room list.
   static String chatRoom(String teamId, String roomId) =>
       '/teams/$teamId/chats/$roomId';
-  static String newChatRoom(String teamId) => '/teams/$teamId/chats/new';
+  static String newChatRoom(String teamId, {String? folderId}) =>
+      '/teams/$teamId/chats/new${folderId == null ? '' : '?folder=$folderId'}';
   static String chatRoomSettings(String teamId, String roomId) =>
       '/teams/$teamId/chats/$roomId/settings';
   static String play(String teamId, String playId) =>

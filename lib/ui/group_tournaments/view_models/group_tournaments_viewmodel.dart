@@ -52,7 +52,8 @@ class GroupTournamentsViewModel extends ChangeNotifier {
   String get uid => _uid;
 
   /// Owners and organizers set tournaments up.
-  bool get isOrganizer => _group?.canEdit(_uid) ?? false;
+  bool get isOrganizer =>
+      _group?.has(_uid, TeamPermission.manageEvents) ?? false;
 
   /// The query depends on the role, so re-subscribe when it changes.
   void _watch() {

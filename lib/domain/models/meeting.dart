@@ -80,7 +80,7 @@ class TeamMeeting {
   bool canSee(Team team, String uid) {
     final role = team.roleOf(uid);
     if (role == null) return false;
-    return role.canEdit ||
+    return team.has(uid, TeamPermission.manageEvents) ||
         inviteRoles.contains(role) ||
         inviteUsers.contains(uid);
   }
@@ -93,7 +93,7 @@ class TeamMeeting {
 
   /// Whether [uid] would wait for an admin before joining.
   bool needsApproval(Team team, String uid) =>
-      requireApproval && !team.canEdit(uid);
+      requireApproval && !team.has(uid, TeamPermission.manageEvents);
 
   /// One-line description of who's invited, for lists.
   String get audience {

@@ -70,7 +70,8 @@ class TournamentViewModel extends ChangeNotifier {
       _team?.canKeepStats(_auth.currentUser?.uid ?? '') ?? false;
 
   /// Owners, coaches and captains delete games and the tournament.
-  bool get canDelete => _team?.canEdit(_auth.currentUser?.uid ?? '') ?? false;
+  bool get canDelete =>
+      canEdit && (_team?.canEdit(_auth.currentUser?.uid ?? '') ?? false);
   static const _uuid = Uuid();
 
   StatsTournament? _tournament;

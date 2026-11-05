@@ -81,6 +81,10 @@ import '../ui/teams/widgets/team_search_screen.dart';
 import '../ui/teams/widgets/team_section_screen.dart';
 import '../ui/teams/widgets/usau_roster_screen.dart';
 import '../ui/teams/widgets/teams_screen.dart';
+import '../ui/teams/view_models/roles_viewmodel.dart';
+import '../ui/teams/widgets/roles_screen.dart';
+import '../ui/teams/view_models/discord_import_viewmodel.dart';
+import '../ui/teams/widgets/discord_import_screen.dart';
 import '../ui/teams/widgets/usau_team_search_screen.dart';
 import '../ui/group_tournaments/view_models/tournament_editor_viewmodel.dart';
 import '../ui/group_tournaments/view_models/group_tournament_viewmodel.dart';
@@ -754,6 +758,41 @@ GoRouter router(AuthRepository auth) => GoRouter(
                             section.route(state.pathParameters['teamId']!),
                       ),
                     GoRoute(
+                      path: 'discord',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        return ViewModelHost(
+                          key: ValueKey('discord-$teamId'),
+                          create: (c) => DiscordImportViewModel(
+                            teamId: teamId,
+                            teamRepository: c.read(),
+                            chatRepository: c.read(),
+                            discordImportRepository: c.read(),
+                            authRepository: c.read(),
+                          ),
+                          builder: (_, vm) =>
+                              DiscordImportScreen(viewModel: vm),
+                        );
+                      },
+                    ),
+                    GoRoute(
+                      path: 'roles',
+                      parentNavigatorKey: _rootKey,
+                      builder: (_, state) {
+                        final teamId = state.pathParameters['teamId']!;
+                        return ViewModelHost(
+                          key: ValueKey('roles-$teamId'),
+                          create: (c) => RolesViewModel(
+                            teamId: teamId,
+                            teamRepository: c.read(),
+                            authRepository: c.read(),
+                          ),
+                          builder: (_, vm) => RolesScreen(viewModel: vm),
+                        );
+                      },
+                    ),
+                    GoRoute(
                       path: 'chats/new',
                       parentNavigatorKey: _rootKey,
                       builder: (_, state) => _chatRoomSettings(state, null),
@@ -1099,6 +1138,7 @@ Widget _chatRoomSettings(GoRouterState state, String? roomId) {
     create: (c) => ChatRoomSettingsViewModel(
       teamId: teamId,
       roomId: roomId,
+      folderId: roomId == null ? state.uri.queryParameters['folder'] : null,
       teamRepository: c.read(),
       chatRepository: c.read(),
       authRepository: c.read(),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
@@ -195,7 +196,7 @@ void main() {
     await tester.pump();
     expect(find.text('Avery'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Hey!');
-    await tester.tap(find.byTooltip('Send'));
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
     await tester.pump();
     expect(find.text('Hey!'), findsOneWidget);

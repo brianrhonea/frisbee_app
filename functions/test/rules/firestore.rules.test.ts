@@ -422,11 +422,30 @@ describe("community groups", () => {
     await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { description: "Hi" }));
   });
 
-  it("groups have organizers, not coaches", async () => {
+  it("groups have only owners and members; custom roles do the rest", async () => {
     await setGroup(false);
     const ref = doc(db(OWNER), "teams", GROUP);
     await assertFails(updateDoc(ref, { [`members.${MEMBER}`]: "coach" }));
-    await assertSucceeds(updateDoc(ref, { [`members.${MEMBER}`]: "captain" }));
+    // No new organizers; legacy ones can be made members.
+    await assertFails(updateDoc(ref, { [`members.${MEMBER}`]: "captain" }));
+    await assertSucceeds(updateDoc(ref, { [`members.${ORGANIZER}`]: "player" }));
+  });
+
+  it("the owner moves legacy organizers into a custom role in one write", async () => {
+    await setGroup(false);
+    const migrate = {
+      roles: { org: { name: "Organizer", color: 0, position: 0, perms: ["manageMembers", "manageEvents"] } },
+      memberRoles: { [ORGANIZER]: ["org"] },
+      memberPerms: { [ORGANIZER]: ["manageMembers", "manageEvents"] },
+      [`members.${ORGANIZER}`]: "player",
+    };
+    await assertFails(updateDoc(doc(db(ORGANIZER), "teams", GROUP), migrate));
+    // Members can't be promoted to owner along the way.
+    await assertFails(updateDoc(doc(db(OWNER), "teams", GROUP), { ...migrate, [`members.${MEMBER}`]: "owner" }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", GROUP), migrate));
+    // Still an organizer in all but name: approves and edits events.
+    await assertSucceeds(getDocs(collection(db(ORGANIZER), "teams", GROUP, "joinRequests")));
+    await assertFails(getDocs(collection(db(MEMBER), "teams", GROUP, "joinRequests")));
   });
 
   it("the directory listing mirrors the group fields", async () => {
@@ -1576,7 +1595,10 @@ describe("chat", () => {
   it("validates rooms: writers must be readers, roles are known", async () => {
     await assertFails(setDoc(roomRef(COACH, "r2"), room({ writeRoles: ["player"] })));
     await assertFails(setDoc(roomRef(COACH, "r2"), room({ writeUsers: [PLAYER] })));
-    await assertFails(setDoc(roomRef(COACH, "r2"), room({ readRoles: ["admin"] })));
+    await assertFails(setDoc(roomRef(COACH, "r2"), room({ readRoles: Array.from({ length: 61 }, (_, i) => `r${i}`) })));
+    await assertFails(setDoc(roomRef(COACH, "r2"), room({ folderId: 7 })));
+    await assertFails(setDoc(roomRef(COACH, "r2"), room({ position: "first" })));
+    await assertSucceeds(setDoc(roomRef(COACH, "r2"), room({ folderId: "f1", position: 2 })));
     await assertFails(setDoc(roomRef(COACH, "r2"), room({ name: "" })));
     await assertFails(setDoc(roomRef(COACH, "r2"), room({ createdBy: OWNER })));
   });
@@ -1596,6 +1618,34 @@ describe("chat", () => {
       readUsers: [], writeUsers: [], createdBy: OUTSIDER, createdAt: serverTimestamp(),
     });
     await assertSucceeds(batch.commit());
+  });
+
+  it("new teams get a voice folder and voice channels in the same batch", async () => {
+    const fs = db(OUTSIDER);
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, "teams", "t3"), {
+      name: "New", division: "mixed", level: "club", city: "",
+      ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" }, memberIds: [OUTSIDER],
+      memberNames: { [OUTSIDER]: "X" }, createdAt: serverTimestamp(),
+    });
+    batch.set(doc(fs, "teams", "t3", "chatFolders", "voice"), {
+      name: "Voice Channels", position: 1000, readRoles: ["everyone"], writeRoles: ["everyone"],
+      readUsers: [], writeUsers: [], createdBy: OUTSIDER, createdAt: serverTimestamp(),
+    });
+    batch.set(doc(fs, "teams", "t3", "chats", "voice-lounge"), {
+      name: "Lounge", kind: "voice", folderId: "voice", position: 0,
+      readRoles: ["everyone"], writeRoles: ["everyone"],
+      readUsers: [], writeUsers: [], createdBy: OUTSIDER, createdAt: serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it("rooms are text or voice, and keep their kind", async () => {
+    await assertSucceeds(setDoc(roomRef(COACH, "v1"), room({ kind: "voice" })));
+    await assertSucceeds(setDoc(roomRef(COACH, "t1"), room({ kind: "text" })));
+    await assertFails(setDoc(roomRef(COACH, "x1"), room({ kind: "video" })));
+    await assertFails(updateDoc(roomRef(COACH, "v1"), { kind: "text" }));
+    await assertSucceeds(updateDoc(roomRef(COACH, "v1"), { name: "Lounge" }));
   });
 
   it("room details: admins see every room, others only rooms they can read", async () => {
@@ -1649,25 +1699,179 @@ describe("chat", () => {
     );
   });
 
-  it("authors delete their own messages; the owner deletes any", async () => {
+  it("authors delete their own messages; the owner and moderators who read the room delete any", async () => {
     const m1 = (uid: string) => doc(db(uid), "teams", TEAM, "chats", "r1", "messages", "m1");
-    await assertFails(deleteDoc(m1(COACH)));
+    const restore = () =>
+      env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "teams", TEAM, "chats", "r1", "messages", "m1"), {
+          ...message(CAPTAIN),
+          createdAt: new Date(),
+        }),
+      );
+    await assertFails(deleteDoc(m1(PLAYER)));
     await assertSucceeds(deleteDoc(m1(CAPTAIN)));
-    await env.withSecurityRulesDisabled((ctx) =>
-      setDoc(doc(ctx.firestore(), "teams", TEAM, "chats", "r1", "messages", "m1"), {
-        ...message(CAPTAIN),
-        createdAt: new Date(),
-      }),
-    );
+    await restore();
+    // Coaches moderate rooms they can read.
+    await assertSucceeds(deleteDoc(m1(COACH)));
+    await restore();
     await assertSucceeds(deleteDoc(m1(OWNER)));
   });
 
-  it("admins change access; only the owner deletes rooms", async () => {
+  it("chat managers change access and delete rooms they can read", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "chats", "secret"), {
+        ...room({ readRoles: ["owner"], writeRoles: ["owner"], readUsers: [] }),
+        createdAt: new Date(),
+      }),
+    );
     await assertSucceeds(updateDoc(roomRef(COACH), { readUsers: [STATS, PLAYER] }));
+    await assertSucceeds(updateDoc(roomRef(COACH), { folderId: "f1", position: 3 }));
     await assertFails(updateDoc(roomRef(PLAYER), { readUsers: [PLAYER] }));
     await assertFails(updateDoc(roomRef(COACH), { createdBy: OWNER }));
-    await assertFails(deleteDoc(roomRef(COACH)));
-    await assertSucceeds(deleteDoc(roomRef(OWNER)));
+    await assertFails(deleteDoc(roomRef(PLAYER)));
+    await assertFails(deleteDoc(roomRef(COACH, "secret")));
+    await assertSucceeds(deleteDoc(roomRef(COACH)));
+    await assertSucceeds(deleteDoc(roomRef(OWNER, "secret")));
+  });
+
+  it("everyone means every member", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "chats", "open"), {
+        ...room({ readRoles: ["everyone"], writeRoles: ["everyone"], readUsers: [] }),
+        createdAt: new Date(),
+      }),
+    );
+    await assertSucceeds(getDoc(roomRef(PLAYER, "open")));
+    await assertSucceeds(setDoc(doc(messages(PLAYER, "open")), message(PLAYER)));
+    await assertFails(getDoc(roomRef(OUTSIDER, "open")));
+    const chats = collection(db(PLAYER), "teams", TEAM, "chats");
+    await assertSucceeds(getDocs(query(chats, where("readRoles", "array-contains", "everyone"))));
+  });
+});
+
+describe("chat folders", () => {
+  const folder = (overrides: Record<string, unknown> = {}) => ({
+    name: "Coaching",
+    position: 0,
+    readRoles: ["coach"],
+    writeRoles: ["coach"],
+    readUsers: [],
+    writeUsers: [],
+    createdBy: COACH,
+    createdAt: serverTimestamp(),
+    ...overrides,
+  });
+  const ref = (uid: string, id = "f1") => doc(db(uid), "teams", TEAM, "chatFolders", id);
+
+  it("chat managers create, edit and delete folders; members read them", async () => {
+    await assertFails(setDoc(ref(PLAYER), folder({ createdBy: PLAYER })));
+    await assertFails(setDoc(ref(COACH), folder({ name: "" })));
+    await assertFails(setDoc(ref(COACH), folder({ writeRoles: ["player"] })));
+    await assertFails(setDoc(ref(COACH), folder({ createdBy: OWNER })));
+    await assertSucceeds(setDoc(ref(COACH), folder()));
+    await assertSucceeds(getDoc(ref(PLAYER)));
+    await assertFails(getDoc(ref(OUTSIDER)));
+    await assertSucceeds(updateDoc(ref(CAPTAIN), { name: "Coaches", position: 2 }));
+    await assertFails(updateDoc(ref(PLAYER), { name: "Mine" }));
+    await assertFails(updateDoc(ref(COACH), { createdBy: PLAYER }));
+    await assertFails(deleteDoc(ref(PLAYER)));
+    await assertSucceeds(deleteDoc(ref(COACH)));
+  });
+});
+
+describe("custom roles", () => {
+  const roles = {
+    h: { name: "Handlers", color: 0, position: 0, perms: [] },
+    m: { name: "Chat mods", color: 0, position: 1, perms: ["manageChats", "moderate"] },
+  };
+  const assign = (memberRoles: Record<string, string[]>, memberPerms: Record<string, string[]>) => ({
+    roles,
+    memberRoles,
+    memberPerms,
+  });
+
+  it("only the owner edits roles and assigns them, to members", async () => {
+    const write = assign({ [PLAYER]: ["m"] }, { [PLAYER]: ["manageChats", "moderate"] });
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), write));
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), write));
+    await assertFails(
+      updateDoc(doc(db(OWNER), "teams", TEAM), assign({ [OUTSIDER]: ["m"] }, {})),
+    );
+    await assertFails(
+      updateDoc(doc(db(OWNER), "teams", TEAM), assign({}, { [OUTSIDER]: ["manageTeam"] })),
+    );
+    // Tiers don't change in a team's role write.
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { ...write, [`members.${PLAYER}`]: "coach" }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), write));
+  });
+
+  it("permissions from roles open the matching powers", async () => {
+    await assertFails(setDoc(doc(db(PLAYER), "teams", TEAM, "chats", "r9"), {
+      name: "Mine", readRoles: ["everyone"], writeRoles: [], readUsers: [], writeUsers: [],
+      createdBy: PLAYER, createdAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), assign(
+      { [PLAYER]: ["m"] },
+      { [PLAYER]: ["manageChats", "moderate"] },
+    )));
+    await assertSucceeds(setDoc(doc(db(PLAYER), "teams", TEAM, "chats", "r9"), {
+      name: "Mine", readRoles: ["everyone"], writeRoles: [], readUsers: [], writeUsers: [],
+      createdBy: PLAYER, createdAt: serverTimestamp(),
+    }));
+    // Chat powers only: no team details.
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), { name: "Renamed" }));
+  });
+
+  it("a room that lets a role in lets its members read, list and post", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", TEAM, "chats", "handlers"), {
+        name: "Handlers", readRoles: ["h"], writeRoles: ["h"], readUsers: [], writeUsers: [],
+        createdBy: OWNER, createdAt: new Date(),
+      });
+    });
+    const room = (uid: string) => doc(db(uid), "teams", TEAM, "chats", "handlers");
+    const msgs = (uid: string) => collection(db(uid), "teams", TEAM, "chats", "handlers", "messages");
+    const post = (uid: string) =>
+      setDoc(doc(msgs(uid)), { authorId: uid, authorName: "N", text: "Hi", attachments: [], createdAt: serverTimestamp() });
+    await assertFails(getDoc(room(PLAYER)));
+    await assertFails(post(PLAYER));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), assign({ [PLAYER]: ["h"] }, {})));
+    await assertSucceeds(getDoc(room(PLAYER)));
+    await assertSucceeds(post(PLAYER));
+    await assertSucceeds(getDocs(msgs(PLAYER)));
+    const chats = collection(db(PLAYER), "teams", TEAM, "chats");
+    await assertSucceeds(getDocs(query(chats, where("readRoles", "array-contains", "h"))));
+    // Someone else's role doesn't open it.
+    await assertFails(getDocs(query(chats, where("readRoles", "array-contains", "m"))));
+    await assertFails(getDoc(room(STATS)));
+  });
+
+  it("removing a member takes their roles too; Manage members removes plain members only", async () => {
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), assign(
+      { [PLAYER]: ["h"], [STATS]: ["m"] },
+      { [STATS]: ["manageMembers"] },
+    )));
+    const removal = (uid: string) => ({
+      [`members.${uid}`]: deleteField(),
+      [`memberNames.${uid}`]: deleteField(),
+      memberIds: arrayRemove(uid),
+      statKeepers: arrayRemove(uid),
+      [`memberRoles.${uid}`]: deleteField(),
+      [`memberPerms.${uid}`]: deleteField(),
+    });
+    // Keeping their roles behind isn't allowed.
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), {
+      [`members.${PLAYER}`]: deleteField(),
+      [`memberNames.${PLAYER}`]: deleteField(),
+      memberIds: arrayRemove(PLAYER),
+    }));
+    // STATS has Manage members but can't remove a coach.
+    await assertFails(updateDoc(doc(db(STATS), "teams", TEAM), removal(COACH)));
+    await assertSucceeds(updateDoc(doc(db(STATS), "teams", TEAM), removal(PLAYER)));
+    // Coaches can't remove someone who holds permissions.
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), removal(STATS)));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), removal(STATS)));
   });
 });
 

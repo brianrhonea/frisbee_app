@@ -96,7 +96,8 @@ class GameTrackerViewModel extends ChangeNotifier {
       _team?.canKeepStats(_auth.currentUser?.uid ?? '') ?? false;
 
   /// Owners, coaches and captains may delete the game.
-  bool get canDelete => _team?.canEdit(_auth.currentUser?.uid ?? '') ?? false;
+  bool get canDelete =>
+      canEdit && (_team?.canEdit(_auth.currentUser?.uid ?? '') ?? false);
 
   late final Command0<void> deleteGame;
 

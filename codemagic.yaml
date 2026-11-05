@@ -1,26 +1,32 @@
-# Codemagic CI: builds the iOS app on a cloud Mac and uploads it to
-# TestFlight. Setup steps are in docs/ios-release.md.
+# Codemagic CI: builds the iOS app on a cloud Mac. Setup steps are in
+# docs/ios-release.md.
 #
-# Secrets never live in this file. They come from the Codemagic
-# environment group `frisbee_secrets` (base64-encoded, marked Secure):
-#   SECRETS_LOCAL_JSON         base64 of secrets.local.json
-#   GOOGLE_SERVICE_INFO_PLIST  base64 of ios/Runner/GoogleService-Info.plist
+#   development branch -> TestFlight, talking to the dev Firebase project
+#                         (frisbee-app-brianrhonea-dev)
+#   main branch        -> App Store, talking to production
+#                         (frisbee-app-brianrhonea)
+#
+# Secrets never live in this file. Each workflow gets them from its
+# Codemagic environment group (base64-encoded, marked Secure):
+#   frisbee_secrets_dev / frisbee_secrets (production), each holding
+#     SECRETS_LOCAL_JSON         base64 of that project's secrets file
+#     GOOGLE_SERVICE_INFO_PLIST  base64 of that project's GoogleService-Info.plist
 # and from the App Store Connect API key integration named below.
 
 workflows:
-  ios-release:
-    name: iOS release (TestFlight)
+  ios-testflight: &ios
+    name: iOS TestFlight (dev)
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
       # Codemagic > Team settings > Integrations > Developer Portal.
       app_store_connect: Frisbee App Store Connect
-    environment:
+    environment: &environment
       flutter: stable
       xcode: latest
       cocoapods: default
       groups:
-        - frisbee_secrets
+        - frisbee_secrets_dev
       ios_signing:
         # Uses the Apple Distribution certificate and App Store profile in
         # Codemagic > Team settings > codemagic.yaml settings > Code signing
@@ -40,7 +46,7 @@ workflows:
           include: true
           source: true
       cancel_previous_builds: true
-    scripts:
+    scripts: &scripts
       - name: Write secrets files
         script: |
           set -euo pipefail
@@ -77,10 +83,34 @@ workflows:
             --dart-define-from-file=secrets.local.json \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/Users/builder/export_options.plist
-    artifacts:
+    artifacts: &artifacts
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+
+  ios-app-store:
+    <<: *ios
+    name: iOS App Store (production)
+    environment:
+      <<: *environment
+      groups:
+        - frisbee_secrets
+    # Every push to main builds against production and submits it for App
+    # Store review. Release it by hand in App Store Connect once approved.
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      cancel_previous_builds: true
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: true
+        release_type: MANUAL

@@ -6,9 +6,35 @@ import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
 
 abstract class ChatRepository {
-  /// Rooms [uid] can see on [team], General first, then by name. Owners,
-  /// coaches and captains see every room so they can manage access.
+  /// Rooms [uid] can see on [team], in order ([sortRooms]). Members who
+  /// can manage chats see every room so they can manage access.
   Stream<List<ChatRoom>> watchRooms(Team team, String uid);
+
+  /// The team's chat folders, in order ([sortFolders]).
+  Stream<List<ChatFolder>> watchFolders(String teamId);
+
+  /// Creates the folder when [ChatFolder.isNew], otherwise updates its name,
+  /// position and default access. Returns the folder id.
+  Future<Result<String>> saveFolder(
+    String teamId,
+    ChatFolder folder,
+    String uid,
+  );
+
+  /// Deletes the folder, moving its rooms (from [rooms]) out of it.
+  Future<Result<void>> deleteFolder(
+    String teamId,
+    String folderId,
+    List<ChatRoom> rooms,
+  );
+
+  /// Saves the positions of [folders], and the positions and folders of
+  /// [rooms], in one write.
+  Future<Result<void>> arrange(
+    String teamId, {
+    List<ChatFolder> folders,
+    List<ChatRoom> rooms,
+  });
 
   Stream<ChatRoom?> watchRoom(String teamId, String roomId);
 
@@ -21,6 +47,11 @@ abstract class ChatRepository {
 
   /// Creates the General room if the team doesn't have one yet.
   Future<Result<void>> ensureGeneralRoom(String teamId, String uid);
+
+  /// Adds the default voice channels and their folder to a team made
+  /// before voice channels, unless it has its Voice Channels folder or
+  /// any of them already.
+  Future<Result<void>> ensureVoiceRooms(String teamId, String uid);
 
   /// The newest [limit] messages, oldest first.
   Stream<List<ChatMessage>> watchMessages(

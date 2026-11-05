@@ -123,7 +123,8 @@ class GroupTournamentViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get isOrganizer => _group?.canEdit(_uid) ?? false;
+  bool get isOrganizer =>
+      _group?.has(_uid, TeamPermission.manageEvents) ?? false;
 
   TournamentTeam? get myTeam => _tournament?.teamOf(_uid);
 

@@ -538,7 +538,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           Text(
             summary.isCommunity
                 ? (summary.requiresApproval
-                      ? 'Organizers approve new members.'
+                      ? "The group's admins approve new members."
                       : 'Open to new players. Join any time.')
                 : 'Joining takes an invite code from a coach or captain.',
             style: TextStyle(fontSize: 11.5, color: c.muted),
@@ -752,7 +752,7 @@ class _Hero extends StatelessWidget {
           icon: const Icon(Icons.chat_bubble_outline, size: 17),
           label: const Text('Message'),
         ),
-      if (vm.team case final team? when vm.canEdit)
+      if (vm.team case final team? when vm.canManageMembers)
         FilledButton.icon(
           onPressed: () => showInviteMembers(context, team),
           icon: const Icon(Icons.person_add_alt, size: 18),
@@ -1299,9 +1299,9 @@ class _GroupJoinCard extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(switch ((pending, requiresApproval)) {
-            (true, _) => 'Request sent. An organizer will let you in soon.',
+            (true, _) => 'Request sent. An admin will let you in soon.',
             (false, true) =>
-              'Organizers approve new members. Ask to join to see '
+              'Admins approve new members. Ask to join to see '
                   'members, events and tournaments.',
             (false, false) =>
               'Join to see members, chat, and sign up for pickup and '

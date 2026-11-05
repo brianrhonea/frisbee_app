@@ -81,12 +81,24 @@ class ChatRoomViewModel extends MessageThreadViewModel {
   @override
   bool get canWrite => access.canWrite;
 
-  /// The owner moderates every room.
+  /// The owner and moderators delete anyone's messages.
   @override
-  bool get canModerate => _team?.roleOf(uid) == TeamRole.owner;
+  bool get canModerate =>
+      _team?.roleOf(uid) == TeamRole.owner ||
+      (_team?.has(uid, TeamPermission.moderate) ?? false);
 
-  /// Owners, coaches and captains can change the room's name and access.
-  bool get canManage => _team?.canEdit(uid) ?? false;
+  /// Like Discord, a member's name takes the color of their highest role
+  /// that has one.
+  @override
+  int? nameColorOf(String uid) {
+    for (final r in _team?.rolesOf(uid) ?? const <CustomRole>[]) {
+      if (r.color != 0) return r.color;
+    }
+    return null;
+  }
+
+  /// Members who can manage chats change the room's name and access.
+  bool get canManage => _team?.has(uid, TeamPermission.manageChats) ?? false;
 
   @override
   Stream<List<ChatMessage>> watchMessages(int limit) =>

@@ -7,6 +7,8 @@ export interface MeetingTeam {
   name?: string;
   members?: Record<string, string>;
   memberNames?: Record<string, string>;
+  /** uid → permissions from their custom roles (CustomRole in Dart). */
+  memberPerms?: Record<string, string[]>;
   deletingAt?: unknown;
 }
 
@@ -33,9 +35,16 @@ export function roleOf(team: MeetingTeam, uid: string): string | undefined {
   return role === "stats" ? "player" : role;
 }
 
+/**
+ * Owners, coaches and captains, and members whose custom roles grant
+ * manageEvents, as can(team, 'manageEvents') in firestore.rules.
+ */
 export function isAdmin(team: MeetingTeam, uid: string): boolean {
   const role = roleOf(team, uid);
-  return role !== undefined && adminRoles.has(role);
+  if (role === undefined) return false;
+  if (adminRoles.has(role)) return true;
+  const perms = team.memberPerms?.[uid];
+  return Array.isArray(perms) && perms.includes("manageEvents");
 }
 
 /** Admins see every meeting; others when invited by role or by name. */
@@ -43,7 +52,7 @@ export function canSee(team: MeetingTeam, meeting: MeetingDoc, uid: string): boo
   const role = roleOf(team, uid);
   if (role === undefined) return false;
   return (
-    adminRoles.has(role) ||
+    isAdmin(team, uid) ||
     (meeting.inviteRoles ?? []).includes(role) ||
     (meeting.inviteUsers ?? []).includes(uid)
   );
@@ -115,3 +124,57 @@ export function meetingChange(before?: MeetingDoc, after?: MeetingDoc): MeetingC
   }
   return null;
 }
+
+// Voice channels ------------------------------------------------------------
+
+/** A chat room (ChatRoom in lib/domain/models/chat.dart). */
+export interface VoiceRoomDoc {
+  kind?: string;
+  readRoles?: string[];
+  writeRoles?: string[];
+  readUsers?: string[];
+  writeUsers?: string[];
+}
+
+export interface VoiceTeam extends MeetingTeam {
+  /** uid → custom role ids. */
+  memberRoles?: Record<string, string[]>;
+}
+
+/**
+ * Whether [uid] is in a room audience, as inAudience in firestore.rules:
+ * "everyone", their tier (a legacy "stats" member is a player), one of
+ * their custom roles, or by name. The owner is in every room.
+ */
+export function inAudience(team: VoiceTeam, uid: string, ids: string[] = [], users: string[] = []): boolean {
+  const role = roleOf(team, uid);
+  if (role === undefined) return false;
+  if (role === "owner") return true;
+  const mine = team.memberRoles?.[uid] ?? [];
+  return ids.includes("everyone") || ids.includes(role) || mine.some((r) => ids.includes(r)) || users.includes(uid);
+}
+
+export type VoiceDecision =
+  | { ok: true; canSpeak: boolean }
+  | { ok: false; code: "permission-denied" | "not-found" | "failed-precondition"; message: string };
+
+/**
+ * Whether [uid] may join a voice channel: members who can read the room
+ * listen, and those who can write in it talk too.
+ */
+export function voiceDecision(team: VoiceTeam | undefined, room: VoiceRoomDoc | undefined, uid: string): VoiceDecision {
+  if (!team || team.deletingAt || roleOf(team, uid) === undefined) {
+    return { ok: false, code: "permission-denied", message: "You're not on this team." };
+  }
+  if (!room) return { ok: false, code: "not-found", message: "This channel no longer exists." };
+  if (room.kind !== "voice") {
+    return { ok: false, code: "failed-precondition", message: "That's not a voice channel." };
+  }
+  if (!inAudience(team, uid, room.readRoles, room.readUsers)) {
+    return { ok: false, code: "permission-denied", message: "You don't have access to this channel." };
+  }
+  return { ok: true, canSpeak: inAudience(team, uid, room.writeRoles, room.writeUsers) };
+}
+
+/** The LiveKit room for a voice channel; can't clash with a meeting's. */
+export const voiceRoomName = (teamId: string, roomId: string) => `voice:${teamId}:${roomId}`;

@@ -61,7 +61,7 @@ class MeetingDetailViewModel extends ChangeNotifier {
   String get uid => _auth.currentUser?.uid ?? '';
 
   /// Admins edit, start and delete meetings.
-  bool get canEdit => _team?.canEdit(uid) ?? false;
+  bool get canEdit => _team?.has(uid, TeamPermission.manageEvents) ?? false;
 
   MeetingRsvp? get myRsvp => _meeting?.rsvpOf(uid);
 

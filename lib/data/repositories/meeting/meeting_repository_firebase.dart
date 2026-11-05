@@ -48,7 +48,7 @@ class MeetingRepositoryFirebase implements MeetingRepository {
   Stream<List<TeamMeeting>> watchMeetings(Team team, String uid) {
     final role = team.roleOf(uid);
     if (role == null) return Stream.value(const []);
-    if (role.canEdit) {
+    if (team.has(uid, TeamPermission.manageEvents)) {
       return _meetings(team.id).snapshots().map((s) => _sorted(_parse(s)));
     }
     // Rules only allow queries limited to meetings the member can see, so

@@ -11,6 +11,7 @@ import '../view_models/invite_code_viewmodel.dart';
 import '../view_models/team_detail_viewmodel.dart';
 import 'invite_code_card.dart';
 import 'invite_members_dialog.dart';
+import 'roles_screen.dart';
 
 class MembersTab extends StatelessWidget {
   const MembersTab({super.key, required this.viewModel});
@@ -31,7 +32,7 @@ class MembersTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (viewModel.canEdit) ...[
+          if (viewModel.canManageMembers) ...[
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
@@ -59,7 +60,7 @@ class MembersTab extends StatelessWidget {
             _JoinRequests(viewModel: viewModel),
             const SizedBox(height: 16),
           ],
-          _RolesHelp(kind: team.kind),
+          _RolesHelp(team: team, isOwner: viewModel.isOwner),
           const SizedBox(height: 16),
           Text(
             '${members.length} member${members.length == 1 ? '' : 's'}',
@@ -76,18 +77,14 @@ class MembersTab extends StatelessWidget {
               title: Text(
                 team.nameOf(m.key) + (m.key == viewModel.uid ? ' (you)' : ''),
               ),
-              subtitle: Text(
-                team.isStatKeeper(m.key)
-                    ? '${team.roleLabel(m.value)} · Stats'
-                    : team.roleLabel(m.value),
-              ),
+              subtitle: _MemberRoles(team: team, uid: m.key, tier: m.value),
               trailing: viewModel.canManage(m.key)
                   ? _MemberMenu(
                       viewModel: viewModel,
                       uid: m.key,
                       name: team.nameOf(m.key),
                       role: m.value,
-                      kind: team.kind,
+                      team: team,
                       statKeeper: team.isStatKeeper(m.key),
                     )
                   : null,
@@ -155,13 +152,102 @@ class _JoinRequests extends StatelessWidget {
   }
 }
 
+/// A member's tier, stats access and custom roles.
+class _MemberRoles extends StatelessWidget {
+  const _MemberRoles({
+    required this.team,
+    required this.uid,
+    required this.tier,
+  });
+
+  final Team team;
+  final String uid;
+  final TeamRole tier;
+
+  @override
+  Widget build(BuildContext context) {
+    final roles = team.rolesOf(uid);
+    final label = team.isStatKeeper(uid)
+        ? '${team.roleLabel(tier)} · Stats'
+        : team.roleLabel(tier);
+    if (roles.isEmpty) return Text(label);
+    return Wrap(
+      spacing: 10,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(label),
+        for (final r in roles)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RoleDot(color: r.color, size: 9),
+              const SizedBox(width: 4),
+              Text(r.name),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+/// Picks which custom roles [uid] has, up to [maxRolesPerMember].
+Future<Set<String>?> _pickRoles(
+  BuildContext context,
+  Team team,
+  String uid,
+  String name,
+) => showDialog<Set<String>>(
+  context: context,
+  builder: (context) {
+    var picked = {...?team.memberRoles[uid]};
+    return StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text('Roles for $name'),
+        content: SizedBox(
+          width: 400,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final r in team.sortedRoles)
+                CheckboxListTile(
+                  value: picked.contains(r.id),
+                  secondary: RoleDot(color: r.color, size: 14),
+                  title: Text(r.name),
+                  onChanged:
+                      picked.contains(r.id) || picked.length < maxRolesPerMember
+                      ? (on) => setState(
+                          () => picked = on ?? false
+                              ? {...picked, r.id}
+                              : ({...picked}..remove(r.id)),
+                        )
+                      : null,
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, picked),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  },
+);
+
 class _MemberMenu extends StatelessWidget {
   const _MemberMenu({
     required this.viewModel,
     required this.uid,
     required this.name,
     required this.role,
-    required this.kind,
+    required this.team,
     required this.statKeeper,
   });
 
@@ -169,9 +255,10 @@ class _MemberMenu extends StatelessWidget {
   final String uid;
   final String name;
   final TeamRole role;
-  final TeamKind kind;
+  final Team team;
   final bool statKeeper;
 
+  TeamKind get kind => team.kind;
   bool get _isGroup => kind == TeamKind.community;
 
   Future<void> _changeRole(BuildContext context) async {
@@ -208,6 +295,11 @@ class _MemberMenu extends StatelessWidget {
         switch (action) {
           case 'role':
             await _changeRole(context);
+          case 'roles':
+            final picked = await _pickRoles(context, team, uid, name);
+            if (picked != null) {
+              vm.setMemberRoles.execute((uid: uid, roleIds: picked));
+            }
           case 'stats':
             vm.setStatKeeper.execute((uid: uid, on: !statKeeper));
           case 'owner':
@@ -239,7 +331,11 @@ class _MemberMenu extends StatelessWidget {
       },
       itemBuilder: (_) => [
         if (vm.canSetRoles) ...[
-          const PopupMenuItem(value: 'role', child: Text('Change role')),
+          // Groups have just one tier below owner; roles do the rest.
+          if (!_isGroup || role != TeamRole.player)
+            const PopupMenuItem(value: 'role', child: Text('Change role')),
+          if (team.roles.isNotEmpty)
+            const PopupMenuItem(value: 'roles', child: Text('Assign roles')),
           // Every other role already keeps stats; groups don't keep any.
           if (role == TeamRole.player && !_isGroup)
             PopupMenuItem(
@@ -260,24 +356,75 @@ class _MemberMenu extends StatelessWidget {
   }
 }
 
-/// What each role can do.
+/// What each tier and custom role can do, and, for the owner, a way to
+/// manage roles.
 class _RolesHelp extends StatelessWidget {
-  const _RolesHelp({required this.kind});
+  const _RolesHelp({required this.team, required this.isOwner});
 
-  final TeamKind kind;
+  final Team team;
+  final bool isOwner;
+
+  TeamKind get kind => team.kind;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final custom = team.sortedRoles;
     return Card.outlined(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         leading: const Icon(Icons.admin_panel_settings_outlined),
         title: const Text('Roles'),
-        subtitle: const Text('What each role can do'),
+        subtitle: Text(
+          custom.isEmpty
+              ? 'What each role can do'
+              : '${custom.length} custom '
+                    '${custom.length == 1 ? 'role' : 'roles'}',
+        ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         children: [
+          for (final r in custom)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, right: 6),
+                    child: RoleDot(color: r.color, size: 10),
+                  ),
+                  SizedBox(
+                    width: 120,
+                    child: Text(
+                      r.name,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      r.permissions.isEmpty
+                          ? 'Chat rooms that let it in'
+                          : [
+                              for (final p in TeamPermission.values)
+                                if (r.permissions.contains(p)) p.label,
+                            ].join(', '),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (isOwner)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => context.push(Routes.teamRoles(team.id)),
+                icon: const Icon(Icons.tune),
+                label: const Text('Manage roles'),
+              ),
+            ),
           for (final r in TeamRole.rolesFor(kind))
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),

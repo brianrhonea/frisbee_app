@@ -5,7 +5,8 @@
 All secrets (API keys, tokens, credentials, service-account files) live in
 gitignored local files and must never be committed or pushed to GitHub.
 
-- Firebase API keys live in `secrets.local.json` (gitignored). The app reads
+- Firebase API keys live in `secrets.local.json` (dev) and
+  `secrets.prod.local.json` (prod), both gitignored. The app reads
   them at build time via `--dart-define-from-file=secrets.local.json`;
   `lib/firebase_options.dart` only references `String.fromEnvironment(...)`.
 - `secrets.example.json` is the committed template — keys only, empty values.
@@ -32,6 +33,21 @@ gitignored local files and must never be committed or pushed to GitHub.
   must print nothing, and `git status` must not list any of the files above.
 - If a secret is ever committed, stop and tell the user. Rotate the key; don't
   just delete it in a follow-up commit.
+
+## Environments
+
+Two Firebase projects:
+
+- `frisbee-app-brianrhonea-dev` (dev): local runs, and TestFlight builds from
+  the `development` branch. `secrets.local.json` (`"FIREBASE_ENV": "dev"`).
+- `frisbee-app-brianrhonea` (prod): App Store builds from `main`.
+  `secrets.prod.local.json` (`"FIREBASE_ENV": "prod"`).
+
+Local native config files (`android/app/google-services.json`) are the dev
+project's; prod copies are `android/app/google-services.prod.json` and the
+root `GoogleService-Info.plist` (dev: `GoogleService-Info.dev.plist`), all
+gitignored. The Firebase CLI defaults to dev; deploy to production only with
+`--project prod`, and only when the user asks.
 
 ## Running and building
 

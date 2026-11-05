@@ -115,14 +115,18 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
 
   @override
   Stream<List<ChatMessage>> watchMessages(String id, {required int limit}) =>
-      countedSnapshots(
-        _messages(id).orderBy('createdAt', descending: true).limit(limit),
-        'directMessages',
-      ).map(
-        (snap) => [
-          for (final d in snap.docs.reversed)
-            ChatMessage.fromMap(d.id, plainData(d.data())),
-        ],
+      _shared.get(
+        'dmMessages/$id/$limit',
+        () =>
+            countedSnapshots(
+              _messages(id).orderBy('createdAt', descending: true).limit(limit),
+              'directMessages',
+            ).map(
+              (snap) => [
+                for (final d in snap.docs.reversed)
+                  ChatMessage.fromMap(d.id, plainData(d.data())),
+              ],
+            ),
       );
 
   @override

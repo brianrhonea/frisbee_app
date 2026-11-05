@@ -160,7 +160,7 @@ class MeetingRoomViewModel extends ChangeNotifier {
   Object? _error;
   Object? get error => _error;
 
-  bool get isAdmin => _team?.canEdit(uid) ?? false;
+  bool get isAdmin => _team?.has(uid, TeamPermission.manageEvents) ?? false;
 
   /// Whether starting now would be ahead of the scheduled time.
   bool get isEarly => _meeting?.startsAt.isAfter(DateTime.now()) ?? false;

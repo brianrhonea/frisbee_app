@@ -14,9 +14,11 @@ import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../utils/command.dart';
+import '../../../utils/result.dart';
 
 typedef RoleChange = ({String uid, TeamRole role});
 typedef StatsAccess = ({String uid, bool on});
+typedef MemberRoles = ({String uid, Set<String> roleIds});
 
 /// Backs the team sections: Team Events, Roster, Playbook and Members.
 /// The team home page has its own `TeamHomeViewModel`.
@@ -56,6 +58,15 @@ class TeamDetailViewModel extends ChangeNotifier {
     removeMember = Command1<void, String>(
       (uid) => _teams.removeMember(teamId, uid),
     );
+    setMemberRoles = Command1<void, MemberRoles>((c) async {
+      final team = _team;
+      if (team == null) return Result.error(Exception('No team'));
+      return _teams.saveRoles(
+        team,
+        roles: team.roles,
+        memberRoles: {...team.memberRoles, c.uid: c.roleIds},
+      );
+    });
     deletePlay = Command1<void, String>((id) => _plays.deletePlay(teamId, id));
     approveJoinRequest = Command1<void, GroupJoinRequest>(
       (r) => _teams.approveJoinRequest(teamId, r),
@@ -71,6 +82,7 @@ class TeamDetailViewModel extends ChangeNotifier {
         _watchRoster();
         _watchJoinRequests();
         _watchMeetings();
+        _migrateOrganizers();
         notifyListeners();
       }, onError: _onError),
       _plays.watchPlays(teamId).listen((p) {
@@ -93,7 +105,8 @@ class TeamDetailViewModel extends ChangeNotifier {
   late final List<StreamSubscription<Object?>> _subs;
   StreamSubscription<List<RosterPlayer>>? _rosterSub;
   StreamSubscription<List<TeamMeeting>>? _meetingSub;
-  TeamRole? _meetingRole;
+  String? _meetingKey;
+  bool _migrating = false;
 
   StreamSubscription<List<GroupJoinRequest>>? _requestSub;
   List<GroupJoinRequest> _joinRequests = const [];
@@ -104,10 +117,10 @@ class TeamDetailViewModel extends ChangeNotifier {
   late final Command1<void, GroupJoinRequest> approveJoinRequest;
   late final Command1<void, String> declineJoinRequest;
 
-  /// Only owners and organizers may read join requests.
+  /// Only members who can manage members may read join requests.
   void _watchJoinRequests() {
     final team = _team;
-    if (team != null && team.isCommunity && canEdit) {
+    if (team != null && team.isCommunity && canManageMembers) {
       _requestSub ??= _teams.watchJoinRequests(teamId).listen((r) {
         _joinRequests = r;
         notifyListeners();
@@ -119,15 +132,17 @@ class TeamDetailViewModel extends ChangeNotifier {
     }
   }
 
-  /// (Re)subscribes to meetings when the role changes: it decides which
-  /// meetings the member may see.
+  /// (Re)subscribes to meetings when the role or Manage events changes:
+  /// they decide which meetings the member may see.
   void _watchMeetings() {
     final team = _team;
     final meetings = _meetings;
     if (team == null || meetings == null) return;
-    final role = team.roleOf(uid);
-    if (_meetingSub != null && role == _meetingRole) return;
-    _meetingRole = role;
+    final key =
+        '${team.roleOf(uid)?.name}/'
+        '${team.has(uid, TeamPermission.manageEvents)}';
+    if (_meetingSub != null && key == _meetingKey) return;
+    _meetingKey = key;
     _meetingSub?.cancel();
     _meetingSub = meetings.watchMeetings(team, uid).listen((m) {
       _meetingEvents = [
@@ -136,6 +151,52 @@ class TeamDetailViewModel extends ChangeNotifier {
       ];
       notifyListeners();
     }, onError: _onError);
+  }
+
+  /// Groups had organizers (the captain tier) before custom roles. When
+  /// the owner opens such a group, move them into an "Organizer" role with
+  /// the same powers, once.
+  Future<void> _migrateOrganizers() async {
+    final team = _team;
+    if (team == null ||
+        _migrating ||
+        !team.needsOrganizerMigration ||
+        team.roleOf(uid) != TeamRole.owner) {
+      return;
+    }
+    _migrating = true;
+    final organizers = {
+      for (final e in team.members.entries)
+        if (e.value == TeamRole.captain) e.key,
+    };
+    final existing = team.roles.values
+        .where((r) => r.name == 'Organizer')
+        .firstOrNull;
+    final role =
+        existing ??
+        CustomRole(
+          id: newRoleId(),
+          name: 'Organizer',
+          color: 0xFF1E88E5,
+          position: team.roles.length,
+          permissions: const {
+            TeamPermission.manageTeam,
+            TeamPermission.manageMembers,
+            TeamPermission.manageChats,
+            TeamPermission.manageEvents,
+          },
+        );
+    final result = await _teams.saveRoles(
+      team,
+      roles: {...team.roles, role.id: role},
+      memberRoles: {
+        ...team.memberRoles,
+        for (final uid in organizers) uid: {...?team.memberRoles[uid], role.id},
+      },
+      demote: organizers,
+    );
+    // Try again next time the team changes only if this failed.
+    if (result is Error) _migrating = false;
   }
 
   bool? _rosterWithStatus;
@@ -236,38 +297,35 @@ class TeamDetailViewModel extends ChangeNotifier {
 
   String get uid => _auth.currentUser?.uid ?? '';
   TeamRole? get myRole => _team?.roleOf(uid);
-  bool get canEdit => myRole?.canEdit ?? false;
+  bool get canEdit => _team?.canEdit(uid) ?? false;
+
+  /// Invite, approve and remove members.
+  bool get canManageMembers =>
+      _team?.has(uid, TeamPermission.manageMembers) ?? false;
 
   /// Paid marks, USA Ultimate status and sync are for team admins; players
   /// see only names, positions and numbers.
   bool get canSeeRosterStatus => canEdit;
   bool get isOwner => myRole == TeamRole.owner;
+
+  /// Tiers, custom roles and stats access are the owner's.
   bool get canSetRoles => myRole?.canSetRoles ?? false;
 
-  /// Owners, coaches and captains show the team's rotating invite code
+  /// Members who can manage members show the team's rotating invite code
   /// (InviteCodeViewModel). Groups have none: they're joined from the
   /// directory.
-  bool get canShareCode =>
-      (myRole?.canShareCode ?? false) && !(_team?.isCommunity ?? true);
+  bool get canShareCode => canManageMembers && !(_team?.isCommunity ?? true);
 
   /// Whether the member menu applies to [memberUid]: the owner manages
-  /// anyone but themself; coaches and captains remove players.
-  bool canManage(String memberUid) {
-    if (memberUid == uid) return false;
-    final target = _team?.roleOf(memberUid);
-    final me = myRole;
-    if (target == null || me == null) return false;
-    return me.canSetRoles || me.canRemove(target);
-  }
+  /// anyone but themself; others with Manage members remove plain members.
+  bool canManage(String memberUid) =>
+      memberUid != uid && (canSetRoles || canRemove(memberUid));
 
-  bool canRemove(String memberUid) {
-    final target = _team?.roleOf(memberUid);
-    return memberUid != uid &&
-        target != null &&
-        (myRole?.canRemove(target) ?? false);
-  }
+  bool canRemove(String memberUid) =>
+      memberUid != uid && (_team?.canRemove(uid, memberUid) ?? false);
 
   late final Command1<void, RosterPlayer> savePlayer;
+  late final Command1<void, MemberRoles> setMemberRoles;
   late final Command1<void, String> deletePlayer;
   late final Command1<void, RoleChange> setMemberRole;
 

@@ -6,7 +6,18 @@
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
-      "toolArgs": ["--dart-define-from-file=secrets.local.json"]
+      "toolArgs": [
+        "--dart-define-from-file=secrets.local.json"
+      ]
+    },
+    {
+      "name": "frisbee_app (prod)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define-from-file=secrets.prod.local.json"
+      ]
     },
     {
       "name": "frisbee_app (emulators)",

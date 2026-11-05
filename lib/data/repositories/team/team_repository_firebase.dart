@@ -152,20 +152,29 @@ class TeamRepositoryFirebase implements TeamRepository {
   };
 
   @override
-  Future<Result<String>> createTeam(NewTeam team, AppUser owner) =>
-      guard(() async {
-        // No invite code: admins mint short-lived ones when they share.
-        final ref = _teams.doc();
-        await (_db.batch()
-              ..set(ref, _teamDoc(team, owner))
-              ..set(_directory.doc(ref.id), team.listing(ref.id).toMap())
-              ..set(
-                chatRooms(_db, ref.id).doc(ChatRoom.generalId),
-                newRoomData(ChatRoom.general(), owner.uid),
-              ))
-            .commit();
-        return ref.id;
-      });
+  Future<Result<String>> createTeam(NewTeam team, AppUser owner) => guard(
+    () async {
+      // No invite code: admins mint short-lived ones when they share.
+      final ref = _teams.doc();
+      // Every team starts with General and a few voice channels.
+      final batch = _db.batch()
+        ..set(ref, _teamDoc(team, owner))
+        ..set(_directory.doc(ref.id), team.listing(ref.id).toMap())
+        ..set(
+          chatRooms(_db, ref.id).doc(ChatRoom.generalId),
+          newRoomData(ChatRoom.general(), owner.uid),
+        )
+        ..set(
+          chatFolders(_db, ref.id).doc(ChatRoom.voiceFolderId),
+          newFolderData(ChatRoom.defaultVoiceFolder(), owner.uid),
+        );
+      for (final r in ChatRoom.defaultVoiceRooms()) {
+        batch.set(chatRooms(_db, ref.id).doc(r.id), newRoomData(r, owner.uid));
+      }
+      await batch.commit();
+      return ref.id;
+    },
+  );
 
   @override
   Future<Result<String>> resolveInviteCode(String inviteCode) =>
@@ -420,6 +429,24 @@ class TeamRepositoryFirebase implements TeamRepository {
       'memberNames.$uid': FieldValue.delete(),
       'memberIds': FieldValue.arrayRemove([uid]),
       'statKeepers': FieldValue.arrayRemove([uid]),
+      'memberRoles.$uid': FieldValue.delete(),
+      'memberPerms.$uid': FieldValue.delete(),
+    }),
+  );
+
+  @override
+  Future<Result<void>> saveRoles(
+    Team team, {
+    required Map<String, CustomRole> roles,
+    required Map<String, Set<String>> memberRoles,
+    Set<String> demote = const {},
+  }) => guard(
+    () => _teams.doc(team.id).update({
+      ...rolesData(
+        roles,
+        cleanMemberRoles(memberRoles, roles, team.members.keys),
+      ),
+      for (final uid in demote) 'members.$uid': TeamRole.player.name,
     }),
   );
 
@@ -434,6 +461,10 @@ class TeamRepositoryFirebase implements TeamRepository {
       for (final room in (await chatRooms(_db, team.id).get()).docs) {
         await deleteChatRoom(_db, _files, room.reference);
       }
+      await deleteDocs(_db, [
+        for (final d in (await chatFolders(_db, team.id).get()).docs)
+          d.reference,
+      ]);
       for (final meeting in (await ref.collection('meetings').get()).docs) {
         final m = meeting.reference;
         final messages = await m.collection('messages').get();

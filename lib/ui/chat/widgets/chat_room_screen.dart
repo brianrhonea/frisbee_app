@@ -8,9 +8,11 @@ import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/chat_list_viewmodel.dart';
 import '../view_models/chat_room_viewmodel.dart';
+import '../view_models/voice_channel_viewmodel.dart';
 import 'chat_layout.dart';
 import 'chat_tab.dart';
 import 'message_thread_view.dart';
+import 'voice_channel_view.dart';
 
 /// A team chat room opened as its own page. Phones show it full screen
 /// with the chat panel (the room list) behind the top-left Chats button;
@@ -29,6 +31,7 @@ class ChatRoomScreen extends StatelessWidget {
         teamRepository: c.read(),
         chatRepository: c.read(),
         authRepository: c.read(),
+        voiceRepository: c.read(),
       ),
       builder: (context, listVm) {
         // Switching rooms replaces this page, so back still leaves chat.
@@ -126,12 +129,15 @@ class ChatRoomView extends StatelessWidget {
               : null,
           subtitle: readable
               ? [
-                  if (count > 0) '$count ${count == 1 ? 'member' : 'members'}',
-                  room.audience,
+                  if (room.isVoice)
+                    'Voice channel'
+                  else if (count > 0)
+                    '$count ${count == 1 ? 'member' : 'members'}',
+                  if (team != null) room.audienceOn(team),
                 ].join(' · ')
               : null,
           actions: [
-            if (readable)
+            if (readable && !room.isVoice)
               IconButton(
                 tooltip: vm.muted
                     ? 'Unmute notifications'
@@ -177,6 +183,22 @@ class ChatRoomView extends StatelessWidget {
                         )
                       : null,
                 );
+        } else if (room.isVoice) {
+          body = SafeArea(
+            top: false,
+            child: ViewModelHost(
+              key: ValueKey('voice-${vm.teamId}-${vm.roomId}'),
+              create: (c) => VoiceChannelViewModel(
+                teamId: vm.teamId,
+                roomId: vm.roomId,
+                teamRepository: c.read(),
+                chatRepository: c.read(),
+                voiceRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, voiceVm) => VoiceChannelView(viewModel: voiceVm),
+            ),
+          );
         } else {
           body = SafeArea(
             top: false,
@@ -184,6 +206,7 @@ class ChatRoomView extends StatelessWidget {
               viewModel: vm,
               emptyMessage: 'Say hello to the team.',
               readOnlyNotice: 'You can read this room but not post in it.',
+              hintText: 'Message #${room.handle}',
             ),
           );
         }

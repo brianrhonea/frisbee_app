@@ -49,7 +49,7 @@ class MeetingEditorViewModel extends ChangeNotifier {
   Team? _team;
   TeamMeeting? _original;
 
-  bool get canEdit => _team?.canEdit(_uid) ?? false;
+  bool get canEdit => _team?.has(_uid, TeamPermission.manageEvents) ?? false;
 
   /// Starting values for the form: a new meeting invites everyone.
   TeamMeeting get initial =>

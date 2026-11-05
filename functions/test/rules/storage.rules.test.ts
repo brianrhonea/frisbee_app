@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, updateDoc } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
 // Run with `npm run test:rules` (starts the Firestore and Storage
@@ -107,16 +107,59 @@ describe("chat attachments", () => {
     );
   });
 
-  it("authors and the owner delete; nobody else", async () => {
-    await assertFails(file(COACH, CAPTAIN).delete());
-    await assertSucceeds(file(CAPTAIN, CAPTAIN).delete());
-    await env.withSecurityRulesDisabled((ctx) =>
+  const restore = () =>
+    env.withSecurityRulesDisabled((ctx) =>
       ctx
         .storage()
         .ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/m1/0-photo.png`)
         .put(bytes(10)).then(),
     );
+
+  it("authors, the owner and moderators who read the room delete", async () => {
+    await assertFails(file(PLAYER, CAPTAIN).delete());
+    await assertFails(file(GUEST, CAPTAIN).delete());
+    await assertSucceeds(file(CAPTAIN, CAPTAIN).delete());
+    await restore();
+    // Coaches have every permission and can read the room.
+    await assertSucceeds(file(COACH, CAPTAIN).delete());
+    await restore();
     await assertSucceeds(file(OWNER, CAPTAIN).delete());
+  });
+
+  it("custom roles open rooms, and grant moderation", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", TEAM, "chats", "r1"), {
+        name: "Handlers",
+        readRoles: ["h"],
+        writeRoles: ["h"],
+        readUsers: [],
+        writeUsers: [],
+      });
+      await updateDoc(doc(fs, "teams", TEAM), {
+        memberRoles: { [PLAYER]: ["h"], [GUEST]: ["h"] },
+        memberPerms: { [GUEST]: ["moderate"] },
+      });
+    });
+    await assertSucceeds(file(PLAYER, CAPTAIN).getMetadata());
+    await assertSucceeds(file(PLAYER, PLAYER).put(bytes(10)).then());
+    await assertFails(file(PLAYER, CAPTAIN).delete());
+    await assertSucceeds(file(GUEST, CAPTAIN).delete());
+  });
+
+  it("everyone means every member", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "chats", "r1"), {
+        name: "Open",
+        readRoles: ["everyone"],
+        writeRoles: [],
+        readUsers: [],
+        writeUsers: [],
+      }),
+    );
+    await assertSucceeds(file(PLAYER, CAPTAIN).getMetadata());
+    await assertFails(file(PLAYER, PLAYER).put(bytes(10)).then());
+    await assertFails(file(OUTSIDER, CAPTAIN).getMetadata());
   });
 });
 

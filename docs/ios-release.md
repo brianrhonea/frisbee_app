@@ -55,23 +55,27 @@ TestFlight. These are the one-time setup steps, in order.
       the profile invalid, so edit and regenerate it.
    3. Codemagic → **iOS provisioning profiles → Fetch profiles** → pick
       `Stall 10 App Store` → **Download selected**.
-4. **App → Environment variables**: create group **`frisbee_secrets`** with
-   two **Secure** variables (base64-encode each file in PowerShell):
+4. **App → Environment variables**: create two groups, each with two
+   **Secure** variables (base64-encode each file in PowerShell):
 
    ```powershell
    [Convert]::ToBase64String([IO.File]::ReadAllBytes("secrets.local.json")) | Set-Clipboard
-   [Convert]::ToBase64String([IO.File]::ReadAllBytes("GoogleService-Info.plist")) | Set-Clipboard
    ```
 
-   | Variable | Value |
-   |---|---|
-   | `SECRETS_LOCAL_JSON` | base64 of `secrets.local.json` |
-   | `GOOGLE_SERVICE_INFO_PLIST` | base64 of `GoogleService-Info.plist` |
+   | Group | `SECRETS_LOCAL_JSON` | `GOOGLE_SERVICE_INFO_PLIST` |
+   |---|---|---|
+   | `frisbee_secrets_dev` | `secrets.local.json` | `GoogleService-Info.dev.plist` |
+   | `frisbee_secrets` (production) | `secrets.prod.local.json` | `GoogleService-Info.plist` |
 
-5. Push to `development` (or start the **iOS release (TestFlight)**
-   workflow by hand) to build. It runs
-   `flutter analyze` and `flutter test`, builds with the next build number,
-   and uploads to TestFlight.
+   Each secrets file has `FIREBASE_ENV` set (`dev` or `prod`); a build
+   without it stops at launch.
+
+5. Push to `development` (or start the **iOS TestFlight (dev)** workflow by
+   hand): it runs `flutter analyze` and `flutter test`, builds against the
+   dev Firebase project with the next build number, and uploads to
+   TestFlight. Merging to `main` runs **iOS App Store (production)**, which
+   builds against production and submits for App Store review; release it
+   by hand in App Store Connect once Apple approves.
 
 ### Invite links (Universal Links)
 

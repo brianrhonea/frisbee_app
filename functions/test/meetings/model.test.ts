@@ -30,6 +30,14 @@ describe("canSee", () => {
     expect(canSee(team, everyone, "p2")).toBe(true);
   });
 
+  it("members whose custom roles grant manageEvents see every meeting", () => {
+    const roled: MeetingTeam = { ...team, memberPerms: { p2: ["manageEvents"], s: ["moderate"] } };
+    expect(canSee(roled, adminsOnly, "p2")).toBe(true);
+    expect(canSee(roled, adminsOnly, "s")).toBe(false);
+    // Permissions don't outlive membership.
+    expect(canSee({ ...roled, memberPerms: { gone: ["manageEvents"] } }, adminsOnly, "gone")).toBe(false);
+  });
+
   it("treats a legacy stats member as a player, and outsiders see nothing", () => {
     expect(canSee(team, everyone, "s")).toBe(true);
     expect(canSee(team, adminsOnly, "s")).toBe(false);

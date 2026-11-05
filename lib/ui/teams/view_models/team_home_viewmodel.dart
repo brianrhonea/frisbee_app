@@ -293,10 +293,14 @@ class TeamHomeViewModel extends ChangeNotifier {
   };
 
   TeamRole? get myRole => _team?.roleOf(uid);
-  bool get canEdit => myRole?.canEdit ?? false;
+  bool get canEdit => _team?.canEdit(uid) ?? false;
   bool get isOwner => myRole == TeamRole.owner;
 
-  /// Owners, coaches and captains write posts.
+  /// Invite, approve and remove members.
+  bool get canManageMembers =>
+      _team?.has(uid, TeamPermission.manageMembers) ?? false;
+
+  /// Members who can manage the team write posts.
   bool get canPost => canEdit;
 
   int get memberCount => _team?.members.length ?? 0;

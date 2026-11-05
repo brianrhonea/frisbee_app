@@ -18,16 +18,32 @@ import 'package:flutter/foundation.dart'
 ///   options: DefaultFirebaseOptions.currentPlatform,
 /// );
 /// ```
+/// Which Firebase project the build talks to, set by `FIREBASE_ENV` in the
+/// secrets file: `dev` (local runs and TestFlight builds from the
+/// `development` branch) or `prod` (App Store builds from `main`). Each
+/// secrets file carries the API keys of its own project.
+enum FirebaseEnv { dev, prod }
+
 class DefaultFirebaseOptions {
+  static const _env = String.fromEnvironment('FIREBASE_ENV');
   static const _androidKey = String.fromEnvironment('FIREBASE_ANDROID_API_KEY');
   static const _appleKey = String.fromEnvironment('FIREBASE_APPLE_API_KEY');
   static const _windowsKey = String.fromEnvironment('FIREBASE_WINDOWS_API_KEY');
 
+  static FirebaseEnv get env =>
+      _env == 'prod' ? FirebaseEnv.prod : FirebaseEnv.dev;
+
   /// Throws with setup instructions if the build was started without the
-  /// secrets file.
+  /// secrets file, or with one that doesn't say which project it's for.
   static void ensureConfigured() {
-    final key = currentPlatform.apiKey;
-    if (key.isEmpty) {
+    if (_env != 'dev' && _env != 'prod') {
+      throw StateError(
+        'FIREBASE_ENV must be "dev" or "prod". Run with '
+        '--dart-define-from-file=secrets.local.json (dev) or '
+        'secrets.prod.local.json (prod); see secrets.example.json.',
+      );
+    }
+    if (currentPlatform.apiKey.isEmpty) {
       throw StateError(
         'Missing Firebase API key. Copy secrets.example.json to '
         'secrets.local.json, fill it in, and run with '
@@ -42,26 +58,18 @@ class DefaultFirebaseOptions {
         'The app does not target web; the website is a separate project.',
       );
     }
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-        return android;
-      case TargetPlatform.iOS:
-        return ios;
-      case TargetPlatform.macOS:
-        return macos;
-      case TargetPlatform.windows:
-        return windows;
-      case TargetPlatform.linux:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
-      default:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions are not supported for this platform.',
-        );
-    }
+    final prod = env == FirebaseEnv.prod;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android => prod ? android : devAndroid,
+      TargetPlatform.iOS || TargetPlatform.macOS => prod ? ios : devIos,
+      TargetPlatform.windows => prod ? windows : devWindows,
+      _ => throw UnsupportedError(
+        'DefaultFirebaseOptions are not supported for this platform.',
+      ),
+    };
   }
+
+  // Production: frisbee-app-brianrhonea.
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: _androidKey,
@@ -80,15 +88,6 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.brianrhonea.frisbeeApp',
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: _appleKey,
-    appId: '1:275864055352:ios:85854fd9229478513280cd',
-    messagingSenderId: '275864055352',
-    projectId: 'frisbee-app-brianrhonea',
-    storageBucket: 'frisbee-app-brianrhonea.firebasestorage.app',
-    iosBundleId: 'com.brianrhonea.frisbeeApp',
-  );
-
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: _windowsKey,
     appId: '1:275864055352:web:3333768309233c043280cd',
@@ -96,5 +95,33 @@ class DefaultFirebaseOptions {
     projectId: 'frisbee-app-brianrhonea',
     authDomain: 'frisbee-app-brianrhonea.firebaseapp.com',
     storageBucket: 'frisbee-app-brianrhonea.firebasestorage.app',
+  );
+
+  // Development: frisbee-app-brianrhonea-dev.
+
+  static const FirebaseOptions devAndroid = FirebaseOptions(
+    apiKey: _androidKey,
+    appId: '1:971051401974:android:2971c9179a3fd07e2ba2d7',
+    messagingSenderId: '971051401974',
+    projectId: 'frisbee-app-brianrhonea-dev',
+    storageBucket: 'frisbee-app-brianrhonea-dev.firebasestorage.app',
+  );
+
+  static const FirebaseOptions devIos = FirebaseOptions(
+    apiKey: _appleKey,
+    appId: '1:971051401974:ios:3d03077ff2eaa7182ba2d7',
+    messagingSenderId: '971051401974',
+    projectId: 'frisbee-app-brianrhonea-dev',
+    storageBucket: 'frisbee-app-brianrhonea-dev.firebasestorage.app',
+    iosBundleId: 'com.brianrhonea.frisbeeApp',
+  );
+
+  static const FirebaseOptions devWindows = FirebaseOptions(
+    apiKey: _windowsKey,
+    appId: '1:971051401974:web:b9d6b579767312cd2ba2d7',
+    messagingSenderId: '971051401974',
+    projectId: 'frisbee-app-brianrhonea-dev',
+    authDomain: 'frisbee-app-brianrhonea-dev.firebaseapp.com',
+    storageBucket: 'frisbee-app-brianrhonea-dev.firebasestorage.app',
   );
 }

@@ -21,11 +21,15 @@ class MessageThreadView extends StatefulWidget {
     required this.viewModel,
     this.emptyMessage = 'Say hello.',
     this.readOnlyNotice = 'You can read this conversation but not post in it.',
+    this.hintText = 'Message',
   });
 
   final MessageThreadViewModel viewModel;
   final String emptyMessage;
   final String readOnlyNotice;
+
+  /// The composer's placeholder, e.g. "Message #general".
+  final String hintText;
 
   @override
   State<MessageThreadView> createState() => _MessageThreadViewState();
@@ -116,6 +120,7 @@ class _MessageThreadViewState extends State<MessageThreadView> {
               controller: _text,
               focusNode: _focus,
               onSend: _send,
+              hintText: widget.hintText,
             )
           else
             _ReadOnlyBar(text: widget.readOnlyNotice),
@@ -141,7 +146,6 @@ class _MessageList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final c = AppColors.of(context);
     if (!vm.messagesLoaded) return const LoadingView();
     final messages = vm.messages;
     if (messages.isEmpty) {
@@ -157,7 +161,7 @@ class _MessageList extends StatelessWidget {
     final count = messages.length + (vm.hasMore ? 1 : 0);
     return ListView.builder(
       reverse: true,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.only(top: 12, bottom: 16),
       itemCount: count,
       itemBuilder: (context, i) {
         if (i == messages.length) {
@@ -176,22 +180,17 @@ class _MessageList extends StatelessWidget {
             !newDay &&
             prev.authorId == m.authorId &&
             _minutesApart(prev.createdAt, m.createdAt) < 5;
+        final color = vm.nameColorOf(m.authorId);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (newDay && m.createdAt != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Text(
-                  _dayLabel(m.createdAt!),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11.5, color: c.muted),
-                ),
-              ),
-            _MessageBubble(
+              _DayDivider(label: _dayLabel(m.createdAt!)),
+            _MessageRow(
+              key: ValueKey(m.id),
               message: m,
-              mine: vm.isMine(m),
               showAuthor: !grouped,
+              nameColor: color == null ? null : Color(color),
               viewModel: vm,
               onDelete: vm.canDelete(m) ? () => onDelete(m) : null,
             ),
@@ -218,135 +217,209 @@ class _MessageList extends StatelessWidget {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({
+/// One message, Discord style: everyone's on the left. The first of a run
+/// shows the author's avatar, name and time; the rest of the run sits
+/// under it, with the time in the gutter on hover.
+class _MessageRow extends StatefulWidget {
+  const _MessageRow({
+    super.key,
     required this.message,
-    required this.mine,
     required this.showAuthor,
+    required this.nameColor,
     required this.viewModel,
     required this.onDelete,
   });
 
   final ChatMessage message;
-  final bool mine;
   final bool showAuthor;
+  final Color? nameColor;
   final MessageThreadViewModel viewModel;
   final VoidCallback? onDelete;
 
   @override
+  State<_MessageRow> createState() => _MessageRowState();
+}
+
+class _MessageRowState extends State<_MessageRow> {
+  bool _hover = false;
+
+  static const _gutter = 56.0;
+
+  @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final m = message;
+    final m = widget.message;
     final time = m.createdAt;
-    final ink = mine ? c.onAccent : c.ink;
-    final bubble = Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: BoxDecoration(
-        color: mine ? c.accent : c.card,
-        border: mine ? null : Border.all(color: c.border),
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(14),
-          topRight: const Radius.circular(14),
-          bottomLeft: Radius.circular(mine ? 14 : 4),
-          bottomRight: Radius.circular(mine ? 4 : 14),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final a in m.attachments)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: a.isImage
-                  ? _ImageAttachment(attachment: a, viewModel: viewModel)
-                  : _FileAttachment(attachment: a, viewModel: viewModel),
+    final onDelete = widget.onDelete;
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.showAuthor)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.end,
+              spacing: 8,
+              children: [
+                Text(
+                  m.authorName.isEmpty ? 'Member' : m.authorName,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: widget.nameColor ?? c.ink,
+                  ),
+                ),
+                Text(
+                  time == null ? 'Sending…' : _stamp(time),
+                  style: TextStyle(fontSize: 11.5, color: c.muted),
+                ),
+              ],
             ),
-          if (m.text.isNotEmpty)
-            LinkifiedText(
-              m.text,
-              style: TextStyle(color: ink, fontSize: 13.5, height: 1.4),
+          ),
+        if (m.text.isNotEmpty)
+          LinkifiedText(
+            m.text,
+            style: TextStyle(
+              color: time == null ? c.muted : c.ink,
+              fontSize: 14.5,
+              height: 1.375,
             ),
-        ],
-      ),
+          ),
+        for (final a in m.attachments)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: a.isImage
+                ? _ImageAttachment(attachment: a, viewModel: widget.viewModel)
+                : _FileAttachment(attachment: a, viewModel: widget.viewModel),
+          ),
+      ],
     );
-    final stamp = Padding(
-      padding: EdgeInsets.only(top: 3, left: mine ? 0 : 2, right: 2),
-      child: Text(
-        time == null ? 'Sending…' : DateFormat.jm().format(time),
-        style: TextStyle(fontSize: 10.5, color: c.muted),
-      ),
-    );
-    // Room for the author's avatar beside their messages.
-    const avatarGap = 36.0;
-    return Padding(
-      padding: EdgeInsets.only(top: showAuthor ? 10 : 3),
-      child: Column(
-        crossAxisAlignment: mine
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
-        children: [
-          if (showAuthor && !mine)
-            Padding(
-              padding: const EdgeInsets.only(left: avatarGap, bottom: 4),
+    final gutter = SizedBox(
+      width: _gutter,
+      child: widget.showAuthor
+          ? Align(
+              alignment: Alignment.topLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16, top: 2),
+                child: PersonAvatar(name: m.authorName, radius: 20),
+              ),
+            )
+          : _hover && time != null
+          ? Padding(
+              padding: const EdgeInsets.only(top: 4, right: 4),
               child: Text(
-                m.authorName,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: c.muted,
-                ),
+                DateFormat.jm().format(time),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10, color: c.muted),
               ),
-            ),
-          Row(
-            mainAxisAlignment: mine
-                ? MainAxisAlignment.end
-                : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.end,
+            )
+          : null,
+    );
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: onDelete,
+        child: Padding(
+          padding: EdgeInsets.only(top: widget.showAuthor ? 14 : 0),
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              if (!mine)
-                SizedBox(
-                  width: avatarGap,
-                  child: showAuthor
-                      ? Align(
-                          alignment: Alignment.bottomLeft,
-                          child: PersonAvatar(name: m.authorName, radius: 13),
-                        )
-                      : null,
-                ),
-              if (mine && onDelete != null) _DeleteButton(onDelete: onDelete!),
-              Flexible(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  child: GestureDetector(onLongPress: onDelete, child: bubble),
+              Container(
+                color: _hover ? c.ink.withValues(alpha: 0.04) : null,
+                padding: const EdgeInsets.fromLTRB(0, 2, 16, 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    gutter,
+                    Expanded(child: body),
+                  ],
                 ),
               ),
-              if (!mine && onDelete != null) _DeleteButton(onDelete: onDelete!),
+              if (_hover && onDelete != null)
+                Positioned(
+                  right: 16,
+                  top: -16,
+                  child: _HoverActions(onDelete: onDelete),
+                ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// "Today at 3:45 PM", "Yesterday at 9:02 AM", else "10/14/2026 3:45 PM".
+  static String _stamp(DateTime d) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final time = DateFormat.jm().format(d);
+    return switch (today.difference(DateUtils.dateOnly(d)).inDays) {
+      0 => 'Today at $time',
+      1 => 'Yesterday at $time',
+      _ => '${DateFormat.yMd().format(d)} $time',
+    };
+  }
+}
+
+/// A rule across the list with the day in the middle.
+class _DayDivider extends StatelessWidget {
+  const _DayDivider({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: c.border, height: 1)),
           Padding(
-            padding: EdgeInsets.only(left: mine ? 0 : avatarGap),
-            child: stamp,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: c.muted,
+              ),
+            ),
           ),
+          Expanded(child: Divider(color: c.border, height: 1)),
         ],
       ),
     );
   }
 }
 
-class _DeleteButton extends StatelessWidget {
-  const _DeleteButton({required this.onDelete});
+/// The little toolbar that floats over a hovered message.
+class _HoverActions extends StatelessWidget {
+  const _HoverActions({required this.onDelete});
 
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) => IconButton(
-    tooltip: 'Delete message',
-    visualDensity: VisualDensity.compact,
-    iconSize: 18,
-    color: AppColors.of(context).muted,
-    icon: const Icon(Icons.delete_outline),
-    onPressed: onDelete,
-  );
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Material(
+      color: c.card,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: c.border),
+      ),
+      child: IconButton(
+        tooltip: 'Delete message',
+        visualDensity: VisualDensity.compact,
+        iconSize: 18,
+        color: Colors.red.shade400,
+        icon: const Icon(Icons.delete_outline),
+        onPressed: onDelete,
+      ),
+    );
+  }
 }
 
 class _ImageAttachment extends StatefulWidget {
@@ -557,12 +630,14 @@ class _Composer extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.onSend,
+    required this.hintText,
   });
 
   final MessageThreadViewModel viewModel;
   final TextEditingController controller;
   final FocusNode focusNode;
   final VoidCallback onSend;
+  final String hintText;
 
   @override
   Widget build(BuildContext context) {
@@ -573,110 +648,114 @@ class _Composer extends StatelessWidget {
       builder: (context, _) {
         final sending = vm.send.running;
         final wide = !ScreenSize.of(context).isMobile;
-        return Container(
-          padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
-          decoration: BoxDecoration(
-            color: c.card,
-            border: Border(top: BorderSide(color: c.border)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (vm.drafts.isNotEmpty)
-                SizedBox(
-                  height: 72,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      for (final d in vm.drafts)
-                        _DraftChip(
-                          draft: d,
-                          onRemove: sending ? null : () => vm.removeDraft(d),
-                        ),
-                    ],
-                  ),
-                ),
-              if (sending) const LinearProgressIndicator(minHeight: 2),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  if (vm.canAttach)
-                    PopupMenuButton<_AttachKind>(
-                      tooltip: 'Attach',
-                      enabled: !sending && !vm.pickFiles.running,
-                      icon: Icon(Icons.add, color: c.muted),
-                      onSelected: (k) =>
-                          vm.pickFiles.execute(k == _AttachKind.photo),
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(
-                          value: _AttachKind.photo,
-                          child: ListTile(
-                            leading: Icon(Icons.photo_outlined),
-                            title: Text('Photo'),
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: _AttachKind.file,
-                          child: ListTile(
-                            leading: Icon(Icons.insert_drive_file_outlined),
-                            title: Text('File'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  Expanded(
-                    child: Focus(
-                      // Enter sends; Shift+Enter adds a line.
-                      onKeyEvent: (_, event) {
-                        if (event is KeyDownEvent &&
-                            event.logicalKey == LogicalKeyboardKey.enter &&
-                            !HardwareKeyboard.instance.isShiftPressed) {
-                          onSend();
-                          return KeyEventResult.handled;
-                        }
-                        return KeyEventResult.ignored;
-                      },
-                      child: TextField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        enabled: !sending,
-                        minLines: 1,
-                        maxLines: 5,
-                        maxLength: 4000,
-                        textCapitalization: TextCapitalization.sentences,
-                        style: const TextStyle(fontSize: 13.5),
-                        decoration: const InputDecoration(
-                          hintText: 'Message',
-                          counterText: '',
-                          isDense: true,
-                        ),
-                      ),
+        final attach = vm.canAttach
+            ? PopupMenuButton<_AttachKind>(
+                tooltip: 'Upload a photo or file',
+                enabled: !sending && !vm.pickFiles.running,
+                icon: Icon(Icons.add_circle, color: c.muted),
+                onSelected: (k) => vm.pickFiles.execute(k == _AttachKind.photo),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: _AttachKind.photo,
+                    child: ListTile(
+                      leading: Icon(Icons.photo_outlined),
+                      title: Text('Photo'),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    tooltip: 'Send',
-                    style: IconButton.styleFrom(
-                      backgroundColor: c.accent,
-                      foregroundColor: c.onAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(controlRadius),
-                      ),
+                  PopupMenuItem(
+                    value: _AttachKind.file,
+                    child: ListTile(
+                      leading: Icon(Icons.insert_drive_file_outlined),
+                      title: Text('File'),
                     ),
-                    icon: const Icon(Icons.arrow_upward, size: 20),
-                    onPressed: sending ? null : onSend,
                   ),
                 ],
-              ),
-              if (wide)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8, top: 6),
-                  child: Text(
-                    'Enter to send · Shift + Enter for a new line',
-                    style: TextStyle(fontSize: 10.5, color: c.muted),
+              )
+            : const SizedBox(width: 12);
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, wide ? 20 : 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: c.background,
+              border: Border.all(color: c.border),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (vm.drafts.isNotEmpty)
+                  Container(
+                    height: 88,
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        for (final d in vm.drafts)
+                          _DraftChip(
+                            draft: d,
+                            onRemove: sending ? null : () => vm.removeDraft(d),
+                          ),
+                      ],
+                    ),
                   ),
+                if (vm.drafts.isNotEmpty) Divider(height: 1, color: c.border),
+                if (sending) const LinearProgressIndicator(minHeight: 2),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    attach,
+                    Expanded(
+                      child: Focus(
+                        // Enter sends; Shift+Enter adds a line.
+                        onKeyEvent: (_, event) {
+                          if (event is KeyDownEvent &&
+                              event.logicalKey == LogicalKeyboardKey.enter &&
+                              !HardwareKeyboard.instance.isShiftPressed) {
+                            onSend();
+                            return KeyEventResult.handled;
+                          }
+                          return KeyEventResult.ignored;
+                        },
+                        child: TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          enabled: !sending,
+                          minLines: 1,
+                          maxLines: 8,
+                          maxLength: 4000,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: TextStyle(fontSize: 14.5, color: c.ink),
+                          decoration: InputDecoration(
+                            hintText: hintText,
+                            counterText: '',
+                            isDense: true,
+                            filled: false,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Phones have no Enter key to send with.
+                    if (!wide)
+                      IconButton(
+                        tooltip: 'Send',
+                        color: c.accent,
+                        icon: const Icon(Icons.send_rounded, size: 22),
+                        onPressed: sending ? null : onSend,
+                      )
+                    else
+                      const SizedBox(width: 12),
+                  ],
                 ),
-            ],
+              ],
+            ),
           ),
         );
       },

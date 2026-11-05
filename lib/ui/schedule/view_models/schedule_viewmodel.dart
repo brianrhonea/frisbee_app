@@ -68,7 +68,7 @@ class ScheduleViewModel extends ChangeNotifier {
     if (entry.isMeeting) return false;
     final team = entry.team;
     if (team == null) return _uid != null;
-    return _uid != null && team.canEdit(_uid);
+    return _uid != null && team.has(_uid, TeamPermission.manageEvents);
   }
 
   /// Deletes [entry] for good. Use [removeWithUndo] from the UI.

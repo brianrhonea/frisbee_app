@@ -133,6 +133,8 @@ async function leaveTeams(db: Firestore, uid: string): Promise<void> {
       [new FieldPath("memberNames", uid), FieldValue.delete()],
       ["memberIds", FieldValue.arrayRemove(uid)],
       ["statKeepers", FieldValue.arrayRemove(uid)],
+      [new FieldPath("memberRoles", uid), FieldValue.delete()],
+      [new FieldPath("memberPerms", uid), FieldValue.delete()],
     ];
     if (heir) {
       update.push(["ownerId", heir], [new FieldPath("members", heir), "owner"]);

@@ -68,7 +68,11 @@ class EventDetailViewModel extends ChangeNotifier {
     if (repo == null || team == null || !team.isCommunity) return;
     if (_tournamentSub != null) return;
     _tournamentSub = repo
-        .watchTournaments(teamId, uid: uid, organizer: team.canEdit(uid))
+        .watchTournaments(
+          teamId,
+          uid: uid,
+          organizer: team.has(uid, TeamPermission.manageEvents),
+        )
         .listen((list) {
           _tournament = list.where((t) => t.eventId == eventId).firstOrNull;
           notifyListeners();
@@ -87,7 +91,7 @@ class EventDetailViewModel extends ChangeNotifier {
   Object? get error => _error;
 
   String get uid => _auth.currentUser?.uid ?? '';
-  bool get canEdit => _team?.canEdit(uid) ?? false;
+  bool get canEdit => _team?.has(uid, TeamPermission.manageEvents) ?? false;
 
   /// Group organizers turn a Tournament event into a bracket.
   bool get canSetUpTournament =>

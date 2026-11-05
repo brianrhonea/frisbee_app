@@ -103,6 +103,17 @@ abstract class TeamRepository {
   /// Removes a member; also used by a member to leave the team.
   Future<Result<void>> removeMember(String teamId, String uid);
 
+  /// Owner only: replaces [team]'s custom roles and who has them, saving
+  /// each member's permissions with them ([rolesData]). [demote] moves
+  /// those members to the player tier in the same write, for community
+  /// organizers from before custom roles.
+  Future<Result<void>> saveRoles(
+    Team team, {
+    required Map<String, CustomRole> roles,
+    required Map<String, Set<String>> memberRoles,
+    Set<String> demote = const {},
+  });
+
   Future<Result<void>> deleteTeam(Team team);
 
   /// Links the team to its USA Ultimate page, or unlinks it when [url] is

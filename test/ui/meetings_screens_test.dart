@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/data/repositories/meeting/meeting_settings_repository.dart';
@@ -118,7 +119,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Meeting chat'), findsOneWidget);
       await tester.enterText(find.byType(TextField).last, 'Can you hear me?');
-      await tester.tap(find.byTooltip('Send'));
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       expect(meetings.messages['m1'], isNotEmpty);
     });

@@ -177,6 +177,111 @@ void main() {
     });
   });
 
+  group('TeamDetailViewModel custom roles', () {
+    TeamDetailViewModel load() => TeamDetailViewModel(
+      teamId: 't1',
+      teamRepository: teams,
+      playRepository: FakePlayRepository(),
+      eventRepository: FakeEventRepository(),
+      authRepository: auth,
+    );
+
+    test("the owner assigns roles; each member's permissions follow", () async {
+      teams.teams['t1'] = teamWith({'u1': TeamRole.owner, 'p': TeamRole.player})
+          .copyWith(
+            roles: {
+              'm': const CustomRole(
+                id: 'm',
+                name: 'Mods',
+                permissions: {TeamPermission.manageMembers},
+              ),
+            },
+          );
+      final vm = load();
+      await pumpEventQueue();
+      await vm.setMemberRoles.execute((uid: 'p', roleIds: {'m'}));
+      await pumpEventQueue();
+      expect(vm.team!.rolesOf('p').single.name, 'Mods');
+      expect(vm.team!.has('p', TeamPermission.manageMembers), isTrue);
+      await vm.setMemberRoles.execute((uid: 'p', roleIds: {}));
+      await pumpEventQueue();
+      expect(vm.team!.memberRoles, isEmpty);
+      expect(vm.team!.has('p', TeamPermission.manageMembers), isFalse);
+      vm.dispose();
+    });
+
+    test('Manage members shares the invite code and removes players', () async {
+      teams.teams['t1'] =
+          teamWith({
+            'o': TeamRole.owner,
+            'u1': TeamRole.player,
+            'p': TeamRole.player,
+          }).copyWith(
+            memberPerms: {
+              'u1': {TeamPermission.manageMembers},
+            },
+          );
+      final vm = load();
+      await pumpEventQueue();
+      expect(vm.canManageMembers, isTrue);
+      expect(vm.canShareCode, isTrue);
+      expect(vm.canRemove('p'), isTrue);
+      expect(vm.canRemove('o'), isFalse);
+      expect(vm.canSetRoles, isFalse);
+      expect(vm.canEdit, isFalse);
+      vm.dispose();
+    });
+
+    Team legacyGroup(String owner) => Team(
+      id: 't1',
+      name: 'Pickup',
+      division: Division.mixed,
+      level: CompetitionLevel.pickup,
+      kind: TeamKind.community,
+      ownerId: owner,
+      members: {
+        owner: TeamRole.owner,
+        if (owner != 'u1') 'u1': TeamRole.player,
+        'k1': TeamRole.captain,
+        'k2': TeamRole.captain,
+        'm': TeamRole.player,
+      },
+    );
+
+    test("the owner's visit turns organizers into a role, once", () async {
+      teams.teams['t1'] = legacyGroup('u1');
+      final vm = load();
+      await pumpEventQueue();
+      // The fake team stream drops writes made while the first snapshot
+      // is being handled, so read what was saved.
+      final team = teams.teams['t1']!;
+      expect(team.needsOrganizerMigration, isFalse);
+      expect(team.roleOf('k1'), TeamRole.player);
+      final organizer = team.roles.values.single;
+      expect(organizer.name, 'Organizer');
+      expect(organizer.permissions, {
+        TeamPermission.manageTeam,
+        TeamPermission.manageMembers,
+        TeamPermission.manageChats,
+        TeamPermission.manageEvents,
+      });
+      expect(team.rolesOf('k2').single.id, organizer.id);
+      expect(team.has('k1', TeamPermission.manageEvents), isTrue);
+      expect(team.has('m', TeamPermission.manageEvents), isFalse);
+      expect(teams.rolesSaved, 1);
+      vm.dispose();
+    });
+
+    test('members leave organizers alone', () async {
+      teams.teams['t1'] = legacyGroup('o');
+      final vm = load();
+      await pumpEventQueue();
+      expect(vm.team!.needsOrganizerMigration, isTrue);
+      expect(teams.rolesSaved, 0);
+      vm.dispose();
+    });
+  });
+
   group('TournamentsViewModel', () {
     final now = DateTime(2026, 10, 26);
     final list = [

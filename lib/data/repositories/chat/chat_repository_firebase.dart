@@ -12,7 +12,8 @@ import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
 import 'chat_repository.dart';
 
-/// Rooms live at `teams/{teamId}/chats/{roomId}` with messages beneath.
+/// Rooms live at `teams/{teamId}/chats/{roomId}` with messages beneath, and
+/// folders at `teams/{teamId}/chatFolders/{folderId}`.
 /// Attachments live in Cloud Storage at
 /// `teams/{teamId}/chats/{roomId}/{uid}/{messageId}/{fileName}`; storage.rules
 /// checks the room's access in Firestore before serving them.
@@ -34,6 +35,9 @@ class ChatRepositoryFirebase implements ChatRepository {
   CollectionReference<Map<String, dynamic>> _rooms(String teamId) =>
       chatRooms(_db, teamId);
 
+  CollectionReference<Map<String, dynamic>> _folders(String teamId) =>
+      chatFolders(_db, teamId);
+
   CollectionReference<Map<String, dynamic>> _messages(
     String teamId,
     String roomId,
@@ -41,86 +45,116 @@ class ChatRepositoryFirebase implements ChatRepository {
 
   @override
   Stream<List<ChatRoom>> watchRooms(Team team, String uid) {
-    final role = team.roleOf(uid);
-    if (role == null) return Stream.value(const []);
+    if (team.roleOf(uid) == null) return Stream.value(const []);
+    final manager = team.has(uid, TeamPermission.manageChats);
+    final ids = manager ? const <String>[] : _audienceIds(team, uid);
     return _shared.get(
-      'rooms/${team.id}/$uid/${role.name}',
-      () => _openRooms(team, uid, role),
+      'rooms/${team.id}/$uid/${manager ? '*' : ids.join(',')}',
+      () => _openRooms(team.id, uid, manager ? null : ids),
     );
   }
 
-  Stream<List<ChatRoom>> _openRooms(Team team, String uid, TeamRole role) {
+  /// The audience ids to query rooms by: everyone, the member's tier and
+  /// up to 10 custom roles, as many as firestore.rules checks.
+  static List<String> _audienceIds(Team team, String uid) {
+    final role = team.roleOf(uid)!;
+    final custom = [
+      for (final r in team.sortedRoles)
+        if (team.memberRoles[uid]?.contains(r.id) ?? false) r.id,
+    ].take(10);
+    return [ChatAudience.everyone, role.name, ...custom];
+  }
+
+  /// Every room when [ids] is null; otherwise the rooms one of [ids] or
+  /// [uid] can read.
+  Stream<List<ChatRoom>> _openRooms(
+    String teamId,
+    String uid,
+    List<String>? ids,
+  ) {
     List<ChatRoom> parse(QuerySnapshot<Map<String, dynamic>> snap) => [
       for (final d in snap.docs) ChatRoom.fromMap(d.id, plainData(d.data())),
     ];
-    if (role.canEdit) {
+    if (ids == null) {
       return countedSnapshots(
-        _rooms(team.id),
+        _rooms(teamId),
         'chatRooms',
-      ).map((s) => _sorted(parse(s)));
+      ).map((s) => sortRooms(parse(s)));
     }
     // Rules only allow queries that are limited to rooms the member can
-    // read, so ask by role and by uid and merge the two.
-    return _merge(
+    // read, so ask once per audience id and by uid, and merge them.
+    return mergeLatest<ChatRoom>([
+      for (final id in ids)
+        countedSnapshots(
+          _rooms(teamId).where('readRoles', arrayContains: id),
+          'chatRooms',
+        ).map(parse),
       countedSnapshots(
-        _rooms(team.id).where('readRoles', arrayContains: role.name),
+        _rooms(teamId).where('readUsers', arrayContains: uid),
         'chatRooms',
       ).map(parse),
-      countedSnapshots(
-        _rooms(team.id).where('readUsers', arrayContains: uid),
-        'chatRooms',
-      ).map(parse),
-    );
+    ], key: (r) => r.id).map(sortRooms);
   }
 
-  Stream<List<ChatRoom>> _merge(
-    Stream<List<ChatRoom>> a,
-    Stream<List<ChatRoom>> b,
-  ) {
-    List<ChatRoom>? lastA, lastB;
-    late StreamController<List<ChatRoom>> controller;
-    final subs = <StreamSubscription<List<ChatRoom>>>[];
-    void emit() {
-      if (lastA == null || lastB == null) return;
-      controller.add(
-        _sorted(
-          {
-            for (final r in [...lastA!, ...lastB!]) r.id: r,
-          }.values,
-        ),
-      );
+  @override
+  Stream<List<ChatFolder>> watchFolders(String teamId) => _shared.get(
+    'chatFolders/$teamId',
+    () => countedSnapshots(_folders(teamId), 'chatFolders').map(
+      (s) => sortFolders([
+        for (final d in s.docs) ChatFolder.fromMap(d.id, plainData(d.data())),
+      ]),
+    ),
+  );
+
+  @override
+  Future<Result<String>> saveFolder(
+    String teamId,
+    ChatFolder folder,
+    String uid,
+  ) => guard(() async {
+    if (folder.isNew) {
+      final ref = _folders(teamId).doc();
+      await ref.set(newFolderData(folder, uid));
+      return ref.id;
     }
+    await _folders(teamId).doc(folder.id).update(folder.toMap());
+    return folder.id;
+  });
 
-    controller = StreamController(
-      onListen: () {
-        subs
-          ..add(
-            a.listen((r) {
-              lastA = r;
-              emit();
-            }, onError: controller.addError),
-          )
-          ..add(
-            b.listen((r) {
-              lastB = r;
-              emit();
-            }, onError: controller.addError),
-          );
-      },
-      onCancel: () async {
-        for (final s in subs) {
-          await s.cancel();
-        }
-      },
-    );
-    return controller.stream;
-  }
+  @override
+  Future<Result<void>> deleteFolder(
+    String teamId,
+    String folderId,
+    List<ChatRoom> rooms,
+  ) => guard(() async {
+    final batch = _db.batch();
+    for (final r in rooms) {
+      if (r.folderId == folderId) {
+        batch.update(_rooms(teamId).doc(r.id), {'folderId': null});
+      }
+    }
+    batch.delete(_folders(teamId).doc(folderId));
+    await batch.commit();
+  });
 
-  static List<ChatRoom> _sorted(Iterable<ChatRoom> rooms) =>
-      rooms.toList()..sort((a, b) {
-        if (a.isGeneral != b.isGeneral) return a.isGeneral ? -1 : 1;
-        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  @override
+  Future<Result<void>> arrange(
+    String teamId, {
+    List<ChatFolder> folders = const [],
+    List<ChatRoom> rooms = const [],
+  }) => guard(() async {
+    final batch = _db.batch();
+    for (final f in folders) {
+      batch.update(_folders(teamId).doc(f.id), {'position': f.position});
+    }
+    for (final r in rooms) {
+      batch.update(_rooms(teamId).doc(r.id), {
+        'position': r.position,
+        'folderId': r.folderId,
       });
+    }
+    await batch.commit();
+  });
 
   @override
   Stream<ChatRoom?> watchRoom(String teamId, String roomId) => _rooms(teamId)
@@ -157,21 +191,47 @@ class ChatRepositoryFirebase implements ChatRepository {
       });
 
   @override
+  Future<Result<void>> ensureVoiceRooms(String teamId, String uid) =>
+      guard(() async {
+        final folder = _folders(teamId).doc(ChatRoom.voiceFolderId);
+        final rooms = [
+          for (final r in ChatRoom.defaultVoiceRooms())
+            (r, _rooms(teamId).doc(r.id)),
+        ];
+        await _db.runTransaction((tx) async {
+          if ((await tx.get(folder)).exists) return;
+          for (final (_, ref) in rooms) {
+            if ((await tx.get(ref)).exists) return;
+          }
+          tx.set(folder, newFolderData(ChatRoom.defaultVoiceFolder(), uid));
+          for (final (room, ref) in rooms) {
+            tx.set(ref, newRoomData(room, uid));
+          }
+        });
+      });
+
+  @override
   Stream<List<ChatMessage>> watchMessages(
     String teamId,
     String roomId, {
     required int limit,
-  }) => _messages(teamId, roomId)
-      .orderBy('createdAt', descending: true)
-      .limit(limit)
-      .snapshots()
-      .map(
-        (snap) => [
-          for (final d in snap.docs.reversed)
-            // createdAt is null until the server stamps a pending message.
-            ChatMessage.fromMap(d.id, plainData(d.data())),
-        ],
-      );
+  }) => _shared.get(
+    'messages/$teamId/$roomId/$limit',
+    () =>
+        countedSnapshots(
+          _messages(
+            teamId,
+            roomId,
+          ).orderBy('createdAt', descending: true).limit(limit),
+          'chatMessages',
+        ).map(
+          (snap) => [
+            for (final d in snap.docs.reversed)
+              // createdAt is null until the server stamps a pending message.
+              ChatMessage.fromMap(d.id, plainData(d.data())),
+          ],
+        ),
+  );
 
   @override
   Future<Result<void>> sendMessage(
@@ -224,9 +284,22 @@ CollectionReference<Map<String, dynamic>> chatRooms(
   String teamId,
 ) => db.collection('teams').doc(teamId).collection('chats');
 
+CollectionReference<Map<String, dynamic>> chatFolders(
+  FirebaseFirestore db,
+  String teamId,
+) => db.collection('teams').doc(teamId).collection('chatFolders');
+
 /// Fields for a room being created by [uid].
 Map<String, dynamic> newRoomData(ChatRoom room, String uid) => {
   ...room.toMap(),
+  'kind': room.kind.name,
+  'createdBy': uid,
+  'createdAt': FieldValue.serverTimestamp(),
+};
+
+/// Fields for a folder being created by [uid].
+Map<String, dynamic> newFolderData(ChatFolder folder, String uid) => {
+  ...folder.toMap(),
   'createdBy': uid,
   'createdAt': FieldValue.serverTimestamp(),
 };

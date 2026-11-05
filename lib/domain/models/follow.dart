@@ -127,7 +127,7 @@ class Follow {
       'name': name.length > maxNameLength
           ? name.substring(0, maxNameLength)
           : name,
-      if (target.photoUrl case final p? when p.isNotEmpty) 'photoUrl': p,
+      if ((target.photoUrl ?? '').isNotEmpty) 'photoUrl': target.photoUrl,
       'notify': notify,
     };
   }

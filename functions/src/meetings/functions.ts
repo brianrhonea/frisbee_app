@@ -19,6 +19,10 @@ import {
   meetingChange,
   type MeetingTeam,
   roomName,
+  type VoiceRoomDoc,
+  type VoiceTeam,
+  voiceDecision,
+  voiceRoomName,
 } from "./model";
 
 const livekitUrl = defineSecret("LIVEKIT_URL");
@@ -76,6 +80,45 @@ export const joinToken = onCall({ secrets }, async (req) => {
     canUpdateOwnMetadata: false,
   });
   return { url: livekitUrl.value().trim(), token: await token.toJwt() };
+});
+
+/**
+ * A token for a team's voice channel (a chat room of kind "voice"), like
+ * a Discord voice channel: always open, no start or end. Members who can
+ * read the room join; those who can write in it may talk.
+ */
+export const voiceToken = onCall({ secrets }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in to join voice channels.");
+  const { teamId, roomId } = (req.data ?? {}) as Record<string, unknown>;
+  if (!validId(teamId) || !validId(roomId)) {
+    throw new HttpsError("invalid-argument", "Unknown channel.");
+  }
+  const db = getFirestore();
+  const [team, room, profile] = await Promise.all([
+    db.doc(`teams/${teamId}`).get(),
+    db.doc(`teams/${teamId}/chats/${roomId}`).get(),
+    db.doc(`profiles/${uid}`).get(),
+  ]);
+  const teamData = team.data() as VoiceTeam | undefined;
+  const decision = voiceDecision(teamData, room.data() as VoiceRoomDoc | undefined, uid);
+  if (!decision.ok) throw new HttpsError(decision.code, decision.message);
+  const photoUrl = profile.get("photoUrl");
+  const token = new AccessToken(livekitKey.value().trim(), livekitSecret.value().trim(), {
+    identity: uid,
+    name: displayName(teamData!, uid, profile.get("name")),
+    metadata: JSON.stringify(typeof photoUrl === "string" ? { photoUrl } : {}),
+    ttl: "6h",
+  });
+  token.addGrant({
+    room: voiceRoomName(teamId, roomId),
+    roomJoin: true,
+    canPublish: decision.canSpeak,
+    canSubscribe: true,
+    canPublishData: true,
+    canUpdateOwnMetadata: false,
+  });
+  return { url: livekitUrl.value().trim(), token: await token.toJwt(), canSpeak: decision.canSpeak };
 });
 
 /**

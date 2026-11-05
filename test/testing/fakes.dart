@@ -475,6 +475,29 @@ class FakeTeamRepository implements TeamRepository {
   Future<Result<void>> removeMember(String teamId, String uid) async =>
       const Result.ok(null);
 
+  int rolesSaved = 0;
+
+  @override
+  Future<Result<void>> saveRoles(
+    Team team, {
+    required Map<String, CustomRole> roles,
+    required Map<String, Set<String>> memberRoles,
+    Set<String> demote = const {},
+  }) async {
+    final t = teams[team.id];
+    if (t == null) return Result.error(Exception('No team'));
+    final cleaned = cleanMemberRoles(memberRoles, roles, t.members.keys);
+    teams[team.id] = t.copyWith(
+      roles: roles,
+      memberRoles: cleaned,
+      memberPerms: memberPermsFor(cleaned, roles),
+      members: {...t.members, for (final uid in demote) uid: TeamRole.player},
+    );
+    rolesSaved++;
+    _emit();
+    return const Result.ok(null);
+  }
+
   @override
   Future<Result<void>> deleteTeam(Team team) async {
     teams.remove(team.id);
@@ -885,9 +908,14 @@ class FakeThemeRepository extends ThemeRepository {
 
 class FakeChatRepository implements ChatRepository {
   final rooms = <String, ChatRoom>{};
+  final folders = <String, ChatFolder>{};
   final messages = <String, List<ChatMessage>>{};
   final files = <String, Uint8List>{};
   int generalEnsured = 0;
+  int voiceEnsured = 0;
+
+  /// Whether ensureVoiceRooms adds the default voice channels.
+  bool seedVoice = true;
   Exception? sendError;
   final _changes = StreamController<void>.broadcast();
 
@@ -910,12 +938,62 @@ class FakeChatRepository implements ChatRepository {
 
   @override
   Stream<List<ChatRoom>> watchRooms(Team team, String uid) => _watch(
-    () =>
-        rooms.values
-            .where((r) => team.canEdit(uid) || r.accessFor(team, uid).canRead)
-            .toList()
-          ..sort((a, b) => a.name.compareTo(b.name)),
+    () => sortRooms(
+      rooms.values.where(
+        (r) =>
+            team.has(uid, TeamPermission.manageChats) ||
+            r.accessFor(team, uid).canRead,
+      ),
+    ),
   );
+
+  @override
+  Stream<List<ChatFolder>> watchFolders(String teamId) =>
+      _watch(() => sortFolders(folders.values));
+
+  @override
+  Future<Result<String>> saveFolder(
+    String teamId,
+    ChatFolder folder,
+    String uid,
+  ) async {
+    final id = folder.isNew ? 'folder${folders.length + 1}' : folder.id;
+    folders[id] = ChatFolder.fromMap(id, folder.toMap());
+    emit();
+    return Result.ok(id);
+  }
+
+  @override
+  Future<Result<void>> deleteFolder(
+    String teamId,
+    String folderId,
+    List<ChatRoom> rooms,
+  ) async {
+    folders.remove(folderId);
+    for (final r in [...this.rooms.values]) {
+      if (r.folderId == folderId) this.rooms[r.id] = r.withFolder(null);
+    }
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> arrange(
+    String teamId, {
+    List<ChatFolder> folders = const [],
+    List<ChatRoom> rooms = const [],
+  }) async {
+    for (final f in folders) {
+      this.folders[f.id] = this.folders[f.id]!.copyWith(position: f.position);
+    }
+    for (final r in rooms) {
+      this.rooms[r.id] = this.rooms[r.id]!
+          .withFolder(r.folderId)
+          .withPosition(r.position);
+    }
+    emit();
+    return const Result.ok(null);
+  }
 
   @override
   Stream<ChatRoom?> watchRoom(String teamId, String roomId) =>
@@ -945,6 +1023,23 @@ class FakeChatRepository implements ChatRepository {
   Future<Result<void>> ensureGeneralRoom(String teamId, String uid) async {
     generalEnsured++;
     rooms.putIfAbsent(ChatRoom.generalId, ChatRoom.general);
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> ensureVoiceRooms(String teamId, String uid) async {
+    voiceEnsured++;
+    if (!seedVoice) return const Result.ok(null);
+    final defaults = ChatRoom.defaultVoiceRooms();
+    if (folders.containsKey(ChatRoom.voiceFolderId) ||
+        defaults.any((r) => rooms.containsKey(r.id))) {
+      return const Result.ok(null);
+    }
+    folders[ChatRoom.voiceFolderId] = ChatRoom.defaultVoiceFolder();
+    for (final r in defaults) {
+      rooms[r.id] = r;
+    }
     emit();
     return const Result.ok(null);
   }

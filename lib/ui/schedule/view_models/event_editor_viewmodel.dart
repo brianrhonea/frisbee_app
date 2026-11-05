@@ -152,7 +152,7 @@ class EventEditorViewModel extends ChangeNotifier {
       final teams = await _teams.watchMyTeams(_uid).first;
       _editableTeams = [
         for (final t in teams)
-          if (t.canEdit(_uid)) t,
+          if (t.has(_uid, TeamPermission.manageEvents)) t,
       ];
     } on Exception {
       // Without the team list the event can still go on the personal

@@ -1,8 +1,13 @@
 import 'model_utils.dart';
+import 'team_role.dart';
 
-/// Member roles, most access first. A player can also be given stats
-/// access ([Team.statKeepers]). firestore.rules enforces the same
-/// permissions; keep the two in step.
+export 'team_role.dart';
+
+/// Member tiers, most access first. Teams have all four; community groups
+/// only an owner and members, with anything more coming from the owner's
+/// custom roles ([Team.roles]). A player can also be given stats access
+/// ([Team.statKeepers]). firestore.rules enforces the same permissions;
+/// keep the two in step.
 enum TeamRole {
   /// Everything, including roles and ownership.
   owner,
@@ -48,7 +53,9 @@ enum TeamRole {
     player => 'Players',
   };
 
-  /// Community groups call captains organizers and players members.
+  /// Community groups call players members. Captains in a group are
+  /// organizers from before custom roles, until the owner's app moves them
+  /// into an "Organizer" role ([Team.needsOrganizerMigration]).
   String labelFor(TeamKind kind) => switch ((kind, this)) {
     (TeamKind.community, captain) => 'Organizer',
     (TeamKind.community, player) => 'Member',
@@ -65,14 +72,15 @@ enum TeamRole {
     (TeamKind.community, owner) => 'Everything, including roles',
     (TeamKind.community, captain) =>
       'Manage events, tournaments and join requests',
-    (TeamKind.community, player) => 'Join events and tournaments',
+    (TeamKind.community, player) => 'Join events; roles can grant more',
     _ => summary,
   };
 
-  /// Roles a member can be given; groups have no coaches.
+  /// Tiers a member can be given; groups have only owner and members, and
+  /// use custom roles for the rest.
   static List<TeamRole> rolesFor(TeamKind kind) => switch (kind) {
     TeamKind.team => values,
-    TeamKind.community => const [owner, captain, player],
+    TeamKind.community => const [owner, player],
   };
 
   /// What the role can do, for the role picker.
@@ -191,6 +199,9 @@ class Team {
     this.description = '',
     this.requiresApproval = false,
     this.location,
+    this.roles = const {},
+    this.memberRoles = const {},
+    this.memberPerms = const {},
   });
 
   final String id;
@@ -200,6 +211,17 @@ class Team {
   final String city;
   final String ownerId;
   final TeamKind kind;
+
+  /// Custom roles by id. Only the owner edits them.
+  final Map<String, CustomRole> roles;
+
+  /// uid → ids of the custom roles they have.
+  final Map<String, Set<String>> memberRoles;
+
+  /// uid → the permissions their custom roles grant, denormalized by the
+  /// owner whenever roles change, so firestore.rules can check them
+  /// without reading every role.
+  final Map<String, Set<TeamPermission>> memberPerms;
 
   /// What the group is about, on its home page. Groups only.
   final String description;
@@ -238,12 +260,62 @@ class Team {
 
   TeamRole? roleOf(String uid) => members[uid];
 
-  bool canEdit(String uid) => roleOf(uid)?.canEdit ?? false;
-
-  bool canKeepStats(String uid) => switch (roleOf(uid)) {
+  /// Whether member [uid] may do [permission]: the owner, coaches and
+  /// captains always; others when a custom role (or, for stats, stats
+  /// access) grants it.
+  bool has(String uid, TeamPermission permission) => switch (roleOf(uid)) {
     null => false,
-    final role => role.canKeepStats || statKeepers.contains(uid),
+    final role when role.canEdit => true,
+    _ =>
+      (permission == TeamPermission.keepStats && statKeepers.contains(uid)) ||
+          (memberPerms[uid]?.contains(permission) ?? false),
   };
+
+  /// Team details, roster, playbook, posts and videos.
+  bool canEdit(String uid) => has(uid, TeamPermission.manageTeam);
+
+  bool canKeepStats(String uid) => has(uid, TeamPermission.keepStats);
+
+  /// Whether [by] may remove [target]. Anyone may leave; nobody removes
+  /// the owner. The owner removes anyone; coaches, captains and members
+  /// with Manage members remove plain members, but not other admins.
+  bool canRemove(String by, String target) {
+    final me = roleOf(by);
+    final them = roleOf(target);
+    if (me == null || them == null || them == TeamRole.owner) return false;
+    if (by == target || me == TeamRole.owner) return true;
+    return has(by, TeamPermission.manageMembers) &&
+        them == TeamRole.player &&
+        (memberPerms[target]?.isEmpty ?? true);
+  }
+
+  /// Custom roles, top of the list first.
+  List<CustomRole> get sortedRoles => roles.values.toList()
+    ..sort(
+      (a, b) => a.position != b.position
+          ? a.position.compareTo(b.position)
+          : a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
+
+  /// [uid]'s custom roles, top first.
+  List<CustomRole> rolesOf(String uid) {
+    final ids = memberRoles[uid] ?? const {};
+    return [
+      for (final r in sortedRoles)
+        if (ids.contains(r.id)) r,
+    ];
+  }
+
+  /// What roles [roleIds] grant together, from [roles] (or this team's).
+  Set<TeamPermission> permissionsOf(
+    Iterable<String> roleIds, [
+    Map<String, CustomRole>? roles,
+  ]) => {for (final id in roleIds) ...?(roles ?? this.roles)[id]?.permissions};
+
+  /// Community organizers from before custom roles, still on the captain
+  /// tier. The owner's app moves them into an "Organizer" role.
+  bool get needsOrganizerMigration =>
+      isCommunity && members.values.contains(TeamRole.captain);
 
   /// A player with stats access.
   bool isStatKeeper(String uid) =>
@@ -296,6 +368,9 @@ class Team {
       description: map['description'] as String? ?? '',
       requiresApproval: map['requiresApproval'] as bool? ?? false,
       location: GroupLocation.fromMap(map['location']),
+      roles: parseCustomRoles(map['roles']),
+      memberRoles: parseMemberLists(map['memberRoles'], (s) => s),
+      memberPerms: parseMemberLists(map['memberPerms'], permissionByName),
     );
   }
 
@@ -326,6 +401,9 @@ class Team {
     String? description,
     bool? requiresApproval,
     GroupLocation? Function()? location,
+    Map<String, CustomRole>? roles,
+    Map<String, Set<String>>? memberRoles,
+    Map<String, Set<TeamPermission>>? memberPerms,
   }) => Team(
     id: id,
     name: name ?? this.name,
@@ -344,6 +422,9 @@ class Team {
     description: description ?? this.description,
     requiresApproval: requiresApproval ?? this.requiresApproval,
     location: location != null ? location() : this.location,
+    roles: roles ?? this.roles,
+    memberRoles: memberRoles ?? this.memberRoles,
+    memberPerms: memberPerms ?? this.memberPerms,
   );
 }
 

@@ -12,11 +12,13 @@ import '../../../utils/result.dart';
 
 typedef ChatMember = ({String uid, String name, TeamRole role});
 
-/// Creates a chat room or edits its name and who can read and write.
+/// Creates a chat room or edits its name, folder and who can read and
+/// write.
 class ChatRoomSettingsViewModel extends ChangeNotifier {
   ChatRoomSettingsViewModel({
     required this.teamId,
     this.roomId,
+    this.folderId,
     required TeamRepository teamRepository,
     required ChatRepository chatRepository,
     required AuthRepository authRepository,
@@ -29,6 +31,12 @@ class ChatRoomSettingsViewModel extends ChangeNotifier {
         _team = t;
         notifyListeners();
       }, onError: _onError),
+      _chats.watchFolders(teamId).listen((f) {
+        _folders = f;
+        _foldersLoaded = true;
+        _startNewRoom();
+        notifyListeners();
+      }, onError: (Object _) => _foldersLoaded = true),
       if (roomId != null)
         _chats.watchRoom(teamId, roomId!).listen((r) {
           // Load once; later changes would overwrite the user's edits.
@@ -38,19 +46,22 @@ class ChatRoomSettingsViewModel extends ChangeNotifier {
           notifyListeners();
         }, onError: _onError),
     ];
-    if (roomId == null) {
-      // New rooms start open to everyone, admins writing.
-      _draft = const ChatRoom(
-        id: '',
-        name: '',
-        readRoles: {...TeamRole.values},
-        writeRoles: {TeamRole.owner, TeamRole.coach, TeamRole.captain},
-      );
-    }
+  }
+
+  /// A new room starts with its folder's access, once folders are known;
+  /// open to everyone outside a folder.
+  void _startNewRoom() {
+    if (roomId != null || _draft != null) return;
+    _draft = ChatRoom.newIn(
+      _folders.where((f) => f.id == folderId).firstOrNull,
+    );
   }
 
   /// Null when creating a room.
   final String? roomId;
+
+  /// The folder a new room goes in, if any.
+  final String? folderId;
   final String teamId;
   final ChatRepository _chats;
   final AuthRepository _auth;
@@ -63,6 +74,8 @@ class ChatRoomSettingsViewModel extends ChangeNotifier {
   late final Command0<void> delete;
 
   Team? _team;
+  List<ChatFolder> _folders = const [];
+  bool _foldersLoaded = false;
   ChatRoom? _draft;
   bool _roomMissing = false;
   Object? _error;
@@ -71,23 +84,37 @@ class ChatRoomSettingsViewModel extends ChangeNotifier {
   Team? get team => _team;
   ChatRoom? get room => _draft;
   bool get isNew => roomId == null;
-  bool get loaded => _team != null && (_draft != null || _roomMissing);
+  bool get loaded =>
+      _team != null && _foldersLoaded && (_draft != null || _roomMissing);
   Object? get error => _error;
 
-  bool get canManage => _team?.canEdit(uid) ?? false;
+  bool get canManage => _team?.has(uid, TeamPermission.manageChats) ?? false;
 
-  /// Only the owner deletes rooms, since only they can read every one.
-  /// General stays.
-  bool get canDelete =>
-      !isNew &&
-      !(_draft?.isGeneral ?? true) &&
-      _team?.roleOf(uid) == TeamRole.owner;
+  /// Deleting a room deletes its messages, so chat managers delete only
+  /// rooms they can read. General stays.
+  bool get canDelete {
+    final room = _draft;
+    final team = _team;
+    return !isNew &&
+        canManage &&
+        room != null &&
+        team != null &&
+        !room.isGeneral &&
+        room.accessFor(team, uid).canRead;
+  }
 
   bool get canSave => canManage && (_draft?.name.trim().isNotEmpty ?? false);
 
-  /// Roles whose access can be set; the owner always has full access.
-  List<TeamRole> get roles =>
-      TeamRole.values.where((r) => r != TeamRole.owner).toList();
+  /// Audience ids whose access can be set ([ChatAudience]): everyone, the
+  /// team's tiers and its custom roles. The owner always has full access.
+  List<String> get audiences =>
+      _team == null ? const [] : ChatAudience.choicesFor(_team!);
+
+  String audienceLabel(String id) =>
+      _team == null ? '' : ChatAudience.labelOf(_team!, id);
+
+  /// Folders the room can go in.
+  List<ChatFolder> get folders => _folders;
 
   /// Members who can be given access beyond their role, by name.
   List<ChatMember> get members {
@@ -100,10 +127,39 @@ class ChatRoomSettingsViewModel extends ChangeNotifier {
     ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
+  /// What member [uid] gets from their tier and custom roles alone.
+  ChatAccess accessByRole(String uid) {
+    final room = _draft;
+    final team = _team;
+    if (room == null || team == null) return ChatAccess.none;
+    var best = ChatAccess.none;
+    for (final id in ChatAudience.idsFor(team, uid)) {
+      final a = room.roleAccess(id);
+      if (a.index > best.index) best = a;
+    }
+    return best;
+  }
+
+  /// [uid]'s tier and custom roles, for the people list.
+  String rolesLabel(String uid) {
+    final team = _team;
+    final role = team?.roleOf(uid);
+    if (team == null || role == null) return '';
+    return [
+      team.roleLabel(role),
+      for (final r in team.rolesOf(uid)) r.name,
+    ].join(', ');
+  }
+
   void setName(String name) => _update(_draft?.withName(name));
 
-  void setRoleAccess(TeamRole role, ChatAccess access) =>
-      _update(_draft?.withRoleAccess(role, access));
+  /// Text or voice; only while creating the room.
+  void setKind(ChatRoomKind kind) => _update(_draft?.withKind(kind));
+
+  void setRoleAccess(String audienceId, ChatAccess access) =>
+      _update(_draft?.withRoleAccess(audienceId, access));
+
+  void setFolder(String? folderId) => _update(_draft?.withFolder(folderId));
 
   void setUserAccess(String uid, ChatAccess access) =>
       _update(_draft?.withUserAccess(uid, access));
