@@ -697,6 +697,38 @@ void main() {
       );
     });
 
+    for (final size in const [Size(390, 844), Size(1024, 768), Size(1600, 900)])
+      testWidgets('the Send button shows and sends at ${size.width}px wide', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        joinAs(TeamRole.player);
+        await pump(tester, 'general');
+        final send = find.byTooltip('Send');
+        expect(send, findsOneWidget);
+        // Nothing to send yet.
+        expect(
+          tester
+              .widget<IconButton>(
+                find.ancestor(of: send, matching: find.byType(IconButton)),
+              )
+              .onPressed,
+          isNull,
+        );
+        await tester.enterText(find.byType(TextField), 'Tap to send');
+        await tester.pump();
+        await tester.tap(send);
+        await tester.pump();
+        await tester.pump();
+        expect(find.text('Tap to send'), findsOneWidget);
+        expect(
+          tester.widget<TextField>(find.byType(TextField)).controller!.text,
+          isEmpty,
+        );
+      });
+
     testWidgets('read-only members see a notice instead of the composer', (
       tester,
     ) async {

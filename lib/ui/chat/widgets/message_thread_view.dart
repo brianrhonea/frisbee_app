@@ -749,16 +749,21 @@ class _Composer extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // Phones have no Enter key to send with.
-                    if (!wide)
-                      IconButton(
-                        tooltip: 'Send',
-                        color: c.accent,
-                        icon: const Icon(Icons.send_rounded, size: 22),
-                        onPressed: sending ? null : onSend,
-                      )
-                    else
-                      const SizedBox(width: 12),
+                    // Always shown: touch screens of any size (tablets
+                    // included) may have no Enter key to send with.
+                    ValueListenableBuilder(
+                      valueListenable: controller,
+                      builder: (context, value, _) {
+                        final empty =
+                            value.text.trim().isEmpty && vm.drafts.isEmpty;
+                        return IconButton(
+                          tooltip: 'Send',
+                          color: c.accent,
+                          icon: const Icon(Icons.send_rounded, size: 22),
+                          onPressed: sending || empty ? null : onSend,
+                        );
+                      },
+                    ),
                   ],
                 ),
               ],
