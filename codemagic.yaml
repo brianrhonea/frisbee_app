@@ -66,6 +66,13 @@ workflows:
         script: xcode-project use-profiles
       - name: Flutter packages
         script: flutter pub get
+      # No Podfile.lock is committed, so pods resolve fresh each build. The
+      # build image's cached CocoaPods spec index can lag behind new Firebase
+      # pod releases ("specs repository is too out-of-date"), so refresh it.
+      - name: CocoaPods install
+        script: |
+          cd ios
+          pod install --repo-update
       - name: Checks
         script: |
           flutter analyze
