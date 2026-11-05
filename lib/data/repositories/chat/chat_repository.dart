@@ -60,6 +60,15 @@ abstract class ChatRepository {
     required int limit,
   });
 
+  /// Up to [limit] messages older than [before], oldest first: the page
+  /// above what's loaded.
+  Future<Result<List<ChatMessage>>> fetchOlderMessages(
+    String teamId,
+    String roomId, {
+    required ChatMessage before,
+    required int limit,
+  });
+
   /// Uploads [attachments], then posts the message.
   Future<Result<void>> sendMessage(
     String teamId,

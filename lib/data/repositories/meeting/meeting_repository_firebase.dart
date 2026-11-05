@@ -300,6 +300,27 @@ class MeetingRepositoryFirebase implements MeetingRepository {
       );
 
   @override
+  Future<Result<List<ChatMessage>>> fetchOlderMessages(
+    String teamId,
+    String meetingId, {
+    required ChatMessage before,
+    required int limit,
+  }) => guard(() async {
+    final docs = await pageAfter(
+      _messages(teamId, meetingId),
+      field: 'createdAt',
+      afterValue: before.createdAt,
+      afterId: before.id,
+      limit: limit,
+      label: 'meetingMessages',
+    );
+    return [
+      for (final d in docs.reversed)
+        ChatMessage.fromMap(d.id, plainData(d.data())),
+    ];
+  });
+
+  @override
   Future<Result<void>> sendMessage(
     String teamId,
     String meetingId, {

@@ -82,6 +82,15 @@ abstract class MeetingRepository {
     required int limit,
   });
 
+  /// Up to [limit] messages older than [before], oldest first: the page
+  /// above what's loaded.
+  Future<Result<List<ChatMessage>>> fetchOlderMessages(
+    String teamId,
+    String meetingId, {
+    required ChatMessage before,
+    required int limit,
+  });
+
   /// Posts a text message to the meeting chat.
   Future<Result<void>> sendMessage(
     String teamId,

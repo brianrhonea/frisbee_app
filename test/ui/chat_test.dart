@@ -502,6 +502,36 @@ void main() {
       expect(vm.hasMore, isFalse);
       vm.dispose();
     });
+
+    test('keeps messages a new one pushes out of the live page', () async {
+      chats.messages['general'] = [
+        for (var i = 0; i < 50; i++)
+          ChatMessage(
+            id: 'old$i',
+            authorId: 'p2',
+            authorName: 'Pat',
+            createdAt: DateTime(2026, 1, 1, 0, i),
+          ),
+      ];
+      joinAs(TeamRole.player);
+      final vm = load('general');
+      await pumpEventQueue();
+      expect(vm.messages.first.id, 'old0');
+      await vm.send.execute('newest');
+      await pumpEventQueue();
+      // The live page is the newest 50; old0 stays shown above it.
+      expect(vm.messages, hasLength(51));
+      expect(vm.messages.first.id, 'old0');
+      expect(vm.messages.last.text, 'newest');
+      // Deleting one still takes it away.
+      await vm.deleteMessage.execute(vm.messages[1]);
+      await pumpEventQueue();
+      final ids = vm.messages.map((m) => m.id).toList();
+      expect(ids, isNot(contains('old1')));
+      expect(ids.toSet(), hasLength(ids.length), reason: 'no duplicates');
+      expect(ids.first, 'old0');
+      vm.dispose();
+    });
   });
 
   group('ChatRoomSettingsViewModel', () {

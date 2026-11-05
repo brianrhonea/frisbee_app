@@ -234,6 +234,27 @@ class ChatRepositoryFirebase implements ChatRepository {
   );
 
   @override
+  Future<Result<List<ChatMessage>>> fetchOlderMessages(
+    String teamId,
+    String roomId, {
+    required ChatMessage before,
+    required int limit,
+  }) => guard(() async {
+    final docs = await pageAfter(
+      _messages(teamId, roomId),
+      field: 'createdAt',
+      afterValue: before.createdAt,
+      afterId: before.id,
+      limit: limit,
+      label: 'chatMessages',
+    );
+    return [
+      for (final d in docs.reversed)
+        ChatMessage.fromMap(d.id, plainData(d.data())),
+    ];
+  });
+
+  @override
   Future<Result<void>> sendMessage(
     String teamId,
     String roomId, {

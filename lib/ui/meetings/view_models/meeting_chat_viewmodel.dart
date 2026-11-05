@@ -74,6 +74,15 @@ class MeetingChatViewModel extends MessageThreadViewModel {
       _meetings.watchMessages(teamId, meetingId, limit: limit);
 
   @override
+  Future<Result<List<ChatMessage>>> fetchOlder(ChatMessage before, int limit) =>
+      _meetings.fetchOlderMessages(
+        teamId,
+        meetingId,
+        before: before,
+        limit: limit,
+      );
+
+  @override
   Future<Result<void>> postMessage(
     AppUser author,
     String text,

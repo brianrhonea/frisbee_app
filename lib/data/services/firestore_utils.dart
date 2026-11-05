@@ -165,3 +165,34 @@ Future<T> muteAware<T>(
     rethrow;
   }
 }
+
+/// One page of [query] after the document ([afterId], whose [field] is
+/// [afterValue]) in `orderBy(field, descending)` order: a cursor read that
+/// bills only the page, unlike re-listening with a bigger limit. The
+/// document id breaks ties between equal values.
+Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> pageAfter(
+  Query<Map<String, dynamic>> query, {
+  required String field,
+  required Object? afterValue,
+  required String afterId,
+  required int limit,
+  bool descending = true,
+  String? label,
+}) async {
+  final snap = await query
+      .orderBy(field, descending: descending)
+      .orderBy(FieldPath.documentId, descending: descending)
+      .startAfter([
+        if (afterValue is DateTime)
+          Timestamp.fromDate(afterValue)
+        else
+          afterValue,
+        afterId,
+      ])
+      .limit(limit)
+      .get();
+  if (label != null && !snap.metadata.isFromCache) {
+    FirestoreReads.add(label, snap.docs.length);
+  }
+  return snap.docs;
+}

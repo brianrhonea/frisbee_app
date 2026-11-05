@@ -241,6 +241,21 @@ class FakeMeetingRepository implements MeetingRepository {
   }) => _watch(() => List.of(messages[meetingId] ?? const <ChatMessage>[]));
 
   @override
+  Future<Result<List<ChatMessage>>> fetchOlderMessages(
+    String teamId,
+    String meetingId, {
+    required ChatMessage before,
+    required int limit,
+  }) async {
+    final all = messages[meetingId] ?? const <ChatMessage>[];
+    final i = all.indexWhere((m) => m.id == before.id);
+    final older = i < 0 ? const <ChatMessage>[] : all.sublist(0, i);
+    return Result.ok(
+      older.skip(older.length > limit ? older.length - limit : 0).toList(),
+    );
+  }
+
+  @override
   Future<Result<void>> sendMessage(
     String teamId,
     String meetingId, {

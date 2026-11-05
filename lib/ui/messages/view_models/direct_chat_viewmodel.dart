@@ -106,6 +106,10 @@ class DirectChatViewModel extends MessageThreadViewModel {
       _dms.watchMessages(conversationId, limit: limit);
 
   @override
+  Future<Result<List<ChatMessage>>> fetchOlder(ChatMessage before, int limit) =>
+      _dms.fetchOlderMessages(conversationId, before: before, limit: limit);
+
+  @override
   Future<Result<void>> postMessage(
     AppUser author,
     String text,

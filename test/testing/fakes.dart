@@ -1390,6 +1390,16 @@ class FakeChatRepository implements ChatRepository {
   });
 
   @override
+  Future<Result<List<ChatMessage>>> fetchOlderMessages(
+    String teamId,
+    String roomId, {
+    required ChatMessage before,
+    required int limit,
+  }) async => Result.ok(
+    olderThan(messages[roomId] ?? const <ChatMessage>[], before, limit),
+  );
+
+  @override
   Future<Result<void>> sendMessage(
     String teamId,
     String roomId, {
@@ -1548,6 +1558,15 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
   @override
   Stream<List<ChatMessage>> watchMessages(String id, {required int limit}) =>
       _watch(() => List.of(messages[id] ?? const <ChatMessage>[]));
+
+  @override
+  Future<Result<List<ChatMessage>>> fetchOlderMessages(
+    String id, {
+    required ChatMessage before,
+    required int limit,
+  }) async => Result.ok(
+    olderThan(messages[id] ?? const <ChatMessage>[], before, limit),
+  );
 
   @override
   Future<Result<void>> sendMessage(
@@ -2132,4 +2151,15 @@ class FakeStatsRepository implements StatsRepository {
   @override
   Future<Result<void>> deleteTournament(String teamId, String tournamentId) =>
       throw UnimplementedError();
+}
+
+/// Messages before [before] in [all] (oldest first), at most [limit].
+List<ChatMessage> olderThan(
+  List<ChatMessage> all,
+  ChatMessage before,
+  int limit,
+) {
+  final i = all.indexWhere((m) => m.id == before.id);
+  final older = i < 0 ? const <ChatMessage>[] : all.sublist(0, i);
+  return older.skip(older.length > limit ? older.length - limit : 0).toList();
 }

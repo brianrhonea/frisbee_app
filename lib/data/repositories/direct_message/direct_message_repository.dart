@@ -26,6 +26,14 @@ abstract class DirectMessageRepository {
   /// The newest [limit] messages, oldest first.
   Stream<List<ChatMessage>> watchMessages(String id, {required int limit});
 
+  /// Up to [limit] messages older than [before], oldest first: the page
+  /// above what's loaded.
+  Future<Result<List<ChatMessage>>> fetchOlderMessages(
+    String id, {
+    required ChatMessage before,
+    required int limit,
+  });
+
   Future<Result<void>> sendMessage(
     String id, {
     required AppUser author,

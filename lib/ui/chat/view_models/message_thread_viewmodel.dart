@@ -20,7 +20,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
        _picker = filePicker {
     send = Command1<void, String>(_send);
     pickFiles = Command1<void, bool>(_pickFiles);
-    deleteMessage = Command1<void, ChatMessage>(removeMessage);
+    deleteMessage = Command1<void, ChatMessage>(_delete);
     saveAttachment = Command1<bool, ChatAttachment>(_saveAttachment);
   }
 
@@ -47,7 +47,17 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   /// Downloads an attachment and asks where to save it. False if cancelled.
   late final Command1<bool, ChatAttachment> saveAttachment;
 
-  List<ChatMessage>? _messages;
+  /// The newest [pageSize] messages, live.
+  List<ChatMessage>? _live;
+
+  /// Older messages: pages loaded with [loadMore], plus ones new messages
+  /// pushed out of the live page. Oldest first.
+  final _older = <ChatMessage>[];
+  bool _olderExhausted = false;
+  bool _loadingMore = false;
+  bool _pagingFailed = false;
+
+  /// Grows when cursor paging fails, as the fallback.
   int _limit = pageSize;
   Object? _messageError;
   final _drafts = <NewAttachment>[];
@@ -56,6 +66,10 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   // Where messages come from and go.
   @protected
   Stream<List<ChatMessage>> watchMessages(int limit);
+
+  /// Up to [limit] messages older than [before], oldest first.
+  @protected
+  Future<Result<List<ChatMessage>>> fetchOlder(ChatMessage before, int limit);
   @protected
   Future<Result<void>> postMessage(
     AppUser author,
@@ -88,12 +102,19 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   void onMessages(List<ChatMessage> messages) {}
 
   String get uid => _auth.currentUser?.uid ?? '';
-  List<ChatMessage> get messages => removals.visible(_messages ?? const []);
-  bool get messagesLoaded => _messages != null;
+  List<ChatMessage> get messages => removals.visible([..._older, ...?_live]);
+  bool get messagesLoaded => _live != null;
   Object? get messageError => _messageError;
 
-  /// More messages may be on the server than the [pageSize]s loaded.
-  bool get hasMore => (_messages?.length ?? 0) >= _limit;
+  /// More messages may be on the server than those loaded.
+  bool get hasMore => !_olderExhausted && (_live?.length ?? 0) >= _limit;
+
+  /// Whether an older page is on its way.
+  bool get loadingMore => _loadingMore;
+
+  /// Whether scrolling to the top should load the next page by itself.
+  /// Off once paging has failed, so a broken query can't loop.
+  bool get autoLoadMore => !_pagingFailed && !_loadingMore;
 
   /// Pending attachments for the next message.
   List<NewAttachment> get drafts => List.unmodifiable(_drafts);
@@ -107,22 +128,72 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   void startMessages() {
     _messageSub?.cancel();
     _messageSub = watchMessages(_limit).listen((m) {
-      _messages = m;
+      _keepPushedOut(_live, m);
+      // A deletion pulls an older message back into the live page.
+      final live = {for (final x in m) x.id};
+      _older.removeWhere((x) => live.contains(x.id));
+      _live = m;
       _messageError = null;
       onMessages(m);
       notifyListeners();
     }, onError: _onMessageError);
   }
 
+  /// A new message pushes the oldest out of the live page; keep it (with
+  /// the older pages) unless it was deleted. A pushed-out message is older
+  /// than everything still in a full page; a deleted one isn't, or the
+  /// page wasn't full.
+  void _keepPushedOut(List<ChatMessage>? before, List<ChatMessage> after) {
+    if (before == null || after.isEmpty || after.length < _limit) return;
+    final oldest = after.first.createdAt;
+    if (oldest == null) return;
+    final ids = {for (final m in after) m.id};
+    final pushed = [
+      for (final m in before)
+        if (!ids.contains(m.id) &&
+            m.createdAt != null &&
+            m.createdAt!.isBefore(oldest))
+          m,
+    ];
+    if (pushed.isEmpty) return;
+    final known = {for (final m in _older) m.id};
+    _older.addAll(pushed.where((m) => !known.contains(m.id)));
+  }
+
   void _onMessageError(Object e) {
     _messageError = e;
-    _messages ??= const [];
+    _live ??= const [];
     notifyListeners();
   }
 
-  void loadMore() {
-    _limit += pageSize;
-    startMessages();
+  /// Loads the page of messages above those shown. Reads only that page;
+  /// if paging fails it falls back to listening to a bigger live page.
+  Future<void> loadMore() async {
+    final live = _live;
+    if (_loadingMore || live == null || !hasMore) return;
+    final before = _older.firstOrNull ?? live.firstOrNull;
+    if (before == null) return;
+    if (_pagingFailed) {
+      _limit += pageSize;
+      startMessages();
+      return;
+    }
+    _loadingMore = true;
+    notifyListeners();
+    final result = await fetchOlder(before, pageSize);
+    _loadingMore = false;
+    switch (result) {
+      case Ok(:final value):
+        final known = {for (final m in _older) m.id};
+        _older.insertAll(0, value.where((m) => !known.contains(m.id)));
+        if (value.length < pageSize) _olderExhausted = true;
+        notifyListeners();
+      case Error():
+        _pagingFailed = true;
+        _older.clear();
+        _limit += pageSize;
+        startMessages();
+    }
   }
 
   void removeDraft(NewAttachment a) {
@@ -136,6 +207,16 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
         if (r is Error) _downloads.remove(a.path);
         return r;
       });
+
+  Future<Result<void>> _delete(ChatMessage m) async {
+    final result = await removeMessage(m);
+    if (result is Ok) {
+      final before = _older.length;
+      _older.removeWhere((o) => o.id == m.id);
+      if (_older.length != before) notifyListeners();
+    }
+    return result;
+  }
 
   Future<Result<void>> _send(String text) async {
     final user = _auth.currentUser;

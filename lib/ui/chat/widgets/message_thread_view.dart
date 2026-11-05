@@ -161,11 +161,23 @@ class _MessageList extends StatelessWidget {
       itemCount: count,
       itemBuilder: (context, i) {
         if (i == messages.length) {
+          // Scrolled to the top: fetch the page above (one page of reads).
+          if (vm.autoLoadMore) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => vm.loadMore());
+          }
           return Center(
-            child: TextButton(
-              onPressed: vm.loadMore,
-              child: const Text('Load earlier messages'),
-            ),
+            child: vm.loadingMore
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : TextButton(
+                    onPressed: vm.loadMore,
+                    child: const Text('Load earlier messages'),
+                  ),
           );
         }
         final index = messages.length - 1 - i;

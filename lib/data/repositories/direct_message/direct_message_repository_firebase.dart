@@ -170,6 +170,26 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
       );
 
   @override
+  Future<Result<List<ChatMessage>>> fetchOlderMessages(
+    String id, {
+    required ChatMessage before,
+    required int limit,
+  }) => guard(() async {
+    final docs = await pageAfter(
+      _messages(id),
+      field: 'createdAt',
+      afterValue: before.createdAt,
+      afterId: before.id,
+      limit: limit,
+      label: 'directMessages',
+    );
+    return [
+      for (final d in docs.reversed)
+        ChatMessage.fromMap(d.id, plainData(d.data())),
+    ];
+  });
+
+  @override
   Future<Result<void>> sendMessage(
     String id, {
     required AppUser author,
