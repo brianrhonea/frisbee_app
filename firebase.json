@@ -7,12 +7,19 @@
     "rules": "storage.rules"
   },
   "hosting": {
-    "public": "hosting",
+    "public": "build/site",
+    "predeploy": [
+      "bash scripts/build_site.sh"
+    ],
     "ignore": [
       "firebase.json",
       "**/node_modules/**"
     ],
     "rewrites": [
+      {
+        "source": "/app/**",
+        "destination": "/app/index.html"
+      },
       {
         "source": "/join/**",
         "destination": "/join.html"
@@ -51,6 +58,15 @@
           {
             "key": "Cache-Control",
             "value": "public, max-age=300, s-maxage=3600"
+          }
+        ]
+      },
+      {
+        "source": "/app/@(index.html|flutter_bootstrap.js|flutter_service_worker.js|main.dart.js|version.json|manifest.json)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
           }
         ]
       }

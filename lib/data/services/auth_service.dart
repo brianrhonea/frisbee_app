@@ -46,6 +46,10 @@ class AuthService {
       _auth.sendPasswordResetEmail(email: email);
 
   Future<void> signInWithGoogle() async {
+    if (PlatformSupport.webGoogleSignIn) {
+      await _auth.signInWithPopup(GoogleAuthProvider());
+      return;
+    }
     await _auth.signInWithCredential(await _googleCredential());
   }
 
@@ -79,6 +83,8 @@ class AuthService {
             password: password ?? '',
           ),
         );
+      case SignInMethod.google when PlatformSupport.webGoogleSignIn:
+        await user.reauthenticateWithPopup(GoogleAuthProvider());
       case SignInMethod.google:
         await user.reauthenticateWithCredential(await _googleCredential());
       case SignInMethod.apple:

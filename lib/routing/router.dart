@@ -6,12 +6,6 @@ import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
 import '../domain/models/model_utils.dart';
 import '../domain/models/team.dart';
-import '../ui/auth/view_models/choose_username_viewmodel.dart';
-import '../ui/auth/view_models/sign_in_viewmodel.dart';
-import '../ui/auth/view_models/sign_up_viewmodel.dart';
-import '../ui/auth/widgets/choose_username_screen.dart';
-import '../ui/auth/widgets/sign_in_screen.dart';
-import '../ui/auth/widgets/sign_up_screen.dart';
 import '../ui/chat/view_models/chat_room_settings_viewmodel.dart';
 import '../ui/chat/view_models/chat_room_viewmodel.dart';
 import '../ui/chat/widgets/chat_layout.dart';
@@ -31,9 +25,6 @@ import '../ui/messages/widgets/inbox_screen.dart';
 import '../ui/messages/widgets/people_search_screen.dart';
 import '../ui/core/ui/status_views.dart';
 import '../ui/core/ui/view_model_host.dart';
-import '../ui/events/widgets/events_screen.dart';
-import '../ui/explore/view_models/player_search_viewmodel.dart';
-import '../ui/explore/widgets/explore_screen.dart';
 import '../ui/core/ui/slide_over_page.dart';
 import '../ui/settings/widgets/follow_requests_screen.dart';
 import '../ui/settings/widgets/settings_screen.dart';
@@ -47,17 +38,11 @@ import '../ui/notifications/view_models/notification_settings_viewmodel.dart';
 import '../ui/notifications/view_models/notifications_viewmodel.dart';
 import '../ui/notifications/widgets/notification_settings_screen.dart';
 import '../ui/notifications/widgets/notifications_screen.dart';
-import '../ui/profile/view_models/player_profile_viewmodel.dart';
 import '../ui/people/view_models/following_viewmodel.dart';
 import '../ui/people/widgets/following_screen.dart';
 import '../ui/posts/view_models/post_detail_viewmodel.dart';
 import '../ui/posts/widgets/post_detail_screen.dart';
 import '../ui/profile/view_models/profile_viewmodel.dart';
-import '../ui/profile/widgets/profile_screen.dart';
-import '../ui/rankings/view_models/rankings_viewmodel.dart';
-import '../ui/rankings/view_models/usau_team_viewmodel.dart';
-import '../ui/rankings/widgets/rankings_screen.dart';
-import '../ui/rankings/widgets/usau_team_screen.dart';
 import '../ui/teams/view_models/join_link_viewmodel.dart';
 import '../ui/teams/widgets/join_link_screen.dart';
 import '../ui/schedule/view_models/event_detail_viewmodel.dart';
@@ -75,13 +60,10 @@ import '../ui/stats/widgets/game_screen.dart';
 import '../ui/stats/widgets/stats_tab.dart';
 import '../ui/stats/widgets/tournament_screen.dart';
 import '../ui/teams/view_models/create_team_viewmodel.dart';
-import '../ui/teams/view_models/team_home_viewmodel.dart';
-import '../ui/teams/view_models/team_search_viewmodel.dart';
 import '../ui/teams/view_models/teams_viewmodel.dart';
 import '../ui/teams/view_models/usau_team_search_viewmodel.dart';
 import '../ui/teams/widgets/create_team_screen.dart';
 import '../ui/teams/view_models/usau_roster_viewmodel.dart';
-import '../ui/teams/widgets/team_home_screen.dart';
 import '../ui/teams/widgets/team_section_screen.dart';
 import '../ui/teams/widgets/usau_roster_screen.dart';
 import '../ui/teams/widgets/teams_screen.dart';
@@ -98,15 +80,13 @@ import '../ui/videos/view_models/video_editor_viewmodel.dart';
 import '../ui/videos/view_models/video_viewmodel.dart';
 import '../ui/videos/widgets/video_editor_screen.dart';
 import '../ui/videos/widgets/video_screen.dart';
-import '../ui/tournaments/view_models/tournament_detail_viewmodel.dart';
-import '../ui/tournaments/view_models/tournaments_viewmodel.dart';
-import '../ui/tournaments/widgets/tournament_detail_screen.dart';
 import '../ui/workouts/view_models/record_workout_viewmodel.dart';
 import '../ui/workouts/widgets/record_workout_screen.dart';
 import '../ui/workouts/widgets/route_widgets.dart';
+import 'route_builders.dart';
 import 'routes.dart';
 
-const _splash = '/splash';
+const splashPath = '/splash';
 const _publicRoutes = {Routes.signIn, Routes.signUp};
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -118,30 +98,15 @@ GoRouter router(AuthRepository auth) => GoRouter(
   redirect: (context, state) => authRedirect(auth, state.uri),
   routes: [
     GoRoute(
-      path: _splash,
+      path: splashPath,
       builder: (_, _) => const Scaffold(body: LoadingView()),
     ),
-    GoRoute(
-      path: Routes.signIn,
-      builder: (context, _) => ViewModelHost(
-        create: (c) => SignInViewModel(authRepository: c.read()),
-        builder: (_, vm) => SignInScreen(viewModel: vm),
-      ),
-    ),
+    GoRoute(path: Routes.signIn, builder: (_, _) => signInPage()),
     GoRoute(
       path: Routes.chooseUsername,
-      builder: (context, _) => ViewModelHost(
-        create: (c) => ChooseUsernameViewModel(authRepository: c.read()),
-        builder: (_, vm) => ChooseUsernameScreen(viewModel: vm),
-      ),
+      builder: (_, _) => chooseUsernamePage(),
     ),
-    GoRoute(
-      path: Routes.signUp,
-      builder: (context, _) => ViewModelHost(
-        create: (c) => SignUpViewModel(authRepository: c.read()),
-        builder: (_, vm) => SignUpScreen(viewModel: vm),
-      ),
-    ),
+    GoRoute(path: Routes.signUp, builder: (_, _) => signUpPage()),
     // Invite links (InviteLinks), opened from other apps: join a team by
     // its code, or open a group's page, where people join or ask to.
     GoRoute(
@@ -647,31 +612,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
           routes: [
             GoRoute(
               path: Routes.explorePath,
-              builder: (_, state) => ViewModelHost(
-                create: (c) => TeamSearchViewModel(
-                  teamRepository: c.read(),
-                  authRepository: c.read(),
-                ),
-                builder: (_, vm) => ViewModelHost(
-                  create: (c) =>
-                      PlayerSearchViewModel(profileRepository: c.read()),
-                  builder: (_, players) => ViewModelHost(
-                    create: (c) =>
-                        TournamentsViewModel(tournamentRepository: c.read()),
-                    builder: (_, events) => ExploreScreen(
-                      viewModel: vm,
-                      players: players,
-                      events: events,
-                      initialQuery: state.uri.queryParameters['q'] ?? '',
-                      initialFilter: ExploreFilter.values
-                          .where(
-                            (f) => f.name == state.uri.queryParameters['only'],
-                          )
-                          .firstOrNull,
-                    ),
-                  ),
-                ),
-              ),
+              builder: (_, state) => explorePage(state),
             ),
             GoRoute(
               path: '/players/:uid',
@@ -680,51 +621,27 @@ GoRouter router(AuthRepository auth) => GoRouter(
                   state.pathParameters['uid'] == auth.currentUser?.uid
                   ? Routes.profile
                   : null,
-              builder: (_, state) {
-                final uid = state.pathParameters['uid']!;
-                return ViewModelHost(
-                  key: ValueKey(uid),
-                  create: (c) => _playerProfile(c, uid),
-                  builder: (_, vm) => PlayerProfileScreen(viewModel: vm),
-                );
-              },
+              builder: (_, state) => playerPage(state.pathParameters['uid']!),
             ),
             GoRoute(
               path: Routes.tournaments,
-              builder: (_, _) => ViewModelHost(
-                create: (c) =>
-                    TournamentsViewModel(tournamentRepository: c.read()),
-                builder: (_, vm) => EventsScreen(viewModel: vm),
-              ),
+              builder: (_, _) => eventsPage(),
               routes: [
                 GoRoute(
                   path: ':id',
-                  builder: (_, state) {
-                    final id = state.pathParameters['id']!;
-                    return ViewModelHost(
-                      key: ValueKey('tournament-$id'),
-                      create: (c) => TournamentDetailViewModel(
-                        tournamentId: id,
-                        tournamentRepository: c.read(),
-                        usauScheduleRepository: c.read(),
-                        followRepository: c.read(),
-                        notificationRepository: c.read(),
-                        authRepository: c.read(),
-                      ),
-                      builder: (_, vm) => TournamentDetailScreen(viewModel: vm),
-                    );
-                  },
+                  builder: (_, state) =>
+                      tournamentPage(state.pathParameters['id']!),
                 ),
               ],
             ),
             GoRoute(
               path: Routes.rankings,
-              builder: (_, _) => ViewModelHost(
-                create: (c) => RankingsViewModel(rankingRepository: c.read()),
-                builder: (_, vm) => RankingsScreen(viewModel: vm),
-              ),
+              builder: (_, _) => rankingsPage(),
               routes: [
-                GoRoute(path: 'team', builder: (_, state) => _usauTeam(state)),
+                GoRoute(
+                  path: 'team',
+                  builder: (_, state) => usauTeamPage(state),
+                ),
               ],
             ),
           ],
@@ -779,7 +696,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                       routes: [
                         GoRoute(
                           path: 'team',
-                          builder: (_, state) => _usauTeam(state),
+                          builder: (_, state) => usauTeamPage(state),
                         ),
                       ],
                     ),
@@ -797,31 +714,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                     return TeamSection.fromLegacyTab(tab)?.route(teamId) ??
                         Routes.team(teamId);
                   },
-                  builder: (_, state) {
-                    final teamId = state.pathParameters['teamId']!;
-                    return ViewModelHost(
-                      key: ValueKey('team-$teamId'),
-                      create: (c) => TeamHomeViewModel(
-                        teamId: teamId,
-                        teamRepository: c.read(),
-                        eventRepository: c.read(),
-                        teamPostRepository: c.read(),
-                        authRepository: c.read(),
-                        filePicker: c.read(),
-                        followRepository: c.read(),
-                        notificationRepository: c.read(),
-                        groupTournamentRepository: c.read(),
-                        usauTeamRepository: c.read(),
-                        rankingRepository: c.read(),
-                      ),
-                      builder: (_, vm) => TeamHomeScreen(
-                        viewModel: vm,
-                        section: TeamSection.fromPath(
-                          state.uri.queryParameters['section'],
-                        ),
-                      ),
-                    );
-                  },
+                  builder: (_, state) => teamPage(state),
                   routes: [
                     // Sections are tabs of the team page; old links (e.g.
                     // in the notification feed) name them by path.
@@ -1057,13 +950,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
           routes: [
             GoRoute(
               path: Routes.profile,
-              builder: (_, _) => ViewModelHost(
-                create: (c) => _playerProfile(
-                  c,
-                  c.read<AuthRepository>().currentUser?.uid ?? '',
-                ),
-                builder: (_, vm) => PlayerProfileScreen(viewModel: vm),
-              ),
+              builder: (_, _) => myProfilePage(),
               routes: [
                 // Everything the user follows, over the shell.
                 GoRoute(
@@ -1100,40 +987,31 @@ Widget _settings(Widget Function(ProfileViewModel vm) screen) => ViewModelHost(
   builder: (_, vm) => screen(vm),
 );
 
-PlayerProfileViewModel _playerProfile(BuildContext c, String uid) =>
-    PlayerProfileViewModel(
-      uid: uid,
-      profileRepository: c.read(),
-      authRepository: c.read(),
-      teamRepository: c.read(),
-      statsRepository: c.read(),
-      directMessageRepository: c.read(),
-      followRepository: c.read(),
-      userPostRepository: c.read(),
-      notificationRepository: c.read(),
-    );
-
 /// Sends signed-out users to sign-in (remembering where they were headed),
 /// signed-in users without a username to pick one, and everyone else away
-/// from the auth screens: to Community, or back to
+/// from the auth screens: to [home] (Community in the app), or back to
 /// the invite link they opened so they can finish joining.
-String? authRedirect(AuthRepository auth, Uri uri) {
+String? authRedirect(
+  AuthRepository auth,
+  Uri uri, {
+  String home = Routes.home,
+}) {
   final path = uri.path;
   final from = uri.queryParameters['from'];
   if (!auth.isReady) {
-    if (path == _splash) return null;
+    if (path == splashPath) return null;
     return Uri(
-      path: _splash,
+      path: splashPath,
       queryParameters: {'from': uri.toString()},
     ).toString();
   }
   final public = _publicRoutes.contains(path);
   if (!auth.isAuthenticated) {
     if (public) return null;
-    final target = path == _splash ? from : uri.toString();
+    final target = path == splashPath ? from : uri.toString();
     return Uri(
       path: Routes.signIn,
-      queryParameters: target == null || target == Routes.home
+      queryParameters: target == null || target == home
           ? null
           : {'from': target},
     ).toString();
@@ -1142,18 +1020,18 @@ String? authRedirect(AuthRepository auth, Uri uri) {
   final choosing = path == Routes.chooseUsername;
   if (auth.needsUsername) {
     if (choosing) return null;
-    final target = public || path == _splash ? from : uri.toString();
+    final target = public || path == splashPath ? from : uri.toString();
     return Uri(
       path: Routes.chooseUsername,
-      queryParameters: target == null || target == Routes.home
+      queryParameters: target == null || target == home
           ? null
           : {'from': target},
     ).toString();
   }
-  if (choosing) return from ?? Routes.home;
-  if (public) return _isInviteLink(from) ? from : Routes.home;
+  if (choosing) return from ?? home;
+  if (public) return _isInviteLink(from) ? from : home;
   // Already signed in when the app opened: carry on where it was headed.
-  if (path == _splash) return from ?? Routes.home;
+  if (path == splashPath) return from ?? home;
   return null;
 }
 
@@ -1206,20 +1084,6 @@ Widget _videoEditor(GoRouterState state, String? videoId) {
           : null,
     ),
     builder: (_, vm) => VideoEditorScreen(viewModel: vm),
-  );
-}
-
-/// A USA Ultimate team page, from Rankings or Teams search.
-Widget _usauTeam(GoRouterState state) {
-  final url = state.uri.queryParameters['url'] ?? '';
-  return ViewModelHost(
-    key: ValueKey('usau-team-$url'),
-    create: (c) => UsauTeamViewModel(
-      url: url,
-      name: state.uri.queryParameters['name'] ?? '',
-      usauTeamRepository: c.read(),
-    ),
-    builder: (_, vm) => UsauTeamScreen(viewModel: vm),
   );
 }
 

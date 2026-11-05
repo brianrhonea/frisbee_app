@@ -3,17 +3,172 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Stall 10</title>
-  <meta name="description" content="Team management, playbooks, events and rankings for ultimate frisbee.">
+  <title>Stall 10 — your ultimate team, in one place</title>
+  <meta name="description" content="Team management, playbooks, events and rankings for ultimate frisbee. Find players, teams and pickup groups near you.">
+  <meta name="theme-color" content="#0e1310">
+  <meta property="og:title" content="Stall 10 — your ultimate team, in one place">
+  <meta property="og:description" content="Rosters, playbooks, schedules, stats and USA Ultimate rankings for your ultimate team.">
+  <meta property="og:image" content="https://frisbee-app-brianrhonea.web.app/logo.png">
   <link rel="icon" href="/favicon.png">
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/site.css">
 </head>
 <body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <img src="/logo.png" alt="" width="34" height="34">
+        <span>Stall 10</span>
+      </a>
+      <nav aria-label="Site">
+        <a href="#features">Features</a>
+        <a href="#search">Search</a>
+        <a href="#download">Download</a>
+      </nav>
+      <div class="header-actions">
+        <a class="link" href="/app/sign-in">Sign in</a>
+        <a class="btn btn-primary btn-small" href="#download">Get the app</a>
+      </div>
+    </div>
+  </header>
+
   <main>
-    <img class="logo" src="/logo.png" alt="Stall 10" width="96" height="96">
-    <h1>Stall 10</h1>
-    <p class="muted">Team management, playbooks, events and rankings for
-      ultimate frisbee.</p>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Built for ultimate frisbee</p>
+          <h1>Your whole team,<br><span class="accent">one huddle.</span></h1>
+          <p class="lead">Rosters, playbooks, schedules, stats and team chat
+            for club, college and pickup ultimate. Plus USA Ultimate events
+            and rankings, and a search for every player and team.</p>
+          <!-- TODO: real store URLs (also lib/config/store_links.dart). -->
+          <div class="badges">
+            <a class="badge" data-store="ios" href="#download" aria-label="Download on the App Store (coming soon)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.37 12.62c-.03-2.6 2.13-3.86 2.22-3.92-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.89-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.8 1.3 10.35.86 1.25 1.89 2.65 3.24 2.6 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.29-1.27 3.14-2.53.99-1.45 1.4-2.86 1.42-2.93-.03-.01-2.72-1.04-2.74-4.12zM13.79 4.98c.72-.87 1.2-2.08 1.07-3.28-1.03.04-2.28.69-3.02 1.55-.66.77-1.24 2-1.09 3.18 1.15.09 2.32-.58 3.04-1.45z"/></svg>
+              <span><small>Coming soon to the</small>App Store</span>
+            </a>
+            <a class="badge" data-store="android" href="#download" aria-label="Get it on Google Play (coming soon)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 1.8c-.24.25-.38.64-.38 1.14v18.12c0 .5.14.89.38 1.14l.06.06L13.8 12.1v-.2L3.66 1.74l-.06.06zm13.58 13.68-3.38-3.38v-.2l3.38-3.38.08.04 4 2.27c1.14.65 1.14 1.71 0 2.36l-4 2.27-.08.02zm-.08.04L13.8 12 3.6 22.2c.38.4 1 .45 1.7.06l11.8-6.74M17.1 8.48 5.3 1.74c-.7-.4-1.32-.34-1.7.06L13.8 12l3.3-3.52z"/></svg>
+              <span><small>Coming soon to</small>Google Play</span>
+            </a>
+          </div>
+          <p class="web-cta">Already on a team? <a href="/app/">Open Stall 10 on the web →</a></p>
+        </div>
+
+        <!-- A phone showing the app's search; a screenshot can replace it. -->
+        <div class="phone" aria-hidden="true">
+          <div class="phone-screen">
+            <div class="ps-top">
+              <img src="/logo.png" alt="" width="22" height="22">
+              <strong>Explore</strong>
+            </div>
+            <div class="ps-search">⌕&nbsp; Search players, teams, events</div>
+            <div class="ps-chips"><span class="on">All</span><span>Players</span><span>Teams</span><span>Groups</span></div>
+            <p class="ps-label">Teams</p>
+            <div class="ps-row"><i class="dot d1"></i><div><b>Riverside Ultimate</b><small>Club · Open</small></div></div>
+            <div class="ps-row"><i class="dot d2"></i><div><b>Thursday Night Pickup</b><small>Pickup group · 48 members</small></div></div>
+            <p class="ps-label">Players</p>
+            <div class="ps-row"><i class="dot d3"></i><div><b>Sam Rivera</b><small>Handler · Riverside</small></div></div>
+            <div class="ps-row"><i class="dot d4"></i><div><b>Alex Chen</b><small>Cutter · Thursday Night</small></div></div>
+            <p class="ps-label">Events</p>
+            <div class="ps-row"><i class="dot d5"></i><div><b>Spring Sectionals</b><small>Apr 12–13</small></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="features">
+      <div class="wrap">
+        <p class="eyebrow">Everything between the pulls</p>
+        <h2>Less group-text chaos. More points.</h2>
+        <div class="feature-grid">
+          <article>
+            <span class="icon">👥</span>
+            <h3>Teams &amp; rosters</h3>
+            <p>Invite players with a link, set roles, and keep your roster in
+              sync with USA Ultimate.</p>
+          </article>
+          <article>
+            <span class="icon">📋</span>
+            <h3>Playbooks</h3>
+            <p>Draw plays on the field, step through them, and share them with
+              the whole team.</p>
+          </article>
+          <article>
+            <span class="icon">📅</span>
+            <h3>Events &amp; schedules</h3>
+            <p>Practices, games and tournaments with RSVPs, reminders and a
+              calendar for every team you're on.</p>
+          </article>
+          <article>
+            <span class="icon">📈</span>
+            <h3>Stats</h3>
+            <p>Track points from the sideline and see season and tournament
+              stats for every player.</p>
+          </article>
+          <article>
+            <span class="icon">🏆</span>
+            <h3>USAU rankings</h3>
+            <p>Follow USA Ultimate events and rankings, and see how your
+              division stacks up.</p>
+          </article>
+          <article>
+            <span class="icon">💬</span>
+            <h3>Chat &amp; meetings</h3>
+            <p>Team chats, direct messages and video film sessions, without
+              juggling five apps.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="search" class="band">
+      <div class="wrap band-inner">
+        <div>
+          <p class="eyebrow">Now on the web</p>
+          <h2>Find your next team from any browser.</h2>
+          <p class="lead">Sign in to search players, teams, pickup groups and
+            events, open team pages and keep your profile up to date, all
+            from your laptop.</p>
+        </div>
+        <form class="band-search" action="/app/explore" method="get" role="search">
+          <label class="visually-hidden" for="q">Search Stall 10</label>
+          <input id="q" name="q" type="search" placeholder="Search players, teams, events" autocomplete="off">
+          <button class="btn btn-primary" type="submit">Search</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="download" class="download">
+      <div class="wrap">
+        <img src="/logo.png" alt="" width="80" height="80" class="download-logo">
+        <h2>Get Stall 10</h2>
+        <p class="lead">The full app for iPhone and Android is on its way.</p>
+        <!-- TODO: real store URLs (also lib/config/store_links.dart). -->
+        <div class="badges center">
+          <a class="badge" data-store="ios" href="#download" aria-label="Download on the App Store (coming soon)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.37 12.62c-.03-2.6 2.13-3.86 2.22-3.92-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.89-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.8 1.3 10.35.86 1.25 1.89 2.65 3.24 2.6 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.29-1.27 3.14-2.53.99-1.45 1.4-2.86 1.42-2.93-.03-.01-2.72-1.04-2.74-4.12zM13.79 4.98c.72-.87 1.2-2.08 1.07-3.28-1.03.04-2.28.69-3.02 1.55-.66.77-1.24 2-1.09 3.18 1.15.09 2.32-.58 3.04-1.45z"/></svg>
+            <span><small>Coming soon to the</small>App Store</span>
+          </a>
+          <a class="badge" data-store="android" href="#download" aria-label="Get it on Google Play (coming soon)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 1.8c-.24.25-.38.64-.38 1.14v18.12c0 .5.14.89.38 1.14l.06.06L13.8 12.1v-.2L3.66 1.74l-.06.06zm13.58 13.68-3.38-3.38v-.2l3.38-3.38.08.04 4 2.27c1.14.65 1.14 1.71 0 2.36l-4 2.27-.08.02zm-.08.04L13.8 12 3.6 22.2c.38.4 1 .45 1.7.06l11.8-6.74M17.1 8.48 5.3 1.74c-.7-.4-1.32-.34-1.7.06L13.8 12l3.3-3.52z"/></svg>
+            <span><small>Coming soon to</small>Google Play</span>
+          </a>
+        </div>
+        <p class="web-cta">Or <a href="/app/sign-up">create an account on the web</a>.</p>
+      </div>
+    </section>
   </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>© <span id="year">2026</span> Stall 10</span>
+      <nav aria-label="Footer">
+        <a href="/app/">Web app</a>
+        <a href="/app/sign-in">Sign in</a>
+        <a href="#download">Download</a>
+      </nav>
+    </div>
+  </footer>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
 </body>
 </html>

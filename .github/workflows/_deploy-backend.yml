@@ -2,6 +2,12 @@
 # Firebase backend (rules, indexes, hosting and the named function groups)
 # from one commit to one project.
 #
+# Hosting includes the website's Flutter web app (scripts/build_site.sh,
+# run by firebase.json's predeploy). It needs the Firebase web API key as the
+# repository secret FIREBASE_WEB_API_KEY_DEV / _PROD (the
+# FIREBASE_WINDOWS_API_KEY value from that project's secrets file); without
+# it, hosting is skipped with a warning and the rest still deploys.
+#
 # Never deploys the USA Ultimate scrapers (scrapeUsau*, refreshUsau); they
 # stay undeployed on purpose. Change the groups with the repository
 # variable FUNCTION_GROUPS (Settings → Secrets and variables → Actions →
@@ -31,6 +37,8 @@ on:
     secrets:
       FIREBASE_SERVICE_ACCOUNT:
         required: true
+      FIREBASE_WEB_API_KEY:
+        required: false
 
 jobs:
   deploy:
@@ -62,14 +70,35 @@ jobs:
           npm run build
           npm test
 
+      # For the website (scripts/build_site.sh); older commits don't have it.
+      - name: Set up Flutter
+        if: hashFiles('scripts/build_site.sh') != ''
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.41.2
+          cache: true
+
       - name: Sign in to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Deploy
+        env:
+          WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
         run: |
-          targets="firestore:rules,firestore:indexes,storage,hosting"
+          targets="firestore:rules,firestore:indexes,storage"
+          if [ ! -f scripts/build_site.sh ]; then
+            targets="$targets,hosting"
+          elif [ -z "$WEB_API_KEY" ]; then
+            echo "::warning::No FIREBASE_WEB_API_KEY_${PROJECT^^} secret; hosting (the website) left as deployed."
+          else
+            # The website's build reads the same keys as a local secrets file.
+            file=$([ "$PROJECT" = prod ] && echo secrets.prod.local.json || echo secrets.local.json)
+            jq -n --arg env "$PROJECT" --arg key "$WEB_API_KEY"               '{FIREBASE_ENV: $env, FIREBASE_WINDOWS_API_KEY: $key}' > "$file"
+            targets="$targets,hosting"
+          fi
           # Only groups this commit has: an older release may predate one.
           for g in ${GROUPS//,/ }; do
             if grep -q "export \* as $g from" functions/src/index.ts; then

@@ -30,3 +30,4 @@ jobs:
       tag: true
     secrets:
       FIREBASE_SERVICE_ACCOUNT: ${{ inputs.environment == 'prod' && secrets.FIREBASE_SA_PROD || secrets.FIREBASE_SA_DEV }}
+      FIREBASE_WEB_API_KEY: ${{ inputs.environment == 'prod' && secrets.FIREBASE_WEB_API_KEY_PROD || secrets.FIREBASE_WEB_API_KEY_DEV }}

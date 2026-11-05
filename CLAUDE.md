@@ -63,6 +63,26 @@ VS Code launch configs in `.vscode/launch.json` already do this.
 iOS App Store builds run on Codemagic (no Mac needed); see
 `docs/ios-release.md`.
 
+## Website
+
+Firebase Hosting serves `build/site` (gitignored), built by
+`scripts/build_site.sh` (firebase.json predeploy): `hosting/` (landing page,
+invite fallbacks) at `/`, and the Flutter web app (`lib/main_web.dart`,
+`lib/routing/web_router.dart`, `lib/ui/web/`) at `/app`. The web app reuses
+the app's repositories and screens but only routes search, profiles, team
+pages, events and rankings; other paths show "get the app".
+
+```
+flutter run -d chrome -t lib/main_web.dart --dart-define-from-file=secrets.local.json
+bash scripts/build_site.sh && firebase emulators:start --only hosting
+```
+
+Store URLs are placeholders in `lib/config/store_links.dart` and
+`hosting/index.html` / `join.html`; keep them in step. The deploy workflow
+builds the site from the `FIREBASE_WEB_API_KEY_DEV` / `_PROD` repository
+secrets and skips hosting without them. The web API key ends up in public
+JS (normal for Firebase web), so never commit `build/`.
+
 ## Architecture
 
 Follow the official Flutter MVVM architecture guide: `data/services` →
