@@ -12,6 +12,7 @@ import '../../core/ui/view_model_host.dart';
 import '../view_models/direct_chat_viewmodel.dart';
 import '../view_models/inbox_viewmodel.dart';
 import 'direct_chat_screen.dart';
+import '../../core/ui/app_search_field.dart';
 
 /// Width of the inbox list beside an open conversation.
 const _listWidth = 300.0;
@@ -168,18 +169,9 @@ class InboxList extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-            child: SizedBox(
-              height: 38,
-              child: TextField(
-                onChanged: vm.setQuery,
-                style: const TextStyle(fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: 'Search messages',
-                  hintStyle: TextStyle(fontSize: 12.5, color: c.muted),
-                  prefixIcon: Icon(Icons.search, size: 18, color: c.muted),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
+            child: AppSearchField(
+              hint: 'Search messages',
+              onChanged: vm.setQuery,
             ),
           ),
           Padding(

@@ -58,6 +58,9 @@ async function deleteUserData(db: Firestore, uid: string): Promise<void> {
   await leaveTeams(db, uid);
   await deleteJoinRequests(db, uid);
   await db.recursiveDelete(db.doc(`users/${uid}`));
+  // Free their username for someone else.
+  const names = await db.collection("usernames").where("uid", "==", uid).get();
+  await Promise.all(names.docs.map((d) => d.ref.delete()));
   await db.doc(`profiles/${uid}`).delete();
 }
 

@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../routing/routes.dart';
+import '../../../utils/password_policy.dart';
 import '../../core/ui/error_message.dart';
 import '../view_models/sign_up_viewmodel.dart';
 import 'auth_layout.dart';
+import 'password_field.dart';
+import 'password_strength_meter.dart';
+import 'username_field.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key, required this.viewModel});
@@ -17,41 +21,52 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _name = TextEditingController();
+  final _first = TextEditingController();
+  final _last = TextEditingController();
+  final _username = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirm = TextEditingController();
+
+  SignUpViewModel get vm => widget.viewModel;
 
   @override
   void initState() {
     super.initState();
-    widget.viewModel.signUp.addListener(_onResult);
+    vm.signUp.addListener(_onResult);
   }
 
   @override
   void dispose() {
-    widget.viewModel.signUp.removeListener(_onResult);
-    _name.dispose();
-    _email.dispose();
-    _password.dispose();
+    vm.signUp.removeListener(_onResult);
+    for (final c in [_first, _last, _username, _email, _password, _confirm]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   void _onResult() {
-    final cmd = widget.viewModel.signUp;
+    final cmd = vm.signUp;
     if (cmd.error) {
       showErrorSnackBar(context, cmd.result);
       cmd.clearResult();
+      _formKey.currentState?.validate();
     }
   }
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    widget.viewModel.signUp.execute((
-      name: _name.text,
+    vm.signUp.execute((
+      firstName: _first.text,
+      lastName: _last.text,
+      username: _username.text,
       email: _email.text,
       password: _password.text,
     ));
   }
+
+  static String? _required(String? v, String message) =>
+      (v == null || v.trim().isEmpty) ? message : null;
 
   @override
   Widget build(BuildContext context) {
@@ -59,46 +74,90 @@ class _SignUpScreenState extends State<SignUpScreen> {
       title: 'Create your account',
       subtitle: 'Join your team on Stall 10.',
       child: ListenableBuilder(
-        listenable: widget.viewModel.signUp,
+        listenable: vm.signUp,
         builder: (context, _) {
-          final busy = widget.viewModel.signUp.running;
+          final busy = vm.signUp.running;
           return Form(
             key: _formKey,
             child: AutofillGroup(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextFormField(
-                    controller: _name,
-                    decoration: const InputDecoration(labelText: 'Name'),
-                    autofillHints: const [AutofillHints.name],
-                    textCapitalization: TextCapitalization.words,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _first,
+                          decoration: const InputDecoration(
+                            labelText: 'First name',
+                          ),
+                          autofillHints: const [AutofillHints.givenName],
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.next,
+                          maxLength: 40,
+                          buildCounter: _noCounter,
+                          validator: (v) =>
+                              _required(v, 'Enter your first name'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _last,
+                          decoration: const InputDecoration(
+                            labelText: 'Last name',
+                          ),
+                          autofillHints: const [AutofillHints.familyName],
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.next,
+                          maxLength: 40,
+                          buildCounter: _noCounter,
+                          validator: (v) =>
+                              _required(v, 'Enter your last name'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  UsernameField(
+                    controller: _username,
+                    checker: vm.username,
                     textInputAction: TextInputAction.next,
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Enter your name'
-                        : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _email,
                     decoration: const InputDecoration(labelText: 'Email'),
                     keyboardType: TextInputType.emailAddress,
+                    autocorrect: false,
                     autofillHints: const [AutofillHints.email],
                     textInputAction: TextInputAction.next,
-                    validator: (v) => (v == null || !v.contains('@'))
+                    validator: (v) =>
+                        (v == null ||
+                            !RegExp(
+                              r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                            ).hasMatch(v.trim()))
                         ? 'Enter a valid email'
                         : null,
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  PasswordField(
                     controller: _password,
-                    decoration: const InputDecoration(labelText: 'Password'),
-                    obscureText: true,
+                    label: 'Password',
+                    autofillHints: const [AutofillHints.newPassword],
+                    textInputAction: TextInputAction.next,
+                    validator: (v) => PasswordPolicy.problem(v ?? ''),
+                  ),
+                  PasswordStrengthMeter(controller: _password),
+                  const SizedBox(height: 12),
+                  PasswordField(
+                    controller: _confirm,
+                    label: 'Confirm password',
                     autofillHints: const [AutofillHints.newPassword],
                     onFieldSubmitted: (_) => _submit(),
-                    validator: (v) => (v == null || v.length < 6)
-                        ? 'At least 6 characters'
-                        : null,
+                    validator: (v) =>
+                        v == _password.text ? null : "Passwords don't match",
                   ),
                   const SizedBox(height: 20),
                   FilledButton(
@@ -110,7 +169,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           )
                         : const Text('Create account'),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   TextButton(
                     onPressed: busy ? null : () => context.go(Routes.signIn),
                     child: const Text('Already have an account? Sign in'),
@@ -123,4 +182,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
     );
   }
+
+  static Widget? _noCounter(
+    BuildContext context, {
+    required int currentLength,
+    required bool isFocused,
+    required int? maxLength,
+  }) => null;
 }

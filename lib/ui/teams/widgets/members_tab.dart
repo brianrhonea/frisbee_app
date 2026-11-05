@@ -331,8 +331,9 @@ class _MemberMenu extends StatelessWidget {
       },
       itemBuilder: (_) => [
         if (vm.canSetRoles) ...[
-          // Groups have just one tier below owner; roles do the rest.
-          if (!_isGroup || role != TeamRole.player)
+          // There's one tier below owner; roles do the rest. Coaches and
+          // captains from before roles can still be moved down.
+          if (role != TeamRole.player)
             const PopupMenuItem(value: 'role', child: Text('Change role')),
           if (team.roles.isNotEmpty)
             const PopupMenuItem(value: 'roles', child: Text('Assign roles')),

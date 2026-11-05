@@ -10,6 +10,7 @@ import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/linkified_text.dart';
 import '../../core/ui/status_views.dart';
+import '../../core/ui/undo_snack_bar.dart';
 import '../view_models/post_detail_viewmodel.dart';
 import 'post_widgets.dart';
 import 'post_composer.dart';
@@ -112,15 +113,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (ok) vm.delete.execute();
   }
 
-  Future<void> _confirmDeleteComment(PostComment c) async {
-    final ok = await confirmDialog(
+  void _deleteComment(PostComment c) {
+    if (!vm.canDeleteComment(c)) return;
+    vm.removals.remove(c);
+    showUndoSnackBar(
       context,
-      title: 'Delete comment?',
-      message: 'It is removed for everyone.',
-      confirmLabel: 'Delete',
-      destructive: true,
+      message: 'Comment deleted',
+      onUndo: () => vm.removals.undo(c),
     );
-    if (ok) vm.deleteComment.execute(c);
   }
 
   void _send() {
@@ -214,7 +214,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                 CommentTile(
                                   comment: c,
                                   onDelete: vm.canDeleteComment(c)
-                                      ? () => _confirmDeleteComment(c)
+                                      ? () => _deleteComment(c)
                                       : null,
                                 ),
                           ],

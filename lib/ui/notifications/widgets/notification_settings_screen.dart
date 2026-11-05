@@ -92,7 +92,7 @@ class _NotificationSettingsScreenState
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: Text(
                       'Change these for one team. To mute a single chat '
-                      'room, use the bell in the room.',
+                      "room, use the room's ⋮ menu.",
                       style: theme.textTheme.bodySmall,
                     ),
                   ),

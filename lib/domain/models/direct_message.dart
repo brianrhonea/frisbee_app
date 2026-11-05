@@ -1,29 +1,45 @@
 import 'model_utils.dart';
+import 'username.dart';
 
 /// A user's public listing in the people directory: name and photo only,
 /// never their email. Written from the signed-in user's auth profile.
 class UserProfile {
-  const UserProfile({required this.uid, required this.name, this.photoUrl});
+  const UserProfile({
+    required this.uid,
+    required this.name,
+    this.photoUrl,
+    this.username,
+  });
 
   final String uid;
   final String name;
   final String? photoUrl;
+
+  /// Unique handle, without the "@"; null for people who haven't picked
+  /// one yet.
+  final String? username;
 
   factory UserProfile.fromMap(String uid, Map<String, dynamic> map) =>
       UserProfile(
         uid: uid,
         name: map['name'] as String? ?? '',
         photoUrl: map['photoUrl'] as String?,
+        username: map['username'] as String?,
       );
 
+  /// The fields anyone may rewrite. The username itself is written only
+  /// when it's claimed (see AuthRepository.claimUsername); it's indexed
+  /// here so people can search by it.
   Map<String, dynamic> toMap() => {
     'name': name,
-    'keywords': searchKeywords(name),
+    'keywords': profileKeywords(name, username),
     'photoUrl': photoUrl,
   };
 
-  /// Whether every word of [query] starts a word of this name.
-  bool matches(String query) => matchesSearch(name, query);
+  /// Whether every word of [query] starts a word of this name or
+  /// username.
+  bool matches(String query) =>
+      matchesSearch('$name ${username ?? ''}', Username.normalize(query));
 }
 
 /// A private conversation between two users. Its id is their uids, sorted
@@ -37,6 +53,7 @@ class Conversation {
     this.lastMessageAt,
     this.lastSenderId = '',
     this.readAt = const {},
+    this.myReadAt,
   });
 
   final String id;
@@ -52,8 +69,25 @@ class Conversation {
   final DateTime? lastMessageAt;
   final String lastSenderId;
 
-  /// uid → when they last opened the conversation.
+  /// uid → when they last opened the conversation, shared with the other
+  /// person as a read receipt. People who turn read receipts off stop
+  /// updating theirs (see [myReadAt]).
   final Map<String, DateTime> readAt;
+
+  /// When the signed-in user last opened it, from their private record;
+  /// kept even with read receipts off. Null if never, or not loaded.
+  final DateTime? myReadAt;
+
+  Conversation withMyReadAt(DateTime? at) => Conversation(
+    id: id,
+    participants: participants,
+    names: names,
+    lastMessage: lastMessage,
+    lastMessageAt: lastMessageAt,
+    lastSenderId: lastSenderId,
+    readAt: readAt,
+    myReadAt: at,
+  );
 
   static String idFor(String a, String b) =>
       (a.compareTo(b) < 0 ? [a, b] : [b, a]).join('_');
@@ -72,8 +106,21 @@ class Conversation {
     if (last == null || lastSenderId == me || lastSenderId.isEmpty) {
       return false;
     }
-    final read = readAt[me];
+    final shared = readAt[me];
+    final mine = myReadAt;
+    final read = shared == null || (mine != null && mine.isAfter(shared))
+        ? mine
+        : shared;
     return read == null || read.isBefore(last);
+  }
+
+  /// Whether the other person has read [me]'s latest message, by their
+  /// read receipt.
+  bool isSeen(String me) {
+    final last = lastMessageAt;
+    if (last == null || lastSenderId != me) return false;
+    final theirs = readAt[otherId(me)];
+    return theirs != null && !theirs.isBefore(last);
   }
 
   factory Conversation.fromMap(String id, Map<String, dynamic> map) =>

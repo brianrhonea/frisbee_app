@@ -146,9 +146,22 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
     `InboxViewModel`. The right pane is a `ViewModelHost` keyed by that
     chat, so switching disposes the old thread's subscriptions.
   - On phones, picking a chat pushes its route with a slide-in transition
-    (`chatPage`). The page's top-left Chats button opens a `Drawer` holding
-    the same list. Picking another chat replaces the page; picking the open
-    one closes the drawer.
+    (`chatPage`). In team chat, the page's top-left Chats button opens a
+    `Drawer` holding the room list; picking another room replaces the
+    page. Direct messages have a plain back arrow to Messages instead
+    (`backOr`), so leaving is one slide.
+- **Settings** (`/settings`, `/settings/general|privacy|account`, and
+  `/notifications/settings`) are root routes built with `slideOverPage`
+  (`ui/core/ui/slide_over_page.dart`): a slide from the right with an edge
+  shadow, `CupertinoPage` on iOS/macOS phones, and on windows at least
+  704 logical px wide a 440 px panel over the dimmed page
+  (`barrierDismissible`). Each page hosts its own `ProfileViewModel`.
+- **Shortcuts**: `AppShortcuts` (`ui/shell/widgets/command_palette.dart`)
+  registers a `HardwareKeyboard` handler, not a focus-based `Shortcuts`,
+  so Ctrl/⌘ K (command menu) and Ctrl/⌘ 1–5 work whatever has focus and
+  on pages pushed over the shell.
+- **Username gate**: `authRedirect` sends a signed-in user whose profile
+  has no username to `/welcome/username?from=…`, then on to `from`.
 
 ## Core features
 
@@ -171,18 +184,25 @@ Tests swap in the fakes from `test/testing/fakes.dart` the same way.
 | Events: USA Ultimate tournaments, schedules and brackets | `ui/tournaments`, `ui/events` | `TournamentsViewModel`, `TournamentDetailViewModel` | Tournament, UsauSchedule |
 | Rankings: every USAU ranking list, team pages | `ui/rankings` | `RankingsViewModel`, `UsauTeamViewModel` | Ranking, UsauTeam |
 | Notifications: feed with unread badge on Home, push on this device, per-category and per-team settings, per-room mute | `ui/notifications` | `NotificationsViewModel`, `NotificationSettingsViewModel` (mute lives in `ChatRoomViewModel`) | Notification, Team |
-| Profile and settings: name, light/dark theme, notifications link, sign out, delete account | `ui/profile` | `ProfileViewModel` | Auth, Theme, Notification |
+| Profile: details, visibility, stats, teams, posts; @username | `ui/profile` | `PlayerProfileViewModel` | Profile, Auth, Team, Stats, Follow, UserPost |
+| Settings: General (theme), Privacy (read receipts), Account (name, username, delete), sign out | `ui/settings` | `ProfileViewModel` | Auth, Theme, Notification, DirectMessage |
+| Usernames and sign-up: availability check, claim, pick-a-username gate | `ui/auth` | `SignUpViewModel`, `ChooseUsernameViewModel` (`UsernameChecker`) | Auth |
+| Search and command menu: Explore over players, teams, groups and USAU events; Ctrl K | `ui/explore`, `ui/shell` | `TeamSearchViewModel`, `PlayerSearchViewModel`, `TournamentsViewModel` | Team, Profile, Tournament |
 
 ### Roles
 
-`TeamRole` (`domain/models/team.dart`) has four values: **owner**,
-**coach**, **captain** and **player**. Owner, coach and captain are
-"editors". They manage the schedule, roster, playbook, stats, chat rooms
-and invite code. Players are read-only, but the owner can give a player
-stats access (`statKeepers`). The owner alone sets roles, mints invite
-codes, transfers or deletes the team, and moderates chat. The same matrix
-is enforced in `firestore.rules`, so the client and the rules must change
-together.
+Built-in roles are **owner** and **player** (`TeamRole`,
+`domain/models/team.dart`). Everything else is a custom role
+(`CustomRole`, `domain/models/team_role.dart`) the owner creates, granting
+`TeamPermission`s: manageTeam, manageMembers, manageChats, manageEvents,
+moderate and keepStats. The team doc holds `roles`, `memberRoles
+{uid: [roleId]}` and the flattened `memberPerms {uid: [perm]}` that
+`firestore.rules` checks with `can(team, perm)`; `statKeepers` still grants
+keepStats. Legacy **coach** and **captain** tiers still read as having
+every permission, but none can be assigned; `migrateTiersToRoles` turns
+them into custom roles (and adds the roles to rooms that admitted the
+tier) when the owner opens the team. Membership writes are validated only
+by the rules, so the client and the rules must change together.
 
 ### Shared message thread
 
@@ -290,14 +310,20 @@ conversations where someone else posted after the user last read.
 ### Cloud Firestore
 
 ```
-users/{uid}                     private profile: email, displayName, photoUrl (owner only)
+users/{uid}                     private profile: email, displayName, firstName, lastName,
+                                photoUrl, readReceipts (owner only)
+  dmReads/{conversationId}      readAt: own read time; the conversation's readAt is the
+                                shared receipt, set only with receipts on (owner only)
   events/{eventId}              personal schedule (owner only)
   settings/notifications        categories {}, teams {teamId: {}}, mutedRooms [], utcOffsetMinutes
   devices/{fid}                 push targets: platform (owner writes, Functions send)
   notifications/{id}            feed: category, title, body, route, read, count (Functions write)
   follows/{type_targetId}       key, type (user/team/tournament/event), targetId, groupId?,
                                 name, photoUrl?, notify (owner only; Functions query them)
-profiles/{uid}                  public directory: name, keywords (search prefixes), photoUrl
+profiles/{uid}                  public directory: name, username (set once), keywords
+                                (search prefixes of name and username), photoUrl
+usernames/{name}                → {uid, createdAt}; one per account, claimed with the profile
+                                in one transaction; never updated (Functions free it on delete)
 posts/{postId}                  people's own posts: kind (text/workout), body, links [],
                                 images [], workout {}?, tournamentKey?, tournamentName?,
                                 authorId, authorName, authorPhotoUrl (anyone signed in reads)
@@ -724,7 +750,7 @@ cd functions && npm run test:rules               # Firestore + Storage rules (em
 
 | Piece | Status |
 |---|---|
-| Firestore rules | Deployed (`firebase deploy --only firestore:rules`) |
+| Firestore rules | Deployed to dev and prod (`firebase deploy --only firestore:rules`, `--project prod` for production); 0.0.11's usernames, read receipts and role migration are on dev only so far |
 | Storage rules | Deployed (`firebase deploy --only storage`); Blaze plan and Storage enabled |
 | Meeting functions | Deployed (`firebase deploy --only functions:meetings`); LiveKit secrets set |
 | Notification functions | Deployed (`firebase deploy --only functions:notifications`) |

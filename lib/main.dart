@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logging/logging.dart';
 import 'package:media_kit/media_kit.dart';
@@ -34,8 +35,22 @@ const _useEmulators = bool.fromEnvironment('USE_EMULATORS');
 /// testing two accounts on one computer.
 const _memoryCache = bool.fromEnvironment('FIRESTORE_MEMORY_CACHE');
 
+/// Keeps phones in portrait, like most social apps: a phone on its side is
+/// wide enough for the tablet layout but too short for it. iPhones are
+/// locked in Info.plist; this covers Android phones. Tablets still rotate.
+Future<void> _lockPhonesToPortrait() async {
+  if (defaultTargetPlatform != TargetPlatform.android) return;
+  final view = WidgetsBinding.instance.platformDispatcher.implicitView;
+  if (view == null) return;
+  final size = view.physicalSize / view.devicePixelRatio;
+  // Android's own phone/tablet line.
+  if (size.shortestSide >= 600) return;
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _lockPhonesToPortrait();
   // Plays uploaded team videos.
   MediaKit.ensureInitialized();
   Logger.root.level = kDebugMode ? Level.ALL : Level.WARNING;

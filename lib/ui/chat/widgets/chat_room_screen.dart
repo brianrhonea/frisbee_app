@@ -137,25 +137,43 @@ class ChatRoomView extends StatelessWidget {
                 ].join(' · ')
               : null,
           actions: [
-            if (readable && !room.isVoice)
-              IconButton(
-                tooltip: vm.muted
-                    ? 'Unmute notifications'
-                    : 'Mute notifications',
+            if ((readable && !room.isVoice) || (room != null && vm.canManage))
+              PopupMenuButton<_RoomAction>(
+                tooltip: 'Room options',
                 icon: Icon(
-                  vm.muted
-                      ? Icons.notifications_off_outlined
-                      : Icons.notifications_outlined,
+                  vm.muted ? Icons.notifications_off_outlined : Icons.more_vert,
                 ),
-                onPressed: vm.toggleMuted.running
-                    ? null
-                    : vm.toggleMuted.execute,
-              ),
-            if (room != null && vm.canManage)
-              IconButton(
-                tooltip: 'Room settings',
-                icon: const Icon(Icons.tune),
-                onPressed: openSettings,
+                onSelected: (a) => switch (a) {
+                  _RoomAction.mute => vm.toggleMuted.execute(),
+                  _RoomAction.settings => openSettings(),
+                },
+                itemBuilder: (_) => [
+                  if (readable && !room.isVoice)
+                    PopupMenuItem(
+                      value: _RoomAction.mute,
+                      enabled: !vm.toggleMuted.running,
+                      child: ListTile(
+                        leading: Icon(
+                          vm.muted
+                              ? Icons.notifications_outlined
+                              : Icons.notifications_off_outlined,
+                        ),
+                        title: Text(
+                          vm.muted
+                              ? 'Unmute notifications'
+                              : 'Mute notifications',
+                        ),
+                      ),
+                    ),
+                  if (vm.canManage)
+                    const PopupMenuItem(
+                      value: _RoomAction.settings,
+                      child: ListTile(
+                        leading: Icon(Icons.tune),
+                        title: Text('Room settings'),
+                      ),
+                    ),
+                ],
               ),
             const SizedBox(width: 4),
           ],
@@ -215,3 +233,5 @@ class ChatRoomView extends StatelessWidget {
     );
   }
 }
+
+enum _RoomAction { mute, settings }

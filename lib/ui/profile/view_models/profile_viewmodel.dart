@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/direct_message/direct_message_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/theme/theme_repository.dart';
 import '../../../domain/models/app_user.dart';
@@ -12,9 +15,11 @@ class ProfileViewModel extends ChangeNotifier {
     required AuthRepository authRepository,
     required ThemeRepository themeRepository,
     required NotificationRepository notificationRepository,
+    required DirectMessageRepository directMessageRepository,
   }) : _auth = authRepository,
        _theme = themeRepository,
-       _notifications = notificationRepository {
+       _notifications = notificationRepository,
+       _dms = directMessageRepository {
     setThemeMode = Command1<void, ThemeMode>(_theme.setThemeMode);
     _theme.addListener(notifyListeners);
     updateDisplayName = Command1<void, String>(_auth.updateDisplayName);
@@ -25,6 +30,31 @@ class ProfileViewModel extends ChangeNotifier {
     });
     deleteAccount = Command1<void, String?>(_deleteAccount);
     _auth.addListener(notifyListeners);
+    setReadReceipts = Command1<void, bool>(_setReadReceipts);
+    if (_auth.currentUser?.uid case final uid?) {
+      _receiptsSub = _dms.watchReadReceipts(uid).listen((on) {
+        _readReceipts = on;
+        notifyListeners();
+      }, onError: (Object _) {});
+    }
+  }
+
+  final DirectMessageRepository _dms;
+  StreamSubscription<bool>? _receiptsSub;
+  bool _readReceipts = true;
+
+  /// Whether people see when the user has read their direct messages
+  /// (and the user sees theirs).
+  bool get readReceipts => _readReceipts;
+
+  late final Command1<void, bool> setReadReceipts;
+
+  Future<Result<void>> _setReadReceipts(bool on) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Result.error(Exception('Not signed in'));
+    _readReceipts = on;
+    notifyListeners();
+    return _dms.setReadReceipts(uid, on: on);
   }
 
   final AuthRepository _auth;
@@ -67,6 +97,8 @@ class ProfileViewModel extends ChangeNotifier {
     _auth.removeListener(notifyListeners);
     _theme.removeListener(notifyListeners);
     setThemeMode.dispose();
+    setReadReceipts.dispose();
+    _receiptsSub?.cancel();
     super.dispose();
   }
 }

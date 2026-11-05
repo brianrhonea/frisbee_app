@@ -6,6 +6,7 @@ import 'package:logging/logging.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/direct_message.dart';
+import '../../../domain/models/username.dart';
 import '../../../utils/result.dart';
 import '../../services/account_service.dart';
 import '../../services/auth_service.dart';
@@ -32,13 +33,89 @@ class AuthRepositoryFirebase extends AuthRepository {
   AppUser? _currentUser;
   bool _isReady = false;
 
+  /// The signed-in user's profile, watched for their username.
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSub;
+  String? _profileUid;
+  String? _username;
+  Timer? _profileTimeout;
+
+  /// Whether the profile has been read (or we gave up waiting).
+  bool _profileKnown = false;
+
+  /// Gave up waiting for the profile (offline on a new device): don't ask
+  /// for a username we may already have.
+  bool _profileUnknown = false;
+
+  /// A username is being claimed; don't ask for one meanwhile.
+  bool _claiming = false;
+
   @override
   AppUser? get currentUser => _currentUser;
 
   @override
-  bool get isReady => _isReady;
+  bool get isReady => _isReady && (_currentUser == null || _profileKnown);
+
+  @override
+  bool get needsUsername =>
+      _currentUser != null &&
+      _profileKnown &&
+      !_profileUnknown &&
+      !_claiming &&
+      _username == null;
+
+  CollectionReference<Map<String, dynamic>> get _profiles =>
+      _firestore.collection('profiles');
+
+  void _watchProfile(String? uid) {
+    if (uid == _profileUid) return;
+    _profileSub?.cancel();
+    _profileTimeout?.cancel();
+    _profileUid = uid;
+    _username = null;
+    _profileKnown = uid == null;
+    _profileUnknown = false;
+    if (uid == null) return;
+    _profileTimeout = Timer(const Duration(seconds: 6), () {
+      if (_profileKnown) return;
+      _profileKnown = true;
+      _profileUnknown = true;
+      notifyListeners();
+    });
+    _profileSub = _profiles
+        .doc(uid)
+        .snapshots(includeMetadataChanges: true)
+        .listen(
+          (snap) {
+            // A missing profile in the cache may just not be synced yet.
+            if (!snap.exists && snap.metadata.isFromCache) return;
+            _profileTimeout?.cancel();
+            final username = snap.data()?['username'] as String?;
+            final changed = username != _username || !_profileKnown;
+            _username = username;
+            _profileKnown = true;
+            _profileUnknown = false;
+            if (!changed) return;
+            final user = _currentUser;
+            if (user != null && user.username != username) {
+              final next = user.withUsername(username);
+              _currentUser = next;
+              // Index the username for search.
+              if (username != null) unawaited(_upsertProfile(next));
+            }
+            notifyListeners();
+          },
+          onError: (Object e) {
+            _log.warning('Profile watch failed', e);
+            _profileTimeout?.cancel();
+            _profileKnown = true;
+            _profileUnknown = true;
+            notifyListeners();
+          },
+        );
+  }
 
   void _onUserChanged(User? user) {
+    _watchProfile(user?.uid);
     final next = user == null
         ? null
         : AppUser(
@@ -46,6 +123,7 @@ class AuthRepositoryFirebase extends AuthRepository {
             email: user.email,
             displayName: user.displayName,
             photoUrl: user.photoURL,
+            username: _username,
           );
     if (next == _currentUser && _isReady) return;
     // Shared listeners belong to the old user; drop them so the next
@@ -74,6 +152,7 @@ class AuthRepositoryFirebase extends AuthRepository {
             uid: user.uid,
             name: name,
             photoUrl: user.photoUrl,
+            username: user.username,
           ).toMap(),
           'updatedAt': FieldValue.serverTimestamp(),
           // Merge: the player's profile details and stats live here too.
@@ -92,14 +171,86 @@ class AuthRepositoryFirebase extends AuthRepository {
   Future<Result<void>> signUpWithEmail({
     required String email,
     required String password,
-    required String displayName,
+    required String firstName,
+    required String lastName,
+    required String username,
   }) => guard(() async {
-    final user = await _authService.signUpWithEmail(
-      email.trim(),
-      password,
-      displayName.trim(),
-    );
-    _onUserChanged(user);
+    final handle = Username.normalize(username);
+    if (Username.problem(handle) case final problem?) {
+      throw ArgumentError(problem);
+    }
+    if (!await _available(handle)) throw UsernameTakenException(handle);
+    _claiming = true;
+    try {
+      final first = firstName.trim();
+      final last = lastName.trim();
+      final user = await _authService.signUpWithEmail(
+        email.trim(),
+        password,
+        '$first $last'.trim(),
+      );
+      _onUserChanged(user);
+      // Private: only they read users/{uid}.
+      await _firestore.collection('users').doc(user.uid).set({
+        'firstName': first,
+        'lastName': last,
+      }, SetOptions(merge: true));
+      // If it was taken meanwhile, the app asks for another.
+      final claimed = await claimUsername(handle);
+      if (claimed case Error(:final error)) {
+        _log.info('Username claim after sign-up failed', error);
+      }
+    } finally {
+      _claiming = false;
+      notifyListeners();
+    }
+  });
+
+  Future<bool> _available(String username) async =>
+      !(await _firestore.collection('usernames').doc(username).get()).exists;
+
+  @override
+  Future<Result<bool>> isUsernameAvailable(String username) => guard(() async {
+    final handle = Username.normalize(username);
+    if (Username.problem(handle) != null) return false;
+    return _available(handle);
+  });
+
+  @override
+  Future<Result<void>> claimUsername(String username) => guard(() async {
+    final user = _currentUser;
+    if (user == null) throw StateError('Not signed in');
+    final handle = Username.normalize(username);
+    if (Username.problem(handle) case final problem?) {
+      throw ArgumentError(problem);
+    }
+    final nameRef = _firestore.collection('usernames').doc(handle);
+    final profileRef = _profiles.doc(user.uid);
+    // Never list an email as someone's name.
+    final display = user.displayName?.trim() ?? '';
+    await _firestore.runTransaction((tx) async {
+      if ((await tx.get(nameRef)).exists) {
+        throw UsernameTakenException(handle);
+      }
+      tx
+        ..set(nameRef, {
+          'uid': user.uid,
+          'createdAt': FieldValue.serverTimestamp(),
+        })
+        ..set(profileRef, {
+          ...UserProfile(
+            uid: user.uid,
+            name: display.isEmpty ? handle : display,
+            photoUrl: user.photoUrl,
+            username: handle,
+          ).toMap(),
+          'username': handle,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+    });
+    _username = handle;
+    _currentUser = user.withUsername(handle);
+    notifyListeners();
   });
 
   @override
@@ -153,6 +304,8 @@ class AuthRepositoryFirebase extends AuthRepository {
   @override
   void dispose() {
     _subscription.cancel();
+    _profileSub?.cancel();
+    _profileTimeout?.cancel();
     super.dispose();
   }
 }

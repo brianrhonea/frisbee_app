@@ -9,6 +9,8 @@ export interface TeamMembers {
   ownerId?: string;
   members?: Record<string, string>;
   memberIds?: string[];
+  /** uid → permissions from custom roles (CustomRole in the app). */
+  memberPerms?: Record<string, string[]>;
 }
 
 /** How long after signing in the user may delete their account. */
@@ -19,20 +21,21 @@ export function signedInRecently(authTime: unknown, now: number): boolean {
   return typeof authTime === "number" && now / 1000 - authTime <= recentSignInSeconds;
 }
 
-// Coaches, then captains (a group's organizers), then everyone else. A
-// legacy "stats" member counts as a player.
-const successionOrder = ["coach", "captain", "stats", "player"];
-
 /**
- * Who owns the team once `uid` is gone: the first coach, then captain,
- * then player, in the order they joined (memberIds grows as people join).
- * Undefined when nobody else is on the team.
+ * Who owns the team once `uid` is gone, in the order they joined
+ * (memberIds grows as people join): a legacy coach, then captain (a
+ * group's organizer), then someone whose custom roles let them manage the
+ * team (where coaches and captains moved), then anyone. A legacy "stats"
+ * member counts as a player. Undefined when nobody else is on the team.
  */
 export function nextOwner(team: TeamMembers, uid: string): string | undefined {
   const others = (team.memberIds ?? []).filter((m) => m !== uid);
   const rank = (m: string) => {
-    const i = successionOrder.indexOf(team.members?.[m] ?? "player");
-    return i < 0 ? successionOrder.length : i;
+    const role = team.members?.[m] ?? "player";
+    if (role === "coach") return 0;
+    if (role === "captain") return 1;
+    if ((team.memberPerms?.[m] ?? []).includes("manageTeam")) return 2;
+    return 3;
   };
   let best: string | undefined;
   for (const m of others) {

@@ -134,16 +134,38 @@ void main() {
       expect(team.canRemove('q', 'q'), isTrue, reason: 'anyone may leave');
     });
 
-    test('groups with captains need their organizers migrated', () {
+    test('coaches and captains need moving into roles', () {
       final group = Team.fromMap('g', {
         'name': 'Pickup',
         'kind': 'community',
         'ownerId': 'o',
         'members': {'o': 'owner', 'k': 'captain'},
       });
-      expect(group.needsOrganizerMigration, isTrue);
-      expect(team.needsOrganizerMigration, isFalse);
-      expect(teamWith({'o': TeamRole.owner}).needsOrganizerMigration, isFalse);
+      expect(group.needsRoleMigration, isTrue);
+      expect(group.legacyTierRoles()[TeamRole.captain]!.name, 'Organizer');
+      expect(team.needsRoleMigration, isTrue);
+      expect(teamWith({'o': TeamRole.owner}).needsRoleMigration, isFalse);
+
+      final tiers = teamWith({
+        'o': TeamRole.owner,
+        'c': TeamRole.coach,
+        'k': TeamRole.captain,
+      }).legacyTierRoles();
+      expect(tiers[TeamRole.coach]!.name, 'Coach');
+      expect(tiers[TeamRole.captain]!.name, 'Captain');
+      expect(tiers[TeamRole.coach]!.permissions, TeamPermission.values.toSet());
+      expect(tiers[TeamRole.coach]!.id, isNot(tiers[TeamRole.captain]!.id));
+      // Only tiers someone is on.
+      expect(
+        teamWith({'o': TeamRole.owner, 'c': TeamRole.coach}).legacyTierRoles(),
+        hasLength(1),
+      );
+    });
+
+    test('only owner and player are on offer', () {
+      for (final kind in TeamKind.values) {
+        expect(TeamRole.rolesFor(kind), [TeamRole.owner, TeamRole.player]);
+      }
     });
   });
 }

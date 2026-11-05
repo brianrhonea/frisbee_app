@@ -7,6 +7,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/usau_attribution.dart';
 import '../view_models/usau_team_search_viewmodel.dart';
+import '../../core/ui/app_search_field.dart';
 
 /// Search USA Ultimate teams by name; each result opens its team page.
 class UsauTeamSearchScreen extends StatefulWidget {
@@ -44,24 +45,10 @@ class _UsauTeamSearchScreenState extends State<UsauTeamSearchScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                TextField(
+                AppSearchField(
                   controller: _search,
                   autofocus: true,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    labelText: 'Team name',
-                    suffixIcon: vm.query.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Clear',
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _search.clear();
-                              vm.setQuery('');
-                            },
-                          ),
-                  ),
+                  hint: 'Search USA Ultimate teams',
                   onChanged: vm.setQuery,
                 ),
                 if (vm.divisions.length > 1) ...[

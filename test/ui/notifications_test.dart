@@ -248,6 +248,7 @@ void main() {
       authRepository: FakeAuthRepository(user: testUser),
       themeRepository: FakeThemeRepository(),
       notificationRepository: repo,
+      directMessageRepository: FakeDirectMessageRepository(),
     );
     await vm.signOut.execute();
     expect(repo.unregistered, ['u1']);

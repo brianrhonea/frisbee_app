@@ -8,9 +8,13 @@ fails if they drift apart or this log has no entry for the version.
 Versions stay at `0.0.x` until the first App Store release. Codemagic
 picks iOS build numbers on its own (see `docs/ios-release.md`).
 
+Plain-language notes for testers are in
+[release-notes.md](release-notes.md); add to both when you bump.
+
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
-| 0.0.10  | 2026-11-03 | `development`                           | (this branch)       |
+| 0.0.11  | 2026-11-04 | `development`                           | (this commit)       |
+| 0.0.10  | 2026-11-03 | `development`                           | `bfcf7f4`–`b80e854` |
 | 0.0.9   | 2026-11-02 | `feature/gps-workouts`                  | `41a03bc`           |
 | 0.0.8   | 2026-10-31 | `feature/follows-feed`                  | `1f81f45` and later |
 | 0.0.7   | 2026-10-31 | `feature/community-groups`              | `9f19c55` and later |
@@ -21,6 +25,78 @@ picks iOS build numbers on its own (see `docs/ios-release.md`).
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.11 — Usernames, Settings, search everywhere and polish
+
+Straight on `development`.
+
+**Added**
+- **Usernames.** Unique, 3–20 of `a-z 0-9 _ .` (no leading, trailing or
+  double periods; a few reserved). Sign-up asks for first and last name,
+  username (live availability check), email, password and confirmation.
+  Google, Apple and older accounts are sent to **Pick your username**
+  (`/welcome/username`) by `authRedirect` before anything else. Shown as
+  @name on profiles, in people search, Explore, the send-post sheet and
+  the invite dialog; search matches it.
+- **Password policy**: 8–128 characters, a letter and a number, no
+  leading or trailing space, not a common password. Strength meter and
+  checklist on sign-up; show/hide on every password field.
+- **Settings page** (`/settings`, gear at the top right of your profile)
+  sliding over the page, a 440 px panel on wide windows: General
+  (theme), Notifications, Privacy (read receipts), People you follow,
+  Account (display name, username, email, delete account), Sign out and
+  the version. Sub-pages `/settings/general`, `/privacy`, `/account`.
+  Replaces the profile's Settings card.
+- **Read receipts**: "Seen" under your last message once the other person
+  reads it; off in Settings → Privacy (then you don't see theirs).
+- **Notification offers**: once at first sign-in, on joining a team, and
+  on following someone. Declining a team turns off its per-team
+  categories.
+- **One search**: Home has a search bar on phones; the top bar's box
+  says "Search Stall 10". Explore searches players, teams, groups and
+  upcoming USA Ultimate events (chips: All, Players, Teams, Groups,
+  Events; three events in All with "See all"). `/teams/search` redirects
+  to Explore. A shared `AppSearchField` everywhere.
+- **Command menu**: Ctrl K / ⌘K from anywhere (a `HardwareKeyboard`
+  handler, so focus doesn't matter): sections, your teams, common
+  actions, and "Search Stall 10 for …". Ctrl 1–5 switch sections, from
+  inside the menu too. Key-cap hints in the top bar, menu and rail
+  tooltips.
+- **Undo instead of "Are you sure?"** for deleting feed posts, comments
+  and chat messages: hidden at once, deleted after 5 s
+  (`PendingRemovals`), or when the screen closes.
+- Skeleton placeholders instead of spinners (`LoadingView` and the
+  feed, profile, Explore, sheets and photos); photos fade in.
+- Balanced headlines (`BalancedText`) on page and auth titles.
+
+**Changed**
+- **Roles**: built in are Owner and Player only; owners create the rest.
+  Coach and captain tiers migrate to custom roles (Coach and Captain
+  with every permission on teams, Organizer on groups) the first time
+  the owner opens the team; rooms that admitted a tier admit the new
+  role. Nobody can be made coach or captain any more.
+- Notifications: per-room mute moved into the room's ⋮ menu; a person's
+  post notifications into the **Following ▾** menu.
+- Phones: portrait only (iPhone `Info.plist`, Android under 600 dp), and
+  the bottom bar has every section.
+- Direct messages on phones have a back arrow to Messages instead of the
+  conversations drawer (team chat keeps its drawer).
+- Sign-in and sign-up fit a phone screen without scrolling.
+- Theme: `RoundedSuperellipseBorder` corners, tabular figures in all
+  text, drag handles on swipeable sheets, predictive back on Android
+  (`enableOnBackInvokedCallback`), Cupertino slides on iOS and macOS and
+  fade-forwards elsewhere. `slideOverPage` (with an edge shadow) for
+  Settings and notification settings.
+
+**Infrastructure**
+- New Firestore data: `usernames/{name}` → `{uid, createdAt}`, claimed in
+  the same transaction that sets `profiles/{uid}.username` (set once);
+  `users/{uid}.firstName`, `.lastName`, `.readReceipts`; private read
+  marks `users/{uid}/dmReads/{conversationId}`. Rules and rules tests
+  for all of them, and for the role migration (deployed to dev).
+- `account-deleteAccount` frees the user's username, and ownership
+  passes to coach, then captain, then a member with Manage team
+  (deployed to dev).
 
 ## 0.0.10 — Comments and sending posts
 
@@ -57,6 +133,23 @@ Straight on `development`; feature branches are retired for the beta.
   `account-deleteAccount` deletes the user's comments.
 - `/p/*` added to the hosting rewrites, the iOS
   `apple-app-site-association` and the Android App Links filter.
+
+**Also in 0.0.10** (`b80e854`)
+- Discord-style **custom roles** with permissions (Manage team, Manage
+  members, Manage chats, Manage events, Moderate, Keep stats) for teams
+  and groups; rooms take role-based access and live in reorderable
+  folders.
+- **Import roles and channels from a Discord server template** link
+  (`discord-previewTemplate` function).
+- **Voice channels** on LiveKit (`meetings-voiceToken`), listen-only for
+  members who can read but not write.
+- Discord-style message rows and composer; drag to rearrange channels and
+  folders.
+- Faster back navigation: shared message streams, and the native iOS page
+  so swipe-back works.
+- A separate **dev Firebase project** (`frisbee-app-brianrhonea-dev`):
+  `FIREBASE_ENV` picks the project; `development` builds TestFlight against
+  dev, `main` builds the App Store against production.
 
 ## 0.0.9 — Record runs and rides with GPS
 

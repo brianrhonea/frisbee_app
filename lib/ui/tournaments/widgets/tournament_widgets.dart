@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/tournament.dart';
 import '../../../routing/routes.dart';
 import '../view_models/tournaments_viewmodel.dart';
+import '../../core/ui/app_search_field.dart';
 
 String formatDateRange(DateTime? start, DateTime? end) {
   if (start == null) return 'Date TBA';
@@ -32,11 +33,8 @@ class TournamentFilters extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Search by name or location',
-            ),
+          AppSearchField(
+            hint: 'Search events by name or location',
             onChanged: vm.setQuery,
           ),
           const SizedBox(height: 12),

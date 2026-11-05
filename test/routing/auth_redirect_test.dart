@@ -46,4 +46,26 @@ void main() {
     expect(redirect(auth, '/splash'), Routes.home);
     expect(redirect(auth, '/splash?from=/teams/t1'), '/teams/t1');
   });
+
+  test('no username yet: pick one first, then carry on', () {
+    final auth = FakeAuthRepository(user: testUser)..usernameMissing = true;
+    expect(redirect(auth, Routes.home), Routes.chooseUsername);
+    expect(
+      redirect(auth, '/teams/t1'),
+      '${Routes.chooseUsername}?from=%2Fteams%2Ft1',
+    );
+    // Straight from signing in with an invite link.
+    expect(
+      redirect(auth, '/sign-in?from=/join/ABC123'),
+      '${Routes.chooseUsername}?from=%2Fjoin%2FABC123',
+    );
+    expect(redirect(auth, Routes.chooseUsername), isNull);
+
+    auth.usernameMissing = false;
+    expect(redirect(auth, Routes.chooseUsername), Routes.home);
+    expect(
+      redirect(auth, '${Routes.chooseUsername}?from=/join/ABC123'),
+      '/join/ABC123',
+    );
+  });
 }

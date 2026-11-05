@@ -12,6 +12,10 @@ const cardRadius = 14.0;
 /// Corner radius of buttons, fields and small tiles.
 const controlRadius = 10.0;
 
+/// Digits all the same width, so counts, scores and timers don't shift
+/// as they change. On by default for all text.
+const tabularFigures = [FontFeature.tabularFigures()];
+
 abstract final class AppTheme {
   static ThemeData get light => _build(Brightness.light, AppColors.light);
 
@@ -53,12 +57,13 @@ abstract final class AppTheme {
       FontWeight w = FontWeight.w700,
       double spacing = -0.3,
     }) => s?.copyWith(fontWeight: w, letterSpacing: spacing, color: c.ink);
-    final text = base.textTheme;
-    final controlShape = RoundedRectangleBorder(
+    final text = _withTabularFigures(base.textTheme);
+    final controlShape = RoundedSuperellipseBorder(
       borderRadius: BorderRadius.circular(controlRadius),
     );
     const buttonText = TextStyle(
       fontFamily: appFont,
+      fontFeatures: tabularFigures,
       fontWeight: FontWeight.w600,
       fontSize: 14,
     );
@@ -66,6 +71,18 @@ abstract final class AppTheme {
     return base.copyWith(
       scaffoldBackgroundColor: c.background,
       extensions: [c],
+      // Native-feeling page changes: Android's predictive back (the page
+      // follows the back swipe), iOS's slide, and a fade elsewhere.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: FadeForwardsPageTransitionsBuilder(),
+        },
+      ),
       textTheme: text.copyWith(
         displaySmall: heading(text.displaySmall, w: FontWeight.w800),
         headlineLarge: heading(text.headlineLarge, w: FontWeight.w800),
@@ -120,7 +137,7 @@ abstract final class AppTheme {
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: c.accent,
         foregroundColor: c.onAccent,
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(cardRadius),
         ),
       ),
@@ -151,7 +168,7 @@ abstract final class AppTheme {
         margin: EdgeInsets.zero,
         elevation: 0,
         color: c.card,
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(cardRadius),
           side: BorderSide(color: c.border),
         ),
@@ -159,18 +176,23 @@ abstract final class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: c.card,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(cardRadius + 4),
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: c.card,
         surfaceTintColor: Colors.transparent,
+        // A handle on every sheet that can be swiped down to close.
+        showDragHandle: true,
+        shape: const RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: c.card,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(controlRadius),
           side: BorderSide(color: c.border),
         ),
@@ -184,6 +206,7 @@ abstract final class AppTheme {
         // its contrasting ink (the plain ink is pale in dark mode).
         labelStyle: TextStyle(
           fontFamily: appFont,
+          fontFeatures: tabularFigures,
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: WidgetStateColor.resolveWith(
@@ -200,11 +223,13 @@ abstract final class AppTheme {
         dividerColor: c.border,
         labelStyle: const TextStyle(
           fontFamily: appFont,
+          fontFeatures: tabularFigures,
           fontWeight: FontWeight.w700,
           fontSize: 13,
         ),
         unselectedLabelStyle: const TextStyle(
           fontFamily: appFont,
+          fontFeatures: tabularFigures,
           fontWeight: FontWeight.w500,
           fontSize: 13,
         ),
@@ -226,6 +251,7 @@ abstract final class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith(
           (s) => TextStyle(
             fontFamily: appFont,
+            fontFeatures: tabularFigures,
             fontSize: 11,
             fontWeight: s.contains(WidgetState.selected)
                 ? FontWeight.w700
@@ -251,11 +277,32 @@ abstract final class AppTheme {
         backgroundColor: c.feature,
         contentTextStyle: TextStyle(fontFamily: appFont, color: c.onFeature),
         actionTextColor: c.highlight,
-        shape: RoundedRectangleBorder(
+        shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(controlRadius),
         ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(color: c.accent),
+    );
+  }
+
+  static TextTheme _withTabularFigures(TextTheme t) {
+    TextStyle? tab(TextStyle? s) => s?.copyWith(fontFeatures: tabularFigures);
+    return t.copyWith(
+      displayLarge: tab(t.displayLarge),
+      displayMedium: tab(t.displayMedium),
+      displaySmall: tab(t.displaySmall),
+      headlineLarge: tab(t.headlineLarge),
+      headlineMedium: tab(t.headlineMedium),
+      headlineSmall: tab(t.headlineSmall),
+      titleLarge: tab(t.titleLarge),
+      titleMedium: tab(t.titleMedium),
+      titleSmall: tab(t.titleSmall),
+      bodyLarge: tab(t.bodyLarge),
+      bodyMedium: tab(t.bodyMedium),
+      bodySmall: tab(t.bodySmall),
+      labelLarge: tab(t.labelLarge),
+      labelMedium: tab(t.labelMedium),
+      labelSmall: tab(t.labelSmall),
     );
   }
 }

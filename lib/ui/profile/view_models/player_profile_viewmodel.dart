@@ -158,6 +158,10 @@ class PlayerProfileViewModel extends ChangeNotifier {
   String? get photoUrl =>
       isMe ? _auth.currentUser?.photoUrl : _profile?.photoUrl;
 
+  /// Their @username, without the @; null before they pick one.
+  String? get username =>
+      (isMe ? _auth.currentUser?.username : null) ?? _profile?.username;
+
   ProfileDetails get details => _profile?.details ?? const ProfileDetails();
 
   ProfileVisibility get visibility => details.visibility;

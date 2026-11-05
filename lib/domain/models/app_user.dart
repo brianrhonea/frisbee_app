@@ -5,12 +5,24 @@ class AppUser {
     this.email,
     this.displayName,
     this.photoUrl,
+    this.username,
   });
 
   final String uid;
   final String? email;
   final String? displayName;
   final String? photoUrl;
+
+  /// Unique handle, without the "@"; null until chosen (or loaded).
+  final String? username;
+
+  AppUser withUsername(String? username) => AppUser(
+    uid: uid,
+    email: email,
+    displayName: displayName,
+    photoUrl: photoUrl,
+    username: username,
+  );
 
   String get label =>
       (displayName?.isNotEmpty ?? false) ? displayName! : (email ?? 'Player');
@@ -21,10 +33,11 @@ class AppUser {
       other.uid == uid &&
       other.email == email &&
       other.displayName == displayName &&
-      other.photoUrl == photoUrl;
+      other.photoUrl == photoUrl &&
+      other.username == username;
 
   @override
-  int get hashCode => Object.hash(uid, email, displayName, photoUrl);
+  int get hashCode => Object.hash(uid, email, displayName, photoUrl, username);
 }
 
 /// How a user signs in.

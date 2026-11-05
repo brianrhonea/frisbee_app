@@ -6,8 +6,10 @@ import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
 import '../domain/models/model_utils.dart';
 import '../domain/models/team.dart';
+import '../ui/auth/view_models/choose_username_viewmodel.dart';
 import '../ui/auth/view_models/sign_in_viewmodel.dart';
 import '../ui/auth/view_models/sign_up_viewmodel.dart';
+import '../ui/auth/widgets/choose_username_screen.dart';
 import '../ui/auth/widgets/sign_in_screen.dart';
 import '../ui/auth/widgets/sign_up_screen.dart';
 import '../ui/chat/view_models/chat_room_settings_viewmodel.dart';
@@ -32,6 +34,8 @@ import '../ui/core/ui/view_model_host.dart';
 import '../ui/events/widgets/events_screen.dart';
 import '../ui/explore/view_models/player_search_viewmodel.dart';
 import '../ui/explore/widgets/explore_screen.dart';
+import '../ui/core/ui/slide_over_page.dart';
+import '../ui/settings/widgets/settings_screen.dart';
 import '../ui/shell/view_models/shell_viewmodel.dart';
 import '../ui/shell/widgets/app_shell.dart';
 import '../ui/home/view_models/home_viewmodel.dart';
@@ -77,7 +81,6 @@ import '../ui/teams/view_models/usau_team_search_viewmodel.dart';
 import '../ui/teams/widgets/create_team_screen.dart';
 import '../ui/teams/view_models/usau_roster_viewmodel.dart';
 import '../ui/teams/widgets/team_home_screen.dart';
-import '../ui/teams/widgets/team_search_screen.dart';
 import '../ui/teams/widgets/team_section_screen.dart';
 import '../ui/teams/widgets/usau_roster_screen.dart';
 import '../ui/teams/widgets/teams_screen.dart';
@@ -122,6 +125,13 @@ GoRouter router(AuthRepository auth) => GoRouter(
       builder: (context, _) => ViewModelHost(
         create: (c) => SignInViewModel(authRepository: c.read()),
         builder: (_, vm) => SignInScreen(viewModel: vm),
+      ),
+    ),
+    GoRoute(
+      path: Routes.chooseUsername,
+      builder: (context, _) => ViewModelHost(
+        create: (c) => ChooseUsernameViewModel(authRepository: c.read()),
+        builder: (_, vm) => ChooseUsernameScreen(viewModel: vm),
       ),
     ),
     GoRoute(
@@ -197,6 +207,35 @@ GoRouter router(AuthRepository auth) => GoRouter(
         builder: (_, vm) => RecordWorkoutScreen(viewModel: vm),
       ),
     ),
+    // Settings, from the gear on the user's profile: slides over the page
+    // (a panel on wide screens), and its sections slide over it.
+    GoRoute(
+      path: Routes.settings,
+      pageBuilder: (context, state) => slideOverPage(
+        context,
+        state.pageKey,
+        _settings((vm) => SettingsScreen(viewModel: vm)),
+        panelOnWide: true,
+      ),
+      routes: [
+        for (final (path, screen)
+            in <(String, Widget Function(ProfileViewModel))>[
+              ('general', (vm) => GeneralSettingsScreen(viewModel: vm)),
+              ('privacy', (vm) => PrivacySettingsScreen(viewModel: vm)),
+              ('account', (vm) => AccountSettingsScreen(viewModel: vm)),
+            ])
+          GoRoute(
+            path: path,
+            pageBuilder: (context, state) => slideOverPage(
+              context,
+              state.pageKey,
+              _settings(screen),
+              panelOnWide: true,
+              dim: false,
+            ),
+          ),
+      ],
+    ),
     // Opened from the bell on Home, over the shell.
     GoRoute(
       path: Routes.notifications,
@@ -211,13 +250,20 @@ GoRouter router(AuthRepository auth) => GoRouter(
       routes: [
         GoRoute(
           path: 'settings',
-          builder: (_, _) => ViewModelHost(
-            create: (c) => NotificationSettingsViewModel(
-              notificationRepository: c.read(),
-              teamRepository: c.read(),
-              authRepository: c.read(),
+          // Usually opened from Settings, so it slides over it the same way.
+          pageBuilder: (context, state) => slideOverPage(
+            context,
+            state.pageKey,
+            ViewModelHost(
+              create: (c) => NotificationSettingsViewModel(
+                notificationRepository: c.read(),
+                teamRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, vm) => NotificationSettingsScreen(viewModel: vm),
             ),
-            builder: (_, vm) => NotificationSettingsScreen(viewModel: vm),
+            panelOnWide: true,
+            dim: false,
           ),
         ),
       ],
@@ -590,10 +636,20 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 builder: (_, vm) => ViewModelHost(
                   create: (c) =>
                       PlayerSearchViewModel(profileRepository: c.read()),
-                  builder: (_, players) => ExploreScreen(
-                    viewModel: vm,
-                    players: players,
-                    initialQuery: state.uri.queryParameters['q'] ?? '',
+                  builder: (_, players) => ViewModelHost(
+                    create: (c) =>
+                        TournamentsViewModel(tournamentRepository: c.read()),
+                    builder: (_, events) => ExploreScreen(
+                      viewModel: vm,
+                      players: players,
+                      events: events,
+                      initialQuery: state.uri.queryParameters['q'] ?? '',
+                      initialFilter: ExploreFilter.values
+                          .where(
+                            (f) => f.name == state.uri.queryParameters['only'],
+                          )
+                          .firstOrNull,
+                    ),
                   ),
                 ),
               ),
@@ -686,13 +742,12 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 ),
                 GoRoute(
                   path: 'search',
-                  builder: (_, _) => ViewModelHost(
-                    create: (c) => TeamSearchViewModel(
-                      teamRepository: c.read(),
-                      authRepository: c.read(),
-                    ),
-                    builder: (_, vm) => TeamSearchScreen(viewModel: vm),
-                  ),
+                  // Finding teams and groups is Explore's job now; old links
+                  // land there. The USA Ultimate search below stays.
+                  redirect: (_, state) => state.uri.path == Routes.searchTeams
+                      ? Routes.explore(only: ExploreFilter.teams)
+                      : null,
+                  builder: (_, _) => const SizedBox.shrink(),
                   routes: [
                     GoRoute(
                       path: 'usau',
@@ -984,19 +1039,11 @@ GoRouter router(AuthRepository auth) => GoRouter(
             GoRoute(
               path: Routes.profile,
               builder: (_, _) => ViewModelHost(
-                create: (c) => ProfileViewModel(
-                  authRepository: c.read(),
-                  themeRepository: c.read(),
-                  notificationRepository: c.read(),
+                create: (c) => _playerProfile(
+                  c,
+                  c.read<AuthRepository>().currentUser?.uid ?? '',
                 ),
-                builder: (_, settings) => ViewModelHost(
-                  create: (c) => _playerProfile(
-                    c,
-                    c.read<AuthRepository>().currentUser?.uid ?? '',
-                  ),
-                  builder: (_, vm) =>
-                      PlayerProfileScreen(viewModel: vm, settings: settings),
-                ),
+                builder: (_, vm) => PlayerProfileScreen(viewModel: vm),
               ),
               routes: [
                 // Everything the user follows, over the shell.
@@ -1021,6 +1068,17 @@ GoRouter router(AuthRepository auth) => GoRouter(
   ],
 );
 
+/// A settings page with its own [ProfileViewModel].
+Widget _settings(Widget Function(ProfileViewModel vm) screen) => ViewModelHost(
+  create: (c) => ProfileViewModel(
+    authRepository: c.read(),
+    themeRepository: c.read(),
+    notificationRepository: c.read(),
+    directMessageRepository: c.read(),
+  ),
+  builder: (_, vm) => screen(vm),
+);
+
 PlayerProfileViewModel _playerProfile(BuildContext c, String uid) =>
     PlayerProfileViewModel(
       uid: uid,
@@ -1034,8 +1092,9 @@ PlayerProfileViewModel _playerProfile(BuildContext c, String uid) =>
       notificationRepository: c.read(),
     );
 
-/// Sends signed-out users to sign-in (remembering where they were headed)
-/// and signed-in users away from the auth screens: to Community, or back to
+/// Sends signed-out users to sign-in (remembering where they were headed),
+/// signed-in users without a username to pick one, and everyone else away
+/// from the auth screens: to Community, or back to
 /// the invite link they opened so they can finish joining.
 String? authRedirect(AuthRepository auth, Uri uri) {
   final path = uri.path;
@@ -1058,6 +1117,19 @@ String? authRedirect(AuthRepository auth, Uri uri) {
           : {'from': target},
     ).toString();
   }
+  // No username yet: pick one first, then carry on.
+  final choosing = path == Routes.chooseUsername;
+  if (auth.needsUsername) {
+    if (choosing) return null;
+    final target = public || path == _splash ? from : uri.toString();
+    return Uri(
+      path: Routes.chooseUsername,
+      queryParameters: target == null || target == Routes.home
+          ? null
+          : {'from': target},
+    ).toString();
+  }
+  if (choosing) return from ?? Routes.home;
   if (public) return _isInviteLink(from) ? from : Routes.home;
   // Already signed in when the app opened: carry on where it was headed.
   if (path == _splash) return from ?? Routes.home;

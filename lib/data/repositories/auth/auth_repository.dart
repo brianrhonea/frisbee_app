@@ -12,15 +12,33 @@ abstract class AuthRepository extends ChangeNotifier {
 
   bool get isAuthenticated => currentUser != null;
 
-  /// False until the initial auth state has been resolved.
+  /// False until the initial auth state has been resolved, and for a
+  /// signed-in user, until we know whether they have a username.
   bool get isReady;
+
+  /// Signed in without a username yet (e.g. new with Google or Apple): the
+  /// app asks for one before anything else.
+  bool get needsUsername;
+
+  /// Whether nobody has [username] yet. It's only claimed by
+  /// [claimUsername], so it can still be taken in between.
+  Future<Result<bool>> isUsernameAvailable(String username);
+
+  /// Gives the signed-in user [username], once; fails if it's taken.
+  Future<Result<void>> claimUsername(String username);
 
   Future<Result<void>> signInWithEmail(String email, String password);
 
+  /// Creates an email account named "[firstName] [lastName]" and claims
+  /// [username] for it. If the username was taken in the meantime, the
+  /// account is still made and the app asks for another
+  /// ([needsUsername]).
   Future<Result<void>> signUpWithEmail({
     required String email,
     required String password,
-    required String displayName,
+    required String firstName,
+    required String lastName,
+    required String username,
   });
 
   Future<Result<void>> signInWithGoogle();

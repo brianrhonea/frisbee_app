@@ -255,7 +255,7 @@ void main() {
       // The fake team stream drops writes made while the first snapshot
       // is being handled, so read what was saved.
       final team = teams.teams['t1']!;
-      expect(team.needsOrganizerMigration, isFalse);
+      expect(team.needsRoleMigration, isFalse);
       expect(team.roleOf('k1'), TeamRole.player);
       final organizer = team.roles.values.single;
       expect(organizer.name, 'Organizer');
@@ -268,7 +268,27 @@ void main() {
       expect(team.rolesOf('k2').single.id, organizer.id);
       expect(team.has('k1', TeamPermission.manageEvents), isTrue);
       expect(team.has('m', TeamPermission.manageEvents), isFalse);
-      expect(teams.rolesSaved, 1);
+      expect(teams.migrations, 1);
+      vm.dispose();
+    });
+
+    test("a team's coaches and captains become roles too", () async {
+      teams.teams['t1'] = teamWith({
+        'u1': TeamRole.owner,
+        'c': TeamRole.coach,
+        'k': TeamRole.captain,
+        'p': TeamRole.player,
+      });
+      final vm = load();
+      await pumpEventQueue();
+      final team = teams.teams['t1']!;
+      expect(team.needsRoleMigration, isFalse);
+      expect(team.rolesOf('c').single.name, 'Coach');
+      expect(team.rolesOf('k').single.name, 'Captain');
+      for (final p in TeamPermission.values) {
+        expect(team.has('c', p), isTrue, reason: '$p');
+      }
+      expect(team.has('p', TeamPermission.manageTeam), isFalse);
       vm.dispose();
     });
 
@@ -276,8 +296,8 @@ void main() {
       teams.teams['t1'] = legacyGroup('o');
       final vm = load();
       await pumpEventQueue();
-      expect(vm.team!.needsOrganizerMigration, isTrue);
-      expect(teams.rolesSaved, 0);
+      expect(vm.team!.needsRoleMigration, isTrue);
+      expect(teams.migrations, 0);
       vm.dispose();
     });
   });

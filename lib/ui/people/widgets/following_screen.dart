@@ -82,9 +82,9 @@ class _FollowingScreenState extends State<FollowingScreen> {
               title: 'Not following anyone yet',
               message:
                   'Follow people, teams, groups and tournaments to see '
-                  'their posts on Home. Tap the bell to get notified.',
+                  'their posts on Home.',
               action: FilledButton.icon(
-                onPressed: () => context.go(Routes.searchTeams),
+                onPressed: () => context.go(Routes.explore()),
                 icon: const Icon(Icons.search),
                 label: const Text('Find teams and groups'),
               ),
@@ -102,24 +102,29 @@ class _FollowingScreenState extends State<FollowingScreen> {
                       ),
                       subtitle: Text(f.type.label),
                       onTap: () => openFollow(context, f.target),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            tooltip: f.notify
-                                ? 'Turn off post notifications'
-                                : 'Notify me about new posts',
-                            isSelected: f.notify,
-                            icon: const Icon(Icons.notifications_none),
-                            selectedIcon: const Icon(
-                              Icons.notifications_active,
-                            ),
-                            onPressed: () =>
-                                vm.setNotify.execute((f.key, !f.notify)),
+                      trailing: PopupMenuButton<_FollowAction>(
+                        tooltip: 'Options for ${f.target.name}',
+                        icon: Icon(
+                          f.notify
+                              ? Icons.notifications_active_outlined
+                              : Icons.more_vert,
+                        ),
+                        onSelected: (a) => switch (a) {
+                          _FollowAction.notify => vm.setNotify.execute((
+                            f.key,
+                            !f.notify,
+                          )),
+                          _FollowAction.unfollow => vm.unfollow.execute(f.key),
+                        },
+                        itemBuilder: (_) => [
+                          CheckedPopupMenuItem(
+                            value: _FollowAction.notify,
+                            checked: f.notify,
+                            child: const Text('Post notifications'),
                           ),
-                          TextButton(
-                            onPressed: () => vm.unfollow.execute(f.key),
-                            child: const Text('Unfollow'),
+                          const PopupMenuItem(
+                            value: _FollowAction.unfollow,
+                            child: Text('Unfollow'),
                           ),
                         ],
                       ),
@@ -130,3 +135,5 @@ class _FollowingScreenState extends State<FollowingScreen> {
     ),
   );
 }
+
+enum _FollowAction { notify, unfollow }

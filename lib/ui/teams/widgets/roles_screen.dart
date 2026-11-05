@@ -113,8 +113,8 @@ class _RolesScreenState extends State<RolesScreen> {
                           ? 'Roles give members extra powers and open chat '
                                 'rooms to them. The owner can do everything.'
                           : 'Roles give players extra powers and open chat '
-                                'rooms to them, on top of Coach, Captain and '
-                                'Player. The owner can do everything.',
+                                'rooms to them, e.g. Coach or Captain. The '
+                                'owner can do everything.',
                       style: TextStyle(color: AppColors.of(context).muted),
                     ),
                     const SizedBox(height: 16),

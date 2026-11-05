@@ -35,7 +35,7 @@ enum NotificationCategory {
   ),
   posts(
     'Posts you follow',
-    'New posts from people, teams and tournaments whose bell you turned on',
+    'New posts from people, teams and tournaments you turned on post notifications for',
     perTeam: true,
   ),
   social(

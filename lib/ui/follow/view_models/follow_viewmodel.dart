@@ -72,7 +72,7 @@ class FollowViewModel extends ChangeNotifier {
   /// Follows or unfollows.
   late final Command0<void> toggleFollow;
 
-  /// Turns the bell on or off. Turning it on asks for push permission; the
+  /// Turns post notifications on or off. Turning it on asks for push permission; the
   /// result is the device's push status then (null when turned off), so the
   /// screen can say when pushes are blocked. In-app notifications still
   /// arrive either way.

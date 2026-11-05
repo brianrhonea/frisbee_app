@@ -1,16 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/data/services/firestore_utils.dart';
 import 'package:frisbee_app/domain/models/player_profile.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/stats.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/domain/models/tournament.dart';
+import 'package:frisbee_app/routing/routes.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
+import 'package:frisbee_app/ui/core/ui/slide_over_page.dart';
 import 'package:frisbee_app/ui/explore/view_models/player_search_viewmodel.dart';
+import 'package:frisbee_app/ui/explore/widgets/explore_screen.dart';
 import 'package:frisbee_app/ui/profile/view_models/player_profile_viewmodel.dart';
 import 'package:frisbee_app/ui/profile/view_models/profile_viewmodel.dart';
 import 'package:frisbee_app/ui/profile/widgets/profile_screen.dart';
+import 'package:frisbee_app/ui/settings/widgets/settings_screen.dart';
+import 'package:frisbee_app/ui/teams/view_models/team_search_viewmodel.dart';
+import 'package:frisbee_app/ui/tournaments/view_models/tournaments_viewmodel.dart';
 
 import '../testing/fakes.dart';
 
@@ -234,45 +242,98 @@ void main() {
     vm.dispose();
   });
 
-  testWidgets('own profile has settings, and the theme toggle works', (
-    tester,
-  ) async {
+  testWidgets('the gear opens Settings over the profile; General sets the '
+      'theme', (tester) async {
     tester.view.physicalSize = const Size(1400, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final theme = FakeThemeRepository();
-    final settings = ProfileViewModel(
+    ProfileViewModel settings() => ProfileViewModel(
       authRepository: auth,
       themeRepository: theme,
       notificationRepository: FakeNotificationRepository(),
+      directMessageRepository: FakeDirectMessageRepository(),
     );
     final vm = profileOf(testUser.uid);
+    addTearDown(vm.dispose);
+    final router = GoRouter(
+      initialLocation: Routes.profile,
+      routes: [
+        GoRoute(
+          path: Routes.profile,
+          builder: (_, _) => PlayerProfileScreen(viewModel: vm),
+        ),
+        GoRoute(
+          path: Routes.settings,
+          pageBuilder: (context, state) => slideOverPage(
+            context,
+            state.pageKey,
+            SettingsScreen(viewModel: settings()),
+            panelOnWide: true,
+          ),
+          routes: [
+            GoRoute(
+              path: 'general',
+              pageBuilder: (context, state) => slideOverPage(
+                context,
+                state.pageKey,
+                GeneralSettingsScreen(viewModel: settings()),
+                panelOnWide: true,
+                dim: false,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
     await tester.pumpWidget(
       ListenableBuilder(
         listenable: theme,
-        builder: (_, _) => MaterialApp(
+        builder: (_, _) => MaterialApp.router(
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           themeMode: theme.themeMode,
-          home: PlayerProfileScreen(viewModel: vm, settings: settings),
+          routerConfig: router,
         ),
       ),
     );
     await tester.pumpAndSettle();
     expect(find.text('Edit profile'), findsOneWidget);
     expect(find.text("I'm Alex Smith"), findsOneWidget);
+    expect(find.text('Appearance'), findsNothing, reason: 'not on the profile');
 
-    expect(find.text('Appearance'), findsOneWidget);
-    final context = tester.element(find.byType(PlayerProfileScreen));
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    // A panel down the right edge, the profile still behind it.
+    expect(tester.getSize(find.byType(SettingsScreen)).width, 440);
+    expect(find.byType(PlayerProfileScreen), findsOneWidget);
+
+    await tester.tap(find.text('General'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
     expect(theme.themeMode, ThemeMode.dark);
+    final context = tester.element(find.byType(GeneralSettingsScreen));
     expect(Theme.of(context).brightness, Brightness.dark);
 
     await tester.tap(find.text('Light'));
     await tester.pumpAndSettle();
     expect(theme.themeMode, ThemeMode.light);
-    vm.dispose();
+
+    // Back to Settings, which shows the choice.
+    // (Settings' own back arrow is under General's panel.)
+    await tester.tap(find.byType(BackButton).last);
+    await tester.pumpAndSettle();
+    expect(find.byType(GeneralSettingsScreen), findsNothing);
+    expect(
+      find.descendant(
+        of: find.widgetWithText(ListTile, 'General'),
+        matching: find.text('Light'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('edit profile saves details and visibility', (tester) async {
@@ -333,5 +394,94 @@ void main() {
       await tester.pumpAndSettle();
     }
     vm.dispose();
+  });
+
+  testWidgets('the profile shows the @username under the name', (tester) async {
+    tester.view.physicalSize = const Size(1400, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    auth = FakeAuthRepository(user: testUser.withUsername('alex_7'));
+    final vm = profileOf(testUser.uid);
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      MaterialApp(home: PlayerProfileScreen(viewModel: vm)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('@alex_7'), findsOneWidget);
+
+    profiles.put(
+      const PlayerProfile(uid: 'p2', name: 'Pat Lee', username: 'patlee'),
+    );
+    final other = profileOf('p2');
+    addTearDown(other.dispose);
+    await tester.pumpWidget(
+      MaterialApp(home: PlayerProfileScreen(viewModel: other)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('@patlee'), findsOneWidget);
+  });
+
+  testWidgets('one search finds players, teams and events', (tester) async {
+    tester.view.physicalSize = const Size(1400, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    profiles.put(
+      const PlayerProfile(uid: 'p2', name: 'Riley Pike', username: 'rpike'),
+    );
+    final tournaments = [
+      for (var i = 1; i <= 4; i++)
+        Tournament(
+          id: 'e$i',
+          name: 'Riverside Classic $i',
+          url: '',
+          startDate: DateTime(2026, 12, i),
+          city: 'Austin',
+          state: 'TX',
+        ),
+      Tournament(
+        id: 'old',
+        name: 'Riverside Classic 2020',
+        url: '',
+        startDate: DateTime(2020, 5, 1),
+      ),
+    ];
+    final teamSearch = TeamSearchViewModel(
+      teamRepository: teams,
+      authRepository: auth,
+    );
+    final players = PlayerSearchViewModel(profileRepository: profiles);
+    final events = TournamentsViewModel(
+      tournamentRepository: FakeTournamentRepository(tournaments),
+      clock: () => DateTime(2026, 11, 4),
+    );
+    addTearDown(teamSearch.dispose);
+    addTearDown(players.dispose);
+    addTearDown(events.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ExploreScreen(
+          viewModel: teamSearch,
+          players: players,
+          events: events,
+          initialQuery: 'ri',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Riley Pike'), findsOneWidget);
+    // Upcoming events only, a few at a time in All.
+    expect(find.text('Riverside Classic 1'), findsOneWidget);
+    expect(find.text('Riverside Classic 4'), findsNothing);
+    expect(find.text('Riverside Classic 2020'), findsNothing);
+    await tester.tap(find.text('See all 4 events'));
+    await tester.pumpAndSettle();
+    expect(find.text('Riverside Classic 4'), findsOneWidget);
+    expect(find.text('Riley Pike'), findsNothing, reason: 'Events only');
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Players'));
+    await tester.pumpAndSettle();
+    expect(find.text('Riley Pike'), findsOneWidget);
+    expect(find.text('Riverside Classic 1'), findsNothing);
   });
 }

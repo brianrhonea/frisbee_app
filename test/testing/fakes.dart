@@ -19,6 +19,7 @@ import 'package:frisbee_app/data/repositories/tournament/tournament_repository.d
 import 'package:frisbee_app/data/repositories/usau_schedule/usau_schedule_repository.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
+import 'package:frisbee_app/domain/models/username.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/invite_code.dart';
@@ -80,10 +81,51 @@ class FakeAuthRepository extends AuthRepository {
   Future<Result<void>> signUpWithEmail({
     required String email,
     required String password,
-    required String displayName,
-  }) => _run(
-    () => setUser(AppUser(uid: 'u1', email: email, displayName: displayName)),
-  );
+    required String firstName,
+    required String lastName,
+    required String username,
+  }) async {
+    if (takenUsernames.contains(Username.normalize(username))) {
+      return Result.error(UsernameTakenException(username));
+    }
+    final result = await _run(
+      () => setUser(
+        AppUser(uid: 'u1', email: email, displayName: '$firstName $lastName'),
+      ),
+    );
+    if (result is Error) return result;
+    return claimUsername(username);
+  }
+
+  /// Usernames someone else has.
+  final takenUsernames = <String>{};
+
+  /// Whether the signed-in user is still to pick one; off so most tests
+  /// go straight in.
+  bool usernameMissing = false;
+
+  @override
+  bool get needsUsername => _user != null && usernameMissing;
+
+  @override
+  Future<Result<bool>> isUsernameAvailable(String username) async {
+    final name = Username.normalize(username);
+    return Result.ok(
+      Username.problem(name) == null && !takenUsernames.contains(name),
+    );
+  }
+
+  @override
+  Future<Result<void>> claimUsername(String username) async {
+    final name = Username.normalize(username);
+    if (takenUsernames.contains(name)) {
+      return Result.error(UsernameTakenException(name));
+    }
+    takenUsernames.add(name);
+    usernameMissing = false;
+    setUser(_user?.withUsername(name));
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<void>> signInWithGoogle() => _run(() => setUser(testUser));
@@ -482,7 +524,6 @@ class FakeTeamRepository implements TeamRepository {
     Team team, {
     required Map<String, CustomRole> roles,
     required Map<String, Set<String>> memberRoles,
-    Set<String> demote = const {},
   }) async {
     final t = teams[team.id];
     if (t == null) return Result.error(Exception('No team'));
@@ -491,9 +532,37 @@ class FakeTeamRepository implements TeamRepository {
       roles: roles,
       memberRoles: cleaned,
       memberPerms: memberPermsFor(cleaned, roles),
-      members: {...t.members, for (final uid in demote) uid: TeamRole.player},
     );
     rolesSaved++;
+    _emit();
+    return const Result.ok(null);
+  }
+
+  int migrations = 0;
+
+  @override
+  Future<Result<void>> migrateTiersToRoles(Team team) async {
+    final t = teams[team.id];
+    if (t == null) return Result.error(Exception('No team'));
+    final tierRoles = t.legacyTierRoles();
+    final roles = {...t.roles, for (final r in tierRoles.values) r.id: r};
+    final memberRoles = {
+      ...t.memberRoles,
+      for (final e in t.members.entries)
+        if (tierRoles[e.value] case final r?)
+          e.key: {...?t.memberRoles[e.key], r.id},
+    };
+    final cleaned = cleanMemberRoles(memberRoles, roles, t.members.keys);
+    teams[team.id] = t.copyWith(
+      roles: roles,
+      memberRoles: cleaned,
+      memberPerms: memberPermsFor(cleaned, roles),
+      members: {
+        for (final e in t.members.entries)
+          e.key: tierRoles.containsKey(e.value) ? TeamRole.player : e.value,
+      },
+    );
+    migrations++;
     _emit();
     return const Result.ok(null);
   }
@@ -1167,12 +1236,30 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
   Stream<List<Conversation>> watchConversations(String uid) => _watch(
     () => conversations.values
         .where((c) => c.participants.contains(uid) && c.hasMessages)
+        .map((c) => c.withMyReadAt(privateReads[c.id]))
         .toList(),
   );
 
   @override
-  Stream<Conversation?> watchConversation(String id) =>
-      _watch(() => conversations[id]);
+  Stream<Conversation?> watchConversation(String id, {required String uid}) =>
+      _watch(() => conversations[id]?.withMyReadAt(privateReads[id]));
+
+  /// Read receipts setting by uid; on unless set.
+  final readReceipts = <String, bool>{};
+
+  /// Private read times by conversation id.
+  final privateReads = <String, DateTime>{};
+
+  @override
+  Stream<bool> watchReadReceipts(String uid) =>
+      _watch(() => readReceipts[uid] ?? true);
+
+  @override
+  Future<Result<void>> setReadReceipts(String uid, {required bool on}) async {
+    readReceipts[uid] = on;
+    emit();
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<String>> openConversation(AppUser me, UserProfile other) async {
@@ -1233,8 +1320,17 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
   }
 
   @override
-  Future<Result<void>> markRead(String id, String uid) async {
+  Future<Result<void>> markRead(
+    String id,
+    String uid, {
+    required bool shareReceipt,
+  }) async {
     reads.add(id);
+    privateReads[id] = DateTime(2100);
+    if (!shareReceipt) {
+      emit();
+      return const Result.ok(null);
+    }
     final c = conversations[id]!;
     conversations[id] = Conversation(
       id: id,
@@ -1260,7 +1356,18 @@ class FakeNotificationRepository implements NotificationRepository {
     List<AppNotification> feed = const [],
     this.status = PushStatus.notDetermined,
     this.pushSupported = true,
+    this.offerPush = false,
   }) : feed = [...feed];
+
+  /// What [shouldOfferPush] answers; off so most tests see no offer.
+  bool offerPush;
+  var pushOfferDismissed = false;
+
+  @override
+  Future<bool> shouldOfferPush() async => offerPush && !pushOfferDismissed;
+
+  @override
+  Future<void> dismissPushOffer() async => pushOfferDismissed = true;
 
   NotificationPreferences prefs;
   final List<AppNotification> feed;

@@ -42,6 +42,8 @@ import 'package:frisbee_app/data/repositories/group_tournament/group_tournament_
 import 'package:frisbee_app/data/repositories/post_comment/post_comment_repository.dart';
 import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 
+import 'package:frisbee_app/utils/pending_removals.dart';
+
 import '../testing/fakes.dart';
 import '../testing/group_tournament_fakes.dart';
 import '../testing/social_fakes.dart';
@@ -342,9 +344,19 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byTooltip('Delete comment'), findsOneWidget);
+    // Gone at once, with Undo instead of "Are you sure?".
     await tester.tap(find.byTooltip('Delete comment'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pump();
+    expect(find.text('See you there!'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Undo'));
+    await tester.pump();
+    expect(find.text('See you there!'), findsOneWidget);
+    expect(userPosts.posts.single.commentCount, 2);
+
+    await tester.tap(find.byTooltip('Delete comment'));
+    await tester.pump();
+    await tester.pump(PendingRemovals.undoWindow);
     await tester.pumpAndSettle();
     expect(find.text('See you there!'), findsNothing);
     expect(find.text('Me too'), findsOneWidget);
@@ -372,7 +384,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Search for someone to send this post to.'), findsOne);
     await tester.enterText(
-      find.widgetWithText(TextField, 'Search people'),
+      find.widgetWithText(TextField, 'Search people by name'),
       'jo',
     );
     await tester.pump(const Duration(milliseconds: 400));

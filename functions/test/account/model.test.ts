@@ -20,6 +20,12 @@ describe("nextOwner", () => {
     );
   });
 
+  it("then members whose roles manage the team", () => {
+    const members = { me: "owner", p1: "player", m1: "player", m2: "player" };
+    const memberPerms = { m1: ["manageChats"], m2: ["manageTeam", "keepStats"] };
+    expect(nextOwner({ members, memberPerms, memberIds: ["me", "p1", "m1", "m2"] }, "me")).toBe("m2");
+  });
+
   it("is undefined when nobody else is on the team", () => {
     expect(nextOwner({ members: { me: "owner" }, memberIds: ["me"] }, "me")).toBeUndefined();
     expect(nextOwner({}, "me")).toBeUndefined();

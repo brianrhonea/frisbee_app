@@ -8,7 +8,6 @@ import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
-import '../../core/ui/brand.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
@@ -17,24 +16,18 @@ import '../../follow/widgets/follow_button.dart';
 import '../../posts/widgets/post_widgets.dart';
 import '../../workouts/widgets/record_button.dart';
 import '../view_models/player_profile_viewmodel.dart';
-import '../view_models/profile_viewmodel.dart';
-import 'delete_account_dialog.dart';
 import '../../posts/widgets/post_composer.dart';
+import '../../core/ui/skeleton.dart';
 
 enum _Tab { overview, posts, stats, teams }
 
 /// A player's profile: who they are, their numbers, recent games and
-/// teams. On the user's own profile, [settings] adds their app settings,
-/// and they can edit the profile and link their roster spots.
+/// teams. On the user's own profile they can edit it, link their roster
+/// spots, and open Settings from the gear at the top right.
 class PlayerProfileScreen extends StatefulWidget {
-  const PlayerProfileScreen({
-    super.key,
-    required this.viewModel,
-    this.settings,
-  });
+  const PlayerProfileScreen({super.key, required this.viewModel});
 
   final PlayerProfileViewModel viewModel;
-  final ProfileViewModel? settings;
 
   @override
   State<PlayerProfileScreen> createState() => _PlayerProfileScreenState();
@@ -120,7 +113,13 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     final mobile = ScreenSize.of(context).isMobile;
     return Scaffold(
       appBar: mobile || !vm.isMe
-          ? AppBar(title: Text(vm.isMe ? 'My profile' : 'Player profile'))
+          ? AppBar(
+              title: Text(vm.isMe ? 'My profile' : 'Player profile'),
+              actions: [
+                if (vm.isMe) const SettingsButton(),
+                const SizedBox(width: 4),
+              ],
+            )
           : null,
       body: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.saveDetails, vm.message]),
@@ -152,13 +151,11 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
   }
 
   List<Widget> _body() {
-    final settings = widget.settings;
     final side = [
       if (vm.isMe)
         for (final c in vm.claimable) _ClaimCard(viewModel: vm, claim: c),
       _OffTheSheet(details: vm.details, primary: vm.primaryTeam),
       if (vm.showsTeams) _TeamsCard(viewModel: vm),
-      ?settings == null ? null : SettingsCard(viewModel: settings),
     ];
     return switch (_tab) {
       _Tab.overview => [
@@ -213,10 +210,7 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
           ),
         ),
       if (!vm.postsLoaded)
-        const Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(child: CircularProgressIndicator()),
-        )
+        const Skeleton(child: SkeletonPost())
       else if (vm.postsError != null)
         ErrorView(error: vm.postsError)
       else if (vm.posts.isEmpty)
@@ -307,10 +301,19 @@ class _Hero extends StatelessWidget {
     final primary = vm.primaryTeam;
     final number = primary?.number;
     final button = vm.isMe
-        ? FilledButton.icon(
-            onPressed: vm.saveDetails.running ? null : onEdit,
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            label: const Text('Edit profile'),
+        ? Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilledButton.icon(
+                onPressed: vm.saveDetails.running ? null : onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Edit profile'),
+              ),
+              // On phones it's in the top bar.
+              if (!mobile) const SettingsButton(outlined: true),
+            ],
           )
         : Wrap(
             spacing: 8,
@@ -410,9 +413,13 @@ class _Hero extends StatelessWidget {
                               color: c.ink,
                             ),
                           ),
-                          if (d.pronouns.isNotEmpty)
+                          if ([
+                                if (vm.username case final u?) '@$u',
+                                if (d.pronouns.isNotEmpty) d.pronouns,
+                              ].join(' · ')
+                              case final line when line.isNotEmpty)
                             Text(
-                              d.pronouns,
+                              line,
                               style: TextStyle(fontSize: 12, color: c.muted),
                             ),
                           const SizedBox(height: 6),
@@ -1171,174 +1178,18 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
 
 // Settings ---------------------------------------------------------------
 
-/// The user's app settings: appearance, notifications, display name, sign
-/// out and account deletion.
-class SettingsCard extends StatefulWidget {
-  const SettingsCard({super.key, required this.viewModel});
+/// The gear that opens Settings, at the top right of the user's profile.
+class SettingsButton extends StatelessWidget {
+  const SettingsButton({super.key, this.outlined = false});
 
-  final ProfileViewModel viewModel;
-
-  @override
-  State<SettingsCard> createState() => _SettingsCardState();
-}
-
-class _SettingsCardState extends State<SettingsCard> {
-  ProfileViewModel get vm => widget.viewModel;
-
-  late final List<Command<void>> _commands = [
-    vm.updateDisplayName,
-    vm.signOut,
-    vm.setThemeMode,
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    for (final c in _commands) {
-      c.addListener(_onCommand);
-    }
-  }
-
-  @override
-  void dispose() {
-    for (final c in _commands) {
-      c.removeListener(_onCommand);
-    }
-    super.dispose();
-  }
-
-  void _onCommand() {
-    for (final c in _commands) {
-      if (c.error) {
-        showErrorSnackBar(context, c.result);
-        c.clearResult();
-      }
-    }
-    if (vm.updateDisplayName.completed) {
-      vm.updateDisplayName.clearResult();
-      showSnackBar(context, 'Name updated');
-    }
-  }
-
-  Future<void> _editName() async {
-    final controller = TextEditingController(text: vm.user?.displayName);
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Display name'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-          onSubmitted: (v) => Navigator.pop(context, v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (name != null && name.trim().isNotEmpty) {
-      vm.updateDisplayName.execute(name);
-    }
-  }
+  final bool outlined;
 
   @override
   Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final error = Theme.of(context).colorScheme.error;
-    return ListenableBuilder(
-      listenable: vm,
-      builder: (context, _) => SectionCard(
-        title: 'Settings',
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (vm.user?.email case final email?)
-              Text(email, style: TextStyle(fontSize: 12, color: c.muted)),
-            const SizedBox(height: 12),
-            Text(
-              'Appearance',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: c.ink,
-              ),
-            ),
-            const SizedBox(height: 6),
-            SegmentedButton<ThemeMode>(
-              segments: const [
-                ButtonSegment(value: ThemeMode.system, label: Text('System')),
-                ButtonSegment(value: ThemeMode.light, label: Text('Light')),
-                ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
-              ],
-              selected: {vm.themeMode},
-              showSelectedIcon: false,
-              onSelectionChanged: (s) => vm.setThemeMode.execute(s.first),
-            ),
-            const SizedBox(height: 8),
-            for (final (icon, label, onTap, color) in [
-              (
-                Icons.people_outline,
-                'Following',
-                () => context.push(Routes.following),
-                null,
-              ),
-              (
-                Icons.notifications_outlined,
-                'Notifications',
-                () => context.push(Routes.notificationSettings),
-                null,
-              ),
-              (Icons.edit_outlined, 'Change display name', _editName, null),
-              (
-                Icons.logout,
-                'Sign out',
-                () async {
-                  if (await confirmDialog(
-                    context,
-                    title: 'Sign out?',
-                    message: 'Are you sure you want to sign out?',
-                    confirmLabel: 'Sign out',
-                  )) {
-                    vm.signOut.execute();
-                  }
-                },
-                null,
-              ),
-              (
-                Icons.delete_forever_outlined,
-                'Delete account',
-                () => showDialog<void>(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (_) => DeleteAccountDialog(viewModel: vm),
-                ),
-                error,
-              ),
-            ])
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                leading: Icon(icon, size: 20, color: color),
-                title: Text(label, style: TextStyle(color: color)),
-                onTap: onTap,
-              ),
-            Text(
-              '$appName v$appVersion',
-              style: TextStyle(fontSize: 11, color: c.muted),
-            ),
-          ],
-        ),
-      ),
-    );
+    void open() => context.push(Routes.settings);
+    const icon = Icon(Icons.settings_outlined);
+    return outlined
+        ? IconButton.outlined(tooltip: 'Settings', onPressed: open, icon: icon)
+        : IconButton(tooltip: 'Settings', onPressed: open, icon: icon);
   }
 }

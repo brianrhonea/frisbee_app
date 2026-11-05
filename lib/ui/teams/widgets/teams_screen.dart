@@ -89,7 +89,8 @@ class _TeamsScreenState extends State<TeamsScreen> {
           IconButton(
             tooltip: 'Find a team',
             icon: const Icon(Icons.search),
-            onPressed: () => context.push(Routes.searchTeams),
+            onPressed: () =>
+                context.go(Routes.explore(only: ExploreFilter.teams)),
           ),
           ListenableBuilder(
             listenable: vm.joinTeam,
@@ -139,7 +140,8 @@ class _TeamsScreenState extends State<TeamsScreen> {
                     child: const Text('Join with code'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => context.push(Routes.searchTeams),
+                    onPressed: () =>
+                        context.go(Routes.explore(only: ExploreFilter.groups)),
                     icon: const Icon(Icons.search),
                     label: const Text('Find a group'),
                   ),

@@ -5,7 +5,7 @@ import 'package:frisbee_app/ui/auth/view_models/sign_in_viewmodel.dart';
 import 'package:frisbee_app/ui/auth/widgets/sign_in_screen.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/profile/view_models/profile_viewmodel.dart';
-import 'package:frisbee_app/ui/profile/widgets/profile_screen.dart';
+import 'package:frisbee_app/ui/settings/widgets/settings_screen.dart';
 
 import '../testing/fakes.dart';
 
@@ -19,19 +19,21 @@ void main() {
       authRepository: auth,
       themeRepository: FakeThemeRepository(),
       notificationRepository: FakeNotificationRepository(),
+      directMessageRepository: FakeDirectMessageRepository(),
     );
   });
 
-  Future<void> pumpSettings(WidgetTester tester) async {
+  /// Settings, or with [account] its Account page.
+  Future<void> pumpSettings(WidgetTester tester, {bool account = false}) async {
     tester.view.physicalSize = const Size(1000, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: Scaffold(
-          body: SingleChildScrollView(child: SettingsCard(viewModel: vm)),
-        ),
+        home: account
+            ? AccountSettingsScreen(viewModel: vm)
+            : SettingsScreen(viewModel: vm),
       ),
     );
   }
@@ -59,7 +61,7 @@ void main() {
   });
 
   testWidgets('deleting needs DELETE typed and the password', (tester) async {
-    await pumpSettings(tester);
+    await pumpSettings(tester, account: true);
     await tester.tap(find.text('Delete account'));
     await tester.pumpAndSettle();
     expect(find.textContaining('permanently deletes'), findsOneWidget);
@@ -93,7 +95,7 @@ void main() {
     tester,
   ) async {
     auth.method = SignInMethod.google;
-    await pumpSettings(tester);
+    await pumpSettings(tester, account: true);
     await tester.tap(find.text('Delete account'));
     await tester.pumpAndSettle();
     expect(find.byType(TextField), findsOneWidget);
@@ -108,7 +110,7 @@ void main() {
   });
 
   testWidgets('cancelling leaves the account alone', (tester) async {
-    await pumpSettings(tester);
+    await pumpSettings(tester, account: true);
     await tester.tap(find.text('Delete account'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));

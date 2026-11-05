@@ -6,6 +6,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/usau_attribution.dart';
 import '../view_models/usau_roster_viewmodel.dart';
+import '../../core/ui/app_search_field.dart';
 
 /// Link the team to USA Ultimate, then preview and apply a roster sync.
 class UsauRosterScreen extends StatefulWidget {
@@ -152,12 +153,9 @@ class _FindTeamState extends State<_FindTeam> {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
-          TextField(
+          AppSearchField(
             controller: _search,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              labelText: 'Team name',
-            ),
+            hint: 'Search USA Ultimate teams',
             onChanged: vm.setQuery,
           ),
           if (vm.searching)

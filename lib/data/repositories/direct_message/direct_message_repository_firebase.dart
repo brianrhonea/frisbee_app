@@ -11,12 +11,16 @@ import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
 import 'direct_message_repository.dart';
+import '../../../domain/models/username.dart';
 
 /// The directory is `profiles/{uid}` (name and photo, written by
 /// AuthRepositoryFirebase). Conversations are `conversations/{a_b}` with
 /// messages beneath; attachments are in Cloud Storage at
 /// `conversations/{id}/{uid}/{messageId}/{fileName}`. firestore.rules and
-/// storage.rules limit both to the two participants.
+/// storage.rules limit both to the two participants. Each user's own read
+/// times are private, in `users/{uid}/dmReads/{id}`; the conversation's
+/// `readAt` is the read receipt the other person sees, and the setting
+/// that turns it off is `readReceipts` on `users/{uid}`.
 class DirectMessageRepositoryFirebase implements DirectMessageRepository {
   DirectMessageRepositoryFirebase({
     required AttachmentStorage attachments,
@@ -40,6 +44,19 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
   CollectionReference<Map<String, dynamic>> get _conversations =>
       _db.collection('conversations');
 
+  CollectionReference<Map<String, dynamic>> _reads(String uid) =>
+      _db.collection('users').doc(uid).collection('dmReads');
+
+  /// [uid]'s private read times, by conversation id.
+  Stream<Map<String, DateTime>> _watchReads(String uid) => _shared.get(
+    'dmReads/$uid',
+    () => countedSnapshots(_reads(uid), 'dmReads').map(
+      (snap) => {
+        for (final d in snap.docs) d.id: ?parseDate(d.data()['readAt']),
+      },
+    ),
+  );
+
   CollectionReference<Map<String, dynamic>> _messages(String id) =>
       _conversations.doc(id).collection('messages');
 
@@ -48,7 +65,7 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     String query, {
     required String excludeUid,
   }) => guard(() async {
-    final words = searchWords(query);
+    final words = searchWords(Username.normalize(query));
     if (words.isEmpty) return const [];
     // Match the longest word in Firestore, then the rest here.
     final key = (words.toList()..sort((a, b) => b.length - a.length)).first;
@@ -68,7 +85,15 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
   });
 
   @override
-  Stream<List<Conversation>> watchConversations(String uid) => _shared.get(
+  Stream<List<Conversation>> watchConversations(String uid) => combineLatest(
+    _watchConversations(uid),
+    _watchReads(uid),
+    (conversations, reads) => [
+      for (final c in conversations) c.withMyReadAt(reads[c.id]),
+    ],
+  );
+
+  Stream<List<Conversation>> _watchConversations(String uid) => _shared.get(
     'conversations/$uid',
     () =>
         countedSnapshots(
@@ -85,12 +110,18 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
   );
 
   @override
-  Stream<Conversation?> watchConversation(String id) => _conversations
-      .doc(id)
-      .snapshots()
-      .map(
-        (d) =>
-            d.exists ? Conversation.fromMap(d.id, plainData(d.data())) : null,
+  Stream<Conversation?> watchConversation(String id, {required String uid}) =>
+      combineLatest(
+        _conversations
+            .doc(id)
+            .snapshots()
+            .map(
+              (d) => d.exists
+                  ? Conversation.fromMap(d.id, plainData(d.data()))
+                  : null,
+            ),
+        _watchReads(uid),
+        (c, reads) => c?.withMyReadAt(reads[id]),
       );
 
   @override
@@ -179,10 +210,33 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
       });
 
   @override
-  Future<Result<void>> markRead(String id, String uid) => guard(
-    () => _conversations.doc(id).update({
-      'readAt.$uid': FieldValue.serverTimestamp(),
-    }),
+  Future<Result<void>> markRead(
+    String id,
+    String uid, {
+    required bool shareReceipt,
+  }) => guard(() async {
+    final batch = _db.batch()
+      ..set(_reads(uid).doc(id), {'readAt': FieldValue.serverTimestamp()});
+    if (shareReceipt) {
+      batch.update(_conversations.doc(id), {
+        'readAt.$uid': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  });
+
+  @override
+  Stream<bool> watchReadReceipts(String uid) => _db
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      .map((d) => d.data()?['readReceipts'] as bool? ?? true);
+
+  @override
+  Future<Result<void>> setReadReceipts(String uid, {required bool on}) => guard(
+    () => _db.collection('users').doc(uid).set({
+      'readReceipts': on,
+    }, SetOptions(merge: true)),
   );
 
   @override

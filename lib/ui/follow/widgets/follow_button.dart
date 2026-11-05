@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../domain/models/notification.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
+import '../../notifications/widgets/notification_offer.dart';
 import '../view_models/follow_viewmodel.dart';
 
-/// Follow / Following, plus a bell for post notifications once following.
+/// Follow, or once following, a "Following" menu with post notifications
+/// and Unfollow. Following someone offers their post notifications.
 /// Page view models own the [FollowViewModel] (see their `follow`).
 class FollowControl extends StatefulWidget {
   const FollowControl({
@@ -26,6 +28,15 @@ class FollowControl extends StatefulWidget {
 class _FollowControlState extends State<FollowControl> {
   FollowViewModel get vm => widget.viewModel;
 
+  /// Whether the running toggle is a follow (not an unfollow), so its
+  /// success can offer notifications.
+  bool _following = false;
+
+  void _toggleFollow() {
+    _following = !vm.following;
+    vm.toggleFollow.execute();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -42,10 +53,27 @@ class _FollowControlState extends State<FollowControl> {
 
   void _onFollow() {
     final cmd = vm.toggleFollow;
-    if (cmd.result case Error()) {
-      showErrorSnackBar(context, cmd.result);
-      cmd.clearResult();
+    switch (cmd.result) {
+      case Error():
+        showErrorSnackBar(context, cmd.result);
+        cmd.clearResult();
+      case Ok() when _following:
+        _following = false;
+        cmd.clearResult();
+        _offerNotifications();
+      default:
+        break;
     }
+  }
+
+  Future<void> _offerNotifications() async {
+    if (vm.notifying) return;
+    final yes = await showNotificationOffer(
+      context,
+      title: 'Get notified when ${vm.target.name} posts?',
+      message: "You'll see their posts on Home either way.",
+    );
+    if (yes == true && mounted && !vm.notifying) vm.toggleNotify.execute();
   }
 
   void _onNotify() {
@@ -78,41 +106,53 @@ class _FollowControlState extends State<FollowControl> {
       }
       final busy = !vm.loaded || vm.toggleFollow.running;
       final density = widget.compact ? VisualDensity.compact : null;
-      final button = vm.following
-          ? OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(visualDensity: density),
-              onPressed: busy ? null : vm.toggleFollow.execute,
-              icon: const Icon(Icons.check, size: 18),
-              label: const Text('Following'),
-            )
-          : FilledButton.icon(
-              style: FilledButton.styleFrom(visualDensity: density),
-              onPressed: busy ? null : vm.toggleFollow.execute,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Follow'),
-            );
+      final Widget button;
+      if (vm.following) {
+        button = MenuAnchor(
+          menuChildren: [
+            CheckboxMenuButton(
+              value: vm.notifying,
+              onChanged: vm.toggleNotify.running
+                  ? null
+                  : (_) => vm.toggleNotify.execute(),
+              child: const Text('Post notifications'),
+            ),
+            MenuItemButton(
+              leadingIcon: const Icon(Icons.person_remove_outlined),
+              onPressed: busy ? null : _toggleFollow,
+              child: const Text('Unfollow'),
+            ),
+          ],
+          builder: (context, menu, _) => OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(visualDensity: density),
+            onPressed: busy
+                ? null
+                : () => menu.isOpen ? menu.close() : menu.open(),
+            icon: Icon(
+              vm.notifying ? Icons.notifications_active : Icons.check,
+              size: 18,
+            ),
+            label: const Text('Following'),
+          ),
+        );
+      } else {
+        button = FilledButton.icon(
+          style: FilledButton.styleFrom(visualDensity: density),
+          onPressed: busy ? null : _toggleFollow,
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Follow'),
+        );
+      }
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (widget.showCount) ...[_count(context), const SizedBox(width: 12)],
-          Tooltip(
-            message: vm.following
-                ? 'Unfollow ${vm.target.name}'
-                : 'Follow ${vm.target.name} to see their posts on Home',
-            child: button,
-          ),
           if (vm.following)
-            IconButton(
-              visualDensity: density,
-              tooltip: vm.notifying
-                  ? 'Turn off post notifications'
-                  : 'Notify me when ${vm.target.name} posts',
-              isSelected: vm.notifying,
-              onPressed: vm.toggleNotify.running
-                  ? null
-                  : vm.toggleNotify.execute,
-              icon: const Icon(Icons.notifications_none),
-              selectedIcon: const Icon(Icons.notifications_active),
+            button
+          else
+            Tooltip(
+              message: 'Follow ${vm.target.name} to see their posts on Home',
+              child: button,
             ),
         ],
       );

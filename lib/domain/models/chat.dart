@@ -45,13 +45,11 @@ abstract final class ChatAudience {
     return {everyone, role.name, ...?team.memberRoles[uid]};
   }
 
-  /// Ids an access editor offers on [team], in order: everyone, the tiers
-  /// below owner (teams only), then custom roles.
+  /// Ids an access editor offers on [team], in order: everyone, then
+  /// custom roles. Rooms may still list legacy tiers (coach, captain,
+  /// player); those keep working but aren't offered.
   static List<String> choicesFor(Team team) => [
     everyone,
-    if (!team.isCommunity)
-      for (final r in TeamRole.values)
-        if (r != TeamRole.owner) r.name,
     for (final r in team.sortedRoles) r.id,
   ];
 
@@ -125,7 +123,12 @@ mixin ChatAccessLists {
     if (tiers.every(readRoles.contains)) return 'Everyone';
     final people = readUsers.length;
     final names = [
-      for (final id in ChatAudience.choicesFor(team))
+      for (final id in [
+        // Legacy tiers first, as the access editor used to list them.
+        for (final r in TeamRole.values)
+          if (r != TeamRole.owner) r.name,
+        ...ChatAudience.choicesFor(team),
+      ])
         if (readRoles.contains(id)) ChatAudience.pluralLabelOf(team, id),
     ];
     return [

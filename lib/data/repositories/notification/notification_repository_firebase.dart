@@ -7,6 +7,7 @@ import '../../../domain/models/notification.dart';
 import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/push_service.dart';
+import '../../services/shared_preferences_service.dart';
 import '../../services/shared_streams.dart';
 import 'notification_repository.dart';
 
@@ -17,10 +18,12 @@ import 'notification_repository.dart';
 class NotificationRepositoryFirebase implements NotificationRepository {
   NotificationRepositoryFirebase({
     required PushService push,
+    SharedPreferencesService? devicePrefs,
     FirebaseFirestore? firestore,
     DateTime Function()? clock,
     SharedStreams? sharedStreams,
   }) : _push = push,
+       _devicePrefs = devicePrefs ?? SharedPreferencesService(),
        _db = firestore ?? FirebaseFirestore.instance,
        _clock = clock ?? DateTime.now,
        _shared = sharedStreams ?? SharedStreams.instance;
@@ -29,6 +32,10 @@ class NotificationRepositoryFirebase implements NotificationRepository {
   final SharedStreams _shared;
 
   final PushService _push;
+
+  /// This device's settings, e.g. whether the push offer was dismissed.
+  final SharedPreferencesService _devicePrefs;
+  static const _offerDismissedKey = 'pushOfferDismissed';
   final FirebaseFirestore _db;
   final DateTime Function() _clock;
   final _log = Logger('NotificationRepository');
@@ -157,6 +164,30 @@ class NotificationRepositoryFirebase implements NotificationRepository {
     if (status == PushStatus.enabled) await _register(uid);
     return status;
   });
+
+  @override
+  Future<bool> shouldOfferPush() async {
+    if (!_push.isSupported) return false;
+    try {
+      if (await _push.status() != PushStatus.notDetermined) return false;
+      return await _devicePrefs.getString(_offerDismissedKey) == null;
+    } on Exception catch (e) {
+      _log.warning('Push offer check failed', e);
+      return false;
+    }
+  }
+
+  @override
+  Future<void> dismissPushOffer() async {
+    try {
+      await _devicePrefs.setString(
+        _offerDismissedKey,
+        _clock().toIso8601String(),
+      );
+    } on Exception catch (e) {
+      _log.warning('Saving push offer dismissal failed', e);
+    }
+  }
 
   @override
   Future<void> syncDevice(String uid) async {

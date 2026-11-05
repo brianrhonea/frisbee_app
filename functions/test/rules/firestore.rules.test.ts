@@ -673,9 +673,12 @@ describe("group tournaments", () => {
 });
 
 describe("roles and removal", () => {
-  it("owner can promote a player; coach cannot", async () => {
+  it("nobody becomes a coach or captain now; the owner moves them down", async () => {
     await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));
-    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "captain" }));
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { [`members.${CAPTAIN}`]: "player" }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${CAPTAIN}`]: "player" }));
   });
 
   it("nobody can demote the owner", async () => {
@@ -702,10 +705,11 @@ describe("roles and removal", () => {
     await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), removal(COACH)));
   });
 
-  it("only the owner sets roles, to any non-owner role", async () => {
-    for (const role of ["coach", "captain", "player"]) {
-      await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: role }));
+  it("only the owner sets tiers, and only player is left to give", async () => {
+    for (const role of ["coach", "captain"]) {
+      await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: role }));
     }
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${COACH}`]: "player" }));
     await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "owner" }));
     await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "stats" }));
     await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "admin" }));
@@ -755,8 +759,8 @@ describe("roles and removal", () => {
     await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), transfer(OUTSIDER)));
     await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), transfer(COACH)));
     // The new owner has full control; the old one doesn't.
-    await assertSucceeds(updateDoc(doc(db(COACH), "teams", TEAM), { [`members.${PLAYER}`]: "captain" }));
-    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${CAPTAIN}`]: "player" }));
+    await assertSucceeds(updateDoc(doc(db(COACH), "teams", TEAM), { [`members.${CAPTAIN}`]: "player" }));
   });
 });
 
@@ -1800,9 +1804,32 @@ describe("custom roles", () => {
     await assertFails(
       updateDoc(doc(db(OWNER), "teams", TEAM), assign({}, { [OUTSIDER]: ["manageTeam"] })),
     );
-    // Tiers don't change in a team's role write.
+    // Tiers don't go up in a role write.
     await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { ...write, [`members.${PLAYER}`]: "coach" }));
     await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), write));
+  });
+
+  it("the owner moves coaches and captains into roles, all at once", async () => {
+    const tiers = {
+      c: { name: "Coach", color: 0, position: 0, perms: ["manageTeam", "manageMembers", "keepStats"] },
+      k: { name: "Captain", color: 0, position: 1, perms: ["manageTeam", "manageMembers", "keepStats"] },
+    };
+    const write = {
+      roles: tiers,
+      memberRoles: { [COACH]: ["c"], [CAPTAIN]: ["k"] },
+      memberPerms: { [COACH]: tiers.c.perms, [CAPTAIN]: tiers.k.perms },
+    };
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), write));
+    // Only the owner, and not leaving one behind.
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), {
+      [`members.${COACH}`]: "player", [`members.${CAPTAIN}`]: "player",
+    }));
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), {
+      [`members.${COACH}`]: "player", [`members.${CAPTAIN}`]: "player",
+    }));
+    // Their roles keep their powers.
+    await assertSucceeds(updateDoc(doc(db(COACH), "teams", TEAM), { name: "Renamed" }));
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), { name: "Nope" }));
   });
 
   it("permissions from roles open the matching powers", async () => {
@@ -1942,6 +1969,23 @@ describe("direct messages", () => {
   it("participants start a conversation with a listed user", async () => {
     await assertSucceeds(getDoc(conv(PLAYER))); // checking it exists
     await assertSucceeds(setDoc(conv(PLAYER), newConv()));
+  });
+
+  it("each user's read times are private to them", async () => {
+    const read = (uid: string, owner = uid, id = CONV) => doc(db(uid), "users", owner, "dmReads", id);
+    await assertSucceeds(setDoc(read(PLAYER), { readAt: serverTimestamp() }));
+    await assertSucceeds(getDoc(read(PLAYER)));
+    await assertFails(getDoc(read(OWNER, PLAYER)));
+    await assertFails(setDoc(read(OWNER, PLAYER), { readAt: serverTimestamp() }));
+    // Only conversations they're in, only a server time.
+    await assertFails(setDoc(read(PLAYER, PLAYER, `${OWNER}_${OUTSIDER}`), { readAt: serverTimestamp() }));
+    await assertFails(setDoc(read(PLAYER), { readAt: new Date(2000, 0, 1) }));
+    await assertFails(setDoc(read(PLAYER), { readAt: serverTimestamp(), seen: true }));
+  });
+
+  it("the read receipts setting is the user's own", async () => {
+    await assertSucceeds(setDoc(doc(db(PLAYER), "users", PLAYER), { readReceipts: false }, { merge: true }));
+    await assertFails(setDoc(doc(db(OWNER), "users", PLAYER), { readReceipts: true }, { merge: true }));
   });
 
   it("rejects bad conversations", async () => {
@@ -2686,5 +2730,52 @@ describe("tournament directory", () => {
     await assertSucceeds(getDoc(ref(OUTSIDER)));
     await assertFails(deleteDoc(ref(MEMBER)));
     await assertSucceeds(deleteDoc(ref(ORGANIZER)));
+  });
+});
+
+describe("usernames", () => {
+  const profile = (extra: Record<string, unknown> = {}) => ({
+    name: "Pat Player", keywords: ["pat"], photoUrl: null, updatedAt: serverTimestamp(), ...extra,
+  });
+  const claim = (uid: string, name: string, profileExtra: Record<string, unknown> = {}) => {
+    const fs = db(uid);
+    return writeBatch(fs)
+      .set(doc(fs, "usernames", name), { uid, createdAt: serverTimestamp() })
+      .set(doc(fs, "profiles", uid), profile({ username: name, ...profileExtra }), { merge: true })
+      .commit();
+  };
+
+  it("an account claims one free username, with its profile", async () => {
+    await assertSucceeds(getDoc(doc(db(PLAYER), "usernames", "pat")));
+    await assertSucceeds(claim(PLAYER, "pat.player"));
+    // Taken: by someone else, or a second one for the same account.
+    await assertFails(claim(OWNER, "pat.player"));
+    await assertFails(claim(PLAYER, "pat2"));
+    await assertSucceeds(claim(OWNER, "olive_o"));
+  });
+
+  it("rejects bad names and claims that don't match the profile", async () => {
+    for (const bad of ["Pat", "pa", "a".repeat(21), ".pat", "pat.", "pa..t", "pat lee", "pat!"]) {
+      await assertFails(claim(PLAYER, bad));
+    }
+    const fs = db(PLAYER);
+    // A claim alone, or for someone else.
+    await assertFails(setDoc(doc(fs, "usernames", "pat"), { uid: PLAYER, createdAt: serverTimestamp() }));
+    await assertFails(writeBatch(fs)
+      .set(doc(fs, "usernames", "pat"), { uid: OWNER, createdAt: serverTimestamp() })
+      .set(doc(fs, "profiles", PLAYER), profile({ username: "pat" }))
+      .commit());
+    // A profile naming a username nobody claimed.
+    await assertFails(setDoc(doc(fs, "profiles", PLAYER), profile({ username: "ghost" })));
+  });
+
+  it("a username can't be changed, deleted or taken over", async () => {
+    await assertSucceeds(claim(PLAYER, "pat"));
+    const fs = db(PLAYER);
+    await assertFails(setDoc(doc(fs, "profiles", PLAYER), { username: "other" }, { merge: true }));
+    // Other profile writes keep it.
+    await assertSucceeds(setDoc(doc(fs, "profiles", PLAYER), profile({ bio: "Cutter" }), { merge: true }));
+    await assertFails(deleteDoc(doc(fs, "usernames", "pat")));
+    await assertFails(setDoc(doc(db(OWNER), "usernames", "pat"), { uid: OWNER, createdAt: serverTimestamp() }));
   });
 });

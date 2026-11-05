@@ -5,28 +5,42 @@ import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/team.dart';
+import '../../../domain/models/tournament.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../../teams/view_models/team_search_viewmodel.dart';
+import '../../tournaments/view_models/tournaments_viewmodel.dart';
+import '../../tournaments/widgets/tournament_widgets.dart' show formatDateRange;
 import '../view_models/player_search_viewmodel.dart';
+import '../../core/ui/app_search_field.dart';
+import '../../core/ui/skeleton.dart';
+import '../../shell/widgets/app_shell.dart' show SearchField;
 
-/// Explore: search the app's teams, groups and players, and jump to events,
-/// rankings, USA Ultimate teams, or starting a team.
+/// Explore: search players, teams, groups and events in one box, and
+/// jump to rankings, USA Ultimate teams, or starting a team.
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({
     super.key,
     required this.viewModel,
     required this.players,
+    required this.events,
     this.initialQuery = '',
+    this.initialFilter,
   });
 
   final TeamSearchViewModel viewModel;
   final PlayerSearchViewModel players;
 
+  /// USA Ultimate events, filtered by the same search.
+  final TournamentsViewModel events;
+
   /// Search text from the top bar's search field.
   final String initialQuery;
+
+  /// Filter to start with; null for All.
+  final ExploreFilter? initialFilter;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -35,26 +49,36 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   TeamSearchViewModel get vm => widget.viewModel;
   PlayerSearchViewModel get players => widget.players;
+  TournamentsViewModel get events => widget.events;
   late final _text = TextEditingController(text: widget.initialQuery);
   Timer? _debounce;
 
-  /// Whether the Players chip is picked, rather than a team kind.
-  var _playersOnly = false;
+  /// The picked chip; null for All.
+  ExploreFilter? _only;
+
+  /// Events in All, before "See all".
+  static const _eventsInAll = 3;
 
   void _search(String text) {
     vm.search.execute(text);
     players.search.execute(text);
+    final q = text.trim();
+    events.setQuery(q.length < TeamSearchViewModel.minQueryLength ? '' : q);
   }
 
   @override
   void initState() {
     super.initState();
+    _applyFilter(widget.initialFilter);
     if (widget.initialQuery.isNotEmpty) _search(widget.initialQuery);
   }
 
   @override
   void didUpdateWidget(ExploreScreen old) {
     super.didUpdateWidget(old);
+    if (widget.initialFilter != old.initialFilter) {
+      _applyFilter(widget.initialFilter);
+    }
     final q = widget.initialQuery;
     if (q != old.initialQuery && q.isNotEmpty) {
       _text.text = q;
@@ -67,6 +91,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _debounce?.cancel();
     _text.dispose();
     super.dispose();
+  }
+
+  void _applyFilter(ExploreFilter? only) {
+    _only = only;
+    vm.setKind(switch (only) {
+      ExploreFilter.teams => TeamKind.team,
+      ExploreFilter.groups => TeamKind.community,
+      _ => null,
+    });
   }
 
   void _onChanged(String text) {
@@ -85,12 +118,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
             const PageHeader(
               eyebrow: 'Explore',
               title: 'Find your next point.',
-              subtitle: 'Teams, pickup groups, tournaments and rankings.',
+              subtitle: 'Players, teams, pickup groups, events and rankings.',
             ),
           SideColumnLayout(
             main: [_searchCard(context)],
             side: [_Shortcuts()],
-            narrow: [_Shortcuts(), _searchCard(context)],
+            narrow: [_searchCard(context), _Shortcuts()],
           ),
         ],
       ),
@@ -100,108 +133,169 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget _searchCard(BuildContext context) {
     final c = AppColors.of(context);
     return SectionCard(
-      title: 'Teams, groups and players',
+      title: 'Search',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
+          AppSearchField(
             controller: _text,
-            textInputAction: TextInputAction.search,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Name, city, school or team',
-            ),
+            hint: SearchField.hint,
             onChanged: _onChanged,
             onSubmitted: _search,
           ),
           const SizedBox(height: 10),
           ListenableBuilder(
-            listenable: Listenable.merge([vm, vm.search, players.search]),
+            listenable: Listenable.merge([
+              vm,
+              vm.search,
+              players.search,
+              events,
+            ]),
             builder: (context, _) {
-              final results = _playersOnly ? const <TeamListing>[] : vm.results;
-              final people = _playersOnly || vm.kind == null
+              final only = _only;
+              final all = only == null;
+              final teamsShown =
+                  all ||
+                  only == ExploreFilter.teams ||
+                  only == ExploreFilter.groups;
+              final playersShown = all || only == ExploreFilter.players;
+              final eventsShown = all || only == ExploreFilter.events;
+
+              final results = teamsShown ? vm.results : const <TeamListing>[];
+              final people = playersShown
                   ? players.results
                   : const <PlayerProfile>[];
-              final running = _playersOnly
-                  ? players.search.running
-                  : vm.search.running ||
-                        (vm.kind == null && players.search.running);
-              final failed = _playersOnly
-                  ? players.search.error
-                  : vm.search.error;
-              final noMatches = _playersOnly
-                  ? players.noMatches
-                  : vm.noMatches && (vm.kind != null || players.noMatches);
+              final searched = events.query.isNotEmpty;
+              final allEvents = eventsShown && searched
+                  ? events.tournaments
+                  : const <Tournament>[];
+              final shownEvents = all
+                  ? allEvents.take(_eventsInAll).toList()
+                  : allEvents;
+
+              final running =
+                  (teamsShown && vm.search.running) ||
+                  (playersShown && players.search.running) ||
+                  (eventsShown && searched && events.loading);
+              final failed = (teamsShown && vm.search.error)
+                  ? vm.search.result
+                  : (playersShown && players.search.error)
+                  ? players.search.result
+                  : null;
+              final nothing =
+                  results.isEmpty && people.isEmpty && shownEvents.isEmpty;
+              final noMatches =
+                  nothing &&
+                  !running &&
+                  (!teamsShown || vm.noMatches) &&
+                  (!playersShown || players.noMatches) &&
+                  (!eventsShown || searched);
+              final sections = [
+                results.isNotEmpty,
+                people.isNotEmpty,
+                shownEvents.isNotEmpty,
+              ].where((x) => x).length;
+
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Wrap(
                     spacing: 8,
+                    runSpacing: 4,
                     children: [
-                      for (final (label, kind) in const [
+                      for (final (label, filter) in const [
                         ('All', null),
-                        ('Teams', TeamKind.team),
-                        ('Groups', TeamKind.community),
+                        ('Players', ExploreFilter.players),
+                        ('Teams', ExploreFilter.teams),
+                        ('Groups', ExploreFilter.groups),
+                        ('Events', ExploreFilter.events),
                       ])
                         ChoiceChip(
                           label: Text(label),
                           showCheckmark: false,
-                          selected: !_playersOnly && vm.kind == kind,
-                          onSelected: (_) {
-                            setState(() => _playersOnly = false);
-                            vm.setKind(kind);
-                          },
+                          selected: _only == filter,
+                          onSelected: (_) =>
+                              setState(() => _applyFilter(filter)),
                         ),
-                      ChoiceChip(
-                        label: const Text('Players'),
-                        showCheckmark: false,
-                        selected: _playersOnly,
-                        onSelected: (_) => setState(() => _playersOnly = true),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  if (running && results.isEmpty && people.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (failed)
-                    ErrorView(
-                      error: _playersOnly
-                          ? players.search.result
-                          : vm.search.result,
-                    )
+                  if (running && nothing)
+                    const SkeletonList(count: 4, padding: EdgeInsets.zero)
+                  else if (failed != null && nothing)
+                    ErrorView(error: failed)
                   else if (noMatches)
                     const EmptyView(
                       icon: Icons.search_off,
                       title: 'Nothing found',
                       message:
-                          'Try another word from the name, a city, '
-                          'school or team.',
+                          'Try another word from a name, username, city, '
+                          'school, team or event.',
                     )
-                  else if (results.isEmpty && people.isEmpty)
+                  else if (nothing)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       child: Text(
                         'Type at least ${TeamSearchViewModel.minQueryLength} '
-                        'letters of a name, city, school or team.',
+                        'letters to search players, teams, groups and '
+                        'events.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: c.muted),
                       ),
                     ),
-                  if (people.isNotEmpty && results.isNotEmpty)
-                    const _ResultsHeading('Teams and groups'),
-                  for (final t in results) _ResultTile(listing: t, vm: vm),
-                  if (people.isNotEmpty && results.isNotEmpty)
-                    const _ResultsHeading('Players'),
-                  for (final p in people) PlayerTile(profile: p),
+                  if (people.isNotEmpty) ...[
+                    if (sections > 1) const _ResultsHeading('Players'),
+                    for (final p in people) PlayerTile(profile: p),
+                  ],
+                  if (results.isNotEmpty) ...[
+                    if (sections > 1) const _ResultsHeading('Teams and groups'),
+                    for (final t in results) _ResultTile(listing: t, vm: vm),
+                  ],
+                  if (shownEvents.isNotEmpty) ...[
+                    if (sections > 1) const _ResultsHeading('Events'),
+                    for (final t in shownEvents) _EventTile(tournament: t),
+                    if (allEvents.length > shownEvents.length)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () => setState(
+                            () => _applyFilter(ExploreFilter.events),
+                          ),
+                          child: Text('See all ${allEvents.length} events'),
+                        ),
+                      ),
+                  ],
                 ],
               );
             },
           ),
         ],
       ),
+    );
+  }
+}
+
+/// An upcoming USA Ultimate event in search results.
+class _EventTile extends StatelessWidget {
+  const _EventTile({required this.tournament});
+
+  final Tournament tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tournament;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const CircleAvatar(child: Icon(Icons.emoji_events_outlined)),
+      title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(
+        [
+          formatDateRange(t.startDate, t.endDate),
+          if (t.location.isNotEmpty) t.location,
+        ].join(' · '),
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => context.push(Routes.tournament(t.id)),
     );
   }
 }
@@ -258,6 +352,7 @@ class PlayerTile extends StatelessWidget {
         .where((t) => t.kind == TeamKind.team)
         .firstOrNull;
     final subtitle = [
+      if (p.username case final u?) '@$u',
       if (team != null)
         [team.name, if (team.number != null) '#${team.number}'].join(' '),
       if (p.details.school.isNotEmpty) p.details.school,

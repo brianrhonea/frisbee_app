@@ -19,6 +19,7 @@ import '../../../domain/models/team.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../domain/models/tournament.dart';
 import '../../../utils/command.dart';
+import '../../../utils/pending_removals.dart';
 import '../../../utils/result.dart';
 import '../../posts/view_models/home_feed.dart';
 import '../../posts/view_models/post_actions.dart';
@@ -106,6 +107,16 @@ class HomeViewModel extends ChangeNotifier {
   /// Deletes one of the user's own posts, by id.
   late final Command1<void, String> deleteUserPost;
 
+  /// Posts deleted from the feed, hidden while "Undo" is offered.
+  late final removals = PendingRemovals<FeedItem>(
+    keyOf: (item) => item.id,
+    commit: (item) => switch (item) {
+      UserPostItem(:final post) => deleteUserPost.execute(post.id),
+      final TeamPostItem p => deletePost.execute(p),
+    },
+    onChange: notifyListeners,
+  );
+
   /// Likes and reposts, and the posts reposts show.
   late final PostActions actions;
 
@@ -151,7 +162,7 @@ class HomeViewModel extends ChangeNotifier {
   late final HomeFeed feed;
 
   bool get postsLoaded => feed.loaded;
-  List<FeedItem> get posts => feed.items;
+  List<FeedItem> get posts => removals.visible(feed.items);
   bool get hasMorePosts => feed.hasMore;
   void loadMorePosts() => feed.loadMore();
 
@@ -225,6 +236,12 @@ class HomeViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    removals.flush(
+      (item) => switch (item) {
+        UserPostItem(:final post) => _userPosts.deletePost(post.id),
+        final TeamPostItem p => _posts.deletePost(p.teamId, p.post.id),
+      },
+    );
     _feed
       ..removeListener(_onFeed)
       ..dispose();

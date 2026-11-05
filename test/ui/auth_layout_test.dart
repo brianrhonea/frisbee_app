@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/ui/auth/view_models/sign_in_viewmodel.dart';
+import 'package:frisbee_app/ui/auth/view_models/sign_up_viewmodel.dart';
 import 'package:frisbee_app/ui/auth/widgets/auth_layout.dart';
 import 'package:frisbee_app/ui/auth/widgets/disc_throw_hero.dart';
 import 'package:frisbee_app/ui/auth/widgets/sign_in_screen.dart';
+import 'package:frisbee_app/ui/auth/widgets/sign_up_screen.dart';
 
 import '../testing/fakes.dart';
 
@@ -119,4 +121,39 @@ void main() {
     expect(hero.right, lessThanOrEqualTo(button.left));
     expect(tester.takeException(), isNull);
   });
+
+  for (final (name, screen) in [
+    (
+      'sign-in',
+      () => SignInScreen(
+        viewModel: SignInViewModel(authRepository: FakeAuthRepository()),
+      ),
+    ),
+    (
+      'sign-up',
+      () => SignUpScreen(
+        viewModel: SignUpViewModel(authRepository: FakeAuthRepository()),
+      ),
+    ),
+  ]) {
+    testWidgets('the whole $name form fits on a big phone without scrolling', (
+      tester,
+    ) async {
+      // iPhone 17 Pro Max, in logical pixels.
+      tester.view.physicalSize = const Size(440, 956);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(home: screen()));
+      await tester.pumpAndSettle();
+
+      final scroll = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      expect(scroll.position.maxScrollExtent, 0);
+      expect(
+        tester.getSize(find.byType(DiscThrowHero)).height,
+        greaterThanOrEqualTo(200),
+      );
+    });
+  }
 }

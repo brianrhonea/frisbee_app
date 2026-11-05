@@ -82,7 +82,7 @@ class TeamDetailViewModel extends ChangeNotifier {
         _watchRoster();
         _watchJoinRequests();
         _watchMeetings();
-        _migrateOrganizers();
+        _migrateRoles();
         notifyListeners();
       }, onError: _onError),
       _plays.watchPlays(teamId).listen((p) {
@@ -153,48 +153,19 @@ class TeamDetailViewModel extends ChangeNotifier {
     }, onError: _onError);
   }
 
-  /// Groups had organizers (the captain tier) before custom roles. When
-  /// the owner opens such a group, move them into an "Organizer" role with
-  /// the same powers, once.
-  Future<void> _migrateOrganizers() async {
+  /// Coaches and captains (organizers, in a group) were tiers before
+  /// custom roles. When the owner opens the team, move them into roles
+  /// with the same powers, once.
+  Future<void> _migrateRoles() async {
     final team = _team;
     if (team == null ||
         _migrating ||
-        !team.needsOrganizerMigration ||
+        !team.needsRoleMigration ||
         team.roleOf(uid) != TeamRole.owner) {
       return;
     }
     _migrating = true;
-    final organizers = {
-      for (final e in team.members.entries)
-        if (e.value == TeamRole.captain) e.key,
-    };
-    final existing = team.roles.values
-        .where((r) => r.name == 'Organizer')
-        .firstOrNull;
-    final role =
-        existing ??
-        CustomRole(
-          id: newRoleId(),
-          name: 'Organizer',
-          color: 0xFF1E88E5,
-          position: team.roles.length,
-          permissions: const {
-            TeamPermission.manageTeam,
-            TeamPermission.manageMembers,
-            TeamPermission.manageChats,
-            TeamPermission.manageEvents,
-          },
-        );
-    final result = await _teams.saveRoles(
-      team,
-      roles: {...team.roles, role.id: role},
-      memberRoles: {
-        ...team.memberRoles,
-        for (final uid in organizers) uid: {...?team.memberRoles[uid], role.id},
-      },
-      demote: organizers,
-    );
+    final result = await _teams.migrateTiersToRoles(team);
     // Try again next time the team changes only if this failed.
     if (result is Error) _migrating = false;
   }

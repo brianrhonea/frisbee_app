@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import 'error_message.dart';
+import 'skeleton.dart';
 
+/// A page or list on the way: placeholder rows, not a spinner.
 class LoadingView extends StatelessWidget {
   const LoadingView({super.key});
 
   @override
   Widget build(BuildContext context) =>
-      const Center(child: CircularProgressIndicator());
+      const Align(alignment: Alignment.topCenter, child: SkeletonList());
 }
 
 class ErrorView extends StatelessWidget {

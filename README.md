@@ -19,7 +19,7 @@ An ultimate frisbee team app built with Flutter + Firebase for Android, iOS, mac
 
 ## Versioning
 
-The version is in `pubspec.yaml` (`version: 0.0.4+4`) and `appVersion` in `lib/ui/core/ui/brand.dart`, and shows on the Profile screen. Each feature branch bumps the patch version and adds an entry to [docs/CHANGELOG.md](docs/CHANGELOG.md); `test/version_test.dart` checks the three agree.
+The version is in `pubspec.yaml` (`version: 0.0.11+11`) and `appVersion` in `lib/ui/core/ui/brand.dart`, and shows at the bottom of Settings. Each release bumps the patch version and adds an entry to [docs/CHANGELOG.md](docs/CHANGELOG.md) (developer log) and [docs/release-notes.md](docs/release-notes.md) (what testers see); `test/version_test.dart` checks the version, pubspec and changelog agree.
 
 ## Architecture
 

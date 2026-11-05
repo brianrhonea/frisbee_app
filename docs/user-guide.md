@@ -2,12 +2,23 @@
 
 Stall 10 keeps your ultimate team in one place: schedule, roster, playbook,
 stats, plus USA Ultimate tournaments and rankings. This guide covers
-version 0.0.4.
+version 0.0.11. What changed in each version is in
+[release-notes.md](release-notes.md).
 
 ## Getting started
 
-1. **Sign in** with email and password, Google or Apple. (Google and Apple
+1. **Sign up** with your first and last name, a **username**, your email
+   and a password (twice), or with Google or Apple. (Google and Apple
    aren't available on Windows.)
+   - Your **username** is how people find and message you, as @name. It's
+     3–20 lowercase letters, numbers, `_` or `.`, and only one person can
+     have each; the form tells you as you type if it's taken. Signing up
+     with Google or Apple asks you to pick one before you start.
+   - **Passwords** need at least 8 characters with a letter and a number,
+     and can't be a common password. The bar under the box shows how
+     strong it is; the eye shows what you typed.
+   - The app asks once whether to send you **notifications**, and again
+     when you join a team or follow someone.
 2. **Join or create a team.** On Home or the Teams tab:
    - **Join with code**: enter the 6-character invite code your team admin
      shows you. Codes change every 30 seconds, so enter it while they have
@@ -17,36 +28,40 @@ version 0.0.4.
      tap **Join**. Links expire (1 hour to 30 days, the sender picks).
    - **Create team**: you become its owner. Show the invite code or share
      an invite link from the team's **Members** page.
-3. **Profile** opens from your avatar at the top of Home. Change your
-   display name, pick a theme (System, Light or Dark), sign out or delete
-   your account there.
+3. **Profile** is the last tab. **Edit profile** changes what others
+   see; the **gear** at the top right opens [Settings](#settings).
 
 ## Roles
 
-What you can do on a team depends on your role. Your role shows on the
-team card in the Teams tab.
+Every team has an **Owner** and **Players**. The owner creates any other
+roles (Coach, Captain, Stats, anything) on the team's **Roles** page, and
+picks what each one can do:
 
-| You can…                                        | Owner | Coach / Captain | Player |
-|-------------------------------------------------|:-----:|:---------------:|:------:|
-| See team events, posts, roster names, numbers, positions | ✓ | ✓          | ✓      |
-| RSVP, react and vote on team events             | ✓     | ✓               | ✓      |
-| Create, edit and delete team events             | ✓     | ✓               |        |
-| Write posts; make posts and events public       | ✓     | ✓               |        |
-| Edit the roster and team details                | ✓     | ✓               |        |
-| See paid and USA Ultimate status, sync roster   | ✓     | ✓               |        |
-| Draw and edit plays                             | ✓     | ✓               |        |
-| Chat in rooms you've been given access to       | ✓     | ✓               | ✓      |
-| Create chat rooms and set who can read/write    | ✓     | ✓               |        |
-| Read every chat room, delete any message or room | ✓    |                 |        |
-| Keep stats                                      | ✓     | ✓               | with stats access |
-| Show invite codes, share invite links           | ✓     | ✓               |        |
-| Remove players                                  | ✓     | ✓               |        |
-| Remove coaches and captains, set roles          | ✓     |                 |        |
-| Give a player stats access                      | ✓     |                 |        |
-| Transfer or delete the team                     | ✓     |                 |        |
+| Permission         | Lets someone…                                          |
+|--------------------|--------------------------------------------------------|
+| **Manage team**    | Edit details, the roster, playbook, posts and videos   |
+| **Manage members** | Invite, approve and remove members                     |
+| **Manage chats**   | Create, edit and delete chat rooms and folders         |
+| **Manage events**  | Run events, meetings and tournaments                   |
+| **Moderate**       | Delete other people's chat messages                    |
+| **Keep stats**     | Track games and edit stats (teams only)                |
 
-Anyone can leave a team from the ⋮ menu on its home page (the owner must transfer
-ownership first).
+Give someone a role from **Members**. A person can have several roles and
+gets everything they allow. Players without a role can see the team,
+RSVP, chat where rooms let them, and play back plays. Only the owner
+creates roles, transfers the team or deletes it.
+
+Teams from before custom roles had Coach and Captain. They become custom
+roles named Coach and Captain (Organizer in groups), with every
+permission, the first time the owner opens the team, and chat rooms that
+were open to them stay open.
+
+You can also **import roles and channels from a Discord server template**
+link.
+
+Anyone can leave a team from the ⋮ menu on its home page (the owner must
+transfer ownership first). If an owner deletes their account, the team
+passes to another member, preferring one with Manage team.
 
 ## The tabs
 
@@ -71,6 +86,21 @@ your events, playbook and rankings sit beside the feed.
 - **Rankings** (wide screens): the top 3 on a podium and ranks 4–10.
   Switch division with the chips, or tap **Full rankings**.
 
+### Search
+
+The search box at the top of Home (phones) or of every page (tablets and
+computers) searches **players** (by name or @username), **teams**,
+**pickup groups** and upcoming **USA Ultimate events**. Results open in
+**Explore**, where chips narrow them to one kind. Explore also has
+shortcuts to Events, Rankings, USA Ultimate teams, and starting a team or
+group.
+
+On a computer, press **Ctrl K** (**⌘K** on a Mac) anywhere for the
+**command menu**: type to jump to a section or one of your teams, start a
+post or message, record a workout, or search everything. Arrow keys
+move, Enter opens, Esc closes. **Ctrl 1–5** switch between Home,
+Explore, Team, Messages and Profile.
+
 ### Following and posts
 
 - **Follow** a person, team, community group, group tournament or USA
@@ -79,8 +109,12 @@ your events, playbook and rankings sit beside the feed.
 - Tap the **bell** next to **Following** to be notified when they post. To
   turn every post notification off, use **Posts you follow** in
   notification settings.
-- **Following** (Profile → Following, or **Following** above the feed)
-  lists everything you follow, with each bell and **Unfollow**.
+- **Following** (Settings → People you follow, or **Following** above the
+  feed) lists everything you follow, with each bell and **Unfollow** in
+  each row's ⋮ menu.
+- After you follow someone, the app offers to notify you when they post.
+  Change it later from **Following ▾ → Post notifications** on their
+  profile.
 - **Write a post**: text, up to 4 photos and 5 links. Anyone signed in can
   see your posts on your profile. Optionally tag a tournament or event you
   follow, so its followers see the post too.
@@ -99,7 +133,8 @@ your events, playbook and rankings sit beside the feed.
 - **Profiles**: tap a post's author, someone in a team's Members list, or
   **View profile** in New message. You'll see their posts and follower
   counts, and buttons to Follow or Message them. Edit or delete your own
-  posts from the ⋮ on each one.
+  posts from the ⋮ on each one. Deleting happens at once with **Undo**
+  for a few seconds, the same for comments and chat messages.
 
 ### Notifications
 
@@ -123,7 +158,7 @@ You're notified about:
 
 You aren't notified about things you did yourself.
 
-**Settings** (the ⋮ menu on the notifications page, or Profile →
+**Settings** (the ⋮ menu on the notifications page, or Settings →
 Notifications):
 
 - **This device**: tap **Turn on** to get push notifications on your phone,
@@ -133,22 +168,24 @@ Notifications):
   choices apply on every device you use.
 - **Teams**: change any kind for one team, for example reminders only for
   your club team. **Use my defaults** undoes that.
-- To mute one chat room, tap the 🔔 at the top of the room.
+- To mute one chat room, open the room's **⋮** menu and tap **Mute notifications**.
 
 ### Messages
 
-Tap the 💬 icon at the top of Home to open your private messages. A badge
-shows how many conversations have something new.
+Open the **Messages** tab for your private messages. A badge shows how
+many conversations have something new.
 
-- **New message**: search for anyone on Stall 10 by name, then tap them to
-  start a conversation. You don't need to share a team.
+- **New message**: search for anyone on Stall 10 by name or @username,
+  then tap them to start a conversation. You don't need to share a team.
 - Only the two of you can see a conversation. Attach photos or files up to
   10 MB, the same as team chat. You can delete your own messages.
 - On a computer, conversations are listed on the left with the open one
-  on the right. On a phone, a conversation opens full screen; use the 💬
-  button at the top left to switch between conversations.
-- You show up in search once you've set a name in your Profile. Search
-  shows names and photos only, never email addresses.
+  on the right. On a phone, a conversation opens full screen; the back
+  arrow returns to Messages.
+- **Seen** shows under your last message once the other person has read
+  it. Turn **Read receipts** off in Settings → Privacy; then they don't
+  see yours and you don't see theirs.
+- Search shows names, @usernames and photos only, never email addresses.
 
 ### Teams
 
@@ -191,8 +228,8 @@ page; back takes you out of the team. The tabs:
   Anyone with a live link can join as a player. A group's link opens its
   page, where people join or ask to, and doesn't expire.
 
-**Find a team**: tap 🔍 at the top of the Teams tab and type part of a
-team's name or city. Tap a team to see its public page: name, division and
+**Find a team**: tap 🔍 at the top of the Teams tab (or search from Home)
+and type part of a team's name or city. Tap a team to see its public page: name, division and
 city, plus any public events and posts. Members, rosters and chat stay
 private. Tap **Join** and enter the invite code an admin shows you.
 
@@ -368,13 +405,34 @@ event.
 USA Ultimate rankings by division. Tap a team for its USA Ultimate page;
 back returns to the list (or to Home, if you opened it there).
 
+## Settings
+
+Tap the **gear** at the top right of your profile. Settings slides in
+from the right (on a computer, as a panel; click outside to close it).
+
+- **General**: the theme: **System** (follows your device), **Light** or
+  **Dark**.
+- **Notifications**: push on this device, and which notifications you get
+  (see [Notifications](#notifications)).
+- **Privacy**: **Read receipts**, and a link to choose what others see on
+  your profile (stats, teams, games) with **Edit profile**.
+- **People you follow**.
+- **Account**: change your **display name**; see your **@username** and
+  **email**; **Delete account** (it asks you to type DELETE and confirm
+  your password, or sign in with Google or Apple again).
+- **Sign out**, and the app version at the bottom.
+
 ## Privacy
 
 - **Personal events** are visible only to you.
 - **Paid status and USA Ultimate status** on the roster are visible only to
-  owners, coaches and captains.
+  the owner and people whose role has **Manage team**.
 - **Direct messages** are visible only to the two people in them. Anyone
-  signed in can find you by name to message you; your email is never shown.
+  signed in can find you by name or @username to message you; your email
+  is never shown. With read receipts off, nobody sees when you've read
+  their messages.
+- **Your username** is public to anyone signed in, and only you can set
+  it.
 - **Chat rooms**, their messages, photos and files are visible only to the
   people the room gives access to (and the team owner).
 - **Notifications** and your notification settings are visible only to
@@ -382,8 +440,8 @@ back returns to the list (or to Home, if you opened it there).
 - **Your posts** (and their photos) are public to anyone signed in to
   Stall 10. **Who you follow** is private: others see only how many people
   follow you and how many you follow.
-- **Invite codes and links** come only from owners, coaches and
-  captains. Anyone with a live code or link can join as a player, so share
+- **Invite codes and links** come only from the owner and people whose
+  role has **Manage members**. Anyone with a live code or link can join as a player, so share
   them only with your team. Codes stop working 45 seconds after they
   appear; links when their time is up. Codes from before codes rotated no
   longer work.

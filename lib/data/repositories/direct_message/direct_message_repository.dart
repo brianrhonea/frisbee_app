@@ -17,7 +17,7 @@ abstract class DirectMessageRepository {
   /// [uid]'s conversations that have messages, newest first.
   Stream<List<Conversation>> watchConversations(String uid);
 
-  Stream<Conversation?> watchConversation(String id);
+  Stream<Conversation?> watchConversation(String id, {required String uid});
 
   /// Finds or starts the conversation between [me] and [other]; returns
   /// its id.
@@ -37,7 +37,17 @@ abstract class DirectMessageRepository {
   Future<Result<void>> deleteMessage(String id, ChatMessage message);
 
   /// Marks the conversation read by [uid] now.
-  Future<Result<void>> markRead(String id, String uid);
+  Future<Result<void>> markRead(
+    String id,
+    String uid, {
+    required bool shareReceipt,
+  });
+
+  /// Whether [uid] sends read receipts (and so sees others'); on unless
+  /// they turned it off.
+  Stream<bool> watchReadReceipts(String uid);
+
+  Future<Result<void>> setReadReceipts(String uid, {required bool on});
 
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment attachment);
 }

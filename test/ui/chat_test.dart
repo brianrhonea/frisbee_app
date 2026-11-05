@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -135,15 +134,9 @@ void main() {
         expect(open.accessFor(roled, 'stranger'), ChatAccess.none);
       });
 
-      test('are offered after everyone and the tiers', () {
-        expect(ChatAudience.choicesFor(roled), [
-          'everyone',
-          'coach',
-          'captain',
-          'player',
-          'h',
-          'm',
-        ]);
+      test('are offered after everyone; legacy tiers are not', () {
+        expect(ChatAudience.choicesFor(roled), ['everyone', 'h', 'm']);
+        expect(ChatAudience.labelOf(roled, 'coach'), 'Coach');
         expect(ChatAudience.labelOf(roled, 'h'), 'Handlers');
         expect(ChatAudience.labelOf(roled, 'gone'), 'Deleted role');
       });

@@ -33,11 +33,11 @@ service cloud.firestore {
 
     // Tiers (TeamRole in lib/domain/models/team.dart):
     //   owner   everything: roles, ownership, new invite codes
-    //   coach   every permission below (teams only)
-    //   captain every permission below; in a group, an organizer from
-    //           before custom roles, until the owner's app migrates them
     //   player  read only, plus whatever custom roles grant; the owner can
     //           add stats access (statKeepers)
+    //   coach, captain  every permission below. Legacy, from before custom
+    //           roles: nobody new gets them, and the owner's app moves
+    //           their members into roles (migrateTiersToRoles).
     // "stats" was briefly a role and still counts as a player with stats.
     //
     // Custom roles (CustomRole in lib/domain/models/team_role.dart) live in
@@ -160,6 +160,17 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read, write: if signedIn() && uid() == userId;
+
+      // When the user last read each direct-message conversation, private
+      // to them (the conversation's readAt is the shared read receipt,
+      // which they can turn off with readReceipts on this doc).
+      match /dmReads/{convId} {
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create, update: if signedIn() && uid() == userId
+          && convId.split('_').hasAny([userId])
+          && request.resource.data.keys().hasOnly(['readAt'])
+          && request.resource.data.readAt == request.time;
+      }
 
       // Personal schedule: private to its owner, no polls or responses.
       match /events/{eventId} {
@@ -419,13 +430,12 @@ service cloud.firestore {
           && diff.changedKeys().size() == 1
           && !(resource.data.ownerId in diff.changedKeys())
           && roles.hasOnly(['owner', 'coach', 'captain', 'stats', 'player'])
-          // Groups have only an owner and members; custom roles do the
-          // rest. Legacy organizers (captain) may stay until migrated, but
-          // nobody new becomes one.
-          && (!isGroup(resource.data)
-              || roles.removeAll(['owner', 'player', 'stats']).size()
-                   < resource.data.members.values()
-                       .removeAll(['owner', 'player', 'stats']).size()
+          // Only an owner and players now; custom roles do the rest.
+          // Legacy coaches and captains may stay until migrated, or be
+          // moved down, but nobody new becomes one.
+          && (roles.removeAll(['owner', 'player', 'stats']).size()
+                < resource.data.members.values()
+                    .removeAll(['owner', 'player', 'stats']).size()
               || roles.removeAll(['owner', 'player', 'stats']).size() == 0)
           && roles.removeAll(['coach', 'captain', 'stats', 'player']).size() == 1
           // No new "stats" roles; that's statKeepers now.
@@ -436,9 +446,9 @@ service cloud.firestore {
       // The owner edits custom roles and who has them, with each member's
       // permissions denormalized into memberPerms (see CustomRole). Only
       // the owner writes these, so a wrong memberPerms can only shortchange
-      // or overgrant on the owner's own team. In a group, the same write may
-      // move legacy organizers (captain) to members, so the owner's app
-      // can turn them into an "Organizer" role.
+      // or overgrant on the owner's own team. A write may also move every
+      // legacy coach and captain to player at once, after the owner's app
+      // gave them roles with the same powers (migrateTiersToRoles).
       function setRoles() {
         let t = request.resource.data;
         let ids = resource.data.memberIds.toSet();
@@ -454,8 +464,7 @@ service cloud.firestore {
           && diff.addedKeys().size() == 0
           && diff.removedKeys().size() == 0
           && (diff.changedKeys().size() == 0
-              || (isGroup(resource.data)
-                  && t.members[resource.data.ownerId] == 'owner'
+              || (t.members[resource.data.ownerId] == 'owner'
                   && t.members.values().hasOnly(['owner', 'player', 'stats'])
                   && t.members.values().removeAll(['player', 'stats']).size() == 1));
       }
@@ -1652,7 +1661,7 @@ service cloud.firestore {
             'name', 'keywords', 'photoUrl', 'updatedAt', 'tags',
             'bio', 'pronouns', 'hometown', 'school', 'throwingHand',
             'playingSince', 'visibility',
-            'teams', 'stats', 'games', 'summaryUpdatedAt'])
+            'teams', 'stats', 'games', 'summaryUpdatedAt', 'username'])
           && p.name is string
           && p.name.size() > 0
           && p.name.size() <= 80
@@ -1677,10 +1686,44 @@ service cloud.firestore {
           && p.get('games', []).size() <= 5;
       }
 
+      // A username is set once, together with its usernames/{name} claim.
+      function usernameClaimed(name) {
+        return name is string
+          && getAfter(/databases/$(database)/documents/usernames/$(name)).data.uid == uid();
+      }
+
       allow read: if signedIn();
       allow delete: if signedIn() && uid() == userId;
-      allow create, update: if signedIn() && uid() == userId
-        && validProfile(request.resource.data);
+      allow create: if signedIn() && uid() == userId
+        && validProfile(request.resource.data)
+        && (!('username' in request.resource.data)
+            || usernameClaimed(request.resource.data.username));
+      allow update: if signedIn() && uid() == userId
+        && validProfile(request.resource.data)
+        && (request.resource.data.get('username', null)
+              == resource.data.get('username', null)
+            || (resource.data.get('username', null) == null
+                && usernameClaimed(request.resource.data.username)));
+    }
+
+    // Unique usernames (Username in lib/domain/models/username.dart): the
+    // doc id is the lowercase name, holding who has it. Claimed in the same
+    // write that puts it on the claimer's profile, once per account; anyone
+    // signed in checks whether a name is free. Deleting an account frees
+    // it (the account-deleteAccount function).
+    match /usernames/{name} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && name.matches('^[a-z0-9_.]{3,20}$')
+        && !name.matches('^[.].*|.*[.]$|.*[.][.].*')
+        && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+        && request.resource.data.uid == uid()
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/profiles/$(uid()))
+             .data.get('username', null) == name
+        && (!exists(/databases/$(database)/documents/profiles/$(uid()))
+            || get(/databases/$(database)/documents/profiles/$(uid()))
+                 .data.get('username', null) == null);
     }
 
     // One conversation per pair of users, id "{uidA}_{uidB}" with the uids

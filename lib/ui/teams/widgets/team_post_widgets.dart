@@ -9,6 +9,7 @@ import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/skeleton.dart';
 
 enum _PostAction { edit, delete }
 
@@ -327,7 +328,7 @@ class _PostImageState extends State<PostImage> {
         child: FutureBuilder(
           future: _data,
           builder: (context, snap) => switch (snap.data) {
-            null => box(const Center(child: CircularProgressIndicator())),
+            null => box(const SkeletonImage()),
             Error() => box(
               IconButton(
                 tooltip: "Couldn't load photo. Retry",
@@ -361,6 +362,7 @@ class _PostImageState extends State<PostImage> {
                   value,
                   fit: BoxFit.cover,
                   semanticLabel: widget.image.name,
+                  frameBuilder: fadeInImageFrame,
                 ),
               ),
             ),

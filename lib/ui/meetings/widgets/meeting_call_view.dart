@@ -444,7 +444,7 @@ class ParticipantTile extends StatelessWidget {
     final camera = p.camera;
     return Material(
       color: const Color(0xFF23262B),
-      shape: RoundedRectangleBorder(
+      shape: RoundedSuperellipseBorder(
         borderRadius: BorderRadius.circular(12),
         side: p.isSpeaking
             ? const BorderSide(color: Colors.greenAccent, width: 3)

@@ -12,7 +12,7 @@ import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/brand.dart';
-import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/undo_snack_bar.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../posts/widgets/post_widgets.dart';
@@ -24,6 +24,7 @@ import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/home_viewmodel.dart';
 import '../../posts/widgets/post_composer.dart';
 import '../../workouts/widgets/record_button.dart';
+import '../../core/ui/skeleton.dart';
 
 enum _Tab { forYou, teams }
 
@@ -150,28 +151,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (draft != null) vm.savePost.execute((teamId: p.teamId, draft: draft));
   }
 
-  Future<void> _delete(TeamPostItem p) async {
-    if (await confirmDialog(
+  /// Deletes at once, with "Undo" in a toast rather than a dialog first.
+  void _remove(FeedItem item) {
+    vm.removals.remove(item);
+    showUndoSnackBar(
       context,
-      title: 'Delete post?',
-      message: 'It will be removed from ${p.teamName} and the feed.',
-      confirmLabel: 'Delete',
-      destructive: true,
-    )) {
-      vm.deletePost.execute(p);
-    }
-  }
-
-  Future<void> _deleteUserPost(String id) async {
-    if (await confirmDialog(
-      context,
-      title: 'Delete post?',
-      message: 'It and its photos are removed for everyone.',
-      confirmLabel: 'Delete',
-      destructive: true,
-    )) {
-      vm.deleteUserPost.execute(id);
-    }
+      message: 'Post deleted',
+      onUndo: () => vm.removals.undo(item),
+    );
   }
 
   void _newPost() => showPostComposer(context);
@@ -222,13 +209,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final mobile = ScreenSize.of(context).isMobile;
     return Scaffold(
-      appBar: mobile ? const MobileTopBar() : null,
+      // Home has its own search bar on phones, so no search button.
+      appBar: mobile ? const MobileTopBar(search: false) : null,
       body: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.savePost, vm.joinTeam]),
         builder: (context, _) {
           // No page header: the composer below is where posts start.
           return PageScroll(
             children: [
+              // On bigger screens the top bar has the same box.
+              if (mobile) ...[const SearchField(), const SizedBox(height: 12)],
               _TabRow(
                 selected: _tab,
                 onSelect: (t) => setState(() => _tab = t),
@@ -277,12 +267,13 @@ class _HomeScreenState extends State<HomeScreen> {
           joining: vm.joinTeam.running,
           onJoin: _join,
           onCreate: () => context.go(Routes.createTeam),
-          onFind: () => context.go(Routes.explore()),
+          onFind: () => context.go(Routes.explore(only: ExploreFilter.groups)),
         ),
       if (!vm.postsLoaded)
-        const Padding(
-          padding: EdgeInsets.all(32),
-          child: Center(child: CircularProgressIndicator()),
+        const Skeleton(
+          child: Column(
+            children: [SkeletonPost(), SizedBox(height: 14), SkeletonPost()],
+          ),
         ),
       for (final item in vm.posts)
         switch (item) {
@@ -295,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? () => showPostComposer(context, postId: post.id)
                 : null,
             onDelete: post.authorId == vm.user?.uid
-                ? () => _deleteUserPost(post.id)
+                ? () => _remove(item)
                 : null,
             actions: vm.actions,
             onRepost: () => repostOrUndo(context, vm.actions, post),
@@ -309,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
             showVisibility: vm.teamOf(p) != null,
             onOpenTeam: () => context.go(Routes.team(p.teamId)),
             onEdit: vm.canEditPost(p) ? () => _edit(p) : null,
-            onDelete: vm.canEditPost(p) ? () => _delete(p) : null,
+            onDelete: vm.canEditPost(p) ? () => _remove(p) : null,
           ),
         },
       if (vm.hasMorePosts)
@@ -333,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
         joining: vm.joinTeam.running,
         onJoin: _join,
         onCreate: () => context.go(Routes.createTeam),
-        onFind: () => context.go(Routes.explore()),
+        onFind: () => context.go(Routes.explore(only: ExploreFilter.groups)),
         hasTeams: vm.teams.isNotEmpty,
       ),
     ],

@@ -5,10 +5,14 @@ import 'package:provider/provider.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
+import '../../core/ui/app_search_field.dart';
 import '../../core/ui/brand.dart';
+import '../../core/ui/key_hint.dart';
 import '../../core/ui/layout.dart';
 import '../../teams/widgets/team_section_screen.dart';
 import '../view_models/shell_viewmodel.dart';
+import 'command_palette.dart';
+import 'notification_offers.dart';
 
 /// The app's top-level sections, in the order of the router's shell
 /// branches.
@@ -37,9 +41,6 @@ enum ShellSection {
   final String shortLabel;
   final IconData icon;
   final IconData activeIcon;
-
-  /// The phone's bottom bar leaves Explore out; it opens from search.
-  static const mobile = [community, team, messages, profile];
 }
 
 /// The frame around every top-level page: a sidebar on desktops, an icon
@@ -67,72 +68,88 @@ class AppShell extends StatelessWidget {
     initialLocation: s.index == navigationShell.currentIndex,
   );
 
+  List<PaletteCommand> _commands() => paletteCommands(
+    sections: [
+      for (final s in ShellSection.values)
+        (label: s.label, icon: s.icon, index: s.index),
+    ],
+    goToSection: (i) => _select(ShellSection.values[i]),
+    teams: viewModel.teams,
+  );
+
   @override
   Widget build(BuildContext context) {
     final size = ScreenSize.of(context);
     final c = AppColors.of(context);
     return ChangeNotifierProvider.value(
       value: viewModel,
-      child: ListenableBuilder(
-        listenable: viewModel,
-        builder: (context, _) {
-          if (size.isMobile) {
-            final index = ShellSection.mobile.indexOf(_section);
-            return Scaffold(
-              body: navigationShell,
-              bottomNavigationBar: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: c.border)),
-                ),
-                child: NavigationBar(
-                  // Explore highlights Home, where its search starts.
-                  selectedIndex: index < 0 ? 0 : index,
-                  onDestinationSelected: (i) => _select(ShellSection.mobile[i]),
-                  destinations: [
-                    for (final s in ShellSection.mobile)
-                      NavigationDestination(
-                        icon: _badged(s, Icon(s.icon)),
-                        selectedIcon: _badged(s, Icon(s.activeIcon)),
-                        label: s.shortLabel,
-                      ),
-                  ],
-                ),
-              ),
-            );
-          }
-          return Scaffold(
-            body: Row(
-              children: [
-                if (size == ScreenSize.desktop)
-                  _Sidebar(
-                    viewModel: viewModel,
-                    selected: _section,
-                    onSelect: _select,
-                  )
-                else
-                  _Rail(
-                    viewModel: viewModel,
-                    selected: _section,
-                    onSelect: _select,
-                  ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _TopBar(
-                        viewModel: viewModel,
-                        crumbs: breadcrumbs(location, viewModel.teamName),
-                      ),
-                      Expanded(child: navigationShell),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+      child: AppShortcuts(
+        commands: _commands,
+        onSection: (i) => _select(ShellSection.values[i]),
+        child: _frame(size, c),
       ),
     );
   }
+
+  Widget _frame(ScreenSize size, AppColors c) => NotificationOffers(
+    viewModel: viewModel,
+    child: ListenableBuilder(
+      listenable: viewModel,
+      builder: (context, _) {
+        if (size.isMobile) {
+          return Scaffold(
+            body: navigationShell,
+            bottomNavigationBar: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: c.border)),
+              ),
+              child: NavigationBar(
+                selectedIndex: _section.index,
+                onDestinationSelected: (i) => _select(ShellSection.values[i]),
+                destinations: [
+                  for (final s in ShellSection.values)
+                    NavigationDestination(
+                      icon: _badged(s, Icon(s.icon)),
+                      selectedIcon: _badged(s, Icon(s.activeIcon)),
+                      label: s.shortLabel,
+                    ),
+                ],
+              ),
+            ),
+          );
+        }
+        return Scaffold(
+          body: Row(
+            children: [
+              if (size == ScreenSize.desktop)
+                _Sidebar(
+                  viewModel: viewModel,
+                  selected: _section,
+                  onSelect: _select,
+                )
+              else
+                _Rail(
+                  viewModel: viewModel,
+                  selected: _section,
+                  onSelect: _select,
+                ),
+              Expanded(
+                child: Column(
+                  children: [
+                    _TopBar(
+                      viewModel: viewModel,
+                      crumbs: breadcrumbs(location, viewModel.teamName),
+                    ),
+                    Expanded(child: navigationShell),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
 
   Widget _badged(ShellSection s, Widget icon) {
     final count = s == ShellSection.messages ? viewModel.unreadMessages : 0;
@@ -540,7 +557,7 @@ class _Rail extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Tooltip(
-                  message: s.label,
+                  message: '${s.label}  ·  ${shortcutLabel('${s.index + 1}')}',
                   child: Material(
                     color: s == selected ? c.highlight : Colors.transparent,
                     borderRadius: BorderRadius.circular(controlRadius),
@@ -691,28 +708,22 @@ class _Breadcrumbs extends StatelessWidget {
   }
 }
 
-/// "Search players, teams, events": opens Explore with the query.
+/// The top bar's search: opens Explore, the app-wide search, with the
+/// query.
 class SearchField extends StatelessWidget {
   const SearchField({super.key});
 
+  /// The app-wide search: players, teams, groups and events. Explore's
+  /// own box says the same.
+  static const hint = 'Search Stall 10';
+
   @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return SizedBox(
-      height: 38,
-      child: TextField(
-        textInputAction: TextInputAction.search,
-        style: const TextStyle(fontSize: 13),
-        decoration: InputDecoration(
-          hintText: 'Search teams, groups, events',
-          hintStyle: TextStyle(fontSize: 12.5, color: c.muted),
-          prefixIcon: Icon(Icons.search, size: 18, color: c.muted),
-          contentPadding: EdgeInsets.zero,
-        ),
-        onSubmitted: (q) => context.go(Routes.explore(query: q)),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => AppSearchField(
+    hint: hint,
+    onSubmitted: (q) => context.go(Routes.explore(query: q)),
+    // The command menu searches too, and is a keystroke away.
+    hintTrailing: showsKeyHints(context) ? KeyHint(shortcutLabel('K')) : null,
+  );
 }
 
 /// The bell, with a dot when there are unread notifications.
@@ -737,7 +748,11 @@ class NotificationsButton extends StatelessWidget {
 /// The phone's top bar on top-level pages: the wordmark on green, with
 /// search (Explore) and notifications.
 class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
-  const MobileTopBar({super.key});
+  const MobileTopBar({super.key, this.search = true});
+
+  /// Whether to show the search button; off where the page has a search
+  /// bar of its own.
+  final bool search;
 
   @override
   Size get preferredSize => const Size.fromHeight(56);
@@ -756,11 +771,12 @@ class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
         child: AppWordmark(size: 28, color: c.onSidebar),
       ),
       actions: [
-        IconButton(
-          tooltip: 'Explore',
-          onPressed: () => context.go(Routes.explore()),
-          icon: Icon(Icons.search, color: c.onSidebar),
-        ),
+        if (search)
+          IconButton(
+            tooltip: 'Explore',
+            onPressed: () => context.go(Routes.explore()),
+            icon: Icon(Icons.search, color: c.onSidebar),
+          ),
         NotificationsButton(count: unread, color: c.onSidebar),
         const SizedBox(width: 4),
       ],

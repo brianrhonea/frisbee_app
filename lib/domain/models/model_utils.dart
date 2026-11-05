@@ -28,6 +28,15 @@ List<String> searchKeywords(String text) {
   }.take(100).toList();
 }
 
+/// A profile's search keywords: its name's words, plus its username
+/// whole and split at "_" and ".", so "@pat_l" and "pat" both find it.
+List<String> profileKeywords(String name, String? username) => {
+  ...searchKeywords('$name ${username ?? ''}'),
+  if (username != null)
+    for (var i = 1; i <= username.length && i <= 20; i++)
+      username.substring(0, i),
+}.take(100).toList();
+
 /// Lowercased words of a name or search query.
 List<String> searchWords(String text) => text
     .toLowerCase()

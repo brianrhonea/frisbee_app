@@ -81,7 +81,7 @@ void main() {
       vm.dispose();
     });
 
-    testWidgets('the button shows Follow, then Following and a bell', (
+    testWidgets('Follow offers notifications; Following is a menu', (
       tester,
     ) async {
       final vm = followVm(hawks);
@@ -96,23 +96,40 @@ void main() {
       expect(find.text('0 followers'), findsOneWidget);
       expect(find.byIcon(Icons.notifications_none), findsNothing);
 
+      // Following offers post notifications, instead of a bell.
       await tester.tap(find.text('Follow'));
-      await tester.pump();
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(find.text('Following'), findsOneWidget);
       expect(find.text('1 follower'), findsOneWidget);
+      expect(find.text('Get notified when Hawks posts?'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.notifications_none));
-      await tester.pump();
-      await tester.pump();
+      await tester.tap(find.text('Turn on'));
+      await tester.pumpAndSettle();
+      expect(vm.notifying, isTrue);
       expect(find.byIcon(Icons.notifications_active), findsOneWidget);
       expect(find.textContaining("We'll let you know"), findsOneWidget);
+
+      // The Following menu turns them off, and unfollows.
+      await tester.tap(find.text('Following'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Post notifications'));
+      await tester.pumpAndSettle();
+      expect(vm.notifying, isFalse);
+
+      await tester.tap(find.text('Following'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Unfollow'));
+      await tester.pumpAndSettle();
+      expect(find.text('Follow'), findsOneWidget);
+      expect(find.text('Get notified when Hawks posts?'), findsNothing);
       vm.dispose();
     });
   });
 
   group('Following', () {
-    testWidgets('lists follows with bells and unfollow', (tester) async {
+    testWidgets('lists follows with a notifications and unfollow menu', (
+      tester,
+    ) async {
       await follows.follow(
         testUser.uid,
         const FollowTarget.team('t1', 'Hawks'),
@@ -136,16 +153,21 @@ void main() {
         tester.getTopLeft(find.text('Sam')).dy,
         lessThan(tester.getTopLeft(find.text('Hawks')).dy),
       );
-      expect(find.byIcon(Icons.notifications_active), findsOneWidget);
+      expect(find.byIcon(Icons.notifications_active_outlined), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.notifications_none));
-      await tester.pump();
-      await tester.pump();
-      expect(find.byIcon(Icons.notifications_active), findsNWidgets(2));
+      await tester.tap(find.byTooltip('Options for Hawks'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Post notifications'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byIcon(Icons.notifications_active_outlined),
+        findsNWidgets(2),
+      );
 
-      await tester.tap(find.text('Unfollow').first);
-      await tester.pump();
-      await tester.pump();
+      await tester.tap(find.byTooltip('Options for Sam'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Unfollow'));
+      await tester.pumpAndSettle();
       expect(find.text('Sam'), findsNothing);
       vm.dispose();
     });

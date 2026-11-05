@@ -8,6 +8,7 @@ import '../../core/ui/back_or.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/usau_attribution.dart';
 import '../view_models/rankings_viewmodel.dart';
+import '../../core/ui/app_search_field.dart';
 
 class RankingsScreen extends StatelessWidget {
   const RankingsScreen({super.key, required this.viewModel});
@@ -65,11 +66,8 @@ class RankingsScreen extends StatelessWidget {
                           onChanged: (k) => vm.select(k!),
                         ),
                         const SizedBox(height: 12),
-                        TextField(
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search),
-                            hintText: 'Find a team',
-                          ),
+                        AppSearchField(
+                          hint: 'Search these rankings',
                           onChanged: vm.setQuery,
                         ),
                         if (selected.updatedAt != null) ...[

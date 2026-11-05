@@ -3,9 +3,11 @@ import 'team_role.dart';
 
 export 'team_role.dart';
 
-/// Member tiers, most access first. Teams have all four; community groups
-/// only an owner and members, with anything more coming from the owner's
-/// custom roles ([Team.roles]). A player can also be given stats access
+/// Member tiers, most access first. Teams and groups have only an owner
+/// and players (members, in a group); anything more comes from the owner's
+/// custom roles ([Team.roles]). Coach and captain are tiers from before
+/// custom roles: the owner's app moves them into roles of the same name
+/// ([Team.needsRoleMigration]). A player can also be given stats access
 /// ([Team.statKeepers]). firestore.rules enforces the same permissions;
 /// keep the two in step.
 enum TeamRole {
@@ -73,15 +75,13 @@ enum TeamRole {
     (TeamKind.community, captain) =>
       'Manage events, tournaments and join requests',
     (TeamKind.community, player) => 'Join events; roles can grant more',
+    (TeamKind.team, player) => 'View the team; roles can grant more',
     _ => summary,
   };
 
-  /// Tiers a member can be given; groups have only owner and members, and
-  /// use custom roles for the rest.
-  static List<TeamRole> rolesFor(TeamKind kind) => switch (kind) {
-    TeamKind.team => values,
-    TeamKind.community => const [owner, player],
-  };
+  /// Tiers a member can be given: the owner and everyone else. Custom
+  /// roles do the rest.
+  static List<TeamRole> rolesFor(TeamKind kind) => const [owner, player];
 
   /// What the role can do, for the role picker.
   String get summary => switch (this) {
@@ -312,10 +312,47 @@ class Team {
     Map<String, CustomRole>? roles,
   ]) => {for (final id in roleIds) ...?(roles ?? this.roles)[id]?.permissions};
 
-  /// Community organizers from before custom roles, still on the captain
-  /// tier. The owner's app moves them into an "Organizer" role.
-  bool get needsOrganizerMigration =>
-      isCommunity && members.values.contains(TeamRole.captain);
+  /// Members still on the coach or captain tier, from before custom roles.
+  /// The owner's app moves them into roles with the same powers
+  /// ([legacyTierRoles]).
+  bool get needsRoleMigration =>
+      members.values.any((r) => r == TeamRole.coach || r == TeamRole.captain);
+
+  /// The custom role each legacy tier in use becomes: "Coach" and
+  /// "Captain" with every permission on a team, "Organizer" in a group.
+  /// Reuses a role of the same name if the team already has one.
+  Map<TeamRole, CustomRole> legacyTierRoles() {
+    final inUse = {
+      for (final r in members.values)
+        if (r == TeamRole.coach || r == TeamRole.captain) r,
+    };
+    var position = roles.length;
+    final made = <String, CustomRole>{};
+    CustomRole named(String name, int color, Set<TeamPermission> perms) =>
+        made[name] ??=
+            roles.values.where((r) => r.name == name).firstOrNull ??
+            CustomRole(
+              id: newRoleId(),
+              name: name,
+              color: color,
+              position: position++,
+              permissions: perms,
+            );
+    return {
+      for (final tier in TeamRole.values)
+        if (inUse.contains(tier))
+          tier: isCommunity
+              ? named('Organizer', 0xFF1E88E5, const {
+                  TeamPermission.manageTeam,
+                  TeamPermission.manageMembers,
+                  TeamPermission.manageChats,
+                  TeamPermission.manageEvents,
+                })
+              : tier == TeamRole.coach
+              ? named('Coach', 0xFF2E7D32, TeamPermission.values.toSet())
+              : named('Captain', 0xFF1E88E5, TeamPermission.values.toSet()),
+    };
+  }
 
   /// A player with stats access.
   bool isStatKeeper(String uid) =>

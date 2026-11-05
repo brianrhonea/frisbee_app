@@ -104,15 +104,19 @@ abstract class TeamRepository {
   Future<Result<void>> removeMember(String teamId, String uid);
 
   /// Owner only: replaces [team]'s custom roles and who has them, saving
-  /// each member's permissions with them ([rolesData]). [demote] moves
-  /// those members to the player tier in the same write, for community
-  /// organizers from before custom roles.
+  /// each member's permissions with them ([rolesData]).
   Future<Result<void>> saveRoles(
     Team team, {
     required Map<String, CustomRole> roles,
     required Map<String, Set<String>> memberRoles,
-    Set<String> demote = const {},
   });
+
+  /// Moves members on the legacy coach and captain tiers into custom
+  /// roles with the same powers ([Team.legacyTierRoles]): gives them the
+  /// roles, opens every chat room and folder that was open to their tier
+  /// to their role too, then makes them players. Each step is safe to
+  /// repeat, so a failed run is finished the next time.
+  Future<Result<void>> migrateTiersToRoles(Team team);
 
   Future<Result<void>> deleteTeam(Team team);
 

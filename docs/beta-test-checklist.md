@@ -108,17 +108,29 @@ console, and note numbers per active tester.
 
 - [ ] The sign-in animation plays once per launch (disc thrown, stall
       counts 1–9, caught as the "0"); tap the field to replay it.
-- [ ] Sign up with email and password; bad email and short password show
-      errors.
+- [ ] Sign up with first and last name, username, email, password and
+      confirmation; bad email, mismatched or weak password show errors.
+- [ ] Username: a taken one says so as you type; `pa`, `pat lee`, `.pat`
+      and `admin` are refused; the account gets the one you picked.
+- [ ] Password strength bar and checklist update as you type; the eye
+      shows and hides it.
+- [ ] Google / Apple sign-up (and an older account) is asked to **pick a
+      username** before Home; invite links still finish joining after.
+- [ ] Sign-in and sign-up fit the screen without scrolling (smallest
+      phone you have).
 - [ ] Sign in with email; wrong password shows an error.
 - [ ] Sign in with **Google** (iOS and Android).
 - [ ] Sign in with **Apple** (iOS; on Android if offered).
 - [ ] After sign-in or sign-up you land on **Community**.
 - [ ] Sign out, then sign in as another account: no data from the first
       account shows.
-- [ ] Profile: change name and photo; it shows on posts, the roster and
-      chat.
-- [ ] App version shows on Profile and matches the build.
+- [ ] Profile shows **@username** under the name (yours and others').
+- [ ] The **gear** on your profile slides Settings in; General, Privacy,
+      Account and Notifications slide in over it, and back slides them
+      away. On a wide screen it's a side panel; clicking outside closes it.
+- [ ] Settings → Account: change display name; it shows on posts, the
+      roster and chat.
+- [ ] App version shows at the bottom of Settings and matches the build.
 - [ ] **Delete account**: confirms first. Then the user's posts, follows
       and personal events are gone, their teams handle the departure,
       and they can sign up again with the same email.
@@ -267,6 +279,13 @@ console, and note numbers per active tester.
       search.
 - [ ] Links are tappable; Stall 10 links open in the app.
 - [ ] New message notifications (push and in-app).
+- [ ] **Seen** shows under your last DM once the other person reads it.
+      With Read receipts off (Settings → Privacy) on either side, neither
+      sees it.
+- [ ] Phone: back from a conversation slides cleanly to Messages.
+- [ ] Delete a message: it goes at once with **Undo**; Undo brings it
+      back; otherwise it's gone on the other device after ~5 s.
+- [ ] Room ⋮ → **Mute notifications** stops that room's pushes.
 
 ### 2.11 Follows, profiles and the home feed
 
@@ -350,6 +369,8 @@ console, and note numbers per active tester.
 - [ ] In-app list: unread badge, open marks read, **Mark all read**,
       **Clear all**.
 - [ ] Notification settings: each category on/off is respected.
+- [ ] First sign-in offers notifications once; **Not now** doesn't ask
+      again. Joining a team and following someone each offer theirs.
 - [ ] Opening several notifications in a row doesn't break navigation.
 
 ### 2.15 USA Ultimate data
@@ -373,6 +394,15 @@ console, and note numbers per active tester.
 - [ ] Deep links: `/join/…`, `/g/…`, `/posts/…`, `/people/…` from
       outside the app.
 - [ ] Pull to refresh where offered.
+- [ ] Phones stay portrait when rotated; tablets still rotate.
+- [ ] Home search (phones) / top-bar search: a player, @username, team,
+      group and USA Ultimate event are all found; chips filter them.
+- [ ] Computer: **Ctrl K** opens the command menu from any page (also
+      after using it, and inside a text box); **Ctrl 1–5** switch tabs,
+      also with the menu open.
+- [ ] Loading shows grey placeholder rows, not spinners; photos fade in.
+- [ ] Roles: an owner opening an older team turns coaches and captains
+      into Coach and Captain roles, with the same access.
 
 ### 2.17 Security and privacy spot checks
 

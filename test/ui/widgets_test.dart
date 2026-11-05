@@ -1,14 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/ui/auth/view_models/choose_username_viewmodel.dart';
 import 'package:frisbee_app/ui/auth/view_models/sign_in_viewmodel.dart';
+import 'package:frisbee_app/ui/auth/view_models/sign_up_viewmodel.dart';
+import 'package:frisbee_app/ui/auth/widgets/choose_username_screen.dart';
 import 'package:frisbee_app/ui/auth/widgets/sign_in_screen.dart';
+import 'package:frisbee_app/ui/auth/widgets/sign_up_screen.dart';
 import 'package:frisbee_app/ui/playbook/view_models/play_editor_viewmodel.dart';
 import 'package:frisbee_app/ui/playbook/widgets/play_canvas.dart';
 
 import '../testing/fakes.dart';
 
 void main() {
+  testWidgets('sign-up asks for names, a free username and a strong password', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(440, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final auth = FakeAuthRepository()..takenUsernames.add('pat');
+    final vm = SignUpViewModel(authRepository: auth);
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(MaterialApp(home: SignUpScreen(viewModel: vm)));
+    await tester.pumpAndSettle();
+
+    Finder field(String label) => find.widgetWithText(TextFormField, label);
+    await tester.enterText(field('First name'), 'Pat');
+    await tester.enterText(field('Last name'), 'Lee');
+    await tester.enterText(field('Username'), 'Pat');
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('@pat is taken'), findsOneWidget);
+
+    await tester.enterText(field('Username'), 'pat.lee');
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('@pat.lee is available'), findsOneWidget);
+
+    await tester.enterText(field('Email'), 'pat@example.com');
+    await tester.enterText(field('Password'), 'pull1234');
+    await tester.pump();
+    expect(find.text('Fair'), findsOneWidget);
+    await tester.enterText(field('Confirm password'), 'pull12345');
+    await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
+    await tester.pumpAndSettle();
+    expect(find.text("Passwords don't match"), findsOneWidget);
+    expect(auth.currentUser, isNull);
+
+    await tester.enterText(field('Confirm password'), 'pull1234');
+    await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
+    await tester.pumpAndSettle();
+    expect(auth.currentUser?.displayName, 'Pat Lee');
+    expect(auth.currentUser?.username, 'pat.lee');
+    expect(auth.needsUsername, isFalse);
+  });
+
+  testWidgets('Google and Apple sign-ups pick a username', (tester) async {
+    final auth = FakeAuthRepository(
+      user: const AppUser(uid: 'u1', displayName: 'Brian Honea'),
+    )..usernameMissing = true;
+    auth.takenUsernames.add('brian.honea');
+    final vm = ChooseUsernameViewModel(authRepository: auth);
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      MaterialApp(home: ChooseUsernameScreen(viewModel: vm)),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    // Suggested from their name, but taken.
+    expect(find.text('@brian.honea is taken'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextFormField), 'bhonea');
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(auth.needsUsername, isFalse);
+    expect(auth.currentUser?.username, 'bhonea');
+  });
+
   testWidgets('sign-in validates and signs in', (tester) async {
     final auth = FakeAuthRepository();
     await tester.pumpWidget(

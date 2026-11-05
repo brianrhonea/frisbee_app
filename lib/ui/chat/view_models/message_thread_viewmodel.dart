@@ -7,6 +7,7 @@ import '../../../data/services/file_picker_service.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../utils/command.dart';
+import '../../../utils/pending_removals.dart';
 import '../../../utils/result.dart';
 
 /// A list of messages with a composer: shared by team chat rooms and
@@ -36,6 +37,13 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   late final Command1<void, bool> pickFiles;
   late final Command1<void, ChatMessage> deleteMessage;
 
+  /// Messages deleted, hidden while "Undo" is offered.
+  late final removals = PendingRemovals<ChatMessage>(
+    keyOf: (m) => m.id,
+    commit: deleteMessage.execute,
+    onChange: notifyListeners,
+  );
+
   /// Downloads an attachment and asks where to save it. False if cancelled.
   late final Command1<bool, ChatAttachment> saveAttachment;
 
@@ -61,6 +69,9 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   bool get canWrite;
 
+  /// A small note under [message], e.g. "Seen"; null for none.
+  String? receiptFor(ChatMessage message) => null;
+
   /// Whether messages can carry photos and files.
   bool get canAttach => true;
 
@@ -77,12 +88,12 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   void onMessages(List<ChatMessage> messages) {}
 
   String get uid => _auth.currentUser?.uid ?? '';
-  List<ChatMessage> get messages => _messages ?? const [];
+  List<ChatMessage> get messages => removals.visible(_messages ?? const []);
   bool get messagesLoaded => _messages != null;
   Object? get messageError => _messageError;
 
   /// More messages may be on the server than the [pageSize]s loaded.
-  bool get hasMore => messages.length >= _limit;
+  bool get hasMore => (_messages?.length ?? 0) >= _limit;
 
   /// Pending attachments for the next message.
   List<NewAttachment> get drafts => List.unmodifiable(_drafts);
@@ -182,6 +193,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    removals.flush(removeMessage);
     _messageSub?.cancel();
     super.dispose();
   }

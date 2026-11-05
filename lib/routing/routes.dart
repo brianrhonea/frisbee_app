@@ -4,6 +4,10 @@ import '../domain/models/team_event.dart';
 abstract final class Routes {
   static const signIn = '/sign-in';
   static const signUp = '/sign-up';
+
+  /// Picking a username, before anything else (see
+  /// AuthRepository.needsUsername).
+  static const chooseUsername = '/welcome/username';
   static const home = '/home';
   static const teams = '/teams';
   static const createTeam = '/teams/new';
@@ -15,16 +19,23 @@ abstract final class Routes {
   static const rankings = '/rankings';
   static const profile = '/profile';
 
+  /// Settings, sliding over the page; its sections open from it.
+  static const settings = '/settings';
+  static const settingsGeneral = '/settings/general';
+  static const settingsPrivacy = '/settings/privacy';
+  static const settingsAccount = '/settings/account';
+
   /// Another player's profile.
   static String player(String uid) => '/players/$uid';
 
-  /// Explore: find teams and groups, events and rankings; [query] fills
-  /// the search.
-  static String explore({String? query}) {
+  /// Explore, the app-wide search: players, teams and groups, plus events
+  /// and rankings. [query] fills the search; [only] picks a filter.
+  static String explore({String? query, ExploreFilter? only}) {
     final q = query?.trim() ?? '';
+    final params = {'q': ?(q.isEmpty ? null : q), 'only': ?only?.name};
     return Uri(
       path: explorePath,
-      queryParameters: q.isEmpty ? null : {'q': q},
+      queryParameters: params.isEmpty ? null : params,
     ).toString();
   }
 
@@ -187,3 +198,6 @@ abstract final class Routes {
     queryParameters: {'url': url, if (name.isNotEmpty) 'name': name},
   ).toString();
 }
+
+/// Explore's result filters.
+enum ExploreFilter { teams, groups, players, events }

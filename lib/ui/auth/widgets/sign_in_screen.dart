@@ -5,6 +5,7 @@ import '../../../routing/routes.dart';
 import '../../core/ui/error_message.dart';
 import '../view_models/sign_in_viewmodel.dart';
 import 'auth_layout.dart';
+import 'password_field.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key, required this.viewModel});
@@ -113,10 +114,9 @@ class _SignInScreenState extends State<SignInScreen> {
                         : null,
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  PasswordField(
                     controller: _password,
-                    decoration: const InputDecoration(labelText: 'Password'),
-                    obscureText: true,
+                    label: 'Password',
                     autofillHints: const [AutofillHints.password],
                     onFieldSubmitted: (_) => _submit(),
                     validator: (v) =>

@@ -17,8 +17,22 @@ class DirectChatViewModel extends MessageThreadViewModel {
     required super.authRepository,
     required super.filePicker,
   }) : _dms = directMessageRepository {
+    _receiptsSub = _dms
+        .watchReadReceipts(uid)
+        .listen(
+          (on) {
+            _receipts = on;
+            _receiptsLoaded = true;
+            _markRead();
+            notifyListeners();
+          },
+          onError: (Object _) {
+            _receiptsLoaded = true;
+            _markRead();
+          },
+        );
     _sub = _dms
-        .watchConversation(conversationId)
+        .watchConversation(conversationId, uid: uid)
         .listen(
           (c) {
             _conversation = c;
@@ -38,6 +52,12 @@ class DirectChatViewModel extends MessageThreadViewModel {
   final String conversationId;
   final DirectMessageRepository _dms;
   late final StreamSubscription<Conversation?> _sub;
+  late final StreamSubscription<bool> _receiptsSub;
+
+  /// Whether the user sends read receipts, and so sees the other
+  /// person's.
+  bool _receipts = true;
+  bool _receiptsLoaded = false;
   Conversation? _conversation;
   bool _loaded = false;
   bool _marking = false;
@@ -60,11 +80,25 @@ class DirectChatViewModel extends MessageThreadViewModel {
   /// Opening the conversation reads it.
   void _markRead() {
     final c = _conversation;
+    // Wait for the setting, so a read never leaks a receipt.
+    if (!_receiptsLoaded) return;
     if (_marking || c == null || !c.isUnread(uid)) return;
     if (_markedUpTo != null && _markedUpTo == c.lastMessageAt) return;
     _markedUpTo = c.lastMessageAt;
     _marking = true;
-    _dms.markRead(conversationId, uid).whenComplete(() => _marking = false);
+    _dms
+        .markRead(conversationId, uid, shareReceipt: _receipts)
+        .whenComplete(() => _marking = false);
+  }
+
+  /// "Seen" under the user's newest message once the other person has
+  /// read it; only for people who send read receipts themselves.
+  @override
+  String? receiptFor(ChatMessage message) {
+    final c = _conversation;
+    if (!_receipts || c == null || message.authorId != uid) return null;
+    if (messages.lastOrNull?.id != message.id) return null;
+    return c.isSeen(uid) ? 'Seen' : null;
   }
 
   @override
@@ -94,6 +128,7 @@ class DirectChatViewModel extends MessageThreadViewModel {
   @override
   void dispose() {
     _sub.cancel();
+    _receiptsSub.cancel();
     super.dispose();
   }
 }

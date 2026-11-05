@@ -47,6 +47,14 @@ abstract class NotificationRepository {
   /// Asks for permission if needed and registers this device for [uid].
   Future<Result<PushStatus>> enablePush(String uid);
 
+  /// Whether to offer push after sign-in: this device supports it, the
+  /// user hasn't been asked by the system yet, and they haven't said
+  /// "Not now" to the offer on this device.
+  Future<bool> shouldOfferPush();
+
+  /// Remembers "Not now" so the sign-in offer isn't shown again here.
+  Future<void> dismissPushOffer();
+
   /// Called at sign-in: registers this device if push is already allowed,
   /// keeps its token fresh, and records the time zone reminders use.
   Future<void> syncDevice(String uid);

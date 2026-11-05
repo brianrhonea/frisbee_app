@@ -308,7 +308,7 @@ class _EmbeddedPost extends StatelessWidget {
     Widget box(Widget child, {VoidCallback? onTap}) => Material(
       color: Colors.transparent,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
+      shape: RoundedSuperellipseBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: scheme.outlineVariant),
       ),
@@ -659,7 +659,7 @@ class SharedEventCard extends StatelessWidget {
     return Material(
       color: scheme.surfaceContainerLow,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
+      shape: RoundedSuperellipseBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: scheme.outlineVariant),
       ),

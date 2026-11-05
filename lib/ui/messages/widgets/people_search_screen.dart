@@ -10,6 +10,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../core/ui/status_views.dart';
 import '../view_models/people_search_viewmodel.dart';
+import '../../core/ui/app_search_field.dart';
 
 /// Search the directory by name and start a conversation.
 class PeopleSearchScreen extends StatefulWidget {
@@ -70,13 +71,9 @@ class _PeopleSearchScreenState extends State<PeopleSearchScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: TextField(
+              child: AppSearchField(
                 autofocus: true,
-                textInputAction: TextInputAction.search,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: 'Search people by name',
-                ),
+                hint: 'Search people by name',
                 onChanged: _onChanged,
                 onSubmitted: vm.search.execute,
               ),
@@ -121,6 +118,9 @@ class _PeopleSearchScreenState extends State<PeopleSearchScreen> {
                           photoUrl: p.photoUrl,
                         ),
                         title: Text(p.name),
+                        subtitle: p.username == null
+                            ? null
+                            : Text('@${p.username}'),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

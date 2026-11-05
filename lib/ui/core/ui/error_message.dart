@@ -1,12 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../domain/models/username.dart';
 import '../../../utils/result.dart';
 
 /// User-facing text for an error [Result] or exception.
 String errorMessage(Object? error) {
   final e = error is Error ? error.error : error;
   return switch (e) {
+    UsernameTakenException() => e.toString(),
     FirebaseAuthException(code: 'invalid-credential' || 'wrong-password') =>
       'Incorrect email or password.',
     FirebaseAuthException(code: 'user-not-found') =>
@@ -14,7 +16,10 @@ String errorMessage(Object? error) {
     FirebaseAuthException(code: 'email-already-in-use') =>
       'An account already exists for that email.',
     FirebaseAuthException(code: 'weak-password') =>
-      'Password must be at least 6 characters.',
+      'That password is too weak. Use 8+ characters with a letter and a '
+          'number.',
+    FirebaseAuthException(code: 'too-many-requests') =>
+      'Too many attempts. Wait a few minutes, or reset your password.',
     FirebaseAuthException(code: 'invalid-email') =>
       'That email address looks invalid.',
     FirebaseAuthException(code: 'requires-recent-login') =>

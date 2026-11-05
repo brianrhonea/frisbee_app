@@ -10,6 +10,8 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/send_post_viewmodel.dart';
+import '../../core/ui/app_search_field.dart';
+import '../../core/ui/skeleton.dart';
 
 /// Sends [post] to people as a direct message, one tap each, or shares its
 /// link to another app.
@@ -109,16 +111,10 @@ class _SendPostSheetState extends State<SendPostSheet> {
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextField(
+                  child: AppSearchField(
                     controller: _search,
+                    hint: 'Search people by name',
                     onChanged: vm.search,
-                    textInputAction: TextInputAction.search,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: 'Search people',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
                   ),
                 ),
                 if (_error != null)
@@ -197,10 +193,7 @@ class _PeopleList extends StatelessWidget {
       ),
     );
     if (list == null || (searching && vm.searching && list.isEmpty)) {
-      return const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
-      );
+      return const SkeletonList(count: 4);
     }
     if (list.isEmpty) {
       if (searching && vm.searchError != null) {
@@ -233,6 +226,7 @@ class _PeopleList extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
+            subtitle: p.username == null ? null : Text('@${p.username}'),
             trailing: vm.wasSent(p.uid)
                 ? OutlinedButton.icon(
                     onPressed: null,

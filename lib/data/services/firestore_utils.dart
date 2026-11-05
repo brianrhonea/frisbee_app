@@ -85,3 +85,41 @@ Future<void> deleteDocs(
     await batch.commit();
   }
 }
+
+/// Emits [combine] of the latest value of each stream once both have one.
+Stream<T> combineLatest<A, B, T>(
+  Stream<A> a,
+  Stream<B> b,
+  T Function(A, B) combine,
+) {
+  late final StreamController<T> controller;
+  StreamSubscription<A>? subA;
+  StreamSubscription<B>? subB;
+  late A lastA;
+  late B lastB;
+  var hasA = false;
+  var hasB = false;
+  void emit() {
+    if (hasA && hasB) controller.add(combine(lastA, lastB));
+  }
+
+  controller = StreamController<T>(
+    onListen: () {
+      subA = a.listen((v) {
+        lastA = v;
+        hasA = true;
+        emit();
+      }, onError: controller.addError);
+      subB = b.listen((v) {
+        lastB = v;
+        hasB = true;
+        emit();
+      }, onError: controller.addError);
+    },
+    onCancel: () => Future.wait([
+      if (subA != null) subA!.cancel(),
+      if (subB != null) subB!.cancel(),
+    ]),
+  );
+  return controller.stream;
+}

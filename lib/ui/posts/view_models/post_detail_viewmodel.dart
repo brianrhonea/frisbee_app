@@ -9,6 +9,7 @@ import '../../../domain/models/chat.dart';
 import '../../../domain/models/post_comment.dart';
 import '../../../domain/models/user_post.dart';
 import '../../../utils/command.dart';
+import '../../../utils/pending_removals.dart';
 import '../../../utils/result.dart';
 import 'post_actions.dart';
 
@@ -74,7 +75,17 @@ class PostDetailViewModel extends ChangeNotifier {
   bool get canComment => _commentRepo != null;
 
   /// Oldest first; null while loading.
-  List<PostComment>? get comments => _comments;
+  List<PostComment>? get comments => switch (_comments) {
+    final list? => removals.visible(list),
+    null => null,
+  };
+
+  /// Comments deleted, hidden while "Undo" is offered.
+  late final removals = PendingRemovals<PostComment>(
+    keyOf: (c) => c.id,
+    commit: deleteComment.execute,
+    onChange: notifyListeners,
+  );
   Object? get commentsError => _commentsError;
 
   /// The post comments go on: a repost's original.
@@ -161,6 +172,7 @@ class PostDetailViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    removals.flush((c) => _commentRepo?.deleteComment(c));
     _sub.cancel();
     _commentSub?.cancel();
     delete.dispose();

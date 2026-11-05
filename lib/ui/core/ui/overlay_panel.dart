@@ -69,7 +69,7 @@ class OverlayCard extends StatelessWidget {
                       color: Theme.of(context).scaffoldBackgroundColor,
                       elevation: 6,
                       clipBehavior: Clip.antiAlias,
-                      shape: RoundedRectangleBorder(
+                      shape: RoundedSuperellipseBorder(
                         borderRadius: BorderRadius.circular(cardRadius + 6),
                       ),
                       child: child,

@@ -6,12 +6,13 @@ import '../../../domain/models/chat.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
-import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/linkified_text.dart';
 import '../../core/ui/status_views.dart';
+import '../../core/ui/undo_snack_bar.dart';
 import '../view_models/message_thread_viewmodel.dart';
+import '../../core/ui/skeleton.dart';
 
 /// Messages with a composer below, for a team room or a direct message.
 /// Shows [readOnlyNotice] in place of the composer when the user can't post.
@@ -86,18 +87,13 @@ class _MessageThreadViewState extends State<MessageThreadView> {
     if (!vm.send.running) vm.send.execute(_text.text);
   }
 
-  Future<void> _delete(ChatMessage m) async {
-    if (await confirmDialog(
+  void _delete(ChatMessage m) {
+    vm.removals.remove(m);
+    showUndoSnackBar(
       context,
-      title: 'Delete message?',
-      message: m.attachments.isEmpty
-          ? 'It will be removed for everyone.'
-          : 'It and its attachments will be removed for everyone.',
-      confirmLabel: 'Delete',
-      destructive: true,
-    )) {
-      vm.deleteMessage.execute(m);
-    }
+      message: 'Message deleted',
+      onUndo: () => vm.removals.undo(m),
+    );
   }
 
   @override
@@ -194,6 +190,17 @@ class _MessageList extends StatelessWidget {
               viewModel: vm,
               onDelete: vm.canDelete(m) ? () => onDelete(m) : null,
             ),
+            if (vm.receiptFor(m) case final receipt?)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                child: Text(
+                  receipt,
+                  textAlign: TextAlign.end,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
           ],
         );
       },
@@ -406,7 +413,7 @@ class _HoverActions extends StatelessWidget {
     return Material(
       color: c.card,
       elevation: 2,
-      shape: RoundedRectangleBorder(
+      shape: RoundedSuperellipseBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: c.border),
       ),
@@ -447,10 +454,9 @@ class _ImageAttachmentState extends State<_ImageAttachment> {
       future: _data,
       builder: (context, snap) {
         final Widget child = switch (snap.data) {
-          null => const SizedBox(
-            width: 220,
-            height: 160,
-            child: Center(child: CircularProgressIndicator()),
+          null => ClipRRect(
+            borderRadius: BorderRadius.circular(controlRadius),
+            child: const SkeletonImage(width: 220, height: 160),
           ),
           Error() => SizedBox(
             width: 220,
@@ -476,6 +482,7 @@ class _ImageAttachmentState extends State<_ImageAttachment> {
                 value,
                 fit: BoxFit.contain,
                 semanticLabel: a.name,
+                frameBuilder: fadeInImageFrame,
                 errorBuilder: (_, _, _) =>
                     _FileAttachment(attachment: a, viewModel: widget.viewModel),
               ),

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
+import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/routing/routes.dart';
 import 'package:frisbee_app/ui/core/ui/layout.dart';
@@ -86,5 +87,100 @@ void main() {
     dms.emit();
     await pumpEventQueue();
     expect(vm.unreadMessages, 1);
+  });
+
+  group('notification offers', () {
+    test('push is offered once after sign-in; Not now sticks', () async {
+      final notifications = FakeNotificationRepository(offerPush: true);
+      ShellViewModel shell() => ShellViewModel(
+        authRepository: FakeAuthRepository(user: testUser),
+        teamRepository: FakeTeamRepository(),
+        directMessageRepository: FakeDirectMessageRepository(),
+        notificationRepository: notifications,
+      );
+      final vm = shell();
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      expect(vm.offerPush, isTrue);
+
+      await vm.answerPushOffer.execute(false);
+      expect(vm.offerPush, isFalse);
+      expect(notifications.status, PushStatus.notDetermined);
+
+      final again = shell();
+      addTearDown(again.dispose);
+      await pumpEventQueue();
+      expect(again.offerPush, isFalse);
+    });
+
+    test('Turn on asks the system for permission', () async {
+      final notifications = FakeNotificationRepository(offerPush: true);
+      final vm = ShellViewModel(
+        authRepository: FakeAuthRepository(user: testUser),
+        teamRepository: FakeTeamRepository(),
+        directMessageRepository: FakeDirectMessageRepository(),
+        notificationRepository: notifications,
+      );
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      await vm.answerPushOffer.execute(true);
+      expect(notifications.status, PushStatus.enabled);
+      expect(vm.offerPush, isFalse);
+    });
+
+    test('joining a team asks about its notifications', () async {
+      final teams = FakeTeamRepository()
+        ..teams['t1'] = teamWith({testUser.uid: TeamRole.owner})
+        ..teams['t2'] = teamWith({'u9': TeamRole.owner}, id: 't2');
+      final notifications = FakeNotificationRepository();
+      final vm = ShellViewModel(
+        authRepository: FakeAuthRepository(user: testUser),
+        teamRepository: teams,
+        directMessageRepository: FakeDirectMessageRepository(),
+        notificationRepository: notifications,
+      );
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      // Teams already on the list aren't new.
+      expect(vm.joinedTeam, isNull);
+
+      await teams.joinTeam('CODEt2', testUser);
+      await pumpEventQueue();
+      expect(vm.joinedTeam?.id, 't2');
+
+      // No thanks turns the team's notifications off.
+      await vm.answerTeamOffer.execute(false);
+      expect(vm.joinedTeam, isNull);
+      expect(
+        notifications.prefs.isOnFor(NotificationCategory.chat, 't2'),
+        isFalse,
+      );
+      expect(
+        notifications.prefs.isOnFor(NotificationCategory.chat, 't1'),
+        isTrue,
+      );
+    });
+
+    test("creating a team doesn't ask", () async {
+      final teams = FakeTeamRepository();
+      final vm = ShellViewModel(
+        authRepository: FakeAuthRepository(user: testUser),
+        teamRepository: teams,
+        directMessageRepository: FakeDirectMessageRepository(),
+        notificationRepository: FakeNotificationRepository(),
+      );
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      await teams.createTeam(
+        const NewTeam(
+          name: 'Mine',
+          division: Division.mixed,
+          level: CompetitionLevel.club,
+        ),
+        testUser,
+      );
+      await pumpEventQueue();
+      expect(vm.joinedTeam, isNull);
+    });
   });
 }

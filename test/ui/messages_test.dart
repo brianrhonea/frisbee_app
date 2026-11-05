@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
@@ -147,6 +148,58 @@ void main() {
     expect(vm.canDelete(vm.messages.last), isTrue);
   });
 
+  group('read receipts', () {
+    Future<DirectChatViewModel> chat() async {
+      await dms.openConversation(
+        testUser,
+        const UserProfile(uid: 'a', name: 'Avery'),
+      );
+      final vm = DirectChatViewModel(
+        conversationId: 'a_u1',
+        directMessageRepository: dms,
+        authRepository: auth,
+        filePicker: FakeFilePickerService(),
+      );
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      return vm;
+    }
+
+    test('show Seen under my newest message once they read it', () async {
+      final vm = await chat();
+      await vm.send.execute('Ride at 6?');
+      await pumpEventQueue();
+      expect(vm.receiptFor(vm.messages.last), isNull);
+
+      await dms.markRead('a_u1', 'a', shareReceipt: true);
+      await pumpEventQueue();
+      expect(vm.receiptFor(vm.messages.last), 'Seen');
+    });
+
+    test('turned off: reads stay private and theirs are hidden', () async {
+      await dms.setReadReceipts(testUser.uid, on: false);
+      await dms.openConversation(
+        testUser,
+        const UserProfile(uid: 'a', name: 'Avery'),
+      );
+      await dms.sendMessage(
+        'a_u1',
+        author: const AppUser(uid: 'a', displayName: 'Avery'),
+        text: 'Need a ride?',
+      );
+      final vm = await chat();
+      // Read privately: no longer unread, but no receipt for Avery.
+      expect(dms.reads, ['a_u1']);
+      expect(dms.conversations['a_u1']!.readAt[testUser.uid], isNull);
+      expect(vm.conversation!.isUnread(testUser.uid), isFalse);
+
+      await vm.send.execute('Yes please');
+      await dms.markRead('a_u1', 'a', shareReceipt: true);
+      await pumpEventQueue();
+      expect(vm.receiptFor(vm.messages.last), isNull);
+    });
+  });
+
   testWidgets('inbox lists conversations with unread marks', (tester) async {
     tester.view.physicalSize = const Size(390, 800);
     tester.view.devicePixelRatio = 1;
@@ -200,14 +253,57 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(find.text('Hey!'), findsOneWidget);
-    // The Chats button opens the conversation panel.
-    await tester.tap(find.byTooltip('Chats'));
-    await tester.pumpAndSettle();
-    expect(find.byType(Drawer), findsOneWidget);
-    expect(
-      find.descendant(of: find.byType(Drawer), matching: find.text('Avery')),
-      findsOneWidget,
+    // On a phone, back goes to Messages; no conversation panel on top.
+    expect(find.byTooltip('Chats'), findsNothing);
+  });
+
+  testWidgets('on a phone, back from a conversation goes to Messages', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await dms.openConversation(
+      testUser,
+      const UserProfile(uid: 'a', name: 'Avery'),
     );
+    final router = GoRouter(
+      initialLocation: '/messages',
+      routes: [
+        GoRoute(
+          path: '/messages',
+          builder: (_, _) => const Scaffold(body: Text('Messages list')),
+          routes: [
+            GoRoute(
+              path: ':id',
+              builder: (_, state) => DirectChatScreen(
+                viewModel: DirectChatViewModel(
+                  conversationId: state.pathParameters['id']!,
+                  directMessageRepository: dms,
+                  authRepository: auth,
+                  filePicker: FakeFilePickerService(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      withRepos(
+        MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+      ),
+    );
+    router.push('/messages/a_u1');
+    await tester.pumpAndSettle();
+    expect(find.text('Avery'), findsOneWidget);
+    expect(find.byTooltip('Chats'), findsNothing);
+
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.text('Messages list'), findsOneWidget);
+    expect(find.byType(DirectChatScreen), findsNothing);
   });
 
   testWidgets('wide inbox opens the newest conversation beside the list', (

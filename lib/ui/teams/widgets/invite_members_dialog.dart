@@ -12,6 +12,8 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../core/ui/view_model_host.dart';
 import '../view_models/invite_members_viewmodel.dart';
+import '../../core/ui/app_search_field.dart';
+import '../../core/ui/skeleton.dart';
 
 /// Opens the people search for inviting members to [team].
 Future<void> showInviteMembers(BuildContext context, Team team) =>
@@ -81,20 +83,14 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
-            TextField(
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: 'Search people by name',
-              ),
-              onChanged: vm.search,
-            ),
+            AppSearchField(hint: 'Search people by name', onChanged: vm.search),
             const SizedBox(height: 8),
             Expanded(
               child: ListenableBuilder(
                 listenable: Listenable.merge([vm, vm.invite]),
                 builder: (context, _) {
                   if (vm.searching) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const SkeletonList(count: 4);
                   }
                   if (vm.error != null) {
                     return Center(child: Text(errorMessage(vm.error)));
@@ -126,6 +122,9 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
                             photoUrl: p.photoUrl,
                           ),
                           title: Text(p.name),
+                          subtitle: p.username == null
+                              ? null
+                              : Text('@${p.username}'),
                           trailing: vm.isMember(p.uid)
                               ? Text('Member', style: TextStyle(color: c.muted))
                               : vm.wasInvited(p.uid)

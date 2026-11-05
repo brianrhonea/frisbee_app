@@ -7,6 +7,7 @@ import '../../../domain/models/player_profile.dart';
 import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
 import 'profile_repository.dart';
+import '../../../domain/models/username.dart';
 
 /// Profiles live beside the direct-message directory in `profiles/{uid}`;
 /// `keywords` index the name and `tags` the school, hometown and teams.
@@ -30,6 +31,7 @@ class ProfileRepositoryFirebase implements ProfileRepository {
       uid: user.uid,
       name: user.label,
       photoUrl: user.photoUrl,
+      username: user.username,
     ).toMap(),
     'tags': tags,
     'updatedAt': FieldValue.serverTimestamp(),
@@ -89,7 +91,7 @@ class ProfileRepositoryFirebase implements ProfileRepository {
   @override
   Future<Result<List<PlayerProfile>>> searchPlayers(String query) => guard(
     () async {
-      final words = searchWords(query);
+      final words = searchWords(Username.normalize(query));
       if (words.isEmpty) return const [];
       // Match the longest word in Firestore, by name or by tag, then the
       // rest here.

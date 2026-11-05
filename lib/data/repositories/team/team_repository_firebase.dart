@@ -439,16 +439,63 @@ class TeamRepositoryFirebase implements TeamRepository {
     Team team, {
     required Map<String, CustomRole> roles,
     required Map<String, Set<String>> memberRoles,
-    Set<String> demote = const {},
   }) => guard(
     () => _teams.doc(team.id).update({
       ...rolesData(
         roles,
         cleanMemberRoles(memberRoles, roles, team.members.keys),
       ),
-      for (final uid in demote) 'members.$uid': TeamRole.player.name,
     }),
   );
+
+  @override
+  Future<Result<void>> migrateTiersToRoles(Team team) => guard(() async {
+    final tierRoles = team.legacyTierRoles();
+    if (tierRoles.isEmpty) return;
+    final legacy = {
+      for (final e in team.members.entries)
+        if (tierRoles[e.value] case final role?) e.key: role.id,
+    };
+    final roles = {...team.roles, for (final r in tierRoles.values) r.id: r};
+    final memberRoles = {
+      ...team.memberRoles,
+      for (final e in legacy.entries)
+        e.key: {...?team.memberRoles[e.key], e.value},
+    };
+    final ref = _teams.doc(team.id);
+    // 1. The roles, while they're still on their tiers.
+    await ref.update(
+      rolesData(roles, cleanMemberRoles(memberRoles, roles, team.members.keys)),
+    );
+    // 2. Rooms and folders open to a tier open to its role too.
+    for (final collection in [
+      chatRooms(_db, team.id),
+      chatFolders(_db, team.id),
+    ]) {
+      final batch = _db.batch();
+      var updates = 0;
+      for (final d in (await collection.get()).docs) {
+        final update = <String, Object>{};
+        for (final field in ['readRoles', 'writeRoles']) {
+          final ids = {for (final x in (d.data()[field] as List?) ?? []) '$x'};
+          final add = [
+            for (final e in tierRoles.entries)
+              if (ids.contains(e.key.name) && !ids.contains(e.value.id))
+                e.value.id,
+          ];
+          if (add.isNotEmpty) update[field] = FieldValue.arrayUnion(add);
+        }
+        if (update.isEmpty) continue;
+        batch.update(d.reference, update);
+        updates++;
+      }
+      if (updates > 0) await batch.commit();
+    }
+    // 3. Off the old tiers, all at once (firestore.rules wants that).
+    await ref.update({
+      for (final uid in legacy.keys) 'members.$uid': TeamRole.player.name,
+    });
+  });
 
   @override
   Future<Result<void>> deleteTeam(Team team) => guard(() async {
@@ -558,7 +605,7 @@ class TeamRepositoryFirebase implements TeamRepository {
     }
     final roster = countedSnapshots(_roster(teamId), 'roster');
     final status = countedSnapshots(_status(teamId), 'rosterStatus');
-    return _combineLatest(roster, status, (r, s) {
+    return combineLatest(roster, status, (r, s) {
       final status = {for (final d in s.docs) d.id: plainData(d.data())};
       _moveLegacyStatus(teamId, r.docs, status.keys.toSet());
       return _sorted([
@@ -612,44 +659,6 @@ class TeamRepositoryFirebase implements TeamRepository {
         .commit()
         .catchError((Object e) => _log.warning('Roster status move failed', e))
         .whenComplete(() => _migrating.remove(teamId));
-  }
-
-  /// Emits [combine] of the latest value of each stream once both have one.
-  static Stream<T> _combineLatest<A, B, T>(
-    Stream<A> a,
-    Stream<B> b,
-    T Function(A, B) combine,
-  ) {
-    late final StreamController<T> controller;
-    StreamSubscription<A>? subA;
-    StreamSubscription<B>? subB;
-    late A lastA;
-    late B lastB;
-    var hasA = false;
-    var hasB = false;
-    void emit() {
-      if (hasA && hasB) controller.add(combine(lastA, lastB));
-    }
-
-    controller = StreamController<T>(
-      onListen: () {
-        subA = a.listen((v) {
-          lastA = v;
-          hasA = true;
-          emit();
-        }, onError: controller.addError);
-        subB = b.listen((v) {
-          lastB = v;
-          hasB = true;
-          emit();
-        }, onError: controller.addError);
-      },
-      onCancel: () => Future.wait([
-        if (subA != null) subA!.cancel(),
-        if (subB != null) subB!.cancel(),
-      ]),
-    );
-    return controller.stream;
   }
 
   @override

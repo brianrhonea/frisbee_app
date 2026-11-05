@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+
 import 'package:intl/intl.dart';
 
 import '../themes/theme.dart';
+import 'balanced_text.dart';
 
 /// The three layouts the app is designed for.
 enum ScreenSize {
@@ -161,7 +163,7 @@ class PageHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (eyebrow != null) ...[Eyebrow(eyebrow!), const SizedBox(height: 6)],
-        Text(
+        BalancedText(
           title,
           style: TextStyle(
             fontSize: mobile ? 24 : 30,

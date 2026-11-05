@@ -1,6 +1,7 @@
 import 'model_utils.dart';
 import 'stats.dart';
 import 'team.dart';
+import 'username.dart';
 
 /// Which hand a player throws with.
 enum ThrowingHand {
@@ -371,6 +372,7 @@ class PlayerProfile {
     required this.uid,
     required this.name,
     this.photoUrl,
+    this.username,
     this.details = const ProfileDetails(),
     this.summary = const ProfileSummary(),
   });
@@ -378,6 +380,9 @@ class PlayerProfile {
   final String uid;
   final String name;
   final String? photoUrl;
+
+  /// Unique handle, without the "@".
+  final String? username;
   final ProfileDetails details;
   final ProfileSummary summary;
 
@@ -391,6 +396,7 @@ class PlayerProfile {
       uid: uid,
       name: m['name'] as String? ?? '',
       photoUrl: m['photoUrl'] as String?,
+      username: m['username'] as String?,
       details: ProfileDetails.fromMap(m),
       summary: ProfileSummary(
         teams: [for (final t in maps(m['teams'])) ProfileTeam.fromMap(t)],
@@ -420,11 +426,12 @@ class PlayerProfile {
   bool matches(String query) => matchesSearch(
     [
       name,
+      ?username,
       details.school,
       details.hometown,
       for (final t in summary.teams) t.name,
     ].join(' '),
-    query,
+    Username.normalize(query),
   );
 }
 

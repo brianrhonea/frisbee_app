@@ -24,12 +24,13 @@ import 'package:frisbee_app/routing/router.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/rankings/widgets/usau_team_screen.dart';
 import 'package:frisbee_app/ui/teams/view_models/usau_team_search_viewmodel.dart';
-import 'package:frisbee_app/ui/teams/widgets/team_search_screen.dart';
+import 'package:frisbee_app/ui/explore/widgets/explore_screen.dart';
 import 'package:frisbee_app/ui/teams/widgets/teams_screen.dart';
 import 'package:frisbee_app/ui/teams/widgets/usau_team_search_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 import 'package:provider/provider.dart';
 
+import 'package:frisbee_app/data/repositories/profile/profile_repository.dart';
 import '../testing/fakes.dart';
 import '../testing/meeting_fakes.dart';
 import '../testing/social_fakes.dart';
@@ -138,6 +139,7 @@ void main() {
           ),
           Provider<UsauTeamRepository>.value(value: _Usau()),
           Provider<FollowRepository>.value(value: FakeFollowRepository()),
+          Provider<ProfileRepository>.value(value: FakeProfileRepository()),
           Provider<TeamPostRepository>.value(value: FakeTeamPostRepository()),
           Provider<UserPostRepository>.value(value: FakeUserPostRepository()),
         ],
@@ -153,11 +155,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(TeamsScreen), findsOneWidget);
 
+    // Finding a team is Explore's search, filtered to teams.
     await tester.tap(find.byTooltip('Find a team'));
     await tester.pumpAndSettle();
-    expect(find.byType(TeamSearchScreen), findsOneWidget);
+    expect(find.byType(ExploreScreen), findsOneWidget);
+    expect(
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Teams'))
+          .selected,
+      isTrue,
+    );
 
-    await tester.tap(find.text('Search USA Ultimate rankings'));
+    await tester.tap(find.text('USA Ultimate teams'));
     await tester.pumpAndSettle();
     expect(find.byType(UsauTeamSearchScreen), findsOneWidget);
 
@@ -172,13 +181,6 @@ void main() {
     expect(find.byType(UsauTeamSearchScreen), findsOneWidget);
     expect(find.text('Ring of Fire'), findsOneWidget);
 
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-    expect(find.byType(TeamSearchScreen), findsOneWidget);
-
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-    expect(find.byType(TeamsScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

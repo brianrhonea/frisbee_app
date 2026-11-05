@@ -1,8 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/ui/balanced_text.dart';
 import 'disc_throw_hero.dart';
 
 /// Sign-in and sign-up: a disc thrown across a field becomes the Stall 10
@@ -117,7 +119,7 @@ class _AuthLayoutState extends State<AuthLayout>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(widget.title, style: theme.textTheme.headlineSmall),
+        BalancedText(widget.title, style: theme.textTheme.headlineSmall),
         if (widget.subtitle case final s?) ...[
           const SizedBox(height: 4),
           Text(
@@ -133,43 +135,52 @@ class _AuthLayoutState extends State<AuthLayout>
     );
   }
 
+  /// Phones: the hero takes whatever height the form leaves, down to
+  /// [_minHeroHeight], so the whole form fits without scrolling. Only a
+  /// very short screen (or the keyboard) makes it scroll.
   Widget _narrow(BuildContext context, BoxConstraints box) {
-    final heroHeight = (box.maxHeight * 0.42).clamp(270.0, 380.0);
     final theme = Theme.of(context);
     return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(height: heroHeight, child: _hero()),
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: math.max(0, box.maxHeight - heroHeight),
-            ),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: box.maxHeight),
+        child: IntrinsicHeight(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _MinIntrinsicHeight(
+                  height: _minHeroHeight,
+                  child: _hero(),
                 ),
               ),
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 440),
-                      child: _reveal(_formBody(context)),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.scaffoldBackgroundColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(28),
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 440),
+                        child: _reveal(_formBody(context)),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+
+  static const _minHeroHeight = 200.0;
 
   Widget _wide(BuildContext context, BoxConstraints box) {
     final theme = Theme.of(context);
@@ -197,4 +208,46 @@ class _AuthLayoutState extends State<AuthLayout>
       ],
     );
   }
+}
+
+/// Reports [height] as its intrinsic height without asking [child], which
+/// lays itself out from its size (a LayoutBuilder can't answer intrinsic
+/// queries). Lets [IntrinsicHeight] give the hero at least [height].
+class _MinIntrinsicHeight extends SingleChildRenderObjectWidget {
+  const _MinIntrinsicHeight({required this.height, super.child});
+
+  final double height;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderMinIntrinsicHeight(height);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderMinIntrinsicHeight renderObject,
+  ) => renderObject.height = height;
+}
+
+class _RenderMinIntrinsicHeight extends RenderProxyBox {
+  _RenderMinIntrinsicHeight(this._height);
+
+  double _height;
+  set height(double value) {
+    if (value == _height) return;
+    _height = value;
+    markNeedsLayout();
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) => 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => 0;
+
+  @override
+  double computeMinIntrinsicHeight(double width) => _height;
+
+  @override
+  double computeMaxIntrinsicHeight(double width) => _height;
 }
