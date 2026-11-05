@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import '../../domain/models/meeting.dart';
+import 'app_check.dart';
 
 /// Thrown when the `meetings-joinToken` function turns the request down,
 /// e.g. the meeting hasn't started or the user hasn't been let in.
@@ -51,6 +52,7 @@ class MeetingTokenService {
       _endpoint,
       headers: {
         'Content-Type': 'application/json',
+        ...await AppCheck.headers(),
         'Authorization': 'Bearer $idToken',
       },
       body: jsonEncode({

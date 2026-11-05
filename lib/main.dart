@@ -17,6 +17,7 @@ import 'data/repositories/auth/auth_repository.dart';
 import 'data/repositories/notification/notification_repository.dart';
 import 'data/repositories/theme/theme_repository.dart';
 import 'data/repositories/theme/theme_repository_prefs.dart';
+import 'data/services/app_check.dart';
 import 'data/services/shared_preferences_service.dart';
 import 'firebase_options.dart';
 import 'routing/router.dart';
@@ -62,6 +63,8 @@ Future<void> main() async {
 
   DefaultFirebaseOptions.ensureConfigured();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Before anything talks to Firebase, so every request carries a token.
+  await AppCheck.activate();
   if (_memoryCache) {
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: false,

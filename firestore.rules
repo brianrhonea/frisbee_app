@@ -8,6 +8,17 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function uid() { return request.auth.uid; }
 
+    // Rate limits: Cloud Functions (functions/src/api) mute someone who
+    // floods messages, posts, comments, follows, join requests or teams,
+    // by setting limits/{uid}.mutedUntil. Muted users can't create those.
+    function limitsPath() {
+      return /databases/$(database)/documents/limits/$(uid());
+    }
+    function notMuted() {
+      return !exists(limitsPath())
+        || get(limitsPath()).data.get('mutedUntil', timestamp.value(0)) < request.time;
+    }
+
     // Private profiles (PlayerProfile in lib/domain/models/player_profile.dart):
     // only people whose follow the player accepted see past the name,
     // username and photo.
@@ -295,7 +306,7 @@ service cloud.firestore {
           && (uid() == userId || key == 'user_' + uid());
         // Following a private profile needs its owner's OK: the owner
         // writes the follow in the same batch that removes the request.
-        allow create: if signedIn() && validFollow()
+        allow create: if signedIn() && notMuted() && validFollow()
           && request.resource.data.createdAt == request.time
           && ((uid() == userId
                && request.resource.data.get('approved', false) == false
@@ -328,7 +339,7 @@ service cloud.firestore {
 
       // Creator becomes sole owner. Invite codes are minted later, and
       // only for as long as an admin shows or shares one (inviteCodes).
-      allow create: if signedIn()
+      allow create: if signedIn() && notMuted()
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
              'memberIds', 'memberNames', 'createdAt', 'orgId', 'orgName'])
@@ -341,7 +352,7 @@ service cloud.firestore {
 
       // A community group: same owner checks, plus its group fields, and
       // no invite code since anyone can find and join it.
-      allow create: if signedIn()
+      allow create: if signedIn() && notMuted()
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
              'memberIds', 'memberNames', 'createdAt', 'kind', 'description',
@@ -649,7 +660,7 @@ service cloud.firestore {
         function team() { return get(teamPath(teamId)).data; }
 
         allow read: if signedIn() && (uid() == userId || can(team(), 'manageMembers'));
-        allow create: if signedIn() && uid() == userId
+        allow create: if signedIn() && notMuted() && uid() == userId
           && isGroup(team())
           && team().requiresApproval
           && !isMember(team())
@@ -993,7 +1004,7 @@ service cloud.firestore {
           function meeting() { return get(meetingPath()).data; }
 
           allow read: if signedIn() && isMember(team()) && inCall(meeting());
-          allow create: if signedIn() && isMember(team())
+          allow create: if signedIn() && notMuted() && isMember(team())
             && meeting().status == 'live'
             && inCall(meeting())
             && request.resource.data.keys().hasOnly([
@@ -1331,7 +1342,7 @@ service cloud.firestore {
 
           allow read: if signedIn() && isMember(team())
             && canReadRoom(team(), room());
-          allow create: if signedIn() && isMember(team())
+          allow create: if signedIn() && notMuted() && isMember(team())
             && canWriteRoom(team(), room())
             && request.resource.data.keys().hasOnly([
                  'authorId', 'authorName', 'text', 'attachments', 'createdAt'])
@@ -1693,7 +1704,7 @@ service cloud.firestore {
 
       allow read: if signedIn();
       allow delete: if signedIn() && resource.data.authorId == uid();
-      allow create: if signedIn()
+      allow create: if signedIn() && notMuted()
         && request.resource.data.keys().hasOnly([
              'kind', 'body', 'links', 'images', 'workout', 'event',
              'repostOf', 'tournamentKey', 'tournamentName', 'authorId',
@@ -1741,7 +1752,7 @@ service cloud.firestore {
         }
 
         allow read: if signedIn();
-        allow create: if signedIn()
+        allow create: if signedIn() && notMuted()
           && request.resource.data.keys().hasOnly([
                'body', 'authorId', 'authorName', 'authorPhotoUrl',
                'createdAt'])
@@ -1950,7 +1961,7 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if signedIn() && inConversation();
-        allow create: if signedIn() && inConversation()
+        allow create: if signedIn() && notMuted() && inConversation()
           && exists(convPath())
           && request.resource.data.keys().hasOnly([
                'authorId', 'authorName', 'text', 'attachments', 'createdAt'])
@@ -2009,6 +2020,13 @@ service cloud.firestore {
     }
     match /meta/{id} {
       allow read: if signedIn();
+    }
+
+    // ---- Rate limits (written by Cloud Functions only) --------------------
+
+    // Each user reads their own, so the app can say how long a mute lasts.
+    match /limits/{userId} {
+      allow read: if signedIn() && uid() == userId;
     }
   }
 }

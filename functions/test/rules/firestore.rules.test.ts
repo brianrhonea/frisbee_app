@@ -1971,6 +1971,27 @@ describe("direct messages", () => {
     await assertSucceeds(setDoc(conv(PLAYER), newConv()));
   });
 
+  it("muted users can't message until the mute ends; limits are server-only", async () => {
+    const mute = (until: Date) =>
+      env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "limits", PLAYER), { mutedUntil: until, counts: {} }),
+      );
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "conversations", CONV), { ...newConv(), createdAt: new Date() }),
+    );
+    await assertSucceeds(setDoc(doc(msgs(PLAYER)), msg(PLAYER)));
+    await mute(new Date(Date.now() + 10 * 60 * SECOND));
+    await assertFails(setDoc(doc(msgs(PLAYER)), msg(PLAYER)));
+    await assertSucceeds(setDoc(doc(msgs(OWNER)), msg(OWNER)));
+    await mute(new Date(Date.now() - SECOND));
+    await assertSucceeds(setDoc(doc(msgs(PLAYER)), msg(PLAYER)));
+    // Users read only their own limits and can never clear a mute.
+    await assertSucceeds(getDoc(doc(db(PLAYER), "limits", PLAYER)));
+    await assertFails(getDoc(doc(db(OWNER), "limits", PLAYER)));
+    await assertFails(setDoc(doc(db(PLAYER), "limits", PLAYER), { mutedUntil: new Date(0) }));
+    await assertFails(deleteDoc(doc(db(PLAYER), "limits", PLAYER)));
+  });
+
   it("each user's read times are private to them", async () => {
     const read = (uid: string, owner = uid, id = CONV) => doc(db(uid), "users", owner, "dmReads", id);
     await assertSucceeds(setDoc(read(PLAYER), { readAt: serverTimestamp() }));

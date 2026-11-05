@@ -123,3 +123,45 @@ Stream<T> combineLatest<A, B, T>(
   );
   return controller.stream;
 }
+
+/// Thrown when firestore.rules turned a write down because Cloud Functions
+/// muted the user for flooding (functions/src/api).
+class RateLimitedException implements Exception {
+  const RateLimitedException(this.until);
+
+  final DateTime until;
+
+  @override
+  String toString() {
+    final minutes = until.difference(DateTime.now()).inMinutes + 1;
+    return "You're going too fast. Try again in "
+        '${minutes <= 1 ? 'a minute' : '$minutes minutes'}.';
+  }
+}
+
+/// Runs the write in [body]; when the rules deny it because [uid] is muted
+/// (`limits/{uid}.mutedUntil`), throws [RateLimitedException] instead of a
+/// bare permission error.
+Future<T> muteAware<T>(
+  FirebaseFirestore db,
+  String uid,
+  Future<T> Function() body,
+) async {
+  try {
+    return await body();
+  } on FirebaseException catch (e) {
+    if (e.code != 'permission-denied') rethrow;
+    DateTime? until;
+    try {
+      final limits = await db.doc('limits/$uid').get();
+      final t = limits.data()?['mutedUntil'];
+      if (t is Timestamp) until = t.toDate();
+    } on Exception {
+      // Can't tell; report the original denial.
+    }
+    if (until != null && until.isAfter(DateTime.now())) {
+      throw RateLimitedException(until);
+    }
+    rethrow;
+  }
+}

@@ -7,6 +7,7 @@ import '../../../domain/models/chat.dart';
 import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/model_utils.dart';
 import '../../../utils/result.dart';
+import '../../services/api_search.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
@@ -26,9 +27,14 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
     SharedStreams? sharedStreams,
+    ApiSearch? search,
   }) : _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
-       _shared = sharedStreams ?? SharedStreams.instance;
+       _shared = sharedStreams ?? SharedStreams.instance,
+       _search = search;
+
+  /// Searches through the rate-limited Cloud Function when it's turned on.
+  final ApiSearch? _search;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
@@ -69,19 +75,22 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     if (words.isEmpty) return const [];
     // Match the longest word in Firestore, then the rest here.
     final key = (words.toList()..sort((a, b) => b.length - a.length)).first;
-    final snap = await _profiles
-        .where(
-          'keywords',
-          arrayContains: key.length > 20 ? key.substring(0, 20) : key,
-        )
-        .limit(_searchLimit * 2)
-        .get();
+    final k = key.length > 20 ? key.substring(0, 20) : key;
+    final List<SearchHit> hits;
+    if (_search case final s? when s.enabled) {
+      hits = await s.search(SearchKind.people, k);
+    } else {
+      final snap = await _profiles
+          .where('keywords', arrayContains: k)
+          .limit(_searchLimit * 2)
+          .get();
+      hits = [for (final d in snap.docs) (id: d.id, data: plainData(d.data()))];
+    }
     return [
-      for (final d in snap.docs)
-        if (d.id != excludeUid) UserProfile.fromMap(d.id, plainData(d.data())),
-    ].where((p) => p.matches(query)).take(_searchLimit).toList()..sort(
-      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-    );
+        for (final h in hits)
+          if (h.id != excludeUid) UserProfile.fromMap(h.id, h.data),
+      ].where((p) => p.matches(query)).take(_searchLimit).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   });
 
   @override
@@ -166,41 +175,44 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     required AppUser author,
     required String text,
     List<NewAttachment> attachments = const [],
-  }) => guard(() async {
-    for (final a in attachments) {
-      if (a.tooLarge) throw AttachmentTooLargeException(a.name);
-    }
-    final ref = _messages(id).doc();
-    final uploaded = await _files.upload(
-      'conversations/$id/${author.uid}/${ref.id}',
-      attachments,
-    );
-    try {
-      await (_db.batch()
-            ..set(ref, {
-              'authorId': author.uid,
-              'authorName': author.label,
-              'text': text.trim(),
-              'attachments': [for (final a in uploaded) a.toMap()],
-              'createdAt': FieldValue.serverTimestamp(),
-            })
-            ..update(_conversations.doc(id), {
-              'lastMessage': messagePreview(
-                text,
-                uploaded.length,
-                image: uploaded.isNotEmpty && uploaded.every((a) => a.isImage),
-              ),
-              'lastMessageAt': FieldValue.serverTimestamp(),
-              'lastSenderId': author.uid,
-              'readAt.${author.uid}': FieldValue.serverTimestamp(),
-              'names.${author.uid}': author.label,
-            }))
-          .commit();
-    } catch (_) {
-      await _files.delete(uploaded.map((a) => a.path));
-      rethrow;
-    }
-  });
+  }) => guard(
+    () => muteAware(_db, author.uid, () async {
+      for (final a in attachments) {
+        if (a.tooLarge) throw AttachmentTooLargeException(a.name);
+      }
+      final ref = _messages(id).doc();
+      final uploaded = await _files.upload(
+        'conversations/$id/${author.uid}/${ref.id}',
+        attachments,
+      );
+      try {
+        await (_db.batch()
+              ..set(ref, {
+                'authorId': author.uid,
+                'authorName': author.label,
+                'text': text.trim(),
+                'attachments': [for (final a in uploaded) a.toMap()],
+                'createdAt': FieldValue.serverTimestamp(),
+              })
+              ..update(_conversations.doc(id), {
+                'lastMessage': messagePreview(
+                  text,
+                  uploaded.length,
+                  image:
+                      uploaded.isNotEmpty && uploaded.every((a) => a.isImage),
+                ),
+                'lastMessageAt': FieldValue.serverTimestamp(),
+                'lastSenderId': author.uid,
+                'readAt.${author.uid}': FieldValue.serverTimestamp(),
+                'names.${author.uid}': author.label,
+              }))
+            .commit();
+      } catch (_) {
+        await _files.delete(uploaded.map((a) => a.path));
+        rethrow;
+      }
+    }),
+  );
 
   @override
   Future<Result<void>> deleteMessage(String id, ChatMessage message) =>

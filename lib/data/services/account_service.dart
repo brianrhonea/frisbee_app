@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'app_check.dart';
 
 /// Thrown when the `account-deleteAccount` function turns the request
 /// down or fails; [message] is fit to show the user.
@@ -73,7 +74,10 @@ class AccountService {
       response = await _client
           .post(
             _endpoint('account-signInEmail'),
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              ...await AppCheck.headers(),
+            },
             body: jsonEncode({
               'data': {'username': username, 'password': password},
             }),
@@ -108,6 +112,7 @@ class AccountService {
             _endpoint('account-deleteAccount'),
             headers: {
               'Content-Type': 'application/json',
+              ...await AppCheck.headers(),
               'Authorization': 'Bearer $idToken',
             },
             body: jsonEncode({'data': <String, Object?>{}}),

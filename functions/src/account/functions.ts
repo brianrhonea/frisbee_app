@@ -25,6 +25,8 @@ import {
   type TeamMembers,
   tournamentWithout,
 } from "./model";
+import { overLimit } from "../api/functions";
+import { enforceAppCheck } from "../options";
 
 // The project's web API key, for checking a password with Identity
 // Toolkit (the Admin SDK can't). Set with
@@ -38,12 +40,16 @@ const webApiKey = defineSecret("WEB_API_KEY");
  * proved the password, and an unknown username fails exactly like a wrong
  * password, so this can't be used to look people up.
  */
-export const signInEmail = onCall({ secrets: [webApiKey] }, async (req) => {
+export const signInEmail = onCall({ secrets: [webApiKey], enforceAppCheck }, async (req) => {
   const data = (req.data ?? {}) as { username?: unknown; password?: unknown };
   const handle = signInHandle(data.username);
   const password = typeof data.password === "string" ? data.password : "";
   const fail = (f = wrongCredentials) => new HttpsError(f.code, f.message);
   if (!handle || !password || password.length > 128) throw fail();
+  // Unknown usernames count too, so this can't tell which ones exist.
+  if (await overLimit(`signIn_${handle}`, "signIn")) {
+    throw new HttpsError("resource-exhausted", "Too many tries. Wait 15 minutes and try again.");
+  }
 
   const claim = await getFirestore().doc(`usernames/${handle}`).get();
   const uid = claim.get("uid");
@@ -84,7 +90,7 @@ export const signInEmail = onCall({ secrets: [webApiKey] }, async (req) => {
  *
  * The caller must have signed in again within the last few minutes.
  */
-export const deleteAccount = onCall({ timeoutSeconds: 540, memory: "512MiB" }, async (req) => {
+export const deleteAccount = onCall({ timeoutSeconds: 540, memory: "512MiB", enforceAppCheck }, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to delete your account.");
   if (!signedInRecently(req.auth?.token.auth_time, Date.now())) {

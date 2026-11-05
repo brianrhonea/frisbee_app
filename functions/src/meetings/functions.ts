@@ -24,6 +24,7 @@ import {
   voiceDecision,
   voiceRoomName,
 } from "./model";
+import { enforceAppCheck } from "../options";
 
 const livekitUrl = defineSecret("LIVEKIT_URL");
 const livekitKey = defineSecret("LIVEKIT_API_KEY");
@@ -38,7 +39,7 @@ const validId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0
  * admin when it needs approval. Participants are named by uid, with their
  * photo in the metadata.
  */
-export const joinToken = onCall({ secrets }, async (req) => {
+export const joinToken = onCall({ secrets, enforceAppCheck }, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to join meetings.");
   const { teamId, meetingId } = (req.data ?? {}) as Record<string, unknown>;
@@ -87,7 +88,7 @@ export const joinToken = onCall({ secrets }, async (req) => {
  * a Discord voice channel: always open, no start or end. Members who can
  * read the room join; those who can write in it may talk.
  */
-export const voiceToken = onCall({ secrets }, async (req) => {
+export const voiceToken = onCall({ secrets, enforceAppCheck }, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to join voice channels.");
   const { teamId, roomId } = (req.data ?? {}) as Record<string, unknown>;

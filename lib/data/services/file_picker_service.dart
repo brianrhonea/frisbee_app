@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 
 import '../../domain/models/chat.dart';
+import 'feature_flags.dart';
 import 'image_compressor.dart';
 
 /// A file the user picked, before its bytes are read.
@@ -28,10 +29,20 @@ class PickedFile {
 
 /// Wraps the platform file dialogs.
 class FilePickerService {
-  FilePickerService({this.compressor = const ImageCompressor()});
+  FilePickerService({
+    ImageCompressor compressor = const ImageCompressor(),
+    FeatureFlags? flags,
+  }) : _compressor = compressor,
+       _flags = flags;
 
-  /// Shrinks picked photos before they're attached.
-  ImageCompressor compressor;
+  final ImageCompressor _compressor;
+  final FeatureFlags? _flags;
+
+  /// Shrinks picked photos before they're attached, unless the
+  /// `compress_images` kill switch is off.
+  ImageCompressor get compressor => _flags?.compressImages ?? true
+      ? _compressor
+      : const ImageCompressor(enabled: false);
 
   /// Lets the user pick files; [imagesOnly] limits it to photos. Empty when
   /// cancelled.

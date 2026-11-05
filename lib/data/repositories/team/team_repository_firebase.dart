@@ -13,6 +13,7 @@ import '../../../domain/models/team.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../domain/models/team_video.dart';
 import '../../../utils/result.dart';
+import '../../services/api_search.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
@@ -48,10 +49,15 @@ class TeamRepositoryFirebase implements TeamRepository {
     FirebaseFirestore? firestore,
     Random? random,
     SharedStreams? sharedStreams,
+    ApiSearch? search,
   }) : _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
        _random = random ?? Random.secure(),
-       _shared = sharedStreams ?? SharedStreams.instance;
+       _shared = sharedStreams ?? SharedStreams.instance,
+       _search = search;
+
+  /// Searches through the rate-limited Cloud Function when it's turned on.
+  final ApiSearch? _search;
 
   /// Chat attachments and post photos go with the team.
   final AttachmentStorage _files;
@@ -438,26 +444,29 @@ class TeamRepositoryFirebase implements TeamRepository {
   );
 
   @override
-  Future<Result<List<TeamListing>>> searchTeams(String query) => guard(
-    () async {
-      final words = searchWords(query);
-      if (words.isEmpty) return const [];
-      // Match the longest word in Firestore, then the rest here.
-      final key = (words.toList()..sort((a, b) => b.length - a.length)).first;
+  Future<Result<List<TeamListing>>> searchTeams(
+    String query,
+  ) => guard(() async {
+    final words = searchWords(query);
+    if (words.isEmpty) return const [];
+    // Match the longest word in Firestore, then the rest here.
+    final key = (words.toList()..sort((a, b) => b.length - a.length)).first;
+    final k = key.length > 20 ? key.substring(0, 20) : key;
+    final List<SearchHit> hits;
+    if (_search case final s? when s.enabled) {
+      hits = await s.search(SearchKind.teams, k);
+    } else {
       final snap = await _directory
-          .where(
-            'keywords',
-            arrayContains: key.length > 20 ? key.substring(0, 20) : key,
-          )
+          .where('keywords', arrayContains: k)
           .limit(_searchLimit * 2)
           .get();
-      return [
-          for (final d in snap.docs)
-            TeamListing.fromMap(d.id, plainData(d.data())),
-        ].where((t) => t.matches(query)).take(_searchLimit).toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    },
-  );
+      hits = [for (final d in snap.docs) (id: d.id, data: plainData(d.data()))];
+    }
+    return [
+        for (final h in hits) TeamListing.fromMap(h.id, h.data),
+      ].where((t) => t.matches(query)).take(_searchLimit).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  });
 
   @override
   Stream<TeamListing?> watchListing(String teamId) => _shared.get(

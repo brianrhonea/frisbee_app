@@ -8,6 +8,7 @@ import '../../../domain/models/model_utils.dart';
 import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/username.dart';
 import '../../../utils/result.dart';
+import '../../services/api_search.dart';
 import '../../services/firestore_utils.dart';
 import 'profile_repository.dart';
 
@@ -21,10 +22,14 @@ import 'profile_repository.dart';
 /// details`, which firestore.rules opens only to the player and to people
 /// who follow them (a follow of a private profile needs the player's OK).
 class ProfileRepositoryFirebase implements ProfileRepository {
-  ProfileRepositoryFirebase({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+  ProfileRepositoryFirebase({FirebaseFirestore? firestore, ApiSearch? search})
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _search = search;
 
   final FirebaseFirestore _db;
+
+  /// Searches through the rate-limited Cloud Function when it's turned on.
+  final ApiSearch? _search;
 
   static const _searchLimit = 20;
 
@@ -275,31 +280,38 @@ class ProfileRepositoryFirebase implements ProfileRepository {
   ];
 
   @override
-  Future<Result<List<PlayerProfile>>> searchPlayers(String query) => guard(
-    () async {
-      final words = searchWords(Username.normalize(query));
-      if (words.isEmpty) return const [];
-      // Match the longest word in Firestore, by name or by tag, then the
-      // rest here.
-      final key = (words.toList()..sort((a, b) => b.length - a.length)).first;
-      final k = key.length > 20 ? key.substring(0, 20) : key;
-      final snaps = await Future.wait([
-        _profiles
-            .where('keywords', arrayContains: k)
-            .limit(_searchLimit * 2)
-            .get(),
-        _profiles.where('tags', arrayContains: k).limit(_searchLimit * 2).get(),
-      ]);
-      final byId = <String, PlayerProfile>{
-        for (final s in snaps)
-          for (final d in s.docs)
-            d.id: PlayerProfile.fromMap(d.id, plainData(d.data())),
-      };
-      return byId.values
-          .where((p) => p.matches(query))
-          .take(_searchLimit)
-          .toList()
+  Future<Result<List<PlayerProfile>>> searchPlayers(
+    String query,
+  ) => guard(() async {
+    final words = searchWords(Username.normalize(query));
+    if (words.isEmpty) return const [];
+    // Match the longest word in Firestore, by name or by tag, then the
+    // rest here.
+    final key = (words.toList()..sort((a, b) => b.length - a.length)).first;
+    final k = key.length > 20 ? key.substring(0, 20) : key;
+    if (_search case final s? when s.enabled) {
+      final hits = await s.search(SearchKind.players, k);
+      return [
+          for (final h in hits) PlayerProfile.fromMap(h.id, h.data),
+        ].where((p) => p.matches(query)).take(_searchLimit).toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    },
-  );
+    }
+    final snaps = await Future.wait([
+      _profiles
+          .where('keywords', arrayContains: k)
+          .limit(_searchLimit * 2)
+          .get(),
+      _profiles.where('tags', arrayContains: k).limit(_searchLimit * 2).get(),
+    ]);
+    final byId = <String, PlayerProfile>{
+      for (final s in snaps)
+        for (final d in s.docs)
+          d.id: PlayerProfile.fromMap(d.id, plainData(d.data())),
+    };
+    return byId.values
+        .where((p) => p.matches(query))
+        .take(_searchLimit)
+        .toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  });
 }

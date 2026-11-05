@@ -8,6 +8,7 @@ import { logger } from "firebase-functions";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { type GuildTemplate, mapTemplate, templateCode } from "./template";
+import { enforceAppCheck } from "../options";
 
 const validId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(v);
 
@@ -17,7 +18,7 @@ const validId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0
  * team's owner calls it, previews the plan, and the app writes it under
  * firestore.rules like any other edit; this function writes nothing.
  */
-export const previewTemplate = onCall({ timeoutSeconds: 30 }, async (req) => {
+export const previewTemplate = onCall({ timeoutSeconds: 30, enforceAppCheck }, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in to import from Discord.");
   const { teamId, link } = (req.data ?? {}) as Record<string, unknown>;

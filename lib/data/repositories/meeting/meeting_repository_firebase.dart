@@ -306,12 +306,16 @@ class MeetingRepositoryFirebase implements MeetingRepository {
     required AppUser author,
     required String text,
   }) => guard(
-    () => _messages(teamId, meetingId).add({
-      'authorId': author.uid,
-      'authorName': author.label,
-      'text': text.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-    }),
+    () => muteAware(
+      _db,
+      author.uid,
+      () => _messages(teamId, meetingId).add({
+        'authorId': author.uid,
+        'authorName': author.label,
+        'text': text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      }),
+    ),
   );
 
   @override

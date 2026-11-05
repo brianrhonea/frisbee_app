@@ -50,6 +50,8 @@ import '../data/repositories/user_post/user_post_repository.dart';
 import '../data/repositories/user_post/user_post_repository_firebase.dart';
 import '../data/services/attachment_storage.dart';
 import '../data/services/auth_service.dart';
+import '../data/services/api_search.dart';
+import '../data/services/feature_flags.dart';
 import '../data/services/file_picker_service.dart';
 import '../data/services/geocoding_service.dart';
 import '../data/services/location_service.dart';
@@ -66,6 +68,18 @@ import '../firebase_options.dart';
 
 /// Services and repositories backed by Firebase.
 List<SingleChildWidget> get firebaseProviders => [
+  ChangeNotifierProvider(create: (_) => FeatureFlags()..start()),
+  Provider(
+    create: (_) => CallableClient(
+      projectId: DefaultFirebaseOptions.currentPlatform.projectId,
+    ),
+  ),
+  Provider(
+    create: (context) => ApiSearch(
+      functions: context.read<CallableClient>(),
+      flags: context.read<FeatureFlags>(),
+    ),
+  ),
   Provider(create: (_) => AuthService()),
   Provider(
     create: (_) => AccountService(
@@ -80,11 +94,16 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider(create: (_) => AttachmentStorage()),
   Provider<TeamRepository>(
-    create: (context) =>
-        TeamRepositoryFirebase(attachments: context.read<AttachmentStorage>()),
+    create: (context) => TeamRepositoryFirebase(
+      attachments: context.read<AttachmentStorage>(),
+      search: context.read<ApiSearch>(),
+    ),
   ),
   Provider<PlayRepository>(create: (_) => PlayRepositoryFirebase()),
-  Provider<ProfileRepository>(create: (_) => ProfileRepositoryFirebase()),
+  Provider<ProfileRepository>(
+    create: (context) =>
+        ProfileRepositoryFirebase(search: context.read<ApiSearch>()),
+  ),
   Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),
   Provider<TeamPostRepository>(
     create: (context) => TeamPostRepositoryFirebase(
@@ -119,9 +138,12 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<DirectMessageRepository>(
     create: (context) => DirectMessageRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
+      search: context.read<ApiSearch>(),
     ),
   ),
-  Provider(create: (_) => FilePickerService()),
+  Provider(
+    create: (context) => FilePickerService(flags: context.read<FeatureFlags>()),
+  ),
   Provider(
     create: (_) => MeetingTokenService(
       projectId: DefaultFirebaseOptions.currentPlatform.projectId,
@@ -130,11 +152,6 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<MeetingRepository>(
     create: (context) =>
         MeetingRepositoryFirebase(tokens: context.read<MeetingTokenService>()),
-  ),
-  Provider(
-    create: (_) => CallableClient(
-      projectId: DefaultFirebaseOptions.currentPlatform.projectId,
-    ),
   ),
   Provider<DiscordImportRepository>(
     create: (context) => DiscordImportRepositoryFirebase(

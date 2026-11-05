@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'app_check.dart';
 
 /// Thrown when a callable Cloud Function turns a request down; [message] is
 /// the function's own, ready to show.
@@ -49,6 +50,7 @@ class CallableClient {
       _endpoint(name),
       headers: {
         'Content-Type': 'application/json',
+        ...await AppCheck.headers(),
         'Authorization': 'Bearer $idToken',
       },
       body: jsonEncode({'data': data}),

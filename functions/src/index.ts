@@ -1,3 +1,5 @@
+import "./options";
+
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { onRequest } from "firebase-functions/v2/https";
@@ -6,6 +8,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { syncRankings, syncTournaments } from "./usau/sync";
 
 export * as account from "./account/functions";
+export * as api from "./api/functions";
 export * as communities from "./communities/functions";
 export * as discord from "./discord/functions";
 export * as follows from "./follows/functions";

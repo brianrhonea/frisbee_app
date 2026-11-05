@@ -240,29 +240,31 @@ class ChatRepositoryFirebase implements ChatRepository {
     required AppUser author,
     required String text,
     List<NewAttachment> attachments = const [],
-  }) => guard(() async {
-    for (final a in attachments) {
-      if (a.tooLarge) throw AttachmentTooLargeException(a.name);
-    }
-    final ref = _messages(teamId, roomId).doc();
-    final uploaded = await _files.upload(
-      'teams/$teamId/chats/$roomId/${author.uid}/${ref.id}',
-      attachments,
-    );
-    try {
-      await ref.set({
-        'authorId': author.uid,
-        'authorName': author.label,
-        'text': text.trim(),
-        'attachments': [for (final a in uploaded) a.toMap()],
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } catch (_) {
-      // Don't leave files behind for a message that was never posted.
-      await _files.delete(uploaded.map((a) => a.path));
-      rethrow;
-    }
-  });
+  }) => guard(
+    () => muteAware(_db, author.uid, () async {
+      for (final a in attachments) {
+        if (a.tooLarge) throw AttachmentTooLargeException(a.name);
+      }
+      final ref = _messages(teamId, roomId).doc();
+      final uploaded = await _files.upload(
+        'teams/$teamId/chats/$roomId/${author.uid}/${ref.id}',
+        attachments,
+      );
+      try {
+        await ref.set({
+          'authorId': author.uid,
+          'authorName': author.label,
+          'text': text.trim(),
+          'attachments': [for (final a in uploaded) a.toMap()],
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {
+        // Don't leave files behind for a message that was never posted.
+        await _files.delete(uploaded.map((a) => a.path));
+        rethrow;
+      }
+    }),
+  );
 
   @override
   Future<Result<void>> deleteMessage(
