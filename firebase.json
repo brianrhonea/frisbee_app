@@ -35,6 +35,24 @@
             "value": "application/json"
           }
         ]
+      },
+      {
+        "source": "**/*.@(png|jpg|jpeg|svg|ico|webp|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=86400, stale-while-revalidate=604800"
+          }
+        ]
+      },
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=300, s-maxage=3600"
+          }
+        ]
       }
     ]
   },
