@@ -1,6 +1,12 @@
 # Firebase's iOS SDK requires iOS 15.
 platform :ios, '15.0'
 
+# firebase_core pins every Firebase pod to "~> 12.19.3", but 12.19.3 was a
+# partial patch release (only FirebaseCore and FirebaseFirestore); the other
+# pods, e.g. FirebaseAppCheck, stop at 12.19.0. "~> 12.19.0" still resolves
+# Core and Firestore to 12.19.3. Remove once firebase_core moves past 12.19.3.
+$FirebaseSDKVersion = '12.19.0'
+
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
