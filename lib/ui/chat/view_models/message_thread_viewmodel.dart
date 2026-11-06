@@ -287,12 +287,35 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   void onMessages(List<ChatMessage> messages) {}
 
   String get uid => _auth.currentUser?.uid ?? '';
-  List<ChatMessage> get messages => removals.visible([..._older, ...?_live]);
+  List<ChatMessage> get messages {
+    final all = removals.visible([..._older, ...?_live]);
+    final after = hiddenBefore;
+    if (after == null) return all;
+    return [
+      for (final m in all)
+        if (m.createdAt == null || m.createdAt!.isAfter(after)) m,
+    ];
+  }
+
+  /// Messages from before this are hidden (the user deleted the
+  /// conversation for themselves); null hides nothing.
+  @protected
+  DateTime? get hiddenBefore => null;
+
+  /// Whether the oldest message loaded is already hidden, so there's
+  /// nothing more worth loading.
+  bool get _reachedHidden {
+    final after = hiddenBefore;
+    final oldest = (_older.firstOrNull ?? _live?.firstOrNull)?.createdAt;
+    return after != null && oldest != null && !oldest.isAfter(after);
+  }
+
   bool get messagesLoaded => _live != null;
   Object? get messageError => _messageError;
 
   /// More messages may be on the server than those loaded.
-  bool get hasMore => !_olderExhausted && (_live?.length ?? 0) >= _limit;
+  bool get hasMore =>
+      !_olderExhausted && !_reachedHidden && (_live?.length ?? 0) >= _limit;
 
   /// Whether an older page is on its way.
   bool get loadingMore => _loadingMore;

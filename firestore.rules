@@ -196,15 +196,31 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if signedIn() && uid() == userId;
 
-      // When the user last read each direct-message conversation, private
-      // to them (the conversation's readAt is the shared read receipt,
-      // which they can turn off with readReceipts on this doc).
+      // Each direct-message conversation as the user keeps it, private to
+      // them: when they last read it (the conversation's readAt is the
+      // shared read receipt, which they can turn off with readReceipts on
+      // this doc), archived it, or deleted it for themselves. Each time
+      // written is the server's; archivedAt may also be removed.
+      // messagePolicy on this doc says who may start a conversation with
+      // them (MessagePolicy in lib/domain/models/direct_message.dart).
       match /dmReads/{convId} {
+        function setNow(f) {
+          let before = resource == null ? {} : resource.data;
+          return !(f in request.resource.data.diff(before).affectedKeys())
+            || !(f in request.resource.data)
+            || request.resource.data[f] == request.time;
+        }
+
         allow read, delete: if signedIn() && uid() == userId;
         allow create, update: if signedIn() && uid() == userId
           && convId.split('_').hasAny([userId])
-          && request.resource.data.keys().hasOnly(['readAt'])
-          && request.resource.data.readAt == request.time;
+          && request.resource.data.keys().hasOnly(
+               ['readAt', 'archivedAt', 'clearedAt'])
+          && setNow('readAt') && setNow('archivedAt') && setNow('clearedAt')
+          // Only archivedAt is ever taken away.
+          && (resource == null
+              || request.resource.data.keys().toSet().union(['archivedAt'].toSet())
+                   .hasAll(resource.data.keys().toSet()));
       }
 
       // Personal schedule: private to its owner, no polls or responses.
@@ -1936,10 +1952,44 @@ service cloud.firestore {
     // One conversation per pair of users, id "{uidA}_{uidB}" with the uids
     // sorted. Only the two participants can read it or post. The id names
     // them, so a participant can check whether it exists before creating it.
+    //
+    // Who may start one is the other person's messagePolicy (on their
+    // users doc). If they follow the starter it's 'accepted' (unless their
+    // policy is 'nobody'). Otherwise, with 'everyone', or 'followers' and
+    // the starter follows them, it's a 'request' waiting on them
+    // (requestedOf): they read it without updating the shared read
+    // receipt and can't post until they accept; or they decline it, which
+    // the starter can't see. The app tries 'accepted', then 'request'.
     match /conversations/{convId} {
       function inConversation() { return uid() in convId.split('_'); }
       function convPath() {
         return /databases/$(database)/documents/conversations/$(convId);
+      }
+      function userDoc(u) { return /databases/$(database)/documents/users/$(u); }
+      function messagePolicy(u) {
+        return exists(userDoc(u))
+          ? get(userDoc(u)).data.get('messagePolicy', 'everyone')
+          : 'everyone';
+      }
+      function follows(follower, followed) {
+        return exists(/databases/$(database)/documents/users/$(follower)/follows/$('user_' + followed));
+      }
+      function allowedStart(d) {
+        let other = d.participants[0] == uid() ? d.participants[1] : d.participants[0];
+        let policy = messagePolicy(other);
+        return (d.get('status', 'accepted') == 'accepted'
+                 && d.get('requestedOf', null) == null
+                 && policy != 'nobody'
+                 && follows(other, uid()))
+          || (d.get('status', 'accepted') == 'request'
+                 && d.get('requestedOf', null) == other
+                 && (policy == 'everyone'
+                     || (policy == 'followers' && follows(uid(), other))));
+      }
+      // A request still waiting on the signed-in user.
+      function awaitingMe() {
+        return resource.data.get('status', 'accepted') == 'request'
+          && resource.data.get('requestedOf', null) == uid();
       }
       // Only their own read time and name may change, besides the preview.
       function onlyMine(f) {
@@ -1952,7 +2002,7 @@ service cloud.firestore {
       allow create: if signedIn() && inConversation()
         && request.resource.data.keys().hasOnly([
              'participants', 'names', 'lastMessage', 'lastMessageAt',
-             'lastSenderId', 'readAt', 'createdAt'])
+             'lastSenderId', 'readAt', 'createdAt', 'status', 'requestedOf'])
         && request.resource.data.participants is list
         && request.resource.data.participants.size() == 2
         && request.resource.data.participants[0] < request.resource.data.participants[1]
@@ -1971,24 +2021,35 @@ service cloud.firestore {
         && request.resource.data.lastMessageAt == null
         && request.resource.data.lastSenderId == ''
         && request.resource.data.readAt == {}
-        && request.resource.data.createdAt == request.time;
-      // Posting updates the preview; opening marks it read.
+        && request.resource.data.createdAt == request.time
+        && allowedStart(request.resource.data);
+      // Posting updates the preview; opening marks it read; whoever a
+      // request waits on accepts or declines it. While it waits on them
+      // they neither post nor send a read receipt.
       allow update: if signedIn() && inConversation() && (
         (changed().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'readAt', 'names'])
+          && !awaitingMe()
           && request.resource.data.lastSenderId == uid()
           && request.resource.data.lastMessageAt == request.time
           && validString(request.resource.data.lastMessage, 200)
           && onlyMine('readAt') && onlyMine('names')
           && validString(request.resource.data.names[uid()], 80))
         || (changed().hasOnly(['readAt'])
+          && !awaitingMe()
           && onlyMine('readAt')
           && request.resource.data.readAt[uid()] == request.time)
+        || (changed().hasOnly(['status'])
+          && awaitingMe()
+          && request.resource.data.status in ['accepted', 'declined'])
       );
 
       match /messages/{messageId} {
         allow read: if signedIn() && inConversation();
         allow create: if signedIn() && notMuted() && inConversation()
           && exists(convPath())
+          // Not by whoever a request waits on, until they accept it.
+          && !(get(convPath()).data.get('status', 'accepted') == 'request'
+               && get(convPath()).data.get('requestedOf', null) == uid())
           && request.resource.data.keys().hasOnly([
                'authorId', 'authorName', 'text', 'attachments', 'createdAt'])
           && request.resource.data.authorId == uid()

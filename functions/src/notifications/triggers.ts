@@ -21,6 +21,8 @@ import {
   commentRecipients,
   type Data,
   directMessageNotice,
+  directMessageRecipients,
+  messageRequestNotice,
   eventChange,
   eventChangeNotice,
   eventViewers,
@@ -91,13 +93,13 @@ export const directMessage = onDocumentCreated(
     if (!message) return;
     const { conversationId } = event.params;
     const conversation = (await getFirestore().doc(`conversations/${conversationId}`).get()).data();
-    const participants = (conversation?.participants ?? []) as string[];
-    await deliver(
-      getFirestore(),
-      getMessaging(),
-      participants.filter((uid) => uid !== message.authorId),
-      directMessageNotice({ conversationId, message }),
-    );
+    const to = directMessageRecipients(conversation, String(message.authorId ?? ""));
+    if (to.direct.length) {
+      await deliver(getFirestore(), getMessaging(), to.direct, directMessageNotice({ conversationId, message }));
+    }
+    if (to.requests.length) {
+      await deliver(getFirestore(), getMessaging(), to.requests, messageRequestNotice({ message }));
+    }
   },
 );
 

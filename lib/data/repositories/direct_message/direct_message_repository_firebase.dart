@@ -55,15 +55,18 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
   CollectionReference<Map<String, dynamic>> _reads(String uid) =>
       _db.collection('users').doc(uid).collection('dmReads');
 
-  /// [uid]'s private read times, by conversation id.
-  Stream<Map<String, DateTime>> _watchReads(String uid) => _shared.get(
-    'dmReads/$uid',
-    () => countedSnapshots(_reads(uid), 'dmReads').map(
-      (snap) => {
-        for (final d in snap.docs) d.id: ?parseDate(d.data()['readAt']),
-      },
-    ),
-  );
+  /// [uid]'s private records (read, archived, deleted), by conversation
+  /// id.
+  Stream<Map<String, ConversationPrivate>> _watchReads(String uid) =>
+      _shared.get(
+        'dmReads/$uid',
+        () => countedSnapshots(_reads(uid), 'dmReads').map(
+          (snap) => {
+            for (final d in snap.docs)
+              d.id: ConversationPrivate.fromMap(plainData(d.data())),
+          },
+        ),
+      );
 
   CollectionReference<Map<String, dynamic>> _typing(String id) =>
       _conversations.doc(id).collection('typing');
@@ -123,7 +126,7 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     _watchConversations(uid),
     _watchReads(uid),
     (conversations, reads) => [
-      for (final c in conversations) c.withMyReadAt(reads[c.id]),
+      for (final c in conversations) c.withMine(reads[c.id]),
     ],
   );
 
@@ -155,7 +158,7 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
                   : null,
             ),
         _watchReads(uid),
-        (c, reads) => c?.withMyReadAt(reads[id]),
+        (c, reads) => c?.withMine(reads[id]),
       );
 
   @override
@@ -163,20 +166,87 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
       guard(() async {
         final id = Conversation.idFor(me.uid, other.uid);
         final ref = _conversations.doc(id);
-        await _db.runTransaction((tx) async {
-          if ((await tx.get(ref)).exists) return;
-          tx.set(ref, {
-            'participants': id.split('_'),
-            'names': {me.uid: me.label, other.uid: other.name},
-            'lastMessage': '',
-            'lastMessageAt': null,
-            'lastSenderId': '',
-            'readAt': <String, Object>{},
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        });
-        return id;
+        // Who follows whom is private, so let the rules decide: straight
+        // to their inbox if they follow me, else a request if their
+        // settings allow one, else not at all.
+        for (final request in [false, true]) {
+          try {
+            await _db.runTransaction((tx) async {
+              if ((await tx.get(ref)).exists) return;
+              tx.set(ref, {
+                'participants': id.split('_'),
+                'names': {me.uid: me.label, other.uid: other.name},
+                'lastMessage': '',
+                'lastMessageAt': null,
+                'lastSenderId': '',
+                'readAt': <String, Object>{},
+                'createdAt': FieldValue.serverTimestamp(),
+                'status': request ? 'request' : 'accepted',
+                if (request) 'requestedOf': other.uid,
+              });
+            });
+            return id;
+          } on FirebaseException catch (e) {
+            if (e.code != 'permission-denied') rethrow;
+          }
+        }
+        throw MessagingNotAllowedException(other.name);
       });
+
+  @override
+  Future<Result<void>> setArchived(
+    String id,
+    String uid, {
+    required bool archived,
+  }) => guard(
+    () => _reads(uid).doc(id).set({
+      'archivedAt': archived
+          ? FieldValue.serverTimestamp()
+          : FieldValue.delete(),
+    }, SetOptions(merge: true)),
+  );
+
+  @override
+  Future<Result<void>> clearConversation(String id, String uid) => guard(
+    () => _reads(uid).doc(id).set({
+      'clearedAt': FieldValue.serverTimestamp(),
+      'archivedAt': FieldValue.delete(),
+    }, SetOptions(merge: true)),
+  );
+
+  @override
+  Future<Result<void>> answerRequest(
+    String id,
+    String uid, {
+    required bool accept,
+  }) => guard(() async {
+    final batch = _db.batch()
+      ..update(_conversations.doc(id), {
+        'status': accept ? 'accepted' : 'declined',
+      });
+    // Declining also clears it for them, so nothing lingers.
+    if (!accept) {
+      batch.set(_reads(uid).doc(id), {
+        'clearedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+    await batch.commit();
+  });
+
+  @override
+  Stream<MessagePolicy> watchMessagePolicy(String uid) => _db
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      .map((d) => MessagePolicy.parse(d.data()?['messagePolicy']));
+
+  @override
+  Future<Result<void>> setMessagePolicy(String uid, MessagePolicy policy) =>
+      guard(
+        () => _db.collection('users').doc(uid).set({
+          'messagePolicy': policy.name,
+        }, SetOptions(merge: true)),
+      );
 
   @override
   Stream<List<ChatMessage>> watchMessages(String id, {required int limit}) =>
@@ -273,7 +343,9 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     required bool shareReceipt,
   }) => guard(() async {
     final batch = _db.batch()
-      ..set(_reads(uid).doc(id), {'readAt': FieldValue.serverTimestamp()});
+      ..set(_reads(uid).doc(id), {
+        'readAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     if (shareReceipt) {
       batch.update(_conversations.doc(id), {
         'readAt.$uid': FieldValue.serverTimestamp(),

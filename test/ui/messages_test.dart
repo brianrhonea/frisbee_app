@@ -255,8 +255,225 @@ void main() {
     expect(dms.typingSent, [('u1', true), ('u1', true), ('u1', false)]);
   });
 
+  group('message requests', () {
+    const avery = AppUser(uid: 'a', displayName: 'Avery');
+    const me = UserProfile(uid: 'u1', name: 'Alex');
+
+    /// Avery messages the user, who doesn't follow them.
+    Future<DirectChatViewModel> request() async {
+      await dms.openConversation(avery, me);
+      await dms.sendMessage('a_u1', author: avery, text: 'Want to pick up?');
+      final vm = DirectChatViewModel(
+        conversationId: 'a_u1',
+        directMessageRepository: dms,
+        authRepository: auth,
+        filePicker: FakeFilePickerService(),
+      );
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      return vm;
+    }
+
+    test(
+      'starting one depends on who follows whom and their setting',
+      () async {
+        Future<Result<String>> open() async {
+          dms.conversations.clear();
+          return dms.openConversation(
+            testUser,
+            const UserProfile(uid: 'a', name: 'Avery'),
+          );
+        }
+
+        Future<ConversationStatus?> statusFor(MessagePolicy p) async {
+          dms.policies['a'] = p;
+          final r = await open();
+          return r is Ok ? dms.conversations['a_u1']!.status : null;
+        }
+
+        expect(
+          await statusFor(MessagePolicy.everyone),
+          ConversationStatus.request,
+        );
+        expect(await statusFor(MessagePolicy.followers), isNull);
+        expect(await statusFor(MessagePolicy.following), isNull);
+        dms.follows.add((testUser.uid, 'a'));
+        expect(
+          await statusFor(MessagePolicy.followers),
+          ConversationStatus.request,
+        );
+        dms.follows.add(('a', testUser.uid));
+        expect(
+          await statusFor(MessagePolicy.following),
+          ConversationStatus.accepted,
+        );
+        expect(await statusFor(MessagePolicy.nobody), isNull);
+        final r = await open();
+        expect(
+          (r as Error).error,
+          isA<MessagingNotAllowedException>().having(
+            (e) => '$e',
+            'message',
+            "Avery isn't accepting messages from you.",
+          ),
+        );
+      },
+    );
+
+    test(
+      'a request waits in Requests, read without a receipt or reply',
+      () async {
+        final vm = await request();
+        final inbox = InboxViewModel(
+          directMessageRepository: dms,
+          authRepository: auth,
+        );
+        addTearDown(inbox.dispose);
+        await pumpEventQueue();
+        expect(inbox.allItems, isEmpty);
+        expect(inbox.requestItems.single.title, 'Avery');
+        expect(inbox.requestCount, 1);
+        expect(inbox.unreadCount, 0, reason: 'requests count apart');
+
+        expect(vm.isRequest, isTrue);
+        expect(vm.canWrite, isFalse);
+        expect(dms.reads, ['a_u1']);
+        expect(
+          dms.conversations['a_u1']!.readAt.containsKey('u1'),
+          isFalse,
+          reason: "Avery can't tell it was read",
+        );
+
+        await vm.accept.execute();
+        await pumpEventQueue();
+        expect(vm.isRequest, isFalse);
+        expect(vm.canWrite, isTrue);
+        expect(inbox.allItems.single.title, 'Avery');
+        expect(inbox.requestItems, isEmpty);
+      },
+    );
+
+    test('deleting a request hides it for good, quietly', () async {
+      final vm = await request();
+      await vm.decline.execute();
+      await pumpEventQueue();
+      final inbox = InboxViewModel(
+        directMessageRepository: dms,
+        authRepository: auth,
+      );
+      addTearDown(inbox.dispose);
+      await pumpEventQueue();
+      expect(inbox.allItems, isEmpty);
+      expect(inbox.requestItems, isEmpty);
+      // More from Avery doesn't bring it back.
+      dms.clock = DateTime(2026, 11, 2);
+      await dms.sendMessage('a_u1', author: avery, text: 'Hello?');
+      await pumpEventQueue();
+      expect(inbox.allItems, isEmpty);
+      expect(inbox.archivedItems, isEmpty);
+      // From Avery's side it still looks pending.
+      expect(dms.conversations['a_u1']!.isPendingFrom('a'), isTrue);
+    });
+
+    test('the request sender sees "Request sent", never "Seen"', () async {
+      await dms.openConversation(
+        testUser,
+        const UserProfile(uid: 'a', name: 'Avery'),
+      );
+      final vm = DirectChatViewModel(
+        conversationId: 'a_u1',
+        directMessageRepository: dms,
+        authRepository: auth,
+        filePicker: FakeFilePickerService(),
+      );
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      expect(vm.isPending, isTrue);
+      expect(vm.canWrite, isTrue);
+      await vm.send.execute('Hi');
+      await pumpEventQueue();
+      expect(vm.receiptFor(vm.messages.single), isNull);
+    });
+  });
+
+  group('archive and delete', () {
+    Future<(DirectChatViewModel, InboxViewModel)> chat() async {
+      dms.follows.add(('a', testUser.uid));
+      await dms.openConversation(
+        testUser,
+        const UserProfile(uid: 'a', name: 'Avery'),
+      );
+      await dms.sendMessage(
+        'a_u1',
+        author: const AppUser(uid: 'a', displayName: 'Avery'),
+        text: 'Old news',
+      );
+      final vm = DirectChatViewModel(
+        conversationId: 'a_u1',
+        directMessageRepository: dms,
+        authRepository: auth,
+        filePicker: FakeFilePickerService(),
+      );
+      addTearDown(vm.dispose);
+      final inbox = InboxViewModel(
+        directMessageRepository: dms,
+        authRepository: auth,
+      );
+      addTearDown(inbox.dispose);
+      await pumpEventQueue();
+      return (vm, inbox);
+    }
+
+    test('archiving moves it out of the inbox until a new message', () async {
+      final (vm, inbox) = await chat();
+      dms.clock = DateTime(2026, 11, 2, 12);
+      await vm.toggleArchived.execute();
+      await pumpEventQueue();
+      expect(vm.isArchived, isTrue);
+      expect(inbox.allItems, isEmpty);
+      expect(inbox.archivedItems.single.title, 'Avery');
+
+      // Unarchive from the inbox, archive again, then a new message.
+      await inbox.archive.execute(inbox.archivedItems.single);
+      await pumpEventQueue();
+      expect(inbox.allItems, hasLength(1));
+      await inbox.archive.execute(inbox.allItems.single);
+      await pumpEventQueue();
+      expect(inbox.allItems, isEmpty);
+      dms.messages['a_u1']!.clear();
+      await dms.sendMessage(
+        'a_u1',
+        author: const AppUser(uid: 'a', displayName: 'Avery'),
+        text: 'Practice moved',
+      );
+      // The fake stamps messages in 2026-10-30; push this one past.
+      dms.conversations['a_u1'] = dms.conversations['a_u1']!.copyWith(
+        lastMessageAt: DateTime(2026, 11, 3),
+      );
+      dms.emit();
+      await pumpEventQueue();
+      expect(inbox.allItems.single.title, 'Avery');
+      expect(inbox.archivedItems, isEmpty);
+    });
+
+    test('deleting it hides its messages from me only', () async {
+      final (vm, inbox) = await chat();
+      expect(vm.messages, hasLength(1));
+      dms.clock = DateTime(2026, 11, 2, 12);
+      await vm.clear.execute();
+      await pumpEventQueue();
+      expect(vm.messages, isEmpty);
+      expect(vm.hasMore, isFalse);
+      expect(inbox.allItems, isEmpty);
+      expect(inbox.archivedItems, isEmpty);
+      expect(dms.messages['a_u1'], hasLength(1), reason: 'Avery keeps them');
+    });
+  });
+
   group('read receipts', () {
     Future<DirectChatViewModel> chat() async {
+      // Avery follows the user, so it's an ordinary conversation.
+      dms.follows.add(('a', testUser.uid));
       await dms.openConversation(
         testUser,
         const UserProfile(uid: 'a', name: 'Avery'),
@@ -331,6 +548,58 @@ void main() {
     expect(find.text('Avery Jones'), findsOneWidget);
     expect(find.text('See you at practice'), findsOneWidget);
     expect(find.byIcon(Icons.circle), findsOneWidget);
+  });
+
+  testWidgets('a request shows Accept and Delete instead of the composer, '
+      'and sits under Requests', (tester) async {
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const avery = AppUser(uid: 'a', displayName: 'Avery');
+    await dms.openConversation(avery, const UserProfile(uid: 'u1', name: 'A'));
+    await dms.sendMessage('a_u1', author: avery, text: 'Want to pick up?');
+    final vm = DirectChatViewModel(
+      conversationId: 'a_u1',
+      directMessageRepository: dms,
+      authRepository: auth,
+      filePicker: FakeFilePickerService(),
+    );
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      withRepos(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: DirectChatScreen(viewModel: vm),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Message request'), findsOneWidget);
+    expect(find.text('Avery wants to message you'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    await tester.tap(find.text('Accept'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('Avery wants to message you'), findsNothing);
+
+    final list = inbox();
+    addTearDown(list.dispose);
+    dms.conversations['a_u1'] = dms.conversations['a_u1']!.copyWith(
+      status: ConversationStatus.request,
+    );
+    dms.emit();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: InboxScreen(viewModel: list),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Avery'), findsNothing);
+    await tester.tap(find.text('Requests (1)'));
+    await tester.pump();
+    expect(find.text('Avery'), findsOneWidget);
   });
 
   testWidgets('direct chat screen sends a message', (tester) async {

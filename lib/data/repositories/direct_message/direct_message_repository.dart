@@ -7,6 +7,10 @@ import '../../../utils/result.dart';
 
 /// Private one-to-one messages between any two users, found through the
 /// people directory.
+///
+/// Who may start one is up to the recipient's [MessagePolicy]: people
+/// they follow reach their inbox; others, if allowed at all, land in their
+/// Message requests.
 abstract class DirectMessageRepository {
   /// People whose name matches [query], excluding [excludeUid].
   Future<Result<List<UserProfile>>> searchPeople(
@@ -20,8 +24,35 @@ abstract class DirectMessageRepository {
   Stream<Conversation?> watchConversation(String id, {required String uid});
 
   /// Finds or starts the conversation between [me] and [other]; returns
-  /// its id.
+  /// its id. A new one is a message request unless [other] follows [me];
+  /// fails with [MessagingNotAllowedException] if [other]'s
+  /// [MessagePolicy] doesn't let [me] message them at all.
   Future<Result<String>> openConversation(AppUser me, UserProfile other);
+
+  /// Archives conversation [id] for [uid] (out of their inbox until a new
+  /// message), or brings it back.
+  Future<Result<void>> setArchived(
+    String id,
+    String uid, {
+    required bool archived,
+  });
+
+  /// Deletes conversation [id] for [uid] only: its messages so far are
+  /// hidden from them, and it leaves their inbox until a new one arrives.
+  Future<Result<void>> clearConversation(String id, String uid);
+
+  /// Accepts or deletes a message request to [uid]. Deleting it tells the
+  /// sender nothing.
+  Future<Result<void>> answerRequest(
+    String id,
+    String uid, {
+    required bool accept,
+  });
+
+  /// Who may start a conversation with [uid].
+  Stream<MessagePolicy> watchMessagePolicy(String uid);
+
+  Future<Result<void>> setMessagePolicy(String uid, MessagePolicy policy);
 
   /// The newest [limit] messages, oldest first.
   Stream<List<ChatMessage>> watchMessages(String id, {required int limit});
@@ -66,4 +97,14 @@ abstract class DirectMessageRepository {
 
   /// Says [uid] is typing in [id] (or has stopped).
   Future<void> setTyping(String id, String uid, {required bool typing});
+}
+
+/// The other person's message settings don't let the user message them.
+class MessagingNotAllowedException implements Exception {
+  const MessagingNotAllowedException(this.name);
+
+  final String name;
+
+  @override
+  String toString() => "$name isn't accepting messages from you.";
 }

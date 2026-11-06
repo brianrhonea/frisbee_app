@@ -6,6 +6,7 @@ import '../../../data/repositories/direct_message/direct_message_repository.dart
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/direct_message.dart';
+import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../chat/view_models/message_thread_viewmodel.dart';
 
@@ -19,6 +20,16 @@ class DirectChatViewModel extends MessageThreadViewModel {
     super.peopleRepository,
     super.notificationRepository,
   }) : _dms = directMessageRepository {
+    accept = Command0<void>(
+      () => _dms.answerRequest(conversationId, uid, accept: true),
+    );
+    decline = Command0<void>(
+      () => _dms.answerRequest(conversationId, uid, accept: false),
+    );
+    toggleArchived = Command0<void>(
+      () => _dms.setArchived(conversationId, uid, archived: !isArchived),
+    );
+    clear = Command0<void>(() => _dms.clearConversation(conversationId, uid));
     _receiptsSub = _dms
         .watchReadReceipts(uid)
         .listen(
@@ -78,24 +89,55 @@ class DirectChatViewModel extends MessageThreadViewModel {
 
   String get otherName => _conversation?.otherName(uid) ?? '';
 
+  /// A message request to the user: they read it without the sender
+  /// knowing, then accept or delete it.
+  bool get isRequest => _conversation?.isRequestFor(uid) ?? false;
+
+  /// A request the user sent that hasn't been accepted yet.
+  bool get isPending => _conversation?.isPendingFrom(uid) ?? false;
+
+  bool get isArchived => _conversation?.isArchived ?? false;
+
+  /// Moves a request to the inbox, with read receipts from then on.
+  late final Command0<void> accept;
+
+  /// Deletes a request; the sender isn't told.
+  late final Command0<void> decline;
+
+  /// Archives the conversation, or brings it back to the inbox.
+  late final Command0<void> toggleArchived;
+
+  /// Deletes the conversation for the user only.
+  late final Command0<void> clear;
+
+  @override
+  DateTime? get hiddenBefore => _conversation?.hiddenBefore;
+
   /// The other person's username, once looked up.
   String? get otherUsername =>
       _conversation == null ? null : usernameOf(_conversation!.otherId(uid));
 
   @override
-  bool get canWrite => _conversation?.participants.contains(uid) ?? false;
+  bool get canWrite =>
+      (_conversation?.participants.contains(uid) ?? false) && !isRequest;
 
   /// Opening the conversation reads it.
   void _markRead() {
     final c = _conversation;
     // Wait for the setting, so a read never leaks a receipt.
     if (!_receiptsLoaded) return;
-    if (_marking || c == null || !c.isUnread(uid)) return;
+    if (_marking || c == null) return;
+    if (!c.isUnread(uid) && !c.isUnreadRequest(uid)) return;
     if (_markedUpTo != null && _markedUpTo == c.lastMessageAt) return;
     _markedUpTo = c.lastMessageAt;
     _marking = true;
     _dms
-        .markRead(conversationId, uid, shareReceipt: _receipts)
+        // A request is read in private until it's accepted.
+        .markRead(
+          conversationId,
+          uid,
+          shareReceipt: _receipts && !c.isRequestFor(uid),
+        )
         .whenComplete(() => _marking = false);
   }
 
@@ -105,6 +147,7 @@ class DirectChatViewModel extends MessageThreadViewModel {
   String? receiptFor(ChatMessage message) {
     final c = _conversation;
     if (!_receipts || c == null || message.authorId != uid) return null;
+    if (c.isPendingFrom(uid)) return null;
     if (messages.lastOrNull?.id != message.id) return null;
     return c.isSeen(uid) ? 'Seen' : null;
   }
@@ -157,6 +200,10 @@ class DirectChatViewModel extends MessageThreadViewModel {
 
   @override
   void dispose() {
+    accept.dispose();
+    decline.dispose();
+    toggleArchived.dispose();
+    clear.dispose();
     _sub.cancel();
     _receiptsSub.cancel();
     super.dispose();

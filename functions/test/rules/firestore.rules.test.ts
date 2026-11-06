@@ -1968,7 +1968,55 @@ describe("direct messages", () => {
 
   it("participants start a conversation with a listed user", async () => {
     await assertSucceeds(getDoc(conv(PLAYER))); // checking it exists
-    await assertSucceeds(setDoc(conv(PLAYER), newConv()));
+    await assertSucceeds(setDoc(conv(PLAYER), newConv({ status: "request", requestedOf: OWNER })));
+  });
+
+  describe("who may start one", () => {
+    const follow = (follower: string, followed: string) =>
+      env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "users", follower, "follows", `user_${followed}`), {
+          key: `user_${followed}`, type: "user", targetId: followed, name: "N", notify: true, createdAt: new Date(),
+        }),
+      );
+    const policy = (uid: string, messagePolicy: string) =>
+      env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), "users", uid), { messagePolicy }));
+    const accepted = () => setDoc(conv(PLAYER), newConv({ status: "accepted" }));
+    const request = (to = OWNER) => setDoc(conv(PLAYER), newConv({ status: "request", requestedOf: to }));
+
+    it("someone who follows you reaches your inbox; anyone else is a request", async () => {
+      await assertFails(accepted());
+      await assertFails(setDoc(conv(PLAYER), newConv()));
+      // A request is waiting on the other person, not on yourself.
+      await assertFails(request(PLAYER));
+      await assertSucceeds(request());
+    });
+
+    it("people the recipient follows go straight to their inbox", async () => {
+      await follow(OWNER, PLAYER);
+      await assertSucceeds(accepted());
+    });
+
+    it("'followers' takes requests only from followers", async () => {
+      await policy(OWNER, "followers");
+      await assertFails(request());
+      await follow(PLAYER, OWNER);
+      await assertSucceeds(request());
+    });
+
+    it("'following' takes nothing from people they don't follow", async () => {
+      await policy(OWNER, "following");
+      await follow(PLAYER, OWNER);
+      await assertFails(request());
+      await follow(OWNER, PLAYER);
+      await assertSucceeds(accepted());
+    });
+
+    it("'nobody' takes nothing new", async () => {
+      await policy(OWNER, "nobody");
+      await follow(OWNER, PLAYER);
+      await assertFails(accepted());
+      await assertFails(request());
+    });
   });
 
   it("muted users can't message until the mute ends; limits are server-only", async () => {
@@ -2089,6 +2137,65 @@ describe("direct messages", () => {
     it("conversations can't be deleted", async () => {
       await assertFails(deleteDoc(conv(OWNER)));
     });
+  });
+
+  describe("a message request", () => {
+    // PLAYER asked OWNER.
+    beforeEach(() =>
+      env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "conversations", CONV), {
+          ...newConv({ status: "request", requestedOf: OWNER }),
+          createdAt: new Date(),
+        }),
+      ),
+    );
+
+    it("the sender keeps writing; the recipient reads without a receipt or reply", async () => {
+      await assertSucceeds(setDoc(doc(msgs(PLAYER)), msg(PLAYER)));
+      await assertSucceeds(getDocs(msgs(OWNER)));
+      await assertFails(setDoc(doc(msgs(OWNER)), msg(OWNER)));
+      await assertFails(updateDoc(conv(OWNER), { [`readAt.${OWNER}`]: serverTimestamp() }));
+      // Their private read time is fine.
+      await assertSucceeds(setDoc(doc(db(OWNER), "users", OWNER, "dmReads", CONV), { readAt: serverTimestamp() }));
+    });
+
+    it("only the recipient accepts or declines it", async () => {
+      await assertFails(updateDoc(conv(PLAYER), { status: "accepted" }));
+      await assertFails(updateDoc(conv(OWNER), { status: "request", requestedOf: PLAYER }));
+      await assertFails(updateDoc(conv(OWNER), { status: "pending" }));
+      await assertSucceeds(updateDoc(conv(OWNER), { status: "accepted" }));
+      // Once accepted, they reply and send receipts, and it stays accepted.
+      await assertSucceeds(setDoc(doc(msgs(OWNER)), msg(OWNER)));
+      await assertSucceeds(updateDoc(conv(OWNER), { [`readAt.${OWNER}`]: serverTimestamp() }));
+      await assertFails(updateDoc(conv(OWNER), { status: "declined" }));
+    });
+
+    it("declining it is quiet: the sender can still write", async () => {
+      await assertSucceeds(updateDoc(conv(OWNER), { status: "declined" }));
+      await assertSucceeds(setDoc(doc(msgs(PLAYER)), msg(PLAYER)));
+      await assertFails(updateDoc(conv(OWNER), { status: "accepted" }));
+    });
+  });
+
+  it("archive and delete-for-me are private, server-timed records", async () => {
+    const mine = (uid: string, owner = uid) => doc(db(uid), "users", owner, "dmReads", CONV);
+    await assertSucceeds(setDoc(mine(PLAYER), { archivedAt: serverTimestamp() }, { merge: true }));
+    await assertSucceeds(setDoc(mine(PLAYER), { readAt: serverTimestamp() }, { merge: true }));
+    // Unarchive by removing it.
+    await assertSucceeds(updateDoc(mine(PLAYER), { archivedAt: deleteField() }));
+    await assertSucceeds(setDoc(mine(PLAYER), { clearedAt: serverTimestamp() }, { merge: true }));
+    await assertFails(setDoc(mine(PLAYER), { clearedAt: new Date(2000, 0, 1) }, { merge: true }));
+    await assertFails(setDoc(mine(PLAYER), { archivedAt: new Date(2000, 0, 1) }, { merge: true }));
+    // The deletion time and read time can't be taken back.
+    await assertFails(updateDoc(mine(PLAYER), { clearedAt: deleteField() }));
+    await assertFails(updateDoc(mine(PLAYER), { readAt: deleteField() }));
+    await assertFails(setDoc(mine(PLAYER), { pinned: true }, { merge: true }));
+    await assertFails(setDoc(mine(OWNER, PLAYER), { archivedAt: serverTimestamp() }, { merge: true }));
+  });
+
+  it("the message policy is the user's own", async () => {
+    await assertSucceeds(setDoc(doc(db(PLAYER), "users", PLAYER), { messagePolicy: "nobody" }, { merge: true }));
+    await assertFails(setDoc(doc(db(OWNER), "users", PLAYER), { messagePolicy: "everyone" }, { merge: true }));
   });
 });
 

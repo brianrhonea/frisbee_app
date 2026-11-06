@@ -1515,13 +1515,89 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
   Stream<List<Conversation>> watchConversations(String uid) => _watch(
     () => conversations.values
         .where((c) => c.participants.contains(uid) && c.hasMessages)
-        .map((c) => c.withMyReadAt(privateReads[c.id]))
+        .map((c) => c.withMine(_private(c.id)))
         .toList(),
   );
 
   @override
   Stream<Conversation?> watchConversation(String id, {required String uid}) =>
-      _watch(() => conversations[id]?.withMyReadAt(privateReads[id]));
+      _watch(() => conversations[id]?.withMine(_private(id)));
+
+  /// Archive and delete times by conversation id (one user's view).
+  final archivedAt = <String, DateTime>{};
+  final clearedAt = <String, DateTime>{};
+
+  ConversationPrivate _private(String id) => ConversationPrivate(
+    readAt: privateReads[id],
+    archivedAt: archivedAt[id],
+    clearedAt: clearedAt[id],
+  );
+
+  /// Message settings by uid; everyone unless set.
+  final policies = <String, MessagePolicy>{};
+
+  /// (follower, followed) pairs, for who may message whom.
+  final follows = <(String, String)>{};
+
+  /// A clock for archive and delete times.
+  DateTime clock = DateTime(2026, 11, 1);
+
+  @override
+  Future<Result<void>> setArchived(
+    String id,
+    String uid, {
+    required bool archived,
+  }) async {
+    if (archived) {
+      archivedAt[id] = clock;
+    } else {
+      archivedAt.remove(id);
+    }
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> clearConversation(String id, String uid) async {
+    clearedAt[id] = clock;
+    archivedAt.remove(id);
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> answerRequest(
+    String id,
+    String uid, {
+    required bool accept,
+  }) async {
+    final c = conversations[id]!;
+    if (!c.isRequestFor(uid)) {
+      return Result.error(Exception('Not a request to you'));
+    }
+    conversations[id] = c.copyWith(
+      status: accept
+          ? ConversationStatus.accepted
+          : ConversationStatus.declined,
+    );
+    if (!accept) clearedAt[id] = clock;
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<MessagePolicy> watchMessagePolicy(String uid) =>
+      _watch(() => policies[uid] ?? MessagePolicy.everyone);
+
+  @override
+  Future<Result<void>> setMessagePolicy(
+    String uid,
+    MessagePolicy policy,
+  ) async {
+    policies[uid] = policy;
+    emit();
+    return const Result.ok(null);
+  }
 
   /// Read receipts setting by uid; on unless set.
   final readReceipts = <String, bool>{};
@@ -1543,14 +1619,30 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
   @override
   Future<Result<String>> openConversation(AppUser me, UserProfile other) async {
     final id = Conversation.idFor(me.uid, other.uid);
-    conversations.putIfAbsent(
-      id,
-      () => Conversation(
+    if (!conversations.containsKey(id)) {
+      // As firestore.rules decides.
+      final policy = policies[other.uid] ?? MessagePolicy.everyone;
+      final theyFollowMe = follows.contains((other.uid, me.uid));
+      final iFollowThem = follows.contains((me.uid, other.uid));
+      final ConversationStatus status;
+      if (policy == MessagePolicy.nobody) {
+        return Result.error(MessagingNotAllowedException(other.name));
+      } else if (theyFollowMe) {
+        status = ConversationStatus.accepted;
+      } else if (policy == MessagePolicy.everyone ||
+          (policy == MessagePolicy.followers && iFollowThem)) {
+        status = ConversationStatus.request;
+      } else {
+        return Result.error(MessagingNotAllowedException(other.name));
+      }
+      conversations[id] = Conversation(
         id: id,
         participants: id.split('_'),
         names: {me.uid: me.label, other.uid: other.name},
-      ),
-    );
+        status: status,
+        requestedOf: status == ConversationStatus.request ? other.uid : null,
+      );
+    }
     emit();
     return Result.ok(id);
   }
@@ -1587,10 +1679,7 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
       ),
     );
     final c = conversations[id]!;
-    conversations[id] = Conversation(
-      id: id,
-      participants: c.participants,
-      names: c.names,
+    conversations[id] = c.copyWith(
       lastMessage: messagePreview(text, attachments.length),
       lastMessageAt: at,
       lastSenderId: author.uid,
@@ -1620,15 +1709,7 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
       return const Result.ok(null);
     }
     final c = conversations[id]!;
-    conversations[id] = Conversation(
-      id: id,
-      participants: c.participants,
-      names: c.names,
-      lastMessage: c.lastMessage,
-      lastMessageAt: c.lastMessageAt,
-      lastSenderId: c.lastSenderId,
-      readAt: {...c.readAt, uid: DateTime(2100)},
-    );
+    conversations[id] = c.copyWith(readAt: {...c.readAt, uid: DateTime(2100)});
     emit();
     return const Result.ok(null);
   }

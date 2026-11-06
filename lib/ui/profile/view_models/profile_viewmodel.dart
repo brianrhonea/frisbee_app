@@ -8,6 +8,7 @@ import '../../../data/repositories/follow/follow_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/profile/profile_repository.dart';
 import '../../../data/repositories/theme/theme_repository.dart';
+import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/follow.dart';
 import '../../../domain/models/player_profile.dart';
@@ -48,6 +49,7 @@ class ProfileViewModel extends ChangeNotifier {
     );
     _auth.addListener(notifyListeners);
     setReadReceipts = Command1<void, bool>(_setReadReceipts);
+    setMessagePolicy = Command1<void, MessagePolicy>(_setMessagePolicy);
     setPrivate = Command1<void, bool>(_setPrivate);
     setVisibility = Command1<void, ProfileVisibility>(_setVisibility);
     acceptRequest = Command1<void, FollowRequest>(_accept);
@@ -58,6 +60,12 @@ class ProfileViewModel extends ChangeNotifier {
       _subs.add(
         _dms.watchReadReceipts(uid).listen((on) {
           _readReceipts = on;
+          notifyListeners();
+        }, onError: (Object _) {}),
+      );
+      _subs.add(
+        _dms.watchMessagePolicy(uid).listen((p) {
+          _messagePolicy = p;
           notifyListeners();
         }, onError: (Object _) {}),
       );
@@ -164,6 +172,21 @@ class ProfileViewModel extends ChangeNotifier {
 
   late final Command1<void, bool> setReadReceipts;
 
+  MessagePolicy _messagePolicy = MessagePolicy.everyone;
+
+  /// Who may start a conversation with the user.
+  MessagePolicy get messagePolicy => _messagePolicy;
+
+  late final Command1<void, MessagePolicy> setMessagePolicy;
+
+  Future<Result<void>> _setMessagePolicy(MessagePolicy p) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Result.error(Exception('Not signed in'));
+    _messagePolicy = p;
+    notifyListeners();
+    return _dms.setMessagePolicy(uid, p);
+  }
+
   Future<Result<void>> _setReadReceipts(bool on) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return Result.error(Exception('Not signed in'));
@@ -223,6 +246,7 @@ class ProfileViewModel extends ChangeNotifier {
     _theme.removeListener(notifyListeners);
     setThemeMode.dispose();
     setReadReceipts.dispose();
+    setMessagePolicy.dispose();
     setPrivate.dispose();
     setVisibility.dispose();
     acceptRequest.dispose();

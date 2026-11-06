@@ -278,6 +278,45 @@ export function directMessageNotice(a: { conversationId: string; message: Data }
   };
 }
 
+/**
+ * A message request: no preview, so reading the notification gives
+ * nothing away. All requests fold into one entry.
+ */
+export function messageRequestNotice(a: { message: Data }): Notice {
+  const name = String(a.message.authorName ?? "") || "Someone";
+  return {
+    category: "directMessages",
+    route: "/messages",
+    collapseId: "dmRequests",
+    text: (_, count) => ({
+      title: count > 1 ? `${count} new message requests` : "New message request",
+      body: count > 1 ? "Open Messages, then Requests." : `${name} wants to send you a message.`,
+    }),
+  };
+}
+
+/**
+ * Who hears about a direct message, and how: everyone in it but the
+ * sender; whoever a request waits on as a request; nobody who declined it.
+ */
+export function directMessageRecipients(
+  conversation: Data | undefined,
+  senderId: string,
+): { direct: string[]; requests: string[] } {
+  const participants = ((conversation?.participants ?? []) as unknown[]).map(String);
+  const status = String(conversation?.status ?? "accepted");
+  const requestedOf = String(conversation?.requestedOf ?? "");
+  const direct: string[] = [];
+  const requests: string[] = [];
+  for (const uid of participants) {
+    if (uid === senderId) continue;
+    if (uid === requestedOf && status === "request") requests.push(uid);
+    else if (uid === requestedOf && status === "declined") continue;
+    else direct.push(uid);
+  }
+  return { direct, requests };
+}
+
 /** What changed, for the body of an "updated" notice. */
 function changeSummary(before: Data, after: Data): string {
   const fields = changedFields(before, after);

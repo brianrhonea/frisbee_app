@@ -23,6 +23,7 @@ class MessageThreadView extends StatefulWidget {
     this.emptyMessage = 'Say hello.',
     this.readOnlyNotice = 'You can read this conversation but not post in it.',
     this.hintText = 'Message',
+    this.footer,
   });
 
   final MessageThreadViewModel viewModel;
@@ -31,6 +32,9 @@ class MessageThreadView extends StatefulWidget {
 
   /// The composer's placeholder, e.g. "Message #general".
   final String hintText;
+
+  /// Shown instead of the composer, e.g. a message request's Accept bar.
+  final Widget? footer;
 
   @override
   State<MessageThreadView> createState() => _MessageThreadViewState();
@@ -121,7 +125,9 @@ class _MessageThreadViewState extends State<MessageThreadView> {
             ),
           ),
           if (vm.showsTyping) _TypingIndicator(label: vm.typingLabel),
-          if (vm.canWrite)
+          if (widget.footer case final footer?)
+            footer
+          else if (vm.canWrite)
             _Composer(
               viewModel: vm,
               controller: _text,

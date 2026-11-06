@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/player_profile.dart';
 import '../../../routing/routes.dart';
@@ -199,7 +200,12 @@ class PrivacySettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     return _CommandErrors(
-      commands: [vm.setReadReceipts, vm.setPrivate, vm.setVisibility],
+      commands: [
+        vm.setReadReceipts,
+        vm.setMessagePolicy,
+        vm.setPrivate,
+        vm.setVisibility,
+      ],
       child: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.setPrivate]),
         builder: (context, _) => SettingsPage(
@@ -237,9 +243,27 @@ class PrivacySettingsScreen extends StatelessWidget {
             SettingsGroup(
               title: 'Messages',
               footer:
-                  "Show people when you've read their messages. Turn it off "
-                  "and you won't see theirs either.",
+                  "Read receipts show people when you've read their "
+                  "messages. Turn them off and you won't see theirs either. "
+                  "Message requests are never marked as read until you "
+                  'accept them.',
               children: [
+                ListTile(
+                  leading: const Icon(Icons.forum_outlined),
+                  title: const Text('Who can message you'),
+                  subtitle: Text(vm.messagePolicy.label),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    final picked = await showDialog<MessagePolicy>(
+                      context: context,
+                      builder: (_) =>
+                          MessagePolicyDialog(selected: vm.messagePolicy),
+                    );
+                    if (picked != null && picked != vm.messagePolicy) {
+                      vm.setMessagePolicy.execute(picked);
+                    }
+                  },
+                ),
                 SwitchListTile(
                   secondary: const Icon(Icons.done_all),
                   title: const Text('Read receipts'),
@@ -483,4 +507,58 @@ class _CommandErrorsState extends State<_CommandErrors> {
 
   @override
   Widget build(BuildContext context) => widget.child;
+}
+
+/// Picks who may start a conversation with the user.
+class MessagePolicyDialog extends StatefulWidget {
+  const MessagePolicyDialog({super.key, required this.selected});
+
+  final MessagePolicy selected;
+
+  @override
+  State<MessagePolicyDialog> createState() => _MessagePolicyDialogState();
+}
+
+class _MessagePolicyDialogState extends State<MessagePolicyDialog> {
+  late MessagePolicy _picked = widget.selected;
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Who can message you'),
+    contentPadding: const EdgeInsets.only(top: 12),
+    content: SingleChildScrollView(
+      child: RadioGroup<MessagePolicy>(
+        groupValue: _picked,
+        onChanged: (p) => setState(() => _picked = p ?? _picked),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final p in MessagePolicy.values)
+              RadioListTile<MessagePolicy>(
+                value: p,
+                title: Text(p.label),
+                subtitle: Text(p.description),
+              ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 8, 24, 0),
+              child: Text(
+                'People you follow can always message you, unless you '
+                'pick No one.',
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, _picked),
+        child: const Text('Save'),
+      ),
+    ],
+  );
 }

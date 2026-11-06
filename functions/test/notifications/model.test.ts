@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   chatNotice,
   directMessageNotice,
+  directMessageRecipients,
+  messageRequestNotice,
   eventChange,
   eventViewers,
   eventChangeNotice,
@@ -131,6 +133,30 @@ describe("notices", () => {
     const n = directMessageNotice({ conversationId: "a_b", message: { authorName: "Sam", text: "yo" } });
     expect(n.text({}, 1)).toEqual({ title: "Sam", body: "yo" });
     expect(n.route).toBe("/messages/a_b");
+  });
+
+  it("tells a request's recipient quietly, and a decliner nothing", () => {
+    const conv = (extra: Record<string, unknown> = {}) => ({ participants: ["a", "b"], ...extra });
+    expect(directMessageRecipients(conv(), "a")).toEqual({ direct: ["b"], requests: [] });
+    expect(directMessageRecipients(conv({ status: "request", requestedOf: "b" }), "a")).toEqual({
+      direct: [],
+      requests: ["b"],
+    });
+    expect(directMessageRecipients(conv({ status: "declined", requestedOf: "b" }), "a")).toEqual({
+      direct: [],
+      requests: [],
+    });
+    // The sender of a request still hears the replies once it's accepted.
+    expect(directMessageRecipients(conv({ status: "accepted", requestedOf: "b" }), "b")).toEqual({
+      direct: ["a"],
+      requests: [],
+    });
+    expect(directMessageRecipients(undefined, "a")).toEqual({ direct: [], requests: [] });
+    const n = messageRequestNotice({ message: { authorName: "Sam", text: "secret" } });
+    expect(n.collapseId).toBe("dmRequests");
+    expect(n.text({}, 1)).toEqual({ title: "New message request", body: "Sam wants to send you a message." });
+    expect(JSON.stringify(n.text({}, 1))).not.toContain("secret");
+    expect(n.text({}, 2).title).toBe("2 new message requests");
   });
 
   it("words event changes in the recipient's time", () => {
