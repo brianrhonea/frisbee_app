@@ -14,6 +14,7 @@ import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/model_utils.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
+import 'package:frisbee_app/ui/chat/view_models/message_thread_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/direct_chat_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/inbox_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/people_search_viewmodel.dart';
@@ -209,6 +210,49 @@ void main() {
     );
     await pumpEventQueue();
     expect(notices.seen, ['dm_a_u1', 'dm_a_u1']);
+  });
+
+  test('shows who is typing until they go quiet, and sends my typing '
+      'at most every few seconds', () async {
+    await dms.openConversation(
+      testUser,
+      const UserProfile(uid: 'a', name: 'Avery'),
+    );
+    final vm = DirectChatViewModel(
+      conversationId: 'a_u1',
+      directMessageRepository: dms,
+      authRepository: auth,
+      filePicker: FakeFilePickerService(),
+    );
+    addTearDown(vm.dispose);
+    var clock = DateTime(2026, 11, 6, 9);
+    vm.now = () => clock;
+    await pumpEventQueue();
+    expect(vm.typingLabel, isNull);
+
+    dms.typed('a_u1', 'a', DateTime(2026, 11, 6, 8));
+    await pumpEventQueue();
+    expect(vm.typingLabel, 'Avery is typing…');
+    // My own entry is never shown.
+    dms.typed('a_u1', 'u1', DateTime(2026, 11, 6, 8));
+    await pumpEventQueue();
+    expect(vm.typingNames, ['Avery']);
+
+    clock = clock.add(MessageThreadViewModel.typingFor);
+    expect(vm.typingLabel, isNull, reason: 'quiet for too long');
+    dms.typed('a_u1', 'a', DateTime(2026, 11, 6, 8, 1));
+    await pumpEventQueue();
+    expect(vm.typingLabel, 'Avery is typing…');
+    dms.stoppedTyping('a_u1', 'a');
+    await pumpEventQueue();
+    expect(vm.typingLabel, isNull);
+
+    vm.composerChanged('H');
+    vm.composerChanged('He');
+    clock = clock.add(MessageThreadViewModel.typingEvery);
+    vm.composerChanged('Hey');
+    vm.composerChanged('');
+    expect(dms.typingSent, [('u1', true), ('u1', true), ('u1', false)]);
   });
 
   group('read receipts', () {

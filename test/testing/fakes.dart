@@ -1633,6 +1633,32 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
     return const Result.ok(null);
   }
 
+  /// conversation id → uid → when they typed.
+  final typing = <String, Map<String, DateTime?>>{};
+  final _typingChanges = StreamController<void>.broadcast();
+  final typingSent = <(String, bool)>[];
+
+  void typed(String id, String uid, DateTime? at) {
+    (typing[id] ??= {})[uid] = at;
+    _typingChanges.add(null);
+  }
+
+  void stoppedTyping(String id, String uid) {
+    typing[id]?.remove(uid);
+    _typingChanges.add(null);
+  }
+
+  @override
+  Stream<Map<String, DateTime?>> watchTyping(String id) async* {
+    yield Map.of(typing[id] ?? const {});
+    yield* _typingChanges.stream.map((_) => Map.of(typing[id] ?? const {}));
+  }
+
+  @override
+  Future<void> setTyping(String id, String uid, {required bool typing}) async {
+    typingSent.add((uid, typing));
+  }
+
   @override
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment a) async =>
       Result.error(Exception('missing'));

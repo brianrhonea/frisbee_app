@@ -128,6 +128,114 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   bool _disposed = false;
 
+  // Typing ------------------------------------------------------------------
+
+  /// How often, at most, the user's typing is sent while they type.
+  static const typingEvery = Duration(seconds: 3);
+
+  /// How long someone counts as typing after their last keystroke shows.
+  static const typingFor = Duration(seconds: 6);
+
+  /// Whether this thread shows who's typing.
+  bool get showsTyping => false;
+
+  /// Where others' typing comes from; null where it isn't shown.
+  @protected
+  Stream<Map<String, DateTime?>>? watchTyping() => null;
+
+  /// Tells the others the user is typing, or has stopped.
+  @protected
+  Future<void> sendTyping({required bool typing}) async {}
+
+  /// The name to show for [uid] when they're typing.
+  @protected
+  String typistName(String uid) => _people?.cached(uid)?.name ?? 'Someone';
+
+  StreamSubscription<Map<String, DateTime?>>? _typingSub;
+  Map<String, DateTime?> _typingSeen = const {};
+
+  /// uid → when (on this device's clock) they stop counting as typing.
+  final _typingUntil = <String, DateTime>{};
+  Timer? _typingExpiry;
+  DateTime? _sentTypingAt;
+
+  /// Clock, replaceable in tests.
+  @visibleForTesting
+  DateTime Function() now = DateTime.now;
+
+  /// Starts showing who's typing; call from the subclass constructor.
+  @protected
+  void startTyping() {
+    _typingSub?.cancel();
+    _typingSub = watchTyping()?.listen(_onTyping, onError: (Object _) {});
+  }
+
+  void _onTyping(Map<String, DateTime?> typing) {
+    final at = now();
+    for (final MapEntry(key: id, value: stamp) in typing.entries) {
+      if (id == uid) continue;
+      // A new or rewritten entry: they've just typed. The server's time
+      // only says it changed, so a skewed clock can't hide or stick it.
+      if (!_typingSeen.containsKey(id) || _typingSeen[id] != stamp) {
+        _typingUntil[id] = at.add(typingFor);
+      }
+    }
+    _typingUntil.removeWhere((id, _) => !typing.containsKey(id));
+    _typingSeen = typing;
+    _scheduleTypingExpiry();
+    notifyListeners();
+  }
+
+  void _scheduleTypingExpiry() {
+    _typingExpiry?.cancel();
+    if (_typingUntil.isEmpty) return;
+    final next = _typingUntil.values.reduce((a, b) => a.isBefore(b) ? a : b);
+    var wait = next.difference(now());
+    if (wait.isNegative) wait = Duration.zero;
+    _typingExpiry = Timer(wait + const Duration(milliseconds: 50), () {
+      if (_disposed) return;
+      final at = now();
+      _typingUntil.removeWhere((_, until) => !until.isAfter(at));
+      _scheduleTypingExpiry();
+      notifyListeners();
+    });
+  }
+
+  /// Others typing right now, oldest typist first.
+  List<String> get typingNames {
+    final at = now();
+    return [
+      for (final MapEntry(key: id, value: until) in _typingUntil.entries)
+        if (until.isAfter(at)) typistName(id),
+    ];
+  }
+
+  /// "Avery is typing…", "Avery and Blake are typing…", or null.
+  String? get typingLabel => switch (typingNames) {
+    [] => null,
+    [final a] => '$a is typing…',
+    [final a, final b] => '$a and $b are typing…',
+    [final a, ...final rest] => '$a and ${rest.length} others are typing…',
+  };
+
+  /// The composer's text changed: tells the others, at most every
+  /// [typingEvery], and that the user stopped once it's empty.
+  void composerChanged(String text) {
+    if (!canWrite) return;
+    final at = now();
+    if (text.trim().isEmpty) {
+      if (_sentTypingAt != null) {
+        _sentTypingAt = null;
+        sendTyping(typing: false);
+      }
+      return;
+    }
+    final last = _sentTypingAt;
+    if (last != null && at.difference(last) < typingEvery) return;
+    _sentTypingAt = at;
+    sendTyping(typing: true);
+  }
+
   /// The collapse id of this thread's notifications (see
   /// functions/src/notifications/model.ts), cleared once its messages
   /// are on screen; null for none.
@@ -304,6 +412,10 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     if (text.trim().isEmpty && _drafts.isEmpty) return const Result.ok(null);
     final attachments = List.of(_drafts);
     final result = await postMessage(user, text, attachments);
+    if (_sentTypingAt != null) {
+      _sentTypingAt = null;
+      unawaited(sendTyping(typing: false));
+    }
     if (result is Ok) {
       _drafts.removeWhere(attachments.contains);
       notifyListeners();
@@ -351,6 +463,9 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _typingSub?.cancel();
+    _typingExpiry?.cancel();
+    if (_sentTypingAt != null) unawaited(sendTyping(typing: false));
     _lifecycle?.dispose();
     removals.flush(removeMessage);
     _messageSub?.cancel();

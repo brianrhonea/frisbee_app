@@ -21,7 +21,9 @@ import '../../../domain/models/username.dart';
 /// storage.rules limit both to the two participants. Each user's own read
 /// times are private, in `users/{uid}/dmReads/{id}`; the conversation's
 /// `readAt` is the read receipt the other person sees, and the setting
-/// that turns it off is `readReceipts` on `users/{uid}`.
+/// that turns it off is `readReceipts` on `users/{uid}`. Typing shows
+/// through `conversations/{id}/typing/{uid}`, rewritten at most every few
+/// seconds while someone types and deleted when they send or clear it.
 class DirectMessageRepositoryFirebase implements DirectMessageRepository {
   DirectMessageRepositoryFirebase({
     required AttachmentStorage attachments,
@@ -62,6 +64,29 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
       },
     ),
   );
+
+  CollectionReference<Map<String, dynamic>> _typing(String id) =>
+      _conversations.doc(id).collection('typing');
+
+  @override
+  Stream<Map<String, DateTime?>> watchTyping(String id) =>
+      _typing(id).snapshots().map(
+        (snap) => {for (final d in snap.docs) d.id: parseDate(d.data()['at'])},
+      );
+
+  @override
+  Future<void> setTyping(String id, String uid, {required bool typing}) async {
+    try {
+      final ref = _typing(id).doc(uid);
+      if (typing) {
+        await ref.set({'at': FieldValue.serverTimestamp()});
+      } else {
+        await ref.delete();
+      }
+    } on Exception {
+      // Typing is a nicety: never bother the user about it.
+    }
+  }
 
   CollectionReference<Map<String, dynamic>> _messages(String id) =>
       _conversations.doc(id).collection('messages');

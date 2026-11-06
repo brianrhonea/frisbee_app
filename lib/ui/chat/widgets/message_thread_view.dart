@@ -54,6 +54,16 @@ class _MessageThreadViewState extends State<MessageThreadView> {
     for (final c in _commands) {
       c.addListener(_onCommand);
     }
+    _text.addListener(_onText);
+  }
+
+  String _lastText = '';
+
+  void _onText() {
+    // Selection changes notify too; only edits count as typing.
+    if (_text.text == _lastText) return;
+    _lastText = _text.text;
+    vm.composerChanged(_text.text);
   }
 
   @override
@@ -110,6 +120,7 @@ class _MessageThreadViewState extends State<MessageThreadView> {
               emptyMessage: widget.emptyMessage,
             ),
           ),
+          if (vm.showsTyping) _TypingIndicator(label: vm.typingLabel),
           if (vm.canWrite)
             _Composer(
               viewModel: vm,
@@ -124,6 +135,44 @@ class _MessageThreadViewState extends State<MessageThreadView> {
       ),
     ),
   );
+}
+
+/// "Avery is typing…" just above the composer; keeps its height when
+/// nobody is, so the messages don't jump.
+class _TypingIndicator extends StatelessWidget {
+  const _TypingIndicator({required this.label});
+
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return SizedBox(
+      height: 20,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 150),
+            child: label == null
+                ? const SizedBox.shrink()
+                : Text(
+                    label!,
+                    key: ValueKey(label),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: c.muted,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // Messages -----------------------------------------------------------------

@@ -1992,6 +1992,26 @@ describe("direct messages", () => {
     await assertFails(deleteDoc(doc(db(PLAYER), "limits", PLAYER)));
   });
 
+  it("participants say they're typing, only as themselves", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "conversations", CONV), { ...newConv(), createdAt: new Date() }),
+    );
+    const typing = (uid: string, who = uid, id = CONV) => doc(db(uid), "conversations", id, "typing", who);
+    await assertSucceeds(setDoc(typing(PLAYER), { at: serverTimestamp() }));
+    await assertSucceeds(setDoc(typing(PLAYER), { at: serverTimestamp() }));
+    await assertSucceeds(getDoc(typing(OWNER, PLAYER)));
+    await assertFails(getDoc(typing(OUTSIDER, PLAYER)));
+    // Not as someone else, not with a made-up time or extra fields.
+    await assertFails(setDoc(typing(OWNER, PLAYER), { at: serverTimestamp() }));
+    await assertFails(setDoc(typing(OWNER), { at: new Date(2000, 0, 1) }));
+    await assertFails(setDoc(typing(OWNER), { at: serverTimestamp(), text: "secret" }));
+    // Not in someone else's conversation, or one that doesn't exist yet.
+    await assertFails(setDoc(typing(OUTSIDER), { at: serverTimestamp() }));
+    await assertFails(setDoc(typing(PLAYER, PLAYER, `${OUTSIDER}_${PLAYER}`), { at: serverTimestamp() }));
+    await assertFails(deleteDoc(typing(OWNER, PLAYER)));
+    await assertSucceeds(deleteDoc(typing(PLAYER)));
+  });
+
   it("each user's read times are private to them", async () => {
     const read = (uid: string, owner = uid, id = CONV) => doc(db(uid), "users", owner, "dmReads", id);
     await assertSucceeds(setDoc(read(PLAYER), { readAt: serverTimestamp() }));

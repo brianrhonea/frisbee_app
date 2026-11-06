@@ -58,4 +58,12 @@ abstract class DirectMessageRepository {
   Future<Result<void>> setReadReceipts(String uid, {required bool on});
 
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment attachment);
+
+  /// Who's typing in conversation [id]: uid → when they last typed, by
+  /// the server's clock (null until it's stamped). The app decides when
+  /// a typist has gone quiet.
+  Stream<Map<String, DateTime?>> watchTyping(String id);
+
+  /// Says [uid] is typing in [id] (or has stopped).
+  Future<void> setTyping(String id, String uid, {required bool typing});
 }

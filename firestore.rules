@@ -2001,6 +2001,18 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time;
         allow delete: if signedIn() && resource.data.authorId == uid();
       }
+
+      // "Typing…": each participant writes only their own, stamped by the
+      // server, and deletes it when they send or clear the box.
+      match /typing/{userId} {
+        allow read: if signedIn() && inConversation();
+        allow create, update: if signedIn() && inConversation()
+          && userId == uid()
+          && exists(convPath())
+          && request.resource.data.keys().hasOnly(['at'])
+          && request.resource.data.at == request.time;
+        allow delete: if signedIn() && userId == uid();
+      }
     }
 
     // ---- Invite codes -----------------------------------------------------

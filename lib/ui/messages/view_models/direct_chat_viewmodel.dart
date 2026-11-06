@@ -50,6 +50,7 @@ class DirectChatViewModel extends MessageThreadViewModel {
           },
         );
     startMessages();
+    startTyping();
   }
 
   final String conversationId;
@@ -110,6 +111,21 @@ class DirectChatViewModel extends MessageThreadViewModel {
 
   @override
   String get noticeKey => 'dm_$conversationId';
+
+  @override
+  bool get showsTyping => true;
+
+  @override
+  Stream<Map<String, DateTime?>> watchTyping() =>
+      _dms.watchTyping(conversationId);
+
+  @override
+  Future<void> sendTyping({required bool typing}) =>
+      _dms.setTyping(conversationId, uid, typing: typing);
+
+  @override
+  String typistName(String uid) =>
+      _conversation?.names[uid] ?? super.typistName(uid);
 
   @override
   Stream<List<ChatMessage>> watchMessages(int limit) =>
