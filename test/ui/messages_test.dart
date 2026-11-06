@@ -22,6 +22,7 @@ import 'package:frisbee_app/ui/messages/widgets/inbox_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
+import '../testing/social_fakes.dart';
 
 void main() {
   group('UserProfile', () {
@@ -146,6 +147,33 @@ void main() {
     expect(vm.messages.map((m) => m.text), ['Need a ride?', 'Yes please']);
     expect(vm.canDelete(vm.messages.first), isFalse);
     expect(vm.canDelete(vm.messages.last), isTrue);
+  });
+
+  test('messages and the header show usernames once looked up', () async {
+    await dms.openConversation(
+      testUser,
+      const UserProfile(uid: 'a', name: 'Avery'),
+    );
+    await dms.sendMessage(
+      'a_u1',
+      author: const AppUser(uid: 'a', displayName: 'Avery'),
+      text: 'Hi',
+    );
+    final people = FakePeopleRepository(const [
+      UserProfile(uid: 'a', name: 'Avery', username: 'avery7'),
+    ]);
+    final vm = DirectChatViewModel(
+      conversationId: 'a_u1',
+      directMessageRepository: dms,
+      authRepository: auth,
+      filePicker: FakeFilePickerService(),
+      peopleRepository: people,
+    );
+    addTearDown(vm.dispose);
+    await pumpEventQueue();
+    expect(vm.usernameOf('a'), 'avery7');
+    expect(vm.otherUsername, 'avery7');
+    expect(vm.usernameOf(testUser.uid), isNull);
   });
 
   group('read receipts', () {

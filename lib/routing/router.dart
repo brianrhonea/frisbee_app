@@ -1,3 +1,4 @@
+import '../data/repositories/people/people_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -889,6 +890,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                               notificationRepository: c.read(),
                               authRepository: c.read(),
                               filePicker: c.read(),
+                              peopleRepository: c.read<PeopleRepository?>(),
                             ),
                             builder: (_, vm) => ChatRoomScreen(viewModel: vm),
                           ),
@@ -1042,6 +1044,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                           directMessageRepository: c.read(),
                           authRepository: c.read(),
                           filePicker: c.read(),
+                          peopleRepository: c.read<PeopleRepository?>(),
                         ),
                         builder: (_, vm) => DirectChatScreen(viewModel: vm),
                       ),

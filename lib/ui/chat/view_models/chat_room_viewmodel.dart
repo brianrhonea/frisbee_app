@@ -23,6 +23,7 @@ class ChatRoomViewModel extends MessageThreadViewModel {
     required NotificationRepository notificationRepository,
     required super.authRepository,
     required super.filePicker,
+    super.peopleRepository,
   }) : _chats = chatRepository {
     toggleMuted = Command0<void>(
       () => notificationRepository.setRoomMuted(

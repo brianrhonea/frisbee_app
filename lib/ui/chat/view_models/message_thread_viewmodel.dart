@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/people/people_repository.dart';
 import '../../../data/services/file_picker_service.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
@@ -16,8 +17,10 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   MessageThreadViewModel({
     required AuthRepository authRepository,
     required FilePickerService filePicker,
+    PeopleRepository? peopleRepository,
   }) : _auth = authRepository,
-       _picker = filePicker {
+       _picker = filePicker,
+       _people = peopleRepository {
     send = Command1<void, String>(_send);
     pickFiles = Command1<void, bool>(_pickFiles);
     deleteMessage = Command1<void, ChatMessage>(_delete);
@@ -28,6 +31,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   final AuthRepository _auth;
   final FilePickerService _picker;
+  final PeopleRepository? _people;
   StreamSubscription<List<ChatMessage>>? _messageSub;
 
   /// Sends the composer's text with the pending attachments.
@@ -93,6 +97,25 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   /// colored role, or null for the default.
   int? nameColorOf(String uid) => null;
 
+  /// [uid]'s username, without the "@", once looked up; null if they
+  /// have none or it hasn't arrived yet.
+  String? usernameOf(String uid) => _people?.cached(uid)?.username;
+
+  /// Looks up the usernames of [uids] not yet known, then redraws.
+  @protected
+  void lookUpPeople(Iterable<String> uids) {
+    final people = _people;
+    if (people == null) return;
+    for (final id in uids.toSet()) {
+      if (id.isEmpty || people.cached(id) != null) continue;
+      people.person(id).then((p) {
+        if (p?.username != null && !_disposed) notifyListeners();
+      });
+    }
+  }
+
+  bool _disposed = false;
+
   /// Who may delete [m] besides its author.
   @protected
   bool get canModerate => false;
@@ -134,6 +157,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
       _older.removeWhere((x) => live.contains(x.id));
       _live = m;
       _messageError = null;
+      lookUpPeople(m.map((x) => x.authorId));
       onMessages(m);
       notifyListeners();
     }, onError: _onMessageError);
@@ -186,6 +210,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
       case Ok(:final value):
         final known = {for (final m in _older) m.id};
         _older.insertAll(0, value.where((m) => !known.contains(m.id)));
+        lookUpPeople(value.map((x) => x.authorId));
         if (value.length < pageSize) _olderExhausted = true;
         notifyListeners();
       case Error():
@@ -270,6 +295,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     removals.flush(removeMessage);
     _messageSub?.cancel();
     super.dispose();

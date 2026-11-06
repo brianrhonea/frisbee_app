@@ -23,6 +23,8 @@ import '../data/repositories/meeting/meeting_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_settings_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/notification/notification_repository_firebase.dart';
+import '../data/repositories/people/people_repository.dart';
+import '../data/repositories/people/people_repository_firebase.dart';
 import '../data/repositories/post_comment/post_comment_repository.dart';
 import '../data/repositories/post_comment/post_comment_repository_firebase.dart';
 import '../data/repositories/profile/profile_repository.dart';
@@ -118,6 +120,7 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<PostCommentRepository>(
     create: (_) => PostCommentRepositoryFirebase(),
   ),
+  Provider<PeopleRepository>(create: (_) => PeopleRepositoryFirebase()),
   Provider<FollowRepository>(create: (_) => FollowRepositoryFirebase()),
   Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),
   Provider<YouTubeInfoService>(create: (_) => YouTubeInfoService()),

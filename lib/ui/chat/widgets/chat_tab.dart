@@ -1,3 +1,4 @@
+import '../../../data/repositories/people/people_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -56,6 +57,7 @@ class ChatTab extends StatelessWidget {
                       notificationRepository: c.read(),
                       authRepository: c.read(),
                       filePicker: c.read(),
+                      peopleRepository: c.read<PeopleRepository?>(),
                     ),
                     builder: (_, roomVm) => ChatRoomView(viewModel: roomVm),
                   ),

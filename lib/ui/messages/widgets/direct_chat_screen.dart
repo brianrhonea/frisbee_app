@@ -109,7 +109,12 @@ class DirectChatView extends StatelessWidget {
                 ? null
                 : PersonAvatar(name: vm.otherName, radius: 18),
             title: vm.conversation == null ? null : vm.otherName,
-            subtitle: vm.conversation == null ? null : 'Direct message',
+            subtitle: vm.conversation == null
+                ? null
+                : switch (vm.otherUsername) {
+                    final handle? => '@$handle',
+                    null => 'Direct message',
+                  },
           ),
           body: body,
         );

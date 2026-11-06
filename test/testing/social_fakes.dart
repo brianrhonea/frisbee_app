@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:frisbee_app/data/repositories/follow/follow_repository.dart';
+import 'package:frisbee_app/data/repositories/people/people_repository.dart';
 import 'package:frisbee_app/data/repositories/post_comment/post_comment_repository.dart';
 import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
+import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/post_comment.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
@@ -472,5 +474,23 @@ class FakePostCommentRepository implements PostCommentRepository {
     if (comments.length < before) _count(comment.postId, -1);
     changed();
     return const Result.ok(null);
+  }
+}
+
+class FakePeopleRepository implements PeopleRepository {
+  FakePeopleRepository([Iterable<UserProfile> people = const []])
+    : _people = {for (final p in people) p.uid: p};
+
+  final Map<String, UserProfile> _people;
+  final _fetched = <String, UserProfile?>{};
+  final lookups = <String>[];
+
+  @override
+  UserProfile? cached(String uid) => _fetched[uid];
+
+  @override
+  Future<UserProfile?> person(String uid) async {
+    lookups.add(uid);
+    return _fetched[uid] = _people[uid];
   }
 }

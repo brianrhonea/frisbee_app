@@ -16,6 +16,7 @@ class DirectChatViewModel extends MessageThreadViewModel {
     required DirectMessageRepository directMessageRepository,
     required super.authRepository,
     required super.filePicker,
+    super.peopleRepository,
   }) : _dms = directMessageRepository {
     _receiptsSub = _dms
         .watchReadReceipts(uid)
@@ -37,6 +38,7 @@ class DirectChatViewModel extends MessageThreadViewModel {
           (c) {
             _conversation = c;
             _loaded = true;
+            if (c != null) lookUpPeople([c.otherId(uid)]);
             _markRead();
             notifyListeners();
           },
@@ -73,6 +75,10 @@ class DirectChatViewModel extends MessageThreadViewModel {
   Object? get error => _error ?? messageError;
 
   String get otherName => _conversation?.otherName(uid) ?? '';
+
+  /// The other person's username, once looked up.
+  String? get otherUsername =>
+      _conversation == null ? null : usernameOf(_conversation!.otherId(uid));
 
   @override
   bool get canWrite => _conversation?.participants.contains(uid) ?? false;

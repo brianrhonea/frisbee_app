@@ -288,6 +288,11 @@ class _MessageRowState extends State<_MessageRow> {
                     color: widget.nameColor ?? c.ink,
                   ),
                 ),
+                if (widget.viewModel.usernameOf(m.authorId) case final handle?)
+                  Text(
+                    '@$handle',
+                    style: TextStyle(fontSize: 12.5, color: c.muted),
+                  ),
                 Text(
                   time == null ? 'Sending…' : _stamp(time),
                   style: TextStyle(fontSize: 11.5, color: c.muted),
