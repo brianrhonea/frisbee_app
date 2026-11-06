@@ -53,12 +53,10 @@ class DefaultFirebaseOptions {
   }
 
   static FirebaseOptions get currentPlatform {
-    if (kIsWeb) {
-      throw UnsupportedError(
-        'The app does not target web; the website is a separate project.',
-      );
-    }
     final prod = env == FirebaseEnv.prod;
+    // The website (lib/main_web.dart, served at /app) shares the Windows
+    // build's Firebase web app: same app id, auth domain and API key.
+    if (kIsWeb) return prod ? windows : devWindows;
     return switch (defaultTargetPlatform) {
       TargetPlatform.android => prod ? android : devAndroid,
       TargetPlatform.iOS || TargetPlatform.macOS => prod ? ios : devIos,

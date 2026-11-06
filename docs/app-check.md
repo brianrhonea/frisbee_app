@@ -27,7 +27,10 @@ tells them "You're going too fast".
 3. **Watch** App Check → APIs → Firestore / Storage / Functions metrics for
    a week. "Verified" should cover nearly all requests from current builds.
 4. **Enforce** in the console (Firestore, Storage) once older builds without
-   App Check are gone. For callables, add `ENFORCE_APP_CHECK=true` to
+   App Check are gone. **The website (`lib/main_web.dart`) has no App Check
+   provider yet**: before enforcing, register a reCAPTCHA Enterprise key for
+   the web app and add `providerWeb` in `AppCheck.activate`, or the website
+   stops working. For callables, add `ENFORCE_APP_CHECK=true` to
    `functions/.env.dev` (or `.env.prod`) and redeploy the functions.
 5. Undo any step by un-enforcing in the console, or removing the env line
    and redeploying.

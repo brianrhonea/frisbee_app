@@ -37,19 +37,8 @@ class ApiSearch {
         if (h is Map && h['id'] is String && h['data'] is Map)
           (
             id: h['id'] as String,
-            data: _plain(h['data']) as Map<String, dynamic>,
+            data: fromCallableJson(h['data']) as Map<String, dynamic>,
           ),
     ];
   }
-
-  /// Undoes the function's JSON encoding: `{__ts: millis}` → DateTime.
-  static Object? _plain(Object? value) => switch (value) {
-    {'__ts': final int ms} when value.length == 1 =>
-      DateTime.fromMillisecondsSinceEpoch(ms),
-    Map m => <String, dynamic>{
-      for (final MapEntry(:key, :value) in m.entries) '$key': _plain(value),
-    },
-    List l => l.map(_plain).toList(),
-    _ => value,
-  };
 }

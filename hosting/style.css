@@ -60,4 +60,7 @@ h1 {
   color: var(--lime);
 }
 
+.store-links { font-size: 14px; }
+.store-links a { color: var(--lime); }
+
 [hidden] { display: none !important; }

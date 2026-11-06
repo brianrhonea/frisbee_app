@@ -41,17 +41,25 @@ class CallableClient {
       ? Uri.parse('http://localhost:5001/$_projectId/$_region/$name')
       : Uri.parse('https://$_region-$_projectId.cloudfunctions.net/$name');
 
-  /// Calls function [name] with [data] and returns its result.
-  Future<Object?> call(String name, Map<String, Object?> data) async {
+  /// Calls function [name] with [data] and returns its result. With
+  /// [signedOut], calls without an account too (the website's `browse`
+  /// functions), still sending the user's token when there is one.
+  Future<Object?> call(
+    String name,
+    Map<String, Object?> data, {
+    bool signedOut = false,
+  }) async {
     final user = (_auth ?? FirebaseAuth.instance).currentUser;
-    if (user == null) throw const CallableException('Not signed in.');
-    final idToken = await user.getIdToken();
+    if (user == null && !signedOut) {
+      throw const CallableException('Not signed in.');
+    }
+    final idToken = await user?.getIdToken();
     final response = await _client.post(
       _endpoint(name),
       headers: {
         'Content-Type': 'application/json',
         ...await AppCheck.headers(),
-        'Authorization': 'Bearer $idToken',
+        'Authorization': ?(idToken == null ? null : 'Bearer $idToken'),
       },
       body: jsonEncode({'data': data}),
     );
@@ -72,3 +80,16 @@ class CallableClient {
     );
   }
 }
+
+/// Undoes the functions' JSON encoding of Firestore values: `{__ts: millis}`
+/// becomes a DateTime, as `plainData` gives them.
+Object? fromCallableJson(Object? value) => switch (value) {
+  {'__ts': final int ms} when value.length == 1 =>
+    DateTime.fromMillisecondsSinceEpoch(ms),
+  Map m => <String, dynamic>{
+    for (final MapEntry(:key, :value) in m.entries)
+      '$key': fromCallableJson(value),
+  },
+  List l => l.map(fromCallableJson).toList(),
+  _ => value,
+};

@@ -93,16 +93,26 @@ service firebase.storage {
 
     // Team post photos, uploaded by members who can manage the team
     // before the post is saved. Visible like the post (see posts in firestore.rules):
-    // to anyone signed in once it's public, otherwise to members.
+    // to anyone signed in once it's public, otherwise to members. Website
+    // visitors without an account see a public post's photos too (the
+    // `browse` functions list those posts), unless the team is a private
+    // group.
     match /teams/{teamId}/posts/{postId}/{upload}/{fileName} {
       function postPath() {
         return /databases/(default)/documents/teams/$(teamId)/posts/$(postId);
       }
+      function publicPost() {
+        return firestore.exists(postPath())
+          && firestore.get(postPath()).data.public == true;
+      }
+      function privateGroup(t) {
+        return t.get('kind', 'team') in ['community', 'organization']
+          && t.get('requiresApproval', false) == true;
+      }
 
-      allow get: if request.auth != null && (
-        (firestore.exists(postPath())
-          && firestore.get(postPath()).data.public == true)
-        || isMember(team(teamId)));
+      allow get: if (request.auth != null
+          && (publicPost() || isMember(team(teamId))))
+        || (publicPost() && !privateGroup(team(teamId)));
       allow create, update: if request.auth != null
         && can(team(teamId), 'manageTeam')
         && request.resource.size <= 10 * 1024 * 1024
@@ -128,9 +138,17 @@ service firebase.storage {
 
     // Photos on people's own posts (posts in firestore.rules), uploaded
     // into the author's folder before the post is saved. Posts are public
-    // to anyone signed in, and so are their photos.
+    // to anyone signed in, and so are their photos. Website visitors
+    // without an account see them too unless the author's profile is
+    // private (the `browse` functions leave those posts out).
     match /users/{userId}/posts/{postId}/{upload}/{fileName} {
-      allow get: if request.auth != null;
+      function publicAuthor() {
+        let profile = /databases/(default)/documents/profiles/$(userId);
+        return firestore.exists(profile)
+          && firestore.get(profile).data.get('private', false) == false;
+      }
+
+      allow get: if request.auth != null || publicAuthor();
       allow create, update: if request.auth != null
         && request.auth.uid == userId
         && request.resource.size <= 10 * 1024 * 1024
