@@ -24,7 +24,8 @@ class ChatRoomViewModel extends MessageThreadViewModel {
     required super.authRepository,
     required super.filePicker,
     super.peopleRepository,
-  }) : _chats = chatRepository {
+  }) : _chats = chatRepository,
+       super(notificationRepository: notificationRepository) {
     toggleMuted = Command0<void>(
       () => notificationRepository.setRoomMuted(
         uid,
@@ -100,6 +101,9 @@ class ChatRoomViewModel extends MessageThreadViewModel {
 
   /// Members who can manage chats change the room's name and access.
   bool get canManage => _team?.has(uid, TeamPermission.manageChats) ?? false;
+
+  @override
+  String get noticeKey => 'chat_${teamId}_$roomId';
 
   @override
   Stream<List<ChatMessage>> watchMessages(int limit) =>

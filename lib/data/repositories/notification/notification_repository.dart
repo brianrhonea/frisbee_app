@@ -38,6 +38,12 @@ abstract class NotificationRepository {
 
   Future<Result<void>> markRead(String uid, Iterable<String> ids);
 
+  /// The thing a notice is about (a conversation, a chat room) was seen
+  /// in the app without going through the notification panel: marks its
+  /// feed entry read, if it's there and unread, and clears its push
+  /// notifications from this device.
+  Future<void> markSeen(String uid, String collapseId);
+
   Future<Result<void>> delete(String uid, Iterable<String> ids);
 
   bool get pushSupported;

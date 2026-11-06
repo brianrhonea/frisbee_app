@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/people/people_repository.dart';
 import '../../../data/services/file_picker_service.dart';
 import '../../../domain/models/app_user.dart';
@@ -18,9 +20,14 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     required AuthRepository authRepository,
     required FilePickerService filePicker,
     PeopleRepository? peopleRepository,
+    NotificationRepository? notificationRepository,
   }) : _auth = authRepository,
        _picker = filePicker,
-       _people = peopleRepository {
+       _people = peopleRepository,
+       _notices = notificationRepository {
+    if (notificationRepository != null) {
+      _lifecycle = _tryLifecycleListener(_markSeen);
+    }
     send = Command1<void, String>(_send);
     pickFiles = Command1<void, bool>(_pickFiles);
     deleteMessage = Command1<void, ChatMessage>(_delete);
@@ -32,6 +39,11 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   final AuthRepository _auth;
   final FilePickerService _picker;
   final PeopleRepository? _people;
+  final NotificationRepository? _notices;
+  AppLifecycleListener? _lifecycle;
+
+  /// The newest message from someone else already marked seen.
+  String? _seenUpTo;
   StreamSubscription<List<ChatMessage>>? _messageSub;
 
   /// Sends the composer's text with the pending attachments.
@@ -116,6 +128,48 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   bool _disposed = false;
 
+  /// The collapse id of this thread's notifications (see
+  /// functions/src/notifications/model.ts), cleared once its messages
+  /// are on screen; null for none.
+  @protected
+  String? get noticeKey => null;
+
+  /// Clears this thread's notification once its newest message from
+  /// someone else has been on screen with the app in the foreground.
+  void _markSeen() {
+    final notices = _notices;
+    final key = noticeKey;
+    final live = _live;
+    if (notices == null || key == null || live == null || _disposed) return;
+    if (!_inForeground()) return;
+    final newest = live.lastWhere(
+      (m) => m.authorId != uid,
+      orElse: () => const ChatMessage(id: '', authorId: '', authorName: ''),
+    );
+    // The first time, clear even with nothing new: it was read elsewhere.
+    if (_seenUpTo != null && newest.id == _seenUpTo) return;
+    _seenUpTo = newest.id;
+    notices.markSeen(uid, key);
+  }
+
+  static bool _inForeground() {
+    try {
+      final s = WidgetsBinding.instance.lifecycleState;
+      return s == null || s == AppLifecycleState.resumed;
+    } on Object {
+      return true;
+    }
+  }
+
+  static AppLifecycleListener? _tryLifecycleListener(VoidCallback onResume) {
+    try {
+      return AppLifecycleListener(onResume: onResume);
+    } on Object {
+      // No binding (a plain unit test).
+      return null;
+    }
+  }
+
   /// Who may delete [m] besides its author.
   @protected
   bool get canModerate => false;
@@ -159,6 +213,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
       _messageError = null;
       lookUpPeople(m.map((x) => x.authorId));
       onMessages(m);
+      _markSeen();
       notifyListeners();
     }, onError: _onMessageError);
   }
@@ -296,6 +351,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _lifecycle?.dispose();
     removals.flush(removeMessage);
     _messageSub?.cancel();
     super.dispose();

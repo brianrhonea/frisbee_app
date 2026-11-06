@@ -1754,6 +1754,14 @@ class FakeNotificationRepository implements NotificationRepository {
   Stream<List<AppNotification>> watchFeed(String uid) =>
       _watch(() => List.of(feed));
 
+  final seen = <String>[];
+
+  @override
+  Future<void> markSeen(String uid, String collapseId) async {
+    seen.add(collapseId);
+    await markRead(uid, [collapseId]);
+  }
+
   @override
   Future<Result<void>> markRead(String uid, Iterable<String> ids) async {
     final set = ids.toSet();

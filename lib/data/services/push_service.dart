@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_app_installations/firebase_app_installations.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
 
 import '../../domain/models/notification.dart';
@@ -33,6 +34,22 @@ class PushService {
   };
 
   String get platform => defaultTargetPlatform.name;
+
+  /// Native side: AppDelegate.swift (iOS, macOS) and MainActivity.kt.
+  static const _channel = MethodChannel('stall10/notifications');
+
+  /// Removes delivered push notifications grouped under [collapseId] (the
+  /// Android tag, the Apple thread id) from the lock screen and
+  /// notification shade, e.g. once the conversation has been read here.
+  Future<void> clearDelivered(String collapseId) async {
+    if (kIsWeb || !isSupported) return;
+    try {
+      await _channel.invokeMethod<void>('clearDelivered', collapseId);
+    } on Exception catch (e) {
+      // An older build without the handler: nothing to clear.
+      _log.fine('clearDelivered failed: $e');
+    }
+  }
 
   Future<PushStatus> status() async {
     if (!isSupported) return PushStatus.unsupported;

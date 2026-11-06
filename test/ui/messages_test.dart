@@ -176,6 +176,41 @@ void main() {
     expect(vm.usernameOf(testUser.uid), isNull);
   });
 
+  test('opening a chat clears its notification, and again for new '
+      'messages from the other person', () async {
+    await dms.openConversation(
+      testUser,
+      const UserProfile(uid: 'a', name: 'Avery'),
+    );
+    await dms.sendMessage(
+      'a_u1',
+      author: const AppUser(uid: 'a', displayName: 'Avery'),
+      text: 'Hi',
+    );
+    final notices = FakeNotificationRepository();
+    final vm = DirectChatViewModel(
+      conversationId: 'a_u1',
+      directMessageRepository: dms,
+      authRepository: auth,
+      filePicker: FakeFilePickerService(),
+      notificationRepository: notices,
+    );
+    addTearDown(vm.dispose);
+    await pumpEventQueue();
+    expect(notices.seen, ['dm_a_u1']);
+    // My own message doesn't need clearing.
+    await vm.send.execute('Hey');
+    await pumpEventQueue();
+    expect(notices.seen, ['dm_a_u1']);
+    await dms.sendMessage(
+      'a_u1',
+      author: const AppUser(uid: 'a', displayName: 'Avery'),
+      text: 'Practice at 6',
+    );
+    await pumpEventQueue();
+    expect(notices.seen, ['dm_a_u1', 'dm_a_u1']);
+  });
+
   group('read receipts', () {
     Future<DirectChatViewModel> chat() async {
       await dms.openConversation(

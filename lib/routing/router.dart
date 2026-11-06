@@ -1,3 +1,4 @@
+import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/people/people_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -1045,6 +1046,8 @@ GoRouter router(AuthRepository auth) => GoRouter(
                           authRepository: c.read(),
                           filePicker: c.read(),
                           peopleRepository: c.read<PeopleRepository?>(),
+                          notificationRepository: c
+                              .read<NotificationRepository?>(),
                         ),
                         builder: (_, vm) => DirectChatScreen(viewModel: vm),
                       ),

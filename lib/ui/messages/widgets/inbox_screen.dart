@@ -1,3 +1,4 @@
+import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/people/people_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -137,6 +138,7 @@ class _Detail extends StatelessWidget {
       authRepository: c.read(),
       filePicker: c.read(),
       peopleRepository: c.read<PeopleRepository?>(),
+      notificationRepository: c.read<NotificationRepository?>(),
     ),
     builder: (_, dmVm) => DirectChatView(viewModel: dmVm),
   );

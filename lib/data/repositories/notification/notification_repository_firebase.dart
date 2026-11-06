@@ -136,6 +136,21 @@ class NotificationRepositoryFirebase implements NotificationRepository {
   );
 
   @override
+  Future<void> markSeen(String uid, String collapseId) async {
+    unawaited(_push.clearDelivered(collapseId));
+    try {
+      // A notice with a collapse id is stored under it (deliver.ts).
+      final ref = _feed(uid).doc(collapseId);
+      final snap = await ref.get();
+      if (snap.exists && snap.data()?['read'] != true) {
+        await ref.update({'read': true});
+      }
+    } on Exception {
+      // Best effort: it's still in the notification panel to clear.
+    }
+  }
+
+  @override
   Future<Result<void>> markRead(String uid, Iterable<String> ids) =>
       guard(() async {
         final all = ids.toList();

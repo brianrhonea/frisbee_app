@@ -17,6 +17,7 @@ class DirectChatViewModel extends MessageThreadViewModel {
     required super.authRepository,
     required super.filePicker,
     super.peopleRepository,
+    super.notificationRepository,
   }) : _dms = directMessageRepository {
     _receiptsSub = _dms
         .watchReadReceipts(uid)
@@ -106,6 +107,9 @@ class DirectChatViewModel extends MessageThreadViewModel {
     if (messages.lastOrNull?.id != message.id) return null;
     return c.isSeen(uid) ? 'Seen' : null;
   }
+
+  @override
+  String get noticeKey => 'dm_$conversationId';
 
   @override
   Stream<List<ChatMessage>> watchMessages(int limit) =>
