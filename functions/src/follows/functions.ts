@@ -71,6 +71,18 @@ export const userPostDeleted = onDocumentDeleted("posts/{postId}", async (event)
 /** Firestore's NOT_FOUND, e.g. updating a post that was deleted. */
 const notFound = (e: unknown) => (e as { code?: number | string }).code === 5 || (e as { code?: string }).code === "not-found";
 
+/** Deletes the replies to comment [commentId] on post [postId]. */
+async function deleteReplies(postId: string, commentId: string) {
+  const db = getFirestore();
+  for (;;) {
+    const snap = await db.collection(`posts/${postId}/comments`).where("parentId", "==", commentId).limit(450).get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    for (const d of snap.docs) batch.delete(d.ref);
+    await batch.commit();
+  }
+}
+
 /**
  * Keeps a post's commentCount in step as comments are added and deleted.
  * Comments deleted along with their post have no post left to count on.
@@ -78,6 +90,10 @@ const notFound = (e: unknown) => (e as { code?: number | string }).code === 5 ||
 export const commentCount = onDocumentWritten("posts/{postId}/comments/{commentId}", async (event) => {
   const by = commentCountChange(event.data?.before.exists ?? false, event.data?.after.exists ?? false);
   if (by === 0) return;
+  // A top-level comment takes its replies with it; each reply deleted
+  // runs this again and takes itself off the count.
+  const gone = by < 0 ? event.data?.before.data() : undefined;
+  if (gone && gone.parentId == null) await deleteReplies(event.params.postId, event.params.commentId);
   try {
     await getFirestore().doc(`posts/${event.params.postId}`).update({ commentCount: FieldValue.increment(by) });
   } catch (e) {

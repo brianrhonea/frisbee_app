@@ -27,6 +27,8 @@ class PostDetailViewModel extends ChangeNotifier {
     delete = Command0<void>(() => _posts.deletePost(postId));
     addComment = Command1<void, String>(_addComment);
     deleteComment = Command1<void, PostComment>(_deleteComment);
+    editComment = Command1<void, String>(_editComment);
+    toggleCommentLike = Command1<void, PostComment>(_toggleCommentLike);
     actions = PostActions(
       userPostRepository: userPostRepository,
       authRepository: authRepository,
@@ -95,6 +97,46 @@ class PostDetailViewModel extends ChangeNotifier {
   late final Command1<void, String> addComment;
   late final Command1<void, PostComment> deleteComment;
 
+  /// Saves new text for [editing].
+  late final Command1<void, String> editComment;
+
+  /// Likes a comment, or takes the like back.
+  late final Command1<void, PostComment> toggleCommentLike;
+
+  /// Top-level comments with their replies, oldest first; null while
+  /// loading.
+  List<CommentThread>? get threads => switch (comments) {
+    final list? => threadComments(list),
+    null => null,
+  };
+
+  PostComment? _replyingTo;
+  PostComment? _editing;
+
+  /// The comment the next one answers; null for a top-level comment.
+  PostComment? get replyingTo => _replyingTo;
+
+  /// The comment being rewritten in the box; null when writing a new one.
+  PostComment? get editing => _editing;
+
+  /// Replies to [c] with the next comment (or stops, with null).
+  void replyTo(PostComment? c) {
+    _replyingTo = c;
+    _editing = null;
+    notifyListeners();
+  }
+
+  /// Starts rewriting [c], one of the user's own (or stops, with null).
+  void startEditing(PostComment? c) {
+    if (c != null && !canEditComment(c)) return;
+    _editing = c;
+    _replyingTo = null;
+    notifyListeners();
+  }
+
+  /// Only a comment's author edits it.
+  bool canEditComment(PostComment c) => uid.isNotEmpty && c.authorId == uid;
+
   String get uid => _auth.currentUser?.uid ?? '';
 
   /// The comment's author, or the author of the post it's on.
@@ -140,17 +182,51 @@ class PostDetailViewModel extends ChangeNotifier {
     if (me == null || id == null || repo == null) {
       return Result.error(Exception("Comments aren't available"));
     }
+    if (_invalidBody(text) case final error?) return error;
+    final r = await repo.addComment(id, text, me, replyTo: _replyingTo);
+    switch (r) {
+      case Ok():
+        _replyingTo = null;
+        notifyListeners();
+        return const Result.ok(null);
+      case Error(:final error):
+        return Result.error(error);
+    }
+  }
+
+  Result<void>? _invalidBody(String text) {
     if (text.isEmpty) return Result.error(Exception('Write a comment first'));
     if (text.length > PostComment.maxBody) {
       return Result.error(
         Exception('Comments are up to ${PostComment.maxBody} characters'),
       );
     }
-    final r = await repo.addComment(id, text, me);
-    return switch (r) {
-      Ok() => const Result.ok(null),
-      Error(:final error) => Result.error(error),
-    };
+    return null;
+  }
+
+  Future<Result<void>> _editComment(String body) async {
+    final repo = _commentRepo;
+    final c = _editing;
+    final text = body.trim();
+    if (repo == null || c == null || !canEditComment(c)) {
+      return Result.error(Exception("You can't edit this comment"));
+    }
+    if (_invalidBody(text) case final error?) return error;
+    if (text == c.body) {
+      startEditing(null);
+      return const Result.ok(null);
+    }
+    final r = await repo.editComment(c, text);
+    if (r is Ok) startEditing(null);
+    return r;
+  }
+
+  Future<Result<void>> _toggleCommentLike(PostComment c) async {
+    final repo = _commentRepo;
+    if (repo == null || uid.isEmpty) {
+      return Result.error(Exception('Sign in to like comments'));
+    }
+    return repo.setCommentLiked(c, uid, liked: !c.likedByUser(uid));
   }
 
   Future<Result<void>> _deleteComment(PostComment c) async {
@@ -178,6 +254,8 @@ class PostDetailViewModel extends ChangeNotifier {
     delete.dispose();
     addComment.dispose();
     deleteComment.dispose();
+    editComment.dispose();
+    toggleCommentLike.dispose();
     actions
       ..removeListener(notifyListeners)
       ..dispose();

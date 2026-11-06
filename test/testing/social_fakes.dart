@@ -446,8 +446,9 @@ class FakePostCommentRepository implements PostCommentRepository {
   Future<Result<String>> addComment(
     String postId,
     String body,
-    AppUser author,
-  ) async {
+    AppUser author, {
+    PostComment? replyTo,
+  }) async {
     final id = 'c${++_next}';
     comments.add(
       PostComment(
@@ -458,11 +459,47 @@ class FakePostCommentRepository implements PostCommentRepository {
         authorPhotoUrl: author.photoUrl,
         body: body.trim(),
         createdAt: DateTime(2026, 11, 3, 12, _next),
+        parentId: replyTo == null ? null : replyTo.parentId ?? replyTo.id,
+        replyToName: replyTo != null && replyTo.isReply
+            ? replyTo.authorName
+            : null,
       ),
     );
     _count(postId, 1);
     changed();
     return Result.ok(id);
+  }
+
+  void _update(PostComment comment, PostComment Function(PostComment) f) {
+    final i = comments.indexWhere(
+      (c) => c.postId == comment.postId && c.id == comment.id,
+    );
+    if (i >= 0) comments[i] = f(comments[i]);
+    changed();
+  }
+
+  @override
+  Future<Result<void>> editComment(PostComment comment, String body) async {
+    _update(
+      comment,
+      (c) => c.copyWith(body: body.trim(), editedAt: DateTime(2026, 11, 4)),
+    );
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> setCommentLiked(
+    PostComment comment,
+    String uid, {
+    required bool liked,
+  }) async {
+    _update(
+      comment,
+      (c) => c.copyWith(
+        likedBy: [...c.likedBy.where((u) => u != uid), if (liked) uid],
+      ),
+    );
+    return const Result.ok(null);
   }
 
   @override

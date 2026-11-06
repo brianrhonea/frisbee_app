@@ -1743,19 +1743,34 @@ service cloud.firestore {
 
       // Comments (PostComment in lib/domain/models/post_comment.dart).
       // Anyone signed in comments on a post that isn't a repost (a repost's
-      // comments go on its original). The comment's author or the post's
-      // author deletes it; nobody edits. The post's commentCount is kept by
-      // the follows-commentCount function, so nobody writes it here.
+      // comments go on its original). A reply names a top-level comment on
+      // the same post as its parentId (one level deep). The comment's
+      // author edits its body; anyone likes it (likedBy, only themselves).
+      // The comment's author or the post's author deletes it, and the
+      // follows-commentCount function deletes its replies with it. The
+      // post's commentCount is kept by that function, so nobody writes it.
       match /comments/{commentId} {
         function post() {
           return get(/databases/$(database)/documents/posts/$(postId)).data;
+        }
+        function commentPath(id) {
+          return /databases/$(database)/documents/posts/$(postId)/comments/$(id);
+        }
+        function validReply(c) {
+          return c.get('parentId', null) == null
+            ? c.get('replyToName', null) == null
+            : (c.parentId is string
+                && exists(commentPath(c.parentId))
+                && get(commentPath(c.parentId)).data.get('parentId', null) == null
+                && (c.get('replyToName', null) == null
+                    || validString(c.replyToName, 80)));
         }
 
         allow read: if signedIn();
         allow create: if signedIn() && notMuted()
           && request.resource.data.keys().hasOnly([
                'body', 'authorId', 'authorName', 'authorPhotoUrl',
-               'createdAt'])
+               'createdAt', 'parentId', 'replyToName'])
           && request.resource.data.authorId == uid()
           && validString(request.resource.data.authorName, 80)
           && (request.resource.data.get('authorPhotoUrl', null) == null
@@ -1764,7 +1779,18 @@ service cloud.firestore {
           && request.resource.data.body.size() > 0
           && request.resource.data.createdAt == request.time
           && exists(/databases/$(database)/documents/posts/$(postId))
-          && post().get('repostOf', null) == null;
+          && post().get('repostOf', null) == null
+          && validReply(request.resource.data);
+        // Its author rewrites it.
+        allow update: if signedIn() && resource.data.authorId == uid()
+          && changed().hasOnly(['body', 'editedAt'])
+          && validString(request.resource.data.body, 1000)
+          && request.resource.data.body.size() > 0
+          && request.resource.data.editedAt == request.time;
+        // Anyone likes it or takes their like back.
+        allow update: if signedIn()
+          && changed().hasOnly(['likedBy'])
+          && onlySelfToggled('likedBy');
         allow delete: if signedIn()
           && (resource.data.authorId == uid() || post().authorId == uid());
       }

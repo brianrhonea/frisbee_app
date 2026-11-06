@@ -6,6 +6,8 @@ import '../../../utils/result.dart';
 import '../../services/firestore_utils.dart';
 import 'post_comment_repository.dart';
 
+/// Replies, edits and likes live on the comment documents themselves
+/// (`parentId`, `editedAt`, `likedBy`); firestore.rules checks each.
 class PostCommentRepositoryFirebase implements PostCommentRepository {
   PostCommentRepositoryFirebase({FirebaseFirestore? firestore})
     : _db = firestore ?? FirebaseFirestore.instance;
@@ -32,8 +34,9 @@ class PostCommentRepositoryFirebase implements PostCommentRepository {
   Future<Result<String>> addComment(
     String postId,
     String body,
-    AppUser author,
-  ) => guard(() async {
+    AppUser author, {
+    PostComment? replyTo,
+  }) => guard(() async {
     final ref = _comments(postId).doc();
     await ref.set({
       'body': body.trim(),
@@ -41,9 +44,35 @@ class PostCommentRepositoryFirebase implements PostCommentRepository {
       'authorName': author.label,
       'authorPhotoUrl': author.photoUrl,
       'createdAt': FieldValue.serverTimestamp(),
+      if (replyTo != null) ...{
+        'parentId': replyTo.parentId ?? replyTo.id,
+        // Replying to a reply says whose; a top-level comment is obvious.
+        if (replyTo.isReply) 'replyToName': replyTo.authorName,
+      },
     });
     return ref.id;
   });
+
+  @override
+  Future<Result<void>> editComment(PostComment comment, String body) => guard(
+    () => _comments(comment.postId).doc(comment.id).update({
+      'body': body.trim(),
+      'editedAt': FieldValue.serverTimestamp(),
+    }),
+  );
+
+  @override
+  Future<Result<void>> setCommentLiked(
+    PostComment comment,
+    String uid, {
+    required bool liked,
+  }) => guard(
+    () => _comments(comment.postId).doc(comment.id).update({
+      'likedBy': liked
+          ? FieldValue.arrayUnion([uid])
+          : FieldValue.arrayRemove([uid]),
+    }),
+  );
 
   @override
   Future<Result<void>> deleteComment(PostComment comment) =>

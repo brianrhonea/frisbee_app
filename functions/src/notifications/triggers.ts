@@ -16,7 +16,9 @@ import { invitees, type MeetingDoc, meetingChange, type MeetingTeam, startedReci
 import { deliver } from "./deliver";
 import {
   chatNotice,
+  commentLikeNotice,
   commentNotice,
+  commentRecipients,
   type Data,
   directMessageNotice,
   eventChange,
@@ -36,6 +38,7 @@ import {
   newLikers,
   playNotice,
   postRecipients,
+  replyNotice,
   repostNotice,
   repostOf,
   reminderNotice,
@@ -328,15 +331,47 @@ export const followRequest = onDocumentCreated(
   },
 );
 
-/** Someone commented on a post: its author hears, unless it's their own. */
+/**
+ * Someone commented on a post: its author hears, unless it's their own.
+ * A reply also tells the author of the comment it answers.
+ */
 export const postCommented = onDocumentCreated("posts/{postId}/comments/{commentId}", async (event) => {
   const comment = event.data?.data();
   if (!comment) return;
   const { postId } = event.params;
-  const post = (await getFirestore().doc(`posts/${postId}`).get()).data();
-  const authorId = String(post?.authorId ?? "");
-  if (!post || !authorId || authorId === String(comment.authorId ?? "")) return;
-  await deliver(getFirestore(), getMessaging(), [authorId], commentNotice({ postId, post, comment }));
+  const db = getFirestore();
+  const post = (await db.doc(`posts/${postId}`).get()).data();
+  if (!post) return;
+  const postAuthorId = String(post.authorId ?? "");
+  const parentId = typeof comment.parentId === "string" ? comment.parentId : undefined;
+  const parent = parentId ? (await db.doc(`posts/${postId}/comments/${parentId}`).get()).data() : undefined;
+  const to = commentRecipients({
+    postAuthorId,
+    commentAuthorId: String(comment.authorId ?? ""),
+    parentAuthorId: parent ? String(parent.authorId ?? "") : undefined,
+  });
+  if (to.postAuthor) await deliver(db, getMessaging(), [postAuthorId], commentNotice({ postId, post, comment }));
+  if (to.parentAuthor && parent && parentId) {
+    await deliver(db, getMessaging(), [String(parent.authorId)], replyNotice({ postId, parentId, comment }));
+  }
+});
+
+/** Someone liked a comment: its author hears, likes on one comment folded together. */
+export const commentLiked = onDocumentUpdated("posts/{postId}/comments/{commentId}", async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!after) return;
+  const authorId = String(after.authorId ?? "");
+  const { postId, commentId } = event.params;
+  for (const uid of newLikers(before, after)) {
+    const liker = await profileOf(uid);
+    await deliver(
+      getFirestore(),
+      getMessaging(),
+      [authorId],
+      commentLikeNotice({ postId, commentId, comment: after, likerName: liker.name }),
+    );
+  }
 });
 
 /**

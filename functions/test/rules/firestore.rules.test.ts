@@ -2648,8 +2648,12 @@ describe("user posts", () => {
     await assertFails(setDoc(comment(OUTSIDER, "c2"), data(OUTSIDER, { body: "x".repeat(1001) })));
     await assertFails(setDoc(comment(OUTSIDER, "c2"), data(OUTSIDER, { pinned: true })));
     await assertFails(setDoc(comment(OUTSIDER, "c2"), data(OUTSIDER, { createdAt: new Date("2020-01-01") })));
-    // Nobody edits; nobody else deletes.
+    // Only its author edits, with the server's time; nobody else deletes.
     await assertFails(updateDoc(comment(OUTSIDER), { body: "Edited" }));
+    await assertFails(updateDoc(comment(CAPTAIN), { body: "Edited", editedAt: serverTimestamp() }));
+    await assertFails(updateDoc(comment(OUTSIDER), { body: "", editedAt: serverTimestamp() }));
+    await assertFails(updateDoc(comment(OUTSIDER), { body: "Edited", editedAt: serverTimestamp(), authorId: CAPTAIN }));
+    await assertSucceeds(updateDoc(comment(OUTSIDER), { body: "Edited", editedAt: serverTimestamp() }));
     await assertFails(deleteDoc(comment(CAPTAIN)));
     // The commenter, or the post's author.
     await assertSucceeds(setDoc(comment(OUTSIDER, "c2"), data(OUTSIDER)));
@@ -2659,6 +2663,40 @@ describe("user posts", () => {
     await assertFails(setDoc(doc(db(OUTSIDER), "posts", "gone", "comments", "c1"), data(OUTSIDER)));
     await assertFails(updateDoc(ref(OUTSIDER), { commentCount: 5 }));
     await assertFails(updateDoc(ref(PLAYER), { commentCount: 5 }));
+  });
+
+  it("replies thread one level under a comment on the same post", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER), post(PLAYER)));
+    const comment = (uid: string, id: string) => doc(db(uid), "posts", "p1", "comments", id);
+    const data = (uid: string, extra: Record<string, unknown> = {}) => ({
+      body: "Nice!",
+      authorId: uid,
+      authorName: "O",
+      createdAt: serverTimestamp(),
+      ...extra,
+    });
+    await assertSucceeds(setDoc(comment(OUTSIDER, "top"), data(OUTSIDER)));
+    await assertSucceeds(setDoc(comment(CAPTAIN, "r1"), data(CAPTAIN, { parentId: "top" })));
+    // Replying to a reply goes under the same top-level comment, naming whom.
+    await assertSucceeds(setDoc(comment(PLAYER, "r2"), data(PLAYER, { parentId: "top", replyToName: "C" })));
+    await assertFails(setDoc(comment(PLAYER, "r3"), data(PLAYER, { parentId: "r1" })));
+    await assertFails(setDoc(comment(PLAYER, "r4"), data(PLAYER, { parentId: "missing" })));
+    await assertFails(setDoc(comment(PLAYER, "r5"), data(PLAYER, { replyToName: "C" })));
+    await assertFails(setDoc(comment(PLAYER, "r6"), data(PLAYER, { parentId: "top", replyToName: "x".repeat(81) })));
+  });
+
+  it("anyone likes a comment, toggling only themselves", async () => {
+    await assertSucceeds(setDoc(ref(PLAYER), post(PLAYER)));
+    const comment = (uid: string) => doc(db(uid), "posts", "p1", "comments", "c1");
+    await assertSucceeds(
+      setDoc(comment(OUTSIDER), { body: "Nice!", authorId: OUTSIDER, authorName: "O", createdAt: serverTimestamp() }),
+    );
+    await assertSucceeds(updateDoc(comment(CAPTAIN), { likedBy: arrayUnion(CAPTAIN) }));
+    await assertSucceeds(updateDoc(comment(PLAYER), { likedBy: arrayUnion(PLAYER) }));
+    await assertFails(updateDoc(comment(PLAYER), { likedBy: [PLAYER] }));
+    await assertFails(updateDoc(comment(OUTSIDER), { likedBy: arrayUnion("someone-else") }));
+    await assertFails(updateDoc(comment(CAPTAIN), { likedBy: arrayUnion(CAPTAIN), body: "Mine now" }));
+    await assertSucceeds(updateDoc(comment(CAPTAIN), { likedBy: arrayRemove(CAPTAIN) }));
   });
 
   it("comments on a repost go on its original", async () => {

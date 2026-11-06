@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
+import 'package:frisbee_app/domain/models/post_comment.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/ui/posts/view_models/post_detail_viewmodel.dart';
 import 'package:frisbee_app/ui/posts/view_models/send_post_viewmodel.dart';
@@ -85,6 +86,88 @@ void main() {
       expect(posts.posts.single.commentCount, 0);
     },
   );
+
+  test('replies thread one level deep under the top-level comment', () async {
+    posts.posts.add(UserPost(id: 'p1', authorId: 'sam', body: 'Hi'));
+    await comments.addComment('p1', 'Who is in?', zed);
+    final vm = open('p1');
+    addTearDown(vm.dispose);
+    await pumpEventQueue();
+    final top = vm.comments!.single;
+
+    vm.replyTo(top);
+    expect(vm.replyingTo, top);
+    await vm.addComment.execute('Me');
+    await pumpEventQueue();
+    expect(vm.replyingTo, isNull, reason: 'the next comment is top-level');
+    final reply = vm.comments!.last;
+    expect(reply.parentId, top.id);
+    expect(reply.replyToName, isNull);
+
+    // Replying to a reply stays under the same top-level comment.
+    vm.replyTo(reply);
+    await vm.addComment.execute('Me too');
+    await vm.addComment.execute('A new thread');
+    await pumpEventQueue();
+    final threads = vm.threads!;
+    expect(threads.map((t) => t.comment.body), ['Who is in?', 'A new thread']);
+    expect(threads.first.replies.map((r) => r.body), ['Me', 'Me too']);
+    expect(threads.first.replies.last.parentId, top.id);
+    expect(threads.first.replies.last.replyToName, testUser.label);
+  });
+
+  test("replies whose comment is gone aren't shown", () {
+    const orphan = PostComment(
+      id: 'r1',
+      postId: 'p1',
+      authorId: 'zed',
+      authorName: 'Zed',
+      body: 'Me',
+      parentId: 'gone',
+    );
+    expect(threadComments([orphan]), isEmpty);
+  });
+
+  test('only the author edits a comment, and it shows as edited', () async {
+    posts.posts.add(UserPost(id: 'p1', authorId: 'sam', body: 'Hi'));
+    await comments.addComment('p1', 'From Zed', zed);
+    final vm = open('p1');
+    addTearDown(vm.dispose);
+    await pumpEventQueue();
+    final theirs = vm.comments!.single;
+    expect(vm.canEditComment(theirs), isFalse);
+    vm.startEditing(theirs);
+    expect(vm.editing, isNull);
+
+    await vm.addComment.execute('Mine');
+    await pumpEventQueue();
+    final mine = vm.comments!.last;
+    expect(mine.edited, isFalse);
+    vm.startEditing(mine);
+    expect(vm.editing, mine);
+    await vm.editComment.execute('   ');
+    expect(vm.editComment.error, isTrue);
+    await vm.editComment.execute(' Mine, fixed ');
+    await pumpEventQueue();
+    expect(vm.editing, isNull);
+    expect(vm.comments!.last.body, 'Mine, fixed');
+    expect(vm.comments!.last.edited, isTrue);
+  });
+
+  test('liking a comment toggles the like', () async {
+    posts.posts.add(UserPost(id: 'p1', authorId: 'sam', body: 'Hi'));
+    await comments.addComment('p1', 'Huck it', zed);
+    final vm = open('p1');
+    addTearDown(vm.dispose);
+    await pumpEventQueue();
+    await vm.toggleCommentLike.execute(vm.comments!.single);
+    await pumpEventQueue();
+    expect(vm.comments!.single.likedByUser(testUser.uid), isTrue);
+    expect(vm.comments!.single.likeCount, 1);
+    await vm.toggleCommentLike.execute(vm.comments!.single);
+    await pumpEventQueue();
+    expect(vm.comments!.single.likeCount, 0);
+  });
 
   test('sends a post to recent people and anyone found, once each', () async {
     final dms = FakeDirectMessageRepository()

@@ -44,6 +44,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     vm.delete.addListener(_onDelete);
     vm.addComment.addListener(_onAddComment);
     vm.deleteComment.addListener(_onDeleteComment);
+    vm.editComment.addListener(_onEditComment);
+    vm.toggleCommentLike.addListener(_onLikeComment);
     _comment.addListener(() => setState(() {}));
     if (widget.focusComment) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -57,6 +59,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     vm.delete.removeListener(_onDelete);
     vm.addComment.removeListener(_onAddComment);
     vm.deleteComment.removeListener(_onDeleteComment);
+    vm.editComment.removeListener(_onEditComment);
+    vm.toggleCommentLike.removeListener(_onLikeComment);
     _comment.dispose();
     _commentFocus.dispose();
     super.dispose();
@@ -94,6 +98,55 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  void _onEditComment() {
+    final cmd = vm.editComment;
+    switch (cmd.result) {
+      case Ok():
+        cmd.clearResult();
+        _comment.clear();
+      case Error():
+        showErrorSnackBar(context, cmd.result);
+        cmd.clearResult();
+      case null:
+        break;
+    }
+  }
+
+  void _onLikeComment() {
+    final cmd = vm.toggleCommentLike;
+    if (cmd.result is Error) {
+      showErrorSnackBar(context, cmd.result);
+      cmd.clearResult();
+    }
+  }
+
+  void _reply(PostComment c) {
+    if (vm.editing != null) _comment.clear();
+    vm.replyTo(c);
+    _commentFocus.requestFocus();
+  }
+
+  void _edit(PostComment c) {
+    vm.startEditing(c);
+    _comment.text = c.body;
+    _comment.selection = TextSelection.collapsed(offset: c.body.length);
+    _commentFocus.requestFocus();
+  }
+
+  void _cancelReplyOrEdit() {
+    if (vm.editing != null) _comment.clear();
+    vm.replyTo(null);
+  }
+
+  CommentTile _tile(PostComment c) => CommentTile(
+    comment: c,
+    liked: c.likedByUser(vm.uid),
+    onLike: vm.uid.isEmpty ? null : () => vm.toggleCommentLike.execute(c),
+    onReply: () => _reply(c),
+    onEdit: vm.canEditComment(c) ? () => _edit(c) : null,
+    onDelete: vm.canDeleteComment(c) ? () => _deleteComment(c) : null,
+  );
+
   void _onDeleteComment() {
     final cmd = vm.deleteComment;
     if (cmd.result is Error) {
@@ -124,18 +177,23 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   void _send() {
-    if (vm.addComment.running) return;
+    if (vm.addComment.running || vm.editComment.running) return;
     final text = _comment.text.trim();
     if (text.isEmpty) return;
-    vm.addComment.execute(text);
+    if (vm.editing != null) {
+      vm.editComment.execute(text);
+    } else {
+      vm.addComment.execute(text);
+    }
   }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: Listenable.merge([vm, vm.addComment]),
+    listenable: Listenable.merge([vm, vm.addComment, vm.editComment]),
     builder: (context, _) {
       final post = vm.post;
       final comments = vm.comments;
+      final threads = vm.threads ?? const <CommentThread>[];
       return Scaffold(
         appBar: AppBar(title: const Text('Post')),
         body: !vm.loaded
@@ -210,13 +268,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                 ),
                               )
                             else
-                              for (final c in comments)
-                                CommentTile(
-                                  comment: c,
-                                  onDelete: vm.canDeleteComment(c)
-                                      ? () => _deleteComment(c)
-                                      : null,
-                                ),
+                              for (final t in threads) ...[
+                                _tile(t.comment),
+                                for (final r in t.replies)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 42),
+                                    child: _tile(r),
+                                  ),
+                              ],
                           ],
                         ],
                       ),
@@ -226,8 +285,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     _CommentBox(
                       controller: _comment,
                       focusNode: _commentFocus,
-                      sending: vm.addComment.running,
+                      sending: vm.addComment.running || vm.editComment.running,
                       onSend: _send,
+                      editing: vm.editing != null,
+                      replyingTo: vm.replyingTo?.authorName,
+                      onCancel: _cancelReplyOrEdit,
                     ),
                 ],
               ),
@@ -251,12 +313,28 @@ class _CommentsHeading extends StatelessWidget {
   );
 }
 
-/// One comment: who, when, and what they said. Tapping the person opens
-/// their profile.
+/// One comment: who, when, and what they said, with Like and Reply
+/// below it. Tapping the person opens their profile.
 class CommentTile extends StatelessWidget {
-  const CommentTile({super.key, required this.comment, this.onDelete});
+  const CommentTile({
+    super.key,
+    required this.comment,
+    this.liked = false,
+    this.onLike,
+    this.onReply,
+    this.onEdit,
+    this.onDelete,
+  });
 
   final PostComment comment;
+
+  /// Whether the signed-in user likes it.
+  final bool liked;
+  final VoidCallback? onLike;
+  final VoidCallback? onReply;
+
+  /// For the comment's author.
+  final VoidCallback? onEdit;
 
   /// For the comment's author and the post's author.
   final VoidCallback? onDelete;
@@ -264,14 +342,24 @@ class CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
     final c = comment;
     final name = c.authorName.isEmpty ? 'Someone' : c.authorName;
     final when = c.createdAt == null
         ? 'Just now'
         : DateFormat.MMMd().add_jm().format(c.createdAt!);
     void openAuthor() => openPage(context, Routes.player(c.authorId));
+    final small = theme.textTheme.bodySmall?.copyWith(color: muted);
+    final action = TextButton.styleFrom(
+      visualDensity: VisualDensity.compact,
+      minimumSize: const Size(0, 32),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      foregroundColor: muted,
+      textStyle: theme.textTheme.labelMedium,
+    );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -281,46 +369,90 @@ class CommentTile extends StatelessWidget {
             child: PersonAvatar(
               name: c.authorName,
               photoUrl: c.authorPhotoUrl,
-              radius: 16,
+              radius: c.isReply ? 13 : 16,
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Flexible(
-                        child: InkWell(
-                          onTap: openAuthor,
-                          child: Text(
-                            name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.labelLarge,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: InkWell(
+                              onTap: openAuthor,
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelLarge,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(when, style: small),
+                          if (c.edited) Text(' · edited', style: small),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      if (c.replyToName case final to?)
+                        Text(
+                          '@$to',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        when,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                      LinkifiedText(c.body, style: theme.textTheme.bodyMedium),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  LinkifiedText(c.body, style: theme.textTheme.bodyMedium),
-                ],
-              ),
+                ),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      style: liked
+                          ? action.copyWith(
+                              foregroundColor: WidgetStatePropertyAll(
+                                theme.colorScheme.error,
+                              ),
+                            )
+                          : action,
+                      onPressed: onLike,
+                      icon: Icon(
+                        liked ? Icons.favorite : Icons.favorite_border,
+                        size: 16,
+                      ),
+                      label: Text(
+                        c.likeCount == 0 ? 'Like' : '${c.likeCount}',
+                        semanticsLabel:
+                            '${liked ? 'Unlike' : 'Like'}, ${c.likeCount} likes',
+                      ),
+                    ),
+                    if (onReply != null)
+                      TextButton(
+                        style: action,
+                        onPressed: onReply,
+                        child: const Text('Reply'),
+                      ),
+                    if (onEdit != null)
+                      TextButton(
+                        style: action,
+                        onPressed: onEdit,
+                        child: const Text('Edit'),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
           if (onDelete != null)
@@ -342,12 +474,24 @@ class _CommentBox extends StatelessWidget {
     required this.focusNode,
     required this.sending,
     required this.onSend,
+    this.editing = false,
+    this.replyingTo,
+    this.onCancel,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool sending;
   final VoidCallback onSend;
+
+  /// Rewriting one of the user's comments rather than adding one.
+  final bool editing;
+
+  /// Whose comment the new one answers.
+  final String? replyingTo;
+
+  /// Stops replying or editing.
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -358,40 +502,71 @@ class _CommentBox extends StatelessWidget {
         top: false,
         child: ConstrainedContent(
           maxWidth: 640,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    minLines: 1,
-                    maxLines: 5,
-                    maxLength: PostComment.maxBody,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      hintText: 'Add a comment…',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      counterText: '',
-                    ),
-                    onSubmitted: (_) => onSend(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (editing || replyingTo != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 4, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          editing
+                              ? 'Editing your comment'
+                              : 'Replying to $replyingTo',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: editing ? 'Cancel editing' : 'Cancel reply',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: onCancel,
+                        icon: const Icon(Icons.close, size: 18),
+                      ),
+                    ],
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Post comment',
-                  onPressed: empty || sending ? null : onSend,
-                  icon: sending
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.send),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        minLines: 1,
+                        maxLines: 5,
+                        maxLength: PostComment.maxBody,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          hintText: replyingTo != null
+                              ? 'Add a reply…'
+                              : 'Add a comment…',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          counterText: '',
+                        ),
+                        onSubmitted: (_) => onSend(),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: editing ? 'Save comment' : 'Post comment',
+                      onPressed: empty || sending ? null : onSend,
+                      icon: sending
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(editing ? Icons.check : Icons.send),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

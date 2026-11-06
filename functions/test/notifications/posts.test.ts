@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   commentCountChange,
+  commentLikeNotice,
   commentNotice,
+  commentRecipients,
+  replyNotice,
   followCountChanges,
   followerNotice,
   followAcceptedNotice,
@@ -174,6 +177,42 @@ describe("comments", () => {
     expect(n.collapseId).toBe("comments_p1");
     expect(n.text({}, 1)).toEqual({ title: "Zed commented on your post", body: "I'm in!" });
     expect(n.text({}, 3).title).toBe("3 new comments on your post");
+  });
+
+  it("tells whoever a reply answers, and never the replier or anyone twice", () => {
+    const n = replyNotice({ postId: "p1", parentId: "c1", comment: { authorName: "Zed", body: "Same" } });
+    expect(n.collapseId).toBe("replies_p1_c1");
+    expect(n.route).toBe("/posts/p1");
+    expect(n.text({}, 1)).toEqual({ title: "Zed replied to your comment", body: "Same" });
+    expect(n.text({}, 2).title).toBe("2 new replies to your comment");
+    expect(commentRecipients({ postAuthorId: "sam", commentAuthorId: "zed" })).toEqual({
+      postAuthor: true,
+      parentAuthor: false,
+    });
+    expect(commentRecipients({ postAuthorId: "sam", commentAuthorId: "zed", parentAuthorId: "ana" })).toEqual({
+      postAuthor: true,
+      parentAuthor: true,
+    });
+    // The post's author replying to a comment on their own post.
+    expect(commentRecipients({ postAuthorId: "sam", commentAuthorId: "sam", parentAuthorId: "ana" })).toEqual({
+      postAuthor: false,
+      parentAuthor: true,
+    });
+    // Replying on your own comment's thread, or the parent is the post's author.
+    expect(commentRecipients({ postAuthorId: "sam", commentAuthorId: "ana", parentAuthorId: "ana" }).parentAuthor).toBe(
+      false,
+    );
+    expect(commentRecipients({ postAuthorId: "sam", commentAuthorId: "zed", parentAuthorId: "sam" })).toEqual({
+      postAuthor: true,
+      parentAuthor: false,
+    });
+  });
+
+  it("tells a comment's author about likes, folded per comment", () => {
+    const n = commentLikeNotice({ postId: "p1", commentId: "c1", comment: { body: "Huck it" }, likerName: "Ana" });
+    expect(n.collapseId).toBe("commentLikes_p1_c1");
+    expect(n.text({}, 1)).toEqual({ title: "Ana liked your comment", body: "Huck it" });
+    expect(n.text({}, 4).title).toBe("4 new likes on your comment");
   });
 
   it("counts comments added and deleted, not edits", () => {

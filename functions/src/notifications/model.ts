@@ -607,6 +607,50 @@ export function commentNotice(a: { postId: string; post: Data; comment: Data }):
   };
 }
 
+/** Someone replied to your comment; replies to one comment fold together. */
+export function replyNotice(a: { postId: string; parentId: string; comment: Data }): Notice {
+  const name = String(a.comment.authorName ?? "") || "Someone";
+  const text = String(a.comment.body ?? "").trim().replace(/\s+/g, " ");
+  return {
+    category: "social",
+    route: `/posts/${a.postId}`,
+    collapseId: `replies_${a.postId}_${a.parentId}`,
+    text: (_, count) => ({
+      title: count > 1 ? `${count} new replies to your comment` : `${name} replied to your comment`,
+      body: clip(text, 120),
+    }),
+  };
+}
+
+/** Someone liked your comment; likes on one comment fold together. */
+export function commentLikeNotice(a: { postId: string; commentId: string; comment: Data; likerName: string }): Notice {
+  const name = a.likerName || "Someone";
+  const text = String(a.comment.body ?? "").trim().replace(/\s+/g, " ");
+  return {
+    category: "social",
+    route: `/posts/${a.postId}`,
+    collapseId: `commentLikes_${a.postId}_${a.commentId}`,
+    text: (_, count) => ({
+      title: count > 1 ? `${count} new likes on your comment` : `${name} liked your comment`,
+      body: clip(text, 120),
+    }),
+  };
+}
+
+/**
+ * Who hears about a new comment: the post's author, and for a reply the
+ * author of the comment it answers. Never the commenter, never twice.
+ */
+export function commentRecipients(a: { postAuthorId: string; commentAuthorId: string; parentAuthorId?: string }): {
+  postAuthor: boolean;
+  parentAuthor: boolean;
+} {
+  const commenter = a.commentAuthorId;
+  const postAuthor = !!a.postAuthorId && a.postAuthorId !== commenter;
+  const parent = a.parentAuthorId ?? "";
+  return { postAuthor, parentAuthor: !!parent && parent !== commenter && parent !== a.postAuthorId };
+}
+
 /** Someone reposted your post, with their note. */
 export function repostNotice(a: { repostId: string; repost: Data; original?: Data }): Notice {
   const name = String(a.repost.authorName ?? "") || "Someone";
