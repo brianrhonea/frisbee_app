@@ -24,6 +24,14 @@ class AppUser {
     username: username,
   );
 
+  AppUser withPhotoUrl(String? photoUrl) => AppUser(
+    uid: uid,
+    email: email,
+    displayName: displayName,
+    photoUrl: photoUrl,
+    username: username,
+  );
+
   String get label =>
       (displayName?.isNotEmpty ?? false) ? displayName! : (email ?? 'Player');
 

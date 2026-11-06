@@ -377,6 +377,7 @@ class PlayerProfile {
     required this.uid,
     required this.name,
     this.photoUrl,
+    this.headerUrl,
     this.username,
     this.details = const ProfileDetails(),
     this.summary = const ProfileSummary(),
@@ -412,6 +413,10 @@ class PlayerProfile {
   final String name;
   final String? photoUrl;
 
+  /// The wide photo across the top of the profile; null for the default
+  /// banner.
+  final String? headerUrl;
+
   /// Unique handle, without the "@".
   final String? username;
   final ProfileDetails details;
@@ -431,6 +436,7 @@ class PlayerProfile {
       uid: uid,
       name: m['name'] as String? ?? '',
       photoUrl: m['photoUrl'] as String?,
+      headerUrl: m['headerUrl'] as String?,
       username: m['username'] as String?,
       isPrivate: m['private'] == true,
       locked: locked,

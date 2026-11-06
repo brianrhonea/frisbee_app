@@ -54,6 +54,10 @@ abstract class AuthRepository extends ChangeNotifier {
 
   Future<Result<void>> updateDisplayName(String name);
 
+  /// Sets the profile picture (a download URL); null removes it. The
+  /// profile and the people directory pick it up.
+  Future<Result<void>> updatePhotoUrl(String? url);
+
   Future<Result<void>> signOut();
 
   /// How the user confirms it's them before deleting their account; null

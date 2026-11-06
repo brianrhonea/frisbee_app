@@ -1,6 +1,18 @@
 import '../../../domain/models/app_user.dart';
+import '../../../domain/models/chat.dart';
 import '../../../domain/models/player_profile.dart';
 import '../../../utils/result.dart';
+
+/// The two pictures on a profile: the round profile picture and the wide
+/// header photo above it.
+enum ProfileImage {
+  photo('profile picture'),
+  header('header photo');
+
+  const ProfileImage(this.label);
+
+  final String label;
+}
 
 /// Players' profiles (`profiles/{uid}`), readable by anyone signed in.
 /// Each player writes only their own. A private profile's details live in
@@ -36,6 +48,23 @@ abstract class ProfileRepository {
     ProfileSummary summary, {
     required List<String> tags,
   });
+
+  /// Uploads [image] as [user]'s [kind] and returns its URL. Nothing shows
+  /// it until it's set: the profile picture with
+  /// AuthRepository.updatePhotoUrl, the header with [setHeader].
+  Future<Result<String>> uploadImage(
+    AppUser user,
+    ProfileImage kind,
+    NewAttachment image,
+  );
+
+  /// Sets [user]'s header photo; null removes it. Shown even on a private
+  /// profile, like the name and profile picture.
+  Future<Result<void>> setHeader(AppUser user, String? url);
+
+  /// Deletes an uploaded image that's no longer shown. Best effort: URLs
+  /// it didn't upload are left alone.
+  Future<void> deleteImage(String url);
 
   /// Players whose name, school, hometown or team matches every word of
   /// [query].

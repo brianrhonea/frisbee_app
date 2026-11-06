@@ -135,6 +135,12 @@ class AuthService {
     await _auth.currentUser?.reload();
   }
 
+  /// The profile picture everyone sees; null removes it.
+  Future<void> updatePhotoUrl(String? url) async {
+    await _auth.currentUser?.updatePhotoURL(url);
+    await _auth.currentUser?.reload();
+  }
+
   Future<void> signOut() async {
     if (_googleInitialized) await _googleSignIn.signOut();
     await _auth.signOut();

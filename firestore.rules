@@ -1835,7 +1835,7 @@ service cloud.firestore {
             'bio', 'pronouns', 'hometown', 'school', 'throwingHand',
             'playingSince', 'visibility',
             'teams', 'stats', 'games', 'summaryUpdatedAt', 'username',
-            'private'])
+            'private', 'headerUrl'])
           && p.get('private', false) is bool
           && p.name is string
           && p.name.size() > 0
@@ -1843,6 +1843,8 @@ service cloud.firestore {
           && p.keywords is list
           && p.keywords.size() <= 100
           && (p.photoUrl == null || validString(p.photoUrl, 2000))
+          && (p.get('headerUrl', null) == null
+              || validString(p.headerUrl, 2000))
           && p.get('tags', []) is list
           && p.get('tags', []).size() <= 100
           && validString(p.get('bio', ''), 280)

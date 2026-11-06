@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../data/repositories/profile/profile_repository.dart';
 import '../../../domain/models/player_profile.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
@@ -42,6 +43,8 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
     vm.claim,
     vm.unclaim,
     vm.deletePost,
+    vm.changeImage,
+    vm.removeImage,
   ];
 
   @override
@@ -343,44 +346,67 @@ class _Hero extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
+          SizedBox(
             height: mobile ? 92 : 112,
-            color: c.feature,
-            padding: EdgeInsets.symmetric(horizontal: mobile ? 16 : 24),
-            child: Row(
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Eyebrow('Chase the next point.', color: c.highlight),
-                      const SizedBox(height: 6),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'ALWAYS IN PLAY.',
-                          style: TextStyle(
-                            color: c.onFeature,
-                            fontSize: mobile ? 24 : 32,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -1,
+                _Banner(
+                  url: vm.headerUrl,
+                  fallback: Container(
+                    color: c.feature,
+                    padding: EdgeInsets.symmetric(horizontal: mobile ? 16 : 24),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Eyebrow(
+                                'Chase the next point.',
+                                color: c.highlight,
+                              ),
+                              const SizedBox(height: 6),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'ALWAYS IN PLAY.',
+                                  style: TextStyle(
+                                    color: c.onFeature,
+                                    fontSize: mobile ? 24 : 32,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -1,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
+                        if (number != null)
+                          Text(
+                            '$number',
+                            style: TextStyle(
+                              color: c.onFeature.withValues(alpha: 0.22),
+                              fontSize: mobile ? 64 : 88,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -3,
+                              height: 1,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-                if (number != null)
-                  Text(
-                    '$number',
-                    style: TextStyle(
-                      color: c.onFeature.withValues(alpha: 0.22),
-                      fontSize: mobile ? 64 : 88,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -3,
-                      height: 1,
+                if (vm.canEditImages)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: _ImageMenu(
+                      viewModel: vm,
+                      kind: ProfileImage.header,
+                      icon: Icons.add_a_photo_outlined,
                     ),
                   ),
               ],
@@ -394,10 +420,26 @@ class _Hero extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    PersonAvatar(
-                      name: vm.name,
-                      photoUrl: vm.photoUrl,
-                      radius: mobile ? 26 : 30,
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        PersonAvatar(
+                          name: vm.name,
+                          photoUrl: vm.photoUrl,
+                          radius: mobile ? 26 : 30,
+                        ),
+                        if (vm.canEditImages)
+                          Positioned(
+                            right: -10,
+                            bottom: -10,
+                            child: _ImageMenu(
+                              viewModel: vm,
+                              kind: ProfileImage.photo,
+                              icon: Icons.photo_camera_outlined,
+                              small: true,
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -502,6 +544,113 @@ class _Hero extends StatelessWidget {
 }
 
 /// In place of a private profile's posts, stats and teams.
+/// The header photo, or [fallback] (the default banner) when there's none
+/// or it can't load.
+class _Banner extends StatelessWidget {
+  const _Banner({required this.url, required this.fallback});
+
+  final String? url;
+  final Widget fallback;
+
+  @override
+  Widget build(BuildContext context) => switch (url) {
+    final url? => Image.network(
+      url,
+      fit: BoxFit.cover,
+      semanticLabel: 'Header photo',
+      errorBuilder: (_, _, _) => fallback,
+    ),
+    null => fallback,
+  };
+}
+
+enum _ImageAction { choose, camera, remove }
+
+/// Changes the profile picture or header photo on the user's own profile:
+/// pick one, take one, or remove it.
+class _ImageMenu extends StatelessWidget {
+  const _ImageMenu({
+    required this.viewModel,
+    required this.kind,
+    required this.icon,
+    this.small = false,
+  });
+
+  final PlayerProfileViewModel viewModel;
+  final ProfileImage kind;
+  final IconData icon;
+  final bool small;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final scheme = Theme.of(context).colorScheme;
+    final hasImage = switch (kind) {
+      ProfileImage.photo => vm.photoUrl != null,
+      ProfileImage.header => vm.headerUrl != null,
+    };
+    final size = small ? 18.0 : 20.0;
+    return ListenableBuilder(
+      listenable: Listenable.merge([vm.changeImage, vm.removeImage]),
+      builder: (context, _) => Material(
+        color: scheme.surface.withValues(alpha: 0.9),
+        shape: const CircleBorder(),
+        elevation: 1,
+        child: vm.changeImage.running || vm.removeImage.running
+            ? Padding(
+                padding: EdgeInsets.all(small ? 7 : 10),
+                child: SizedBox.square(
+                  dimension: size,
+                  child: const CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : PopupMenuButton<_ImageAction>(
+                tooltip: 'Change ${kind.label}',
+                iconSize: size,
+                padding: EdgeInsets.all(small ? 4 : 8),
+                icon: Icon(icon),
+                onSelected: (a) => switch (a) {
+                  _ImageAction.choose => vm.changeImage.execute((
+                    kind,
+                    camera: false,
+                  )),
+                  _ImageAction.camera => vm.changeImage.execute((
+                    kind,
+                    camera: true,
+                  )),
+                  _ImageAction.remove => vm.removeImage.execute(kind),
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: _ImageAction.choose,
+                    child: ListTile(
+                      leading: Icon(Icons.photo_library_outlined),
+                      title: Text('Choose photo'),
+                    ),
+                  ),
+                  if (vm.canUseCamera)
+                    const PopupMenuItem(
+                      value: _ImageAction.camera,
+                      child: ListTile(
+                        leading: Icon(Icons.photo_camera_outlined),
+                        title: Text('Take photo'),
+                      ),
+                    ),
+                  if (hasImage)
+                    PopupMenuItem(
+                      value: _ImageAction.remove,
+                      child: ListTile(
+                        leading: const Icon(Icons.delete_outline),
+                        title: Text('Remove ${kind.label}'),
+                      ),
+                    ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
 class _PrivateNotice extends StatelessWidget {
   const _PrivateNotice({required this.name});
 

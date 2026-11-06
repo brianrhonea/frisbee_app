@@ -10,6 +10,8 @@ import '../../../data/repositories/profile/profile_repository.dart';
 import '../../../data/repositories/stats/stats_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/user_post/user_post_repository.dart';
+import '../../../data/services/file_picker_service.dart';
+import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/follow.dart';
@@ -22,6 +24,7 @@ import '../../posts/view_models/post_actions.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
+import '../../teams/view_models/team_home_viewmodel.dart' show pickPostImages;
 
 /// A team whose roster the user isn't linked to yet, and the roster spots
 /// they could claim, best name match first.
@@ -33,7 +36,9 @@ typedef ClaimableTeam = ({Team team, List<RosterPlayer> players});
 /// parts they choose to show.
 ///
 /// With [FollowRepository] and [UserPostRepository] it also shows follower
-/// counts, the Follow button and the player's posts.
+/// counts, the Follow button and the player's posts. With
+/// [FilePickerService] the user can change their profile picture and
+/// header photo.
 class PlayerProfileViewModel extends ChangeNotifier {
   PlayerProfileViewModel({
     required this.uid,
@@ -45,7 +50,9 @@ class PlayerProfileViewModel extends ChangeNotifier {
     FollowRepository? followRepository,
     UserPostRepository? userPostRepository,
     NotificationRepository? notificationRepository,
+    FilePickerService? filePicker,
   }) : _profiles = profileRepository,
+       _picker = filePicker,
        _auth = authRepository,
        _teamRepo = teamRepository,
        _stats = statsRepository,
@@ -64,6 +71,8 @@ class PlayerProfileViewModel extends ChangeNotifier {
       (r) => _teamRepo.linkPlayer(r.$1, r.$2, null),
     );
     message = Command0<String>(_message);
+    changeImage = Command1<void, (ProfileImage, {bool camera})>(_changeImage);
+    removeImage = Command1<void, ProfileImage>(_removeImage);
     deletePost = Command1<void, String>(
       (id) async =>
           await _userPosts?.deletePost(id) ??
@@ -101,6 +110,9 @@ class PlayerProfileViewModel extends ChangeNotifier {
       );
     }
     _watchProfile();
+    // A new profile picture comes through the account.
+    _watchesAccount = isMe;
+    if (_watchesAccount) authRepository.addListener(notifyListeners);
     if (isMe) {
       _subs.add(
         _teamRepo.watchMyTeams(uid).listen(_onTeams, onError: (Object _) {}),
@@ -116,6 +128,8 @@ class PlayerProfileViewModel extends ChangeNotifier {
   final StatsRepository _stats;
   final DirectMessageRepository _dms;
   final UserPostRepository? _userPosts;
+  final FilePickerService? _picker;
+  bool _watchesAccount = false;
   final FollowSlot _followSlot;
   final _downloads = <String, Future<Result<Uint8List>>>{};
   final List<StreamSubscription<Object?>> _subs = [];
@@ -196,6 +210,15 @@ class PlayerProfileViewModel extends ChangeNotifier {
 
   String? get photoUrl =>
       isMe ? _auth.currentUser?.photoUrl : _profile?.photoUrl;
+
+  /// The wide photo across the top; null for the default banner.
+  String? get headerUrl => _profile?.headerUrl;
+
+  /// Whether the user can change the pictures here: their own profile.
+  bool get canEditImages => isMe && _picker != null;
+
+  /// Whether a new picture can come straight from the camera.
+  bool get canUseCamera => _picker?.canUseCamera ?? false;
 
   /// Their @username, without the @; null before they pick one.
   String? get username =>
@@ -470,6 +493,13 @@ class PlayerProfileViewModel extends ChangeNotifier {
   /// its id.
   late final Command0<String> message;
 
+  /// Picks a new profile picture or header (from the camera when
+  /// `camera`), uploads it and shows it. Picking nothing changes nothing.
+  late final Command1<void, (ProfileImage, {bool camera})> changeImage;
+
+  /// Goes back to no profile picture, or the default banner.
+  late final Command1<void, ProfileImage> removeImage;
+
   // Follows and posts -----------------------------------------------------
 
   /// Whether this profile shows posts and follows at all.
@@ -532,6 +562,62 @@ class PlayerProfileViewModel extends ChangeNotifier {
     );
   }
 
+  /// Shows [url] as [kind]: the profile picture on the account (which
+  /// updates the profile and the people directory), the header on the
+  /// profile.
+  Future<Result<void>> _setImage(AppUser me, ProfileImage kind, String? url) =>
+      switch (kind) {
+        ProfileImage.photo => _auth.updatePhotoUrl(url),
+        ProfileImage.header => _profiles.setHeader(me, url),
+      };
+
+  String? _imageUrl(ProfileImage kind) => switch (kind) {
+    ProfileImage.photo => photoUrl,
+    ProfileImage.header => headerUrl,
+  };
+
+  Future<Result<void>> _changeImage((ProfileImage, {bool camera}) r) async {
+    final (kind, :camera) = r;
+    final me = _auth.currentUser;
+    final picker = _picker;
+    if (!isMe || me == null || picker == null) {
+      return Result.error(Exception('Only you can change your pictures.'));
+    }
+    final picked = await pickPostImages(picker, camera: camera);
+    final NewAttachment image;
+    switch (picked) {
+      case Error(:final error):
+        return Result.error(error);
+      case Ok(:final value) when value.isEmpty:
+        return const Result.ok(null);
+      case Ok(:final value):
+        image = value.first;
+    }
+    final old = _imageUrl(kind);
+    final uploaded = await _profiles.uploadImage(me, kind, image);
+    if (uploaded case Error(:final error)) return Result.error(error);
+    final url = (uploaded as Ok<String>).value;
+    final set = await _setImage(me, kind, url);
+    if (set is Error) {
+      unawaited(_profiles.deleteImage(url));
+      return set;
+    }
+    if (old != null) unawaited(_profiles.deleteImage(old));
+    return const Result.ok(null);
+  }
+
+  Future<Result<void>> _removeImage(ProfileImage kind) async {
+    final me = _auth.currentUser;
+    if (!isMe || me == null) {
+      return Result.error(Exception('Only you can change your pictures.'));
+    }
+    final old = _imageUrl(kind);
+    if (old == null) return const Result.ok(null);
+    final result = await _setImage(me, kind, null);
+    if (result is Ok) unawaited(_profiles.deleteImage(old));
+    return result;
+  }
+
   Future<Result<String>> _message() async {
     final me = _auth.currentUser;
     if (me == null) return Result.error(Exception('Not signed in'));
@@ -546,6 +632,7 @@ class PlayerProfileViewModel extends ChangeNotifier {
     _publishLater?.cancel();
     _profileSub?.cancel();
     _followed?.removeListener(_onFollowChanged);
+    if (_watchesAccount) _auth.removeListener(notifyListeners);
     for (final s in [..._subs, ..._rosterSubs.values, ..._gameSubs.values]) {
       s.cancel();
     }
@@ -553,6 +640,8 @@ class PlayerProfileViewModel extends ChangeNotifier {
     claim.dispose();
     unclaim.dispose();
     message.dispose();
+    changeImage.dispose();
+    removeImage.dispose();
     deletePost.dispose();
     actions
       ?..removeListener(notifyListeners)

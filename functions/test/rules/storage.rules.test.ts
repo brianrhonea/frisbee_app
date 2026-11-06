@@ -254,6 +254,20 @@ describe("group message attachments", () => {
   });
 });
 
+describe("profile pictures and headers", () => {
+  const image = (uid: string, owner = uid) => storage(uid).ref(`users/${owner}/profile/header-1.jpg`);
+
+  it("players upload their own images; anyone signed in sees them", async () => {
+    await assertSucceeds(image(PLAYER).put(bytes(10), { contentType: "image/jpeg" }).then());
+    await assertFails(image(OUTSIDER, PLAYER).put(bytes(10), { contentType: "image/jpeg" }).then());
+    await assertFails(image(PLAYER).put(bytes(10), { contentType: "video/mp4" }).then());
+    await assertFails(image(PLAYER).put(bytes(10 * 1024 * 1024 + 1), { contentType: "image/jpeg" }).then());
+    await assertSucceeds(image(OUTSIDER, PLAYER).getMetadata());
+    await assertFails(image(OUTSIDER, PLAYER).delete());
+    await assertSucceeds(image(PLAYER).delete());
+  });
+});
+
 describe("user post photos", () => {
   const photo = (uid: string, owner = uid) => storage(uid).ref(`users/${owner}/posts/p1/1/0-photo.png`);
 

@@ -1939,6 +1939,14 @@ describe("direct messages", () => {
     await assertFails(setDoc(doc(db(PLAYER), "profiles", PLAYER), profile("")));
   });
 
+  it("profiles may carry a header photo URL", async () => {
+    const ref = doc(db(PLAYER), "profiles", PLAYER);
+    await assertSucceeds(setDoc(ref, { ...profile(), headerUrl: "https://example.test/h.jpg" }));
+    await assertSucceeds(setDoc(ref, { ...profile(), headerUrl: null }));
+    await assertFails(setDoc(ref, { ...profile(), headerUrl: 42 }));
+    await assertFails(setDoc(ref, { ...profile(), headerUrl: "x".repeat(2001) }));
+  });
+
   it("profiles carry player details and a published summary", async () => {
     const ref = doc(db(PLAYER), "profiles", PLAYER);
     const full = {

@@ -157,6 +157,10 @@ class FakeAuthRepository extends AuthRepository {
   Future<Result<void>> sendPasswordReset(String email) => _run(() {});
 
   @override
+  Future<Result<void>> updatePhotoUrl(String? url) =>
+      _run(() => setUser(_user!.withPhotoUrl(url)));
+
+  @override
   Future<Result<void>> updateDisplayName(String name) => _run(
     () => setUser(
       AppUser(uid: _user!.uid, email: _user!.email, displayName: name),
@@ -2221,7 +2225,54 @@ class FakeProfileRepository implements ProfileRepository {
   String? viewer;
   final allowed = <String>{};
 
-  PlayerProfile? _asSeen(String uid) {
+  /// Header photos set with [setHeader], kept apart so the other fake
+  /// writes don't drop them.
+  final headers = <String, String>{};
+  final uploads = <(ProfileImage, String)>[];
+  final deleted = <String>[];
+
+  @override
+  Future<Result<String>> uploadImage(
+    AppUser user,
+    ProfileImage kind,
+    NewAttachment image,
+  ) async {
+    uploads.add((kind, image.name));
+    return Result.ok(
+      'https://img.test/${user.uid}/${kind.name}-${uploads.length}',
+    );
+  }
+
+  @override
+  Future<Result<void>> setHeader(AppUser user, String? url) async {
+    if (url == null) {
+      headers.remove(user.uid);
+    } else {
+      headers[user.uid] = url;
+    }
+    _changes.add(user.uid);
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<void> deleteImage(String url) async => deleted.add(url);
+
+  PlayerProfile? _asSeen(String uid) => switch (_seen(uid)) {
+    final p? when headers[uid] != null => PlayerProfile(
+      uid: p.uid,
+      name: p.name,
+      photoUrl: p.photoUrl,
+      headerUrl: headers[uid],
+      username: p.username,
+      details: p.details,
+      summary: p.summary,
+      isPrivate: p.isPrivate,
+      locked: p.locked,
+    ),
+    final p => p,
+  };
+
+  PlayerProfile? _seen(String uid) {
     final p = profiles[uid];
     if (p == null || !p.isPrivate || uid == viewer || allowed.contains(uid)) {
       return p;

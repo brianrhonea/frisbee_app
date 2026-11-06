@@ -1135,6 +1135,7 @@ PlayerProfileViewModel _playerProfile(BuildContext c, String uid) =>
       followRepository: c.read(),
       userPostRepository: c.read(),
       notificationRepository: c.read(),
+      filePicker: c.read(),
     );
 
 /// Sends signed-out users to sign-in (remembering where they were headed),

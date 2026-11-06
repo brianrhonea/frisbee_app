@@ -293,6 +293,10 @@ class AuthRepositoryFirebase extends AuthRepository {
       guard(() => _authService.updateDisplayName(name.trim()));
 
   @override
+  Future<Result<void>> updatePhotoUrl(String? url) =>
+      guard(() => _authService.updatePhotoUrl(url));
+
+  @override
   Future<Result<void>> signOut() => guard(_authService.signOut);
 
   @override

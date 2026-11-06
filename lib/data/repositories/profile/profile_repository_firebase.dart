@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../domain/models/app_user.dart';
+import '../../../domain/models/chat.dart';
 import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/model_utils.dart';
 import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/username.dart';
 import '../../../utils/result.dart';
 import '../../services/api_search.dart';
+import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import 'profile_repository.dart';
 
@@ -22,9 +24,16 @@ import 'profile_repository.dart';
 /// details`, which firestore.rules opens only to the player and to people
 /// who follow them (a follow of a private profile needs the player's OK).
 class ProfileRepositoryFirebase implements ProfileRepository {
-  ProfileRepositoryFirebase({FirebaseFirestore? firestore, ApiSearch? search})
-    : _db = firestore ?? FirebaseFirestore.instance,
-      _search = search;
+  ProfileRepositoryFirebase({
+    FirebaseFirestore? firestore,
+    ApiSearch? search,
+    AttachmentStorage? attachments,
+  }) : _db = firestore ?? FirebaseFirestore.instance,
+       _search = search,
+       _attachments = attachments ?? AttachmentStorage();
+
+  /// Profile pictures and headers, in `users/{uid}/profile/` (storage.rules).
+  final AttachmentStorage _attachments;
 
   final FirebaseFirestore _db;
 
@@ -314,4 +323,40 @@ class ProfileRepositoryFirebase implements ProfileRepository {
         .toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   });
+
+  @override
+  Future<Result<String>> uploadImage(
+    AppUser user,
+    ProfileImage kind,
+    NewAttachment image,
+  ) => guard(() {
+    final dot = image.name.lastIndexOf('.');
+    final ext = dot < 0 ? 'jpg' : image.name.substring(dot + 1).toLowerCase();
+    // A new name each time, so the old URL keeps working until it's
+    // replaced and caches never go stale.
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    return _attachments.uploadForUrl(
+      'users/${user.uid}/profile/${kind.name}-$stamp.$ext',
+      image,
+    );
+  });
+
+  @override
+  Future<Result<void>> setHeader(AppUser user, String? url) => guard(
+    () => _profiles.doc(user.uid).set({
+      // The directory fields, so a profile that isn't there yet is valid.
+      ...UserProfile(
+        uid: user.uid,
+        name: user.label,
+        photoUrl: user.photoUrl,
+        username: user.username,
+      ).toMap(),
+      'headerUrl': url ?? FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true)),
+  );
+
+  @override
+  Future<void> deleteImage(String url) =>
+      _attachments.deleteUrl(url).catchError((Object _) {});
 }

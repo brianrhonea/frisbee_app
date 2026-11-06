@@ -55,6 +55,33 @@ class AttachmentStorage {
     }
   }
 
+  /// Uploads one file to [path] and returns its download URL, for images
+  /// shown by URL (profile pictures and headers). Each path is written
+  /// once, so it's cached for good.
+  Future<String> uploadForUrl(String path, NewAttachment file) async {
+    final ref = _storage.ref(path);
+    await ref.putData(
+      file.bytes,
+      SettableMetadata(
+        contentType: file.contentType,
+        cacheControl: 'public, max-age=31536000, immutable',
+      ),
+    );
+    return ref.getDownloadURL();
+  }
+
+  /// Deletes the file behind a download URL from [uploadForUrl]. Anything
+  /// else (a Google account photo, say) and files already gone are left.
+  Future<void> deleteUrl(String url) async {
+    final Reference ref;
+    try {
+      ref = _storage.refFromURL(url);
+    } on Object {
+      return;
+    }
+    await delete([ref.fullPath]);
+  }
+
   /// Deletes files; ones already gone are skipped.
   Future<void> delete(Iterable<String> paths) => Future.wait([
     for (final p in paths)

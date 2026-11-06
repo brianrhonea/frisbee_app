@@ -104,8 +104,10 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<PlayRepository>(create: (_) => PlayRepositoryFirebase()),
   Provider<ProfileRepository>(
-    create: (context) =>
-        ProfileRepositoryFirebase(search: context.read<ApiSearch>()),
+    create: (context) => ProfileRepositoryFirebase(
+      search: context.read<ApiSearch>(),
+      attachments: context.read<AttachmentStorage>(),
+    ),
   ),
   Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),
   Provider<TeamPostRepository>(
