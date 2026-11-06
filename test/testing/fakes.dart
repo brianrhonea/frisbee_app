@@ -1514,7 +1514,7 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
   @override
   Stream<List<Conversation>> watchConversations(String uid) => _watch(
     () => conversations.values
-        .where((c) => c.participants.contains(uid) && c.hasMessages)
+        .where((c) => c.participants.contains(uid) && c.listed)
         .map((c) => c.withMine(_private(c.id)))
         .toList(),
   );
@@ -1541,6 +1541,77 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
 
   /// A clock for archive and delete times.
   DateTime clock = DateTime(2026, 11, 1);
+
+  var _groups = 0;
+
+  /// As firestore.rules: [member] follows [me] and takes messages.
+  bool _canAdd(String me, String member) =>
+      follows.contains((member, me)) &&
+      (policies[member] ?? MessagePolicy.everyone) != MessagePolicy.nobody;
+
+  List<String> _addEach(String id, AppUser me, List<UserProfile> members) {
+    final notAdded = <String>[];
+    for (final m in members) {
+      final c = conversations[id]!;
+      if (c.participants.contains(m.uid)) continue;
+      if (c.participants.length >= Conversation.maxGroupSize ||
+          !_canAdd(me.uid, m.uid)) {
+        notAdded.add(m.name);
+        continue;
+      }
+      conversations[id] = c.copyWith(
+        participants: [...c.participants, m.uid],
+        names: {...c.names, m.uid: m.name},
+      );
+    }
+    emit();
+    return notAdded;
+  }
+
+  @override
+  Future<Result<GroupAdded>> createGroup(
+    AppUser me,
+    String name,
+    List<UserProfile> members,
+  ) async {
+    final id = 'g-group${++_groups}';
+    conversations[id] = Conversation(
+      id: id,
+      participants: [me.uid],
+      isGroup: true,
+      name: name.trim(),
+      createdBy: me.uid,
+      names: {me.uid: me.label},
+    );
+    return Result.ok((id: id, notAdded: _addEach(id, me, members)));
+  }
+
+  @override
+  Future<Result<GroupAdded>> addToGroup(
+    String id,
+    AppUser me,
+    List<UserProfile> members,
+  ) async => Result.ok((id: id, notAdded: _addEach(id, me, members)));
+
+  @override
+  Future<Result<void>> removeFromGroup(String id, String uid) async {
+    final c = conversations[id]!;
+    conversations[id] = c.copyWith(
+      participants: [
+        for (final p in c.participants)
+          if (p != uid) p,
+      ],
+    );
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> renameGroup(String id, String name) async {
+    conversations[id] = conversations[id]!.copyWith(name: name.trim());
+    emit();
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<void>> setArchived(

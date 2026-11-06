@@ -133,6 +133,13 @@ describe("notices", () => {
     const n = directMessageNotice({ conversationId: "a_b", message: { authorName: "Sam", text: "yo" } });
     expect(n.text({}, 1)).toEqual({ title: "Sam", body: "yo" });
     expect(n.route).toBe("/messages/a_b");
+    const g = directMessageNotice({
+      conversationId: "g-1",
+      message: { authorName: "Sam", text: "yo" },
+      conversation: { kind: "group", name: "Carpool" },
+    });
+    expect(g.text({}, 1)).toEqual({ title: "Carpool", body: "Sam: yo" });
+    expect(g.collapseId).toBe("dm_g-1");
   });
 
   it("tells a request's recipient quietly, and a decliner nothing", () => {

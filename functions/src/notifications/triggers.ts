@@ -95,7 +95,7 @@ export const directMessage = onDocumentCreated(
     const conversation = (await getFirestore().doc(`conversations/${conversationId}`).get()).data();
     const to = directMessageRecipients(conversation, String(message.authorId ?? ""));
     if (to.direct.length) {
-      await deliver(getFirestore(), getMessaging(), to.direct, directMessageNotice({ conversationId, message }));
+      await deliver(getFirestore(), getMessaging(), to.direct, directMessageNotice({ conversationId, message, conversation }));
     }
     if (to.requests.length) {
       await deliver(getFirestore(), getMessaging(), to.requests, messageRequestNotice({ message }));

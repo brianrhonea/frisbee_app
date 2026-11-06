@@ -26,9 +26,11 @@ import '../ui/meetings/widgets/meeting_detail_screen.dart';
 import '../ui/meetings/widgets/meeting_editor_screen.dart';
 import '../ui/meetings/widgets/meeting_room_screen.dart';
 import '../ui/messages/view_models/direct_chat_viewmodel.dart';
+import '../ui/messages/view_models/group_members_viewmodel.dart';
 import '../ui/messages/view_models/inbox_viewmodel.dart';
 import '../ui/messages/view_models/people_search_viewmodel.dart';
 import '../ui/messages/widgets/direct_chat_screen.dart';
+import '../ui/messages/widgets/group_members_screen.dart';
 import '../ui/messages/widgets/inbox_screen.dart';
 import '../ui/messages/widgets/people_search_screen.dart';
 import '../ui/core/ui/status_views.dart';
@@ -1030,6 +1032,22 @@ GoRouter router(AuthRepository auth) => GoRouter(
                     ),
                     builder: (_, vm) => PeopleSearchScreen(viewModel: vm),
                   ),
+                ),
+                GoRoute(
+                  path: 'new-group',
+                  parentNavigatorKey: _rootKey,
+                  builder: (_, state) {
+                    final to = state.uri.queryParameters['to'];
+                    return ViewModelHost(
+                      key: ValueKey('group-members-$to'),
+                      create: (c) => GroupMembersViewModel(
+                        directMessageRepository: c.read(),
+                        authRepository: c.read(),
+                        groupId: to,
+                      ),
+                      builder: (_, vm) => GroupMembersScreen(viewModel: vm),
+                    );
+                  },
                 ),
                 GoRoute(
                   path: ':conversationId',

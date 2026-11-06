@@ -238,6 +238,22 @@ describe("direct message attachments", () => {
   });
 });
 
+describe("group message attachments", () => {
+  const GROUP = "g-abcDEF123";
+  const file = (uid: string, author: string) => storage(uid).ref(`conversations/${GROUP}/${author}/m1/0-photo.png`);
+
+  it("only its current members read and upload", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "conversations", GROUP), { kind: "group", participants: [OWNER, PLAYER] }),
+    );
+    await assertSucceeds(file(PLAYER, PLAYER).put(bytes(10)).then());
+    await assertSucceeds(file(OWNER, PLAYER).getMetadata());
+    await assertFails(file(COACH, PLAYER).getMetadata());
+    await assertFails(file(COACH, COACH).put(bytes(10)).then());
+    await assertFails(file(OWNER, PLAYER).put(bytes(10)).then());
+  });
+});
+
 describe("user post photos", () => {
   const photo = (uid: string, owner = uid) => storage(uid).ref(`users/${owner}/posts/p1/1/0-photo.png`);
 

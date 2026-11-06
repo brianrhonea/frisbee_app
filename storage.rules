@@ -128,10 +128,15 @@ service firebase.storage {
     }
 
     // Direct-message attachments: conversation ids are "{uidA}_{uidB}", so
-    // only those two can read, and each uploads into their own folder.
+    // only those two can read, and each uploads into their own folder. A
+    // group's ("g-…") are for its current members.
     match /conversations/{convId}/{userId}/{messageId}/{fileName} {
       function inConversation() {
-        return request.auth != null && request.auth.uid in convId.split('_');
+        return request.auth != null
+          && (convId.matches('g-[A-Za-z0-9]+')
+              ? request.auth.uid in firestore.get(
+                  /databases/(default)/documents/conversations/$(convId)).data.participants
+              : request.auth.uid in convId.split('_'));
       }
       allow get: if inConversation();
       allow create, update: if inConversation()

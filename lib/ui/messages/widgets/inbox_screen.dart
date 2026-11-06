@@ -44,6 +44,11 @@ class InboxScreen extends StatelessWidget {
           title: const Text('Messages'),
           actions: [
             IconButton(
+              tooltip: 'New group',
+              onPressed: () => context.push(Routes.newGroup),
+              icon: const Icon(Icons.group_add_outlined),
+            ),
+            IconButton(
               tooltip: 'New message',
               onPressed: () => context.push(Routes.newMessage),
               icon: const Icon(Icons.edit_square),
@@ -66,10 +71,20 @@ class InboxScreen extends StatelessWidget {
             PageHeader(
               title: 'Your sideline, connected.',
               subtitle: 'Plan the next point. Keep the conversation going.',
-              action: FilledButton.icon(
-                onPressed: () => context.push(Routes.newMessage),
-                icon: const Icon(Icons.edit_square, size: 18),
-                label: const Text('New message'),
+              action: Wrap(
+                spacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => context.push(Routes.newGroup),
+                    icon: const Icon(Icons.group_add_outlined, size: 18),
+                    label: const Text('New group'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () => context.push(Routes.newMessage),
+                    icon: const Icon(Icons.edit_square, size: 18),
+                    label: const Text('New message'),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -388,7 +403,13 @@ class _InboxTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              PersonAvatar(name: item.title, radius: 18),
+              if (item.isGroup)
+                const CircleAvatar(
+                  radius: 18,
+                  child: Icon(Icons.groups, size: 20),
+                )
+              else
+                PersonAvatar(name: item.title, radius: 18),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(

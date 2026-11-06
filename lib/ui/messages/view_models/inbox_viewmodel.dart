@@ -28,12 +28,21 @@ class InboxItem {
 
   String get key => 'dm:${conversation.id}';
 
-  String get title => conversation.otherName(uid);
+  String get title => conversation.titleFor(uid);
+
+  bool get isGroup => conversation.isGroup;
 
   /// The last message, prefixed with "You: " when the user sent it.
-  String get preview =>
-      '${conversation.lastSenderId == uid ? 'You: ' : ''}'
-      '${conversation.lastMessage}';
+  String get preview {
+    final c = conversation;
+    if (!c.hasMessages) return c.isGroup ? 'New group' : '';
+    final from = c.lastSenderId == uid
+        ? 'You: '
+        : c.isGroup
+        ? '${(c.names[c.lastSenderId] ?? 'Someone').split(' ').first}: '
+        : '';
+    return '$from${c.lastMessage}';
+  }
 
   DateTime? get lastAt => conversation.lastMessageAt;
 

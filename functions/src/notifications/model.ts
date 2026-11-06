@@ -265,15 +265,20 @@ export function chatNotice(a: {
   };
 }
 
-export function directMessageNotice(a: { conversationId: string; message: Data }): Notice {
+export function directMessageNotice(a: { conversationId: string; message: Data; conversation?: Data }): Notice {
   const preview = messagePreview(a.message);
+  const author = String(a.message.authorName ?? "") || "Someone";
+  // A group's notice is titled with the group, and says who wrote.
+  const group = a.conversation?.kind === "group";
+  const groupName = String(a.conversation?.name ?? "").trim() || "Group message";
+  const line = group ? `${author}: ${preview}` : preview;
   return {
     category: "directMessages",
     route: `/messages/${a.conversationId}`,
     collapseId: `dm_${a.conversationId}`,
     text: (_, count) => ({
-      title: String(a.message.authorName ?? "New message"),
-      body: count > 1 ? `${count} new messages · ${preview}` : preview,
+      title: group ? groupName : String(a.message.authorName ?? "New message"),
+      body: count > 1 ? `${count} new messages · ${line}` : line,
     }),
   };
 }

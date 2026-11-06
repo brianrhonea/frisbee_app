@@ -30,6 +30,23 @@ class DirectChatViewModel extends MessageThreadViewModel {
       () => _dms.setArchived(conversationId, uid, archived: !isArchived),
     );
     clear = Command0<void>(() => _dms.clearConversation(conversationId, uid));
+    leave = Command0<void>(() => _dms.removeFromGroup(conversationId, uid));
+    removeMember = Command1<void, String>(
+      (member) => _dms.removeFromGroup(conversationId, member),
+    );
+    rename = Command1<void, String>((name) {
+      final n = name.trim();
+      if (n.length > Conversation.maxGroupName) {
+        return Future.value(
+          Result.error(
+            Exception(
+              'Names are up to ${Conversation.maxGroupName} characters',
+            ),
+          ),
+        );
+      }
+      return _dms.renameGroup(conversationId, n);
+    });
     _receiptsSub = _dms
         .watchReadReceipts(uid)
         .listen(
@@ -50,7 +67,7 @@ class DirectChatViewModel extends MessageThreadViewModel {
           (c) {
             _conversation = c;
             _loaded = true;
-            if (c != null) lookUpPeople([c.otherId(uid)]);
+            if (c != null) lookUpPeople(c.othersThan(uid));
             _markRead();
             notifyListeners();
           },
@@ -88,6 +105,43 @@ class DirectChatViewModel extends MessageThreadViewModel {
   Object? get error => _error ?? messageError;
 
   String get otherName => _conversation?.otherName(uid) ?? '';
+
+  bool get isGroup => _conversation?.isGroup ?? false;
+
+  /// The other person's name, or the group's.
+  String get title => _conversation?.titleFor(uid) ?? '';
+
+  /// A group's members, the user first, then by name.
+  List<({String uid, String name})> get members {
+    final c = _conversation;
+    if (c == null) return const [];
+    final list = [
+      for (final p in c.participants)
+        (uid: p, name: p == uid ? 'You' : (c.names[p] ?? 'Someone')),
+    ];
+    list.sort((a, b) {
+      if (a.uid == uid) return -1;
+      if (b.uid == uid) return 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return list;
+  }
+
+  bool get canAddPeople => _conversation?.canAddTo(uid) ?? false;
+
+  bool canRemove(String member) =>
+      _conversation?.canRemove(uid, member) ?? false;
+
+  /// Whether [member] started the group.
+  bool isCreator(String member) => _conversation?.createdBy == member;
+
+  /// Leaves the group; its messages are gone for the user.
+  late final Command0<void> leave;
+
+  /// Takes someone out of the group (its creator only).
+  late final Command1<void, String> removeMember;
+
+  late final Command1<void, String> rename;
 
   /// A message request to the user: they read it without the sender
   /// knowing, then accept or delete it.
@@ -148,6 +202,13 @@ class DirectChatViewModel extends MessageThreadViewModel {
     final c = _conversation;
     if (!_receipts || c == null || message.authorId != uid) return null;
     if (c.isPendingFrom(uid)) return null;
+    if (c.isGroup) {
+      if (messages.lastOrNull?.id != message.id) return null;
+      final seen = c.seenCount(uid);
+      final others = c.othersThan(uid).length;
+      if (seen == 0) return null;
+      return seen >= others ? 'Seen by everyone' : 'Seen by $seen';
+    }
     if (messages.lastOrNull?.id != message.id) return null;
     return c.isSeen(uid) ? 'Seen' : null;
   }
@@ -204,6 +265,9 @@ class DirectChatViewModel extends MessageThreadViewModel {
     decline.dispose();
     toggleArchived.dispose();
     clear.dispose();
+    leave.dispose();
+    removeMember.dispose();
+    rename.dispose();
     _sub.cancel();
     _receiptsSub.cancel();
     super.dispose();

@@ -29,6 +29,29 @@ abstract class DirectMessageRepository {
   /// [MessagePolicy] doesn't let [me] message them at all.
   Future<Result<String>> openConversation(AppUser me, UserProfile other);
 
+  /// Starts a group named [name] with [me] and [members]; returns its id
+  /// and anyone who couldn't be added (only people who follow [me], and
+  /// haven't turned messages off, can be).
+  Future<Result<GroupAdded>> createGroup(
+    AppUser me,
+    String name,
+    List<UserProfile> members,
+  );
+
+  /// Adds [members] to group [id], one at a time; returns its id and
+  /// anyone who couldn't be added.
+  Future<Result<GroupAdded>> addToGroup(
+    String id,
+    AppUser me,
+    List<UserProfile> members,
+  );
+
+  /// Takes [uid] out of group [id]: leaving it, or (its creator) removing
+  /// them.
+  Future<Result<void>> removeFromGroup(String id, String uid);
+
+  Future<Result<void>> renameGroup(String id, String name);
+
   /// Archives conversation [id] for [uid] (out of their inbox until a new
   /// message), or brings it back.
   Future<Result<void>> setArchived(
@@ -107,4 +130,15 @@ class MessagingNotAllowedException implements Exception {
 
   @override
   String toString() => "$name isn't accepting messages from you.";
+}
+
+/// A group, and the names of anyone who couldn't be added to it.
+typedef GroupAdded = ({String id, List<String> notAdded});
+
+/// A group already has [Conversation.maxGroupSize] members.
+class GroupFullException implements Exception {
+  const GroupFullException();
+
+  @override
+  String toString() => 'Groups have up to ${Conversation.maxGroupSize} people.';
 }

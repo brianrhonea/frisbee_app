@@ -213,7 +213,9 @@ service cloud.firestore {
 
         allow read, delete: if signedIn() && uid() == userId;
         allow create, update: if signedIn() && uid() == userId
-          && convId.split('_').hasAny([userId])
+          && (convId.split('_').hasAny([userId])
+              || (convId.matches('g-[A-Za-z0-9]+')
+                  && userId in get(/databases/$(database)/documents/conversations/$(convId)).data.participants))
           && request.resource.data.keys().hasOnly(
                ['readAt', 'archivedAt', 'clearedAt'])
           && setNow('readAt') && setNow('archivedAt') && setNow('clearedAt')
@@ -1960,10 +1962,53 @@ service cloud.firestore {
     // (requestedOf): they read it without updating the shared read
     // receipt and can't post until they accept; or they decline it, which
     // the starter can't see. The app tries 'accepted', then 'request'.
+    //
+    // A group (kind 'group', id "g-" + an auto id, which has no "_") is
+    // started by one person alone, then members are added one per write:
+    // each must follow whoever adds them and not have messagePolicy
+    // 'nobody', up to 10 people. Members leave; its creator removes
+    // anyone; anyone in it renames it.
     match /conversations/{convId} {
-      function inConversation() { return uid() in convId.split('_'); }
+      function isGroup() { return convId.matches('g-[A-Za-z0-9]+'); }
       function convPath() {
         return /databases/$(database)/documents/conversations/$(convId);
+      }
+      function inConversation() {
+        return isGroup()
+          ? exists(convPath()) && uid() in get(convPath()).data.participants
+          : uid() in convId.split('_');
+      }
+      function groupDoc() {
+        return resource.data.get('kind', 'direct') == 'group';
+      }
+      // One person appended to a group's members, who follows the adder.
+      function addsMember() {
+        let before = resource.data.participants;
+        let after = request.resource.data.participants;
+        let added = after[after.size() - 1];
+        return changed().hasOnly(['participants', 'names'])
+          && after.size() == before.size() + 1
+          && after.size() <= 10
+          && after[0:before.size()] == before
+          && !(added in before)
+          && request.resource.data.names.diff(resource.data.names)
+               .affectedKeys().hasOnly([added])
+          && validString(request.resource.data.names[added], 80)
+          && exists(/databases/$(database)/documents/profiles/$(added))
+          && follows(added, uid())
+          && messagePolicy(added) != 'nobody';
+      }
+      // One person taken out: yourself, or anyone if you started it.
+      function removesMember() {
+        let before = resource.data.participants.toSet();
+        let after = request.resource.data.participants.toSet();
+        let removed = before.difference(after);
+        return changed().hasOnly(['participants'])
+          && request.resource.data.participants.size()
+               == resource.data.participants.size() - 1
+          && after.difference(before).size() == 0
+          && removed.size() == 1
+          && (removed.hasOnly([uid()]) || resource.data.createdBy == uid());
       }
       function userDoc(u) { return /databases/$(database)/documents/users/$(u); }
       function messagePolicy(u) {
@@ -1999,7 +2044,7 @@ service cloud.firestore {
 
       allow get: if signedIn() && inConversation();
       allow list: if signedIn() && uid() in resource.data.participants;
-      allow create: if signedIn() && inConversation()
+      allow create: if signedIn() && !isGroup() && inConversation()
         && request.resource.data.keys().hasOnly([
              'participants', 'names', 'lastMessage', 'lastMessageAt',
              'lastSenderId', 'readAt', 'createdAt', 'status', 'requestedOf'])
@@ -2023,6 +2068,23 @@ service cloud.firestore {
         && request.resource.data.readAt == {}
         && request.resource.data.createdAt == request.time
         && allowedStart(request.resource.data);
+      // A group starts with just its creator.
+      allow create: if signedIn() && isGroup()
+        && request.resource.data.keys().hasOnly([
+             'kind', 'name', 'createdBy', 'participants', 'names',
+             'lastMessage', 'lastMessageAt', 'lastSenderId', 'readAt',
+             'createdAt'])
+        && request.resource.data.kind == 'group'
+        && request.resource.data.createdBy == uid()
+        && request.resource.data.participants == [uid()]
+        && request.resource.data.names.keys().hasOnly([uid()])
+        && validString(request.resource.data.names[uid()], 80)
+        && validString(request.resource.data.name, 60)
+        && request.resource.data.lastMessage == ''
+        && request.resource.data.lastMessageAt == null
+        && request.resource.data.lastSenderId == ''
+        && request.resource.data.readAt == {}
+        && request.resource.data.createdAt == request.time;
       // Posting updates the preview; opening marks it read; whoever a
       // request waits on accepts or declines it. While it waits on them
       // they neither post nor send a read receipt.
@@ -2041,6 +2103,10 @@ service cloud.firestore {
         || (changed().hasOnly(['status'])
           && awaitingMe()
           && request.resource.data.status in ['accepted', 'declined'])
+        || (groupDoc() && addsMember())
+        || (groupDoc() && removesMember())
+        || (groupDoc() && changed().hasOnly(['name'])
+          && validString(request.resource.data.name, 60))
       );
 
       match /messages/{messageId} {

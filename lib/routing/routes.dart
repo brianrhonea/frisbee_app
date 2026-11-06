@@ -65,6 +65,10 @@ abstract final class Routes {
   // notification or on a phone) opens over the shell, with `context.push`.
   static const messages = '/messages';
   static const newMessage = '/messages/new';
+  static const newGroup = '/messages/new-group';
+
+  /// Adds people to group [id].
+  static String addToGroup(String id) => '/messages/new-group?to=$id';
   static String conversation(String id) => '/messages/$id';
 
   // The notification feed and its settings, over the shell.

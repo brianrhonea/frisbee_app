@@ -2177,6 +2177,120 @@ describe("direct messages", () => {
     });
   });
 
+  describe("groups", () => {
+    const GROUP = "g-abcDEF123";
+    const group = (uid: string, id = GROUP) => doc(db(uid), "conversations", id);
+    const newGroup = (uid: string, overrides: Record<string, unknown> = {}) => ({
+      kind: "group",
+      name: "Hat league carpool",
+      createdBy: uid,
+      participants: [uid],
+      names: { [uid]: "N" },
+      lastMessage: "",
+      lastMessageAt: null,
+      lastSenderId: "",
+      readAt: {},
+      createdAt: serverTimestamp(),
+      ...overrides,
+    });
+    const follow = (follower: string, followed: string) =>
+      env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "users", follower, "follows", `user_${followed}`), {
+          key: `user_${followed}`, type: "user", targetId: followed, name: "N", notify: true, createdAt: new Date(),
+        }),
+      );
+    const add = (adder: string, before: string[], added: string) =>
+      updateDoc(group(adder), { participants: [...before, added], [`names.${added}`]: "New" });
+    const seed = (participants: string[], createdBy = OWNER) =>
+      env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "conversations", GROUP), {
+          ...newGroup(createdBy, { participants, names: Object.fromEntries(participants.map((p) => [p, "N"])) }),
+          createdAt: new Date(),
+        }),
+      );
+
+    beforeEach(() =>
+      env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "profiles", COACH), { name: "Cory Coach", keywords: ["cory"], photoUrl: null });
+        await setDoc(doc(ctx.firestore(), "profiles", OUTSIDER), { name: "Oz", keywords: ["oz"], photoUrl: null });
+      }),
+    );
+
+    it("starts with just its creator", async () => {
+      await assertFails(setDoc(group(OWNER), newGroup(OWNER, { participants: [OWNER, PLAYER] })));
+      await assertFails(setDoc(group(OWNER), newGroup(PLAYER)));
+      await assertFails(setDoc(group(OWNER), newGroup(OWNER, { name: "x".repeat(61) })));
+      await assertFails(setDoc(group(OWNER, "g_bad"), newGroup(OWNER)));
+      await assertFails(setDoc(group(OWNER), newGroup(OWNER, { status: "accepted" })));
+      await assertSucceeds(setDoc(group(OWNER), newGroup(OWNER)));
+    });
+
+    it("members add people who follow them, one at a time", async () => {
+      await seed([OWNER]);
+      await assertFails(add(OWNER, [OWNER], PLAYER));
+      await follow(PLAYER, OWNER);
+      await follow(COACH, OWNER);
+      await assertFails(updateDoc(group(OWNER), {
+        participants: [OWNER, PLAYER, COACH], [`names.${PLAYER}`]: "P", [`names.${COACH}`]: "C",
+      }));
+      await assertSucceeds(add(OWNER, [OWNER], PLAYER));
+      // Now a member, PLAYER adds people who follow PLAYER, not OWNER.
+      await assertFails(add(PLAYER, [OWNER, PLAYER], COACH));
+      await follow(COACH, PLAYER);
+      await assertSucceeds(add(PLAYER, [OWNER, PLAYER], COACH));
+      // Outsiders can't add themselves, or read it.
+      await follow(OUTSIDER, OWNER);
+      await assertFails(add(OUTSIDER, [OWNER, PLAYER, COACH], OUTSIDER));
+      await assertFails(getDoc(group(OUTSIDER)));
+      await assertSucceeds(getDoc(group(COACH)));
+    });
+
+    it("nobody is added who turned messages off, or past 10", async () => {
+      await seed([OWNER]);
+      await follow(PLAYER, OWNER);
+      await env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "users", PLAYER), { messagePolicy: "nobody" }),
+      );
+      await assertFails(add(OWNER, [OWNER], PLAYER));
+      const ten = [OWNER, "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9"];
+      await seed(ten);
+      await follow(COACH, OWNER);
+      await assertFails(add(OWNER, ten, COACH));
+    });
+
+    it("members leave; its creator removes anyone; nobody else does", async () => {
+      await seed([OWNER, PLAYER, COACH]);
+      await assertFails(updateDoc(group(PLAYER), { participants: arrayRemove(COACH) }));
+      await assertSucceeds(updateDoc(group(PLAYER), { participants: arrayRemove(PLAYER) }));
+      await assertFails(getDoc(group(PLAYER)));
+      await assertSucceeds(updateDoc(group(OWNER), { participants: arrayRemove(COACH) }));
+    });
+
+    it("members post, rename it and keep private read records", async () => {
+      await seed([OWNER, PLAYER]);
+      const fs = db(PLAYER);
+      const batch = writeBatch(fs);
+      batch.set(doc(collection(fs, "conversations", GROUP, "messages")), msg(PLAYER));
+      batch.update(doc(fs, "conversations", GROUP), {
+        lastMessage: "Hi", lastMessageAt: serverTimestamp(), lastSenderId: PLAYER,
+        [`readAt.${PLAYER}`]: serverTimestamp(), [`names.${PLAYER}`]: "Pat",
+      });
+      await assertSucceeds(batch.commit());
+      await assertFails(setDoc(doc(collection(db(COACH), "conversations", GROUP, "messages")), msg(COACH)));
+      await assertSucceeds(getDocs(collection(db(OWNER), "conversations", GROUP, "messages")));
+      await assertFails(getDocs(collection(db(COACH), "conversations", GROUP, "messages")));
+      await assertSucceeds(updateDoc(group(PLAYER), { name: "Carpool" }));
+      await assertFails(updateDoc(group(COACH), { name: "Mine" }));
+      await assertSucceeds(
+        setDoc(doc(db(PLAYER), "users", PLAYER, "dmReads", GROUP), { readAt: serverTimestamp() }, { merge: true }),
+      );
+      await assertFails(
+        setDoc(doc(db(COACH), "users", COACH, "dmReads", GROUP), { readAt: serverTimestamp() }, { merge: true }),
+      );
+      await assertSucceeds(setDoc(doc(db(PLAYER), "conversations", GROUP, "typing", PLAYER), { at: serverTimestamp() }));
+    });
+  });
+
   it("archive and delete-for-me are private, server-timed records", async () => {
     const mine = (uid: string, owner = uid) => doc(db(uid), "users", owner, "dmReads", CONV);
     await assertSucceeds(setDoc(mine(PLAYER), { archivedAt: serverTimestamp() }, { merge: true }));

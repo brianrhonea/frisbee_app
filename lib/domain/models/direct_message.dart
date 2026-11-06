@@ -116,12 +116,18 @@ class ConversationPrivate {
       );
 }
 
-/// A private conversation between two users. Its id is their uids, sorted
-/// and joined with `_`, so each pair has exactly one.
+/// A private conversation. A direct one is between two users; its id is
+/// their uids, sorted and joined with `_`, so each pair has exactly one.
+/// A group ([isGroup]) has an id starting `g-`, a [name], and up to
+/// [maxGroupSize] members, who add people that follow them, leave, and
+/// (its creator) remove people.
 class Conversation {
   const Conversation({
     required this.id,
     required this.participants,
+    this.isGroup = false,
+    this.name = '',
+    this.createdBy = '',
     this.names = const {},
     this.lastMessage = '',
     this.lastMessageAt,
@@ -134,6 +140,21 @@ class Conversation {
 
   final String id;
   final List<String> participants;
+
+  /// A group conversation rather than a pair's.
+  final bool isGroup;
+
+  /// A group's name; empty for a direct conversation or an unnamed group.
+  final String name;
+
+  /// Who started a group; they can remove its members.
+  final String createdBy;
+
+  static const maxGroupSize = 10;
+  static const maxGroupName = 60;
+
+  /// Ids for groups: `g-` and a Firestore auto id, which never has `_`.
+  static bool isGroupId(String id) => id.startsWith('g-');
 
   /// uid → display name, as each person last sent it.
   final Map<String, String> names;
@@ -170,9 +191,14 @@ class Conversation {
     String? lastSenderId,
     Map<String, DateTime>? readAt,
     ConversationStatus? status,
+    List<String>? participants,
+    String? name,
   }) => Conversation(
     id: id,
-    participants: participants,
+    participants: participants ?? this.participants,
+    isGroup: isGroup,
+    name: name ?? this.name,
+    createdBy: createdBy,
     names: names ?? this.names,
     lastMessage: lastMessage ?? this.lastMessage,
     lastMessageAt: lastMessageAt ?? this.lastMessageAt,
@@ -186,6 +212,9 @@ class Conversation {
   Conversation withMine(ConversationPrivate? mine) => Conversation(
     id: id,
     participants: participants,
+    isGroup: isGroup,
+    name: name,
+    createdBy: createdBy,
     names: names,
     lastMessage: lastMessage,
     lastMessageAt: lastMessageAt,
@@ -213,7 +242,53 @@ class Conversation {
 
   String otherName(String me) => names[otherId(me)] ?? 'Stall 10 user';
 
+  /// Everyone in it but [me].
+  List<String> othersThan(String me) => [
+    for (final p in participants)
+      if (p != me) p,
+  ];
+
+  /// What [me] calls it: the other person, or a group's name, else its
+  /// members' first names.
+  String titleFor(String me) {
+    if (!isGroup) return otherName(me);
+    if (name.trim().isNotEmpty) return name.trim();
+    final others = [
+      for (final p in othersThan(me)) (names[p] ?? 'Someone').split(' ').first,
+    ];
+    if (others.isEmpty) return 'Just you';
+    if (others.length <= 3) return others.join(', ');
+    return '${others.take(3).join(', ')} +${others.length - 3}';
+  }
+
+  /// [me] may add people: a group they're in that isn't full.
+  bool canAddTo(String me) =>
+      isGroup &&
+      participants.contains(me) &&
+      participants.length < maxGroupSize;
+
+  /// [me] may remove [member]: [me] started the group, and it's someone else.
+  bool canRemove(String me, String member) =>
+      isGroup &&
+      createdBy == me &&
+      member != me &&
+      participants.contains(member);
+
+  /// How many others have read [me]'s latest message, by read receipts.
+  int seenCount(String me) {
+    final last = lastMessageAt;
+    if (last == null || lastSenderId != me) return 0;
+    return [
+      for (final p in othersThan(me))
+        if (readAt[p] case final at? when !at.isBefore(last)) p,
+    ].length;
+  }
+
   bool get hasMessages => lastMessageAt != null;
+
+  /// Shown in the inbox: once it has messages, or straight away for a
+  /// group someone added the user to.
+  bool get listed => hasMessages || isGroup;
 
   /// A message request waiting on [me] to accept or delete it.
   bool isRequestFor(String me) =>
@@ -248,7 +323,7 @@ class Conversation {
   /// In [me]'s inbox: has messages, isn't a request to them (or one they
   /// declined), and they haven't archived or deleted it since.
   bool inInbox(String me) =>
-      hasMessages &&
+      listed &&
       !isRequestFor(me) &&
       !isDeclinedBy(me) &&
       !isArchived &&
@@ -310,6 +385,9 @@ class Conversation {
         },
         status: ConversationStatus.parse(map['status']),
         requestedOf: map['requestedOf'] as String?,
+        isGroup: map['kind'] == 'group',
+        name: map['name'] as String? ?? '',
+        createdBy: map['createdBy'] as String? ?? '',
       );
 }
 

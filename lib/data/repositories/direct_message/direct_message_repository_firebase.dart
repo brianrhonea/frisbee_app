@@ -46,6 +46,9 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
 
   static const _searchLimit = 20;
 
+  /// Sorts groups without messages yet last.
+  static final _never = DateTime.fromMillisecondsSinceEpoch(0);
+
   CollectionReference<Map<String, dynamic>> get _profiles =>
       _db.collection('profiles');
 
@@ -139,10 +142,13 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
         ).map(
           (snap) =>
               [
-                  for (final d in snap.docs)
-                    Conversation.fromMap(d.id, plainData(d.data())),
-                ].where((c) => c.hasMessages).toList()
-                ..sort((a, b) => b.lastMessageAt!.compareTo(a.lastMessageAt!)),
+                for (final d in snap.docs)
+                  Conversation.fromMap(d.id, plainData(d.data())),
+              ].where((c) => c.listed).toList()..sort(
+                (a, b) => (b.lastMessageAt ?? _never).compareTo(
+                  a.lastMessageAt ?? _never,
+                ),
+              ),
         ),
   );
 
@@ -192,6 +198,82 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
         }
         throw MessagingNotAllowedException(other.name);
       });
+
+  @override
+  Future<Result<GroupAdded>> createGroup(
+    AppUser me,
+    String name,
+    List<UserProfile> members,
+  ) => guard(() async {
+    final ref = _conversations.doc('g-${_conversations.doc().id}');
+    await ref.set({
+      'kind': 'group',
+      'name': name.trim(),
+      'createdBy': me.uid,
+      'participants': [me.uid],
+      'names': {me.uid: me.label},
+      'lastMessage': '',
+      'lastMessageAt': null,
+      'lastSenderId': '',
+      'readAt': <String, Object>{},
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return (id: ref.id, notAdded: await _addEach(ref, members));
+  });
+
+  @override
+  Future<Result<GroupAdded>> addToGroup(
+    String id,
+    AppUser me,
+    List<UserProfile> members,
+  ) => guard(
+    () async =>
+        (id: id, notAdded: await _addEach(_conversations.doc(id), members)),
+  );
+
+  /// The rules check one new member per write (that they follow the
+  /// adder), so people go in one at a time, at the end of the list.
+  Future<List<String>> _addEach(
+    DocumentReference<Map<String, dynamic>> ref,
+    List<UserProfile> members,
+  ) async {
+    final notAdded = <String>[];
+    for (final m in members) {
+      try {
+        await _db.runTransaction((tx) async {
+          final snap = await tx.get(ref);
+          final now = [
+            for (final p in (snap.data()?['participants'] as List?) ?? []) '$p',
+          ];
+          if (now.contains(m.uid)) return;
+          if (now.length >= Conversation.maxGroupSize) {
+            throw const GroupFullException();
+          }
+          tx.update(ref, {
+            'participants': [...now, m.uid],
+            'names.${m.uid}': m.name,
+          });
+        });
+      } on FirebaseException catch (e) {
+        if (e.code != 'permission-denied') rethrow;
+        notAdded.add(m.name);
+      } on GroupFullException {
+        notAdded.add(m.name);
+      }
+    }
+    return notAdded;
+  }
+
+  @override
+  Future<Result<void>> removeFromGroup(String id, String uid) => guard(
+    () => _conversations.doc(id).update({
+      'participants': FieldValue.arrayRemove([uid]),
+    }),
+  );
+
+  @override
+  Future<Result<void>> renameGroup(String id, String name) =>
+      guard(() => _conversations.doc(id).update({'name': name.trim()}));
 
   @override
   Future<Result<void>> setArchived(
