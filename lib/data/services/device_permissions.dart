@@ -22,7 +22,11 @@ enum AccessStatus {
 
   /// iOS "Selected photos": only the photos the user picked.
   limited('Selected photos only'),
-  denied('Not allowed');
+  denied('Not allowed'),
+
+  /// Android's photo picker hands over only the photos picked, so the app
+  /// never asks for the library (and doesn't declare it).
+  notNeeded('Not needed: you pick each photo');
 
   const AccessStatus(this.label);
 
@@ -47,16 +51,21 @@ class DevicePermissions {
   };
 
   static AccessStatus _status(PermissionStatus s) => switch (s) {
-    PermissionStatus.granted || PermissionStatus.provisional =>
-      AccessStatus.allowed,
+    PermissionStatus.granted ||
+    PermissionStatus.provisional => AccessStatus.allowed,
     PermissionStatus.limited => AccessStatus.limited,
     PermissionStatus.denied => AccessStatus.notAsked,
     PermissionStatus.permanentlyDenied ||
     PermissionStatus.restricted => AccessStatus.denied,
   };
 
+  bool _pickerOnly(DeviceAccess a) =>
+      a == DeviceAccess.photos &&
+      defaultTargetPlatform == TargetPlatform.android;
+
   Future<AccessStatus> status(DeviceAccess a) async {
     if (!supported) return AccessStatus.allowed;
+    if (_pickerOnly(a)) return AccessStatus.notNeeded;
     final s = await _permission(a).status;
     // Android reports "denied" both before asking and after one refusal.
     if (s == PermissionStatus.denied &&
@@ -70,6 +79,7 @@ class DevicePermissions {
   /// Asks for [a] if it hasn't been decided; returns where it stands.
   Future<AccessStatus> request(DeviceAccess a) async {
     if (!supported) return AccessStatus.allowed;
+    if (_pickerOnly(a)) return AccessStatus.notNeeded;
     return _status(await _permission(a).request());
   }
 

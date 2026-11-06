@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
+import '../view_models/device_access_viewmodel.dart';
+import 'device_access_group.dart';
+import '../../core/ui/view_model_host.dart';
+import '../../../data/services/device_permissions.dart';
 import '../../../domain/models/direct_message.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/player_profile.dart';
@@ -271,6 +276,13 @@ class PrivacySettingsScreen extends StatelessWidget {
                   onChanged: vm.setReadReceipts.execute,
                 ),
               ],
+            ),
+            ViewModelHost(
+              create: (c) => DeviceAccessViewModel(
+                permissions:
+                    c.read<DevicePermissions?>() ?? const DevicePermissions(),
+              ),
+              builder: (_, access) => DeviceAccessGroup(viewModel: access),
             ),
             SettingsGroup(
               title: 'Show on my profile',

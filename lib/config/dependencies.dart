@@ -5,6 +5,7 @@ import '../data/repositories/discord/discord_import_repository.dart';
 import '../data/repositories/discord/discord_import_repository_firebase.dart';
 import '../data/repositories/voice/voice_repository.dart';
 import '../data/repositories/voice/voice_repository_livekit.dart';
+import '../data/services/device_permissions.dart';
 import '../data/services/callable_client.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/auth/auth_repository_firebase.dart';
@@ -121,6 +122,7 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (_) => PostCommentRepositoryFirebase(),
   ),
   Provider<PeopleRepository>(create: (_) => PeopleRepositoryFirebase()),
+  Provider(create: (_) => const DevicePermissions()),
   Provider<FollowRepository>(create: (_) => FollowRepositoryFirebase()),
   Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),
   Provider<YouTubeInfoService>(create: (_) => YouTubeInfoService()),
