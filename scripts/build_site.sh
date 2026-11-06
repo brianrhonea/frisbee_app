@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the website into build/site, which Firebase Hosting serves:
-#   /       the landing page and invite fallbacks (hosting/)
-#   /app/   the Flutter web app (lib/main_web.dart)
+#   /                   the Flutter web app (lib/main_web.dart)
+#   /about, /privacy…   static pages and invite fallbacks (hosting/)
 #
 # Runs before every `firebase deploy --only hosting` (firebase.json
 # predeploy). Picks the secrets file from the project being deployed:
@@ -24,16 +24,17 @@ if [[ ! -f "$secrets" ]]; then
 fi
 echo "Building the website with $secrets${project:+ for $project}"
 
-# Git Bash would otherwise turn /app/ into a Windows path.
+# Git Bash would otherwise turn / into a Windows path.
 MSYS_NO_PATHCONV=1 flutter build web \
   -t lib/main_web.dart \
   --release \
-  --base-href /app/ \
+  --base-href / \
   --no-wasm-dry-run \
   --dart-define-from-file="$secrets"
 
 rm -rf build/site
 mkdir -p build/site
+# hosting/ has no index.html, so the app's files don't collide with it.
 cp -R hosting/. build/site/
-cp -R build/web build/site/app
+cp -R build/web/. build/site/
 echo "Built build/site"

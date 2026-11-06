@@ -3,92 +3,222 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/auth/auth_repository.dart';
+import '../ui/browse/view_models/browse_search_viewmodel.dart';
+import '../ui/browse/view_models/community_feed_viewmodel.dart';
+import '../ui/browse/view_models/public_profile_viewmodel.dart';
+import '../ui/browse/view_models/public_team_viewmodel.dart';
+import '../ui/browse/view_models/upcoming_events_viewmodel.dart';
+import '../ui/browse/widgets/browse_search_screen.dart';
+import '../ui/browse/widgets/community_feed_screen.dart';
+import '../ui/browse/widgets/public_profile_screen.dart';
+import '../ui/browse/widgets/public_team_screen.dart';
+import '../ui/browse/widgets/upcoming_events_screen.dart';
 import '../ui/core/ui/status_views.dart';
 import '../ui/core/ui/view_model_host.dart';
 import '../ui/web/view_models/web_shell_viewmodel.dart';
 import '../ui/web/widgets/get_the_app_screen.dart';
 import '../ui/web/widgets/web_shell.dart';
 import 'route_builders.dart';
-import 'router.dart' show authRedirect, splashPath;
+import 'router.dart' show splashPath;
 import 'routes.dart';
 
-/// The website's router (lib/main_web.dart): sign-in, then Explore, player
-/// and team pages, events, rankings and the user's profile, framed by
-/// [WebShell]. Paths the app has but the website doesn't (team sections,
-/// messages, meetings…) show [GetTheAppScreen].
+/// Paths only members open; visitors are sent to sign in first.
+const _membersOnly = [
+  Routes.home,
+  Routes.profile,
+  Routes.postsPath,
+  Routes.tournaments,
+  Routes.rankings,
+];
+
+bool _isMembersOnly(String path) =>
+    _membersOnly.any((p) => path == p || path.startsWith('$p/'));
+
+const _authPages = {Routes.signIn, Routes.signUp};
+
+/// The website's redirects. Visitors browse everything public; members-only
+/// pages ask them to sign in and come back. Signing in returns to where
+/// they were (`?from=`), else Home.
+String? webRedirect(AuthRepository auth, Uri uri) {
+  final path = uri.path;
+  final from = uri.queryParameters['from'];
+  if (!auth.isReady) {
+    if (path == splashPath) return null;
+    return Uri(
+      path: splashPath,
+      queryParameters: {'from': uri.toString()},
+    ).toString();
+  }
+  final landing = auth.isAuthenticated ? Routes.home : Routes.community;
+  if (path == splashPath) return from ?? landing;
+  if (path == '/') return landing;
+  if (!auth.isAuthenticated) {
+    if (!_isMembersOnly(path)) return null;
+    return Uri(
+      path: Routes.signIn,
+      queryParameters: {'from': uri.toString()},
+    ).toString();
+  }
+  // No username yet: pick one first, then carry on.
+  if (auth.needsUsername) {
+    if (path == Routes.chooseUsername) return null;
+    final target = _authPages.contains(path) ? from : uri.toString();
+    return Uri(
+      path: Routes.chooseUsername,
+      queryParameters: target == null ? null : {'from': target},
+    ).toString();
+  }
+  if (path == Routes.chooseUsername || _authPages.contains(path)) {
+    return from ?? Routes.home;
+  }
+  return null;
+}
+
+/// The website's router (lib/main_web.dart), laid out by [WebShell].
+///
+/// Everyone sees the community feed, Explore, Events, and player and team
+/// pages. Members see the app's own screens for those (with liking,
+/// following, joining…) plus their Home feed and profile; visitors see
+/// read-only pages from the `browse` functions that ask them to join for
+/// anything more. Other app paths show [GetTheAppScreen].
 ///
 /// Paths match the app's (Routes), so links work in both.
-GoRouter webRouter(AuthRepository auth, {String? initialLocation}) => GoRouter(
-  initialLocation: initialLocation ?? Routes.explorePath,
-  refreshListenable: auth,
-  redirect: (_, state) =>
-      authRedirect(auth, state.uri, home: Routes.explorePath),
-  errorBuilder: (_, state) => _framed(state, const GetTheAppScreen()),
-  routes: [
-    GoRoute(
-      path: splashPath,
-      builder: (_, _) => const Scaffold(body: LoadingView()),
-    ),
-    GoRoute(path: '/', redirect: (_, _) => Routes.explorePath),
-    GoRoute(path: Routes.home, redirect: (_, _) => Routes.explorePath),
-    GoRoute(path: Routes.signIn, builder: (_, _) => signInPage()),
-    GoRoute(path: Routes.signUp, builder: (_, _) => signUpPage()),
-    GoRoute(
-      path: Routes.chooseUsername,
-      builder: (_, _) => chooseUsernamePage(),
-    ),
-    // Group links (InviteLinks): the group's page.
-    GoRoute(
-      path: '/g/:groupId',
-      redirect: (_, state) => Routes.team(state.pathParameters['groupId']!),
-    ),
-    ShellRoute(
-      builder: (_, state, child) => _framed(state, child),
-      routes: [
-        GoRoute(
-          path: Routes.explorePath,
-          builder: (_, state) => explorePage(state),
-        ),
-        GoRoute(
-          path: '/players/:uid',
-          // Your own profile is /profile, as in the app.
-          redirect: (_, state) =>
-              state.pathParameters['uid'] == auth.currentUser?.uid
-              ? Routes.profile
-              : null,
-          builder: (_, state) => playerPage(state.pathParameters['uid']!),
-        ),
-        GoRoute(path: Routes.profile, builder: (_, _) => myProfilePage()),
-        GoRoute(
-          path: '${Routes.teams}/:teamId',
-          builder: (_, state) => teamPage(state),
-        ),
-        GoRoute(
-          path: Routes.tournaments,
-          builder: (_, _) => eventsPage(),
-          routes: [
-            GoRoute(
-              path: ':id',
-              builder: (_, state) =>
-                  tournamentPage(state.pathParameters['id']!),
+GoRouter webRouter(AuthRepository auth, {String? initialLocation}) {
+  /// [member] for signed-in users, else [visitor].
+  Widget either(Widget Function() member, Widget Function() visitor) =>
+      auth.isAuthenticated ? member() : visitor();
+
+  return GoRouter(
+    initialLocation: initialLocation ?? '/',
+    refreshListenable: auth,
+    redirect: (_, state) => webRedirect(auth, state.uri),
+    errorBuilder: (_, state) => _framed(state, const GetTheAppScreen()),
+    routes: [
+      GoRoute(
+        path: splashPath,
+        builder: (_, _) => const Scaffold(body: LoadingView()),
+      ),
+      GoRoute(path: '/', builder: (_, _) => const SizedBox.shrink()),
+      GoRoute(path: Routes.signIn, builder: (_, _) => signInPage()),
+      GoRoute(path: Routes.signUp, builder: (_, _) => signUpPage()),
+      GoRoute(
+        path: Routes.chooseUsername,
+        builder: (_, _) => chooseUsernamePage(),
+      ),
+      // Group links (InviteLinks): the group's page.
+      GoRoute(
+        path: '/g/:groupId',
+        redirect: (_, state) => Routes.team(state.pathParameters['groupId']!),
+      ),
+      ShellRoute(
+        builder: (_, state, child) => _framed(state, child),
+        routes: [
+          GoRoute(path: Routes.home, builder: (_, _) => homePage()),
+          GoRoute(
+            path: Routes.community,
+            builder: (_, _) => ViewModelHost(
+              create: (c) => CommunityFeedViewModel(
+                browseRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, vm) => CommunityFeedScreen(viewModel: vm),
             ),
-          ],
-        ),
-        GoRoute(
-          path: Routes.rankings,
-          builder: (_, _) => rankingsPage(),
-          routes: [
-            GoRoute(path: 'team', builder: (_, state) => usauTeamPage(state)),
-          ],
-        ),
-        GoRoute(
-          path: getTheAppPath,
-          builder: (_, _) => const GetTheAppScreen(appOnly: false),
-        ),
-      ],
-    ),
-  ],
-);
+          ),
+          GoRoute(
+            path: Routes.explorePath,
+            builder: (_, state) => either(
+              () => explorePage(state),
+              () => ViewModelHost(
+                create: (c) =>
+                    BrowseSearchViewModel(browseRepository: c.read()),
+                builder: (_, vm) => BrowseSearchScreen(
+                  viewModel: vm,
+                  initialQuery: state.uri.queryParameters['q'] ?? '',
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: Routes.upcomingEvents,
+            builder: (_, _) => ViewModelHost(
+              create: (c) =>
+                  UpcomingEventsViewModel(browseRepository: c.read()),
+              builder: (_, vm) => UpcomingEventsScreen(viewModel: vm),
+            ),
+          ),
+          GoRoute(
+            path: '/players/:uid',
+            // Your own profile is /profile, as in the app.
+            redirect: (_, state) =>
+                state.pathParameters['uid'] == auth.currentUser?.uid
+                ? Routes.profile
+                : null,
+            builder: (_, state) {
+              final uid = state.pathParameters['uid']!;
+              return either(
+                () => playerPage(uid),
+                () => ViewModelHost(
+                  key: ValueKey('public-player-$uid'),
+                  create: (c) => PublicProfileViewModel(
+                    uid: uid,
+                    browseRepository: c.read(),
+                  ),
+                  builder: (_, vm) => PublicProfileScreen(viewModel: vm),
+                ),
+              );
+            },
+          ),
+          GoRoute(path: Routes.profile, builder: (_, _) => myProfilePage()),
+          GoRoute(
+            path: '${Routes.teams}/:teamId',
+            builder: (_, state) {
+              final id = state.pathParameters['teamId']!;
+              return either(
+                () => teamPage(state),
+                () => ViewModelHost(
+                  key: ValueKey('public-team-$id'),
+                  create: (c) => PublicTeamViewModel(
+                    teamId: id,
+                    browseRepository: c.read(),
+                  ),
+                  builder: (_, vm) => PublicTeamScreen(viewModel: vm),
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: '${Routes.postsPath}/:postId',
+            builder: (_, state) => postPage(state),
+          ),
+          // USA Ultimate events and rankings: members only, as the website
+          // can't reach play.usaultimate.org from the browser yet.
+          GoRoute(
+            path: Routes.tournaments,
+            builder: (_, _) => eventsPage(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (_, state) =>
+                    tournamentPage(state.pathParameters['id']!),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: Routes.rankings,
+            builder: (_, _) => rankingsPage(),
+            routes: [
+              GoRoute(path: 'team', builder: (_, state) => usauTeamPage(state)),
+            ],
+          ),
+          GoRoute(
+            path: getTheAppPath,
+            builder: (_, _) => const GetTheAppScreen(appOnly: false),
+          ),
+        ],
+      ),
+    ],
+  );
+}
 
 /// [child] in the website's frame.
 Widget _framed(GoRouterState state, Widget child) => ViewModelHost(

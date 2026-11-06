@@ -186,6 +186,18 @@ describe("post photos", () => {
     await assertFails(photo(OUTSIDER, "priv").getMetadata());
   });
 
+  it("website visitors see public post photos, but not a private group's", async () => {
+    await seed();
+    const visitor = (post: string) =>
+      env.unauthenticatedContext().storage().ref(`teams/${TEAM}/posts/${post}/1/0-photo.png`);
+    await assertSucceeds(visitor("pub").getMetadata());
+    await assertFails(visitor("priv").getMetadata());
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "teams", TEAM), { kind: "community", requiresApproval: true }),
+    );
+    await assertFails(visitor("pub").getMetadata());
+  });
+
   it("owners, coaches and captains upload photos; players cannot", async () => {
     for (const uid of [OWNER, COACH, CAPTAIN]) {
       await assertSucceeds(
@@ -249,5 +261,21 @@ describe("user post photos", () => {
     await assertSucceeds(photo(OUTSIDER, PLAYER).getMetadata());
     await assertFails(photo(OUTSIDER, PLAYER).delete());
     await assertSucceeds(photo(PLAYER).delete());
+  });
+
+  it("website visitors see them unless the author's profile is private", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "profiles", PLAYER), { name: "Pat" });
+      await setDoc(doc(ctx.firestore(), "profiles", OWNER), { name: "Olive", private: true });
+      for (const uid of [PLAYER, OWNER, COACH]) {
+        await ctx.storage().ref(`users/${uid}/posts/p1/1/0-photo.png`).put(bytes(10)).then();
+      }
+    });
+    const visitor = (owner: string) =>
+      env.unauthenticatedContext().storage().ref(`users/${owner}/posts/p1/1/0-photo.png`);
+    await assertSucceeds(visitor(PLAYER).getMetadata());
+    await assertFails(visitor(OWNER).getMetadata());
+    // No profile: hidden.
+    await assertFails(visitor(COACH).getMetadata());
   });
 });

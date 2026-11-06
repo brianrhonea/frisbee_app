@@ -66,11 +66,17 @@ iOS App Store builds run on Codemagic (no Mac needed); see
 ## Website
 
 Firebase Hosting serves `build/site` (gitignored), built by
-`scripts/build_site.sh` (firebase.json predeploy): `hosting/` (landing page,
-invite fallbacks) at `/`, and the Flutter web app (`lib/main_web.dart`,
-`lib/routing/web_router.dart`, `lib/ui/web/`) at `/app`. The web app reuses
-the app's repositories and screens but only routes search, profiles, team
-pages, events and rankings; other paths show "get the app".
+`scripts/build_site.sh` (firebase.json predeploy): the Flutter web app
+(`lib/main_web.dart`, `lib/routing/web_router.dart`, `lib/ui/web/`,
+`lib/ui/browse/`) at `/`, and the static pages in `hosting/` (`/about`,
+`/help`, `/terms`, `/privacy`, `/cookies`, invite fallbacks) beside it.
+Signed-out visitors browse the community feed, search, public profiles,
+team pages and events through the `browse` Cloud Functions (allow-listed
+public fields, rate-limited per hashed IP; Firestore rules stay
+sign-in-only), and liking, following or joining asks them to sign up.
+Members get their home feed and the app's screens; other paths show "get
+the app". The legal pages are drafts: fill in the [bracketed] details and
+get them reviewed before launch.
 
 ```
 flutter run -d chrome -t lib/main_web.dart --dart-define-from-file=secrets.local.json
@@ -78,7 +84,7 @@ bash scripts/build_site.sh && firebase emulators:start --only hosting
 ```
 
 Store URLs are placeholders in `lib/config/store_links.dart` and
-`hosting/index.html` / `join.html`; keep them in step. The deploy workflow
+`hosting/about.html` / `join.html`; keep them in step. The deploy workflow
 builds the site from the `FIREBASE_WEB_API_KEY_DEV` / `_PROD` repository
 secrets and skips hosting without them. The web API key ends up in public
 JS (normal for Firebase web), so never commit `build/`.

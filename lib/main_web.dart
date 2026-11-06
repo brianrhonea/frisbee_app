@@ -31,7 +31,7 @@ const _useEmulators = bool.fromEnvironment('USE_EMULATORS');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // /app/explore, not /app/#/explore.
+  // /explore, not /#/explore.
   usePathUrlStrategy();
   Logger.root.level = kDebugMode ? Level.ALL : Level.WARNING;
   Logger.root.onRecord.listen(

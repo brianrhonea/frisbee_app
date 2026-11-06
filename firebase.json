@@ -15,11 +15,8 @@
       "firebase.json",
       "**/node_modules/**"
     ],
+    "cleanUrls": true,
     "rewrites": [
-      {
-        "source": "/app/**",
-        "destination": "/app/index.html"
-      },
       {
         "source": "/join/**",
         "destination": "/join.html"
@@ -31,6 +28,10 @@
       {
         "source": "/p/**",
         "destination": "/join.html"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
       }
     ],
     "headers": [
@@ -62,7 +63,7 @@
         ]
       },
       {
-        "source": "/app/@(index.html|flutter_bootstrap.js|flutter_service_worker.js|main.dart.js|version.json|manifest.json)",
+        "source": "/@(index.html|flutter_bootstrap.js|flutter_service_worker.js|main.dart.js|version.json|manifest.json)",
         "headers": [
           {
             "key": "Cache-Control",

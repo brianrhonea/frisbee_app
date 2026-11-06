@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cookie Policy — Stall 10</title>
+  <meta name="description" content="How the Stall 10 website uses cookies and browser storage.">
+  <meta name="theme-color" content="#0e1310">
+  <link rel="icon" href="/favicon.png">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/community">
+        <img src="/logo.png" alt="" width="34" height="34">
+        <span>Stall 10</span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/community">Community</a>
+        <a href="/explore">Explore</a>
+        <a href="/events">Events</a>
+        <a href="/about">About</a>
+      </nav>
+      <div class="header-actions">
+        <a class="link" href="/sign-in">Log in</a>
+        <a class="btn btn-primary btn-small" href="/sign-up">Sign up</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="doc wrap">
+    <!-- DRAFT: written from what the app does as of November 5, 2026. Have it
+         reviewed (ideally by a lawyer) before launch, fill in the
+         [bracketed] details, then remove this note and the banner. -->
+    <p class="draft-banner"><strong>Draft</strong> — this page hasn't been
+      reviewed yet and may change before Stall 10 launches.</p>
+    <h1>Cookie Policy</h1>
+    <p class="updated">Last updated: November 5, 2026</p>
+
+    <p>This page explains how the Stall 10 website stores information in your
+      browser. The short version: we only store what's needed to make the
+      site work. There are no advertising or analytics cookies, and nothing
+      tracks you across other sites.</p>
+
+    <h2>What we store</h2>
+    <table class="doc-table">
+      <thead><tr><th>What</th><th>Why</th><th>How long</th></tr></thead>
+      <tbody>
+        <tr><td>Sign-in session (Firebase Authentication, in your browser's
+          IndexedDB)</td><td>Keeps you signed in between visits.</td>
+          <td>Until you log out</td></tr>
+        <tr><td>Theme preference (local storage)</td><td>Remembers light or
+          dark mode.</td><td>Until you clear it</td></tr>
+        <tr><td>App files (browser cache)</td><td>Loads the site faster on
+          your next visit.</td><td>Until updated or cleared</td></tr>
+      </tbody>
+    </table>
+    <p>These are strictly necessary for the site to work, so most cookie
+      laws don't require your consent for them.</p>
+
+    <h2>Third parties</h2>
+    <p>Signing in with Google opens a Google window, which uses Google's own
+      cookies. A YouTube video in a post may set YouTube cookies when it
+      plays. Google's policies cover those.</p>
+
+    <h2>Your choices</h2>
+    <p>You can clear site data in your browser settings at any time; you'll
+      be signed out. Blocking all site storage stops sign-in from working.</p>
+
+    <p>See our <a href="/privacy">Privacy Policy</a> for more about how we
+      handle your information.</p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>© <span id="year">2026</span> Stall 10</span>
+      <nav aria-label="Footer">
+        <a href="/about">About</a>
+        <a href="/help">Help</a>
+        <a href="/terms">Terms of Service</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/cookies">Cookie Policy</a>
+      </nav>
+    </div>
+  </footer>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

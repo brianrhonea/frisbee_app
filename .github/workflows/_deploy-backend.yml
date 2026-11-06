@@ -50,7 +50,7 @@ jobs:
       contents: write # to push the release tag
     env:
       PROJECT: ${{ inputs.environment }}
-      GROUPS: ${{ vars.FUNCTION_GROUPS || 'account,api,communities,discord,follows,meetings,notifications' }}
+      GROUPS: ${{ vars.FUNCTION_GROUPS || 'account,api,browse,communities,discord,follows,meetings,notifications' }}
     steps:
       - uses: actions/checkout@v4
         with:

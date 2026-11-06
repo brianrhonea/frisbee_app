@@ -68,18 +68,4 @@ void main() {
       '/join/ABC123',
     );
   });
-
-  test('the website lands on its own home page', () {
-    String? web(FakeAuthRepository auth, String location) =>
-        authRedirect(auth, Uri.parse(location), home: Routes.explorePath);
-
-    final out = FakeAuthRepository();
-    expect(web(out, Routes.explorePath), Routes.signIn);
-    expect(web(out, '/players/u2'), '/sign-in?from=%2Fplayers%2Fu2');
-
-    final signedIn = FakeAuthRepository(user: testUser);
-    expect(web(signedIn, Routes.signIn), Routes.explorePath);
-    expect(web(signedIn, '/splash'), Routes.explorePath);
-    expect(web(signedIn, '/splash?from=/rankings'), '/rankings');
-  });
 }

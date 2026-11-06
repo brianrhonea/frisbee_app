@@ -23,8 +23,10 @@ and costs, `docs/cloud-limits.md`.
 Stall 10 is an ultimate frisbee app for teams, community groups, schools
 and clubs, and the players in them. It's one Flutter app for Android, iOS,
 macOS and Windows on a Firebase backend, plus a website: a static landing
-page and the same Flutter app compiled for web at `/app` (search, profiles,
-team pages, events and rankings; everything else says "get the app").
+the same Flutter app compiled for web at `/`, X-style: visitors browse the
+public feed, search, profiles, team pages and events (through the `browse`
+functions), members also get their home feed; everything else says "get the
+app". Static pages (`/about`, `/privacy`, `/terms`…) sit beside it.
 
 | | |
 |---|---|
@@ -57,7 +59,7 @@ functions/src/              Cloud Functions, one folder per deploy group
 functions/test/             Unit tests and rules tests (emulators)
 hosting/                    Landing page, join and invite pages (copied into build/site)
 web/                        Flutter web shell (index.html, manifest, icons)
-scripts/build_site.sh       Builds build/site: hosting/ at /, the web app at /app
+scripts/build_site.sh       Builds build/site: the web app at /, hosting/ pages beside it
 scripts/monitoring/         Text-alert setup (Cloud Monitoring)
 .github/workflows/          Deploy and roll back the backend
 firestore.rules, storage.rules, firestore.indexes.json, firebase.json
@@ -789,7 +791,7 @@ Read live by every running app (`FeatureFlags`):
   the Firestore cache.
 - Hosting: images and CSS `max-age=86400, stale-while-revalidate=604800`;
   HTML `max-age=300, s-maxage=3600` at the CDN; the web app's entry files
-  (`/app/index.html`, `main.dart.js`, `flutter_bootstrap.js`…) `no-cache`.
+  (`/index.html`, `main.dart.js`, `flutter_bootstrap.js`…) `no-cache`.
 - Storage uploads: `max-age=31536000, immutable`.
 
 ### Deploy, roll back, monitor

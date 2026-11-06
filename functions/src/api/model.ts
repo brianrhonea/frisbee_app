@@ -9,7 +9,8 @@ export type Action =
   | "joinRequest"
   | "team"
   | "search"
-  | "signIn";
+  | "signIn"
+  | "browse";
 
 export interface Limit {
   max: number;
@@ -33,6 +34,8 @@ export const limits: Record<Action, Limit> = {
   search: { max: 30, windowMs: minute },
   // Per username, against password guessing.
   signIn: { max: 10, windowMs: 15 * minute },
+  // Per visitor (hashed IP), for the website's signed-out pages.
+  browse: { max: 120, windowMs: minute },
 };
 
 /** How long someone over a limit can't post, message, comment or follow. */

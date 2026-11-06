@@ -30,8 +30,6 @@ import '../ui/settings/widgets/follow_requests_screen.dart';
 import '../ui/settings/widgets/settings_screen.dart';
 import '../ui/shell/view_models/shell_viewmodel.dart';
 import '../ui/shell/widgets/app_shell.dart';
-import '../ui/home/view_models/home_viewmodel.dart';
-import '../ui/home/widgets/home_screen.dart';
 import '../ui/playbook/view_models/play_editor_viewmodel.dart';
 import '../ui/playbook/widgets/play_editor_screen.dart';
 import '../ui/notifications/view_models/notification_settings_viewmodel.dart';
@@ -40,8 +38,6 @@ import '../ui/notifications/widgets/notification_settings_screen.dart';
 import '../ui/notifications/widgets/notifications_screen.dart';
 import '../ui/people/view_models/following_viewmodel.dart';
 import '../ui/people/widgets/following_screen.dart';
-import '../ui/posts/view_models/post_detail_viewmodel.dart';
-import '../ui/posts/widgets/post_detail_screen.dart';
 import '../ui/profile/view_models/profile_viewmodel.dart';
 import '../ui/teams/view_models/join_link_viewmodel.dart';
 import '../ui/teams/widgets/join_link_screen.dart';
@@ -141,25 +137,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
       redirect: (_, state) =>
           state.uri.path == Routes.postsPath ? Routes.home : null,
       routes: [
-        GoRoute(
-          path: ':postId',
-          builder: (_, state) {
-            final id = state.pathParameters['postId']!;
-            return ViewModelHost(
-              key: ValueKey('post-$id'),
-              create: (c) => PostDetailViewModel(
-                postId: id,
-                userPostRepository: c.read(),
-                authRepository: c.read(),
-                commentRepository: c.read(),
-              ),
-              builder: (_, vm) => PostDetailScreen(
-                viewModel: vm,
-                focusComment: state.uri.queryParameters['comment'] == '1',
-              ),
-            );
-          },
-        ),
+        GoRoute(path: ':postId', builder: (_, state) => postPage(state)),
       ],
     ),
     GoRoute(
@@ -576,23 +554,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
         // Community: the feed and the user's schedule.
         StatefulShellBranch(
           routes: [
-            GoRoute(
-              path: Routes.home,
-              builder: (_, _) => ViewModelHost(
-                create: (c) => HomeViewModel(
-                  authRepository: c.read(),
-                  teamRepository: c.read(),
-                  eventRepository: c.read(),
-                  meetingRepository: c.read<MeetingRepository>(),
-                  teamPostRepository: c.read(),
-                  tournamentRepository: c.read(),
-                  followRepository: c.read(),
-                  userPostRepository: c.read(),
-                  filePicker: c.read(),
-                ),
-                builder: (_, vm) => HomeScreen(viewModel: vm),
-              ),
-            ),
+            GoRoute(path: Routes.home, builder: (_, _) => homePage()),
             GoRoute(
               path: Routes.schedule,
               builder: (_, _) => ViewModelHost(
@@ -989,13 +951,9 @@ Widget _settings(Widget Function(ProfileViewModel vm) screen) => ViewModelHost(
 
 /// Sends signed-out users to sign-in (remembering where they were headed),
 /// signed-in users without a username to pick one, and everyone else away
-/// from the auth screens: to [home] (Community in the app), or back to
+/// from the auth screens: to Community, or back to
 /// the invite link they opened so they can finish joining.
-String? authRedirect(
-  AuthRepository auth,
-  Uri uri, {
-  String home = Routes.home,
-}) {
+String? authRedirect(AuthRepository auth, Uri uri) {
   final path = uri.path;
   final from = uri.queryParameters['from'];
   if (!auth.isReady) {
@@ -1011,7 +969,7 @@ String? authRedirect(
     final target = path == splashPath ? from : uri.toString();
     return Uri(
       path: Routes.signIn,
-      queryParameters: target == null || target == home
+      queryParameters: target == null || target == Routes.home
           ? null
           : {'from': target},
     ).toString();
@@ -1023,15 +981,15 @@ String? authRedirect(
     final target = public || path == splashPath ? from : uri.toString();
     return Uri(
       path: Routes.chooseUsername,
-      queryParameters: target == null || target == home
+      queryParameters: target == null || target == Routes.home
           ? null
           : {'from': target},
     ).toString();
   }
-  if (choosing) return from ?? home;
-  if (public) return _isInviteLink(from) ? from : home;
+  if (choosing) return from ?? Routes.home;
+  if (public) return _isInviteLink(from) ? from : Routes.home;
   // Already signed in when the app opened: carry on where it was headed.
-  if (path == splashPath) return from ?? home;
+  if (path == splashPath) return from ?? Routes.home;
   return null;
 }
 

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/auth/auth_repository.dart';
+import '../data/repositories/meeting/meeting_repository.dart';
 import '../ui/auth/view_models/choose_username_viewmodel.dart';
 import '../ui/auth/view_models/sign_in_viewmodel.dart';
 import '../ui/auth/view_models/sign_up_viewmodel.dart';
@@ -11,6 +12,10 @@ import '../ui/auth/widgets/sign_in_screen.dart';
 import '../ui/auth/widgets/sign_up_screen.dart';
 import '../ui/core/ui/view_model_host.dart';
 import '../ui/events/widgets/events_screen.dart';
+import '../ui/home/view_models/home_viewmodel.dart';
+import '../ui/home/widgets/home_screen.dart';
+import '../ui/posts/view_models/post_detail_viewmodel.dart';
+import '../ui/posts/widgets/post_detail_screen.dart';
 import '../ui/explore/view_models/player_search_viewmodel.dart';
 import '../ui/explore/widgets/explore_screen.dart';
 import '../ui/profile/view_models/player_profile_viewmodel.dart';
@@ -154,6 +159,41 @@ Widget teamPage(GoRouterState state) {
     builder: (_, vm) => TeamHomeScreen(
       viewModel: vm,
       section: TeamSection.fromPath(state.uri.queryParameters['section']),
+    ),
+  );
+}
+
+/// The signed-in user's Home: posts from who they follow, their teams'
+/// news and what's next on their schedule.
+Widget homePage() => ViewModelHost(
+  create: (c) => HomeViewModel(
+    authRepository: c.read(),
+    teamRepository: c.read(),
+    eventRepository: c.read(),
+    meetingRepository: c.read<MeetingRepository>(),
+    teamPostRepository: c.read(),
+    tournamentRepository: c.read(),
+    followRepository: c.read(),
+    userPostRepository: c.read(),
+    filePicker: c.read(),
+  ),
+  builder: (_, vm) => HomeScreen(viewModel: vm),
+);
+
+/// A post's page with its comments; `?comment=1` goes to the comment box.
+Widget postPage(GoRouterState state) {
+  final id = state.pathParameters['postId']!;
+  return ViewModelHost(
+    key: ValueKey('post-$id'),
+    create: (c) => PostDetailViewModel(
+      postId: id,
+      userPostRepository: c.read(),
+      authRepository: c.read(),
+      commentRepository: c.read(),
+    ),
+    builder: (_, vm) => PostDetailScreen(
+      viewModel: vm,
+      focusComment: state.uri.queryParameters['comment'] == '1',
     ),
   );
 }
