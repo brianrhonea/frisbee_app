@@ -108,6 +108,7 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
         initial: vm.announcement,
         suggested: true,
         pickImages: vm.pickImages,
+        canUseCamera: vm.canUseCamera,
         loadImage: (_) async => Result.error(Exception('No photo')),
       ),
     );

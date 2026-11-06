@@ -240,9 +240,9 @@ class _PostComposerState extends State<PostComposer> {
     });
   }
 
-  Future<void> _addPhotos() async {
+  Future<void> _addPhotos({bool camera = false}) async {
     setState(() => _picking = true);
-    final result = await vm.pickImages();
+    final result = await vm.pickImages(camera: camera);
     if (!mounted) return;
     setState(() => _picking = false);
     switch (result) {
@@ -452,6 +452,14 @@ class _PostComposerState extends State<PostComposer> {
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const Spacer(),
+                    if (vm.canUseCamera)
+                      IconButton(
+                        tooltip: 'Take photo',
+                        onPressed: _picking || _imageCount >= UserPost.maxImages
+                            ? null
+                            : () => _addPhotos(camera: true),
+                        icon: const Icon(Icons.photo_camera_outlined),
+                      ),
                     TextButton.icon(
                       onPressed: _picking || _imageCount >= UserPost.maxImages
                           ? null

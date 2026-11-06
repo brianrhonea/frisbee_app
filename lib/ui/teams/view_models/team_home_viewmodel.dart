@@ -383,7 +383,11 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   /// Lets an admin pick photos for a post; empty when cancelled. Photos
   /// over [maxAttachmentBytes] are left out and reported as an error.
-  Future<Result<List<NewAttachment>>> pickImages() => pickPostImages(_picker);
+  Future<Result<List<NewAttachment>>> pickImages({bool camera = false}) =>
+      pickPostImages(_picker, camera: camera);
+
+  /// Whether posts can take a photo with the camera here.
+  bool get canUseCamera => _picker.canUseCamera;
 
   /// A post photo's bytes, fetched once per photo.
   Future<Result<Uint8List>> imageData(ChatAttachment image) =>
@@ -416,15 +420,18 @@ class TeamHomeViewModel extends ChangeNotifier {
   }
 }
 
-/// Picks photos for a post; empty when cancelled. Photos are shrunk first;
-/// ones still over [maxAttachmentBytes] are left out and reported as an
-/// error.
+/// Picks photos for a post, or takes one with the [camera]; empty when
+/// cancelled. Photos are shrunk first; ones still over
+/// [maxAttachmentBytes] are left out and reported as an error.
 Future<Result<List<NewAttachment>>> pickPostImages(
-  FilePickerService picker,
-) async {
+  FilePickerService picker, {
+  bool camera = false,
+}) async {
   final List<PickedFile> picked;
   try {
-    picked = await picker.pick(imagesOnly: true);
+    picked = camera
+        ? [?await picker.takePhoto()]
+        : await picker.pick(imagesOnly: true);
   } on Exception catch (e) {
     return Result.error(e);
   }

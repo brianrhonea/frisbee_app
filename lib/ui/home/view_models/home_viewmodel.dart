@@ -184,7 +184,11 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   /// Lets an admin pick photos for a post; empty when cancelled.
-  Future<Result<List<NewAttachment>>> pickImages() => pickPostImages(_picker);
+  Future<Result<List<NewAttachment>>> pickImages({bool camera = false}) =>
+      pickPostImages(_picker, camera: camera);
+
+  /// Whether posts can take a photo with the camera here.
+  bool get canUseCamera => _picker.canUseCamera;
 
   /// A post photo's bytes, fetched once per photo.
   /// People's photos are under `users/`, team posts' under `teams/`.

@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   cloud_firestore
   connectivity_plus
+  file_selector_windows
   firebase_app_check
   firebase_auth
   firebase_core
@@ -14,6 +15,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   livekit_client
   media_kit_libs_windows_video
   media_kit_video
+  permission_handler_windows
   share_plus
   url_launcher_windows
   webview_windows

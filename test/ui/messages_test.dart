@@ -255,6 +255,33 @@ void main() {
     expect(dms.typingSent, [('u1', true), ('u1', true), ('u1', false)]);
   });
 
+  test('a photo from the camera joins the next message', () async {
+    dms.follows.add(('a', testUser.uid));
+    await dms.openConversation(
+      testUser,
+      const UserProfile(uid: 'a', name: 'Avery'),
+    );
+    final picker = FakeFilePickerService()
+      ..canUseCamera = true
+      ..nextPhoto = FakeFilePickerService.file('image_123.jpg', 2000);
+    final vm = DirectChatViewModel(
+      conversationId: 'a_u1',
+      directMessageRepository: dms,
+      authRepository: auth,
+      filePicker: picker,
+    );
+    addTearDown(vm.dispose);
+    await pumpEventQueue();
+    expect(vm.canUseCamera, isTrue);
+    await vm.takePhoto.execute();
+    expect(vm.drafts.single.isImage, isTrue);
+    // Cancelling the camera adds nothing.
+    picker.nextPhoto = null;
+    await vm.takePhoto.execute();
+    expect(vm.drafts, hasLength(1));
+    expect(vm.takePhoto.error, isFalse);
+  });
+
   group('message requests', () {
     const avery = AppUser(uid: 'a', displayName: 'Avery');
     const me = UserProfile(uid: 'u1', name: 'Alex');

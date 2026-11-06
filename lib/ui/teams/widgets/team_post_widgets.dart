@@ -380,6 +380,7 @@ class PostEditorDialog extends StatefulWidget {
     super.key,
     required this.pickImages,
     required this.loadImage,
+    this.canUseCamera = false,
     this.initial,
     this.suggested = false,
     this.allowPublic = true,
@@ -393,8 +394,11 @@ class PostEditorDialog extends StatefulWidget {
 
   /// [initial] is a suggested new post, not one being edited.
   final bool suggested;
-  final Future<Result<List<NewAttachment>>> Function() pickImages;
+  final Future<Result<List<NewAttachment>>> Function({bool camera}) pickImages;
   final ImageLoader loadImage;
+
+  /// Offer Take photo beside Add photos.
+  final bool canUseCamera;
 
   @override
   State<PostEditorDialog> createState() => _PostEditorDialogState();
@@ -440,9 +444,9 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
     });
   }
 
-  Future<void> _addPhotos() async {
+  Future<void> _addPhotos({bool camera = false}) async {
     setState(() => _picking = true);
-    final result = await widget.pickImages();
+    final result = await widget.pickImages(camera: camera);
     if (!mounted) return;
     setState(() => _picking = false);
     switch (result) {
@@ -567,6 +571,14 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
                   children: [
                     Text('Photos', style: theme.textTheme.titleSmall),
                     const SizedBox(width: 8),
+                    if (widget.canUseCamera)
+                      IconButton(
+                        tooltip: 'Take photo',
+                        onPressed: _picking || _imageCount >= TeamPost.maxImages
+                            ? null
+                            : () => _addPhotos(camera: true),
+                        icon: const Icon(Icons.photo_camera_outlined),
+                      ),
                     // Shrinks on narrow phones instead of overflowing.
                     Expanded(
                       child: Align(

@@ -228,6 +228,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       builder: (_) => PostEditorDialog(
         initial: post,
         pickImages: vm.pickImages,
+        canUseCamera: vm.canUseCamera,
         loadImage: vm.imageData,
         allowPublic: !(vm.team?.isPrivateGroup ?? false),
       ),

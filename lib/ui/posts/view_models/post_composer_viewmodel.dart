@@ -115,7 +115,11 @@ class PostComposerViewModel extends ChangeNotifier {
     return _posts.savePost(draft, me);
   }
 
-  Future<Result<List<NewAttachment>>> pickImages() => pickPostImages(_picker);
+  Future<Result<List<NewAttachment>>> pickImages({bool camera = false}) =>
+      pickPostImages(_picker, camera: camera);
+
+  /// Whether the composer can take a photo with the camera here.
+  bool get canUseCamera => _picker.canUseCamera;
 
   Future<Result<Uint8List>> imageData(ChatAttachment image) =>
       _downloads[image.path] ??= _posts.downloadImage(image).then((r) {

@@ -103,14 +103,14 @@
 		<string>remote-notification</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Choose photos to share in team chat.</string>
+	<string>Choose photos and videos to share in posts, messages and team chat.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Show your camera in team meetings.</string>
+	<string>Take photos and videos for posts and messages, and show your camera in team meetings.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Map your runs, rides and hikes, and time each mile.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Keep recording your run or ride while your phone is locked.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Talk in team meetings.</string>
+	<string>Record sound with your videos, and talk in team meetings.</string>
 </dict>
 </plist>

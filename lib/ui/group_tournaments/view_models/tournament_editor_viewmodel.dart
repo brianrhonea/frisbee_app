@@ -553,11 +553,14 @@ class TournamentEditorViewModel extends ChangeNotifier {
     );
   }
 
-  Future<Result<List<NewAttachment>>> pickImages() async {
+  Future<Result<List<NewAttachment>>> pickImages({bool camera = false}) async {
     final picker = _picker;
     if (picker == null) return const Result.ok([]);
-    return pickPostImages(picker);
+    return pickPostImages(picker, camera: camera);
   }
+
+  /// Whether posts can take a photo with the camera here.
+  bool get canUseCamera => _picker?.canUseCamera ?? false;
 
   Future<Result<void>> _announce(PostDraft draft) async {
     final me = _auth.currentUser;

@@ -30,6 +30,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     }
     send = Command1<void, String>(_send);
     pickFiles = Command1<void, bool>(_pickFiles);
+    takePhoto = Command0<void>(() => _capture(_picker.takePhoto));
     deleteMessage = Command1<void, ChatMessage>(_delete);
     saveAttachment = Command1<bool, ChatAttachment>(_saveAttachment);
   }
@@ -51,6 +52,12 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   /// Adds files to the pending attachments; true picks photos only.
   late final Command1<void, bool> pickFiles;
+
+  /// Adds a photo from the camera to the pending attachments.
+  late final Command0<void> takePhoto;
+
+  /// Whether the camera can be used here (phones).
+  bool get canUseCamera => _picker.canUseCamera;
   late final Command1<void, ChatMessage> deleteMessage;
 
   /// Messages deleted, hidden while "Undo" is offered.
@@ -469,6 +476,24 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     return const Result.ok(null);
   }
 
+  /// Adds what [capture] returns (a photo or video from the camera).
+  Future<Result<void>> _capture(Future<PickedFile?> Function() capture) async {
+    final PickedFile? f;
+    try {
+      f = await capture();
+    } on Exception catch (e) {
+      return Result.error(e);
+    }
+    if (f == null) return const Result.ok(null);
+    final a = await readAttachment(_picker, f);
+    if (a == null || a.tooLarge) {
+      return Result.error(AttachmentTooLargeException(f.name));
+    }
+    _drafts.add(a);
+    notifyListeners();
+    return const Result.ok(null);
+  }
+
   Future<Result<bool>> _saveAttachment(ChatAttachment a) async {
     final data = await attachmentData(a);
     switch (data) {
@@ -486,6 +511,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    takePhoto.dispose();
     _typingSub?.cancel();
     _typingExpiry?.cancel();
     if (_sentTypingAt != null) unawaited(sendTyping(typing: false));

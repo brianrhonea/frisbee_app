@@ -48,6 +48,7 @@ class _MessageThreadViewState extends State<MessageThreadView> {
   late final List<Command<Object?>> _commands = [
     vm.send,
     vm.pickFiles,
+    vm.takePhoto,
     vm.deleteMessage,
     vm.saveAttachment,
   ];
@@ -701,7 +702,7 @@ class _ReadOnlyBar extends StatelessWidget {
   }
 }
 
-enum _AttachKind { photo, file }
+enum _AttachKind { camera, photo, file }
 
 class _Composer extends StatelessWidget {
   const _Composer({
@@ -723,7 +724,7 @@ class _Composer extends StatelessWidget {
     final c = AppColors.of(context);
     final vm = viewModel;
     return ListenableBuilder(
-      listenable: Listenable.merge([vm.send, vm.pickFiles]),
+      listenable: Listenable.merge([vm.send, vm.pickFiles, vm.takePhoto]),
       builder: (context, _) {
         final sending = vm.send.running;
         final wide = !ScreenSize.of(context).isMobile;
@@ -732,16 +733,26 @@ class _Composer extends StatelessWidget {
                 tooltip: 'Upload a photo or file',
                 enabled: !sending && !vm.pickFiles.running,
                 icon: Icon(Icons.add_circle, color: c.muted),
-                onSelected: (k) => vm.pickFiles.execute(k == _AttachKind.photo),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
+                onSelected: (k) => k == _AttachKind.camera
+                    ? vm.takePhoto.execute()
+                    : vm.pickFiles.execute(k == _AttachKind.photo),
+                itemBuilder: (_) => [
+                  if (vm.canUseCamera)
+                    const PopupMenuItem(
+                      value: _AttachKind.camera,
+                      child: ListTile(
+                        leading: Icon(Icons.photo_camera_outlined),
+                        title: Text('Take photo'),
+                      ),
+                    ),
+                  const PopupMenuItem(
                     value: _AttachKind.photo,
                     child: ListTile(
                       leading: Icon(Icons.photo_outlined),
                       title: Text('Photo'),
                     ),
                   ),
-                  PopupMenuItem(
+                  const PopupMenuItem(
                     value: _AttachKind.file,
                     child: ListTile(
                       leading: Icon(Icons.insert_drive_file_outlined),

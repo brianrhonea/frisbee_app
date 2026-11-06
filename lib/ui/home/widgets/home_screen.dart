@@ -131,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (_) => PostEditorDialog(
         pickImages: vm.pickImages,
+        canUseCamera: vm.canUseCamera,
         loadImage: vm.imageData,
         allowPublic: !team.isPrivateGroup,
       ),
@@ -144,6 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (_) => PostEditorDialog(
         initial: p.post,
         pickImages: vm.pickImages,
+        canUseCamera: vm.canUseCamera,
         loadImage: vm.imageData,
         allowPublic: !(vm.teamOf(p)?.isPrivateGroup ?? false),
       ),
