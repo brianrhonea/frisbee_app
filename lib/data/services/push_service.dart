@@ -79,8 +79,10 @@ class PushService {
     } on Exception catch (e) {
       throw PushRegistrationException(
         "Firebase couldn't register this device for notifications ($e). "
-        'On iPhone this usually means the Firebase project has no APNs '
-        'key (Project settings → Cloud Messaging).',
+        'On iPhone, invalid-request means the app build is missing '
+        'FirebaseMessagingInstallationIdEnabled in Info.plist; other '
+        'errors can mean the Firebase project has no APNs key (Project '
+        'settings → Cloud Messaging).',
       );
     }
     // The FID is the installation ID. Read it directly: on iOS, FCM may

@@ -91,6 +91,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Required by FirebaseMessaging.register() (FID-based push, see
+	     lib/data/services/push_service.dart). Without it, registering fails
+	     with firebase_messaging/invalid-request before reaching Firebase. -->
+	<key>FirebaseMessagingInstallationIdEnabled</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
