@@ -1455,6 +1455,10 @@ class FakeChatRepository implements ChatRepository {
     final f = files[a.path];
     return f == null ? Result.error(Exception('missing')) : Result.ok(f);
   }
+
+  @override
+  Future<Result<String>> attachmentUrl(ChatAttachment a) async =>
+      Result.ok('https://files.test/${a.path}');
 }
 
 class FakeFilePickerService implements FilePickerService {
@@ -1757,12 +1761,22 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
   }) async {
     final list = messages.putIfAbsent(id, () => []);
     final at = DateTime(2026, 10, 30, 12, list.length);
+    final messageId = 'm${list.length + 1}';
     list.add(
       ChatMessage(
-        id: 'm${list.length + 1}',
+        id: messageId,
         authorId: author.uid,
         authorName: author.label,
         text: text.trim(),
+        attachments: [
+          for (final (i, a) in attachments.indexed)
+            ChatAttachment(
+              path: 'conversations/$id/${author.uid}/$messageId/$i-${a.name}',
+              name: a.name,
+              contentType: a.contentType,
+              size: a.size,
+            ),
+        ],
         createdAt: at,
       ),
     );
@@ -1831,6 +1845,10 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
   @override
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment a) async =>
       Result.error(Exception('missing'));
+
+  @override
+  Future<Result<String>> attachmentUrl(ChatAttachment a) async =>
+      Result.ok('https://files.test/${a.path}');
 }
 
 class FakeNotificationRepository implements NotificationRepository {

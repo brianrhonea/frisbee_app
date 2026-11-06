@@ -113,6 +113,9 @@ abstract class DirectMessageRepository {
 
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment attachment);
 
+  /// A URL to stream a video attachment from.
+  Future<Result<String>> attachmentUrl(ChatAttachment attachment);
+
   /// Who's typing in conversation [id]: uid → when they last typed, by
   /// the server's clock (null until it's stamped). The app decides when
   /// a typist has gone quiet.

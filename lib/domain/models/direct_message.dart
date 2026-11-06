@@ -392,10 +392,16 @@ class Conversation {
 }
 
 /// Preview text for a message: its text, else what's attached.
-String messagePreview(String text, int attachments, {bool image = false}) {
+String messagePreview(
+  String text,
+  int attachments, {
+  bool image = false,
+  bool video = false,
+}) {
   final t = text.trim().replaceAll(RegExp(r'\s+'), ' ');
   if (t.isNotEmpty) return t.length > 120 ? '${t.substring(0, 117)}…' : t;
   if (attachments == 0) return '';
   if (image) return attachments == 1 ? '📷 Photo' : '📷 $attachments photos';
+  if (video) return attachments == 1 ? '🎬 Video' : '🎬 $attachments videos';
   return attachments == 1 ? '📎 File' : '📎 $attachments files';
 }

@@ -264,7 +264,12 @@ class ChatRepositoryFirebase implements ChatRepository {
   }) => guard(
     () => muteAware(_db, author.uid, () async {
       for (final a in attachments) {
-        if (a.tooLarge) throw AttachmentTooLargeException(a.name);
+        if (a.tooLarge) {
+          throw AttachmentTooLargeException(
+            a.name,
+            limit: maxBytesFor(a.contentType),
+          );
+        }
       }
       final ref = _messages(teamId, roomId).doc();
       final uploaded = await _files.upload(
@@ -300,6 +305,10 @@ class ChatRepositoryFirebase implements ChatRepository {
   @override
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment attachment) =>
       guard(() => _files.download(attachment));
+
+  @override
+  Future<Result<String>> attachmentUrl(ChatAttachment attachment) =>
+      guard(() => _files.url(attachment));
 }
 
 CollectionReference<Map<String, dynamic>> chatRooms(

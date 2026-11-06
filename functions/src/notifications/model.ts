@@ -196,8 +196,9 @@ export function messagePreview(message: Data): string {
   if (text) return text.length > 120 ? `${text.slice(0, 117)}…` : text;
   const files = Array.isArray(message.attachments) ? message.attachments : [];
   if (files.length === 0) return "";
-  const images = files.every((f) => String((f as Data)?.contentType ?? "").startsWith("image/"));
-  if (images) return files.length === 1 ? "📷 Photo" : `📷 ${files.length} photos`;
+  const all = (prefix: string) => files.every((f) => String((f as Data)?.contentType ?? "").startsWith(prefix));
+  if (all("image/")) return files.length === 1 ? "📷 Photo" : `📷 ${files.length} photos`;
+  if (all("video/")) return files.length === 1 ? "🎬 Video" : `🎬 ${files.length} videos`;
   return files.length === 1 ? "📎 File" : `📎 ${files.length} files`;
 }
 

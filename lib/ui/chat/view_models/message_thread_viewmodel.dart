@@ -31,6 +31,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     send = Command1<void, String>(_send);
     pickFiles = Command1<void, bool>(_pickFiles);
     takePhoto = Command0<void>(() => _capture(_picker.takePhoto));
+    recordVideo = Command0<void>(() => _capture(_picker.recordVideo));
     deleteMessage = Command1<void, ChatMessage>(_delete);
     saveAttachment = Command1<bool, ChatAttachment>(_saveAttachment);
   }
@@ -55,6 +56,9 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   /// Adds a photo from the camera to the pending attachments.
   late final Command0<void> takePhoto;
+
+  /// Adds a video, with sound, from the camera to the pending attachments.
+  late final Command0<void> recordVideo;
 
   /// Whether the camera can be used here (phones).
   bool get canUseCamera => _picker.canUseCamera;
@@ -103,6 +107,11 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   Future<Result<void>> removeMessage(ChatMessage message);
   @protected
   Future<Result<Uint8List>> download(ChatAttachment attachment);
+
+  /// A URL to stream a video attachment from; threads without attachments
+  /// have none.
+  Future<Result<String>> streamUrl(ChatAttachment attachment) async =>
+      Result.error(Exception('Videos aren\'t available here.'));
 
   bool get canWrite;
 
@@ -419,6 +428,14 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Where to stream a video attachment from, fetched once per video.
+  Future<Result<String>> videoUrl(ChatAttachment a) =>
+      _videoUrls[a.path] ??= streamUrl(a).then((r) {
+        if (r is Error) _videoUrls.remove(a.path);
+        return r;
+      });
+  final _videoUrls = <String, Future<Result<String>>>{};
+
   /// Attachment bytes, fetched once per attachment.
   Future<Result<Uint8List>> attachmentData(ChatAttachment a) =>
       _downloads[a.path] ??= download(a).then((r) {
@@ -471,7 +488,15 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     }
     notifyListeners();
     if (tooLarge.isNotEmpty) {
-      return Result.error(AttachmentTooLargeException(tooLarge.join(', ')));
+      final videos = tooLarge.every(
+        (n) => contentTypeFor(n).startsWith('video/'),
+      );
+      return Result.error(
+        AttachmentTooLargeException(
+          tooLarge.join(', '),
+          limit: videos ? maxVideoBytes : maxAttachmentBytes,
+        ),
+      );
     }
     return const Result.ok(null);
   }
@@ -487,7 +512,12 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     if (f == null) return const Result.ok(null);
     final a = await readAttachment(_picker, f);
     if (a == null || a.tooLarge) {
-      return Result.error(AttachmentTooLargeException(f.name));
+      return Result.error(
+        AttachmentTooLargeException(
+          f.name,
+          limit: maxBytesFor(contentTypeFor(f.name)),
+        ),
+      );
     }
     _drafts.add(a);
     notifyListeners();
@@ -512,6 +542,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     takePhoto.dispose();
+    recordVideo.dispose();
     _typingSub?.cancel();
     _typingExpiry?.cancel();
     if (_sentTypingAt != null) unawaited(sendTyping(typing: false));

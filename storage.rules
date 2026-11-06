@@ -18,6 +18,18 @@ service firebase.storage {
     }
     function isMember(t) { return request.auth.uid in t.memberIds; }
 
+    // Message attachments: 10 MB, or 100 MB for videos (maxAttachmentBytes
+    // and maxVideoBytes in lib/domain/models/chat.dart). The desktop SDK
+    // sets the content type in a second write, so videos are known by name.
+    function attachmentSizeOk(fileName) {
+      return request.resource.size <= 10 * 1024 * 1024
+        || (request.resource.size <= 100 * 1024 * 1024
+            && fileName.lower().matches('.*[.](mp4|mov|m4v|webm|3gp)')
+            && (request.resource.contentType == null
+                || request.resource.contentType == 'application/octet-stream'
+                || request.resource.contentType.matches('video/.*')));
+    }
+
     // Same as can() in firestore.rules: owners, coaches and captains have
     // every permission; others what their custom roles grant.
     function can(t, perm) {
@@ -59,8 +71,8 @@ service firebase.storage {
         && (role(t) == 'owner' || inAudience(t, r.writeRoles, r.writeUsers));
     }
 
-    // Photos and files up to 10 MB (maxAttachmentBytes in
-    // lib/domain/models/chat.dart), uploaded by their author into their
+    // Photos and files up to 10 MB, videos up to 100 MB
+    // (attachmentSizeOk), uploaded by their author into their
     // own folder. Authors delete their own; the owner, and moderators and
     // chat managers who can read the room, delete any.
     match /teams/{teamId}/chats/{roomId}/{userId}/{messageId}/{fileName} {
@@ -69,7 +81,7 @@ service firebase.storage {
       // update, so authors may update their own files too.
       allow create, update: if request.auth != null
         && request.auth.uid == userId
-        && request.resource.size <= 10 * 1024 * 1024
+        && attachmentSizeOk(fileName)
         && canWrite(teamId, roomId);
       allow delete: if request.auth != null
         && (request.auth.uid == userId
@@ -154,7 +166,7 @@ service firebase.storage {
       allow get: if inConversation();
       allow create, update: if inConversation()
         && request.auth.uid == userId
-        && request.resource.size <= 10 * 1024 * 1024;
+        && attachmentSizeOk(fileName);
       allow delete: if inConversation() && request.auth.uid == userId;
     }
   }

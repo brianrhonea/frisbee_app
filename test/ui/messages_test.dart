@@ -15,6 +15,7 @@ import 'package:frisbee_app/domain/models/model_utils.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/chat/view_models/message_thread_viewmodel.dart';
+import 'package:frisbee_app/ui/chat/widgets/message_thread_view.dart';
 import 'package:frisbee_app/ui/messages/view_models/direct_chat_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/inbox_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/people_search_viewmodel.dart';
@@ -70,6 +71,7 @@ void main() {
       expect(messagePreview('  hi\n there ', 0), 'hi there');
       expect(messagePreview('', 2, image: true), '📷 2 photos');
       expect(messagePreview('', 1), '📎 File');
+      expect(messagePreview('', 1, video: true), '🎬 Video');
       expect(messagePreview('x' * 200, 0).length, 118);
     });
   });
@@ -280,6 +282,108 @@ void main() {
     await vm.takePhoto.execute();
     expect(vm.drafts, hasLength(1));
     expect(vm.takePhoto.error, isFalse);
+  });
+
+  group('videos', () {
+    Future<DirectChatViewModel> chat(
+      FakeFilePickerService picker, {
+      bool settle = true,
+    }) async {
+      dms.follows.add(('a', testUser.uid));
+      await dms.openConversation(
+        testUser,
+        const UserProfile(uid: 'a', name: 'Avery'),
+      );
+      final vm = DirectChatViewModel(
+        conversationId: 'a_u1',
+        directMessageRepository: dms,
+        authRepository: auth,
+        filePicker: picker,
+      );
+      addTearDown(vm.dispose);
+      if (settle) await pumpEventQueue();
+      return vm;
+    }
+
+    test('a recorded video joins the next message, up to 100 MB', () async {
+      final picker = FakeFilePickerService()
+        ..canUseCamera = true
+        ..nextRecording = FakeFilePickerService.file(
+          'clip.mp4',
+          40 * 1024 * 1024,
+        );
+      final vm = await chat(picker);
+      await vm.recordVideo.execute();
+      expect(vm.drafts.single.isVideo, isTrue);
+      await vm.send.execute('');
+      final sent = dms.messages['a_u1']!.single.attachments.single;
+      expect(sent.isVideo, isTrue);
+      expect(
+        await vm.videoUrl(sent),
+        isA<Ok<String>>().having(
+          (r) => r.value,
+          'url',
+          'https://files.test/${sent.path}',
+        ),
+      );
+
+      picker.nextRecording = FakeFilePickerService.file(
+        'long.mp4',
+        maxVideoBytes + 1,
+      );
+      await vm.recordVideo.execute();
+      expect(vm.recordVideo.error, isTrue);
+      expect(vm.recordVideo.result.toString(), contains('100.0 MB'));
+      expect(vm.drafts, isEmpty);
+    });
+
+    test('other files stay capped at 10 MB', () async {
+      final picker = FakeFilePickerService()
+        ..next = [FakeFilePickerService.file('notes.pdf', 11 * 1024 * 1024)];
+      final vm = await chat(picker);
+      await vm.pickFiles.execute(false);
+      expect(vm.pickFiles.result.toString(), contains('10.0 MB'));
+      expect(vm.drafts, isEmpty);
+    });
+
+    testWidgets('a video plays from the conversation', (tester) async {
+      final picker = FakeFilePickerService()
+        ..canUseCamera = true
+        ..nextRecording = FakeFilePickerService.file('clip.mp4', 5000);
+      final vm = await chat(picker, settle: false);
+      await tester.pumpWidget(
+        withRepos(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: MessageThreadView(
+                viewModel: vm,
+                videoPlayer: (url) => Text('playing $url'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Upload a photo, video or file'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Record video'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Huck!');
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Video ·'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.play_circle_fill));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'playing https://files.test/conversations/a_u1/u1/m1/0-clip.mp4',
+        ),
+        findsOneWidget,
+      );
+    });
   });
 
   group('message requests', () {

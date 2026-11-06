@@ -86,4 +86,7 @@ abstract class ChatRepository {
   );
 
   Future<Result<Uint8List>> downloadAttachment(ChatAttachment attachment);
+
+  /// A URL to stream a video attachment from.
+  Future<Result<String>> attachmentUrl(ChatAttachment attachment);
 }

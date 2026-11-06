@@ -107,6 +107,16 @@ describe("chat attachments", () => {
     );
   });
 
+  it("lets videos be up to 100 MB", async () => {
+    const at = (name: string) => storage(CAPTAIN).ref(`teams/${TEAM}/chats/r1/${CAPTAIN}/m3/${name}`);
+    await assertSucceeds(at("0-clip.MP4").put(bytes(10 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
+    // Before the desktop SDK sets the type.
+    await assertSucceeds(at("1-clip.mov").put(bytes(10 * 1024 * 1024 + 1)).then());
+    await assertFails(at("2-clip.mp4").put(bytes(100 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
+    await assertFails(at("3-big.png").put(bytes(10 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
+    await assertFails(at("4-fake.mp4").put(bytes(10 * 1024 * 1024 + 1), { contentType: "application/zip" }).then());
+  });
+
   const restore = () =>
     env.withSecurityRulesDisabled((ctx) =>
       ctx
@@ -227,6 +237,12 @@ describe("direct message attachments", () => {
         .put(bytes(10 * 1024 * 1024 + 1))
         .then(),
     );
+  });
+
+  it("videos may be up to 100 MB", async () => {
+    const at = (name: string) => storage(PLAYER).ref(`conversations/${CONV}/${PLAYER}/m3/${name}`);
+    await assertSucceeds(at("0-clip.mp4").put(bytes(10 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
+    await assertFails(at("1-clip.mp4").put(bytes(100 * 1024 * 1024 + 1), { contentType: "video/mp4" }).then());
   });
 
   it("authors delete their own", async () => {

@@ -111,6 +111,7 @@ describe("messagePreview", () => {
     expect(messagePreview({ text: "  hi\n  there " })).toBe("hi there");
     expect(messagePreview({ text: "", attachments: [{ contentType: "image/png" }] })).toBe("📷 Photo");
     expect(messagePreview({ attachments: [{ contentType: "application/pdf" }, {}] })).toBe("📎 2 files");
+    expect(messagePreview({ attachments: [{ contentType: "video/mp4" }] })).toBe("🎬 Video");
   });
 });
 

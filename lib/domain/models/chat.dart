@@ -16,18 +16,29 @@ enum ChatAccess {
   bool get canWrite => this == write;
 }
 
-/// Attachments (photos and files) are capped at 10 MB. storage.rules
-/// enforces the same limit; keep the two in step.
+/// Attachments (photos and files) are capped at 10 MB, videos at
+/// [maxVideoBytes]. storage.rules enforces the same limits; keep them in
+/// step.
 const maxAttachmentBytes = 10 * 1024 * 1024;
 
+/// Videos in messages, which play in the conversation.
+const maxVideoBytes = 100 * 1024 * 1024;
+
+/// The most a file of [contentType] may be.
+int maxBytesFor(String contentType) =>
+    contentType.startsWith('video/') ? maxVideoBytes : maxAttachmentBytes;
+
 class AttachmentTooLargeException implements Exception {
-  const AttachmentTooLargeException(this.name);
+  const AttachmentTooLargeException(
+    this.name, {
+    this.limit = maxAttachmentBytes,
+  });
 
   final String name;
+  final int limit;
 
   @override
-  String toString() =>
-      '$name is larger than ${formatFileSize(maxAttachmentBytes)}.';
+  String toString() => '$name is larger than ${formatFileSize(limit)}.';
 }
 
 //// Who a room or folder lets in: the ids that can go in its access lists.
@@ -493,6 +504,9 @@ class ChatAttachment {
 
   bool get isImage => contentType.startsWith('image/');
 
+  /// Plays in the conversation (streamed, not downloaded first).
+  bool get isVideo => contentType.startsWith('video/');
+
   factory ChatAttachment.fromMap(Map<String, dynamic> map) => ChatAttachment(
     path: map['path'] as String? ?? '',
     name: map['name'] as String? ?? '',
@@ -519,7 +533,8 @@ class NewAttachment {
 
   int get size => bytes.length;
   bool get isImage => contentType.startsWith('image/');
-  bool get tooLarge => size > maxAttachmentBytes;
+  bool get isVideo => contentType.startsWith('video/');
+  bool get tooLarge => size > maxBytesFor(contentType);
 }
 
 class ChatMessage {
@@ -577,6 +592,9 @@ const _contentTypes = {
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'mp4': 'video/mp4',
   'mov': 'video/quicktime',
+  'm4v': 'video/mp4',
+  'webm': 'video/webm',
+  '3gp': 'video/3gpp',
   'zip': 'application/zip',
 };
 

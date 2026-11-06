@@ -11,6 +11,7 @@ import '../../core/ui/layout.dart';
 import '../../core/ui/linkified_text.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/undo_snack_bar.dart';
+import '../../videos/widgets/file_video_player.dart';
 import '../view_models/message_thread_viewmodel.dart';
 import '../../core/ui/skeleton.dart';
 
@@ -24,6 +25,7 @@ class MessageThreadView extends StatefulWidget {
     this.readOnlyNotice = 'You can read this conversation but not post in it.',
     this.hintText = 'Message',
     this.footer,
+    this.videoPlayer = fileVideoPlayer,
   });
 
   final MessageThreadViewModel viewModel;
@@ -35,6 +37,9 @@ class MessageThreadView extends StatefulWidget {
 
   /// Shown instead of the composer, e.g. a message request's Accept bar.
   final Widget? footer;
+
+  /// Plays video attachments; tests swap in a stand-in.
+  final FileVideoPlayerBuilder videoPlayer;
 
   @override
   State<MessageThreadView> createState() => _MessageThreadViewState();
@@ -49,6 +54,7 @@ class _MessageThreadViewState extends State<MessageThreadView> {
     vm.send,
     vm.pickFiles,
     vm.takePhoto,
+    vm.recordVideo,
     vm.deleteMessage,
     vm.saveAttachment,
   ];
@@ -123,6 +129,7 @@ class _MessageThreadViewState extends State<MessageThreadView> {
               viewModel: vm,
               onDelete: _delete,
               emptyMessage: widget.emptyMessage,
+              videoPlayer: widget.videoPlayer,
             ),
           ),
           if (vm.showsTyping) _TypingIndicator(label: vm.typingLabel),
@@ -189,11 +196,13 @@ class _MessageList extends StatelessWidget {
     required this.viewModel,
     required this.onDelete,
     required this.emptyMessage,
+    required this.videoPlayer,
   });
 
   final MessageThreadViewModel viewModel;
   final ValueChanged<ChatMessage> onDelete;
   final String emptyMessage;
+  final FileVideoPlayerBuilder videoPlayer;
 
   @override
   Widget build(BuildContext context) {
@@ -257,6 +266,7 @@ class _MessageList extends StatelessWidget {
               nameColor: color == null ? null : Color(color),
               viewModel: vm,
               onDelete: vm.canDelete(m) ? () => onDelete(m) : null,
+              videoPlayer: videoPlayer,
             ),
             if (vm.receiptFor(m) case final receipt?)
               Padding(
@@ -303,7 +313,10 @@ class _MessageRow extends StatefulWidget {
     required this.nameColor,
     required this.viewModel,
     required this.onDelete,
+    required this.videoPlayer,
   });
+
+  final FileVideoPlayerBuilder videoPlayer;
 
   final ChatMessage message;
   final bool showAuthor;
@@ -370,6 +383,12 @@ class _MessageRowState extends State<_MessageRow> {
             padding: const EdgeInsets.only(top: 6),
             child: a.isImage
                 ? _ImageAttachment(attachment: a, viewModel: widget.viewModel)
+                : a.isVideo
+                ? _VideoAttachment(
+                    attachment: a,
+                    viewModel: widget.viewModel,
+                    player: widget.videoPlayer,
+                  )
                 : _FileAttachment(attachment: a, viewModel: widget.viewModel),
           ),
       ],
@@ -666,6 +685,143 @@ class _FileAttachment extends StatelessWidget {
   }
 }
 
+/// A video: a play card that opens the player. Videos stream from a
+/// download URL rather than loading into memory like photos.
+class _VideoAttachment extends StatelessWidget {
+  const _VideoAttachment({
+    required this.attachment,
+    required this.viewModel,
+    required this.player,
+  });
+
+  final ChatAttachment attachment;
+  final MessageThreadViewModel viewModel;
+  final FileVideoPlayerBuilder player;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = attachment;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 280),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Material(
+            color: Colors.black87,
+            borderRadius: BorderRadius.circular(10),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (_) => _VideoDialog(
+                  attachment: a,
+                  viewModel: viewModel,
+                  player: player,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  const Center(
+                    child: Icon(
+                      Icons.play_circle_fill,
+                      size: 52,
+                      color: Colors.white,
+                      semanticLabel: 'Play video',
+                    ),
+                  ),
+                  Positioned(
+                    left: 10,
+                    bottom: 8,
+                    child: Text(
+                      'Video · ${formatFileSize(a.size)}',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoDialog extends StatefulWidget {
+  const _VideoDialog({
+    required this.attachment,
+    required this.viewModel,
+    required this.player,
+  });
+
+  final ChatAttachment attachment;
+  final MessageThreadViewModel viewModel;
+  final FileVideoPlayerBuilder player;
+
+  @override
+  State<_VideoDialog> createState() => _VideoDialogState();
+}
+
+class _VideoDialogState extends State<_VideoDialog> {
+  late var _url = widget.viewModel.videoUrl(widget.attachment);
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+    clipBehavior: Clip.antiAlias,
+    insetPadding: const EdgeInsets.all(16),
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 900),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FutureBuilder(
+            future: _url,
+            builder: (context, snap) => switch (snap.data) {
+              null => const AspectRatio(
+                aspectRatio: 16 / 9,
+                child: ColoredBox(
+                  color: Colors.black,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+              Ok(:final value) => widget.player(value),
+              Error(:final error) => AspectRatio(
+                aspectRatio: 16 / 9,
+                child: ErrorView(
+                  error: error,
+                  onRetry: () => setState(
+                    () => _url = widget.viewModel.videoUrl(widget.attachment),
+                  ),
+                ),
+              ),
+            },
+          ),
+          OverflowBar(
+            alignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () =>
+                    widget.viewModel.saveAttachment.execute(widget.attachment),
+                icon: const Icon(Icons.download_outlined),
+                label: const Text('Save'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 IconData _fileIcon(String contentType) => switch (contentType) {
   'application/pdf' => Icons.picture_as_pdf_outlined,
   final t when t.startsWith('image/') => Icons.image_outlined,
@@ -702,7 +858,7 @@ class _ReadOnlyBar extends StatelessWidget {
   }
 }
 
-enum _AttachKind { camera, photo, file }
+enum _AttachKind { camera, video, photo, file }
 
 class _Composer extends StatelessWidget {
   const _Composer({
@@ -724,18 +880,29 @@ class _Composer extends StatelessWidget {
     final c = AppColors.of(context);
     final vm = viewModel;
     return ListenableBuilder(
-      listenable: Listenable.merge([vm.send, vm.pickFiles, vm.takePhoto]),
+      listenable: Listenable.merge([
+        vm.send,
+        vm.pickFiles,
+        vm.takePhoto,
+        vm.recordVideo,
+      ]),
       builder: (context, _) {
         final sending = vm.send.running;
         final wide = !ScreenSize.of(context).isMobile;
         final attach = vm.canAttach
             ? PopupMenuButton<_AttachKind>(
-                tooltip: 'Upload a photo or file',
-                enabled: !sending && !vm.pickFiles.running,
+                tooltip: 'Upload a photo, video or file',
+                enabled:
+                    !sending &&
+                    !vm.pickFiles.running &&
+                    !vm.recordVideo.running,
                 icon: Icon(Icons.add_circle, color: c.muted),
-                onSelected: (k) => k == _AttachKind.camera
-                    ? vm.takePhoto.execute()
-                    : vm.pickFiles.execute(k == _AttachKind.photo),
+                onSelected: (k) => switch (k) {
+                  _AttachKind.camera => vm.takePhoto.execute(),
+                  _AttachKind.video => vm.recordVideo.execute(),
+                  _AttachKind.photo => vm.pickFiles.execute(true),
+                  _AttachKind.file => vm.pickFiles.execute(false),
+                },
                 itemBuilder: (_) => [
                   if (vm.canUseCamera)
                     const PopupMenuItem(
@@ -743,6 +910,14 @@ class _Composer extends StatelessWidget {
                       child: ListTile(
                         leading: Icon(Icons.photo_camera_outlined),
                         title: Text('Take photo'),
+                      ),
+                    ),
+                  if (vm.canUseCamera)
+                    const PopupMenuItem(
+                      value: _AttachKind.video,
+                      child: ListTile(
+                        leading: Icon(Icons.videocam_outlined),
+                        title: Text('Record video'),
                       ),
                     ),
                   const PopupMenuItem(

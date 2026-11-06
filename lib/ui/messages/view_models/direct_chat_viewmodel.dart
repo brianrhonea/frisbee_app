@@ -260,6 +260,10 @@ class DirectChatViewModel extends MessageThreadViewModel {
       _dms.downloadAttachment(attachment);
 
   @override
+  Future<Result<String>> streamUrl(ChatAttachment attachment) =>
+      _dms.attachmentUrl(attachment);
+
+  @override
   void dispose() {
     accept.dispose();
     decline.dispose();

@@ -49,8 +49,9 @@ class FilePickerService {
 
   ImagePicker get _images => _camera ??= ImagePicker();
 
-  /// Longest video the camera records for a message or post.
-  static const maxVideoLength = Duration(seconds: 60);
+  /// Longest video the camera records for a message. Half a minute keeps
+  /// a phone's full-quality recording under maxVideoBytes.
+  static const maxVideoLength = Duration(seconds: 30);
 
   /// Whether this device can take photos and videos here (phones; desktop
   /// and web pick files instead).
@@ -162,8 +163,9 @@ Future<NewAttachment?> readAttachment(
   FilePickerService picker,
   PickedFile file,
 ) async {
-  final isImage = contentTypeFor(file.name).startsWith('image/');
-  final limit = isImage ? maxPickedImageBytes : maxAttachmentBytes;
+  final type = contentTypeFor(file.name);
+  final isImage = type.startsWith('image/');
+  final limit = isImage ? maxPickedImageBytes : maxBytesFor(type);
   if ((file.size ?? 0) > limit) return null;
   final bytes = await file.read();
   if (!isImage) return NewAttachment(name: file.name, bytes: bytes);

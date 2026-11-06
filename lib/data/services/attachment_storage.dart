@@ -55,6 +55,11 @@ class AttachmentStorage {
     }
   }
 
+  /// A URL to stream [attachment] from (videos). Only people storage.rules
+  /// lets read the file can get one.
+  Future<String> url(ChatAttachment attachment) =>
+      _storage.ref(attachment.path).getDownloadURL();
+
   /// Uploads one file to [path] and returns its download URL, for images
   /// shown by URL (profile pictures and headers). Each path is written
   /// once, so it's cached for good.
@@ -94,7 +99,7 @@ class AttachmentStorage {
   Future<Uint8List> download(ChatAttachment attachment) async {
     final data = await _storage
         .ref(attachment.path)
-        .getData(maxAttachmentBytes);
+        .getData(maxBytesFor(attachment.contentType));
     if (data == null) throw Exception('Attachment not found.');
     return data;
   }

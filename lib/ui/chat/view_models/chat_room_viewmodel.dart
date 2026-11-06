@@ -134,6 +134,10 @@ class ChatRoomViewModel extends MessageThreadViewModel {
   Future<Result<Uint8List>> download(ChatAttachment attachment) =>
       _chats.downloadAttachment(attachment);
 
+  @override
+  Future<Result<String>> streamUrl(ChatAttachment attachment) =>
+      _chats.attachmentUrl(attachment);
+
   void _onError(Object e) {
     _error = e;
     _teamLoaded = true;
