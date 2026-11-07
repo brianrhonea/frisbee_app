@@ -13,15 +13,15 @@ IconData followIcon(FollowType t) => switch (t) {
   FollowType.user => Icons.person_outline,
   FollowType.team => Icons.groups_outlined,
   FollowType.tournament => Icons.emoji_events_outlined,
-  FollowType.event => Icons.event_outlined,
 };
 
 /// Where a follow's target lives in the app.
 String followRoute(FollowTarget t) => switch (t.type) {
   FollowType.user => Routes.player(t.id),
   FollowType.team => Routes.team(t.id),
-  FollowType.tournament => Routes.groupTournament(t.groupId ?? '', t.id),
-  FollowType.event => Routes.tournament(t.id),
+  // Hosted and hat tournaments share the key shape; the hosted page
+  // falls back to the group's hat tournament.
+  FollowType.tournament => Routes.tournament(t.id, host: t.groupId),
 };
 
 /// Opens a follow's target: a team with `go` (its tab), the rest with
@@ -29,9 +29,7 @@ String followRoute(FollowTarget t) => switch (t.type) {
 /// would stack the tabs twice (from Settings, which is over them).
 void openFollow(BuildContext context, FollowTarget t) => switch (t.type) {
   FollowType.team => context.go(followRoute(t)),
-  FollowType.user ||
-  FollowType.tournament ||
-  FollowType.event => openPage(context, followRoute(t)),
+  FollowType.user || FollowType.tournament => openPage(context, followRoute(t)),
 };
 
 class FollowingScreen extends StatefulWidget {

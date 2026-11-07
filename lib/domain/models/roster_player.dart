@@ -16,7 +16,6 @@ class RosterPlayer {
     this.number,
     this.position = PlayerPosition.hybrid,
     this.userId,
-    this.onUsau,
     this.paid = false,
   });
 
@@ -28,30 +27,18 @@ class RosterPlayer {
   /// Linked app account, if this player has joined the team.
   final String? userId;
 
-  /// Whether the player is on the linked USA Ultimate roster as of the last
-  /// sync; null if never synced. Admin-only, like [paid] (see [toStatusMap]).
-  final bool? onUsau;
-
-  /// Marked by an admin; USA Ultimate doesn't publish payment status.
+  /// Marked by an admin; only admins can read it (see [toStatusMap]).
   final bool paid;
 
-  /// On the USA Ultimate roster and paid.
-  bool get confirmed => (onUsau ?? false) && paid;
-
-  RosterPlayer copyWith({
-    int? number,
-    PlayerPosition? position,
-    bool? onUsau,
-    bool? paid,
-  }) => RosterPlayer(
-    id: id,
-    name: name,
-    number: number ?? this.number,
-    position: position ?? this.position,
-    userId: userId,
-    onUsau: onUsau ?? this.onUsau,
-    paid: paid ?? this.paid,
-  );
+  RosterPlayer copyWith({int? number, PlayerPosition? position, bool? paid}) =>
+      RosterPlayer(
+        id: id,
+        name: name,
+        number: number ?? this.number,
+        position: position ?? this.position,
+        userId: userId,
+        paid: paid ?? this.paid,
+      );
 
   /// [map] is the roster entry every member can read; [status] is the
   /// admin-only status from [toStatusMap], if the reader may see it.
@@ -69,7 +56,6 @@ class RosterPlayer {
       PlayerPosition.hybrid,
     ),
     userId: map['userId'] as String?,
-    onUsau: status?['onUsau'] as bool?,
     paid: status?['paid'] as bool? ?? false,
   );
 
@@ -82,5 +68,5 @@ class RosterPlayer {
   };
 
   /// Fields only team admins may read, stored apart from [toMap].
-  Map<String, dynamic> toStatusMap() => {'onUsau': onUsau, 'paid': paid};
+  Map<String, dynamic> toStatusMap() => {'paid': paid};
 }

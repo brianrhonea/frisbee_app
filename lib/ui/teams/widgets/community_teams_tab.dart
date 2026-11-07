@@ -493,11 +493,22 @@ class _NewTeamDialogState extends State<_NewTeamDialog> {
     super.dispose();
   }
 
-  void _next() {
+  Future<void> _next() async {
     if (_name.text.trim().isEmpty) {
       setState(() => _nameError = 'Enter a team name');
       return;
     }
+    // As TeamForm: a team's division can't be changed once it's made.
+    final ok = await confirmDialog(
+      context,
+      title: 'Is ${_division.label} the right division?',
+      message:
+          "You won't be able to change divisions after the team is "
+          'created; that takes a request to support. Please confirm '
+          "it's correct before submitting.",
+      confirmLabel: 'Yes, ${_division.label}',
+    );
+    if (!ok || !mounted) return;
     setState(() => _naming = false);
   }
 
@@ -527,7 +538,10 @@ class _NewTeamDialogState extends State<_NewTeamDialog> {
                   const SizedBox(height: 8),
                   DropdownButtonFormField<Division>(
                     initialValue: _division,
-                    decoration: const InputDecoration(labelText: 'Division'),
+                    decoration: const InputDecoration(
+                      labelText: 'Division',
+                      helperText: "Can't be changed after the team is created.",
+                    ),
                     items: [
                       for (final d in Division.values)
                         DropdownMenuItem(value: d, child: Text(d.label)),

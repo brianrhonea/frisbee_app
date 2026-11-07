@@ -111,23 +111,6 @@ List<PaletteCommand> paletteCommands({
     run: (c) => c.push(Routes.notificationSettings),
   ),
   PaletteCommand(
-    label: 'USA Ultimate events',
-    icon: Icons.emoji_events_outlined,
-    keywords: 'tournaments',
-    run: (c) => c.go(Routes.tournaments),
-  ),
-  PaletteCommand(
-    label: 'Rankings',
-    icon: Icons.leaderboard_outlined,
-    run: (c) => c.go(Routes.rankings),
-  ),
-  PaletteCommand(
-    label: 'USA Ultimate teams',
-    icon: Icons.travel_explore_outlined,
-    keywords: 'rosters results',
-    run: (c) => c.go(Routes.searchUsauTeams),
-  ),
-  PaletteCommand(
     label: 'Start a team',
     icon: Icons.add_circle_outline,
     keywords: 'create new',

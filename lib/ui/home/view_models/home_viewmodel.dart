@@ -8,7 +8,6 @@ import '../../../data/repositories/follow/follow_repository.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/team_post/team_post_repository.dart';
-import '../../../data/repositories/tournament/tournament_repository.dart';
 import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../../../data/services/file_picker_service.dart';
 import '../../../domain/models/app_user.dart';
@@ -17,7 +16,6 @@ import '../../../domain/models/feed_item.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_post.dart';
-import '../../../domain/models/tournament.dart';
 import '../../../utils/command.dart';
 import '../../../utils/pending_removals.dart';
 import '../../../utils/result.dart';
@@ -40,7 +38,6 @@ class HomeViewModel extends ChangeNotifier {
     required EventRepository eventRepository,
     MeetingRepository? meetingRepository,
     required TeamPostRepository teamPostRepository,
-    required TournamentRepository tournamentRepository,
     required FollowRepository followRepository,
     required UserPostRepository userPostRepository,
     required FilePickerService filePicker,
@@ -76,12 +73,6 @@ class HomeViewModel extends ChangeNotifier {
       clock: _clock,
       upcomingOnly: true,
     )..addListener(_onFeed);
-    _subs.add(
-      tournamentRepository.watchTournaments().listen((t) {
-        _tournaments = t;
-        notifyListeners();
-      }, onError: (_) {}),
-    );
   }
 
   final AuthRepository _auth;
@@ -92,7 +83,6 @@ class HomeViewModel extends ChangeNotifier {
   final DateTime Function() _clock;
   final _downloads = <String, Future<Result<Uint8List>>>{};
   late final MySchedule _feed;
-  final List<StreamSubscription<Object?>> _subs = [];
 
   /// Events listed under "Coming up".
   static const upcomingLimit = 4;
@@ -223,14 +213,6 @@ class HomeViewModel extends ChangeNotifier {
   ScheduleEntry? nextEventFor(Team team) =>
       _feed.upcoming().where((e) => e.team?.id == team.id).firstOrNull;
 
-  List<Tournament> _tournaments = const [];
-
-  /// The next USA Ultimate tournament, for "Around the league".
-  Tournament? get nextTournament {
-    final now = _clock();
-    return _tournaments.where((t) => t.isUpcoming(now)).firstOrNull;
-  }
-
   void _onPosts() {
     actions.track([
       for (final item in feed.items)
@@ -253,9 +235,6 @@ class HomeViewModel extends ChangeNotifier {
     feed
       ..removeListener(_onPosts)
       ..dispose();
-    for (final s in _subs) {
-      s.cancel();
-    }
     joinTeam.dispose();
     savePost.dispose();
     deletePost.dispose();

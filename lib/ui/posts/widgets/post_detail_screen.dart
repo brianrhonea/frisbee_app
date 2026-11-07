@@ -6,6 +6,7 @@ import '../../../domain/models/post_comment.dart';
 import '../../../routing/open_link.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/ui/scroll_to_top.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/linkified_text.dart';
@@ -33,6 +34,7 @@ class PostDetailScreen extends StatefulWidget {
 }
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
+  final _scroll = ScrollController();
   final _comment = TextEditingController();
   final _commentFocus = FocusNode();
 
@@ -63,6 +65,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     vm.toggleCommentLike.removeListener(_onLikeComment);
     _comment.dispose();
     _commentFocus.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -211,73 +214,79 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   Expanded(
                     child: ConstrainedContent(
                       maxWidth: 640,
-                      child: ListView(
-                        padding: const EdgeInsets.all(16),
-                        children: [
-                          UserPostCard(
-                            post: post,
-                            loadImage: vm.imageData,
-                            onEdit: vm.isMine
-                                ? () =>
-                                      showPostComposer(context, postId: post.id)
-                                : null,
-                            onDelete: vm.isMine ? _confirmDelete : null,
-                            actions: vm.actions,
-                            onRepost: () =>
-                                repostOrUndo(context, vm.actions, post),
-                            onComment: vm.canComment
-                                ? _commentFocus.requestFocus
-                                : null,
-                          ),
-                          if (post.workout case final w? when w.route != null)
-                            Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: WorkoutSplits(workout: w),
-                              ),
-                            ),
-                          if (vm.canComment) ...[
-                            const SizedBox(height: 12),
-                            _CommentsHeading(count: comments?.length),
-                            if (comments == null)
-                              const Padding(
-                                padding: EdgeInsets.all(24),
-                                child: Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              )
-                            else if (vm.commentsError != null &&
-                                comments.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Text(errorMessage(vm.commentsError)),
-                              )
-                            else if (comments.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                child: Text(
-                                  'No comments yet. Be the first.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Theme.of(
+                      child: ScrollToTop(
+                        controller: _scroll,
+                        child: ListView(
+                          controller: _scroll,
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            UserPostCard(
+                              post: post,
+                              loadImage: vm.imageData,
+                              onEdit: vm.isMine
+                                  ? () => showPostComposer(
                                       context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
+                                      postId: post.id,
+                                    )
+                                  : null,
+                              onDelete: vm.isMine ? _confirmDelete : null,
+                              actions: vm.actions,
+                              onRepost: () =>
+                                  repostOrUndo(context, vm.actions, post),
+                              onComment: vm.canComment
+                                  ? _commentFocus.requestFocus
+                                  : null,
+                            ),
+                            if (post.workout case final w? when w.route != null)
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: WorkoutSplits(workout: w),
                                 ),
-                              )
-                            else
-                              for (final t in threads) ...[
-                                _tile(t.comment),
-                                for (final r in t.replies)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 42),
-                                    child: _tile(r),
+                              ),
+                            if (vm.canComment) ...[
+                              const SizedBox(height: 12),
+                              _CommentsHeading(count: comments?.length),
+                              if (comments == null)
+                                const Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
                                   ),
-                              ],
+                                )
+                              else if (vm.commentsError != null &&
+                                  comments.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Text(errorMessage(vm.commentsError)),
+                                )
+                              else if (comments.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  child: Text(
+                                    'No comments yet. Be the first.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                )
+                              else
+                                for (final t in threads) ...[
+                                  _tile(t.comment),
+                                  for (final r in t.replies)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 42),
+                                      child: _tile(r),
+                                    ),
+                                ],
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -366,7 +375,8 @@ class CommentTile extends StatelessWidget {
           InkWell(
             borderRadius: BorderRadius.circular(20),
             onTap: openAuthor,
-            child: PersonAvatar(
+            child: UserAvatar(
+              uid: c.authorId,
               name: c.authorName,
               photoUrl: c.authorPhotoUrl,
               radius: c.isReply ? 13 : 16,

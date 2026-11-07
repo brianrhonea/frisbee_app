@@ -9,10 +9,25 @@ extension OpenLink on GoRouter {
   /// opened with `go`, which switches to that tab: pushing one would stack
   /// a second copy of pages the tab already holds (go_router then fails
   /// with duplicate page keys).
+  ///
+  /// A link to the page already open does nothing, and one to another of
+  /// the same kind (another conversation, from a conversation) replaces
+  /// it, so following notifications never piles up pages to back out of.
   void openLink(String location) {
-    final matches = configuration.findMatch(Uri.parse(location)).matches;
-    if (matches.isNotEmpty && matches.last is ShellRouteMatch) {
+    final target = Uri.parse(location);
+    final matches = configuration.findMatch(target);
+    if (matches.matches.isNotEmpty && matches.matches.last is ShellRouteMatch) {
       go(location);
+      return;
+    }
+    final here = routerDelegate.currentConfiguration;
+    if (here.uri.path == target.path) return;
+    final hereLast = here.isEmpty ? null : here.last;
+    final targetLast = matches.isEmpty ? null : matches.last;
+    if (hereLast != null &&
+        targetLast != null &&
+        hereLast.route == targetLast.route) {
+      pushReplacement(location);
     } else {
       push(location);
     }

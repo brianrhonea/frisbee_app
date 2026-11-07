@@ -70,7 +70,8 @@ class NotificationsViewModel extends ChangeNotifier {
   Object? get error => _error;
   int get unreadCount => items.where((n) => !n.read).length;
 
-  /// Marks [AppNotification] read; the screen then follows its route.
+  /// Puts [AppNotification] away (it's been checked); the screen then
+  /// follows its route.
   late final Command1<void, AppNotification> open;
   late final Command0<void> markAllRead;
 
@@ -88,8 +89,10 @@ class NotificationsViewModel extends ChangeNotifier {
   bool isFollowing(String otherUid) => _following.contains(otherUid);
   late final Command0<void> clearAll;
 
-  Future<Result<void>> _open(AppNotification n) async =>
-      n.read ? const Result.ok(null) : _repo.markRead(uid, [n.id]);
+  Future<Result<void>> _open(AppNotification n) async {
+    await _repo.markSeen(uid, n.id);
+    return const Result.ok(null);
+  }
 
   Future<Result<void>> _followBack(AppNotification n) async {
     final who = n.followBack;

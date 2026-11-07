@@ -17,7 +17,6 @@ import 'package:frisbee_app/data/repositories/direct_message/direct_message_repo
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/meeting/meeting_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
-import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
 import 'package:frisbee_app/data/repositories/profile/profile_repository.dart';
 import 'package:frisbee_app/ui/profile/widgets/profile_screen.dart';
@@ -25,7 +24,6 @@ import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
-import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
@@ -46,9 +44,12 @@ import 'package:frisbee_app/data/repositories/group_tournament/group_tournament_
 import 'package:frisbee_app/data/repositories/post_comment/post_comment_repository.dart';
 import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 
+import 'package:frisbee_app/data/repositories/hosted_tournament/hosted_tournament_repository.dart';
+import 'package:frisbee_app/ui/tournaments/widgets/hosted_tournament_screen.dart';
 import 'package:frisbee_app/utils/pending_removals.dart';
 
 import '../testing/fakes.dart';
+import '../testing/hosted_tournament_fakes.dart';
 import '../testing/group_tournament_fakes.dart';
 import '../testing/social_fakes.dart';
 import '../testing/meeting_fakes.dart';
@@ -116,12 +117,6 @@ void main() {
           Provider<StatsRepository>.value(
             value: MockStatsRepository(teamRepository: teams),
           ),
-          Provider<TournamentRepository>.value(
-            value: FakeTournamentRepository(const []),
-          ),
-          Provider<RankingRepository>.value(
-            value: FakeRankingRepository(const []),
-          ),
           Provider<FollowRepository>.value(
             value: follows = FakeFollowRepository(),
           ),
@@ -133,6 +128,9 @@ void main() {
           ),
           Provider<GroupTournamentRepository>.value(
             value: FakeGroupTournamentRepository(),
+          ),
+          Provider<HostedTournamentRepository>.value(
+            value: FakeHostedTournamentRepository(),
           ),
         ],
         child: MaterialApp.router(
@@ -152,6 +150,28 @@ void main() {
     await tester.tap(f);
     await tester.pumpAndSettle();
   }
+
+  testWidgets('a tournament the team was accepted into opens its page', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final router = GoRouter.of(tester.element(find.byType(HomeScreen)));
+    events.events['e2'] = TeamEvent(
+      id: 'e2',
+      title: 'Lone Star Classic',
+      type: EventType.tournament,
+      startsAt: DateTime.now().add(const Duration(days: 3)),
+      tournamentId: 'x9',
+    );
+    unawaited(router.push(Routes.event('t1', 'e2')));
+    await tester.pumpAndSettle();
+    expect(find.byType(EventDetailScreen), findsOneWidget);
+    await tapText(tester, 'Open tournament page');
+    expect(find.byType(HostedTournamentScreen), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(EventDetailScreen), findsOneWidget);
+  });
 
   testWidgets('team and personal events return to home', (tester) async {
     await pumpApp(tester);

@@ -8,13 +8,18 @@ enum TournamentFormat {
     'Pools first, then a bracket seeded by pool finish',
   ),
   singleElim('Single elimination', 'Lose once and you are out'),
-  doubleElim('Double elimination', 'Lose twice and you are out');
+  doubleElim('Double elimination', 'Lose twice and you are out'),
+  poolsPlacement(
+    'Pool play + placement bracket',
+    'Pools, then brackets where every team plays for a final place',
+  );
 
   const TournamentFormat(this.label, this.summary);
   final String label;
   final String summary;
 
-  bool get hasPools => this == roundRobin || this == poolsSingleElim;
+  bool get hasPools =>
+      this == roundRobin || this == poolsSingleElim || this == poolsPlacement;
   bool get hasBracket => this != roundRobin;
 }
 
@@ -392,7 +397,14 @@ enum GameStage {
 
   /// Double elimination's second final, played only if the losers'
   /// bracket team wins the first.
-  reset('Final (if needed)');
+  reset('Final (if needed)'),
+
+  /// Bracket games before the quarterfinals, for brackets that aren't a
+  /// power of two (e.g. 2nd and 3rd from different pools).
+  crossover('Crossover'),
+
+  /// Games for places below 1st: consolation brackets and "5th place".
+  placement('Placement');
 
   const GameStage(this.label);
   final String label;
@@ -458,6 +470,7 @@ class GroupGame {
     this.scoreB,
     this.report,
     this.ifNeeded = false,
+    this.place,
   });
 
   final String id;
@@ -487,6 +500,10 @@ class GroupGame {
 
   /// Only played if needed (double elimination's reset final).
   final bool ifNeeded;
+
+  /// For a game deciding a final place: the winner's place (1 for the
+  /// final, 3 for "3rd place"); the loser takes the next.
+  final int? place;
 
   bool get isDone => status == GameStatus.done;
   bool get hasTeams => teamA != null && teamB != null;
@@ -525,6 +542,7 @@ class GroupGame {
     scoreB: scoreB != null ? scoreB() : this.scoreB,
     report: report != null ? report() : this.report,
     ifNeeded: ifNeeded,
+    place: place,
   );
 
   factory GroupGame.fromMap(String id, Map<String, dynamic> map) => GroupGame(
@@ -545,6 +563,7 @@ class GroupGame {
     scoreB: (map['scoreB'] as num?)?.toInt(),
     report: ScoreReport.fromMap(map['report']),
     ifNeeded: map['ifNeeded'] as bool? ?? false,
+    place: (map['place'] as num?)?.toInt(),
   );
 
   Map<String, dynamic> toMap() => {
@@ -564,6 +583,9 @@ class GroupGame {
     'scoreB': scoreB,
     'report': report?.toMap(),
     'ifNeeded': ifNeeded,
+    // Only placement brackets have it; group tournament rules allow
+    // only the keys above.
+    'place': ?place,
   };
 }
 

@@ -1,7 +1,7 @@
 # Stall 10 user guide
 
 Stall 10 keeps your ultimate team in one place: schedule, roster, playbook,
-stats, plus USA Ultimate tournaments and rankings. This guide covers
+stats, chat and pickup groups. This guide covers
 version 0.0.12. What changed in each version is in
 [release-notes.md](release-notes.md).
 
@@ -71,7 +71,7 @@ passes to another member, preferring one with Manage team.
 ### Home
 
 Home has the week, your team, then your **feed**. On a wide screen,
-your events, playbook and rankings sit beside the feed.
+your events and playbook sit beside the feed.
 
 - **This week**: the next seven days. Dots under each day show events:
   **blue for team**, **purple for personal**. Each event has a TEAM or
@@ -84,19 +84,14 @@ your events, playbook and rankings sit beside the feed.
   [Following and posts](#following-and-posts).
 - **Playbook** (wide screens): a preview of your team's plays. Tap one to
   open it.
-- **Coming up** (wide screens): your next team and personal events. Turn
-  on **Show other events** to add upcoming USA Ultimate tournaments.
-- **Rankings** (wide screens): the top 3 on a podium and ranks 4–10.
-  Switch division with the chips, or tap **Full rankings**.
+- **Coming up** (wide screens): your next team and personal events.
 
 ### Search
 
 The search box at the top of Home (phones) or of every page (tablets and
-computers) searches **players** (by name or @username), **teams**,
-**pickup groups** and upcoming **USA Ultimate events**. Results open in
-**Explore**, where chips narrow them to one kind. Explore also has
-shortcuts to Events, Rankings, USA Ultimate teams, and starting a team or
-group.
+computers) searches **players** (by name or @username), **teams** and
+**pickup groups**. Results open in **Explore**, where chips narrow them to
+one kind. Explore also has shortcuts to starting a team or group.
 
 On a computer, press **Ctrl K** (**⌘K** on a Mac) anywhere for the
 **command menu**: type to jump to a section or one of your teams, start a
@@ -106,8 +101,8 @@ Explore, Team, Messages and Profile.
 
 ### Following and posts
 
-- **Follow** a person, team, community group, group tournament or USA
-  Ultimate event from its page. Their posts then show up in your Home
+- **Follow** a person, team, community group or group tournament from its
+  page. Their posts then show up in your Home
   feed. Posts from your own teams and groups are always there.
 - Tap the **bell** next to **Following** to be notified when they post. To
   turn every post notification off, use **Posts you follow** in
@@ -119,8 +114,7 @@ Explore, Team, Messages and Profile.
   Change it later from **Following ▾ → Post notifications** on their
   profile.
 - **Write a post**: text, up to 4 photos and 5 links. Anyone signed in can
-  see your posts on your profile. Optionally tag a tournament or event you
-  follow, so its followers see the post too.
+  see your posts on your profile. Optionally tag a tournament you follow, so its followers see the post too.
 - **Share a workout**: pick the activity, then add how long it took, an
   optional distance and effort, and any exercises with sets, reps and
   weight. Runs with a distance show your pace.
@@ -215,8 +209,8 @@ page; back takes you out of the team. The tabs:
   On a computer, rooms are listed on the left and the open room is on the
   right. On a phone, tap a room to slide it open; the 💬 button at the top
   left opens your room list, and tapping the open room takes you back.
-- **Roster**: players with number and position. Admins also see paid and
-  USA Ultimate status, and can import or sync the roster from USA Ultimate.
+- **Roster**: players with number and position. Admins also see and mark
+  who's paid, and can filter to **Unpaid only**.
 - **Playbook**: the team's plays. Admins draw plays on the field and add
   animation steps (drag a player to record a cut, the disc to record a
   throw); everyone can play them back.
@@ -237,11 +231,6 @@ and type part of a team's name or city. Tap a team to see its public page: name,
 city, plus any public events and posts. Members, rosters and chat stay
 private. Tap **Join** and enter the invite code an admin shows you.
 
-**Search USA Ultimate rankings**: at the bottom of Find a team. Type a
-team name and filter by ranking list (for example, Club Mixed). Tap a team
-to see its USA Ultimate page. Only teams in the USA Ultimate rankings show
-up.
-
 ### Community groups
 
 A community group is an open pickup community: no roster or stats, just
@@ -259,7 +248,8 @@ tournaments) and **Member**.
   the RSVPs are **Attending**, **Planning to attend** and **Not able to
   make it :(**.
 
-**Running a tournament** (owners and organizers):
+**Running a hat tournament** (owners and organizers; teams made from
+RSVPs, listed under **Hat tournaments** in the Tournaments section):
 
 1. Post a Tournament event so people can RSVP. On the event, tap **Set up
    tournament** (or **New tournament** on the Tournaments page). Every
@@ -295,6 +285,43 @@ score for the first captain to confirm. Organizers can set or correct any
 score. Once a score is final, winners (and losers, in double elimination)
 move on in the bracket. With pool play, organizers tap **Pools are done:
 seed the bracket** when every pool game is final.
+
+### Hosting a tournament
+
+Any team, community group or school/club can host a tournament for other
+teams, from its **Tournaments** section. People with **Manage events**
+run it.
+
+1. Tap **Host a tournament**: name, dates, location, about, **Public**
+   (any team can apply) or **Invite only** (only teams you invite play),
+   and an optional **bid fee**: amount, how to pay and a due date. Stall
+   10 doesn't take payments; teams pay you and you mark them paid.
+2. It starts as a **draft** only your managers see. On its page, **Add**
+   divisions: level and division (e.g. Club Mixed), team cap, format and
+   game rules (game to, timeouts, length, fields, first game).
+   **Suggest** picks the usual format for the cap: a round robin for 5
+   or fewer, otherwise pools of 4–5 and a placement bracket.
+3. **Publish and open registration**. The page, schedule, results and
+   news are public either way.
+4. **Teams** tab: accept, waitlist or decline applications; **Invite**
+   searches for teams. Accepted teams show the bid fee **Paid** switch;
+   **Unpaid only** filters, and unpaid teams past the due date show
+   **Overdue**.
+5. **Close registration**, then drag teams into seed order (1 is the
+   strongest). Pools are snake-seeded and brackets follow pool finish.
+6. **Schedule** tab: check the preview and **Publish schedule** for each
+   division. Republishing regenerates every game from the seeds.
+7. Captains report and confirm scores; you can set or correct any score.
+   When every game is played, the **Results** tab shows the champion and
+   final places.
+8. **News**: **Post update** puts a public post on your page, tagged
+   with the tournament, so its followers see it.
+
+**Playing in one**: find tournaments in **Explore → Find a tournament**.
+A team's owner or captain taps **Apply with a team**, picks the division
+and up to 4 captains (they report scores), or **Accept invite** if
+invited. The Overview tab shows your status and whether your bid fee is
+marked paid.
 
 ### Schools and clubs
 
@@ -418,24 +445,6 @@ but only to the people invited.
   them, just for you. Settings (⚙) changes devices mid-call and the
   overall volume. Stall 10 remembers these on this device.
 
-### Events
-
-Upcoming USA Ultimate tournaments. Filter the list, and tap a tournament for
-its details and a link to USA Ultimate. Back returns to wherever you
-opened it from (Events, Home or Following).
-
-If USA Ultimate has posted a schedule, the tournament page also shows
-**Schedule & brackets**. Pick a division (Men, Mixed, Women), then a stage
-tab: pool standings and games, crossovers, and the championship and
-placement brackets drawn as a tree (scroll sideways for earlier rounds).
-Winners are highlighted green. Tap refresh for the latest scores during an
-event.
-
-### Rankings
-
-USA Ultimate rankings by division. Tap a team for its USA Ultimate page;
-back returns to the list (or to Home, if you opened it there).
-
 ## Settings
 
 Tap the **gear** at the top right of your profile. Settings slides in
@@ -457,7 +466,7 @@ from the right (on a computer, as a panel; click outside to close it).
 ## Privacy
 
 - **Personal events** are visible only to you.
-- **Paid status and USA Ultimate status** on the roster are visible only to
+- **Paid status** on the roster is visible only to
   the owner and people whose role has **Manage team**.
 - **Direct messages** are visible only to the two people in them. Anyone
   signed in can find you by name or @username to message you; your email
@@ -481,10 +490,3 @@ from the right (on a computer, as a panel; click outside to close it).
   longer work.
 
 These rules are enforced by the server, not just hidden in the app.
-
-## USA Ultimate data
-
-USA Ultimate has no public API. Stall 10 reads tournaments, rankings and team
-pages (including event schedules and brackets) from play.usaultimate.org and
-links back to it. Information may be out of date or incomplete; check USA
-Ultimate for anything official.

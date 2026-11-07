@@ -9,13 +9,12 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "test": "vitest run test/api test/browse test/parse test/notifications test/meetings test/account test/discord test/communities",
+    "test": "vitest run test/api test/browse test/notifications test/meetings test/account test/discord test/communities test/tournaments",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-frisbee \"vitest run test/rules --no-file-parallelism\"",
     "serve": "npm run build && firebase emulators:start --only functions,firestore,auth",
     "deploy": "firebase deploy --only functions"
   },
   "dependencies": {
-    "cheerio": "^1.2.0",
     "firebase-admin": "^14.5.0",
     "firebase-functions": "^7.4.0",
     "livekit-server-sdk": "^2.19.2"

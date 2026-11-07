@@ -8,7 +8,6 @@ import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/team_post.dart';
-import 'package:frisbee_app/domain/models/tournament.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/home/view_models/home_viewmodel.dart';
@@ -27,26 +26,6 @@ TeamEvent event(String id, String title, EventType type, DateTime at) =>
 void main() {
   // A Wednesday.
   final now = DateTime(2026, 10, 28, 9);
-  final tournaments = [
-    Tournament(
-      id: 'past',
-      name: 'Past Cup',
-      url: '',
-      startDate: DateTime.utc(2026, 10, 1, 12),
-      endDate: DateTime.utc(2026, 10, 2, 12),
-    ),
-    Tournament(
-      id: 'next',
-      name: 'Fall Classic',
-      url: '',
-      startDate: DateTime.utc(2026, 10, 31, 12),
-      endDate: DateTime.utc(2026, 11, 1, 12),
-      city: 'Portland',
-      state: 'OR',
-      competitionLevel: 'Club',
-      divisions: const ['Mixed'],
-    ),
-  ];
 
   Team team(
     String id,
@@ -139,7 +118,6 @@ void main() {
       teamRepository: teams,
       eventRepository: events,
       teamPostRepository: posts,
-      tournamentRepository: FakeTournamentRepository(tournaments),
       followRepository: follows,
       userPostRepository: userPosts,
       filePicker: FakeFilePickerService(),
@@ -359,11 +337,6 @@ void main() {
       expect(vm.canEditPost(pub), isFalse);
     });
 
-    test('names the next tournament', () async {
-      final vm = await load();
-      expect(vm.nextTournament?.id, 'next');
-    });
-
     test('joins a team by invite code', () async {
       final vm = await load(withTeam: false);
       teams.teams['t9'] = team('t9', 'Other', owner: 'u9');
@@ -442,7 +415,6 @@ void main() {
     final upNext = tester.getTopLeft(find.text('UP NEXT · NORTHSIDE FLYERS'));
     expect(upNext.dx, greaterThan(feed.dx + 400));
     expect(find.text('Coming up'), findsOneWidget);
-    expect(find.text('Fall Classic'), findsOneWidget);
     // One way to post: the composer, not a second header button.
     expect(find.text('Create post'), findsNothing);
     expect(tester.takeException(), isNull);

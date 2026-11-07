@@ -8,10 +8,8 @@
 # FIREBASE_WINDOWS_API_KEY value from that project's secrets file); without
 # it, hosting is skipped with a warning and the rest still deploys.
 #
-# Never deploys the USA Ultimate scrapers (scrapeUsau*, refreshUsau); they
-# stay undeployed on purpose. Change the groups with the repository
-# variable FUNCTION_GROUPS (Settings → Secrets and variables → Actions →
-# Variables), e.g. "account,api,communities,discord,follows,meetings,notifications".
+# Change the groups with the repository variable FUNCTION_GROUPS
+# (Settings → Secrets and variables → Actions → Variables), e.g. "account,api,browse,communities,discord,follows,meetings,notifications,tournaments".
 
 name: Deploy backend (shared)
 
@@ -50,7 +48,7 @@ jobs:
       contents: write # to push the release tag
     env:
       PROJECT: ${{ inputs.environment }}
-      GROUPS: ${{ vars.FUNCTION_GROUPS || 'account,api,browse,communities,discord,follows,meetings,notifications' }}
+      GROUPS: ${{ vars.FUNCTION_GROUPS || 'account,api,browse,communities,discord,follows,meetings,notifications,tournaments' }}
     steps:
       - uses: actions/checkout@v4
         with:

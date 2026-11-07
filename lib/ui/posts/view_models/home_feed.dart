@@ -208,8 +208,7 @@ class HomeFeed extends ChangeNotifier {
 
     final tags = [
       for (final f in _follows)
-        if (f.type == FollowType.tournament || f.type == FollowType.event)
-          f.key,
+        if (f.type == FollowType.tournament) f.key,
     ]..sort();
     if (tags.isNotEmpty) {
       wanted['tags:${tags.join(',')}'] = () => _source(

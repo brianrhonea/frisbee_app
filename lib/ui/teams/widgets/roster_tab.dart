@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../domain/models/roster_player.dart';
-import '../../../routing/routes.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/team_detail_viewmodel.dart';
@@ -69,20 +66,18 @@ class RosterTab extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 96),
           children: [
-            if (showStatus) _UsauCard(viewModel: viewModel),
+            if (showStatus && viewModel.roster.isNotEmpty)
+              _PaidCard(viewModel: viewModel),
             if (viewModel.roster.isEmpty)
               EmptyView(
                 icon: Icons.badge_outlined,
                 title: 'No players on the roster',
-                message: canEdit
-                    ? 'Add players one by one, or import them from USA '
-                          'Ultimate.'
-                    : null,
+                message: canEdit ? 'Add players one by one.' : null,
               )
             else if (roster.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(24),
-                child: Center(child: Text('Everyone is confirmed.')),
+                child: Center(child: Text('Everyone has paid.')),
               ),
             for (final (i, p) in roster.indexed) ...[
               if (i > 0) const Divider(height: 1),
@@ -98,7 +93,6 @@ class RosterTab extends StatelessWidget {
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(p.position.label),
-                            if (p.onUsau != null) _UsauBadge(onUsau: p.onUsau!),
                             _PaidBadge(
                               paid: p.paid,
                               onTap: canEdit
@@ -126,98 +120,35 @@ class RosterTab extends StatelessWidget {
   }
 }
 
-/// USA Ultimate link, sync button and confirmation counts.
-class _UsauCard extends StatelessWidget {
-  const _UsauCard({required this.viewModel});
+/// How many players have paid, with a filter for those who haven't.
+class _PaidCard extends StatelessWidget {
+  const _PaidCard({required this.viewModel});
 
   final TeamDetailViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final team = vm.team!;
-    final theme = Theme.of(context);
-    final linked = team.usauUrl != null;
-    final total = vm.roster.length;
-    final synced = team.usauSyncedAt;
     return Card.outlined(
       margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        child: Row(
           children: [
-            Row(
-              children: [
-                const Icon(Icons.verified_outlined),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    linked
-                        ? (team.usauName?.isNotEmpty ?? false)
-                              ? team.usauName!
-                              : 'USA Ultimate team linked'
-                        : 'USA Ultimate roster',
-                    style: theme.textTheme.titleSmall,
-                  ),
-                ),
-                if (vm.canEdit)
-                  FilledButton.tonalIcon(
-                    onPressed: () => context.push(Routes.usauRoster(team.id)),
-                    icon: Icon(linked ? Icons.sync : Icons.download),
-                    label: Text(linked ? 'Sync' : 'Import'),
-                  ),
-              ],
+            Expanded(
+              child: Text(
+                '${vm.paidCount}/${vm.roster.length} paid',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ),
-            const SizedBox(height: 6),
-            if (!linked)
-              Text(
-                'Import your roster from USA Ultimate and track who has '
-                'accepted a spot.',
-                style: theme.textTheme.bodySmall,
-              )
-            else ...[
-              Text(
-                '${vm.confirmedCount}/$total confirmed  ·  '
-                '${vm.onUsauCount} on USA Ultimate  ·  ${vm.paidCount} paid',
-                style: theme.textTheme.bodyMedium,
-              ),
-              Text(
-                synced == null
-                    ? 'Not synced yet'
-                    : 'Last synced ${DateFormat.yMMMd().add_jm().format(synced)}',
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-            if (total > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: FilterChip(
-                  label: const Text('Unconfirmed only'),
-                  selected: vm.unconfirmedOnly,
-                  onSelected: vm.setUnconfirmedOnly,
-                ),
-              ),
+            FilterChip(
+              label: const Text('Unpaid only'),
+              selected: vm.unpaidOnly,
+              onSelected: vm.setUnpaidOnly,
+            ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _UsauBadge extends StatelessWidget {
-  const _UsauBadge({required this.onUsau});
-
-  final bool onUsau;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final color = onUsau ? scheme.primary : scheme.error;
-    return _Badge(
-      icon: onUsau ? Icons.check_circle : Icons.error_outline,
-      label: onUsau ? 'On USAU' : 'Not on USAU',
-      color: color,
     );
   }
 }

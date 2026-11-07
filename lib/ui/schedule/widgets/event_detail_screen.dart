@@ -166,7 +166,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   List<Widget> _details(TeamEvent e) => [
     EventHeader(event: e),
-    if (vm.tournament case final t?) ...[
+    if (e.tournamentId case final id?) ...[
+      const SizedBox(height: 12),
+      FilledButton.icon(
+        onPressed: () => _open(Routes.tournament(id)),
+        icon: const Icon(Icons.emoji_events_outlined),
+        label: const Text('Open tournament page'),
+      ),
+    ] else if (vm.tournament case final t?) ...[
       const SizedBox(height: 12),
       FilledButton.icon(
         onPressed: () => _open(Routes.groupTournament(vm.teamId, t.id)),

@@ -40,8 +40,7 @@ What a rollback doesn't undo:
    Prod deploys and rollbacks then wait for your approval.
 4. Optional: the variable `FUNCTION_GROUPS` overrides which function groups
    deploy. The default is
-   `account,api,communities,discord,follows,meetings,notifications`. The
-   USA Ultimate scrapers are never deployed by these workflows.
+   `account,api,communities,discord,follows,meetings,notifications`.
 
 ## App: kill switches in `meta/flags`
 

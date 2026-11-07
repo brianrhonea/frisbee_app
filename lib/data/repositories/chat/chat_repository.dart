@@ -76,7 +76,17 @@ abstract class ChatRepository {
     required AppUser author,
     required String text,
     List<NewAttachment> attachments = const [],
+    MessageReply? replyTo,
   });
+
+  /// Sets [uid]'s reaction to message [messageId]; null takes it away.
+  Future<Result<void>> setReaction(
+    String teamId,
+    String roomId,
+    String messageId,
+    String uid,
+    String? emoji,
+  );
 
   /// Deletes the message and its attachments.
   Future<Result<void>> deleteMessage(

@@ -30,10 +30,17 @@ class FollowRepositoryFirebase implements FollowRepository {
   @override
   Stream<List<Follow>> watchFollows(String uid) => _shared.get(
     'follows/$uid',
-    () => countedSnapshots(
-      _follows(uid).orderBy('createdAt', descending: true),
-      'follows',
-    ).map((s) => [for (final d in s.docs) Follow.fromMap(plainData(d.data()))]),
+    () =>
+        countedSnapshots(
+          _follows(uid).orderBy('createdAt', descending: true),
+          'follows',
+        ).map(
+          (s) => [
+            for (final d in s.docs)
+              if (plainData(d.data()) case final m when Follow.isKnown(m))
+                Follow.fromMap(m),
+          ],
+        ),
   );
 
   /// From the shared list of [uid]'s follows, so every Follow button on

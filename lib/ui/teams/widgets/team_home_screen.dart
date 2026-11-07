@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -29,7 +31,6 @@ import 'team_form.dart';
 import 'team_post_widgets.dart';
 import 'team_community_sheet.dart';
 import 'team_section_screen.dart';
-import 'team_usau_card.dart';
 
 enum _MenuAction { edit, community, leave, delete }
 
@@ -79,7 +80,34 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     super.dispose();
   }
 
+  /// The "Deleting…" dialog, while it's up.
+  NavigatorState? _deleting;
+
+  void _closeDeleting() {
+    _deleting?.pop();
+    _deleting = null;
+  }
+
+  /// Deleting takes a while: a dialog nobody can dismiss shows each step,
+  /// so it's clear the app is working rather than stuck.
+  void _showDeleting(String name) {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    _deleting = navigator;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        useRootNavigator: true,
+        barrierDismissible: false,
+        builder: (_) => PopScope(
+          canPop: false,
+          child: _DeletingDialog(viewModel: vm, name: name),
+        ),
+      ),
+    );
+  }
+
   void _onCommand() {
+    if (!vm.deleteTeam.running && _deleting != null) _closeDeleting();
     if (vm.leaveTeam.completed || vm.deleteTeam.completed) {
       vm.leaveTeam.clearResult();
       vm.deleteTeam.clearResult();
@@ -217,6 +245,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           confirmLabel: 'Delete',
           destructive: true,
         )) {
+          if (!mounted) return;
+          _showDeleting(team.name);
           vm.deleteTeam.execute();
         }
     }
@@ -383,7 +413,6 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 ],
                 side: [
                   ..._events(context),
-                  ?_usau(),
                   ..._tournaments(context),
                   _details(summary),
                 ],
@@ -391,7 +420,6 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                   _about(summary),
                   if (!vm.isMember) _joinCard(summary),
                   ..._events(context),
-                  ?_usau(),
                   ..._tournaments(context),
                   if (team != null) _MembersCard(team: team),
                   ..._posts(context),
@@ -426,13 +454,6 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       ],
     );
   }
-
-  /// Ranking, record and schedule from the linked USA Ultimate page, for
-  /// everyone; null when the team isn't linked.
-  Widget? _usau() => switch (vm.usau) {
-    final usau? => TeamUsauCard(viewModel: usau),
-    null => null,
-  };
 
   Widget _about(TeamListing summary) {
     final c = AppColors.of(context);
@@ -1410,4 +1431,50 @@ class _PublicEventSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Shown while a team is deleted: a progress bar and the step it's on.
+class _DeletingDialog extends StatelessWidget {
+  const _DeletingDialog({required this.viewModel, required this.name});
+
+  final TeamHomeViewModel viewModel;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: viewModel,
+    builder: (context, _) {
+      final p = viewModel.deleteProgress;
+      final value = p == null || p.total == 0 ? null : p.done / p.total;
+      return AlertDialog(
+        title: Text('Deleting $name'),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(value: value, minHeight: 8),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                [
+                  p?.step ?? 'Getting ready',
+                  if (value != null) '${(value * 100).round()}%',
+                ].join(' · '),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'This can take a minute. Keep the app open until it '
+                'finishes.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }

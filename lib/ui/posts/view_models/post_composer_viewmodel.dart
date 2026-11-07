@@ -34,8 +34,7 @@ class PostComposerViewModel extends ChangeNotifier {
         followRepository.watchFollows(uid).listen((f) {
           _tournaments = [
             for (final x in f)
-              if (x.type == FollowType.tournament || x.type == FollowType.event)
-                x.target,
+              if (x.type == FollowType.tournament) x.target,
           ];
           notifyListeners();
         }, onError: (Object _) {}),

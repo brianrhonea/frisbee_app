@@ -151,7 +151,7 @@ void main() {
     },
   );
 
-  testWidgets('the new group screen picks people and names the group', (
+  testWidgets('new message: one person is a chat, several make a group', (
     tester,
   ) async {
     final vm = picker();
@@ -161,19 +161,32 @@ void main() {
         home: GroupMembersScreen(viewModel: vm),
       ),
     );
-    expect(find.text('New group'), findsOneWidget);
+    expect(find.text('New message'), findsOneWidget);
     expect(
-      find.text('You can add people who follow you. 9 more can join.'),
+      find.text(
+        'Pick one person to message them, or several to start a group.',
+      ),
       findsOneWidget,
     );
+    expect(find.text('Group name (optional)'), findsNothing);
     await tester.enterText(find.byType(TextField).last, 'sam');
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
     await tester.tap(find.text('Sam Lee'));
     await tester.pump();
     expect(find.byType(InputChip), findsOneWidget);
+    expect(find.text('Chat'), findsOneWidget);
+    expect(find.text('Group name (optional)'), findsNothing);
+    await tester.enterText(find.byType(TextField).last, 'jo');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    await tester.tap(find.text('Jo Park'));
+    await tester.pump();
+    expect(find.byType(InputChip), findsNWidgets(2));
+    expect(find.text('Create group'), findsOneWidget);
+    expect(find.text('Group name (optional)'), findsOneWidget);
     expect(
-      find.text('You can add people who follow you. 8 more can join.'),
+      find.text('You can add people who follow you. 7 more can join.'),
       findsOneWidget,
     );
   });

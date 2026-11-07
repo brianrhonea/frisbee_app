@@ -373,9 +373,7 @@ void main() {
       expect(find.text("Don't miss a point"), findsNothing);
     });
 
-    testWidgets('on a phone the sections are along the bottom', (
-      tester,
-    ) async {
+    testWidgets('on a phone the sections are along the bottom', (tester) async {
       auth = FakeAuthRepository();
       await pump(tester, Routes.community, size: const Size(390, 800));
       expect(find.byType(NavigationBar), findsOneWidget);

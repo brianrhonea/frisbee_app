@@ -11,7 +11,6 @@ void main() {
     test('keys match firestore.rules and the Cloud Functions', () {
       expect(const FollowTarget.user('u1', 'Sam').key, 'user_u1');
       expect(const FollowTarget.team('t1', 'Hawks').key, 'team_t1');
-      expect(const FollowTarget.event('123', 'Nationals').key, 'event_123');
       expect(
         const FollowTarget.tournament('g1', 'x1', 'Fall Hat').key,
         'tournament_g1_x1',
@@ -38,6 +37,11 @@ void main() {
       expect(back.target.id, 'x1');
       expect(back.target.groupId, 'g1');
       expect(back.notify, isTrue);
+    });
+
+    test('skips follows of types the app no longer has', () {
+      expect(Follow.isKnown({'type': 'team'}), isTrue);
+      expect(Follow.isKnown({'type': 'event'}), isFalse);
     });
 
     test('names are capped like the rules', () {

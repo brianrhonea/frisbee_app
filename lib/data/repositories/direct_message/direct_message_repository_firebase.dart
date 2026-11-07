@@ -372,6 +372,7 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
     required AppUser author,
     required String text,
     List<NewAttachment> attachments = const [],
+    MessageReply? replyTo,
   }) => guard(
     () => muteAware(_db, author.uid, () async {
       for (final a in attachments) {
@@ -395,6 +396,7 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
                 'text': text.trim(),
                 'attachments': [for (final a in uploaded) a.toMap()],
                 'createdAt': FieldValue.serverTimestamp(),
+                'replyTo': ?replyTo?.toMap(),
               })
               ..update(_conversations.doc(id), {
                 'lastMessage': messagePreview(
@@ -424,6 +426,18 @@ class DirectMessageRepositoryFirebase implements DirectMessageRepository {
         await _files.delete(message.attachments.map((a) => a.path));
         await _messages(id).doc(message.id).delete();
       });
+
+  @override
+  Future<Result<void>> setReaction(
+    String id,
+    String messageId,
+    String uid,
+    String? emoji,
+  ) => guard(
+    () => _messages(
+      id,
+    ).doc(messageId).update({'reactions.$uid': emoji ?? FieldValue.delete()}),
+  );
 
   @override
   Future<Result<void>> markRead(

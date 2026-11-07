@@ -10,13 +10,10 @@ import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/profile/profile_repository.dart';
-import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
-import 'package:frisbee_app/data/repositories/tournament/tournament_repository.dart';
-import 'package:frisbee_app/data/repositories/usau_schedule/usau_schedule_repository.dart';
 import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/data/services/image_compressor.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
@@ -28,14 +25,12 @@ import 'package:frisbee_app/domain/models/invite_code.dart';
 import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/player_profile.dart';
-import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/stats.dart';
+import 'package:frisbee_app/domain/models/team_name.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/team_post.dart';
-import 'package:frisbee_app/domain/models/tournament.dart';
-import 'package:frisbee_app/domain/models/usau_schedule.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 const testUser = AppUser(uid: 'u1', email: 'a@b.com', displayName: 'Alex');
@@ -355,7 +350,8 @@ class FakeTeamRepository implements TeamRepository {
     Set<String> roles,
   ) async {
     final made = await createTeam(team.inCommunity(org), owner);
-    final id = (made as Ok<String>).value;
+    if (made is! Ok<String>) return made;
+    final id = made.value;
     final o = teams[org.id]!;
     teams[org.id] = o.copyWith(
       linkedTeams: {
@@ -486,6 +482,9 @@ class FakeTeamRepository implements TeamRepository {
 
   @override
   Future<Result<String>> createTeam(NewTeam team, AppUser owner) async {
+    if (_nameTaken(team.name, team.kind, team.division) case final e?) {
+      return Result.error(e);
+    }
     final id = 't${teams.length + 1}';
     teams[id] = Team(
       id: id,
@@ -647,6 +646,10 @@ class FakeTeamRepository implements TeamRepository {
 
   @override
   Future<Result<void>> updateTeam(Team team) async {
+    if (_nameTaken(team.name, team.kind, team.division, team.id)
+        case final e?) {
+      return Result.error(e);
+    }
     teams[team.id] = team;
     listings[team.id] = TeamListing.of(team);
     _emit();
@@ -655,6 +658,28 @@ class FakeTeamRepository implements TeamRepository {
 
   /// The public team directory; teams appear here only once listed.
   final listings = <String, TeamListing>{};
+
+  /// As the Firebase repository: names are unique per kind (and division).
+  TeamNameTakenException? _nameTaken(
+    String name,
+    TeamKind kind,
+    Division division, [
+    String? excludeId,
+  ]) {
+    // The real directory lists every team, not just groups.
+    for (final l in teams.values.map(TeamListing.of)) {
+      if (teamNameClashes(
+        l,
+        name: name,
+        kind: kind,
+        division: division,
+        excludeId: excludeId,
+      )) {
+        return TeamNameTakenException(l.name, kind, division);
+      }
+    }
+    return null;
+  }
 
   /// Teams whose listing was (re)published.
   final published = <String>[];
@@ -809,47 +834,22 @@ class FakeTeamRepository implements TeamRepository {
   }
 
   @override
-  Future<Result<void>> deleteTeam(Team team) async {
+  Future<Result<void>> deleteTeam(
+    Team team, {
+    void Function(DeleteProgress progress)? onProgress,
+  }) async {
+    for (var i = 0; i < 3; i++) {
+      onProgress?.call((done: i, total: 3, step: 'Deleting step $i'));
+      await deleteGate?.future;
+    }
     teams.remove(team.id);
     _emit();
     return const Result.ok(null);
   }
 
-  final syncs = <List<RosterPlayer>>[];
-
-  @override
-  Future<Result<void>> linkUsauTeam(
-    String teamId, {
-    String? url,
-    String? name,
-  }) async {
-    final t = teams[teamId];
-    if (t == null) return Result.error(Exception('No team'));
-    teams[teamId] = Team(
-      id: t.id,
-      name: t.name,
-      division: t.division,
-      level: t.level,
-      city: t.city,
-      ownerId: t.ownerId,
-      members: t.members,
-      memberNames: t.memberNames,
-      statKeepers: t.statKeepers,
-      usauUrl: url,
-      usauName: url == null ? null : name,
-    );
-    _emit();
-    return const Result.ok(null);
-  }
-
-  @override
-  Future<Result<void>> applyRosterSync(
-    String teamId,
-    List<RosterPlayer> players,
-  ) async {
-    syncs.add(players);
-    return const Result.ok(null);
-  }
+  /// Holds deleteTeam at each step until completed, for tests that watch
+  /// its progress.
+  Completer<void>? deleteGate;
 
   final _rosterChanges = StreamController<void>.broadcast();
 
@@ -895,7 +895,6 @@ class FakeTeamRepository implements TeamRepository {
                 number: p.number,
                 position: p.position,
                 userId: uid,
-                onUsau: p.onUsau,
                 paid: p.paid,
               )
             : p,
@@ -945,42 +944,6 @@ class FakePlayRepository implements PlayRepository {
   }
 }
 
-class FakeTournamentRepository implements TournamentRepository {
-  FakeTournamentRepository(this.tournaments);
-
-  final List<Tournament> tournaments;
-
-  @override
-  Stream<List<Tournament>> watchTournaments() => Stream.value(tournaments);
-}
-
-class FakeUsauScheduleRepository implements UsauScheduleRepository {
-  FakeUsauScheduleRepository({this.schedules = const {}});
-
-  /// Each division's schedule; a division mapped to null fails to load.
-  final Map<UsauDivision, UsauDivisionSchedule?> schedules;
-  final requests = <(UsauDivision, bool)>[];
-
-  /// When set, schedule loads wait for it to complete.
-  Completer<void>? hold;
-
-  @override
-  Future<Result<List<UsauDivision>>> getDivisions(String eventUrl) async =>
-      Result.ok(schedules.keys.toList());
-
-  @override
-  Future<Result<UsauDivisionSchedule>> getSchedule(
-    String eventUrl,
-    UsauDivision division, {
-    bool refresh = false,
-  }) async {
-    requests.add((division, refresh));
-    await hold?.future;
-    final s = schedules[division];
-    return s == null ? Result.error(Exception('No schedule')) : Result.ok(s);
-  }
-}
-
 Team teamWith(
   Map<String, TeamRole> members, {
   String id = 't1',
@@ -994,15 +957,6 @@ Team teamWith(
   ownerId: members.entries.firstWhere((e) => e.value == TeamRole.owner).key,
   members: members,
 );
-
-class FakeRankingRepository implements RankingRepository {
-  FakeRankingRepository(this.divisions);
-
-  final List<RankingDivision> divisions;
-
-  @override
-  Stream<List<RankingDivision>> watchDivisions() => Stream.value(divisions);
-}
 
 class FakeEventRepository implements EventRepository {
   final events = <String, TeamEvent>{};
@@ -1410,6 +1364,7 @@ class FakeChatRepository implements ChatRepository {
     required AppUser author,
     required String text,
     List<NewAttachment> attachments = const [],
+    MessageReply? replyTo,
   }) async {
     if (sendError case final e?) return Result.error(e);
     final list = messages.putIfAbsent(roomId, () => []);
@@ -1421,6 +1376,7 @@ class FakeChatRepository implements ChatRepository {
         authorName: author.label,
         text: text.trim(),
         createdAt: DateTime(2026, 10, 30, 12, list.length),
+        replyTo: replyTo,
         attachments: [
           for (final (i, a) in attachments.indexed)
             ChatAttachment(
@@ -1435,6 +1391,22 @@ class FakeChatRepository implements ChatRepository {
     for (final (i, a) in attachments.indexed) {
       files['$roomId/$id/$i'] = a.bytes;
     }
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> setReaction(
+    String teamId,
+    String roomId,
+    String messageId,
+    String uid,
+    String? emoji,
+  ) async {
+    final list = messages[roomId];
+    final i = list?.indexWhere((m) => m.id == messageId) ?? -1;
+    if (i < 0) return Result.error(Exception('No such message'));
+    list![i] = list[i].withReaction(uid, emoji);
     emit();
     return const Result.ok(null);
   }
@@ -1758,6 +1730,7 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
     required AppUser author,
     required String text,
     List<NewAttachment> attachments = const [],
+    MessageReply? replyTo,
   }) async {
     final list = messages.putIfAbsent(id, () => []);
     final at = DateTime(2026, 10, 30, 12, list.length);
@@ -1778,6 +1751,7 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
             ),
         ],
         createdAt: at,
+        replyTo: replyTo,
       ),
     );
     final c = conversations[id]!;
@@ -1787,6 +1761,21 @@ class FakeDirectMessageRepository implements DirectMessageRepository {
       lastSenderId: author.uid,
       readAt: {...c.readAt, author.uid: at},
     );
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> setReaction(
+    String id,
+    String messageId,
+    String uid,
+    String? emoji,
+  ) async {
+    final list = messages[id];
+    final i = list?.indexWhere((m) => m.id == messageId) ?? -1;
+    if (i < 0) return Result.error(Exception('No such message'));
+    list![i] = list[i].withReaction(uid, emoji);
     emit();
     return const Result.ok(null);
   }
@@ -1972,7 +1961,38 @@ class FakeNotificationRepository implements NotificationRepository {
   @override
   Future<void> markSeen(String uid, String collapseId) async {
     seen.add(collapseId);
-    await markRead(uid, [collapseId]);
+    await delete(uid, [collapseId]);
+  }
+
+  final clearedRoutes = <String>[];
+
+  @override
+  Future<void> clearRoute(String uid, String route) async {
+    clearedRoutes.add(route);
+    await delete(uid, [
+      for (final n in feed)
+        if (n.route == route) n.id,
+    ]);
+  }
+
+  @override
+  Future<Result<void>> setConversationMuted(
+    String uid,
+    String conversationId, {
+    required bool muted,
+  }) async {
+    final key = NotificationPreferences.conversationKey(conversationId);
+    prefs = NotificationPreferences(
+      categories: prefs.categories,
+      teams: prefs.teams,
+      mutedRooms: {
+        for (final r in prefs.mutedRooms)
+          if (r != key) r,
+        if (muted) key,
+      },
+    );
+    emit();
+    return const Result.ok(null);
   }
 
   @override

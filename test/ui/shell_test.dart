@@ -25,15 +25,6 @@ void main() {
     expect(links('/explore'), [null], reason: "you're already there");
 
     // Pages opened from Explore lead back to it.
-    expect(labels('/tournaments'), ['Explore', 'Events']);
-    expect(links('/tournaments'), [Routes.explorePath, null]);
-    expect(labels('/tournaments/x1'), ['Explore', 'Events', 'Event']);
-    expect(links('/tournaments/x1'), [
-      Routes.explorePath,
-      Routes.tournaments,
-      null,
-    ]);
-    expect(labels('/rankings/team'), ['Explore', 'Rankings', 'Team']);
     expect(labels('/players/u2'), ['Explore', 'Player']);
 
     expect(labels('/teams/t1'), ['My teams', 'Cascades']);

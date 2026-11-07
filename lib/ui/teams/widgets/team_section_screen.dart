@@ -12,6 +12,8 @@ import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../../group_tournaments/view_models/group_tournaments_viewmodel.dart';
 import '../../group_tournaments/widgets/group_tournaments_tab.dart';
+import '../../tournaments/view_models/hosted_tournaments_viewmodel.dart';
+import '../../tournaments/widgets/hosted_tournaments_list.dart';
 import '../../playbook/widgets/playbook_tab.dart';
 import '../../schedule/widgets/team_events_tab.dart';
 import '../../stats/view_models/stats_viewmodel.dart';
@@ -56,13 +58,12 @@ enum TeamSection {
   };
 
   /// Sections a team or community group has, in display order. Groups
-  /// don't keep a roster, plays, videos or stats; only they run
+  /// don't keep a roster, plays, videos or stats. Any of them can host
   /// tournaments.
   static List<TeamSection> forKind(TeamKind kind) => switch (kind) {
-    TeamKind.team =>
-      values.where((s) => s != tournaments && s != teams).toList(),
+    TeamKind.team => values.where((s) => s != teams).toList(),
     TeamKind.community => const [events, chat, tournaments, members],
-    TeamKind.organization => const [teams, events, chat, members],
+    TeamKind.organization => const [teams, events, chat, tournaments, members],
   };
 
   /// "Team Events" is just "Events" in a group or community.
@@ -170,13 +171,27 @@ class _TeamSectionBodyState extends State<TeamSectionBody> {
       builder: (_, statsVm) => StatsTab(viewModel: statsVm),
     ),
     TeamSection.tournaments => ViewModelHost(
-      create: (c) => GroupTournamentsViewModel(
-        groupId: vm.teamId,
-        teamRepository: c.read(),
+      create: (c) => HostedTournamentsViewModel(
+        hostId: vm.teamId,
         tournamentRepository: c.read(),
+        teamRepository: c.read(),
         authRepository: c.read(),
       ),
-      builder: (_, tvm) => GroupTournamentsTab(viewModel: tvm),
+      builder: (_, hosted) => vm.team?.kind != TeamKind.community
+          ? HostedTournamentsSection(viewModel: hosted)
+          // Groups also run hat tournaments, with teams made from RSVPs.
+          : ViewModelHost(
+              create: (c) => GroupTournamentsViewModel(
+                groupId: vm.teamId,
+                teamRepository: c.read(),
+                tournamentRepository: c.read(),
+                authRepository: c.read(),
+              ),
+              builder: (_, hat) => HostedTournamentsSection(
+                viewModel: hosted,
+                footer: [HatTournamentsList(viewModel: hat)],
+              ),
+            ),
     ),
     TeamSection.members => MembersTab(viewModel: vm),
     TeamSection.teams => ViewModelHost(

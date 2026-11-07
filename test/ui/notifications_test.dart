@@ -192,14 +192,14 @@ void main() {
       expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
     });
 
-    testWidgets('tapping an entry marks it read and opens it', (tester) async {
+    testWidgets('tapping an entry opens it and clears it', (tester) async {
       final repo = await pump(tester, [note('a', route: '/target')]);
       expect(find.text('Title a'), findsOneWidget);
       expect(find.text('Mark all read'), findsOneWidget);
       await tester.tap(find.text('Title a'));
       await tester.pumpAndSettle();
       expect(find.text('Target page'), findsOneWidget);
-      expect(repo.feed.single.read, isTrue);
+      expect(repo.feed, isEmpty);
     });
   });
 

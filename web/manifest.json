@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#0e1310",
     "theme_color": "#0e1310",
-    "description": "Search players, teams, pickup groups, events and rankings for ultimate frisbee.",
+    "description": "Search players, teams, pickup groups and events for ultimate frisbee.",
     "prefer_related_applications": false,
     "icons": [
         {

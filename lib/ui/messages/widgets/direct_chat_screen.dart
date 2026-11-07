@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../domain/models/direct_message.dart';
 import '../../../utils/command.dart';
 import '../../../routing/routes.dart';
@@ -43,6 +44,7 @@ class DirectChatScreen extends StatelessWidget {
           create: (c) => InboxViewModel(
             directMessageRepository: c.read(),
             authRepository: c.read(),
+            notificationRepository: c.read<NotificationRepository?>(),
           ),
           builder: (context, inbox) => Scaffold(
             appBar: AppBar(title: const Text('Messages')),
@@ -396,7 +398,7 @@ class _MembersSheet extends StatelessWidget {
                       ? null
                       : () {
                           Navigator.pop(context);
-                          context.push(Routes.player(m.uid));
+                          context.push(Routes.personOver(m.uid));
                         },
                   trailing: vm.canRemove(m.uid)
                       ? TextButton(

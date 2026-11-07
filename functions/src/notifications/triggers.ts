@@ -1,5 +1,5 @@
 // Notification triggers, exported as the `notifications` group so they can
-// be deployed without the USA Ultimate functions:
+// be deployed on their own:
 //   firebase deploy --only functions:notifications
 
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
@@ -80,7 +80,14 @@ export const chatMessage = onDocumentCreated(
       getFirestore(),
       getMessaging(),
       recipients,
-      chatNotice({ teamId, roomId, teamName: teamName(team), roomName: roomData.name || "Chat", message }),
+      chatNotice({
+        teamId,
+        roomId,
+        teamName: teamName(team),
+        roomName: roomData.name || "Chat",
+        message,
+        messageId: event.params.messageId,
+      }),
     );
   },
 );
@@ -95,7 +102,12 @@ export const directMessage = onDocumentCreated(
     const conversation = (await getFirestore().doc(`conversations/${conversationId}`).get()).data();
     const to = directMessageRecipients(conversation, String(message.authorId ?? ""));
     if (to.direct.length) {
-      await deliver(getFirestore(), getMessaging(), to.direct, directMessageNotice({ conversationId, message, conversation }));
+      await deliver(
+        getFirestore(),
+        getMessaging(),
+        to.direct,
+        directMessageNotice({ conversationId, message, conversation, messageId: event.params.messageId }),
+      );
     }
     if (to.requests.length) {
       await deliver(getFirestore(), getMessaging(), to.requests, messageRequestNotice({ message }));

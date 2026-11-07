@@ -19,6 +19,7 @@ class DirectChatViewModel extends MessageThreadViewModel {
     required super.filePicker,
     super.peopleRepository,
     super.notificationRepository,
+    super.draftRepository,
   }) : _dms = directMessageRepository {
     accept = Command0<void>(
       () => _dms.answerRequest(conversationId, uid, accept: true),
@@ -239,17 +240,31 @@ class DirectChatViewModel extends MessageThreadViewModel {
   Future<Result<List<ChatMessage>>> fetchOlder(ChatMessage before, int limit) =>
       _dms.fetchOlderMessages(conversationId, before: before, limit: limit);
 
+  /// Two people talk in bubbles; a group reads like a team chat.
+  @override
+  ThreadStyle get style => isGroup ? ThreadStyle.feed : ThreadStyle.bubbles;
+
   @override
   Future<Result<void>> postMessage(
     AppUser author,
     String text,
-    List<NewAttachment> attachments,
-  ) => _dms.sendMessage(
+    List<NewAttachment> attachments, {
+    MessageReply? replyTo,
+  }) => _dms.sendMessage(
     conversationId,
     author: author,
     text: text,
     attachments: attachments,
+    replyTo: replyTo,
   );
+
+  @override
+  Future<Result<void>> setReaction(ChatMessage message, String? emoji) =>
+      _dms.setReaction(conversationId, message.id, uid, emoji);
+
+  /// A message request can be read but not answered until it's accepted.
+  @override
+  bool get canReact => !isRequest;
 
   @override
   Future<Result<void>> removeMessage(ChatMessage message) =>

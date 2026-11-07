@@ -102,6 +102,10 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Woof');
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle();
+    // The division is for good, so it's confirmed first.
+    expect(find.text('Is Open the right division?'), findsOneWidget);
+    await tester.tap(find.text('Yes, Open'));
+    await tester.pumpAndSettle();
     // No roles yet, so the owner is offered one named after the team.
     expect(
       tester

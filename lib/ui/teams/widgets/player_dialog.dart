@@ -53,7 +53,6 @@ class _PlayerDialogState extends State<PlayerDialog> {
         number: int.tryParse(_number.text),
         position: _position,
         userId: _userId,
-        onUsau: widget.initial?.onUsau,
         paid: _paid,
       ),
     );
@@ -103,7 +102,7 @@ class _PlayerDialogState extends State<PlayerDialog> {
                 value: _paid,
                 onChanged: (v) => setState(() => _paid = v ?? false),
                 title: const Text('Paid'),
-                subtitle: const Text('Dues or USA Ultimate fees received'),
+                subtitle: const Text('Dues or fees received'),
               ),
               if (widget.members.isNotEmpty) ...[
                 const SizedBox(height: 8),

@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.14  | 2026-11-06 | `development`                           |                     |
 | 0.0.13  | 2026-11-05 | `hardening/scale-and-abuse`             | `09d17af` and later |
 | 0.0.12  | 2026-11-05 | `development`                           |                     |
 | 0.0.11  | 2026-11-04 | `development`                           | `6d50dc5`–`ea081ac` |
@@ -27,6 +28,44 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.14 — Hosted tournaments; USA Ultimate data removed
+
+**Removed**
+- All USA Ultimate data and features (events, rankings, team pages and
+  search, team linking and roster sync, the `onUsau` flag, USAU event
+  follows, the Home card and the `functions/src/usau` scrapers). We don't
+  have rights to the data; see CLAUDE.md.
+
+**Added**
+- **Hosted tournaments** at `tournaments/{id}` (`HostedTournament` in
+  `lib/domain/models/hosted_tournament.dart`), with `divisions/{id}/games`,
+  `entries/{teamId}` and `payments/{teamId}`. Any team, group or
+  school/club hosts from its Tournaments section; members with Manage
+  events run it. Draft → registration → seeding → scheduled → live →
+  final. Public or invite-only; published tournaments are readable by
+  anyone signed in, payments only by managers and the team's admins.
+- Divisions (division × level, team cap, format, game rules), team
+  applications and invites with captains, accept/waitlist/decline/
+  withdraw, a recorded bid fee marked paid by hand (unpaid and overdue
+  filters), drag-to-seed, publish per division, captain score reporting,
+  results with final placements, news (public host posts tagged with the
+  tournament's follow key) and following.
+- Engine: `TournamentFormat.poolsPlacement` (pools, then brackets where
+  every team plays for a final place), `GameStage.crossover` and
+  `placement`, `GroupGame.place`, `placementsOf`, `suggestedPools` /
+  `suggestedFormat`, `scheduleFor(teams, settings)`.
+- Routes `/tournaments` (find), `/tournaments/new?host=`,
+  `/tournaments/:id`, `/tournaments/:id/edit`; Explore → **Find a
+  tournament**. Signed-in web gets the same routes; visitors sign in.
+- `firestore.rules`: `tournaments` block; game docs (both kinds) may
+  carry `place`. Index: `tournaments` (status, startsOn). Rules and
+  indexes deployed to dev.
+
+**Changed**
+- Teams and schools/clubs get a Tournaments section; groups list hat
+  tournaments under their hosted ones. Tournament follows open
+  `/tournaments/:id?host=`, which falls back to the hat tournament.
 
 ## 0.0.13 — Flood protection, paging, smaller photos, push fix
 

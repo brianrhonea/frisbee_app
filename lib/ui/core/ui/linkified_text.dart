@@ -34,10 +34,19 @@ List<(String, Uri?)> splitLinks(String text) {
 /// Selectable text whose web addresses are tappable. Stall 10's own invite
 /// links ([InviteLinks]) open in the app; others open in the browser.
 class LinkifiedText extends StatefulWidget {
-  const LinkifiedText(this.text, {super.key, this.style});
+  const LinkifiedText(
+    this.text, {
+    super.key,
+    this.style,
+    this.selectable = true,
+  });
 
   final String text;
   final TextStyle? style;
+
+  /// False draws plain text, so a long-press reaches the widget around it
+  /// (a chat message's actions, where Copy is one).
+  final bool selectable;
 
   @override
   State<LinkifiedText> createState() => _LinkifiedTextState();
@@ -78,25 +87,26 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   Widget build(BuildContext context) {
     final parts = splitLinks(widget.text);
     if (parts.every((p) => p.$2 == null)) {
-      return SelectableText(widget.text, style: widget.style);
+      return widget.selectable
+          ? SelectableText(widget.text, style: widget.style)
+          : Text(widget.text, style: widget.style);
     }
     _disposeRecognizers();
-    return SelectableText.rich(
-      TextSpan(
-        style: widget.style,
-        children: [
-          for (final (text, uri) in parts)
-            if (uri == null)
-              TextSpan(text: text)
-            else
-              TextSpan(
-                text: text,
-                style: const TextStyle(decoration: TextDecoration.underline),
-                mouseCursor: SystemMouseCursors.click,
-                recognizer: _recognizer(() => _open(uri)),
-              ),
-        ],
-      ),
+    final span = TextSpan(
+      style: widget.style,
+      children: [
+        for (final (text, uri) in parts)
+          if (uri == null)
+            TextSpan(text: text)
+          else
+            TextSpan(
+              text: text,
+              style: const TextStyle(decoration: TextDecoration.underline),
+              mouseCursor: SystemMouseCursors.click,
+              recognizer: _recognizer(() => _open(uri)),
+            ),
+      ],
     );
+    return widget.selectable ? SelectableText.rich(span) : Text.rich(span);
   }
 }

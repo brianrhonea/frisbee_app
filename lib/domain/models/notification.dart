@@ -64,7 +64,7 @@ enum NotificationCategory {
 ///
 /// [teams] holds per-team overrides: a category set there wins over
 /// [categories] for that team. [mutedRooms] silences single chat rooms
-/// (see [roomKey]).
+/// (see [roomKey]) and conversations (see [conversationKey]).
 class NotificationPreferences {
   const NotificationPreferences({
     this.categories = const {},
@@ -78,6 +78,10 @@ class NotificationPreferences {
 
   static String roomKey(String teamId, String roomId) => '$teamId/$roomId';
 
+  /// A muted conversation's entry in [mutedRooms]. Team ids are Firestore
+  /// auto ids, so they're never "dm".
+  static String conversationKey(String conversationId) => 'dm/$conversationId';
+
   bool isOn(NotificationCategory category) => categories[category] ?? true;
 
   /// Whether [category] is on for [teamId], after its override.
@@ -88,6 +92,9 @@ class NotificationPreferences {
 
   bool isRoomMuted(String teamId, String roomId) =>
       mutedRooms.contains(roomKey(teamId, roomId));
+
+  bool isConversationMuted(String conversationId) =>
+      mutedRooms.contains(conversationKey(conversationId));
 
   factory NotificationPreferences.fromMap(Map<String, dynamic> map) {
     Map<NotificationCategory, bool> parse(Object? raw) => {

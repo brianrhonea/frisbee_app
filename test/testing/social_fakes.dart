@@ -514,7 +514,7 @@ class FakePostCommentRepository implements PostCommentRepository {
   }
 }
 
-class FakePeopleRepository implements PeopleRepository {
+class FakePeopleRepository extends PeopleRepository {
   FakePeopleRepository([Iterable<UserProfile> people = const []])
     : _people = {for (final p in people) p.uid: p};
 
@@ -528,6 +528,18 @@ class FakePeopleRepository implements PeopleRepository {
   @override
   Future<UserProfile?> person(String uid) async {
     lookups.add(uid);
-    return _fetched[uid] = _people[uid];
+    final p = _fetched[uid] = _people[uid];
+    notifyListeners();
+    return p;
   }
+
+  /// Changes [p]'s listing, as if they'd edited their profile.
+  void update(UserProfile p) {
+    _people[p.uid] = p;
+    _fetched[p.uid] = p;
+    notifyListeners();
+  }
+
+  @override
+  void remember(UserProfile profile) => update(profile);
 }

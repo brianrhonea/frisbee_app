@@ -1,10 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/team.dart';
-import 'package:frisbee_app/domain/models/tournament.dart';
 import 'package:frisbee_app/ui/teams/view_models/create_team_viewmodel.dart';
 import 'package:frisbee_app/ui/teams/view_models/team_detail_viewmodel.dart';
 import 'package:frisbee_app/ui/teams/view_models/teams_viewmodel.dart';
-import 'package:frisbee_app/ui/tournaments/view_models/tournaments_viewmodel.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
@@ -299,61 +297,6 @@ void main() {
       expect(vm.team!.needsRoleMigration, isTrue);
       expect(teams.migrations, 0);
       vm.dispose();
-    });
-  });
-
-  group('TournamentsViewModel', () {
-    final now = DateTime(2026, 10, 26);
-    final list = [
-      Tournament(
-        id: 'past',
-        name: 'Fall Brawl',
-        url: '',
-        startDate: DateTime(2026, 9, 1),
-        endDate: DateTime(2026, 9, 2),
-        competitionLevel: 'Club',
-        divisions: const ['Mixed'],
-      ),
-      Tournament(
-        id: 'soon',
-        name: 'Winter Classic',
-        url: '',
-        city: 'Denver',
-        startDate: DateTime(2026, 11, 7),
-        competitionLevel: 'College',
-        divisions: const ['Women'],
-      ),
-      Tournament(
-        id: 'later',
-        name: 'Spring Fling',
-        url: '',
-        startDate: DateTime(2027, 3, 1),
-        competitionLevel: 'Club',
-        divisions: const ['Mixed', 'Men'],
-      ),
-    ];
-
-    test('filters by upcoming/past, level, division and query', () async {
-      final vm = TournamentsViewModel(
-        tournamentRepository: FakeTournamentRepository(list),
-        clock: () => now,
-      );
-      await pumpEventQueue();
-      expect(vm.tournaments.map((t) => t.id), ['soon', 'later']);
-      expect(vm.levels, ['Club', 'College']);
-      expect(vm.divisions, ['Men', 'Mixed', 'Women']);
-
-      vm.setLevel('Club');
-      expect(vm.tournaments.map((t) => t.id), ['later']);
-      vm.setLevel(null);
-
-      vm.setQuery('denver');
-      expect(vm.tournaments.map((t) => t.id), ['soon']);
-      vm.setQuery('');
-
-      vm.setDivision('Mixed');
-      vm.setShowPast(true);
-      expect(vm.tournaments.map((t) => t.id), ['past']);
     });
   });
 }

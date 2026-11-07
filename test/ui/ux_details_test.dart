@@ -85,7 +85,7 @@ void main() {
               context,
               commands: [
                 cmd('Home'),
-                cmd('Rankings'),
+                cmd('Playbook'),
                 cmd('Notification settings', keywords: 'push mute'),
               ],
             ),
@@ -96,13 +96,13 @@ void main() {
     );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(find.text('Rankings'), findsOneWidget);
+    expect(find.text('Playbook'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'mute');
     await tester.pump();
     expect(find.text('Search Stall 10 for “mute”'), findsOneWidget);
     expect(find.text('Notification settings'), findsOneWidget);
-    expect(find.text('Rankings'), findsNothing);
+    expect(find.text('Playbook'), findsNothing);
 
     // The search is first; arrow down to the match and press Enter.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
@@ -123,9 +123,9 @@ void main() {
         home: AppShortcuts(
           commands: () => [
             PaletteCommand(
-              label: 'Rankings',
+              label: 'Playbook',
               icon: Icons.circle,
-              run: (_) => ran.add('Rankings'),
+              run: (_) => ran.add('Playbook'),
             ),
           ],
           onSection: (i) => section = i,
@@ -145,13 +145,13 @@ void main() {
       await tester.pump();
       await ctrl(LogicalKeyboardKey.keyK);
       expect(find.byType(CommandPalette), findsOneWidget, reason: 'try $i');
-      await tester.enterText(find.byType(TextField), 'rank');
+      await tester.enterText(find.byType(TextField), 'play');
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       expect(find.byType(CommandPalette), findsNothing);
     }
-    expect(ran, ['Rankings', 'Rankings']);
+    expect(ran, ['Playbook', 'Playbook']);
 
     await ctrl(LogicalKeyboardKey.digit2);
     expect(section, 1);

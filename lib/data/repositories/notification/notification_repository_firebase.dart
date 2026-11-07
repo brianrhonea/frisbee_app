@@ -121,6 +121,22 @@ class NotificationRepositoryFirebase implements NotificationRepository {
   }
 
   @override
+  Future<Result<void>> setConversationMuted(
+    String uid,
+    String conversationId, {
+    required bool muted,
+  }) {
+    final key = NotificationPreferences.conversationKey(conversationId);
+    return guard(
+      () => _merge(uid, {
+        'mutedRooms': muted
+            ? FieldValue.arrayUnion([key])
+            : FieldValue.arrayRemove([key]),
+      }),
+    );
+  }
+
+  @override
   Stream<List<AppNotification>> watchFeed(String uid) => _shared.get(
     'notifications/$uid',
     () =>
@@ -142,11 +158,25 @@ class NotificationRepositoryFirebase implements NotificationRepository {
       // A notice with a collapse id is stored under it (deliver.ts).
       final ref = _feed(uid).doc(collapseId);
       final snap = await ref.get();
-      if (snap.exists && snap.data()?['read'] != true) {
-        await ref.update({'read': true});
-      }
+      if (snap.exists) await ref.delete();
     } on Exception {
       // Best effort: it's still in the notification panel to clear.
+    }
+  }
+
+  @override
+  Future<void> clearRoute(String uid, String route) async {
+    try {
+      final snap = await _feed(
+        uid,
+      ).where('route', isEqualTo: route).limit(50).get();
+      if (snap.docs.isEmpty) return;
+      for (final d in snap.docs) {
+        unawaited(_push.clearDelivered(d.id));
+      }
+      await deleteDocs(_db, [for (final d in snap.docs) d.reference]);
+    } on Exception {
+      // Best effort, as markSeen.
     }
   }
 

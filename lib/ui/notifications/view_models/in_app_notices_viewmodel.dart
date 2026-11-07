@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../domain/models/notification.dart';
+import '../../../utils/on_screen.dart';
 
 /// The small bubble shown while the app is open when a notification
 /// arrives: a new message, comment, follower and so on.
@@ -67,7 +68,7 @@ class InAppNoticesViewModel extends ChangeNotifier {
       if (n.read) continue;
       final before = seen[n.id];
       final isNew = before == null || before.read || n.count > before.count;
-      if (!isNew || _isOpen(n.route)) continue;
+      if (!isNew || _isOpen(n.route) || OnScreen.isShowing(n.id)) continue;
       _show(n);
       return;
     }
@@ -96,14 +97,14 @@ class InAppNoticesViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The bubble was tapped: where to go, after taking it down and marking
-  /// the entry read.
+  /// The bubble was tapped: where to go, after taking it down and
+  /// putting the entry away.
   String? open() {
     final n = _current;
     dismiss();
     final uid = _uid;
     if (n == null || uid == null) return null;
-    unawaited(_repo.markRead(uid, [n.id]));
+    unawaited(_repo.markSeen(uid, n.id));
     return n.route;
   }
 

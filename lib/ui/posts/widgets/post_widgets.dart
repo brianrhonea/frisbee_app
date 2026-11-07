@@ -11,7 +11,7 @@ import '../../../domain/models/workout_route.dart';
 import '../../../routing/open_link.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
-import '../../core/ui/layout.dart';
+import '../../core/ui/user_avatar.dart';
 import '../../schedule/widgets/event_style.dart';
 import '../../teams/widgets/team_post_widgets.dart';
 import '../../workouts/widgets/route_widgets.dart';
@@ -20,6 +20,7 @@ import 'post_composer.dart';
 import 'send_post_sheet.dart';
 
 export '../../core/ui/layout.dart' show PersonAvatar;
+export '../../core/ui/user_avatar.dart';
 
 enum _PostAction { edit, delete }
 
@@ -97,7 +98,8 @@ class UserPostCard extends StatelessWidget {
                         openPage(context, Routes.player(post.authorId)),
                     child: Padding(
                       padding: const EdgeInsets.all(2),
-                      child: PersonAvatar(
+                      child: UserAvatar(
+                        uid: post.authorId,
                         name: post.authorName,
                         photoUrl: post.authorPhotoUrl,
                       ),
@@ -353,7 +355,8 @@ class _EmbeddedPost extends StatelessWidget {
         children: [
           Row(
             children: [
-              PersonAvatar(
+              UserAvatar(
+                uid: post.authorId,
                 name: post.authorName,
                 photoUrl: post.authorPhotoUrl,
                 radius: 12,

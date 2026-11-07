@@ -124,8 +124,6 @@ export function listingView(listing: Data): Data {
     "description",
     "requiresApproval",
     "location",
-    "usauUrl",
-    "usauName",
   ]);
 }
 

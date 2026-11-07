@@ -40,9 +40,9 @@ class GetTheAppScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   appOnly
-                      ? 'The website has search, profiles, team pages, events '
-                            'and rankings. Chats, playbooks, meetings, stats '
-                            'and the rest live in the app.'
+                      ? 'The website has search, profiles, team pages and '
+                            'events. Chats, playbooks, meetings, stats and the '
+                            'rest live in the app.'
                       : 'Team chats, playbooks, schedules, stats and meetings '
                             'for your ultimate team, on your phone.',
                   textAlign: TextAlign.center,

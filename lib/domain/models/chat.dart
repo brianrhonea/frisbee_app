@@ -537,6 +537,59 @@ class NewAttachment {
   bool get tooLarge => size > maxBytesFor(contentType);
 }
 
+/// The message a reply answers, copied onto the reply when it's sent so it
+/// still shows if the original is deleted or not loaded.
+class MessageReply {
+  const MessageReply({
+    required this.id,
+    required this.authorId,
+    required this.authorName,
+    this.text = '',
+  });
+
+  /// [message]'s quote: its text (or what's attached), clipped.
+  factory MessageReply.of(ChatMessage message) => MessageReply(
+    id: message.id,
+    authorId: message.authorId,
+    authorName: message.authorName,
+    text: message.preview,
+  );
+
+  /// Longest quote kept; firestore.rules allows the same.
+  static const maxText = 200;
+
+  final String id;
+  final String authorId;
+  final String authorName;
+  final String text;
+
+  static MessageReply? fromMap(Object? map) {
+    if (map is! Map) return null;
+    final id = map['id'];
+    if (id is! String || id.isEmpty) return null;
+    return MessageReply(
+      id: id,
+      authorId: map['authorId'] as String? ?? '',
+      authorName: map['authorName'] as String? ?? '',
+      text: map['text'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'authorId': authorId,
+    'authorName': authorName,
+    'text': text.length > maxText ? '${text.substring(0, maxText - 1)}…' : text,
+  };
+}
+
+/// The quick reactions offered on a message, as iMessage's tapbacks.
+const quickReactions = ['❤️', '👍', '👎', '😂', '‼️', '❓'];
+
+/// How many people reacted to a message with [emoji], and whether the
+/// user is one of them.
+typedef ReactionCount = ({String emoji, int count, bool mine});
+
 class ChatMessage {
   const ChatMessage({
     required this.id,
@@ -545,7 +598,12 @@ class ChatMessage {
     this.text = '',
     this.attachments = const [],
     this.createdAt,
+    this.replyTo,
+    this.reactions = const {},
   });
+
+  /// Longest reaction stored: one emoji, possibly several code units.
+  static const maxReaction = 16;
 
   final String id;
   final String authorId;
@@ -555,6 +613,68 @@ class ChatMessage {
 
   /// Null only for a message still being written to the server.
   final DateTime? createdAt;
+
+  /// The message this one answers; null for none.
+  final MessageReply? replyTo;
+
+  /// uid → their reaction. One each, like iMessage's tapbacks; reacting
+  /// again replaces it.
+  final Map<String, String> reactions;
+
+  /// Its text, else what's attached: for quotes and previews.
+  String get preview {
+    final images =
+        attachments.isNotEmpty && attachments.every((a) => a.isImage);
+    final videos =
+        attachments.isNotEmpty && attachments.every((a) => a.isVideo);
+    final t = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (t.isNotEmpty) return t.length > 120 ? '${t.substring(0, 117)}…' : t;
+    if (attachments.isEmpty) return '';
+    if (images) return attachments.length == 1 ? '📷 Photo' : '📷 Photos';
+    if (videos) return attachments.length == 1 ? '🎬 Video' : '🎬 Videos';
+    return attachments.length == 1 ? '📎 File' : '📎 Files';
+  }
+
+  /// [uid]'s reaction, or null.
+  String? reactionOf(String uid) => reactions[uid];
+
+  /// Each reaction with how many gave it, most first (ties in the order
+  /// of [quickReactions], then first seen).
+  List<ReactionCount> reactionCounts(String uid) {
+    final counts = <String, int>{};
+    for (final r in reactions.values) {
+      counts[r] = (counts[r] ?? 0) + 1;
+    }
+    final mine = reactions[uid];
+    int rank(String e) {
+      final i = quickReactions.indexOf(e);
+      return i < 0 ? quickReactions.length : i;
+    }
+
+    final order = counts.keys.toList()
+      ..sort((a, b) {
+        final byCount = counts[b]!.compareTo(counts[a]!);
+        return byCount != 0 ? byCount : rank(a).compareTo(rank(b));
+      });
+    return [
+      for (final e in order) (emoji: e, count: counts[e]!, mine: e == mine),
+    ];
+  }
+
+  ChatMessage withReaction(String uid, String? emoji) => ChatMessage(
+    id: id,
+    authorId: authorId,
+    authorName: authorName,
+    text: text,
+    attachments: attachments,
+    createdAt: createdAt,
+    replyTo: replyTo,
+    reactions: {
+      for (final e in reactions.entries)
+        if (e.key != uid) e.key: e.value,
+      uid: ?emoji,
+    },
+  );
 
   factory ChatMessage.fromMap(String id, Map<String, dynamic> map) =>
       ChatMessage(
@@ -567,6 +687,12 @@ class ChatMessage {
             ChatAttachment.fromMap(Map<String, dynamic>.from(a as Map)),
         ],
         createdAt: parseDate(map['createdAt']),
+        replyTo: MessageReply.fromMap(map['replyTo']),
+        reactions: {
+          for (final e in ((map['reactions'] as Map?) ?? const {}).entries)
+            if (e.value is String && (e.value as String).isNotEmpty)
+              '${e.key}': e.value as String,
+        },
       );
 }
 

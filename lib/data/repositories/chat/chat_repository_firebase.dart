@@ -261,6 +261,7 @@ class ChatRepositoryFirebase implements ChatRepository {
     required AppUser author,
     required String text,
     List<NewAttachment> attachments = const [],
+    MessageReply? replyTo,
   }) => guard(
     () => muteAware(_db, author.uid, () async {
       for (final a in attachments) {
@@ -283,6 +284,7 @@ class ChatRepositoryFirebase implements ChatRepository {
           'text': text.trim(),
           'attachments': [for (final a in uploaded) a.toMap()],
           'createdAt': FieldValue.serverTimestamp(),
+          'replyTo': ?replyTo?.toMap(),
         });
       } catch (_) {
         // Don't leave files behind for a message that was never posted.
@@ -290,6 +292,20 @@ class ChatRepositoryFirebase implements ChatRepository {
         rethrow;
       }
     }),
+  );
+
+  @override
+  Future<Result<void>> setReaction(
+    String teamId,
+    String roomId,
+    String messageId,
+    String uid,
+    String? emoji,
+  ) => guard(
+    () => _messages(
+      teamId,
+      roomId,
+    ).doc(messageId).update({'reactions.$uid': emoji ?? FieldValue.delete()}),
   );
 
   @override

@@ -17,8 +17,8 @@ import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/chat/view_models/message_thread_viewmodel.dart';
 import 'package:frisbee_app/ui/chat/widgets/message_thread_view.dart';
 import 'package:frisbee_app/ui/messages/view_models/direct_chat_viewmodel.dart';
+import 'package:frisbee_app/ui/messages/view_models/group_members_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/view_models/inbox_viewmodel.dart';
-import 'package:frisbee_app/ui/messages/view_models/people_search_viewmodel.dart';
 import 'package:frisbee_app/ui/messages/widgets/direct_chat_screen.dart';
 import 'package:frisbee_app/ui/messages/widgets/inbox_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
@@ -107,19 +107,24 @@ void main() {
   InboxViewModel inbox() =>
       InboxViewModel(directMessageRepository: dms, authRepository: auth);
 
-  test('search finds people by name, not yourself, and opens a chat', () async {
-    final vm = PeopleSearchViewModel(
+  test('search finds people by name, not yourself; one picked opens a '
+      'direct chat, not a group', () async {
+    final vm = GroupMembersViewModel(
       directMessageRepository: dms,
       authRepository: auth,
     );
+    addTearDown(vm.dispose);
     await vm.search.execute('j');
     expect(vm.results, isEmpty, reason: 'too short');
     await vm.search.execute('jo');
     expect(vm.results.map((p) => p.uid), ['a', 'b']);
     await vm.search.execute('alex');
     expect(vm.noMatches, isTrue);
-    await vm.open.execute(dms.profiles.first);
-    expect((vm.open.result as Ok<String>).value, 'a_u1');
+    vm.toggle(dms.profiles.first);
+    expect(vm.makesGroup, isFalse);
+    await vm.save.execute();
+    expect((vm.save.result as Ok<GroupAdded>).value.id, 'a_u1');
+    expect(dms.conversations['a_u1']!.isGroup, isFalse);
     expect(dms.conversations['a_u1']!.names['a'], 'Avery Jones');
   });
 
@@ -763,6 +768,56 @@ void main() {
     // On a phone, back goes to Messages; no conversation panel on top.
     expect(find.byTooltip('Chats'), findsNothing);
   });
+
+  for (final (platform, strip) in [
+    (TargetPlatform.windows, true),
+    (TargetPlatform.android, false),
+  ]) {
+    testWidgets('react and reply sit at the end of each message with a '
+        'mouse, not on a phone (${platform.name})', (tester) async {
+      await dms.openConversation(
+        testUser,
+        const UserProfile(uid: 'a', name: 'Avery'),
+      );
+      await dms.sendMessage(
+        'a_u1',
+        author: const AppUser(uid: 'a', displayName: 'Avery'),
+        text: 'Pickup at 6?',
+      );
+      final vm = DirectChatViewModel(
+        conversationId: 'a_u1',
+        directMessageRepository: dms,
+        authRepository: auth,
+        filePicker: FakeFilePickerService(),
+      );
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(
+        withRepos(
+          MaterialApp(
+            theme: AppTheme.light.copyWith(platform: platform),
+            home: DirectChatScreen(viewModel: vm),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byTooltip('React'), strip ? findsOneWidget : findsNothing);
+      expect(find.byTooltip('Reply'), strip ? findsOneWidget : findsNothing);
+      if (!strip) return;
+      // Beside the bubble, on the same line, not floating over it.
+      final bubble = tester.getRect(find.text('Pickup at 6?'));
+      final react = tester.getRect(find.byTooltip('React'));
+      expect(react.left, greaterThan(bubble.right));
+      expect((react.center.dy - bubble.center.dy).abs(), lessThan(12));
+      await tester.tap(find.byTooltip('React'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('😂'));
+      await tester.pumpAndSettle();
+      expect(vm.messages.single.reactionOf(testUser.uid), '😂');
+      await tester.tap(find.byTooltip('Reply'));
+      await tester.pump();
+      expect(vm.replyingTo?.text, 'Pickup at 6?');
+    });
+  }
 
   testWidgets('on a phone, back from a conversation goes to Messages', (
     tester,

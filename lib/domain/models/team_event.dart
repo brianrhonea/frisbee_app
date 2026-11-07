@@ -123,7 +123,13 @@ class TeamEvent {
     this.createdBy,
     this.isPublic = false,
     this.audience = const {},
+    this.tournamentId,
   });
+
+  /// The hosted tournament this is, for a team the host accepted: the
+  /// server puts it on the schedule and keeps it in step (functions/src/
+  /// tournaments). Editors can't change it.
+  final String? tournamentId;
 
   /// Who sees it in a school or club community: `everyone`, or community
   /// role ids (like chat rooms). Empty on teams and groups, where every
@@ -208,6 +214,7 @@ class TeamEvent {
     createdBy: createdBy,
     isPublic: isPublic ?? this.isPublic,
     audience: audience ?? this.audience,
+    tournamentId: tournamentId,
   );
 
   factory TeamEvent.fromMap(String id, Map<String, dynamic> map) {
@@ -249,6 +256,7 @@ class TeamEvent {
       createdBy: map['createdBy'] as String?,
       isPublic: map['public'] as bool? ?? false,
       audience: {for (final a in (map['audience'] as List?) ?? const []) '$a'},
+      tournamentId: map['tournamentId'] as String?,
     );
   }
 

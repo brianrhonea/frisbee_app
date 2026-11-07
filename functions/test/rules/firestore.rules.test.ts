@@ -673,6 +673,26 @@ describe("group tournaments", () => {
 });
 
 describe("roles and removal", () => {
+  it("members read the tournaments their team entered; only the server writes them", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "tournamentEntries", "x1"), { name: "Classic", status: "applied" }),
+    );
+    const rec = (uid: string) => doc(db(uid), "teams", TEAM, "tournamentEntries", "x1");
+    await assertSucceeds(getDoc(rec(PLAYER)));
+    await assertFails(getDoc(rec(OUTSIDER)));
+    await assertFails(setDoc(rec(OWNER), { name: "Fake", status: "accepted" }));
+    await assertFails(updateDoc(rec(OWNER), { status: "accepted" }));
+    await assertFails(deleteDoc(rec(PLAYER)));
+    await assertSucceeds(deleteDoc(rec(OWNER)));
+  });
+
+  it("a team's name and level can be edited, but never its division", async () => {
+    const team = (uid: string) => doc(db(uid), "teams", TEAM);
+    await assertSucceeds(updateDoc(team(OWNER), { name: "Renamed", level: "club" }));
+    await assertFails(updateDoc(team(OWNER), { division: "open" }));
+    await assertFails(updateDoc(team(OWNER), { name: "Again", division: "women" }));
+  });
+
   it("nobody becomes a coach or captain now; the owner moves them down", async () => {
     await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));
     await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`members.${PLAYER}`]: "coach" }));
@@ -883,7 +903,7 @@ describe("roster and plays", () => {
     await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, memberId: "123" }));
   });
 
-  it("roster entries can't carry paid or USA Ultimate status", async () => {
+  it("roster entries can't carry paid or the retired USA Ultimate status", async () => {
     const ref = doc(db(OWNER), "teams", TEAM, "roster", "r1");
     await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, paid: true }));
     await assertFails(setDoc(ref, { name: "Sam", number: 7, position: "handler", userId: null, onUsau: true }));
@@ -931,7 +951,7 @@ describe("roster status", () => {
 
   beforeEach(() =>
     env.withSecurityRulesDisabled((ctx) =>
-      setDoc(doc(ctx.firestore(), "teams", TEAM, "rosterStatus", "r1"), { onUsau: true, paid: false }),
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "rosterStatus", "r1"), { paid: false }),
     ),
   );
 
@@ -950,37 +970,23 @@ describe("roster status", () => {
   });
 
   it("only admins write it, with valid fields", async () => {
-    await assertSucceeds(setDoc(status(CAPTAIN), { onUsau: false, paid: true }));
-    await assertSucceeds(setDoc(status(OWNER), { onUsau: null, paid: false }));
-    await assertFails(setDoc(status(PLAYER), { onUsau: true, paid: true }));
-    await assertFails(setDoc(status(STATS), { onUsau: true, paid: true }));
-    await assertFails(setDoc(status(COACH), { onUsau: true, paid: "yes" }));
+    await assertSucceeds(setDoc(status(CAPTAIN), { paid: true }));
+    await assertSucceeds(setDoc(status(OWNER), { paid: false }));
+    await assertFails(setDoc(status(PLAYER), { paid: true }));
+    await assertFails(setDoc(status(STATS), { paid: true }));
+    await assertFails(setDoc(status(COACH), { paid: "yes" }));
+    await assertFails(setDoc(status(COACH), { onUsau: true, paid: true }));
     await assertFails(setDoc(status(COACH), { paid: true, note: "cash" }));
     await assertFails(deleteDoc(status(PLAYER)));
     await assertSucceeds(deleteDoc(status(COACH)));
   });
 });
 
-describe("USA Ultimate link", () => {
-  const url = "https://play.usaultimate.org/teams/events/Eventteam/?TeamId=abc%3d";
-
-  it("admins link the team page; players and other sites cannot", async () => {
-    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), { usauUrl: url, usauName: "Ring" }));
-    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { usauUrl: "https://evil.example/x" }));
-    await assertSucceeds(updateDoc(doc(db(CAPTAIN), "teams", TEAM), { usauUrl: url, usauName: "Ring" }));
-    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { usauUrl: null, usauName: null, usauSyncedAt: null }));
-  });
-
-  it("a sync stamps the server time with the roster writes", async () => {
-    const fs = db(COACH);
-    await assertSucceeds(
-      writeBatch(fs)
-        .update(doc(fs, "teams", TEAM), { usauSyncedAt: serverTimestamp() })
-        .set(doc(fs, "teams", TEAM, "roster", "r9"), { name: "New", number: 12, position: "hybrid", userId: null })
-        .set(doc(fs, "teams", TEAM, "rosterStatus", "r9"), { onUsau: true, paid: false })
-        .commit(),
-    );
-    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { usauSyncedAt: new Date(2020, 1, 1) }));
+describe("USA Ultimate link (removed)", () => {
+  it("teams can't link a USA Ultimate page any more", async () => {
+    const url = "https://play.usaultimate.org/teams/events/Eventteam/?TeamId=abc%3d";
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { usauUrl: url, usauName: "Ring" }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { usauSyncedAt: serverTimestamp() }));
   });
 });
 
@@ -1444,15 +1450,10 @@ describe("team directory", () => {
     await assertSucceeds(batch.commit());
   });
 
-  it("the listing carries the team's linked USA Ultimate page, and only that", async () => {
-    const usau = { usauUrl: "https://play.usaultimate.org/teams/events/Eventteam/?TeamId=1", usauName: "Team" };
-    const fs = db(COACH);
-    const batch = writeBatch(fs);
-    batch.update(doc(fs, "teams", TEAM), usau);
-    batch.set(doc(fs, "teamDirectory", TEAM), listing(usau));
-    await assertSucceeds(batch.commit());
-    await assertFails(setDoc(ref(COACH), listing({ ...usau, usauUrl: "https://example.com/" })));
-    await assertFails(setDoc(ref(COACH), listing()));
+  it("the listing no longer carries a USA Ultimate page", async () => {
+    await assertFails(
+      setDoc(ref(COACH), listing({ usauUrl: "https://play.usaultimate.org/teams/events/Eventteam/?TeamId=1" })),
+    );
   });
 
   it("a new team lists itself in its create batch", async () => {
@@ -1548,10 +1549,14 @@ describe("stats", () => {
   });
 });
 
-describe("usau cache", () => {
+describe("meta", () => {
   it("is read-only for clients", async () => {
-    await assertSucceeds(getDoc(doc(db(PLAYER), "usau_tournaments", "x")));
-    await assertFails(setDoc(doc(db(PLAYER), "usau_tournaments", "x"), { name: "hack" }));
+    await assertSucceeds(getDoc(doc(db(PLAYER), "meta", "flags")));
+    await assertFails(setDoc(doc(db(PLAYER), "meta", "flags"), { use_api_search: true }));
+  });
+
+  it("no longer serves the USA Ultimate cache", async () => {
+    await assertFails(getDoc(doc(db(PLAYER), "usau_tournaments", "x")));
   });
 });
 
@@ -1588,6 +1593,22 @@ describe("chat", () => {
       });
     }),
   );
+
+  it("readers of a room react to its messages as themselves", async () => {
+    const m1 = (uid: string) => doc(db(uid), "teams", TEAM, "chats", "r1", "messages", "m1");
+    await assertSucceeds(updateDoc(m1(COACH), { [`reactions.${COACH}`]: "😂" }));
+    await assertSucceeds(updateDoc(m1(STATS), { [`reactions.${STATS}`]: "👍" }));
+    await assertFails(updateDoc(m1(COACH), { [`reactions.${STATS}`]: deleteField() }));
+    await assertFails(updateDoc(m1(PLAYER), { [`reactions.${PLAYER}`]: "👍" }));
+    await assertFails(updateDoc(m1(OUTSIDER), { [`reactions.${OUTSIDER}`]: "👍" }));
+    await assertFails(updateDoc(m1(COACH), { [`reactions.${COACH}`]: "😂", text: "x" }));
+  });
+
+  it("a chat reply carries a valid quote", async () => {
+    const quote = { id: "m1", authorId: CAPTAIN, authorName: "Cap", text: "Hi" };
+    await assertSucceeds(setDoc(doc(messages(CAPTAIN)), message(CAPTAIN, { replyTo: quote })));
+    await assertFails(setDoc(doc(messages(CAPTAIN)), message(CAPTAIN, { replyTo: { ...quote, id: "" } })));
+  });
 
   it("owners, coaches and captains create rooms; players cannot", async () => {
     await assertSucceeds(setDoc(roomRef(COACH, "r2"), room()));
@@ -2145,6 +2166,29 @@ describe("direct messages", () => {
     it("conversations can't be deleted", async () => {
       await assertFails(deleteDoc(conv(OWNER)));
     });
+
+    it("a reply carries a short quote of the message it answers", async () => {
+      const quote = { id: "m1", authorId: OWNER, authorName: "Olive", text: "Ride?" };
+      await assertSucceeds(setDoc(doc(msgs(PLAYER)), { ...msg(PLAYER), replyTo: quote }));
+      await assertFails(setDoc(doc(msgs(PLAYER)), { ...msg(PLAYER), replyTo: { ...quote, text: "x".repeat(201) } }));
+      await assertFails(setDoc(doc(msgs(PLAYER)), { ...msg(PLAYER), replyTo: { ...quote, extra: 1 } }));
+      await assertFails(setDoc(doc(msgs(PLAYER)), { ...msg(PLAYER), replyTo: "m1" }));
+    });
+
+    it("participants react as themselves, and change nothing else", async () => {
+      await env.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "conversations", CONV, "messages", "m1"), {
+          ...msg(OWNER), createdAt: new Date(), reactions: { [OWNER]: "👍" },
+        }),
+      );
+      const m1 = (uid: string) => doc(db(uid), "conversations", CONV, "messages", "m1");
+      await assertSucceeds(updateDoc(m1(PLAYER), { [`reactions.${PLAYER}`]: "❤️" }));
+      await assertSucceeds(updateDoc(m1(PLAYER), { [`reactions.${PLAYER}`]: deleteField() }));
+      await assertFails(updateDoc(m1(PLAYER), { [`reactions.${OWNER}`]: deleteField() }));
+      await assertFails(updateDoc(m1(PLAYER), { [`reactions.${PLAYER}`]: "x".repeat(17) }));
+      await assertFails(updateDoc(m1(PLAYER), { [`reactions.${PLAYER}`]: "❤️", text: "Edited" }));
+      await assertFails(updateDoc(m1(COACH), { [`reactions.${COACH}`]: "❤️" }));
+    });
   });
 
   describe("a message request", () => {
@@ -2617,19 +2661,20 @@ describe("follows", () => {
     ...extra,
   });
 
-  it("lets people follow users, teams, tournaments and events", async () => {
+  it("lets people follow users, teams and tournaments", async () => {
     await assertSucceeds(setDoc(ref(PLAYER, "user_u2"), follow("user", "u2", { photoUrl: "https://x.org/a.png" })));
     await assertSucceeds(setDoc(ref(PLAYER, `team_${TEAM}`), follow("team", TEAM, { notify: true })));
     await assertSucceeds(
       setDoc(ref(PLAYER, "tournament_g1_t1"), follow("tournament", "g1_t1", { groupId: "g1" })),
     );
-    await assertSucceeds(setDoc(ref(PLAYER, "event_123"), follow("event", "123")));
   });
 
   it("keeps follows private and well-formed", async () => {
     await assertFails(setDoc(ref(OUTSIDER, "team_x", PLAYER), follow("team", "x")));
     await assertFails(setDoc(ref(PLAYER, "team_x"), follow("team", "y")));
     await assertFails(setDoc(ref(PLAYER, "page_x"), follow("page", "x")));
+    // USA Ultimate events can't be followed any more.
+    await assertFails(setDoc(ref(PLAYER, "event_123"), follow("event", "123")));
     await assertFails(setDoc(ref(PLAYER, `user_${PLAYER}`), follow("user", PLAYER)));
     await assertFails(setDoc(ref(PLAYER, "tournament_g1_t1"), follow("tournament", "g1_t1")));
     await assertFails(setDoc(ref(PLAYER, "tournament_g1_t1"), follow("tournament", "g1_t1", { groupId: "g2" })));
@@ -2705,8 +2750,9 @@ describe("user posts", () => {
     await assertFails(setDoc(ref(PLAYER), post(PLAYER, { pinned: true })));
     await assertFails(setDoc(ref(PLAYER), post(PLAYER, { createdAt: new Date("2020-01-01") })));
     await assertSucceeds(
-      setDoc(ref(PLAYER), post(PLAYER, { tournamentKey: "event_123", tournamentName: "Nationals" })),
+      setDoc(ref(PLAYER), post(PLAYER, { tournamentKey: "tournament_g1_t1", tournamentName: "Fall Hat" })),
     );
+    await assertFails(setDoc(ref(PLAYER, "p3"), post(PLAYER, { tournamentKey: "event_123" })));
     await assertFails(setDoc(ref(PLAYER, "p2"), post(PLAYER, { tournamentKey: "team_x" })));
   });
 
@@ -3347,6 +3393,216 @@ describe("school and club communities", () => {
     await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), leave));
     await assertSucceeds(
       updateDoc(doc(db(PLAYER), "teams", TEAM), { ...leave, orgMembers: arrayRemove(PLAYER) }),
+    );
+  });
+});
+
+describe("hosted tournaments", () => {
+  const HOST = "host1";
+  const DIRECTOR = "director";
+  const HOST_MEMBER = "hostMember";
+  const T = "x1";
+  const DIV = "d1";
+  const tRef = (uid: string, id = T) => doc(db(uid), "tournaments", id);
+  const divRef = (uid: string) => doc(db(uid), "tournaments", T, "divisions", DIV);
+  const entryRef = (uid: string, teamId = TEAM) => doc(db(uid), "tournaments", T, "entries", teamId);
+  const payRef = (uid: string, teamId = TEAM) => doc(db(uid), "tournaments", T, "payments", teamId);
+  const gameRef = (uid: string, id: string) => doc(db(uid), "tournaments", T, "divisions", DIV, "games", id);
+
+  const tournament = (extra: Record<string, unknown> = {}) => ({
+    hostId: HOST,
+    hostName: "Denver Ultimate",
+    hostKind: "community",
+    name: "Spring Fling",
+    startsOn: new Date(2027, 4, 1),
+    endsOn: null,
+    description: "",
+    location: "City Park",
+    visibility: "public",
+    entryType: "teams",
+    status: "registration",
+    bidFee: { amountCents: 25000, currency: "USD", instructions: "Venmo", dueAt: null },
+    divisions: [{ id: DIV, division: "mixed", level: "club" }],
+    createdBy: DIRECTOR,
+    createdAt: new Date(2026, 10, 1),
+    ...extra,
+  });
+  const division = (extra: Record<string, unknown> = {}) => ({
+    division: "mixed",
+    level: "club",
+    settings: {},
+    maxTeams: 8,
+    seeds: [TEAM, "team2"],
+    captains: { [TEAM]: [CAPTAIN], team2: ["cap2"] },
+    placements: [],
+    ...extra,
+  });
+  const entry = (extra: Record<string, unknown> = {}) => ({
+    teamName: "Team",
+    divisionId: DIV,
+    status: "applied",
+    captainIds: [CAPTAIN],
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const game = (extra: Record<string, unknown> = {}) => ({
+    order: 1, stage: "pool", round: 1, label: "Pool A, round 1", pool: "A", field: 1,
+    startsAt: null, teamA: TEAM, teamB: "team2", sourceA: null, sourceB: null,
+    status: "scheduled", scoreA: null, scoreB: null, report: null, ifNeeded: false,
+    ...extra,
+  });
+
+  const seed = (t: Record<string, unknown> = {}) =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "tournaments", T), tournament(t));
+      await setDoc(doc(fs, "tournaments", T, "divisions", DIV), division());
+    });
+
+  beforeEach(() =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", HOST), {
+        name: "Denver Ultimate",
+        kind: "community",
+        ownerId: DIRECTOR,
+        members: { [DIRECTOR]: "owner", [HOST_MEMBER]: "player" },
+        memberIds: [DIRECTOR, HOST_MEMBER],
+      });
+      await setDoc(doc(fs, "teams", "team2"), {
+        name: "Other", ownerId: "cap2", members: { cap2: "owner" }, memberIds: ["cap2"],
+      });
+    }),
+  );
+
+  it("only the host's managers create and edit it", async () => {
+    const fresh = { ...tournament({ status: "draft" }), createdAt: serverTimestamp() };
+    await assertFails(setDoc(tRef(HOST_MEMBER), { ...fresh, createdBy: HOST_MEMBER }));
+    await assertFails(setDoc(tRef(OUTSIDER), { ...fresh, createdBy: OUTSIDER }));
+    await assertSucceeds(setDoc(tRef(DIRECTOR), fresh));
+    await assertSucceeds(updateDoc(tRef(DIRECTOR), { status: "registration" }));
+    await assertFails(updateDoc(tRef(HOST_MEMBER), { name: "Mine" }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { hostId: TEAM }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { status: "cancelled" }));
+    await assertFails(
+      updateDoc(tRef(DIRECTOR), { bidFee: { amountCents: -5, currency: "USD", instructions: "", dueAt: null } }),
+    );
+    await assertSucceeds(updateDoc(tRef(DIRECTOR), { bidFee: null }));
+  });
+
+  it("drafts are hidden; published tournaments are public to signed-in users", async () => {
+    await seed({ status: "draft" });
+    await assertFails(getDoc(tRef(OUTSIDER)));
+    await assertFails(getDoc(divRef(OUTSIDER)));
+    await assertSucceeds(getDoc(tRef(DIRECTOR)));
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "tournaments", T), { status: "registration" }),
+    );
+    await assertSucceeds(getDoc(tRef(OUTSIDER)));
+    await assertSucceeds(getDoc(divRef(OUTSIDER)));
+    await assertSucceeds(getDoc(entryRef(OUTSIDER)));
+  });
+
+  it("team admins apply to public tournaments taking entries; players can't", async () => {
+    await seed();
+    await assertFails(setDoc(entryRef(PLAYER), entry()));
+    await assertFails(setDoc(entryRef(CAPTAIN), entry({ status: "accepted" })));
+    await assertFails(setDoc(entryRef(CAPTAIN), entry({ captainIds: [OUTSIDER] })));
+    await assertSucceeds(setDoc(entryRef(CAPTAIN), entry()));
+    await assertSucceeds(
+      updateDoc(entryRef(CAPTAIN), { captainIds: [CAPTAIN, COACH], updatedAt: serverTimestamp() }),
+    );
+    await assertSucceeds(updateDoc(entryRef(CAPTAIN), { status: "withdrawn", updatedAt: serverTimestamp() }));
+  });
+
+  it("invite-only: teams can only answer an invite", async () => {
+    await seed({ visibility: "inviteOnly" });
+    await assertFails(setDoc(entryRef(CAPTAIN), entry()));
+    await assertSucceeds(setDoc(entryRef(DIRECTOR), entry({ status: "invited", captainIds: [] })));
+    await assertSucceeds(setDoc(entryRef(CAPTAIN), entry()));
+  });
+
+  it("no applying once registration closes", async () => {
+    await seed({ status: "seeding" });
+    await assertFails(setDoc(entryRef(CAPTAIN), entry()));
+  });
+
+  it("only managers seed divisions and accept teams", async () => {
+    await seed();
+    await assertFails(updateDoc(divRef(CAPTAIN), { seeds: [TEAM] }));
+    await assertSucceeds(updateDoc(divRef(DIRECTOR), { seeds: ["team2", TEAM] }));
+    await assertFails(updateDoc(divRef(DIRECTOR), { maxTeams: 1 }));
+    await assertSucceeds(setDoc(entryRef(DIRECTOR), entry({ status: "accepted" })));
+  });
+
+  it("payments: managers mark them; a team's admins read only their own", async () => {
+    await seed();
+    await assertFails(setDoc(payRef(CAPTAIN), { paid: true, paidAt: null, note: "" }));
+    await assertSucceeds(setDoc(payRef(DIRECTOR), { paid: true, paidAt: new Date(), note: "Venmo" }));
+    await assertFails(setDoc(payRef(DIRECTOR), { paid: "yes", paidAt: null, note: "" }));
+    await assertSucceeds(getDoc(payRef(CAPTAIN)));
+    await assertFails(getDoc(payRef(PLAYER)));
+    await assertFails(getDoc(payRef(OUTSIDER)));
+    await assertFails(getDoc(payRef("cap2")));
+    await assertSucceeds(getDoc(payRef("cap2", "team2")));
+  });
+
+  it("captains report and confirm; others can't; managers override", async () => {
+    await seed();
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "tournaments", T, "divisions", DIV, "games", "g1"), game()),
+    );
+    const report = { report: { scoreA: 15, scoreB: 10, byTeam: TEAM }, status: "reported" };
+    await assertFails(updateDoc(gameRef(PLAYER, "g1"), report));
+    await assertFails(updateDoc(gameRef("cap2", "g1"), report));
+    await assertSucceeds(updateDoc(gameRef(CAPTAIN, "g1"), report));
+    await assertFails(updateDoc(gameRef(CAPTAIN, "g1"), { status: "done", scoreA: 15, scoreB: 10, report: null }));
+    await assertSucceeds(updateDoc(gameRef("cap2", "g1"), { status: "done", scoreA: 15, scoreB: 10, report: null }));
+    await assertSucceeds(updateDoc(gameRef(DIRECTOR, "g1"), { scoreA: 15, scoreB: 12 }));
+    await assertFails(updateDoc(gameRef(DIRECTOR, "g1"), { scoreA: 12, scoreB: 12 }));
+  });
+
+  it("a captain of a finished game moves its winner on", async () => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(
+        doc(fs, "tournaments", T, "divisions", DIV, "games", "g1"),
+        game({ status: "done", scoreA: 15, scoreB: 9 }),
+      );
+      await setDoc(
+        doc(fs, "tournaments", T, "divisions", DIV, "games", "g2"),
+        game({
+          stage: "winners", label: "Final", teamA: null, teamB: null,
+          sourceA: { type: "winner", game: "g1" }, sourceB: null,
+        }),
+      );
+    });
+    await assertFails(updateDoc(gameRef(CAPTAIN, "g2"), { teamA: "team2" }));
+    await assertFails(updateDoc(gameRef(OUTSIDER, "g2"), { teamA: TEAM }));
+    await assertSucceeds(updateDoc(gameRef(CAPTAIN, "g2"), { teamA: TEAM }));
+  });
+
+  it("placement games carry their place", async () => {
+    await seed();
+    await assertSucceeds(
+      setDoc(gameRef(DIRECTOR, "g5"), game({ stage: "placement", label: "5th place", place: 5 })),
+    );
+    await assertFails(setDoc(gameRef(DIRECTOR, "g6"), game({ place: 0 })));
+    await assertFails(setDoc(gameRef(DIRECTOR, "g7"), game({ place: "5th" })));
+  });
+
+  it("a team withdraws itself without touching the division", async () => {
+    await seed();
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "tournaments", T, "entries", TEAM), {
+        ...entry({ status: "accepted" }),
+        updatedAt: new Date(),
+      }),
+    );
+    await assertFails(updateDoc(divRef(CAPTAIN), { seeds: ["team2"] }));
+    await assertSucceeds(
+      updateDoc(entryRef(CAPTAIN), { status: "withdrawn", updatedAt: serverTimestamp() }),
     );
   });
 });

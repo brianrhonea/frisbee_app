@@ -6,16 +6,15 @@ An ultimate frisbee team app built with Flutter + Firebase for Android, iOS, mac
 
 **Features**
 - Sign in with email/password, Google and Apple (Google/Apple are hidden on Windows, which has no plugin support)
-- Team-first Home: this week's events, your team, a playbook preview, upcoming events and a rankings podium
-- Teams with roles (owner, coach, captain, player, plus stats access), invite codes and a roster that can be imported and synced from USA Ultimate
+- Team-first Home: this week's events, your team, a playbook preview and upcoming events
+- Teams with roles (owner, coach, captain, player, plus stats access), invite codes and a roster with admin-only paid marks
 - A home page for each team: summary, upcoming events and posts from owners, coaches and captains
 - Team search: anyone can find a team and see its public page (public events and posts only)
 - Team Events with RSVPs, reactions and polls; a personal schedule; and a Schedule tab merging both, with swipe-to-delete by role
 - Playbook with a drawable field editor and animated plays
 - Live game stats: lines, O/D, pull timer, stat sheets and season stats
-- USA Ultimate tournaments, rankings and team search, scraped live in the app
 - Light/dark theme setting
-- Role-based privacy enforced by `firestore.rules`: paid/USA Ultimate status and the invite code are admin-only; personal events are private
+- Role-based privacy enforced by `firestore.rules`: paid marks and the invite code are admin-only; personal events are private
 
 ## Versioning
 
@@ -35,7 +34,7 @@ lib/
   ui/<feature>/view_models/   ChangeNotifier ViewModels exposing Commands
   ui/<feature>/widgets/       Views, no business logic
   utils/                      Result, Command, platform support
-functions/                    Cloud Functions (TypeScript): USA Ultimate sync (not deployed yet)
+functions/                    Cloud Functions (TypeScript), deployed by group
 firestore.rules               security rules (the trust boundary for membership and privacy)
 docs/                         architecture, user guide, version log, iOS release steps
 ```
@@ -80,8 +79,6 @@ firebase deploy --only functions:notifications
 
 iOS push also needs an APNs key uploaded to Firebase (see [iOS release](docs/ios-release.md)). Android needs nothing extra. Windows has no push (FCM has no Windows plugin); notifications still show in the app's feed.
 
-Don't deploy the other functions (or run a bare `firebase deploy`) until you're ready to move USA Ultimate collection to the cloud; see below.
-
 ## Secrets
 
 API keys are kept out of git (see `CLAUDE.md`). On a fresh clone:
@@ -106,30 +103,12 @@ Against local emulators (needs Java 21+ for the Firestore emulator):
 ```
 cd functions && npm run serve          # auth, firestore, functions emulators
 flutter run -d windows --dart-define-from-file=secrets.local.json --dart-define=USE_EMULATORS=true
-curl http://127.0.0.1:5001/frisbee-app-brianrhonea/us-central1/refreshUsau   # populate USAU data
 ```
 
 ## Tests
 
 ```
 flutter analyze && flutter test        # models, ViewModels, router redirect, widgets
-cd functions && npm test               # USA Ultimate HTML parsers (real page snapshots)
+cd functions && npm test               # functions logic (notifications, browse, api, ...)
 cd functions && npm run test:rules     # Firestore security rules (needs Java for the emulator)
 ```
-
-## USA Ultimate data
-
-USA Ultimate has no public API, so its pages on `play.usaultimate.org` are scraped.
-
-**Today: live, in the app.** `TournamentRepositoryUsau`, `RankingRepositoryUsau` and `UsauTeamRepositoryUsau` fetch pages on the device (client and parser in `lib/data/services/usau/`) and keep them in memory. No Firebase usage is spent on it.
-
-**Later: Cloud Functions.** `functions/src/usau/` does the same server-side on a schedule (every two months for now: `0 5 1 */2 *` and `30 5 1 */2 *`, Denver time) and writes:
-
-- `/events/tournament/` -> `usau_tournaments/{slug}`
-- `/teams/events/rankings/` lists rank sets -> each `team_rankings/?RankSet=...` -> `usau_rankings/{key}`
-
-The functions are deliberately **not deployed** while the user base is small. To switch: deploy them (`firebase deploy --only functions`, needs the Blaze plan) and use `TournamentRepositoryFirebase` and `RankingRepositoryFirebase` in `lib/config/dependencies.dart`.
-
-Server-side parsers live in `parse.ts` with HTML fixtures in `functions/test/fixtures/`. If USAU changes its layout, sync throws instead of wiping data; update the parser and fixture. The rankings-page parser maps columns by header name and is tested against a **synthetic** fixture; check it against a real page after the first sync.
-
-The app shows attribution and links back to USA Ultimate. Review USA Ultimate's terms of use before releasing publicly, and consider asking them for permission or a data feed.

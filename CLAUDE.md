@@ -100,9 +100,11 @@ membership change.
 
 ## USA Ultimate data
 
-play.usaultimate.org's robots.txt disallows Claude/Anthropic agents. Don't
-fetch it directly; work from the fixtures in `functions/test/fixtures/` or ask
-the user for a page snapshot.
+USA Ultimate events, rankings, team pages and roster sync were removed
+(November 2026): we don't have rights to that data. Don't add USA Ultimate
+data back without the user confirming they have permission. The old code is
+in git history. play.usaultimate.org's robots.txt also disallows
+Claude/Anthropic agents, so never fetch it.
 
 ## Checks
 

@@ -10,6 +10,7 @@ import '../../core/ui/brand.dart';
 import '../../core/ui/disc_icon.dart';
 import '../../core/ui/key_hint.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/scroll_to_top.dart';
 import '../../teams/widgets/team_section_screen.dart';
 import '../view_models/shell_viewmodel.dart';
 import 'command_palette.dart';
@@ -64,10 +65,13 @@ class AppShell extends StatelessWidget {
   ShellSection get _section =>
       ShellSection.values[navigationShell.currentIndex];
 
-  void _select(ShellSection s) => navigationShell.goBranch(
-    s.index,
-    initialLocation: s.index == navigationShell.currentIndex,
-  );
+  /// Opens section [s]. Tapping the one already open goes back to its
+  /// first page, and scrolls the page showing to the top.
+  void _select(ShellSection s) {
+    final again = s.index == navigationShell.currentIndex;
+    if (again) ScrollToTop.request();
+    navigationShell.goBranch(s.index, initialLocation: again);
+  }
 
   List<PaletteCommand> _commands() => paletteCommands(
     sections: [
@@ -183,16 +187,6 @@ List<Crumb> breadcrumbs(String path, String? Function(String id) teamName) {
     'schedule' => [community, here('Schedule')],
     'explore' => [explore],
     'players' => [explore, here('Player')],
-    'tournaments' => [
-      explore,
-      (label: 'Events', path: Routes.tournaments),
-      if (parts.length > 1) here('Event'),
-    ],
-    'rankings' => [
-      explore,
-      (label: 'Rankings', path: Routes.rankings),
-      if (parts.length > 1) here('Team'),
-    ],
     'messages' => [(label: 'Messages', path: Routes.messages)],
     'profile' => [
       (label: 'My profile', path: Routes.profile),

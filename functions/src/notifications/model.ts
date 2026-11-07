@@ -41,14 +41,22 @@ export interface RoomDoc {
 
 export type Data = Record<string, unknown>;
 
-/** Whether [prefs] allow [category], after the team override and room mute. */
+/**
+ * Whether [prefs] allow [category], after the team override and the room or
+ * conversation mute. A muted conversation is `dm/{id}` in mutedRooms
+ * (NotificationPreferences.conversationKey in lib/domain/models).
+ */
 export function wants(
   prefs: Prefs | undefined,
   category: Category,
   teamId?: string,
   roomId?: string,
+  conversationId?: string,
 ): boolean {
   if (teamId && roomId && prefs?.mutedRooms?.includes(`${teamId}/${roomId}`)) {
+    return false;
+  }
+  if (conversationId && prefs?.mutedRooms?.includes(`dm/${conversationId}`)) {
     return false;
   }
   if (teamId && category !== "directMessages") {
@@ -152,8 +160,12 @@ export const quietRepeatMs = 10 * 60 * 1000;
  * (same collapse id) of one still unread that already pushed in the last
  * [quietRepeatMs] stays quiet, so a busy chat is one push, not fifty.
  */
-export function shouldPush(previous: { read?: unknown; pushedAt?: unknown } | undefined, nowMs: number): boolean {
-  if (!previous || previous.read !== false) return true;
+export function shouldPush(
+  previous: { read?: unknown; pushedAt?: unknown } | undefined,
+  nowMs: number,
+  every = false,
+): boolean {
+  if (every || !previous || previous.read !== false) return true;
   const last = millis(previous.pushedAt);
   return last === undefined || nowMs - last >= quietRepeatMs;
 }
@@ -212,6 +224,8 @@ export interface Notice {
   category: Category;
   teamId?: string;
   roomId?: string;
+  /** A direct or group conversation, which its members can mute. */
+  conversationId?: string;
   route: string;
   /**
    * Feed entry to fold repeats into (one per room or conversation); a new
@@ -222,6 +236,12 @@ export interface Notice {
   text(prefs: Prefs, count: number): Text;
   /** More fields for the feed entry, e.g. followBack. */
   extra?: Data;
+  /**
+   * A message: every one buzzes the phone and gets its own lock-screen
+   * entry (tagged `{collapseId}|{pushId}`), rather than folding quietly
+   * into the last. The feed entry still folds.
+   */
+  pushId?: string;
 }
 
 const eventTypes: Record<string, string> = {
@@ -245,12 +265,17 @@ function whenAndWhere(e: Data, prefs: Prefs): string {
   return parts.filter(Boolean).join(" · ");
 }
 
+/**
+ * A team chat message. Each one is pushed with its own text: no "3 new
+ * messages" roll-up.
+ */
 export function chatNotice(a: {
   teamId: string;
   roomId: string;
   teamName: string;
   roomName: string;
   message: Data;
+  messageId?: string;
 }): Notice {
   const line = `${String(a.message.authorName ?? "Someone")}: ${messagePreview(a.message)}`;
   return {
@@ -259,14 +284,18 @@ export function chatNotice(a: {
     roomId: a.roomId,
     route: `/teams/${a.teamId}/chats/${a.roomId}`,
     collapseId: `chat_${a.teamId}_${a.roomId}`,
-    text: (_, count) => ({
-      title: `${a.roomName} · ${a.teamName}`,
-      body: count > 1 ? `${count} new messages · ${line}` : line,
-    }),
+    pushId: a.messageId,
+    text: () => ({ title: `${a.roomName} · ${a.teamName}`, body: line }),
   };
 }
 
-export function directMessageNotice(a: { conversationId: string; message: Data; conversation?: Data }): Notice {
+/** A direct or group message; each is pushed with its own text. */
+export function directMessageNotice(a: {
+  conversationId: string;
+  message: Data;
+  conversation?: Data;
+  messageId?: string;
+}): Notice {
   const preview = messagePreview(a.message);
   const author = String(a.message.authorName ?? "") || "Someone";
   // A group's notice is titled with the group, and says who wrote.
@@ -275,11 +304,13 @@ export function directMessageNotice(a: { conversationId: string; message: Data; 
   const line = group ? `${author}: ${preview}` : preview;
   return {
     category: "directMessages",
+    conversationId: a.conversationId,
     route: `/messages/${a.conversationId}`,
     collapseId: `dm_${a.conversationId}`,
-    text: (_, count) => ({
+    pushId: a.messageId,
+    text: () => ({
       title: group ? groupName : String(a.message.authorName ?? "New message"),
-      body: count > 1 ? `${count} new messages · ${line}` : line,
+      body: line,
     }),
   };
 }

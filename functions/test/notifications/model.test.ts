@@ -50,6 +50,12 @@ describe("wants", () => {
     expect(wants(prefs, "chat", "t1", "general")).toBe(false);
     expect(wants(prefs, "chat", "t1", "caps")).toBe(true);
   });
+
+  it("silences muted conversations only", () => {
+    const prefs = { mutedRooms: ["dm/a_b"] };
+    expect(wants(prefs, "directMessages", undefined, undefined, "a_b")).toBe(false);
+    expect(wants(prefs, "directMessages", undefined, undefined, "a_c")).toBe(true);
+  });
 });
 
 describe("roomReaders", () => {
@@ -116,24 +122,29 @@ describe("messagePreview", () => {
 });
 
 describe("notices", () => {
-  it("folds chat repeats into one entry", () => {
+  it("folds chat into one feed entry but pushes each message's own text", () => {
     const n = chatNotice({
       teamId: "t1",
       roomId: "general",
       teamName: "Hawks",
       roomName: "General",
       message: { authorName: "Sam", text: "Bring lights" },
+      messageId: "m1",
     });
     expect(n.collapseId).toBe("chat_t1_general");
+    expect(n.pushId).toBe("m1");
     expect(n.route).toBe("/teams/t1/chats/general");
     expect(n.text({}, 1)).toEqual({ title: "General · Hawks", body: "Sam: Bring lights" });
-    expect(n.text({}, 3).body).toBe("3 new messages · Sam: Bring lights");
+    expect(n.text({}, 3).body).toBe("Sam: Bring lights");
   });
 
   it("titles direct messages with the sender", () => {
-    const n = directMessageNotice({ conversationId: "a_b", message: { authorName: "Sam", text: "yo" } });
+    const n = directMessageNotice({ conversationId: "a_b", message: { authorName: "Sam", text: "yo" }, messageId: "m9" });
     expect(n.text({}, 1)).toEqual({ title: "Sam", body: "yo" });
+    expect(n.text({}, 4)).toEqual({ title: "Sam", body: "yo" });
     expect(n.route).toBe("/messages/a_b");
+    expect(n.conversationId).toBe("a_b");
+    expect(n.pushId).toBe("m9");
     const g = directMessageNotice({
       conversationId: "g-1",
       message: { authorName: "Sam", text: "yo" },
@@ -246,6 +257,10 @@ describe("shouldPush", () => {
   it("pushes unread entries from before push times were kept", () => {
     expect(shouldPush({ read: false }, now)).toBe(true);
     expect(shouldPush({ read: false, pushedAt: null }, now)).toBe(true);
+  });
+
+  it("pushes every message, however quick", () => {
+    expect(shouldPush({ read: false, pushedAt: at(now - 1000) }, now, true)).toBe(true);
   });
 });
 

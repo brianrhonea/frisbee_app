@@ -10,6 +10,7 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/skeleton.dart';
+import '../../core/ui/user_avatar.dart';
 
 enum _PostAction { edit, delete }
 
@@ -73,7 +74,7 @@ class TeamPostCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                PersonAvatar(name: author, radius: 18),
+                UserAvatar(uid: post.authorId, name: author, radius: 18),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(

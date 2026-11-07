@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/team.dart';
+import '../../core/ui/confirm_dialog.dart';
 import '../../groups/widgets/location_picker_dialog.dart';
 
 /// Fields shared by create and edit. Teams have name, division, level and
@@ -59,8 +60,24 @@ class _TeamFormState extends State<TeamForm> {
     if (picked != null) setState(() => _location = picked);
   }
 
-  void _submit() {
+  /// Editing an existing team: its division is fixed.
+  bool get _editing => widget.initial != null;
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    // A team's division can't be changed once it's made.
+    if (!_editing && !_isGroup) {
+      final ok = await confirmDialog(
+        context,
+        title: 'Is ${_division.label} the right division?',
+        message:
+            "You won't be able to change divisions after the team is "
+            'created; that takes a request to support. Please confirm '
+            "it's correct before submitting.",
+        confirmLabel: 'Create in ${_division.label}',
+      );
+      if (!ok || !mounted) return;
+    }
     widget.onSubmit(
       NewTeam(
         name: _name.text.trim(),
@@ -115,12 +132,21 @@ class _TeamFormState extends State<TeamForm> {
           ] else ...[
             DropdownButtonFormField<Division>(
               initialValue: _division,
-              decoration: const InputDecoration(labelText: 'Division'),
+              decoration: InputDecoration(
+                labelText: 'Division',
+                helperText: _editing
+                    ? 'To change the division, contact support.'
+                    : "Can't be changed after the team is created.",
+                helperMaxLines: 2,
+              ),
               items: [
                 for (final d in Division.values)
                   DropdownMenuItem(value: d, child: Text(d.label)),
               ],
-              onChanged: (v) => setState(() => _division = v!),
+              // Fixed once the team exists (firestore.rules).
+              onChanged: _editing
+                  ? null
+                  : (v) => setState(() => _division = v!),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<CompetitionLevel>(

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../themes/theme.dart';
 import 'balanced_text.dart';
+import 'scroll_to_top.dart';
 
 /// The three layouts the app is designed for.
 enum ScreenSize {
@@ -49,24 +50,47 @@ EdgeInsets pagePadding(ScreenSize size) => switch (size) {
 
 /// A scrolling page: content centered, capped at [maxPageWidth] and padded
 /// for the screen size.
-class PageScroll extends StatelessWidget {
+///
+/// Tapping the status bar (iOS), or the page's tab again, scrolls it back
+/// to the top (see [ScrollToTop]).
+class PageScroll extends StatefulWidget {
   const PageScroll({super.key, required this.children, this.controller});
 
   final List<Widget> children;
   final ScrollController? controller;
 
   @override
+  State<PageScroll> createState() => _PageScrollState();
+}
+
+class _PageScrollState extends State<PageScroll> {
+  ScrollController? _own;
+
+  ScrollController get _controller =>
+      widget.controller ?? (_own ??= ScrollController());
+
+  @override
+  void dispose() {
+    _own?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final size = ScreenSize.of(context);
-    return SingleChildScrollView(
+    final controller = _controller;
+    return ScrollToTop(
       controller: controller,
-      padding: pagePadding(size),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: maxPageWidth),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: children,
+      child: SingleChildScrollView(
+        controller: controller,
+        padding: pagePadding(size),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: maxPageWidth),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: widget.children,
+            ),
           ),
         ),
       ),

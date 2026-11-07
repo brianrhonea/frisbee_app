@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../domain/models/group_tournament.dart';
-import '../../../domain/tournament_engine/standings.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../core/ui/confirm_dialog.dart';
@@ -284,7 +283,7 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
                   style: theme.textTheme.titleMedium,
                 ),
               ),
-            _StandingsTable(rows: e.value, nameOf: vm.teamName),
+            StandingsTable(rows: e.value, nameOf: vm.teamName),
             const SizedBox(height: 16),
           ],
           if (vm.awaitingBracketSeeds && !vm.canSeedBracket)
@@ -309,7 +308,9 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
     }
     String title((GameStage, int) key, List<GroupGame> games) =>
         switch (key.$1) {
-          GameStage.winners => games.first.label,
+          GameStage.winners ||
+          GameStage.crossover ||
+          GameStage.placement => games.first.label,
           GameStage.losers => "Losers' round ${key.$2}",
           GameStage.grandFinal => 'Final',
           GameStage.reset => 'Final (if needed)',
@@ -388,60 +389,6 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _StandingsTable extends StatelessWidget {
-  const _StandingsTable({required this.rows, required this.nameOf});
-
-  final List<Standing> rows;
-  final String Function(String?) nameOf;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelMedium;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Table(
-          columnWidths: const {
-            0: FixedColumnWidth(36),
-            1: FlexColumnWidth(),
-            2: FixedColumnWidth(44),
-            3: FixedColumnWidth(44),
-            4: FixedColumnWidth(52),
-          },
-          children: [
-            TableRow(
-              children: [
-                for (final h in ['#', 'Team', 'W', 'L', '+/-'])
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Text(h, style: style),
-                  ),
-              ],
-            ),
-            for (var i = 0; i < rows.length; i++)
-              TableRow(
-                children: [
-                  for (final cell in [
-                    '${i + 1}',
-                    nameOf(rows[i].teamId),
-                    '${rows[i].wins}',
-                    '${rows[i].losses}',
-                    '${rows[i].pointDiff > 0 ? '+' : ''}${rows[i].pointDiff}',
-                  ])
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(cell),
-                    ),
-                ],
-              ),
-          ],
-        ),
       ),
     );
   }

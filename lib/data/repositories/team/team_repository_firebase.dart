@@ -10,6 +10,7 @@ import '../../../domain/models/invite_code.dart';
 import '../../../domain/models/model_utils.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
+import '../../../domain/models/team_name.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../domain/models/team_video.dart';
 import '../../../utils/result.dart';
@@ -101,7 +102,8 @@ class TeamRepositoryFirebase implements TeamRepository {
   DocumentReference<Map<String, dynamic>> _join(String teamId, String uid) =>
       _teams.doc(teamId).collection('joins').doc(uid);
 
-  /// Older roster entries kept paid/onUsau on the entry itself.
+  /// Older roster entries kept paid (and the retired USA Ultimate onUsau
+  /// flag) on the entry itself.
   static const _legacyStatusKeys = ['onUsau', 'paid'];
 
   String _newCode(int length) => String.fromCharCodes(
@@ -160,10 +162,41 @@ class TeamRepositoryFirebase implements TeamRepository {
   @override
   Future<Result<String>> createTeam(NewTeam team, AppUser owner) =>
       guard(() async {
+        await _ensureNameFree(team.name, team.kind, team.division);
         final ref = _teams.doc();
         await _newTeamBatch(ref, team, owner).commit();
         return ref.id;
       });
+
+  /// Throws [TeamNameTakenException] if another of [kind] (in [division],
+  /// for teams) already has [name] or one that reads the same (see
+  /// [teamNameKey]). Checked against the public directory, which every
+  /// team, group and community is listed in.
+  Future<void> _ensureNameFree(
+    String name,
+    TeamKind kind,
+    Division division, {
+    String? excludeId,
+  }) async {
+    final probe = teamNameProbe(name);
+    if (probe.isEmpty) return;
+    final snap = await _directory
+        .where('keywords', arrayContainsAny: probe)
+        .limit(200)
+        .get();
+    for (final d in snap.docs) {
+      final listing = TeamListing.fromMap(d.id, plainData(d.data()));
+      if (teamNameClashes(
+        listing,
+        name: name,
+        kind: kind,
+        division: division,
+        excludeId: excludeId,
+      )) {
+        throw TeamNameTakenException(listing.name, kind, division);
+      }
+    }
+  }
 
   @override
   Future<Result<String>> createTeamInCommunity(
@@ -172,6 +205,7 @@ class TeamRepositoryFirebase implements TeamRepository {
     Team org,
     Set<String> roles,
   ) => guard(() async {
+    await _ensureNameFree(team.name, team.kind, team.division);
     final ref = _teams.doc();
     final linked = LinkedTeam(
       id: ref.id,
@@ -435,13 +469,28 @@ class TeamRepositoryFirebase implements TeamRepository {
       guard(() => _invites(uid).doc(teamId).delete());
 
   @override
-  Future<Result<void>> updateTeam(Team team) => guard(
-    () =>
-        (_db.batch()
-              ..update(_teams.doc(team.id), team.toEditableMap())
-              ..set(_directory.doc(team.id), TeamListing.of(team).toMap()))
-            .commit(),
-  );
+  Future<Result<void>> updateTeam(Team team) => guard(() async {
+    final listed = await _directory.doc(team.id).get();
+    final before = listed.exists
+        ? TeamListing.fromMap(listed.id, plainData(listed.data()))
+        : null;
+    // Renamed, or moved to another division: the new one must be free.
+    if (before == null ||
+        teamNameKey(before.name) != teamNameKey(team.name) ||
+        before.division != team.division ||
+        before.kind != team.kind) {
+      await _ensureNameFree(
+        team.name,
+        team.kind,
+        team.division,
+        excludeId: team.id,
+      );
+    }
+    await (_db.batch()
+          ..update(_teams.doc(team.id), team.toEditableMap())
+          ..set(_directory.doc(team.id), TeamListing.of(team).toMap()))
+        .commit();
+  });
 
   @override
   Future<Result<List<TeamListing>>> searchTeams(
@@ -626,13 +675,39 @@ class TeamRepositoryFirebase implements TeamRepository {
   });
 
   @override
-  Future<Result<void>> deleteTeam(Team team) => guard(() async {
+  Future<Result<void>> deleteTeam(
+    Team team, {
+    void Function(DeleteProgress progress)? onProgress,
+  }) => guard(() async {
     final ref = _teams.doc(team.id);
+    const subs = [
+      'roster',
+      'rosterStatus',
+      'joins',
+      'plays',
+      'events',
+      'publicEvents',
+      'posts',
+      'videos',
+      'videoFolders',
+      'statsTournaments',
+      'statsGames',
+      'joinRequests',
+      'tournamentEntries',
+    ];
+    // Chat, meetings, tournaments, videos' files, posts' photos, each
+    // collection, then the team itself.
+    final total = 5 + subs.length + 1;
+    var done = 0;
+    void step(String label) =>
+        onProgress?.call((done: done++, total: total, step: label));
+    step('Getting ready');
     // Tells the notification functions not to announce the cascade below
     // (every event "cancelled", and so on).
     await ref.update({'deletingAt': FieldValue.serverTimestamp()});
     try {
       // Firestore doesn't cascade deletes; clear subcollections first.
+      step('Deleting chat');
       for (final room in (await chatRooms(_db, team.id).get()).docs) {
         await deleteChatRoom(_db, _files, room.reference);
       }
@@ -640,6 +715,7 @@ class TeamRepositoryFirebase implements TeamRepository {
         for (final d in (await chatFolders(_db, team.id).get()).docs)
           d.reference,
       ]);
+      step('Deleting meetings');
       for (final meeting in (await ref.collection('meetings').get()).docs) {
         final m = meeting.reference;
         final messages = await m.collection('messages').get();
@@ -650,6 +726,7 @@ class TeamRepositoryFirebase implements TeamRepository {
           m,
         ]);
       }
+      step('Deleting tournaments');
       final tournaments = await ref.collection('groupTournaments').get();
       for (final t in tournaments.docs) {
         final games = await t.reference.collection('games').get();
@@ -667,6 +744,7 @@ class TeamRepositoryFirebase implements TeamRepository {
           .get();
       await deleteDocs(_db, [for (final d in listings.docs) d.reference]);
       // Uploaded videos go before the videos that list them.
+      step('Deleting videos');
       for (final video in (await ref.collection('videos').get()).docs) {
         final path = TeamVideo.fromMap(
           video.id,
@@ -675,6 +753,7 @@ class TeamRepositoryFirebase implements TeamRepository {
         if (path != null) await _files.delete([path]);
       }
       // Post photos go before their posts, which list them.
+      step('Deleting photos');
       for (final post in (await ref.collection('posts').get()).docs) {
         await _files.delete(
           TeamPost.fromMap(
@@ -683,20 +762,8 @@ class TeamRepositoryFirebase implements TeamRepository {
           ).images.map((i) => i.path),
         );
       }
-      for (final sub in [
-        'roster',
-        'rosterStatus',
-        'joins',
-        'plays',
-        'events',
-        'publicEvents',
-        'posts',
-        'videos',
-        'videoFolders',
-        'statsTournaments',
-        'statsGames',
-        'joinRequests',
-      ]) {
+      for (final sub in subs) {
+        step(_deleteStepLabel(sub));
         final docs = await ref.collection(sub).get();
         await deleteDocs(_db, [for (final d in docs.docs) d.reference]);
       }
@@ -709,11 +776,24 @@ class TeamRepositoryFirebase implements TeamRepository {
       await ref.update({'deletingAt': FieldValue.delete()});
       rethrow;
     }
+    step('Finishing up');
     await (_db.batch()
           ..delete(_directory.doc(team.id))
           ..delete(ref))
         .commit();
+    onProgress?.call((done: total, total: total, step: 'Deleted'));
   });
+
+  static String _deleteStepLabel(String collection) => switch (collection) {
+    'roster' || 'rosterStatus' => 'Deleting the roster',
+    'joins' || 'joinRequests' => 'Deleting join requests',
+    'plays' => 'Deleting the playbook',
+    'tournamentEntries' => 'Deleting tournament entries',
+    'events' || 'publicEvents' => 'Deleting events',
+    'posts' => 'Deleting posts',
+    'videos' || 'videoFolders' => 'Deleting videos',
+    _ => 'Deleting stats',
+  };
 
   @override
   Stream<List<RosterPlayer>> watchRoster(
@@ -775,7 +855,6 @@ class TeamRepositoryFirebase implements TeamRepository {
     for (final d in legacy) {
       if (!hasStatus.contains(d.id)) {
         batch.set(_status(teamId).doc(d.id), {
-          'onUsau': d.data()['onUsau'] as bool?,
           'paid': d.data()['paid'] as bool? ?? false,
         });
       }
@@ -788,39 +867,6 @@ class TeamRepositoryFirebase implements TeamRepository {
         .catchError((Object e) => _log.warning('Roster status move failed', e))
         .whenComplete(() => _migrating.remove(teamId));
   }
-
-  @override
-  Future<Result<void>> linkUsauTeam(
-    String teamId, {
-    String? url,
-    String? name,
-  }) => guard(
-    () => _teams.doc(teamId).update({
-      'usauUrl': url,
-      'usauName': url == null ? null : name,
-      if (url == null) 'usauSyncedAt': null,
-    }),
-  );
-
-  @override
-  Future<Result<void>> applyRosterSync(
-    String teamId,
-    List<RosterPlayer> players,
-  ) => guard(() async {
-    final col = _roster(teamId);
-    // Firestore batches cap at 500 writes; rosters are far smaller.
-    final batch = _db.batch()
-      ..update(_teams.doc(teamId), {
-        'usauSyncedAt': FieldValue.serverTimestamp(),
-      });
-    for (final p in players) {
-      final ref = p.id.isEmpty ? col.doc() : col.doc(p.id);
-      batch
-        ..set(ref, p.toMap())
-        ..set(_status(teamId).doc(ref.id), p.toStatusMap());
-    }
-    await batch.commit();
-  });
 
   @override
   Future<Result<void>> savePlayer(String teamId, RosterPlayer player) =>

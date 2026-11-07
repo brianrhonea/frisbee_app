@@ -32,7 +32,7 @@ export async function deliver(
 async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notice: Notice) {
   const user = db.collection("users").doc(uid);
   const prefs = ((await user.collection("settings").doc("notifications").get()).data() ?? {}) as Prefs;
-  if (!wants(prefs, notice.category, notice.teamId, notice.roomId)) return;
+  if (!wants(prefs, notice.category, notice.teamId, notice.roomId, notice.conversationId)) return;
 
   const feed = user.collection("notifications");
   const entry = notice.collapseId ? feed.doc(notice.collapseId) : feed.doc();
@@ -42,7 +42,7 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
     const previous = notice.collapseId ? await tx.get(entry) : undefined;
     const before = previous?.exists ? previous.data() : undefined;
     const count = before?.read === false ? Number(before.count ?? 1) + 1 : 1;
-    const push = shouldPush(before, Date.now());
+    const push = shouldPush(before, Date.now(), notice.pushId !== undefined);
     const text: Text = notice.text(prefs, count);
     tx.set(entry, {
       category: notice.category,
@@ -67,13 +67,17 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
     logger.info("No push devices", { uid, category: notice.category });
     return;
   }
+  // Messages each get their own tag, so one doesn't replace the last on
+  // Android; the app clears them all by the collapse id prefix.
+  const tag = notice.pushId && notice.collapseId ? `${notice.collapseId}|${notice.pushId}` : notice.collapseId;
   const messages: Message[] = devices.docs.map((d) => ({
     fid: d.id,
     notification: { title: text.title, body: text.body },
     data: { route: notice.route, category: notice.category },
     android: {
-      collapseKey: notice.collapseId,
-      notification: { tag: notice.collapseId },
+      // Queued messages for a phone that was offline aren't dropped.
+      collapseKey: notice.pushId ? undefined : notice.collapseId,
+      notification: { tag },
     },
     apns: { payload: { aps: { sound: "default", threadId: notice.collapseId } } },
   }));

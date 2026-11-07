@@ -120,7 +120,3 @@ builds are signed with it too); add the release key's when there is one.
   app functionality, plus anything Firebase collects.
 - **Review notes**: give reviewers a demo email/password account; they
   can't use your Google or Apple login.
-- **USA Ultimate content**: the app shows data from play.usaultimate.org.
-  Apple can reject apps that use another organisation's content without
-  permission (guideline 5.2). Written permission from USA Ultimate is the
-  safest path; mention it in the review notes if you have it.

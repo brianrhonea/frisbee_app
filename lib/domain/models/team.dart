@@ -206,9 +206,6 @@ class Team {
     this.memberNames = const {},
     this.statKeepers = const {},
     this.city = '',
-    this.usauUrl,
-    this.usauName,
-    this.usauSyncedAt,
     this.createdAt,
     this.kind = TeamKind.team,
     this.description = '',
@@ -327,14 +324,6 @@ class Team {
   /// Players the owner gave stats access to.
   final Set<String> statKeepers;
 
-  /// Linked USA Ultimate team page, for roster imports.
-  final String? usauUrl;
-
-  /// Team name as USA Ultimate shows it.
-  final String? usauName;
-
-  /// When the roster was last synced with USA Ultimate.
-  final DateTime? usauSyncedAt;
   final DateTime? createdAt;
 
   TeamRole? roleOf(String uid) => members[uid];
@@ -476,9 +465,6 @@ class Team {
         for (final id in (map['statKeepers'] as List?) ?? const []) '$id',
         ...legacyStats,
       },
-      usauUrl: map['usauUrl'] as String?,
-      usauName: map['usauName'] as String?,
-      usauSyncedAt: parseDate(map['usauSyncedAt']),
       createdAt: parseDate(map['createdAt']),
       kind: enumByName(TeamKind.values, map['kind'], TeamKind.team),
       description: map['description'] as String? ?? '',
@@ -547,9 +533,6 @@ class Team {
     members: members ?? this.members,
     memberNames: memberNames ?? this.memberNames,
     statKeepers: statKeepers ?? this.statKeepers,
-    usauUrl: usauUrl,
-    usauName: usauName,
-    usauSyncedAt: usauSyncedAt,
     createdAt: createdAt,
     kind: kind,
     description: description ?? this.description,
@@ -729,8 +712,6 @@ class TeamListing {
     this.description = '',
     this.requiresApproval = false,
     this.location,
-    this.usauUrl,
-    this.usauName,
   });
 
   factory TeamListing.of(Team team) => TeamListing(
@@ -743,8 +724,6 @@ class TeamListing {
     description: team.description,
     requiresApproval: team.requiresApproval,
     location: team.location,
-    usauUrl: team.usauUrl,
-    usauName: team.usauName,
   );
 
   final String id;
@@ -756,13 +735,6 @@ class TeamListing {
   final String description;
   final bool requiresApproval;
   final GroupLocation? location;
-
-  /// The linked USA Ultimate team page, so anyone can see the team's
-  /// schedule, record and ranking.
-  final String? usauUrl;
-
-  /// Team name as USA Ultimate shows it.
-  final String? usauName;
 
   bool get isCommunity => kind.isGroupLike;
 
@@ -791,9 +763,7 @@ class TeamListing {
       kind == team.kind &&
       description == team.description &&
       requiresApproval == team.requiresApproval &&
-      location == (team.isPrivateGroup ? null : team.location) &&
-      usauUrl == team.usauUrl &&
-      usauName == team.usauName;
+      location == (team.isPrivateGroup ? null : team.location);
 
   factory TeamListing.fromMap(String id, Map<String, dynamic> map) =>
       TeamListing(
@@ -810,8 +780,6 @@ class TeamListing {
         description: map['description'] as String? ?? '',
         requiresApproval: map['requiresApproval'] as bool? ?? false,
         location: GroupLocation.fromMap(map['location']),
-        usauUrl: map['usauUrl'] as String?,
-        usauName: map['usauName'] as String?,
       );
 
   Map<String, dynamic> toMap() => {
@@ -827,7 +795,6 @@ class TeamListing {
       location: isPrivateGroup ? null : location,
     ),
     'keywords': searchKeywords('$name $city'),
-    if (usauUrl case final url?) ...{'usauUrl': url, 'usauName': ?usauName},
   };
 }
 

@@ -33,7 +33,7 @@ app". Static pages (`/about`, `/privacy`, `/terms`…) sit beside it.
 | **Client** | Flutter, following the official Flutter MVVM guide: services → repositories → view models (`ChangeNotifier` + `Command`) → widgets. DI with `provider` (no Riverpod); routing with `go_router`. |
 | **Backend** | Firebase: Auth, Cloud Firestore (app data), Cloud Storage (photos, files, videos), Cloud Messaging (push), Cloud Functions v2 (TypeScript), App Check, Hosting (landing page, web app, invite and join pages). |
 | **Trust boundary** | Hybrid. Most reads and writes go straight from the app to Firestore and Storage, checked by `firestore.rules` and `storage.rules`. Cloud Functions sit beside the database for what rules can't do: rate limits and flood control, server-side search, third-party tokens (LiveKit), notifications, counters and cascades. |
-| **Third parties** | LiveKit Cloud (meetings and voice channels), YouTube (video embeds and oEmbed), OpenStreetMap and Nominatim (group maps), Discord server templates (import), play.usaultimate.org (scraped on-device). |
+| **Third parties** | LiveKit Cloud (meetings and voice channels), YouTube (video embeds and oEmbed), OpenStreetMap and Nominatim (group maps), Discord server templates (import). |
 | **Environments** | `frisbee-app-brianrhonea-dev` (dev, default; TestFlight from `development`) and `frisbee-app-brianrhonea` (prod; App Store from `main`). |
 
 ### Source layout
@@ -55,7 +55,6 @@ lib/
   utils/                    Result, Command, platform support flags
 functions/src/              Cloud Functions, one folder per deploy group
   account/ api/ communities/ discord/ follows/ meetings/ notifications/
-  usau/                     USA Ultimate scrapers (deliberately not deployed)
 functions/test/             Unit tests and rules tests (emulators)
 hosting/                    Landing page, join and invite pages (copied into build/site)
 web/                        Flutter web shell (index.html, manifest, icons)
@@ -72,8 +71,8 @@ firestore.rules, storage.rules, firestore.indexes.json, firebase.json
 | Area | What people can do |
 |---|---|
 | **Accounts** | Sign up and sign in with email, username, Google or Apple (browser OAuth for Google on Windows); pick a unique @username; delete the account. |
-| **Home** | This week's events, your team, a playbook preview, coming-up events, a rankings podium and a feed of posts from people, teams and tournaments you follow. |
-| **Teams** | Create a team, join by invite code, link or invite; custom roles with Discord-style permissions; roster imported and synced from USA Ultimate; team home page and public page. |
+| **Home** | This week's events, your team, a playbook preview, coming-up events and a feed of posts from people, teams and tournaments you follow. |
+| **Teams** | Create a team, join by invite code, link or invite; custom roles with Discord-style permissions; roster with admin-only paid marks; team home page and public page. |
 | **Community groups, schools and clubs** | Open or approval-only groups with a map location; schools and clubs that link several teams and hand out membership by role. |
 | **Chat** | Team text rooms in folders with per-role and per-person access, photos and files; drop-in voice channels; 1:1 direct messages; Discord server import. |
 | **Schedule** | Team and personal events, RSVPs, reactions, polls, public events, community events limited to roles, reminders. |
@@ -82,9 +81,9 @@ firestore.rules, storage.rules, firestore.indexes.json, firebase.json
 | **Videos** | Team film: YouTube links or uploaded files, in folders. |
 | **Stats** | Live game tracking (lines, O/D, pull timer, timeouts), stat sheets, season stats. |
 | **Group tournaments** | Teams built from RSVPs, generated schedules and brackets, captain-reported scores. |
+| **Hosted tournaments** | Any team, group or school/club hosts: divisions, applications and invites, recorded bid fees, seeding, per-division schedules, placements, news and follows (`lib/ui/tournaments`). |
 | **Social** | Profiles (public or private), follows and follow requests, posts with photos, links and workouts, likes, reposts, comments; GPS run and ride recording. |
-| **USA Ultimate** | Tournaments, schedules, brackets, rankings and team pages. |
-| **Search** | Explore and the Ctrl/⌘ K command menu over players, teams, groups and USAU events. |
+| **Search** | Explore and the Ctrl/⌘ K command menu over players, teams and groups. |
 | **Notifications** | Feed, push on phones, in-app bubbles, per-category, per-team and per-room settings. |
 | **Settings** | Theme, privacy (read receipts, profile visibility), account. |
 
@@ -100,14 +99,13 @@ flowchart LR
     W[Widgets] -->|commands| VM[View models]
     VM -->|Stream / Future&lt;Result&gt;| R[Repositories]
     R --> SS[SharedStreams<br/>one listener per query]
-    R --> SV[Services<br/>Auth, AttachmentStorage,<br/>ImageCompressor, CallableClient,<br/>ApiSearch, FeatureFlags, AppCheck,<br/>UsauClient, PushService]
+    R --> SV[Services<br/>Auth, AttachmentStorage,<br/>ImageCompressor, CallableClient,<br/>ApiSearch, FeatureFlags, AppCheck,<br/>PushService]
   end
 
   SS -->|listeners, reads, writes| FS[(Cloud Firestore)]
   SV -->|uploads, downloads| ST[(Cloud Storage)]
   SV --> AU[(Firebase Auth)]
   SV -->|HTTPS callables + App Check token| CF[Cloud Functions]
-  SV -->|HTML scraping| USAU[(play.usaultimate.org)]
   SV -->|WebRTC| LK[(LiveKit Cloud)]
 
   FS -. every request checked .- FR[firestore.rules]
@@ -201,7 +199,7 @@ and tests swap in the fakes in `test/testing/`.
 | `AttachmentStorage` | Storage uploads (year-long `Cache-Control`), downloads, deletes | – |
 | `TeamRepository` | `TeamRepositoryFirebase` | `AttachmentStorage`, `ApiSearch` |
 | `ProfileRepository` | `ProfileRepositoryFirebase` | `ApiSearch` |
-| `PlayRepository`, `EventRepository`, `FollowRepository`, `VideoRepository`, `GroupTournamentRepository`, `PostCommentRepository` | Firebase implementations | – |
+| `PlayRepository`, `EventRepository`, `FollowRepository`, `VideoRepository`, `GroupTournamentRepository`, `HostedTournamentRepository`, `PostCommentRepository` | Firebase implementations | – |
 | `TeamPostRepository`, `UserPostRepository` | Firebase implementations | `AttachmentStorage` |
 | `ChatRepository`, `DirectMessageRepository` | Firebase implementations | `AttachmentStorage` (DMs also `ApiSearch`) |
 | `FilePickerService` | `file_picker` + `ImageCompressor` | `FeatureFlags` (`compress_images`) |
@@ -213,7 +211,6 @@ and tests swap in the fakes in `test/testing/`.
 | `WorkoutRecorder` (`ChangeNotifier`) | GPS run/ride recording, app-wide | `LocationService` |
 | `PushService`, `NotificationRepository` | `firebase_messaging` (no-op on Windows); Firebase | – |
 | `StatsRepository` | `StatsRepositoryFirebase` | `TeamRepository` |
-| `UsauClient` + `Tournament`, `Ranking`, `UsauTeam`, `UsauSchedule` repositories | On-device scraping (`…Usau` implementations) | `UsauClient` |
 | `ThemeRepository` (`ChangeNotifier`) | `ThemeRepositoryPrefs`, loaded before `runApp` | – |
 
 ### 4.3 Navigation
@@ -222,11 +219,12 @@ and tests swap in the fakes in `test/testing/`.
   holds users on a splash until auth is ready, sends signed-out users to
   sign-in (remembering `from`), sends users without a username to
   `/welcome/username`, and keeps signed-in users off the auth pages.
-- **Shell:** a `StatefulShellRoute.indexedStack` with five tabs (Home,
-  Teams, Schedule, Events, Rankings), each with its own stack.
+- **Shell:** a `StatefulShellRoute.indexedStack` with five tabs
+  (Community, Explore, My teams, Messages, Profile), each with its own
+  stack.
   `AdaptiveShell` shows a bottom bar under 720 px and a rail above.
-- **Full-screen pages** (events, USAU tournaments and teams, plays, stats,
-  chat rooms, DMs, profiles, posts, the composer) use the root navigator
+- **Full-screen pages** (events, plays, stats, chat rooms, DMs,
+  profiles, posts, the composer) use the root navigator
   and `context.push`, so back returns where you were. Path helpers are in
   `routing/routes.dart` (`Routes.teamChat(id)`, `Routes.conversation(id)`…).
 - **Team pages:** one page with a tab bar of `TeamSection`s. Section
@@ -268,16 +266,9 @@ writes at once; messages show "Sending…" until `createdAt` arrives.
 Attachments upload before the message is written and are deleted again
 if the write fails; they aren't offline-capable.
 
-**USA Ultimate caches.** The USAU repositories are app-wide singletons
-with in-memory caches (one tournaments future, ranking divisions as they
-parse, one future per team page and schedule key). `UsauClient` sends
-requests one at a time, about a second apart, with a 30-second timeout.
-Nothing from USAU is stored on disk.
-
 ### 4.5 Server layer (Cloud Functions)
 
-Functions are deployed by group, never all at once (the USAU scrapers
-stay undeployed). Every group runs under `setGlobalOptions({maxInstances: 10})`
+Functions are deployed by group, never all at once. Every group runs under `setGlobalOptions({maxInstances: 10})`
 so a flood can't scale the bill, and every callable sets
 `enforceAppCheck` (on when `ENFORCE_APP_CHECK=true`).
 
@@ -331,6 +322,10 @@ limits/{uid}                    flood counters and mutedUntil (Functions only; o
 inviteCodes/{code}              → {teamId}; single lookups only
 teamDirectory/{teamId}          public team search listing
 tournamentDirectory/{g_t}       public group-tournament listing
+tournaments/{id}                hosted tournament (public once published)
+  divisions/{id}                + games/{id}; seeds, captains, placements
+  entries/{teamId}              applications and invites
+  payments/{teamId}             bid fee paid/unpaid (host managers + team admins)
 teams/{teamId}                  team, group, school or club: members, roles, memberPerms, links
   private/invite, joins/{uid}   invite code and proof of knowing it
   joinRequests/{uid}            approval-group requests
@@ -346,8 +341,7 @@ teams/{teamId}                  team, group, school or club: members, roles, mem
   statsTournaments/{id}, statsGames/{id}
 conversations/{uidA_uidB}       DM header: participants, names, last message, readAt
   messages/{id}
-usau_tournaments, usau_rankings Functions only (scrapers not deployed)
-meta/{id}                       flags (kill switches), health, usau (Admin SDK writes)
+meta/{id}                       flags (kill switches), health (Admin SDK writes)
 sentReminders/{key}             reminder de-duplication (Functions only)
 ```
 
@@ -390,8 +384,7 @@ teams/{teamId}/videos/{videoId}/{name}                       uploaded team video
 #### On device
 
 `shared_preferences` (theme, meeting devices and volumes), Firestore's
-offline cache, `SharedStreams` in memory, USAU data and image bytes in
-memory only.
+offline cache, `SharedStreams` in memory, image bytes in memory only.
 
 ### 4.7 Security model
 
@@ -416,7 +409,7 @@ rules change together (with tests in `functions/test/rules`).
 | Conversations and DMs | The two participants | Participants; your own messages only; not muted |
 | Posts, comments | Signed-in users (private authors: followers) | The author, validated field by field; not muted |
 | Follows, follow requests | That user / the two people | That user; private profiles need an accepted request |
-| `followCounts`, `limits`, `sentReminders`, `usau_*`, `meta` | Signed-in (limits: owner; reminders: nobody) | Admin SDK only |
+| `followCounts`, `limits`, `sentReminders`, `meta` | Signed-in (limits: owner; reminders: nobody) | Admin SDK only |
 
 Storage rules use `firestore.get()`, which needs the Storage service
 agent to hold the *Firebase Rules Firestore Service Agent* role.
@@ -433,10 +426,9 @@ agent to hold the *Firebase Rules Firestore Service Agent* role.
 | YouTube oEmbed and embed | Link checks and playback | `YouTubeInfoService`, `youTubePlayer()` |
 | OpenStreetMap tiles, Nominatim | Group maps and address search | `GroupMap`, `GeocodingService` |
 | Discord templates (`discord.new`) | Server import | `discord-previewTemplate` |
-| play.usaultimate.org | Tournaments, rankings, teams, rosters, schedules | `UsauClient` + `UsauParser` |
 
-The USAU site's `robots.txt` disallows AI agents; development uses the
-fixtures in `functions/test/fixtures/`.
+USA Ultimate data (events, rankings, team pages, roster sync) was removed
+in November 2026: we don't have rights to it. It's in git history.
 
 ---
 
@@ -469,13 +461,13 @@ on Windows except browser Google), sign-out unregisters the device first.
 
 **Workflows**
 - **Open Home:** `HomeViewModel` composes `MySchedule` (team events +
-  personal events), the user's teams, a playbook preview, USAU
-  tournaments and rankings, the DM unread badge and `HomeFeed`.
+  personal events), the user's teams, a playbook preview, the DM unread
+  badge and `HomeFeed`.
 - **Build the feed:** `HomeFeed` keeps one source per kind and adds or
   drops them as follows and teams change:
   - people (the user plus everyone followed): `posts where authorId in`,
     in chunks of 30
-  - followed tournaments and events: `posts where tournamentKey in`
+  - followed group tournaments: `posts where tournamentKey in`
   - each team the user is on: all its posts
   - each followed team they're not on: its public posts
   - followed group tournaments outside the user's groups: that group's
@@ -488,8 +480,7 @@ on Windows except browser Google), sign-out unregisters the device first.
   the cutoff with `fetchPostsBefore`, and repeats up to 5 rounds, so the
   merged feed has no gaps and each load reads about one page.
 
-**Subfeatures:** two-column dashboard at 960 px, rankings podium, this
-week strip, inbox badge, in-app notice bubbles.
+**Subfeatures:** two-column dashboard at 960 px, this week strip, inbox badge, in-app notice bubbles.
 
 ### 5.3 Teams
 
@@ -510,9 +501,8 @@ week strip, inbox badge, in-app notice bubbles.
   flattened `memberPerms` that rules check with `can(team, perm)`. Legacy
   coach and captain tiers are migrated to custom roles
   (`migrateTiersToRoles`) when the owner opens the team.
-- **USA Ultimate roster:** `UsauRosterViewModel` finds the team on USAU,
-  imports the roster, and later syncs changes; `rosterStatus` (paid, on
-  USAU) is admin-only.
+- **Roster:** admins add players and mark who's paid; `rosterStatus`
+  (paid) is admin-only.
 - **Team search and public page:** search goes to `teamDirectory`
   keywords (or `api-search` when `use_api_search` is on); non-members see
   the public page with public events and posts.
@@ -718,31 +708,17 @@ for), public listing in `tournamentDirectory`, follow a tournament.
   the app; finishing posts it as a workout with its route.
 
 **Subfeatures:** username, pronouns, bio, visibility settings, Following
-page, follow bells, follow buttons on teams, tournaments and events.
+page, follow bells, follow buttons on teams and tournaments.
 
-### 5.15 USA Ultimate events and rankings
-
-**Workflows**
-- **Tournaments:** `TournamentsViewModel` reads the cached tournaments
-  list; `TournamentDetailViewModel` fetches schedules and brackets per
-  event and division (`UsauScheduleRepository`).
-- **Rankings:** the first listener starts the load; divisions arrive as
-  they parse; later listeners get the cache.
-- **Team pages:** one fetch per USAU team URL.
-
-**Subfeatures:** follow a USAU event, tag posts with it, podium on Home.
-When the user base grows, deploy the scrapers and switch to the
-`…Firebase` repositories (see `functions/src/usau`).
-
-### 5.16 Search and command menu
+### 5.15 Search and command menu
 
 **Workflow:** the Explore page and Ctrl/⌘ K debounce input, then search
 players and people (`profiles` keywords), teams and groups
-(`teamDirectory` keywords) and USAU events. When `use_api_search` is on,
+(`teamDirectory` keywords). When `use_api_search` is on,
 people and team searches go through `api-search`, which validates the
 keyword, rate-limits per user and returns at most 50 results.
 
-### 5.17 Notifications
+### 5.16 Notifications
 
 **Workflows**
 - **Deliver:** a trigger decides recipients (pure logic in `model.ts`),
@@ -760,7 +736,7 @@ keyword, rate-limits per user and returns at most 50 results.
 times in the recipient's UTC offset, feed pruned after 60 days. Windows
 has the feed only (no FCM plugin).
 
-### 5.18 Settings
+### 5.17 Settings
 
 **Workflow:** `ProfileViewModel` backs General (theme), Privacy (read
 receipts, profile visibility) and Account (name, username, delete,
@@ -797,8 +773,7 @@ Read live by every running app (`FeatureFlags`):
 ### Deploy, roll back, monitor
 - **Deploy and roll back:** GitHub Actions **Deploy backend** and **Roll
   back backend** (`docs/rollback.md`). Deploys tag `release-<env>-<time>`;
-  rollback redeploys the previous tag. The USAU scrapers are never
-  deployed by these workflows.
+  rollback redeploys the previous tag.
 - **Text alerts:** `scripts/monitoring/setup-alerts.sh` creates SMS alerts
   for site and API downtime (`api-health`), function errors, traffic
   floods, Firestore read spikes and mass mutes (`docs/monitoring.md`).
@@ -807,7 +782,7 @@ Read live by every running app (`FeatureFlags`):
 
 ```
 flutter analyze && flutter test                 # unit, view-model and widget tests with fakes
-cd functions && npm run build && npm test        # functions logic (USAU parser, notifications, api)
+cd functions && npm run build && npm test        # functions logic (notifications, browse, api)
 cd functions && npm run test:rules               # Firestore + Storage rules (emulators; needs Java)
 ```
 
@@ -821,7 +796,6 @@ rules tests before deploying rules.
 | Firestore rules and indexes | Deployed to dev with the flood mutes and index exemptions; prod has the earlier version |
 | Storage rules | Deployed |
 | Functions | `account`, `api`, `communities`, `discord`, `follows`, `meetings`, `notifications` on dev |
-| USAU functions | Not deployed, on purpose |
 | Hosting | Deployed to dev with CDN cache headers |
 | App Check | In the app; enforcement off until rolled out |
 | iOS builds | Codemagic (`codemagic.yaml`, `docs/ios-release.md`) |
@@ -831,5 +805,3 @@ rules tests before deploying rules.
   meeting.
 - Direct messages have no blocking or reporting yet.
 - Messages can't be edited; attachments aren't available offline.
-- USAU data is fetched per device; the server-side cache (scrapers) is
-  waiting for a bigger user base.

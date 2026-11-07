@@ -50,9 +50,13 @@ class ScheduleException implements Exception {
 
 /// Generates and schedules every game of [tournament] for its teams, in
 /// their current order (which seeds pools and brackets).
-SchedulePlan generateSchedule(GroupTournament tournament) {
-  final s = tournament.settings;
-  final teams = [for (final t in tournament.teams) t.id];
+SchedulePlan generateSchedule(GroupTournament tournament) =>
+    scheduleFor([for (final t in tournament.teams) t.id], tournament.settings);
+
+/// Generates and schedules every game for [teams] in seed order (seed 1
+/// first) under [s]. Used for a group tournament's teams and for each
+/// division of a hosted tournament.
+SchedulePlan scheduleFor(List<String> teams, TournamentSettings s) {
   if (teams.length < 2) {
     throw const ScheduleException('A tournament needs at least two teams.');
   }
@@ -67,6 +71,14 @@ SchedulePlan generateSchedule(GroupTournament tournament) {
       _singleElim(b, [for (final t in teams) _Entrant.team(t)]);
     case TournamentFormat.doubleElim:
       _doubleElim(b, [for (final t in teams) _Entrant.team(t)]);
+    case TournamentFormat.poolsPlacement:
+      final count = s.poolCount.clamp(1, teams.length ~/ 2);
+      _placement(
+        b,
+        count == 1
+            ? [for (final t in teams) _Entrant.team(t)]
+            : _crossSeed(_pools(b, teams, count)),
+      );
   }
   return _schedule(b.games, s);
 }
@@ -195,6 +207,76 @@ void _singleElim(_Builder b, List<_Entrant> entrants) {
   }
 }
 
+/// Suggested pool count for [teams] teams, after the usual club formats:
+/// one round robin up to 6, pools of 4 or 5 above that (8 → 2, 12 → 3,
+/// 16 → 4, 20 → 4).
+int suggestedPools(int teams) => teams <= 6 ? 1 : max(2, (teams / 4.5).round());
+
+/// Suggested format for [teams] teams: a round robin for small fields,
+/// otherwise pools and a placement bracket.
+TournamentFormat suggestedFormat(int teams) =>
+    teams <= 5 ? TournamentFormat.roundRobin : TournamentFormat.poolsPlacement;
+
+String ordinal(int n) {
+  final teen = n % 100 >= 11 && n % 100 <= 13;
+  final suffix = teen
+      ? 'th'
+      : switch (n % 10) {
+          1 => 'st',
+          2 => 'nd',
+          3 => 'rd',
+          _ => 'th',
+        };
+  return '$n$suffix';
+}
+
+/// A bracket for 1st place where every loser keeps playing in brackets
+/// for the places below, so each team ends with one final place. Byes go
+/// to the top seeds; when the field isn't a power of two the first round
+/// is a crossover. Games are added round by round across all brackets.
+void _placement(_Builder b, List<_Entrant> entrants) {
+  final crossover = entrants.length < _bracketSize(entrants.length);
+  // Each bracket: its slots in match order and the best place it decides.
+  var level = [(_firstRound(entrants), 1)];
+  var round = 1;
+  while (level.isNotEmpty) {
+    final next = <(List<_Entrant?>, int)>[];
+    for (final (slots, place) in level) {
+      if (slots.length < 2) continue;
+      final matches = slots.length ~/ 2;
+      final name = _roundName(matches, round);
+      final label = place == 1
+          ? (round == 1 && crossover ? 'Crossover' : name)
+          : matches == 1
+          ? '${ordinal(place)} place'
+          : '${ordinal(place)}–${ordinal(place + slots.length - 1)} '
+                '${name.toLowerCase()}';
+      final stage = round == 1 && crossover
+          ? GameStage.crossover
+          : place == 1
+          ? GameStage.winners
+          : GameStage.placement;
+      final results = [
+        for (var i = 0; i < matches; i++)
+          b.match(
+            stage: stage,
+            round: round,
+            label: label,
+            a: slots[2 * i],
+            c: slots[2 * i + 1],
+            place: matches == 1 ? place : null,
+          ),
+      ];
+      if (matches == 1) continue;
+      next
+        ..add(([for (final r in results) r.winner], place))
+        ..add(([for (final r in results) r.loser], place + matches));
+    }
+    level = next;
+    round++;
+  }
+}
+
 /// Double elimination: a winners' bracket, a losers' bracket fed by its
 /// losers, then a final between the two champions. If the losers'
 /// bracket team wins it, a second final decides it.
@@ -312,9 +394,17 @@ class _Builder {
     required String label,
     required _Entrant? a,
     required _Entrant? c,
+    int? place,
   }) {
     if (a == null || c == null) return _Match(winner: a ?? c);
-    final id = add(stage: stage, round: round, label: label, a: a, c: c);
+    final id = add(
+      stage: stage,
+      round: round,
+      label: label,
+      a: a,
+      c: c,
+      place: place,
+    );
     return _Match(
       winner: _Entrant.source(WinnerOf(id)),
       loser: _Entrant.source(LoserOf(id)),
@@ -330,6 +420,7 @@ class _Builder {
     required _Entrant c,
     String? poolId,
     bool ifNeeded = false,
+    int? place,
   }) {
     final id = _nextId();
     games.add(
@@ -345,6 +436,7 @@ class _Builder {
         sourceA: a.source,
         sourceB: c.source,
         ifNeeded: ifNeeded,
+        place: place,
       ),
     );
     return id;

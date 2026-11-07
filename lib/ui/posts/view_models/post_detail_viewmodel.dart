@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/post_comment/post_comment_repository.dart';
 import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../../../domain/models/chat.dart';
@@ -21,9 +22,14 @@ class PostDetailViewModel extends ChangeNotifier {
     required UserPostRepository userPostRepository,
     required AuthRepository authRepository,
     PostCommentRepository? commentRepository,
+    NotificationRepository? notificationRepository,
   }) : _posts = userPostRepository,
        _auth = authRepository,
        _commentRepo = commentRepository {
+    // Likes, comments and replies on it have been seen now.
+    if (authRepository.currentUser?.uid case final uid?) {
+      unawaited(notificationRepository?.clearRoute(uid, '/posts/$postId'));
+    }
     delete = Command0<void>(() => _posts.deletePost(postId));
     addComment = Command1<void, String>(_addComment);
     deleteComment = Command1<void, PostComment>(_deleteComment);

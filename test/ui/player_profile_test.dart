@@ -7,7 +7,6 @@ import 'package:frisbee_app/domain/models/player_profile.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/stats.dart';
 import 'package:frisbee_app/domain/models/team.dart';
-import 'package:frisbee_app/domain/models/tournament.dart';
 import 'package:frisbee_app/routing/routes.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/core/ui/slide_over_page.dart';
@@ -18,7 +17,6 @@ import 'package:frisbee_app/ui/profile/view_models/profile_viewmodel.dart';
 import 'package:frisbee_app/ui/profile/widgets/profile_screen.dart';
 import 'package:frisbee_app/ui/settings/widgets/settings_screen.dart';
 import 'package:frisbee_app/ui/teams/view_models/team_search_viewmodel.dart';
-import 'package:frisbee_app/ui/tournaments/view_models/tournaments_viewmodel.dart';
 
 import '../testing/fakes.dart';
 
@@ -432,48 +430,25 @@ void main() {
     expect(find.text('@patlee'), findsOneWidget);
   });
 
-  testWidgets('one search finds players, teams and events', (tester) async {
+  testWidgets('one search finds players and teams', (tester) async {
     tester.view.physicalSize = const Size(1400, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     profiles.put(
       const PlayerProfile(uid: 'p2', name: 'Riley Pike', username: 'rpike'),
     );
-    final tournaments = [
-      for (var i = 1; i <= 4; i++)
-        Tournament(
-          id: 'e$i',
-          name: 'Riverside Classic $i',
-          url: '',
-          startDate: DateTime(2026, 12, i),
-          city: 'Austin',
-          state: 'TX',
-        ),
-      Tournament(
-        id: 'old',
-        name: 'Riverside Classic 2020',
-        url: '',
-        startDate: DateTime(2020, 5, 1),
-      ),
-    ];
     final teamSearch = TeamSearchViewModel(
       teamRepository: teams,
       authRepository: auth,
     );
     final players = PlayerSearchViewModel(profileRepository: profiles);
-    final events = TournamentsViewModel(
-      tournamentRepository: FakeTournamentRepository(tournaments),
-      clock: () => DateTime(2026, 11, 4),
-    );
     addTearDown(teamSearch.dispose);
     addTearDown(players.dispose);
-    addTearDown(events.dispose);
     await tester.pumpWidget(
       MaterialApp(
         home: ExploreScreen(
           viewModel: teamSearch,
           players: players,
-          events: events,
           initialQuery: 'ri',
         ),
       ),
@@ -481,18 +456,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Riley Pike'), findsOneWidget);
-    // Upcoming events only, a few at a time in All.
-    expect(find.text('Riverside Classic 1'), findsOneWidget);
-    expect(find.text('Riverside Classic 4'), findsNothing);
-    expect(find.text('Riverside Classic 2020'), findsNothing);
-    await tester.tap(find.text('See all 4 events'));
-    await tester.pumpAndSettle();
-    expect(find.text('Riverside Classic 4'), findsOneWidget);
-    expect(find.text('Riley Pike'), findsNothing, reason: 'Events only');
+    expect(find.widgetWithText(ChoiceChip, 'Events'), findsNothing);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Players'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Teams'));
     await tester.pumpAndSettle();
-    expect(find.text('Riley Pike'), findsOneWidget);
-    expect(find.text('Riverside Classic 1'), findsNothing);
+    expect(find.text('Riley Pike'), findsNothing, reason: 'Teams only');
   });
 }

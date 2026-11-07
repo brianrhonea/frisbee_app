@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
 import '../ui/auth/view_models/choose_username_viewmodel.dart';
@@ -11,7 +12,6 @@ import '../ui/auth/widgets/choose_username_screen.dart';
 import '../ui/auth/widgets/sign_in_screen.dart';
 import '../ui/auth/widgets/sign_up_screen.dart';
 import '../ui/core/ui/view_model_host.dart';
-import '../ui/events/widgets/events_screen.dart';
 import '../ui/home/view_models/home_viewmodel.dart';
 import '../ui/home/widgets/home_screen.dart';
 import '../ui/posts/view_models/post_detail_viewmodel.dart';
@@ -20,17 +20,10 @@ import '../ui/explore/view_models/player_search_viewmodel.dart';
 import '../ui/explore/widgets/explore_screen.dart';
 import '../ui/profile/view_models/player_profile_viewmodel.dart';
 import '../ui/profile/widgets/profile_screen.dart';
-import '../ui/rankings/view_models/rankings_viewmodel.dart';
-import '../ui/rankings/view_models/usau_team_viewmodel.dart';
-import '../ui/rankings/widgets/rankings_screen.dart';
-import '../ui/rankings/widgets/usau_team_screen.dart';
 import '../ui/teams/view_models/team_home_viewmodel.dart';
 import '../ui/teams/view_models/team_search_viewmodel.dart';
 import '../ui/teams/widgets/team_home_screen.dart';
 import '../ui/teams/widgets/team_section_screen.dart';
-import '../ui/tournaments/view_models/tournament_detail_viewmodel.dart';
-import '../ui/tournaments/view_models/tournaments_viewmodel.dart';
-import '../ui/tournaments/widgets/tournament_detail_screen.dart';
 import 'routes.dart';
 
 // Pages that both the app's router (router.dart) and the website's
@@ -57,17 +50,13 @@ Widget explorePage(GoRouterState state) => ViewModelHost(
       TeamSearchViewModel(teamRepository: c.read(), authRepository: c.read()),
   builder: (_, vm) => ViewModelHost(
     create: (c) => PlayerSearchViewModel(profileRepository: c.read()),
-    builder: (_, players) => ViewModelHost(
-      create: (c) => TournamentsViewModel(tournamentRepository: c.read()),
-      builder: (_, events) => ExploreScreen(
-        viewModel: vm,
-        players: players,
-        events: events,
-        initialQuery: state.uri.queryParameters['q'] ?? '',
-        initialFilter: ExploreFilter.values
-            .where((f) => f.name == state.uri.queryParameters['only'])
-            .firstOrNull,
-      ),
+    builder: (_, players) => ExploreScreen(
+      viewModel: vm,
+      players: players,
+      initialQuery: state.uri.queryParameters['q'] ?? '',
+      initialFilter: ExploreFilter.values
+          .where((f) => f.name == state.uri.queryParameters['only'])
+          .firstOrNull,
     ),
   ),
 );
@@ -102,43 +91,6 @@ Widget myProfilePage() => ViewModelHost(
   builder: (_, vm) => PlayerProfileScreen(viewModel: vm),
 );
 
-Widget eventsPage() => ViewModelHost(
-  create: (c) => TournamentsViewModel(tournamentRepository: c.read()),
-  builder: (_, vm) => EventsScreen(viewModel: vm),
-);
-
-Widget tournamentPage(String id) => ViewModelHost(
-  key: ValueKey('tournament-$id'),
-  create: (c) => TournamentDetailViewModel(
-    tournamentId: id,
-    tournamentRepository: c.read(),
-    usauScheduleRepository: c.read(),
-    followRepository: c.read(),
-    notificationRepository: c.read(),
-    authRepository: c.read(),
-  ),
-  builder: (_, vm) => TournamentDetailScreen(viewModel: vm),
-);
-
-Widget rankingsPage() => ViewModelHost(
-  create: (c) => RankingsViewModel(rankingRepository: c.read()),
-  builder: (_, vm) => RankingsScreen(viewModel: vm),
-);
-
-/// A USA Ultimate team page, from Rankings or Teams search.
-Widget usauTeamPage(GoRouterState state) {
-  final url = state.uri.queryParameters['url'] ?? '';
-  return ViewModelHost(
-    key: ValueKey('usau-team-$url'),
-    create: (c) => UsauTeamViewModel(
-      url: url,
-      name: state.uri.queryParameters['name'] ?? '',
-      usauTeamRepository: c.read(),
-    ),
-    builder: (_, vm) => UsauTeamScreen(viewModel: vm),
-  );
-}
-
 /// A team's home page, on the tab named by `?section=`.
 Widget teamPage(GoRouterState state) {
   final teamId = state.pathParameters['teamId']!;
@@ -154,8 +106,6 @@ Widget teamPage(GoRouterState state) {
       followRepository: c.read(),
       notificationRepository: c.read(),
       groupTournamentRepository: c.read(),
-      usauTeamRepository: c.read(),
-      rankingRepository: c.read(),
     ),
     builder: (_, vm) => TeamHomeScreen(
       viewModel: vm,
@@ -173,7 +123,6 @@ Widget homePage() => ViewModelHost(
     eventRepository: c.read(),
     meetingRepository: c.read<MeetingRepository>(),
     teamPostRepository: c.read(),
-    tournamentRepository: c.read(),
     followRepository: c.read(),
     userPostRepository: c.read(),
     filePicker: c.read(),
@@ -191,6 +140,7 @@ Widget postPage(GoRouterState state) {
       userPostRepository: c.read(),
       authRepository: c.read(),
       commentRepository: c.read(),
+      notificationRepository: c.read<NotificationRepository?>(),
     ),
     builder: (_, vm) => PostDetailScreen(
       viewModel: vm,

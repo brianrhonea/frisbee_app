@@ -13,6 +13,7 @@ const List<SitePage> sitePages = [
   (label: 'Terms of Service', path: '/terms'),
   (label: 'Privacy Policy', path: '/privacy'),
   (label: 'Cookie Policy', path: '/cookies'),
+  (label: 'Delete your account', path: '/delete-account'),
 ];
 
 /// Opens one of the site's static pages in this tab.

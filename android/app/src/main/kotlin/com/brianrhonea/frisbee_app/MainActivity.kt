@@ -20,7 +20,10 @@ class MainActivity : FlutterActivity() {
                 // notice's collapse id, see functions/src/notifications).
                 val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 for (n in manager.activeNotifications) {
-                    if (n.tag == tag) manager.cancel(n.tag, n.id)
+                    // Messages are tagged "{collapse id}|{message id}".
+                    if (n.tag == tag || n.tag?.startsWith("$tag|") == true) {
+                        manager.cancel(n.tag, n.id)
+                    }
                 }
                 result.success(null)
             }

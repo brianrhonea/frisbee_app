@@ -21,8 +21,8 @@ import 'ui/core/ui/brand.dart';
 
 /// The website's entry point, served at /app (see scripts/build_site.sh).
 /// The same repositories and screens as the app (lib/main.dart), framed by
-/// a web top bar and limited to search, profiles, team pages, events and
-/// rankings. It skips what only the app does: push, meeting alerts, video
+/// a web top bar and limited to search, profiles, team pages and events.
+/// It skips what only the app does: push, meeting alerts, video
 /// playback setup and the phone orientation lock.
 ///
 /// Run with `flutter run -d chrome -t lib/main_web.dart

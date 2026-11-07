@@ -26,10 +26,7 @@ abstract final class Routes {
   static const createGroup = '/teams/new?kind=community';
   static const createCommunity = '/teams/new?kind=organization';
   static const searchTeams = '/teams/search';
-  static const searchUsauTeams = '/teams/search/usau';
   static const schedule = '/schedule';
-  static const tournaments = '/tournaments';
-  static const rankings = '/rankings';
   static const profile = '/profile';
 
   /// Settings, sliding over the page; its sections open from it.
@@ -46,8 +43,11 @@ abstract final class Routes {
   /// Another player's profile.
   static String player(String uid) => '/players/$uid';
 
-  /// Explore, the app-wide search: players, teams and groups, plus events
-  /// and rankings. [query] fills the search; [only] picks a filter.
+  /// Another player's profile over a page outside the tabs (a chat), with
+  /// `context.push`, so back returns to it.
+  static String personOver(String uid) => '/people/$uid';
+
+  /// Explore, the app-wide search: players, teams and groups. [query] fills the search; [only] picks a filter.
   static String explore({String? query, ExploreFilter? only}) {
     final q = query?.trim() ?? '';
     final params = {'q': ?(q.isEmpty ? null : q), 'only': ?only?.name};
@@ -137,6 +137,18 @@ abstract final class Routes {
   static String teamTournaments(String teamId) =>
       teamSection(teamId, 'tournaments');
 
+  // Hosted tournaments (any team, group or school/club hosts them) open
+  // full screen over the tabs. The list finds upcoming ones.
+  static const tournaments = '/tournaments';
+
+  /// [host] (a group id) opens that group's hat tournament [id] instead
+  /// if there's no hosted tournament [id].
+  static String tournament(String id, {String? host}) =>
+      '$tournaments/$id${host == null ? '' : '?host=${Uri.encodeQueryComponent(host)}'}';
+  static String newTournament(String hostId) =>
+      '$tournaments/new?host=${Uri.encodeQueryComponent(hostId)}';
+  static String editTournament(String id) => '$tournaments/$id/edit';
+
   // Community group tournament pages open over the tabs, like video pages;
   // use `context.push`.
   static const groupTournamentsPath = '/group-tournaments';
@@ -204,22 +216,7 @@ abstract final class Routes {
   static String statsGame(String teamId, String gameId) =>
       '/teams/$teamId/stats/games/$gameId';
   static String seasonStats(String teamId) => '/teams/$teamId/stats/season';
-  static String usauRoster(String teamId) => '/teams/$teamId/usau-roster';
-  static String tournament(String id) => '/tournaments/$id';
-  static const usauTeamPath = '/rankings/team';
-  static String usauTeam(String url, {String name = ''}) =>
-      _usauTeam(usauTeamPath, url, name);
-
-  /// A USA Ultimate team page opened from Teams search, staying in the
-  /// Teams tab so back returns to the results.
-  static String searchedUsauTeam(String url, {String name = ''}) =>
-      _usauTeam('$searchUsauTeams/team', url, name);
-
-  static String _usauTeam(String path, String url, String name) => Uri(
-    path: path,
-    queryParameters: {'url': url, if (name.isNotEmpty) 'name': name},
-  ).toString();
 }
 
 /// Explore's result filters.
-enum ExploreFilter { teams, groups, players, events }
+enum ExploreFilter { teams, groups, players }

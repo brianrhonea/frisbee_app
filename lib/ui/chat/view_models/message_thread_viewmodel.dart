@@ -4,14 +4,28 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/draft/message_draft_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/people/people_repository.dart';
 import '../../../data/services/file_picker_service.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../utils/command.dart';
+import '../../../utils/on_screen.dart';
 import '../../../utils/pending_removals.dart';
 import '../../../utils/result.dart';
+
+/// How a thread lays out its messages.
+enum ThreadStyle {
+  /// Like a phone's messages app: the user's on the right, the other
+  /// person's on the left, in bubbles, without names or faces. For a
+  /// conversation between two people.
+  bubbles,
+
+  /// Like Discord: everyone on the left, each run of messages under its
+  /// author's photo and name. For groups and team chats.
+  feed,
+}
 
 /// A list of messages with a composer: shared by team chat rooms and
 /// direct messages. Subclasses say where messages come from and go.
@@ -21,10 +35,12 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     required FilePickerService filePicker,
     PeopleRepository? peopleRepository,
     NotificationRepository? notificationRepository,
+    MessageDraftRepository? draftRepository,
   }) : _auth = authRepository,
        _picker = filePicker,
        _people = peopleRepository,
-       _notices = notificationRepository {
+       _notices = notificationRepository,
+       _draftStore = draftRepository {
     if (notificationRepository != null) {
       _lifecycle = _tryLifecycleListener(_markSeen);
     }
@@ -34,6 +50,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     recordVideo = Command0<void>(() => _capture(_picker.recordVideo));
     deleteMessage = Command1<void, ChatMessage>(_delete);
     saveAttachment = Command1<bool, ChatAttachment>(_saveAttachment);
+    react = Command1<void, (ChatMessage, String)>((a) => _react(a.$1, a.$2));
   }
 
   static const pageSize = 50;
@@ -42,6 +59,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   final FilePickerService _picker;
   final PeopleRepository? _people;
   final NotificationRepository? _notices;
+  final MessageDraftRepository? _draftStore;
   AppLifecycleListener? _lifecycle;
 
   /// The newest message from someone else already marked seen.
@@ -74,6 +92,55 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   /// Downloads an attachment and asks where to save it. False if cancelled.
   late final Command1<bool, ChatAttachment> saveAttachment;
 
+  /// Reacts to a message with an emoji; the same one again takes it back,
+  /// another replaces it.
+  late final Command1<void, (ChatMessage, String)> react;
+
+  /// How the messages are laid out.
+  ThreadStyle get style => ThreadStyle.feed;
+
+  /// Whether messages can be reacted to and replied to.
+  bool get canReact => true;
+
+  /// Whether tapping an author's name or photo opens their profile.
+  bool get opensProfiles => true;
+
+  // Replies ------------------------------------------------------------------
+
+  ChatMessage? _replyingTo;
+
+  /// The message the next one answers; null for none.
+  ChatMessage? get replyingTo => _replyingTo;
+
+  /// Starts a reply to [message]: it's quoted above the composer.
+  void replyTo(ChatMessage message) {
+    if (!canWrite || !canReact) return;
+    _replyingTo = message;
+    notifyListeners();
+  }
+
+  void cancelReply() {
+    if (_replyingTo == null) return;
+    _replyingTo = null;
+    notifyListeners();
+  }
+
+  // Drafts -------------------------------------------------------------------
+
+  /// Where this thread's unsent text is kept; null keeps none.
+  @protected
+  String? get draftKey => noticeKey;
+
+  /// What was left unsent in the composer last time.
+  String get draft => switch (draftKey) {
+    final key? => _draftStore?.draft(key) ?? '',
+    null => '',
+  };
+
+  void _saveDraft(String text) {
+    if (draftKey case final key?) _draftStore?.save(key, text);
+  }
+
   /// The newest [pageSize] messages, live.
   List<ChatMessage>? _live;
 
@@ -101,8 +168,9 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   Future<Result<void>> postMessage(
     AppUser author,
     String text,
-    List<NewAttachment> attachments,
-  );
+    List<NewAttachment> attachments, {
+    MessageReply? replyTo,
+  });
   @protected
   Future<Result<void>> removeMessage(ChatMessage message);
   @protected
@@ -162,6 +230,11 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   /// Tells the others the user is typing, or has stopped.
   @protected
   Future<void> sendTyping({required bool typing}) async {}
+
+  /// Sets or clears the user's reaction to [message].
+  @protected
+  Future<Result<void>> setReaction(ChatMessage message, String? emoji) async =>
+      Result.error(Exception("Reactions aren't available here."));
 
   /// The name to show for [uid] when they're typing.
   @protected
@@ -238,6 +311,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   /// [typingEvery], and that the user stopped once it's empty.
   void composerChanged(String text) {
     if (!canWrite) return;
+    _saveDraft(text);
     final at = now();
     if (text.trim().isEmpty) {
       if (_sentTypingAt != null) {
@@ -255,7 +329,6 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   /// The collapse id of this thread's notifications (see
   /// functions/src/notifications/model.ts), cleared once its messages
   /// are on screen; null for none.
-  @protected
   String? get noticeKey => null;
 
   /// Clears this thread's notification once its newest message from
@@ -266,6 +339,8 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     final live = _live;
     if (notices == null || key == null || live == null || _disposed) return;
     if (!_inForeground()) return;
+    // Open in a tab that's in the background, say: not seen yet.
+    if (OnScreen.isHidden(key)) return;
     final newest = live.lastWhere(
       (m) => m.authorId != uid,
       orElse: () => const ChatMessage(id: '', authorId: '', authorName: ''),
@@ -275,6 +350,9 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     _seenUpTo = newest.id;
     notices.markSeen(uid, key);
   }
+
+  /// The thread came (back) into view: clears what arrived meanwhile.
+  void shown() => _markSeen();
 
   static bool _inForeground() {
     try {
@@ -304,7 +382,13 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   String get uid => _auth.currentUser?.uid ?? '';
   List<ChatMessage> get messages {
-    final all = removals.visible([..._older, ...?_live]);
+    final all = [
+      for (final m in removals.visible([..._older, ...?_live]))
+        if (_reacting[m.id] case (final emoji,))
+          m.withReaction(uid, emoji)
+        else
+          m,
+    ];
     final after = hiddenBefore;
     if (after == null) return all;
     return [
@@ -458,15 +542,38 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     if (user == null) return Result.error(Exception('Not signed in'));
     if (text.trim().isEmpty && _drafts.isEmpty) return const Result.ok(null);
     final attachments = List.of(_drafts);
-    final result = await postMessage(user, text, attachments);
+    final reply = _replyingTo;
+    final result = await postMessage(
+      user,
+      text,
+      attachments,
+      replyTo: reply == null ? null : MessageReply.of(reply),
+    );
     if (_sentTypingAt != null) {
       _sentTypingAt = null;
       unawaited(sendTyping(typing: false));
     }
     if (result is Ok) {
       _drafts.removeWhere(attachments.contains);
+      if (identical(_replyingTo, reply)) _replyingTo = null;
+      _saveDraft('');
       notifyListeners();
     }
+    return result;
+  }
+
+  /// Reactions sent but not yet back from the server, by message id; a
+  /// one-element record so "taken back" (null) is distinct from none.
+  final _reacting = <String, (String?,)>{};
+
+  Future<Result<void>> _react(ChatMessage message, String emoji) async {
+    final current = _reacting[message.id]?.$1 ?? message.reactionOf(uid);
+    final next = current == emoji ? null : emoji;
+    _reacting[message.id] = (next,);
+    notifyListeners();
+    final result = await setReaction(message, next);
+    if (_reacting[message.id]?.$1 == next) _reacting.remove(message.id);
+    if (!_disposed) notifyListeners();
     return result;
   }
 
@@ -543,6 +650,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     _disposed = true;
     takePhoto.dispose();
     recordVideo.dispose();
+    react.dispose();
     _typingSub?.cancel();
     _typingExpiry?.cancel();
     if (_sentTypingAt != null) unawaited(sendTyping(typing: false));

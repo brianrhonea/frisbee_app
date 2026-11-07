@@ -352,7 +352,7 @@ void main() {
     test('offers followed tournaments as tags', () async {
       await follows.follow(
         testUser.uid,
-        const FollowTarget.event('nats', 'Nationals'),
+        const FollowTarget.tournament('g1', 'x1', 'Nationals'),
       );
       await follows.follow(
         testUser.uid,

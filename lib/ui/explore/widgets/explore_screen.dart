@@ -5,36 +5,29 @@ import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/team.dart';
-import '../../../domain/models/tournament.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../../teams/view_models/team_search_viewmodel.dart';
-import '../../tournaments/view_models/tournaments_viewmodel.dart';
-import '../../tournaments/widgets/tournament_widgets.dart' show formatDateRange;
 import '../view_models/player_search_viewmodel.dart';
 import '../../core/ui/app_search_field.dart';
 import '../../core/ui/skeleton.dart';
 import '../../shell/widgets/app_shell.dart' show SearchField;
 
-/// Explore: search players, teams, groups and events in one box, and
-/// jump to rankings, USA Ultimate teams, or starting a team.
+/// Explore: search players, teams and groups in one box, and jump to
+/// starting a team or group.
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({
     super.key,
     required this.viewModel,
     required this.players,
-    required this.events,
     this.initialQuery = '',
     this.initialFilter,
   });
 
   final TeamSearchViewModel viewModel;
   final PlayerSearchViewModel players;
-
-  /// USA Ultimate events, filtered by the same search.
-  final TournamentsViewModel events;
 
   /// Search text from the top bar's search field.
   final String initialQuery;
@@ -49,21 +42,15 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   TeamSearchViewModel get vm => widget.viewModel;
   PlayerSearchViewModel get players => widget.players;
-  TournamentsViewModel get events => widget.events;
   late final _text = TextEditingController(text: widget.initialQuery);
   Timer? _debounce;
 
   /// The picked chip; null for All.
   ExploreFilter? _only;
 
-  /// Events in All, before "See all".
-  static const _eventsInAll = 3;
-
   void _search(String text) {
     vm.search.execute(text);
     players.search.execute(text);
-    final q = text.trim();
-    events.setQuery(q.length < TeamSearchViewModel.minQueryLength ? '' : q);
   }
 
   @override
@@ -118,7 +105,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             const PageHeader(
               eyebrow: 'Explore',
               title: 'Find your next point.',
-              subtitle: 'Players, teams, pickup groups, events and rankings.',
+              subtitle: 'Players, teams and pickup groups.',
             ),
           SideColumnLayout(
             main: [_searchCard(context)],
@@ -145,12 +132,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
           const SizedBox(height: 10),
           ListenableBuilder(
-            listenable: Listenable.merge([
-              vm,
-              vm.search,
-              players.search,
-              events,
-            ]),
+            listenable: Listenable.merge([vm, vm.search, players.search]),
             builder: (context, _) {
               final only = _only;
               final all = only == null;
@@ -159,41 +141,29 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   only == ExploreFilter.teams ||
                   only == ExploreFilter.groups;
               final playersShown = all || only == ExploreFilter.players;
-              final eventsShown = all || only == ExploreFilter.events;
 
               final results = teamsShown ? vm.results : const <TeamListing>[];
               final people = playersShown
                   ? players.results
                   : const <PlayerProfile>[];
-              final searched = events.query.isNotEmpty;
-              final allEvents = eventsShown && searched
-                  ? events.tournaments
-                  : const <Tournament>[];
-              final shownEvents = all
-                  ? allEvents.take(_eventsInAll).toList()
-                  : allEvents;
 
               final running =
                   (teamsShown && vm.search.running) ||
-                  (playersShown && players.search.running) ||
-                  (eventsShown && searched && events.loading);
+                  (playersShown && players.search.running);
               final failed = (teamsShown && vm.search.error)
                   ? vm.search.result
                   : (playersShown && players.search.error)
                   ? players.search.result
                   : null;
-              final nothing =
-                  results.isEmpty && people.isEmpty && shownEvents.isEmpty;
+              final nothing = results.isEmpty && people.isEmpty;
               final noMatches =
                   nothing &&
                   !running &&
                   (!teamsShown || vm.noMatches) &&
-                  (!playersShown || players.noMatches) &&
-                  (!eventsShown || searched);
+                  (!playersShown || players.noMatches);
               final sections = [
                 results.isNotEmpty,
                 people.isNotEmpty,
-                shownEvents.isNotEmpty,
               ].where((x) => x).length;
 
               return Column(
@@ -208,7 +178,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         ('Players', ExploreFilter.players),
                         ('Teams', ExploreFilter.teams),
                         ('Groups', ExploreFilter.groups),
-                        ('Events', ExploreFilter.events),
                       ])
                         ChoiceChip(
                           label: Text(label),
@@ -230,15 +199,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       title: 'Nothing found',
                       message:
                           'Try another word from a name, username, city, '
-                          'school, team or event.',
+                          'school or team.',
                     )
                   else if (nothing)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       child: Text(
                         'Type at least ${TeamSearchViewModel.minQueryLength} '
-                        'letters to search players, teams, groups and '
-                        'events.',
+                        'letters to search players, teams and groups.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: c.muted),
                       ),
@@ -251,51 +219,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     if (sections > 1) const _ResultsHeading('Teams and groups'),
                     for (final t in results) _ResultTile(listing: t, vm: vm),
                   ],
-                  if (shownEvents.isNotEmpty) ...[
-                    if (sections > 1) const _ResultsHeading('Events'),
-                    for (final t in shownEvents) _EventTile(tournament: t),
-                    if (allEvents.length > shownEvents.length)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton(
-                          onPressed: () => setState(
-                            () => _applyFilter(ExploreFilter.events),
-                          ),
-                          child: Text('See all ${allEvents.length} events'),
-                        ),
-                      ),
-                  ],
                 ],
               );
             },
           ),
         ],
       ),
-    );
-  }
-}
-
-/// An upcoming USA Ultimate event in search results.
-class _EventTile extends StatelessWidget {
-  const _EventTile({required this.tournament});
-
-  final Tournament tournament;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tournament;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: const CircleAvatar(child: Icon(Icons.emoji_events_outlined)),
-      title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(
-        [
-          formatDateRange(t.startDate, t.endDate),
-          if (t.location.isNotEmpty) t.location,
-        ].join(' · '),
-      ),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => context.push(Routes.tournament(t.id)),
     );
   }
 }
@@ -375,21 +304,9 @@ class _Shortcuts extends StatelessWidget {
     final items = [
       (
         Icons.emoji_events_outlined,
-        'Events',
-        'USA Ultimate tournaments near you',
-        () => context.go(Routes.tournaments),
-      ),
-      (
-        Icons.leaderboard_outlined,
-        'Rankings',
-        'Every division, top to bottom',
-        () => context.go(Routes.rankings),
-      ),
-      (
-        Icons.travel_explore_outlined,
-        'USA Ultimate teams',
-        'Rosters and results for any ranked team',
-        () => context.go(Routes.searchUsauTeams),
+        'Find a tournament',
+        'Apply with your team, or follow results',
+        () => context.push(Routes.tournaments),
       ),
       (
         Icons.add_circle_outline,

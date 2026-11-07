@@ -102,7 +102,7 @@ void main() {
     expect(vm.current, isNull);
   });
 
-  testWidgets('tapping opens it and marks it read', (tester) async {
+  testWidgets('tapping opens it and puts the entry away', (tester) async {
     await pump(tester);
     arrive(_dm());
     await tester.pump();
@@ -111,7 +111,7 @@ void main() {
     await tester.tap(find.textContaining('Pat Player', findRichText: true));
     await tester.pump();
     expect(opened, ['/messages/c1']);
-    expect(repo.feed.firstWhere((n) => n.id == 'c1').read, isTrue);
+    expect(repo.feed.where((n) => n.id == 'c1'), isEmpty);
     expect(vm.current, isNull);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));

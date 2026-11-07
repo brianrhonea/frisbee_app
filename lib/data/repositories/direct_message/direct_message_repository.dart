@@ -93,10 +93,20 @@ abstract class DirectMessageRepository {
     required AppUser author,
     required String text,
     List<NewAttachment> attachments = const [],
+    MessageReply? replyTo,
   });
 
   /// Deletes one of the author's own messages and its attachments.
   Future<Result<void>> deleteMessage(String id, ChatMessage message);
+
+  /// Sets [uid]'s reaction to message [messageId] in conversation [id];
+  /// null takes it away.
+  Future<Result<void>> setReaction(
+    String id,
+    String messageId,
+    String uid,
+    String? emoji,
+  );
 
   /// Marks the conversation read by [uid] now.
   Future<Result<void>> markRead(

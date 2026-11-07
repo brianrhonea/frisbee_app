@@ -167,6 +167,30 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
 
+    // A message's quote of the one it answers (MessageReply in
+    // lib/domain/models/chat.dart), copied when the reply is sent.
+    function validReplyTo(r) {
+      return r is map
+        && r.keys().hasOnly(['id', 'authorId', 'authorName', 'text'])
+        && validString(r.id, 128) && r.id.size() > 0
+        && validString(r.authorId, 128)
+        && validString(r.authorName, 80)
+        && validString(r.text, 200);
+    }
+    function validNewMessageReply(d) {
+      return !('replyTo' in d) || validReplyTo(d.replyTo);
+    }
+    // Reacting to a message: someone who can read it sets or clears
+    // their own entry in `reactions` (uid → one emoji), nothing else.
+    function reactsOnlyAsMe() {
+      let before = resource.data.get('reactions', {});
+      let after = request.resource.data.get('reactions', {});
+      return changed().hasOnly(['reactions'])
+        && after is map
+        && after.diff(before).affectedKeys().hasOnly([uid()])
+        && (!(uid() in after) || validString(after[uid()], 16));
+    }
+
     // Event details, shared by team and personal events.
     function validEvent(e) {
       return validEventDetails(e)
@@ -304,7 +328,7 @@ service cloud.firestore {
           return d.keys().hasOnly(['key', 'type', 'targetId', 'groupId',
                                    'name', 'photoUrl', 'notify', 'createdAt',
                                    'approved'])
-            && d.type in ['user', 'team', 'tournament', 'event']
+            && d.type in ['user', 'team', 'tournament']
             && validString(d.targetId, 300) && d.targetId.size() > 0
             && d.key == key
             && key == d.type + '_' + d.targetId
@@ -383,7 +407,7 @@ service cloud.firestore {
         && request.resource.data.memberNames.keys().hasOnly([uid()]);
 
       allow update: if signedIn() && (
-        editDetails() || linkUsau() || dropLegacyCode() || changeRole() ||
+        editDetails() || dropLegacyCode() || changeRole() ||
         setStatKeepers() || transferOwnership() || removeMember() || join() ||
         joinOpenGroup() || approveRequest() || acceptInvite() || markDeleting() ||
         setRoles() || setOrg() || editLinks()
@@ -425,13 +449,15 @@ service cloud.firestore {
         return resource.data.memberIds == [uid()];
       }
 
-      // The kind never changes, and only groups have group fields.
+      // The kind never changes, and only groups have group fields. Nor
+      // does a team's division: team names are unique per division, and
+      // changing it goes through support.
       function editDetails() {
         return can(resource.data, 'manageTeam')
           && changed().hasOnly(isGroup(resource.data)
-               ? ['name', 'division', 'level', 'city', 'description',
+               ? ['name', 'level', 'city', 'description',
                   'requiresApproval', 'location']
-               : ['name', 'division', 'level', 'city'])
+               : ['name', 'level', 'city'])
           && validTeamFields(request.resource.data);
       }
 
@@ -489,18 +515,6 @@ service cloud.firestore {
           && soleOwner()
           && changed().hasOnly(['deletingAt'])
           && request.resource.data.get('deletingAt', request.time) == request.time;
-      }
-
-            // Admins link the team's USA Ultimate page and stamp roster syncs.
-      function linkUsau() {
-        let t = request.resource.data;
-        return can(resource.data, 'manageTeam')
-          && changed().hasOnly(['usauUrl', 'usauName', 'usauSyncedAt'])
-          && (t.get('usauUrl', null) == null
-              || (t.usauUrl is string && t.usauUrl.size() <= 300
-                  && t.usauUrl.matches('https://play[.]usaultimate[.]org/teams/events/Eventteam/[?]TeamId=.+')))
-          && (t.get('usauName', null) == null || validString(t.usauName, 120))
-          && (t.get('usauSyncedAt', null) == null || t.usauSyncedAt == request.time);
       }
 
       // Admins move an older team's code off the team doc (into
@@ -748,14 +762,13 @@ service cloud.firestore {
                 && linkedTo(request.resource.data) == null));
       }
 
-      // Per-player paid mark and USA Ultimate status, keyed like roster.
+      // Per-player paid mark, keyed like roster.
       // Owners, coaches and captains only; players can't read it.
       match /rosterStatus/{playerId} {
         allow read, delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageTeam');
         allow create, update: if signedIn()
           && can(get(teamPath(teamId)).data, 'manageTeam')
-          && request.resource.data.keys().hasOnly(['onUsau', 'paid'])
-          && (request.resource.data.get('onUsau', null) == null || request.resource.data.onUsau is bool)
+          && request.resource.data.keys().hasOnly(['paid'])
           && request.resource.data.get('paid', false) is bool;
       }
 
@@ -852,6 +865,15 @@ service cloud.firestore {
           && request.resource.data.votes == {}
           && validEvent(request.resource.data);
         allow update: if signedIn() && (respond() || editDetails());
+      }
+
+      // The hosted tournaments the team has entered, and its entry's
+      // status (functions/src/tournaments keeps them; entries don't name
+      // their team in a field). Members read them; managers delete them
+      // with the team.
+      match /tournamentEntries/{tournamentId} {
+        allow read: if signedIn() && isMember(get(teamPath(teamId)).data);
+        allow delete: if signedIn() && can(get(teamPath(teamId)).data, 'manageTeam');
       }
 
       // Copies of events marked public, for the team's public home page:
@@ -1225,8 +1247,12 @@ service cloud.firestore {
             return g.keys().hasOnly([
                      'order', 'stage', 'round', 'label', 'pool', 'field',
                      'startsAt', 'teamA', 'teamB', 'sourceA', 'sourceB',
-                     'status', 'scoreA', 'scoreB', 'report', 'ifNeeded'])
-              && g.stage in ['pool', 'winners', 'losers', 'grandFinal', 'reset']
+                     'status', 'scoreA', 'scoreB', 'report', 'ifNeeded',
+                     'place'])
+              && g.stage in ['pool', 'winners', 'losers', 'grandFinal', 'reset',
+                             'crossover', 'placement']
+              && (g.get('place', null) == null
+                  || (g.place is int && g.place >= 1 && g.place <= 64))
               && g.status in ['scheduled', 'reported', 'done']
               && validString(g.label, 60)
               && (g.status != 'done'
@@ -1363,7 +1389,9 @@ service cloud.firestore {
           allow create: if signedIn() && notMuted() && isMember(team())
             && canWriteRoom(team(), room())
             && request.resource.data.keys().hasOnly([
-                 'authorId', 'authorName', 'text', 'attachments', 'createdAt'])
+                 'authorId', 'authorName', 'text', 'attachments', 'createdAt',
+                 'replyTo'])
+            && validNewMessageReply(request.resource.data)
             && request.resource.data.authorId == uid()
             && validString(request.resource.data.authorName, 80)
             && validString(request.resource.data.text, 4000)
@@ -1372,6 +1400,10 @@ service cloud.firestore {
             && (request.resource.data.text.size() > 0
                 || request.resource.data.attachments.size() > 0)
             && request.resource.data.createdAt == request.time;
+          // Anyone who can read the room reacts.
+          allow update: if signedIn() && isMember(team())
+            && canReadRoom(team(), room())
+            && reactsOnlyAsMe();
           // Authors delete their own; the owner and moderators who can
           // read the room moderate, and chat managers clear a room they
           // delete.
@@ -1478,21 +1510,258 @@ service cloud.firestore {
       }
     }
 
+    // ---- Hosted tournaments -----------------------------------------------
+
+    // Tournaments a team, group or school/club hosts (HostedTournament in
+    // lib/domain/models/hosted_tournament.dart). The host's members with
+    // Manage events run them. Once published (any status but draft) the
+    // tournament, divisions, entries and games are public to anyone signed
+    // in; bid fee payments stay with the host's managers and the team.
+    match /tournaments/{tournamentId} {
+      function tournamentPath() {
+        return /databases/$(database)/documents/tournaments/$(tournamentId);
+      }
+      function current() { return get(tournamentPath()).data; }
+      function manages(t) { return can(get(teamPath(t.hostId)).data, 'manageEvents'); }
+      function visible(t) { return t.status != 'draft' || manages(t); }
+      function teamAdmin(teamId) {
+        return can(get(teamPath(teamId)).data, 'manageTeam');
+      }
+
+      function validBidFee(f) {
+        return f == null
+          || (f.keys().hasOnly(['amountCents', 'currency', 'instructions', 'dueAt'])
+              && f.amountCents is int && f.amountCents >= 0
+              && f.amountCents <= 10000000
+              && f.currency is string && f.currency.matches('[A-Z]{3}')
+              && validString(f.instructions, 500)
+              && (f.dueAt == null || f.dueAt is timestamp));
+      }
+
+      function validHosted(t) {
+        return t.keys().hasOnly([
+                 'hostId', 'hostName', 'hostKind', 'name', 'startsOn', 'endsOn',
+                 'description', 'location', 'visibility', 'entryType', 'status',
+                 'bidFee', 'divisions', 'createdBy', 'createdAt'])
+          && t.name is string && t.name.size() > 0 && t.name.size() <= 100
+          && validString(t.hostName, 100)
+          && t.hostKind in ['team', 'community', 'organization']
+          && t.startsOn is timestamp
+          && (t.endsOn == null || t.endsOn is timestamp)
+          && validString(t.description, 2000)
+          && validString(t.location, 200)
+          && t.visibility in ['public', 'inviteOnly']
+          && t.entryType in ['teams', 'players']
+          && t.status in ['draft', 'registration', 'seeding', 'scheduled', 'live', 'finished']
+          && validBidFee(t.get('bidFee', null))
+          && t.divisions is list && t.divisions.size() <= 12;
+      }
+
+      allow read: if signedIn() && visible(resource.data);
+      allow create: if signedIn()
+        && manages(request.resource.data)
+        && request.resource.data.createdBy == uid()
+        && request.resource.data.createdAt == request.time
+        && validHosted(request.resource.data);
+      allow update: if signedIn()
+        && manages(resource.data)
+        && request.resource.data.hostId == resource.data.hostId
+        && !('createdBy' in changed()) && !('createdAt' in changed())
+        && validHosted(request.resource.data);
+      allow delete: if signedIn() && manages(resource.data);
+
+      // Divisions: format, seeds and which uids report each team's scores.
+      match /divisions/{divisionId} {
+        function divisionPath() {
+          return /databases/$(database)/documents/tournaments/$(tournamentId)/divisions/$(divisionId);
+        }
+        function validDivision(d) {
+          return d.keys().hasOnly(['division', 'level', 'settings', 'maxTeams',
+                                   'seeds', 'captains', 'placements'])
+            && d.division in ['mixed', 'open', 'women', 'masters']
+            && d.level in ['club', 'college', 'youth', 'league', 'pickup']
+            && d.settings is map
+            && d.maxTeams is int && d.maxTeams >= 2 && d.maxTeams <= 64
+            && d.seeds is list && d.seeds.size() <= d.maxTeams
+            && d.captains is map && d.captains.size() <= 64
+            && d.placements is list && d.placements.size() <= 64;
+        }
+
+        allow read: if signedIn() && visible(current());
+        allow create, update: if signedIn() && manages(current())
+          && validDivision(request.resource.data);
+        allow delete: if signedIn() && manages(current());
+
+        // Games (GroupGame), like group tournament games: managers write
+        // anything; a team's captain reports, the other confirms; a
+        // captain from a finished game moves its winner and loser on.
+        match /games/{gameId} {
+          function division() { return get(divisionPath()).data; }
+          function gamePath(id) {
+            return /databases/$(database)/documents/tournaments/$(tournamentId)/divisions/$(divisionId)/games/$(id);
+          }
+          function captainOf(teamRef) {
+            return teamRef != null && uid() in division().captains.get(teamRef, []);
+          }
+          function validScore(n) { return n is int && n >= 0 && n <= 99; }
+
+          function validGame(g) {
+            return g.keys().hasOnly([
+                     'order', 'stage', 'round', 'label', 'pool', 'field',
+                     'startsAt', 'teamA', 'teamB', 'sourceA', 'sourceB',
+                     'status', 'scoreA', 'scoreB', 'report', 'ifNeeded',
+                     'place'])
+              && g.stage in ['pool', 'winners', 'losers', 'grandFinal', 'reset',
+                             'crossover', 'placement']
+              && (g.get('place', null) == null
+                  || (g.place is int && g.place >= 1 && g.place <= 64))
+              && g.status in ['scheduled', 'reported', 'done']
+              && validString(g.label, 60)
+              && (g.status != 'done'
+                  || (validScore(g.scoreA) && validScore(g.scoreB)
+                      && g.scoreA != g.scoreB));
+          }
+
+          function report() {
+            let g = resource.data;
+            let r = request.resource.data.report;
+            return changed().hasOnly(['report', 'status'])
+              && g.teamA != null && g.teamB != null
+              && g.status != 'done'
+              && request.resource.data.status == 'reported'
+              && r.keys().hasOnly(['scoreA', 'scoreB', 'byTeam'])
+              && validScore(r.scoreA) && validScore(r.scoreB)
+              && r.scoreA != r.scoreB
+              && r.byTeam in [g.teamA, g.teamB]
+              && captainOf(r.byTeam);
+          }
+
+          function confirm() {
+            let g = resource.data;
+            let d = request.resource.data;
+            let other = g.report.byTeam == g.teamA ? g.teamB : g.teamA;
+            return g.status == 'reported'
+              && changed().hasOnly(['status', 'scoreA', 'scoreB', 'report'])
+              && captainOf(other)
+              && d.status == 'done'
+              && d.scoreA == g.report.scoreA
+              && d.scoreB == g.report.scoreB
+              && d.report == null;
+          }
+
+          function resultOf(source) {
+            let g = getAfter(gamePath(source.game)).data;
+            let winner = g.scoreA > g.scoreB ? g.teamA : g.teamB;
+            let loser = g.scoreA > g.scoreB ? g.teamB : g.teamA;
+            return g.status == 'done'
+              ? (source.type == 'winner' ? winner : loser)
+              : null;
+          }
+
+          // An empty slot gets the team its source game sent it, written
+          // by a captain of that source game.
+          function slotFilled(side) {
+            let before = resource.data['team' + side];
+            let after = request.resource.data['team' + side];
+            let source = resource.data['source' + side];
+            return after == before
+              || (before == null
+                  && source != null
+                  && source.type in ['winner', 'loser']
+                  && after != null
+                  && after == resultOf(source)
+                  && (captainOf(getAfter(gamePath(source.game)).data.teamA)
+                      || captainOf(getAfter(gamePath(source.game)).data.teamB)));
+          }
+
+          function advance() {
+            return changed().hasOnly(['teamA', 'teamB'])
+              && slotFilled('A') && slotFilled('B');
+          }
+
+          allow read: if signedIn() && visible(current());
+          allow create: if signedIn() && manages(current())
+            && validGame(request.resource.data);
+          allow delete: if signedIn() && manages(current());
+          allow update: if signedIn() && (
+            (manages(current()) && validGame(request.resource.data))
+            || report() || confirm() || advance()
+          );
+        }
+      }
+
+      // A team's entry, keyed by team id. Managers invite, accept,
+      // waitlist and decline. The team's admins apply (public tournaments
+      // taking entries), answer an invite (invited → applied), change
+      // their captains (members of the team), and withdraw.
+      match /entries/{teamId} {
+        function validEntry(e) {
+          return e.keys().hasOnly(['teamName', 'divisionId', 'status',
+                                   'captainIds', 'updatedAt'])
+            && e.teamName is string && e.teamName.size() > 0
+            && e.teamName.size() <= 100
+            && validString(e.divisionId, 100)
+            && e.status in ['invited', 'applied', 'accepted', 'waitlisted',
+                            'declined', 'withdrawn']
+            && e.captainIds is list && e.captainIds.size() <= 4
+            && e.captainIds.toSet()
+                 .difference(get(teamPath(teamId)).data.memberIds.toSet())
+                 .size() == 0
+            && e.updatedAt == request.time;
+        }
+        function teamApplies(t) {
+          return teamAdmin(teamId)
+            && request.resource.data.status == 'applied'
+            && t.status == 'registration'
+            && (t.visibility == 'public'
+                || (resource != null && resource.data.status == 'invited'));
+        }
+        function teamEdits() {
+          return teamAdmin(teamId)
+            && resource.data.status == request.resource.data.status
+            && resource.data.status in ['applied', 'accepted', 'waitlisted']
+            && changed().hasOnly(['captainIds', 'updatedAt']);
+        }
+        function teamWithdraws() {
+          return teamAdmin(teamId)
+            && request.resource.data.status == 'withdrawn'
+            && changed().hasOnly(['status', 'updatedAt']);
+        }
+
+        allow read: if signedIn() && visible(current());
+        allow create: if signedIn() && validEntry(request.resource.data)
+          && (manages(current()) || teamApplies(current()));
+        allow update: if signedIn() && validEntry(request.resource.data)
+          && (manages(current()) || teamApplies(current())
+              || teamEdits() || teamWithdraws());
+        allow delete: if signedIn() && manages(current());
+      }
+
+      // Bid fee payments: the host's managers mark them; the team's admins
+      // can see their own.
+      match /payments/{teamId} {
+        allow read: if signedIn() && (manages(current()) || teamAdmin(teamId));
+        allow create, update: if signedIn() && manages(current())
+          && request.resource.data.keys().hasOnly(['paid', 'paidAt', 'note'])
+          && request.resource.data.paid is bool
+          && (request.resource.data.paidAt == null
+              || request.resource.data.paidAt is timestamp)
+          && validString(request.resource.data.note, 200);
+        allow delete: if signedIn() && manages(current());
+      }
+    }
+
     // ---- Team directory ---------------------------------------------------
 
     // Public team listings for search (TeamListing in
-    // lib/domain/models/team.dart): name, division, level, city and the
-    // linked USA Ultimate page, copied from the team. Editors write them
-    // with the team, so getAfter covers the create and edit batches.
+    // lib/domain/models/team.dart): name, division, level and city, copied
+    // from the team. Editors write them with the team, so getAfter covers
+    // the create and edit batches.
     match /teamDirectory/{teamId} {
       function validListing(d, team) {
         return d.keys().hasOnly([
                  'name', 'division', 'level', 'city', 'keywords', 'kind',
-                 'description', 'requiresApproval', 'location', 'usauUrl',
-                 'usauName'])
-          && d.get('usauUrl', null) == team.get('usauUrl', null)
-          && d.get('usauName', null) == team.get('usauName', null)
-
+                 'description', 'requiresApproval', 'location'])
           && d.name == team.name
           && d.division == team.division
           && d.level == team.level
@@ -1696,7 +1965,7 @@ service cloud.firestore {
                   && (p.body.size() > 0 || images.size() > 0)))
           && (p.get('tournamentKey', null) == null
               || (validString(p.tournamentKey, 300)
-                  && p.tournamentKey.matches('(tournament|event)_.+')))
+                  && p.tournamentKey.matches('tournament_.+')))
           && (p.get('tournamentName', null) == null
               || validString(p.tournamentName, 100));
       }
@@ -2119,7 +2388,9 @@ service cloud.firestore {
           && !(get(convPath()).data.get('status', 'accepted') == 'request'
                && get(convPath()).data.get('requestedOf', null) == uid())
           && request.resource.data.keys().hasOnly([
-               'authorId', 'authorName', 'text', 'attachments', 'createdAt'])
+               'authorId', 'authorName', 'text', 'attachments', 'createdAt',
+               'replyTo'])
+          && validNewMessageReply(request.resource.data)
           && request.resource.data.authorId == uid()
           && validString(request.resource.data.authorName, 80)
           && validString(request.resource.data.text, 4000)
@@ -2128,6 +2399,8 @@ service cloud.firestore {
           && (request.resource.data.text.size() > 0
               || request.resource.data.attachments.size() > 0)
           && request.resource.data.createdAt == request.time;
+        // Anyone in the conversation reacts.
+        allow update: if signedIn() && inConversation() && reactsOnlyAsMe();
         allow delete: if signedIn() && resource.data.authorId == uid();
       }
 
@@ -2177,14 +2450,9 @@ service cloud.firestore {
             || isOwner(get(teamPath(resource.data.teamId)).data));
     }
 
-    // ---- USA Ultimate cache (written by Cloud Functions only) -------------
+    // ---- App metadata (written by the Admin SDK only) ---------------------
 
-    match /usau_tournaments/{id} {
-      allow read: if signedIn();
-    }
-    match /usau_rankings/{id} {
-      allow read: if signedIn();
-    }
+    // Feature flags (meta/flags) and the health check (meta/health).
     match /meta/{id} {
       allow read: if signedIn();
     }

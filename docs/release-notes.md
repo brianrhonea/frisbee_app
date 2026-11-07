@@ -10,6 +10,28 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.14 (in TestFlight from `development`)
+
+**Host a tournament**
+- Any team, pickup group or school/club can host a tournament from its
+  **Tournaments** section: dates, place, public or invite only, and an
+  optional **bid fee** (teams pay you directly; you mark them paid).
+- Add **divisions** (say Club Mixed and Club Open), each with its own
+  team cap, format and game rules. **Suggest** picks a format for the
+  number of teams.
+- Team admins **apply** with their team and pick captains; hosts
+  **invite** teams, then accept, waitlist or decline.
+- **Seed** teams by dragging, **publish the schedule**, and captains
+  report scores like in hat tournaments. The new **pool play + placement
+  bracket** format gives every team a final place.
+- Everyone can follow a tournament for its schedule, results and news.
+  Find tournaments from **Explore → Find a tournament**.
+
+**Removed**
+- USA Ultimate events and rankings.
+
+---
+
 ## 0.0.13 (in TestFlight from `development`)
 
 **Notifications on iPhone**

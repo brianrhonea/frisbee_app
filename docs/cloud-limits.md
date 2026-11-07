@@ -18,7 +18,6 @@ check the links before deciding anything that costs money:
 | GitHub Actions | Free for the repo | Deploy and rollback runs use a few minutes each. |
 | Codemagic | Your existing plan | iOS builds; not covered here. |
 | OpenStreetMap tiles, Nominatim, YouTube oEmbed | Free public services | Fair-use policies, no quota numbers. Nominatim asks for at most 1 request a second. |
-| play.usaultimate.org | Scraped on-device | No quota, but `UsauClient` waits about a second between requests. |
 
 > **Set a billing budget.** Blaze has no spending cap. In Google Cloud
 > console → Billing → Budgets & alerts, add a budget (e.g. $10/month) on
@@ -121,7 +120,6 @@ so 10,000 a day covers a few thousand daily Android users.
 | Notifications and comments on screen | Newest 100 | repositories |
 | Feed entries kept | 60 days | `eventReminders` prunes |
 | LiveKit tokens | 6 hours | `functions/src/meetings` |
-| USAU requests | One at a time, ~1 second apart, 30 s timeout | `UsauClient` |
 
 ## 3. Platform hard limits worth knowing
 
@@ -164,7 +162,6 @@ Rough estimates for planning, not measurements. The debug read counter
 | **Sign-in and accounts** | Auth MAU, `account-*` functions | Auth 50,000 MAU | Far off |
 | **App Check** | Play Integrity calls on Android | 10,000/day | A few thousand daily Android users |
 | **Join pages and hosting** | Hosting transfer, cached at the CDN | 360 MB/day | Thousands of page views a day |
-| **USA Ultimate data** | Each device scrapes the USAU site; no Firebase use | USAU's own tolerance | Scrapers on the server would trade this for Functions and Firestore use |
 | **Monitoring and alerts** | 2 uptime checks, 6 alert policies, 1 log metric | Cloud Monitoring's own free allotment | Expected to stay inside it at this size |
 | **Deploys and rollbacks** | Cloud Build minutes for functions | 120 min/day | A full deploy uses a few minutes |
 

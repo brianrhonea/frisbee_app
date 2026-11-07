@@ -4,6 +4,10 @@ import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
 
+/// How far deleting a team has got: [done] of [total] steps, now on
+/// [step] ("Deleting chat").
+typedef DeleteProgress = ({int done, int total, String step});
+
 abstract class TeamRepository {
   /// Teams the user is a member of, sorted by name.
   Stream<List<Team>> watchMyTeams(String uid);
@@ -118,7 +122,12 @@ abstract class TeamRepository {
   /// repeat, so a failed run is finished the next time.
   Future<Result<void>> migrateTiersToRoles(Team team);
 
-  Future<Result<void>> deleteTeam(Team team);
+  /// Deletes the team and everything in it. It takes a while (each
+  /// collection goes in turn), so [onProgress] hears each step.
+  Future<Result<void>> deleteTeam(
+    Team team, {
+    void Function(DeleteProgress progress)? onProgress,
+  });
 
   // ---- School and club communities -------------------------------------
   // A team is in a community once both agree: the team names it (orgId)
@@ -166,19 +175,8 @@ abstract class TeamRepository {
   /// Drops a team from the community; people it added leave the team.
   Future<Result<void>> unlinkTeam(String orgId, String teamId);
 
-  /// Links the team to its USA Ultimate page, or unlinks it when [url] is
-  /// null.
-  Future<Result<void>> linkUsauTeam(String teamId, {String? url, String? name});
-
-  /// Writes a roster sync in one batch and stamps the sync time.
-  Future<Result<void>> applyRosterSync(
-    String teamId,
-    List<RosterPlayer> players,
-  );
-
   /// Roster sorted by number, then name. Only team admins may pass
-  /// [withStatus] to include paid and USA Ultimate status; without it those
-  /// fields are left empty.
+  /// [withStatus] to include the paid mark; without it, it's left false.
   Stream<List<RosterPlayer>> watchRoster(
     String teamId, {
     bool withStatus = false,

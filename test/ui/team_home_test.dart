@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
@@ -332,6 +334,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Delete Team?'), findsOneWidget);
       expect(find.textContaining("Can't delete"), findsNothing);
+
+      // While it deletes, a dialog nobody can dismiss shows how far it is.
+      teams.deleteGate = Completer<void>();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Deleting Team'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.textContaining('Deleting step 0'), findsOneWidget);
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pump();
+      expect(find.text('Deleting Team'), findsOneWidget, reason: 'stays up');
+      expect(teams.teams, contains('t1'), reason: 'still going');
     });
 
     testWidgets('others get the public page and can join', (tester) async {

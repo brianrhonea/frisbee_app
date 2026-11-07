@@ -6,7 +6,6 @@ import '../../../domain/models/feed_item.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_post.dart';
-import '../../../domain/models/tournament.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
@@ -343,7 +342,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> _side() => [
     if (vm.nextTeamEvent case final next?) _UpNextCard(entry: next),
     _ComingUpCard(events: vm.upcomingEvents, onAdd: _newEvent),
-    if (vm.nextTournament case final t?) _AroundTheLeague(tournament: t),
     const _Footer(),
   ];
 }
@@ -841,53 +839,6 @@ class _ComingUpCard extends StatelessWidget {
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Add event'),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AroundTheLeague extends StatelessWidget {
-  const _AroundTheLeague({required this.tournament});
-
-  final Tournament tournament;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final t = tournament;
-    final start = t.startDate;
-    final place = [t.city, t.state].where((s) => s.isNotEmpty).join(', ');
-    return SectionCard(
-      onTap: () => context.go(Routes.tournament(t.id)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Tag('AROUND THE LEAGUE'),
-          const SizedBox(height: 10),
-          Text(
-            t.name,
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 15.5,
-              letterSpacing: -0.3,
-              color: c.ink,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            [
-              if (start != null) DateFormat.MMMd().format(start),
-              if (place.isNotEmpty) place,
-              if (t.divisions.isNotEmpty) t.divisions.join(', '),
-            ].join(' · '),
-            style: TextStyle(fontSize: 12, color: c.muted),
-          ),
-          const SizedBox(height: 10),
-          CardLink(
-            label: 'Explore events',
-            onTap: () => context.go(Routes.tournaments),
           ),
         ],
       ),

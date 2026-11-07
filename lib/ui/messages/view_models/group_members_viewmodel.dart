@@ -8,9 +8,10 @@ import '../../../domain/models/direct_message.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
-/// Picks people for a group message: a new group (with a name), or more
-/// people for group [groupId]. Only people who follow the user can be
-/// added; anyone else is reported back by name.
+/// Picks people to message. New: one person opens (or starts) a direct
+/// conversation with them; two or more start a group, which can be named.
+/// With [groupId], adds more people to that group. Only people who follow
+/// the user can be put in a group; anyone else is reported back by name.
 class GroupMembersViewModel extends ChangeNotifier {
   GroupMembersViewModel({
     required DirectMessageRepository directMessageRepository,
@@ -40,6 +41,9 @@ class GroupMembersViewModel extends ChangeNotifier {
   String get uid => _auth.currentUser?.uid ?? '';
 
   bool get isNew => groupId == null;
+
+  /// Starting a group: new, with more than one person picked.
+  bool get makesGroup => isNew && _picked.length > 1;
 
   late final Command1<List<UserProfile>, String> search;
 
@@ -108,10 +112,18 @@ class GroupMembersViewModel extends ChangeNotifier {
       );
     }
     final people = List.of(_picked);
-    final r = switch (groupId) {
-      null => await _dms.createGroup(me, name, people),
-      final id => await _dms.addToGroup(id, me, people),
-    };
+    final Result<GroupAdded> r;
+    if (groupId case final id?) {
+      r = await _dms.addToGroup(id, me, people);
+    } else if (people.length == 1) {
+      // Just one person: a direct message, not a group.
+      r = switch (await _dms.openConversation(me, people.single)) {
+        Ok(:final value) => Result.ok((id: value, notAdded: const [])),
+        Error(:final error) => Result.error(error),
+      };
+    } else {
+      r = await _dms.createGroup(me, name, people);
+    }
     if (r is Ok) {
       _picked.clear();
       notifyListeners();

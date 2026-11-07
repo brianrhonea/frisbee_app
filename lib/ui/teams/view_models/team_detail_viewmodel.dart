@@ -191,7 +191,7 @@ class TeamDetailViewModel extends ChangeNotifier {
   bool? _rosterWithStatus;
 
   /// (Re)subscribes to the roster once the role is known, and when it
-  /// changes: only admins may read paid and USA Ultimate status.
+  /// changes: only admins may read paid marks.
   void _watchRoster() {
     if (_team == null) return;
     final withStatus = canSeeRosterStatus;
@@ -215,26 +215,24 @@ class TeamDetailViewModel extends ChangeNotifier {
   List<RosterPlayer> _roster = const [];
   List<RosterPlayer> get roster => _roster;
 
-  bool _unconfirmedOnly = false;
+  bool _unpaidOnly = false;
 
-  /// Roster tab shows only players not yet on USA Ultimate or unpaid.
-  bool get unconfirmedOnly => _unconfirmedOnly;
+  /// Roster tab shows only players not marked paid.
+  bool get unpaidOnly => _unpaidOnly;
 
-  void setUnconfirmedOnly(bool value) {
-    _unconfirmedOnly = value;
+  void setUnpaidOnly(bool value) {
+    _unpaidOnly = value;
     notifyListeners();
   }
 
-  List<RosterPlayer> get visibleRoster => _unconfirmedOnly && canSeeRosterStatus
+  List<RosterPlayer> get visibleRoster => _unpaidOnly && canSeeRosterStatus
       ? [
           for (final p in _roster)
-            if (!p.confirmed) p,
+            if (!p.paid) p,
         ]
       : _roster;
 
-  int get onUsauCount => _roster.where((p) => p.onUsau ?? false).length;
   int get paidCount => _roster.where((p) => p.paid).length;
-  int get confirmedCount => _roster.where((p) => p.confirmed).length;
 
   /// Flips a player's Paid mark.
   void togglePaid(RosterPlayer p) =>
@@ -292,7 +290,7 @@ class TeamDetailViewModel extends ChangeNotifier {
   bool get canManageMembers =>
       _team?.has(uid, TeamPermission.manageMembers) ?? false;
 
-  /// Paid marks, USA Ultimate status and sync are for team admins; players
+  /// Paid marks are for team admins; players
   /// see only names, positions and numbers.
   bool get canSeeRosterStatus => canEdit;
   bool get isOwner => myRole == TeamRole.owner;

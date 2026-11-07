@@ -24,6 +24,7 @@ class ChatRoomViewModel extends MessageThreadViewModel {
     required super.authRepository,
     required super.filePicker,
     super.peopleRepository,
+    super.draftRepository,
   }) : _chats = chatRepository,
        super(notificationRepository: notificationRepository) {
     toggleMuted = Command0<void>(
@@ -117,14 +118,24 @@ class ChatRoomViewModel extends MessageThreadViewModel {
   Future<Result<void>> postMessage(
     AppUser author,
     String text,
-    List<NewAttachment> attachments,
-  ) => _chats.sendMessage(
+    List<NewAttachment> attachments, {
+    MessageReply? replyTo,
+  }) => _chats.sendMessage(
     teamId,
     roomId,
     author: author,
     text: text,
     attachments: attachments,
+    replyTo: replyTo,
   );
+
+  @override
+  Future<Result<void>> setReaction(ChatMessage message, String? emoji) =>
+      _chats.setReaction(teamId, roomId, message.id, uid, emoji);
+
+  /// Anyone who can read the room reacts.
+  @override
+  bool get canReact => access.canRead;
 
   @override
   Future<Result<void>> removeMessage(ChatMessage message) =>

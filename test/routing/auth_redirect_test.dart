@@ -29,9 +29,9 @@ void main() {
     final auth = FakeAuthRepository(user: testUser);
     expect(redirect(auth, Routes.signIn), Routes.home);
     expect(redirect(auth, '/sign-in?from=/teams/t1'), Routes.home);
-    expect(redirect(auth, '/sign-in?from=/rankings'), Routes.home);
+    expect(redirect(auth, '/sign-in?from=/explore'), Routes.home);
     expect(redirect(auth, '/sign-up?from=/teams/t1'), Routes.home);
-    expect(redirect(auth, '/rankings'), isNull);
+    expect(redirect(auth, '/explore'), isNull);
   });
 
   test('except from an invite link, to finish joining', () {

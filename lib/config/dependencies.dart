@@ -21,11 +21,14 @@ import '../data/repositories/follow/follow_repository.dart';
 import '../data/repositories/follow/follow_repository_firebase.dart';
 import '../data/repositories/group_tournament/group_tournament_repository.dart';
 import '../data/repositories/group_tournament/group_tournament_repository_firebase.dart';
+import '../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
+import '../data/repositories/hosted_tournament/hosted_tournament_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
 import '../data/repositories/meeting/meeting_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_settings_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/notification/notification_repository_firebase.dart';
+import '../data/repositories/draft/message_draft_repository.dart';
 import '../data/repositories/people/people_repository.dart';
 import '../data/repositories/people/people_repository_firebase.dart';
 import '../data/repositories/post_comment/post_comment_repository.dart';
@@ -34,22 +37,14 @@ import '../data/repositories/profile/profile_repository.dart';
 import '../data/repositories/profile/profile_repository_firebase.dart';
 import '../data/repositories/playbook/play_repository.dart';
 import '../data/repositories/playbook/play_repository_firebase.dart';
-import '../data/repositories/ranking/ranking_repository.dart';
 import '../data/repositories/stats/stats_repository.dart';
 import '../data/repositories/stats/stats_repository_firebase.dart';
-import '../data/repositories/ranking/ranking_repository_usau.dart';
 import '../data/repositories/team/team_repository.dart';
 import '../data/repositories/team/team_repository_firebase.dart';
 import '../data/repositories/team_post/team_post_repository.dart';
 import '../data/repositories/team_post/team_post_repository_firebase.dart';
 import '../data/repositories/video/video_repository.dart';
 import '../data/repositories/video/video_repository_firebase.dart';
-import '../data/repositories/tournament/tournament_repository.dart';
-import '../data/repositories/tournament/tournament_repository_usau.dart';
-import '../data/repositories/usau_schedule/usau_schedule_repository.dart';
-import '../data/repositories/usau_schedule/usau_schedule_repository_usau.dart';
-import '../data/repositories/usau_team/usau_team_repository.dart';
-import '../data/repositories/usau_team/usau_team_repository_usau.dart';
 import '../data/services/account_service.dart';
 import '../data/repositories/user_post/user_post_repository.dart';
 import '../data/repositories/user_post/user_post_repository_firebase.dart';
@@ -67,7 +62,6 @@ import '../data/services/meeting_presence.dart';
 import '../data/services/meeting_token_service.dart';
 import '../data/services/push_service.dart';
 import '../data/services/shared_preferences_service.dart';
-import '../data/services/usau/usau_client.dart';
 import '../data/services/youtube_info_service.dart';
 import '../firebase_options.dart';
 
@@ -132,7 +126,12 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<PostCommentRepository>(
     create: (_) => PostCommentRepositoryFirebase(),
   ),
-  Provider<PeopleRepository>(create: (_) => PeopleRepositoryFirebase()),
+  Provider<MessageDraftRepository>(
+    create: (_) => MessageDraftRepositoryPrefs(SharedPreferencesService()),
+  ),
+  ChangeNotifierProvider<PeopleRepository>(
+    create: (_) => PeopleRepositoryFirebase(),
+  ),
   Provider(create: (_) => const DevicePermissions()),
   Provider<FollowRepository>(create: (_) => FollowRepositoryFirebase()),
   Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),
@@ -146,6 +145,9 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<GroupTournamentRepository>(
     create: (_) => GroupTournamentRepositoryFirebase(),
+  ),
+  Provider<HostedTournamentRepository>(
+    create: (_) => HostedTournamentRepositoryFirebase(),
   ),
   Provider<ChatRepository>(
     create: (context) =>
@@ -194,25 +196,5 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<StatsRepository>(
     create: (context) =>
         StatsRepositoryFirebase(teamRepository: context.read<TeamRepository>()),
-  ),
-  // USA Ultimate data is scraped by the app and held in memory until the
-  // Cloud Functions in functions/src/usau are deployed. To switch back, use
-  // TournamentRepositoryFirebase and RankingRepositoryFirebase here.
-  Provider(create: (_) => UsauClient()),
-  Provider<TournamentRepository>(
-    create: (context) =>
-        TournamentRepositoryUsau(client: context.read<UsauClient>()),
-  ),
-  Provider<RankingRepository>(
-    create: (context) =>
-        RankingRepositoryUsau(client: context.read<UsauClient>()),
-  ),
-  Provider<UsauTeamRepository>(
-    create: (context) =>
-        UsauTeamRepositoryUsau(client: context.read<UsauClient>()),
-  ),
-  Provider<UsauScheduleRepository>(
-    create: (context) =>
-        UsauScheduleRepositoryUsau(client: context.read<UsauClient>()),
   ),
 ];

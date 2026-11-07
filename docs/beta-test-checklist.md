@@ -37,7 +37,7 @@ screenshot or screen recording helps.
 - [ ] `firestore.rules` and `firestore.indexes.json` deployed (done for
       0.0.9; re-check after any change).
 - [ ] Function groups deployed: `notifications`, `meetings`, `account`,
-      `follows`. USA Ultimate scrapers stay **undeployed**.
+      `follows`.
 - [ ] LiveKit secrets set (`LIVEKIT_URL`, `LIVEKIT_API_KEY`,
       `LIVEKIT_API_SECRET`).
 - [ ] Firebase Hosting serves the invite-link page (`hosting/`), and the
@@ -155,19 +155,16 @@ console, and note numbers per active tester.
       players; Owner transfers ownership.
 - [ ] Coaches and captains can show codes and make links; players can't.
 - [ ] Players see only names, numbers and positions on the roster; Paid
-      and USAU status only for owner, coach and captain.
+      only for owner, coach and captain.
 - [ ] Leave a team (non-owner). Remove a member (admin).
 - [ ] Delete a team: confirms, then its events, meetings, videos, folders
       and posts go; members no longer see it.
 
-### 2.3 Roster and USA Ultimate import
+### 2.3 Roster
 
 - [ ] Add, edit and remove players by hand.
-- [ ] Link the team to its USA Ultimate page by search or pasted link.
-- [ ] Preview a roster sync, then apply it: new players added, numbers
-      and positions updated, missing players flagged, nobody removed.
-- [ ] Paid mark, On / Not on USAU, confirmed count, **Unconfirmed only**
-      filter.
+- [ ] Paid mark, paid count, **Unpaid only** filter.
+- [ ] No USA Ultimate import, sync, events or rankings anywhere.
 
 ### 2.4 Community groups and pickup tournaments
 
@@ -289,8 +286,8 @@ console, and note numbers per active tester.
 
 ### 2.11 Follows, profiles and the home feed
 
-- [ ] **Follow** a person, team, group, group tournament and USA Ultimate
-      event; the follower count changes.
+- [ ] **Follow** a person, team, group and group tournament; the
+      follower count changes.
 - [ ] Bell on → that one's new posts notify you; bell off → they don't.
 - [ ] **Following** list (Profile → Following): bells and Unfollow work.
 - [ ] Profile (`/people/:uid`): name, photo, followers / following
@@ -373,18 +370,10 @@ console, and note numbers per active tester.
       again. Joining a team and following someone each offer theirs.
 - [ ] Opening several notifications in a row doesn't break navigation.
 
-### 2.15 USA Ultimate data
-
-- [ ] Events tab: tournaments list; open one → schedule and brackets.
-- [ ] Rankings: 2-1-3 podium, ranks 4–10, division chips.
-- [ ] Search USA Ultimate teams from Teams; open a team page.
-- [ ] Pages open over the current tab; back returns where you were.
-- [ ] Watch for slow loads or errors (it scrapes on the device).
-
-### 2.16 Home, navigation and layout
+### 2.15 Home, navigation and layout
 
 - [ ] Home on phones: This week, your team (or the join / create card),
-      Coming up (with the USA Ultimate toggle), then the feed.
+      Coming up, then the feed.
 - [ ] Every bottom tab opens and keeps its scroll and state when you
       come back.
 - [ ] From a post's own page, tapping the author or team switches to
@@ -396,7 +385,7 @@ console, and note numbers per active tester.
 - [ ] Pull to refresh where offered.
 - [ ] Phones stay portrait when rotated; tablets still rotate.
 - [ ] Home search (phones) / top-bar search: a player, @username, team,
-      group and USA Ultimate event are all found; chips filter them.
+      and group are all found; chips filter them.
 - [ ] Computer: **Ctrl K** opens the command menu from any page (also
       after using it, and inside a text box); **Ctrl 1–5** switch tabs,
       also with the menu open.
@@ -404,7 +393,7 @@ console, and note numbers per active tester.
 - [ ] Roles: an owner opening an older team turns coaches and captains
       into Coach and Captain roles, with the same access.
 
-### 2.17 Security and privacy spot checks
+### 2.16 Security and privacy spot checks
 
 - [ ] B (not on the team) can't see the team's roster status, chat,
       playbook, videos, stats or private events.

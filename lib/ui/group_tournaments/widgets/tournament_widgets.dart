@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/tournament_engine/progress.dart';
+import '../../../domain/tournament_engine/standings.dart';
 
 /// "Sat, Nov 7 · 9:00 AM".
 String tournamentWhen(DateTime d) =>
@@ -258,3 +259,58 @@ String tournamentStatusLabel(GroupTournament t) => switch (t.status) {
   TournamentStatus.scheduled => 'Scheduled',
   TournamentStatus.done => 'Finished',
 };
+
+/// Pool standings: wins, losses and point differential.
+class StandingsTable extends StatelessWidget {
+  const StandingsTable({super.key, required this.rows, required this.nameOf});
+
+  final List<Standing> rows;
+  final String Function(String?) nameOf;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelMedium;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Table(
+          columnWidths: const {
+            0: FixedColumnWidth(36),
+            1: FlexColumnWidth(),
+            2: FixedColumnWidth(44),
+            3: FixedColumnWidth(44),
+            4: FixedColumnWidth(52),
+          },
+          children: [
+            TableRow(
+              children: [
+                for (final h in ['#', 'Team', 'W', 'L', '+/-'])
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(h, style: style),
+                  ),
+              ],
+            ),
+            for (var i = 0; i < rows.length; i++)
+              TableRow(
+                children: [
+                  for (final cell in [
+                    '${i + 1}',
+                    nameOf(rows[i].teamId),
+                    '${rows[i].wins}',
+                    '${rows[i].losses}',
+                    '${rows[i].pointDiff > 0 ? '+' : ''}${rows[i].pointDiff}',
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Text(cell),
+                    ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

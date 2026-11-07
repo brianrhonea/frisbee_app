@@ -86,8 +86,21 @@ class MeetingChatViewModel extends MessageThreadViewModel {
   Future<Result<void>> postMessage(
     AppUser author,
     String text,
-    List<NewAttachment> attachments,
-  ) => _meetings.sendMessage(teamId, meetingId, author: author, text: text);
+    List<NewAttachment> attachments, {
+    MessageReply? replyTo,
+  }) => _meetings.sendMessage(teamId, meetingId, author: author, text: text);
+
+  /// A call's chat is quick text: no replies or reactions.
+  @override
+  bool get canReact => false;
+
+  /// Opening a profile would cover the call.
+  @override
+  bool get opensProfiles => false;
+
+  /// Nothing to come back to once the call ends.
+  @override
+  String? get draftKey => null;
 
   @override
   Future<Result<void>> removeMessage(ChatMessage message) =>

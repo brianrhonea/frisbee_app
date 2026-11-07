@@ -33,16 +33,27 @@ abstract class NotificationRepository {
     required bool muted,
   });
 
+  /// Silences (or unsilences) one direct or group conversation.
+  Future<Result<void>> setConversationMuted(
+    String uid,
+    String conversationId, {
+    required bool muted,
+  });
+
   /// The newest notifications, newest first.
   Stream<List<AppNotification>> watchFeed(String uid);
 
   Future<Result<void>> markRead(String uid, Iterable<String> ids);
 
   /// The thing a notice is about (a conversation, a chat room) was seen
-  /// in the app without going through the notification panel: marks its
-  /// feed entry read, if it's there and unread, and clears its push
-  /// notifications from this device.
+  /// in the app: removes its feed entry, if it's there, and clears its
+  /// push notifications from this device. Also how a tapped notice is
+  /// put away.
   Future<void> markSeen(String uid, String collapseId);
+
+  /// The page at [route] (a post) was opened: removes the feed entries
+  /// that lead there, and their pushes.
+  Future<void> clearRoute(String uid, String route);
 
   Future<Result<void>> delete(String uid, Iterable<String> ids);
 

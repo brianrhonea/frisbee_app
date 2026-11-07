@@ -2,12 +2,11 @@ import 'model_utils.dart';
 
 /// What a follow points at. Teams and community groups are both team docs,
 /// so [team] covers both. [tournament] is a community group's pickup
-/// tournament; [event] a USA Ultimate tournament from the Events tab.
+/// tournament.
 enum FollowType {
   user('Person'),
   team('Team'),
-  tournament('Tournament'),
-  event('Event');
+  tournament('Tournament');
 
   const FollowType(this.label);
   final String label;
@@ -45,10 +44,6 @@ class FollowTarget {
         name: name,
       );
 
-  /// A USA Ultimate tournament.
-  const FollowTarget.event(String eventId, String name)
-    : this(type: FollowType.event, id: eventId, name: name);
-
   final FollowType type;
   final String id;
 
@@ -72,7 +67,6 @@ class FollowTarget {
   static String teamKey(String teamId) => keyFor(FollowType.team, teamId);
   static String tournamentKey(String groupId, String tournamentId) =>
       keyFor(FollowType.tournament, '${groupId}_$tournamentId');
-  static String eventKey(String eventId) => keyFor(FollowType.event, eventId);
 }
 
 /// A user's follow, stored at `users/{uid}/follows/{key}`. [notify] turns
@@ -94,6 +88,12 @@ class Follow {
     notify: notify ?? this.notify,
     createdAt: createdAt,
   );
+
+  /// Whether [map] is a follow of a type the app still knows. Follows of
+  /// USA Ultimate events (type `event`) are left over from before those
+  /// were removed.
+  static bool isKnown(Map<String, dynamic> map) =>
+      FollowType.values.any((t) => t.name == map['type']);
 
   factory Follow.fromMap(Map<String, dynamic> map) {
     final type = enumByName(FollowType.values, map['type'], FollowType.user);

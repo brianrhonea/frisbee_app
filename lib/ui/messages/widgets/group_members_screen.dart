@@ -10,11 +10,12 @@ import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/app_search_field.dart';
 import '../../core/ui/error_message.dart';
-import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
+import '../../core/ui/user_avatar.dart';
 import '../view_models/group_members_viewmodel.dart';
 
-/// Start a group message (name it, pick people), or add people to one.
+/// New message: pick one person for a direct message, or several for a
+/// group (which can then be named). Or add people to a group.
 class GroupMembersScreen extends StatefulWidget {
   const GroupMembersScreen({super.key, required this.viewModel});
 
@@ -76,7 +77,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       listenable: Listenable.merge([vm, vm.search, vm.save]),
       builder: (context, _) => Scaffold(
         appBar: AppBar(
-          title: Text(vm.isNew ? 'New group' : 'Add people'),
+          title: Text(vm.isNew ? 'New message' : 'Add people'),
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 12),
@@ -87,7 +88,13 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                         dimension: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Text(vm.isNew ? 'Create' : 'Add'),
+                    : Text(
+                        !vm.isNew
+                            ? 'Add'
+                            : vm.makesGroup
+                            ? 'Create group'
+                            : 'Chat',
+                      ),
               ),
             ),
           ],
@@ -97,7 +104,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (vm.isNew)
+              if (vm.makesGroup)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   child: TextField(
@@ -120,7 +127,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                     children: [
                       for (final p in vm.picked)
                         InputChip(
-                          avatar: PersonAvatar(
+                          avatar: UserAvatar(
+                            uid: p.uid,
                             name: p.name,
                             photoUrl: p.photoUrl,
                             radius: 12,
@@ -134,7 +142,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                 child: AppSearchField(
-                  autofocus: !vm.isNew,
+                  autofocus: true,
                   hint: 'Search people by name',
                   onChanged: _onChanged,
                   onSubmitted: vm.search.execute,
@@ -143,8 +151,14 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                 child: Text(
-                  'You can add people who follow you. '
-                  '${vm.room > 0 ? '${vm.room} more can join.' : 'The group is full.'}',
+                  vm.isNew && vm.picked.isEmpty
+                      ? 'Pick one person to message them, or several to '
+                            'start a group.'
+                      : vm.isNew && !vm.makesGroup
+                      ? 'Pick more people to make it a group. Groups can '
+                            'include people who follow you.'
+                      : 'You can add people who follow you. '
+                            '${vm.room > 0 ? '${vm.room} more can join.' : 'The group is full.'}',
                   style: TextStyle(fontSize: 12, color: c.muted),
                 ),
               ),
@@ -186,7 +200,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         return CheckboxListTile(
           value: picked,
           enabled: picked || vm.room > 0,
-          secondary: PersonAvatar(name: p.name, photoUrl: p.photoUrl),
+          secondary: UserAvatar(uid: p.uid, name: p.name, photoUrl: p.photoUrl),
           title: Text(p.name),
           subtitle: p.username == null ? null : Text('@${p.username}'),
           onChanged: (_) => vm.toggle(p),

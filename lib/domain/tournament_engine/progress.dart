@@ -123,12 +123,19 @@ bool skippedGame(GroupGame game, List<GroupGame> games) =>
     game.ifNeeded && !game.isDone && !gamesToPlay(games).contains(game);
 
 /// The winner's team id once every game that needs playing is done.
-String? champion(GroupTournament t, List<GroupGame> games) {
+String? champion(GroupTournament t, List<GroupGame> games) =>
+    championOf(t.settings.format, games);
+
+/// The winner of [games], played in [format], once every game that needs
+/// playing is done.
+String? championOf(TournamentFormat format, List<GroupGame> games) {
   if (games.isEmpty || gamesToPlay(games).isNotEmpty) return null;
-  if (t.settings.format == TournamentFormat.roundRobin) {
+  if (format == TournamentFormat.roundRobin) {
     final pool = poolTeams(games).values.firstOrNull ?? const [];
     return standings(pool, games).firstOrNull?.teamId;
   }
+  final finalGame = games.where((g) => g.place == 1).firstOrNull;
+  if (finalGame != null) return finalGame.winner;
   final reset = games.where((g) => g.stage == GameStage.reset).firstOrNull;
   if (reset != null && reset.isDone) return reset.winner;
   final grand = games.where((g) => g.stage == GameStage.grandFinal).firstOrNull;
@@ -143,6 +150,39 @@ String? champion(GroupTournament t, List<GroupGame> games) {
       .where((g) => g.stage.isBracket && !fed.contains(g.id))
       .lastOrNull
       ?.winner;
+}
+
+/// Final places, best first, once [games] are all played: from games
+/// that decide a place (winner takes it, loser the next), then a round
+/// robin's standings, then anyone left (a bye all the way down) in seed
+/// order. Empty while games are left to play.
+List<String> placementsOf(
+  TournamentFormat format,
+  List<String> seeds,
+  List<GroupGame> games,
+) {
+  if (games.isEmpty || gamesToPlay(games).isNotEmpty) return const [];
+  final byPlace = <int, String>{};
+  for (final g in games) {
+    final place = g.place;
+    if (place == null || !g.isDone) continue;
+    byPlace[place] = g.winner!;
+    byPlace[place + 1] = g.loser!;
+  }
+  final placed = [for (final p in byPlace.keys.toList()..sort()) byPlace[p]!];
+  if (placed.isEmpty) {
+    if (format == TournamentFormat.roundRobin) {
+      final pool = poolTeams(games).values.firstOrNull ?? const [];
+      placed.addAll([for (final s in standings(pool, games)) s.teamId]);
+    } else if (championOf(format, games) case final champ?) {
+      placed.add(champ);
+    }
+  }
+  return [
+    ...placed,
+    for (final t in seeds)
+      if (!placed.contains(t)) t,
+  ];
 }
 
 /// Valid scores: whole numbers, no ties (someone has to win).

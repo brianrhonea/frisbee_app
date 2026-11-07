@@ -1,4 +1,5 @@
 import '../data/repositories/notification/notification_repository.dart';
+import '../data/repositories/draft/message_draft_repository.dart';
 import '../data/repositories/people/people_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -22,11 +23,9 @@ import '../ui/meetings/widgets/meeting_room_screen.dart';
 import '../ui/messages/view_models/direct_chat_viewmodel.dart';
 import '../ui/messages/view_models/group_members_viewmodel.dart';
 import '../ui/messages/view_models/inbox_viewmodel.dart';
-import '../ui/messages/view_models/people_search_viewmodel.dart';
 import '../ui/messages/widgets/direct_chat_screen.dart';
 import '../ui/messages/widgets/group_members_screen.dart';
 import '../ui/messages/widgets/inbox_screen.dart';
-import '../ui/messages/widgets/people_search_screen.dart';
 import '../ui/core/ui/status_views.dart';
 import '../ui/core/ui/view_model_host.dart';
 import '../ui/core/ui/slide_over_page.dart';
@@ -61,21 +60,18 @@ import '../ui/stats/widgets/stats_tab.dart';
 import '../ui/stats/widgets/tournament_screen.dart';
 import '../ui/teams/view_models/create_team_viewmodel.dart';
 import '../ui/teams/view_models/teams_viewmodel.dart';
-import '../ui/teams/view_models/usau_team_search_viewmodel.dart';
 import '../ui/teams/widgets/create_team_screen.dart';
-import '../ui/teams/view_models/usau_roster_viewmodel.dart';
 import '../ui/teams/widgets/team_section_screen.dart';
-import '../ui/teams/widgets/usau_roster_screen.dart';
 import '../ui/teams/widgets/teams_screen.dart';
 import '../ui/teams/view_models/roles_viewmodel.dart';
 import '../ui/teams/widgets/roles_screen.dart';
 import '../ui/teams/view_models/discord_import_viewmodel.dart';
 import '../ui/teams/widgets/discord_import_screen.dart';
-import '../ui/teams/widgets/usau_team_search_screen.dart';
 import '../ui/group_tournaments/view_models/tournament_editor_viewmodel.dart';
 import '../ui/group_tournaments/view_models/group_tournament_viewmodel.dart';
 import '../ui/group_tournaments/widgets/tournament_editor_screen.dart';
 import '../ui/group_tournaments/widgets/group_tournament_screen.dart';
+import 'tournament_routes.dart';
 import '../ui/videos/view_models/video_editor_viewmodel.dart';
 import '../ui/videos/view_models/video_viewmodel.dart';
 import '../ui/videos/widgets/video_editor_screen.dart';
@@ -133,6 +129,16 @@ GoRouter router(AuthRepository auth) => GoRouter(
     GoRoute(
       path: '/p/:postId',
       redirect: (_, state) => Routes.post(state.pathParameters['postId']!),
+    ),
+    // A profile opened from a conversation or chat room, over it, so back
+    // returns there (the Explore tab's /players/:uid would switch tabs).
+    GoRoute(
+      path: '/people/:uid',
+      redirect: (_, state) =>
+          state.pathParameters['uid'] == auth.currentUser?.uid
+          ? Routes.profile
+          : null,
+      builder: (_, state) => playerPage(state.pathParameters['uid']!),
     ),
     // People's posts, over the shell. `/posts` alone goes Home, where the
     // feed is. The composer is an overlay, not a route.
@@ -341,6 +347,9 @@ GoRouter router(AuthRepository auth) => GoRouter(
         ),
       ],
     ),
+    // Hosted tournaments, full screen over the shell (see
+    // Routes.tournaments).
+    ...hostedTournamentRoutes(),
     // Community group tournaments, full screen over the shell (see
     // Routes.groupTournamentsPath).
     GoRoute(
@@ -482,7 +491,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
     GoRoute(
       path: Routes.myEventsPath,
       redirect: (_, state) =>
-          state.uri.path == Routes.myEventsPath ? Routes.tournaments : null,
+          state.uri.path == Routes.myEventsPath ? Routes.schedule : null,
       routes: [
         GoRoute(
           path: 'new',
@@ -573,7 +582,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
             ),
           ],
         ),
-        // Explore: search, events and rankings.
+        // Explore: search and player profiles.
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -588,27 +597,6 @@ GoRouter router(AuthRepository auth) => GoRouter(
                   ? Routes.profile
                   : null,
               builder: (_, state) => playerPage(state.pathParameters['uid']!),
-            ),
-            GoRoute(
-              path: Routes.tournaments,
-              builder: (_, _) => eventsPage(),
-              routes: [
-                GoRoute(
-                  path: ':id',
-                  builder: (_, state) =>
-                      tournamentPage(state.pathParameters['id']!),
-                ),
-              ],
-            ),
-            GoRoute(
-              path: Routes.rankings,
-              builder: (_, _) => rankingsPage(),
-              routes: [
-                GoRoute(
-                  path: 'team',
-                  builder: (_, state) => usauTeamPage(state),
-                ),
-              ],
             ),
           ],
         ),
@@ -645,28 +633,9 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 GoRoute(
                   path: 'search',
                   // Finding teams and groups is Explore's job now; old links
-                  // land there. The USA Ultimate search below stays.
-                  redirect: (_, state) => state.uri.path == Routes.searchTeams
-                      ? Routes.explore(only: ExploreFilter.teams)
-                      : null,
+                  // land there.
+                  redirect: (_, _) => Routes.explore(only: ExploreFilter.teams),
                   builder: (_, _) => const SizedBox.shrink(),
-                  routes: [
-                    GoRoute(
-                      path: 'usau',
-                      builder: (_, _) => ViewModelHost(
-                        create: (c) => UsauTeamSearchViewModel(
-                          rankingRepository: c.read(),
-                        ),
-                        builder: (_, vm) => UsauTeamSearchScreen(viewModel: vm),
-                      ),
-                      routes: [
-                        GoRoute(
-                          path: 'team',
-                          builder: (_, state) => usauTeamPage(state),
-                        ),
-                      ],
-                    ),
-                  ],
                 ),
                 GoRoute(
                   path: ':teamId',
@@ -749,6 +718,8 @@ GoRouter router(AuthRepository auth) => GoRouter(
                               authRepository: c.read(),
                               filePicker: c.read(),
                               peopleRepository: c.read<PeopleRepository?>(),
+                              draftRepository: c
+                                  .read<MessageDraftRepository?>(),
                             ),
                             builder: (_, vm) => ChatRoomScreen(viewModel: vm),
                           ),
@@ -781,24 +752,6 @@ GoRouter router(AuthRepository auth) => GoRouter(
                             authRepository: c.read(),
                           ),
                           builder: (_, vm) => PlayEditorScreen(viewModel: vm),
-                        );
-                      },
-                    ),
-                    GoRoute(
-                      path: 'usau-roster',
-                      parentNavigatorKey: _rootKey,
-                      builder: (_, state) {
-                        final teamId = state.pathParameters['teamId']!;
-                        return ViewModelHost(
-                          key: ValueKey('usau-roster-$teamId'),
-                          create: (c) => UsauRosterViewModel(
-                            teamId: teamId,
-                            teamRepository: c.read(),
-                            usauTeamRepository: c.read(),
-                            rankingRepository: c.read(),
-                            authRepository: c.read(),
-                          ),
-                          builder: (_, vm) => UsauRosterScreen(viewModel: vm),
                         );
                       },
                     ),
@@ -873,6 +826,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 create: (c) => InboxViewModel(
                   directMessageRepository: c.read(),
                   authRepository: c.read(),
+                  notificationRepository: c.read<NotificationRepository?>(),
                 ),
                 builder: (_, vm) => InboxScreen(viewModel: vm),
               ),
@@ -880,12 +834,13 @@ GoRouter router(AuthRepository auth) => GoRouter(
                 GoRoute(
                   path: 'new',
                   parentNavigatorKey: _rootKey,
+                  // One person picked: a direct message; several: a group.
                   builder: (_, _) => ViewModelHost(
-                    create: (c) => PeopleSearchViewModel(
+                    create: (c) => GroupMembersViewModel(
                       directMessageRepository: c.read(),
                       authRepository: c.read(),
                     ),
-                    builder: (_, vm) => PeopleSearchScreen(viewModel: vm),
+                    builder: (_, vm) => GroupMembersScreen(viewModel: vm),
                   ),
                 ),
                 GoRoute(
@@ -919,6 +874,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
                           authRepository: c.read(),
                           filePicker: c.read(),
                           peopleRepository: c.read<PeopleRepository?>(),
+                          draftRepository: c.read<MessageDraftRepository?>(),
                           notificationRepository: c
                               .read<NotificationRepository?>(),
                         ),

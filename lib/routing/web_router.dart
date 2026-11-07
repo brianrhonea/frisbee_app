@@ -21,14 +21,15 @@ import '../ui/web/widgets/web_shell.dart';
 import 'route_builders.dart';
 import 'router.dart' show splashPath;
 import 'routes.dart';
+import 'tournament_routes.dart';
 
 /// Paths only members open; visitors are sent to sign in first.
+/// Tournaments have no public `browse` pages yet.
 const _membersOnly = [
   Routes.home,
   Routes.profile,
   Routes.postsPath,
   Routes.tournaments,
-  Routes.rankings,
 ];
 
 bool _isMembersOnly(String path) =>
@@ -190,26 +191,7 @@ GoRouter webRouter(AuthRepository auth, {String? initialLocation}) {
             path: '${Routes.postsPath}/:postId',
             builder: (_, state) => postPage(state),
           ),
-          // USA Ultimate events and rankings: members only, as the website
-          // can't reach play.usaultimate.org from the browser yet.
-          GoRoute(
-            path: Routes.tournaments,
-            builder: (_, _) => eventsPage(),
-            routes: [
-              GoRoute(
-                path: ':id',
-                builder: (_, state) =>
-                    tournamentPage(state.pathParameters['id']!),
-              ),
-            ],
-          ),
-          GoRoute(
-            path: Routes.rankings,
-            builder: (_, _) => rankingsPage(),
-            routes: [
-              GoRoute(path: 'team', builder: (_, state) => usauTeamPage(state)),
-            ],
-          ),
+          ...hostedTournamentRoutes(),
           GoRoute(
             path: getTheAppPath,
             builder: (_, _) => const GetTheAppScreen(appOnly: false),

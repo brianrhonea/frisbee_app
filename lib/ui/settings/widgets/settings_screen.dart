@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../config/legal_links.dart';
 
 import '../view_models/device_access_viewmodel.dart';
 import 'device_access_group.dart';
@@ -107,6 +110,32 @@ class SettingsScreen extends StatelessWidget {
                   SettingsTile(
                     icon: Icons.person_outline,
                     title: 'Account',
+                    onTap: () => context.push(Routes.settingsAccount),
+                  ),
+                ],
+              ),
+              SettingsGroup(
+                title: 'Legal & your data',
+                children: [
+                  SettingsTile(
+                    icon: Icons.privacy_tip_outlined,
+                    title: 'Privacy Policy',
+                    onTap: () => _openPage(context, LegalLinks.privacy),
+                  ),
+                  SettingsTile(
+                    icon: Icons.cookie_outlined,
+                    title: 'Cookie Policy',
+                    onTap: () => _openPage(context, LegalLinks.cookies),
+                  ),
+                  SettingsTile(
+                    icon: Icons.gavel_outlined,
+                    title: 'Terms of Service',
+                    onTap: () => _openPage(context, LegalLinks.terms),
+                  ),
+                  SettingsTile(
+                    icon: Icons.delete_forever_outlined,
+                    title: 'Delete account & data',
+                    subtitle: 'Your profile, posts and messages',
                     onTap: () => context.push(Routes.settingsAccount),
                   ),
                 ],
@@ -468,6 +497,14 @@ class AccountSettingsScreen extends StatelessWidget {
         },
       ),
     );
+  }
+}
+
+/// Opens a page of the website in the browser.
+Future<void> _openPage(BuildContext context, Uri url) async {
+  final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+  if (!opened && context.mounted) {
+    showSnackBar(context, "Couldn't open $url");
   }
 }
 
