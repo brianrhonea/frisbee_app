@@ -168,6 +168,10 @@ class DirectChatViewModel extends MessageThreadViewModel {
   @override
   DateTime? get hiddenBefore => _conversation?.hiddenBefore;
 
+  /// The other person's uid in a one-to-one chat; null in a group.
+  String? get otherId =>
+      _conversation == null || isGroup ? null : _conversation!.otherId(uid);
+
   /// The other person's username, once looked up.
   String? get otherUsername =>
       _conversation == null ? null : usernameOf(_conversation!.otherId(uid));

@@ -34,6 +34,20 @@ import 'team_section_screen.dart';
 
 enum _MenuAction { edit, community, leave, delete }
 
+/// Goes to [location], another tab of the team page. On a team pushed over
+/// a tournament ([Routes.teamOver]) it swaps the tab in place, keeping the
+/// tournament underneath, rather than jumping into the Teams tab.
+void goWithinTeam(BuildContext context, String location) {
+  final over = GoRouterState.of(
+    context,
+  ).uri.path.startsWith('${Routes.teamsOverPath}/');
+  if (over) {
+    context.replace(Routes.asTeamOver(location));
+  } else {
+    context.go(location);
+  }
+}
+
 /// A team's home page. Members see a summary, tabs for each section, what's
 /// coming up and the team's posts; anyone else sees the public page. The
 /// tabs show their section in place, under a compact header.
@@ -231,7 +245,10 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           ),
         );
         if (goToMembers == true && mounted) {
-          context.go(Routes.teamSection(team.id, TeamSection.members.path));
+          goWithinTeam(
+            context,
+            Routes.teamSection(team.id, TeamSection.members.path),
+          );
         }
       case _MenuAction.delete:
         if (await confirmDialog(
@@ -601,7 +618,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         action: vm.isMember
             ? CardLink(
                 label: 'All events',
-                onTap: () => context.go(TeamSection.events.route(vm.teamId)),
+                onTap: () =>
+                    goWithinTeam(context, TeamSection.events.route(vm.teamId)),
               )
             : null,
         child: Column(
@@ -792,7 +810,8 @@ class _Hero extends StatelessWidget {
       if (!mobile) ?follow,
       if (vm.isMember)
         OutlinedButton.icon(
-          onPressed: () => context.go(TeamSection.chat.route(teamId)),
+          onPressed: () =>
+              goWithinTeam(context, TeamSection.chat.route(teamId)),
           icon: const Icon(Icons.chat_bubble_outline, size: 17),
           label: const Text('Message'),
         ),
@@ -971,7 +990,8 @@ class _TeamTabs extends StatelessWidget {
     return UnderlineTabs(
       labels: ['Overview', for (final s in sections) s.labelFor(kind)],
       selected: current == null ? 0 : sections.indexOf(current) + 1,
-      onSelect: (i) => context.go(
+      onSelect: (i) => goWithinTeam(
+        context,
         i == 0 ? Routes.team(teamId) : sections[i - 1].route(teamId),
       ),
     );
@@ -1231,7 +1251,7 @@ class _MembersCard extends StatelessWidget {
       title: team.isCommunity ? 'Meet the group' : 'Meet the sideline',
       action: CardLink(
         label: 'All $count ${team.isCommunity ? 'members' : 'players'}',
-        onTap: () => context.go(TeamSection.members.route(team.id)),
+        onTap: () => goWithinTeam(context, TeamSection.members.route(team.id)),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {

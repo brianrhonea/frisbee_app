@@ -93,6 +93,17 @@ abstract final class Routes {
 
   // Team sections (TeamSection) are tabs of the team page, shown in place.
   // The old `/teams/{id}/events`-style paths redirect here.
+  /// A team or group's page over a full-screen page outside the tabs (a
+  /// tournament), with `context.push`, so it slides in and back returns
+  /// there; `/teams/:id` would switch to the Teams tab instead.
+  static const teamsOverPath = '/over/teams';
+  static String teamOver(String teamId) => '$teamsOverPath/$teamId';
+
+  /// [location] (a `/teams/...` page) as its [teamOver] equivalent.
+  static String asTeamOver(String location) => location.startsWith('$teams/')
+      ? '$teamsOverPath${location.substring(teams.length)}'
+      : location;
+
   static String teamSection(String teamId, String section) =>
       '/teams/$teamId?section=$section';
   static String teamEvents(String teamId) => teamSection(teamId, 'events');

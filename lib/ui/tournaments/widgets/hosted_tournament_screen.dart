@@ -14,6 +14,7 @@ import '../../follow/widgets/follow_button.dart';
 import '../../group_tournaments/widgets/tournament_widgets.dart';
 import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
+import 'hosted_status_badge.dart';
 import 'tournament_dialogs.dart';
 
 enum _Menu { edit, delete }
@@ -295,8 +296,9 @@ class _OverviewTab extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Chip(label: Text(t.status.label)),
+              HostedStatusBadge(status: t.status),
               Chip(
                 avatar: Icon(
                   t.visibility == TournamentVisibility.public
@@ -314,7 +316,7 @@ class _OverviewTab extends StatelessWidget {
             leading: const Icon(Icons.groups_outlined),
             title: Text('Hosted by ${t.hostName}'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go(Routes.team(t.hostId)),
+            onTap: () => context.push(Routes.teamOver(t.hostId)),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -1378,7 +1380,7 @@ class _NewsTab extends StatelessWidget {
                       post: p,
                       loadImage: vm.loadImage,
                       teamName: t.hostName,
-                      onOpenTeam: () => context.go(Routes.team(t.hostId)),
+                      onOpenTeam: () => context.push(Routes.teamOver(t.hostId)),
                     ),
                 ],
               ),

@@ -140,6 +140,13 @@ GoRouter router(AuthRepository auth) => GoRouter(
           : null,
       builder: (_, state) => playerPage(state.pathParameters['uid']!),
     ),
+    // A team or group opened from a tournament, over it, so back returns
+    // there (see Routes.teamOver).
+    GoRoute(
+      path: '${Routes.teamsOverPath}/:teamId',
+      parentNavigatorKey: _rootKey,
+      builder: (_, state) => teamPage(state),
+    ),
     // People's posts, over the shell. `/posts` alone goes Home, where the
     // feed is. The composer is an overlay, not a route.
     GoRoute(

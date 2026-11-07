@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../data/repositories/profile/profile_repository.dart';
 import '../../../domain/models/player_profile.dart';
+import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
@@ -12,6 +13,7 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/tone.dart';
 import '../../core/ui/status_views.dart';
 import '../../follow/widgets/follow_button.dart';
 import '../../posts/widgets/post_widgets.dart';
@@ -106,7 +108,10 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen> {
   Future<void> _edit() async {
     final details = await showDialog<ProfileDetails>(
       context: context,
-      builder: (_) => EditProfileDialog(initial: vm.details),
+      builder: (_) => EditProfileDialog(
+        initial: vm.details,
+        images: vm.canEditImages ? vm : null,
+      ),
     );
     if (details != null) vm.saveDetails.execute(details);
   }
@@ -399,16 +404,6 @@ class _Hero extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (vm.canEditImages)
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: _ImageMenu(
-                      viewModel: vm,
-                      kind: ProfileImage.header,
-                      icon: Icons.add_a_photo_outlined,
-                    ),
-                  ),
               ],
             ),
           ),
@@ -420,26 +415,10 @@ class _Hero extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        PersonAvatar(
-                          name: vm.name,
-                          photoUrl: vm.photoUrl,
-                          radius: mobile ? 26 : 30,
-                        ),
-                        if (vm.canEditImages)
-                          Positioned(
-                            right: -10,
-                            bottom: -10,
-                            child: _ImageMenu(
-                              viewModel: vm,
-                              kind: ProfileImage.photo,
-                              icon: Icons.photo_camera_outlined,
-                              small: true,
-                            ),
-                          ),
-                      ],
+                    PersonAvatar(
+                      name: vm.name,
+                      photoUrl: vm.photoUrl,
+                      radius: mobile ? 26 : 30,
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -573,13 +552,11 @@ class _ImageMenu extends StatelessWidget {
     required this.viewModel,
     required this.kind,
     required this.icon,
-    this.small = false,
   });
 
   final PlayerProfileViewModel viewModel;
   final ProfileImage kind;
   final IconData icon;
-  final bool small;
 
   @override
   Widget build(BuildContext context) {
@@ -589,7 +566,7 @@ class _ImageMenu extends StatelessWidget {
       ProfileImage.photo => vm.photoUrl != null,
       ProfileImage.header => vm.headerUrl != null,
     };
-    final size = small ? 18.0 : 20.0;
+    const size = 20.0;
     return ListenableBuilder(
       listenable: Listenable.merge([vm.changeImage, vm.removeImage]),
       builder: (context, _) => Material(
@@ -598,7 +575,7 @@ class _ImageMenu extends StatelessWidget {
         elevation: 1,
         child: vm.changeImage.running || vm.removeImage.running
             ? Padding(
-                padding: EdgeInsets.all(small ? 7 : 10),
+                padding: const EdgeInsets.all(10),
                 child: SizedBox.square(
                   dimension: size,
                   child: const CircularProgressIndicator(strokeWidth: 2),
@@ -607,7 +584,7 @@ class _ImageMenu extends StatelessWidget {
             : PopupMenuButton<_ImageAction>(
                 tooltip: 'Change ${kind.label}',
                 iconSize: size,
-                padding: EdgeInsets.all(small ? 4 : 8),
+                padding: const EdgeInsets.all(8),
                 icon: Icon(icon),
                 onSelected: (a) => switch (a) {
                   _ImageAction.choose => vm.changeImage.execute((
@@ -1056,7 +1033,8 @@ class _TeamsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     final c = AppColors.of(context);
-    final teams = vm.summary.teams;
+    final teams = vm.shownTeams;
+    final kinds = vm.teamKindCounts;
     return SectionCard(
       title: vm.isMe ? 'My teams' : 'Teams',
       action: vm.isMe && !vm.visibility.teams ? const _HiddenTag() : null,
@@ -1073,6 +1051,24 @@ class _TeamsCard extends StatelessWidget {
               'Not on a team yet.',
               style: TextStyle(fontSize: 12.5, color: c.muted),
             ),
+          if (vm.showsTeams && vm.filtersTeams)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: ToneFilterBar<TeamKind>(
+                filters: [
+                  (
+                    value: null,
+                    label: 'All',
+                    tone: null,
+                    count: vm.summary.teams.length,
+                  ),
+                  for (final MapEntry(key: k, value: n) in kinds.entries)
+                    (value: k, label: k.pluralLabel, tone: k.tone, count: n),
+                ],
+                selected: vm.teamKindFilter,
+                onSelected: vm.setTeamKindFilter,
+              ),
+            ),
           if (vm.showsTeams)
             for (final t in teams)
               InkWell(
@@ -1082,10 +1078,7 @@ class _TeamsCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(
                     children: [
-                      TeamBadge(
-                        size: 38,
-                        community: t.kind.name == 'community',
-                      ),
+                      TeamBadge(size: 38, community: t.kind != TeamKind.team),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -1112,6 +1105,8 @@ class _TeamsCard extends StatelessWidget {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      ToneTag(label: t.kind.shortLabel, tone: t.kind.tone),
                       Icon(Icons.chevron_right, size: 18, color: c.muted),
                     ],
                   ),
@@ -1121,6 +1116,27 @@ class _TeamsCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Each kind of team's color and names on a profile's Teams card.
+extension on TeamKind {
+  Tone get tone => switch (this) {
+    TeamKind.team => Tone.blue,
+    TeamKind.community => Tone.teal,
+    TeamKind.organization => Tone.purple,
+  };
+
+  String get shortLabel => switch (this) {
+    TeamKind.team => 'Team',
+    TeamKind.community => 'Group',
+    TeamKind.organization => 'School/club',
+  };
+
+  String get pluralLabel => switch (this) {
+    TeamKind.team => 'Teams',
+    TeamKind.community => 'Groups',
+    TeamKind.organization => 'Schools & clubs',
+  };
 }
 
 /// Asks the user which roster spot on a team is theirs, so their stats
@@ -1206,11 +1222,15 @@ class _ClaimCard extends StatelessWidget {
 // Editing ----------------------------------------------------------------
 
 /// Edits the user's profile details and what others see; pops with the
-/// new details or null.
+/// new details or null. With [images], it also changes the profile
+/// picture and header photo (those save straight away).
 class EditProfileDialog extends StatefulWidget {
-  const EditProfileDialog({super.key, required this.initial});
+  const EditProfileDialog({super.key, required this.initial, this.images});
 
   final ProfileDetails initial;
+
+  /// The user's own profile, whose pictures this changes.
+  final PlayerProfileViewModel? images;
 
   @override
   State<EditProfileDialog> createState() => _EditProfileDialogState();
@@ -1284,6 +1304,10 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (widget.images case final vm?) ...[
+                _EditImages(viewModel: vm),
+                const SizedBox(height: 12),
+              ],
               field(_bio, 'Bio', maxLength: ProfileDetails.maxBio, maxLines: 4),
               field(_pronouns, 'Pronouns', maxLength: 30),
               field(_hometown, 'Based in (city)'),
@@ -1327,6 +1351,67 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
         ),
         FilledButton(onPressed: _save, child: const Text('Save')),
       ],
+    );
+  }
+}
+
+/// The profile picture and header photo at the top of Edit profile, each
+/// with a menu to choose, take or remove one.
+class _EditImages extends StatelessWidget {
+  const _EditImages({required this.viewModel});
+
+  final PlayerProfileViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final vm = viewModel;
+    return ListenableBuilder(
+      listenable: vm,
+      builder: (context, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: PersonAvatar(
+              name: vm.name,
+              photoUrl: vm.photoUrl,
+              radius: 22,
+            ),
+            title: const Text('Profile picture'),
+            trailing: _ImageMenu(
+              viewModel: vm,
+              kind: ProfileImage.photo,
+              icon: Icons.photo_camera_outlined,
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                width: 64,
+                height: 36,
+                child: _Banner(
+                  url: vm.headerUrl,
+                  fallback: ColoredBox(color: c.feature),
+                ),
+              ),
+            ),
+            title: const Text('Header photo'),
+            trailing: _ImageMenu(
+              viewModel: vm,
+              kind: ProfileImage.header,
+              icon: Icons.add_a_photo_outlined,
+            ),
+          ),
+          Text(
+            'Photo changes save right away.',
+            style: TextStyle(fontSize: 11.5, color: c.muted),
+          ),
+          const Divider(height: 24),
+        ],
+      ),
     );
   }
 }

@@ -192,6 +192,17 @@ GoRouter webRouter(AuthRepository auth, {String? initialLocation}) {
             builder: (_, state) => postPage(state),
           ),
           ...hostedTournamentRoutes(),
+          // The app pushes teams over tournaments; on the web they're
+          // ordinary pages.
+          GoRoute(
+            path: '${Routes.teamsOverPath}/:teamId',
+            redirect: (_, state) => Uri(
+              path: Routes.team(state.pathParameters['teamId']!),
+              queryParameters: state.uri.queryParameters.isEmpty
+                  ? null
+                  : state.uri.queryParameters,
+            ).toString(),
+          ),
           GoRoute(
             path: getTheAppPath,
             builder: (_, _) => const GetTheAppScreen(appOnly: false),

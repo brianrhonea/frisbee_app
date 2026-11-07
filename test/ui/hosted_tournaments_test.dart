@@ -336,6 +336,40 @@ void main() {
     }
   });
 
+  test('a list filters by status when it has more than one', () async {
+    final id = await host();
+    repo.tournaments['draft'] = repo.tournaments[id]!.copyWith(
+      id: 'draft',
+      status: HostedStatus.draft,
+    );
+    final managerList = HostedTournamentsViewModel(
+      hostId: 'host',
+      tournamentRepository: repo,
+      teamRepository: teams,
+      authRepository: as('director'),
+    );
+    final fanList = HostedTournamentsViewModel(
+      hostId: 'host',
+      tournamentRepository: repo,
+      teamRepository: teams,
+      authRepository: as('fan'),
+    );
+    await pumpEventQueue();
+    final published = repo.tournaments[id]!.status;
+    expect(managerList.filtersByStatus, isTrue);
+    expect(managerList.statusCounts, {HostedStatus.draft: 1, published: 1});
+    managerList.setStatusFilter(HostedStatus.draft);
+    expect([for (final t in managerList.tournaments) t.id], ['draft']);
+    managerList.setStatusFilter(null);
+    expect(managerList.tournaments, hasLength(2));
+    // Fans don't see the draft, so there's only one status: no filter.
+    expect(fanList.filtersByStatus, isFalse);
+    fanList.setStatusFilter(HostedStatus.draft);
+    expect(fanList.tournaments, hasLength(1));
+    managerList.dispose();
+    fanList.dispose();
+  });
+
   test("a host's list hides drafts from non-managers", () async {
     final id = await host();
     repo.tournaments['draft'] = repo.tournaments[id]!.copyWith(

@@ -14,6 +14,7 @@ import '../../core/ui/confirm_dialog.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../core/ui/status_views.dart';
+import '../../core/ui/user_avatar.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/direct_chat_viewmodel.dart';
 import '../view_models/inbox_viewmodel.dart';
@@ -260,7 +261,17 @@ class _DirectChatViewState extends State<DirectChatView> {
                 ? null
                 : vm.isGroup
                 ? const CircleAvatar(radius: 18, child: Icon(Icons.groups))
-                : PersonAvatar(name: vm.otherName, radius: 18),
+                : UserAvatar(
+                    uid: vm.otherId ?? '',
+                    name: vm.otherName,
+                    radius: 18,
+                  ),
+            onTap: switch (vm.otherId) {
+              final id? when id.isNotEmpty => () => context.push(
+                Routes.personOver(id),
+              ),
+              _ => null,
+            },
             title: vm.conversation == null ? null : vm.title,
             subtitle: vm.conversation == null
                 ? null

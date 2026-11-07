@@ -129,7 +129,7 @@ void main() {
     expect(profiles.uploads, isEmpty);
   });
 
-  testWidgets('own profile offers to change both pictures', (tester) async {
+  testWidgets('Edit profile offers to change both pictures', (tester) async {
     tester.view.physicalSize = const Size(1400, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -145,6 +145,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Only once editing, not on the profile itself.
+    expect(find.byTooltip('Change profile picture'), findsNothing);
+    expect(find.byTooltip('Change header photo'), findsNothing);
+    await tester.tap(find.text('Edit profile'));
+    await tester.pumpAndSettle();
     expect(find.byTooltip('Change profile picture'), findsOneWidget);
     await tester.tap(find.byTooltip('Change header photo'));
     await tester.pumpAndSettle();
@@ -156,7 +161,8 @@ void main() {
     await tester.tap(find.text('Choose photo'));
     await tester.pumpAndSettle();
     expect(vm.headerUrl, isNotNull);
-    // Tests can't load it, so the default banner shows in its place.
+    // On the profile and in the dialog's preview. Tests can't load it, so
+    // the default banner shows in its place.
     expect(
       find.byWidgetPredicate(
         (w) =>
@@ -164,7 +170,7 @@ void main() {
             w.image is NetworkImage &&
             (w.image as NetworkImage).url == vm.headerUrl,
       ),
-      findsOneWidget,
+      findsNWidgets(2),
     );
 
     await tester.tap(find.byTooltip('Change header photo'));
@@ -182,6 +188,7 @@ void main() {
       MaterialApp(home: PlayerProfileScreen(viewModel: vm)),
     );
     await tester.pumpAndSettle();
+    expect(find.text('Edit profile'), findsNothing);
     expect(find.byTooltip('Change profile picture'), findsNothing);
     expect(find.byTooltip('Change header photo'), findsNothing);
   });

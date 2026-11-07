@@ -211,6 +211,70 @@ void main() {
     });
   });
 
+  testWidgets('teams of more than one kind are colored and filter by kind', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    profiles.put(
+      const PlayerProfile(
+        uid: 'p2',
+        name: 'Pat',
+        summary: ProfileSummary(
+          teams: [
+            ProfileTeam(id: 't1', name: 'Riptide'),
+            ProfileTeam(id: 't2', name: 'Sol'),
+            ProfileTeam(
+              id: 'g1',
+              name: 'Denver Pickup',
+              kind: TeamKind.community,
+            ),
+          ],
+        ),
+      ),
+    );
+    final vm = profileOf('p2');
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: PlayerProfileScreen(viewModel: vm),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Teams').first);
+    await tester.pumpAndSettle();
+    expect(find.text('All 3'), findsOneWidget);
+    expect(find.text('Teams 2'), findsOneWidget);
+    expect(find.text('Groups 1'), findsOneWidget);
+    expect(find.text('Team'), findsNWidgets(2));
+    expect(find.text('Group'), findsOneWidget);
+
+    await tester.tap(find.text('Groups 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('Denver Pickup'), findsOneWidget);
+    expect(find.text('Riptide'), findsNothing);
+
+    // One kind only: nothing to filter.
+    vm.setTeamKindFilter(null);
+    profiles.put(
+      const PlayerProfile(
+        uid: 'p2',
+        name: 'Pat',
+        summary: ProfileSummary(
+          teams: [
+            ProfileTeam(id: 't1', name: 'Riptide'),
+            ProfileTeam(id: 't2', name: 'Sol'),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(vm.filtersTeams, isFalse);
+    expect(find.text('All 2'), findsNothing);
+  });
+
   test('player search matches name, school and team', () async {
     profiles
       ..put(

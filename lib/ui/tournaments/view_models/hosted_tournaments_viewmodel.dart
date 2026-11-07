@@ -70,14 +70,45 @@ class HostedTournamentsViewModel extends ChangeNotifier {
   bool _loaded = false;
   Object? _error;
   String _query = '';
+  HostedStatus? _status;
 
   bool get loaded => _loaded || _error != null;
   Object? get error => _error;
   Team? get host => _host;
   String get query => _query;
 
-  /// Filtered by [query] (name, host or place).
+  /// The status [tournaments] is narrowed to; null for all.
+  HostedStatus? get statusFilter => _status;
+
+  /// How many of the [query]'s matches are in each status, in the order
+  /// a tournament goes through them; only statuses some have.
+  Map<HostedStatus, int> get statusCounts {
+    final counts = <HostedStatus, int>{};
+    for (final t in _matching) {
+      counts[t.status] = (counts[t.status] ?? 0) + 1;
+    }
+    return {
+      for (final s in HostedStatus.values)
+        s: ?counts[s],
+    };
+  }
+
+  /// Whether there's more than one status to filter by.
+  bool get filtersByStatus => statusCounts.length > 1;
+
+  /// Matching [query] (name, host or place) and [statusFilter].
   List<HostedTournament> get tournaments {
+    final status = filtersByStatus ? _status : null;
+    final matching = _matching;
+    if (status == null) return matching;
+    return [
+      for (final t in matching)
+        if (t.status == status) t,
+    ];
+  }
+
+  /// Matching [query] only.
+  List<HostedTournament> get _matching {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return _list;
     return [
@@ -85,6 +116,11 @@ class HostedTournamentsViewModel extends ChangeNotifier {
         if ('${t.name} ${t.hostName} ${t.location}'.toLowerCase().contains(q))
           t,
     ];
+  }
+
+  void setStatusFilter(HostedStatus? status) {
+    _status = status;
+    notifyListeners();
   }
 
   /// Members with Manage events host tournaments here.

@@ -127,7 +127,7 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
             body: _PublicTournament(
               listing: listing,
               follow: follow,
-              onOpenGroup: () => context.go(Routes.team(vm.groupId)),
+              onOpenGroup: () => context.push(Routes.teamOver(vm.groupId)),
             ),
           );
         }

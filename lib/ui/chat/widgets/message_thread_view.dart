@@ -186,6 +186,8 @@ class _MessageThreadViewState extends State<MessageThreadView> {
         canReact: vm.canReact && m.createdAt != null,
         canReply: _canReply(m),
         canDelete: vm.canDelete(m),
+        canOpenProfile:
+            vm.opensProfiles && m.authorId.isNotEmpty && !vm.isMine(m),
       ),
     );
     if (!mounted || action == null) return;
@@ -198,6 +200,8 @@ class _MessageThreadViewState extends State<MessageThreadView> {
         _copy(m);
       case _Delete():
         _delete(m);
+      case _Profile():
+        _openProfile(m.authorId);
     }
   }
 
@@ -265,6 +269,10 @@ class _Copy extends _MessageAction {
   const _Copy();
 }
 
+class _Profile extends _MessageAction {
+  const _Profile();
+}
+
 class _Delete extends _MessageAction {
   const _Delete();
 }
@@ -300,6 +308,7 @@ class _MessageActionsSheet extends StatelessWidget {
     required this.canReact,
     required this.canReply,
     required this.canDelete,
+    required this.canOpenProfile,
   });
 
   final ChatMessage message;
@@ -309,11 +318,13 @@ class _MessageActionsSheet extends StatelessWidget {
   final bool canReact;
   final bool canReply;
   final bool canDelete;
+  final bool canOpenProfile;
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     void pick(_MessageAction a) => Navigator.pop(context, a);
+    final name = message.authorName.isEmpty ? 'Member' : message.authorName;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -359,6 +370,12 @@ class _MessageActionsSheet extends StatelessWidget {
               leading: const Icon(Icons.copy_outlined),
               title: const Text('Copy text'),
               onTap: () => pick(const _Copy()),
+            ),
+          if (canOpenProfile)
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: Text("View $name's profile"),
+              onTap: () => pick(const _Profile()),
             ),
           if (canDelete)
             ListTile(
@@ -1108,11 +1125,13 @@ class _BubbleRow extends StatelessWidget {
                   if (m.replyTo case final r?)
                     _ReplyQuote(reply: r, onBubble: false),
                   if (m.text.isNotEmpty)
-                    Tooltip(
+                    // The time on hover. Not on touch screens: a Tooltip
+                    // there claims the long-press the actions sheet needs.
+                    _HoverTime(
+                      enabled: _usesMouse(context),
                       message: sending
                           ? 'Sending…'
                           : DateFormat.jm().format(m.createdAt!),
-                      waitDuration: const Duration(milliseconds: 600),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: fill,
@@ -1168,6 +1187,28 @@ class _BubbleRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A [Tooltip] when [enabled], else just [child].
+class _HoverTime extends StatelessWidget {
+  const _HoverTime({
+    required this.enabled,
+    required this.message,
+    required this.child,
+  });
+
+  final bool enabled;
+  final String message;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => enabled
+      ? Tooltip(
+          message: message,
+          waitDuration: const Duration(milliseconds: 600),
+          child: child,
+        )
+      : child;
 }
 
 /// The time, centered, over a message that came a while after the last.

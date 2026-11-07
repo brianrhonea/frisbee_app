@@ -261,6 +261,40 @@ class PlayerProfileViewModel extends ChangeNotifier {
     null => summary.career,
   };
 
+  TeamKind? _teamKind;
+
+  /// The kind of team [shownTeams] is narrowed to; null for all.
+  TeamKind? get teamKindFilter => _teamKind;
+
+  /// How many of their teams are of each kind, in [TeamKind] order; only
+  /// kinds they have.
+  Map<TeamKind, int> get teamKindCounts {
+    final counts = <TeamKind, int>{};
+    for (final t in summary.teams) {
+      counts[t.kind] = (counts[t.kind] ?? 0) + 1;
+    }
+    return {for (final k in TeamKind.values) k: ?counts[k]};
+  }
+
+  /// Whether their teams are of more than one kind to filter by.
+  bool get filtersTeams => teamKindCounts.length > 1;
+
+  /// Their teams, narrowed to [teamKindFilter].
+  List<ProfileTeam> get shownTeams {
+    final kind = filtersTeams ? _teamKind : null;
+    return kind == null
+        ? summary.teams
+        : [
+            for (final t in summary.teams)
+              if (t.kind == kind) t,
+          ];
+  }
+
+  void setTeamKindFilter(TeamKind? kind) {
+    _teamKind = kind;
+    notifyListeners();
+  }
+
   /// Jersey number and position from the first team that has one.
   ProfileTeam? get primaryTeam =>
       summary.teams.where((t) => t.number != null).firstOrNull ??

@@ -5,8 +5,40 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/status_views.dart';
+import '../../core/ui/tone.dart';
 import '../view_models/hosted_tournaments_viewmodel.dart';
+import 'hosted_status_badge.dart';
 import 'hosted_tournament_screen.dart';
+
+/// "All" and each status the list has, when it has more than one.
+class HostedStatusFilterBar extends StatelessWidget {
+  const HostedStatusFilterBar({super.key, required this.viewModel});
+
+  final HostedTournamentsViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final counts = vm.statusCounts;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ToneFilterBar<HostedStatus>(
+        filters: [
+          (
+            value: null,
+            label: 'All',
+            tone: null,
+            count: counts.values.fold(0, (a, b) => a + b),
+          ),
+          for (final MapEntry(key: s, value: n) in counts.entries)
+            (value: s, label: s.label, tone: s.tone, count: n),
+        ],
+        selected: vm.statusFilter,
+        onSelected: vm.setStatusFilter,
+      ),
+    );
+  }
+}
 
 /// One tournament in a list.
 class HostedTournamentCard extends StatelessWidget {
@@ -41,7 +73,7 @@ class HostedTournamentCard extends StatelessWidget {
           ].join('\n'),
         ),
         isThreeLine: true,
-        trailing: Chip(label: Text(t.status.label)),
+        trailing: HostedStatusBadge(status: t.status),
         onTap: () => context.push(Routes.tournament(t.id)),
       ),
     );
@@ -92,6 +124,7 @@ class HostedTournamentsSection extends StatelessWidget {
                   if (vm.tournaments.isNotEmpty || vm.canHost)
                     const _Heading('Hosted here'),
                 ],
+                if (vm.filtersByStatus) HostedStatusFilterBar(viewModel: vm),
                 if (vm.tournaments.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
@@ -145,6 +178,7 @@ class FindTournamentsScreen extends StatelessWidget {
                   onChanged: vm.setQuery,
                 ),
                 const SizedBox(height: 12),
+                if (vm.filtersByStatus) HostedStatusFilterBar(viewModel: vm),
                 if (vm.tournaments.isEmpty)
                   const EmptyView(
                     icon: Icons.emoji_events_outlined,

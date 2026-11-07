@@ -158,8 +158,12 @@ class ChatHeaderBar extends StatelessWidget implements PreferredSizeWidget {
     this.avatar,
     this.title,
     this.subtitle,
+    this.onTap,
     this.actions = const [],
   });
+
+  /// Tapping the avatar and title, e.g. to open the person's profile.
+  final VoidCallback? onTap;
 
   final Widget? leading;
   final Widget? avatar;
@@ -184,37 +188,54 @@ class ChatHeaderBar extends StatelessWidget implements PreferredSizeWidget {
       shape: Border(bottom: BorderSide(color: c.border)),
       title: t == null
           ? null
-          : Row(
-              children: [
-                if (avatar != null) ...[avatar!, const SizedBox(width: 12)],
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        t,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: c.ink,
-                        ),
-                      ),
-                      if (subtitle != null)
+          : _tappable(
+              Row(
+                children: [
+                  if (avatar != null) ...[avatar!, const SizedBox(width: 12)],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         Text(
-                          subtitle!,
+                          t,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11.5, color: c.muted),
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: c.ink,
+                          ),
                         ),
-                    ],
+                        if (subtitle != null)
+                          Text(
+                            subtitle!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11.5, color: c.muted),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
       actions: actions,
     );
   }
+
+  Widget _tappable(Widget child) => onTap == null
+      ? child
+      : Semantics(
+          button: true,
+          label: title == null ? null : "$title's profile",
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: child,
+            ),
+          ),
+        );
 }

@@ -45,6 +45,7 @@ import 'package:frisbee_app/data/repositories/post_comment/post_comment_reposito
 import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 
 import 'package:frisbee_app/data/repositories/hosted_tournament/hosted_tournament_repository.dart';
+import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/ui/tournaments/widgets/hosted_tournament_screen.dart';
 import 'package:frisbee_app/utils/pending_removals.dart';
 
@@ -62,6 +63,7 @@ void main() {
   late FakePostCommentRepository comments;
   late FakeDirectMessageRepository dms;
   late FakeFollowRepository follows;
+  late FakeHostedTournamentRepository hosted;
 
   Future<void> pumpApp(WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
@@ -130,7 +132,7 @@ void main() {
             value: FakeGroupTournamentRepository(),
           ),
           Provider<HostedTournamentRepository>.value(
-            value: FakeHostedTournamentRepository(),
+            value: hosted = FakeHostedTournamentRepository(),
           ),
         ],
         child: MaterialApp.router(
@@ -171,6 +173,48 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(EventDetailScreen), findsOneWidget);
+  });
+
+  testWidgets("a tournament's host slides in over it; its tabs stay "
+      'there and back returns to the tournament', (tester) async {
+    await pumpApp(tester);
+    final router = GoRouter.of(tester.element(find.byType(HomeScreen)));
+    hosted.tournaments['x9'] = HostedTournament(
+      id: 'x9',
+      hostId: 't1',
+      hostName: 'Northside Flyers',
+      name: 'Lone Star Classic',
+      startsOn: DateTime.now().add(const Duration(days: 3)),
+    );
+    unawaited(router.push(Routes.tournament('x9')));
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Hosted by Northside Flyers');
+    expect(find.byType(TeamHomeScreen), findsOneWidget);
+    // Pushed over the tournament, not swapped for the Teams tab.
+    expect(
+      find.byType(HostedTournamentScreen, skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      GoRouterState.of(tester.element(find.byType(TeamHomeScreen))).uri.path,
+      Routes.teamOver('t1'),
+    );
+
+    await tapText(tester, 'All events');
+    final uri = GoRouterState.of(
+      tester.element(find.byType(TeamHomeScreen)),
+    ).uri;
+    expect(uri.path, Routes.teamOver('t1'));
+    expect(uri.queryParameters['section'], 'events');
+    expect(
+      find.byType(HostedTournamentScreen, skipOffstage: false),
+      findsOneWidget,
+    );
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(HostedTournamentScreen), findsOneWidget);
+    expect(find.byType(TeamHomeScreen), findsNothing);
   });
 
   testWidgets('team and personal events return to home', (tester) async {
