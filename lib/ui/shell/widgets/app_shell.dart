@@ -187,6 +187,7 @@ List<Crumb> breadcrumbs(String path, String? Function(String id) teamName) {
     'schedule' => [community, here('Schedule')],
     'explore' => [explore],
     'players' => [explore, here('Player')],
+    'rankings' => [explore, here('Rankings')],
     'messages' => [(label: 'Messages', path: Routes.messages)],
     'profile' => [
       (label: 'My profile', path: Routes.profile),

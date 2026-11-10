@@ -2089,6 +2089,20 @@ service cloud.firestore {
       allow read: if signedIn();
     }
 
+    // Team rankings (rankings/{level-division}) and recent tournament
+    // results (tournamentResults/recent): the `rankings` Cloud Functions
+    // build them from public tournaments; anyone signed in reads them.
+    match /rankings/{key} {
+      allow read: if signedIn();
+    }
+    match /tournamentResults/{id} {
+      allow read: if signedIn();
+    }
+    // Player ratings (playerRankings/all), from public profiles' stats.
+    match /playerRankings/{id} {
+      allow read: if signedIn();
+    }
+
     // ---- Direct messages --------------------------------------------------
 
     // The people directory: name and photo only (never email), so any

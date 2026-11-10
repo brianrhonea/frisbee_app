@@ -23,6 +23,8 @@ import '../data/repositories/group_tournament/group_tournament_repository.dart';
 import '../data/repositories/group_tournament/group_tournament_repository_firebase.dart';
 import '../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
 import '../data/repositories/hosted_tournament/hosted_tournament_repository_firebase.dart';
+import '../data/repositories/ranking/ranking_repository.dart';
+import '../data/repositories/ranking/ranking_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
 import '../data/repositories/meeting/meeting_repository_firebase.dart';
 import '../data/repositories/meeting/meeting_settings_repository.dart';
@@ -149,6 +151,7 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<HostedTournamentRepository>(
     create: (_) => HostedTournamentRepositoryFirebase(),
   ),
+  Provider<RankingRepository>(create: (_) => RankingRepositoryFirebase()),
   Provider<ChatRepository>(
     create: (context) =>
         ChatRepositoryFirebase(attachments: context.read<AttachmentStorage>()),

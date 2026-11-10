@@ -597,6 +597,10 @@ GoRouter router(AuthRepository auth) => GoRouter(
               builder: (_, state) => explorePage(state),
             ),
             GoRoute(
+              path: Routes.rankingsPath,
+              builder: (_, state) => rankingsPage(state),
+            ),
+            GoRoute(
               path: '/players/:uid',
               // Your own profile lives on the Profile tab.
               redirect: (_, state) =>

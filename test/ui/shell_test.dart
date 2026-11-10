@@ -36,6 +36,9 @@ void main() {
       'Roster',
     ]);
     expect(labels('/teams/t9'), ['My teams', 'Team']);
+
+    expect(labels('/rankings?d=club-mixed'), ['Explore', 'Rankings']);
+    expect(links('/rankings'), [Routes.explorePath, null]);
   });
 
   test('screen sizes follow the phone, tablet and desktop breakpoints', () {

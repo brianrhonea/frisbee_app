@@ -59,6 +59,13 @@ abstract final class Routes {
 
   static const explorePath = '/explore';
 
+  /// Stall 10's team rankings; [key] ("club-mixed") picks the division.
+  static const rankingsPath = '/rankings';
+  static String rankings([String? key]) => Uri(
+    path: rankingsPath,
+    queryParameters: key == null ? null : {'d': key},
+  ).toString();
+
   /// Everything the user follows, with each bell.
   static const following = '/profile/following';
 
@@ -230,4 +237,4 @@ abstract final class Routes {
 }
 
 /// Explore's result filters.
-enum ExploreFilter { teams, groups, players }
+enum ExploreFilter { teams, groups, players, tournaments }

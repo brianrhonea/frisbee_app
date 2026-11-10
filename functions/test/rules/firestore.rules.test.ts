@@ -2710,6 +2710,22 @@ describe("follows", () => {
   });
 });
 
+describe("rankings", () => {
+  it("lets anyone signed in read rankings and results, and nobody write them", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "rankings", "club-mixed"), { teams: [] });
+      await setDoc(doc(ctx.firestore(), "tournamentResults", "recent"), { tournaments: [] });
+    });
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "rankings", "club-mixed")));
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "tournamentResults", "recent")));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "rankings", "club-mixed")));
+    await assertFails(setDoc(doc(db(OWNER), "rankings", "club-mixed"), { teams: [] }));
+    await assertFails(setDoc(doc(db(OWNER), "tournamentResults", "recent"), { tournaments: [] }));
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "playerRankings", "all")));
+    await assertFails(setDoc(doc(db(PLAYER), "playerRankings", "all"), { players: [] }));
+  });
+});
+
 describe("user posts", () => {
   const ref = (uid: string, id = "p1") => doc(db(uid), "posts", id);
   const post = (uid: string, extra: Record<string, unknown> = {}) => ({

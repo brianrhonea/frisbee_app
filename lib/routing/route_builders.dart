@@ -16,7 +16,9 @@ import '../ui/home/view_models/home_viewmodel.dart';
 import '../ui/home/widgets/home_screen.dart';
 import '../ui/posts/view_models/post_detail_viewmodel.dart';
 import '../ui/posts/widgets/post_detail_screen.dart';
+import '../ui/explore/view_models/explore_viewmodel.dart';
 import '../ui/explore/view_models/player_search_viewmodel.dart';
+import '../ui/explore/widgets/rankings_screen.dart';
 import '../ui/explore/widgets/explore_screen.dart';
 import '../ui/profile/view_models/player_profile_viewmodel.dart';
 import '../ui/profile/widgets/profile_screen.dart';
@@ -50,16 +52,38 @@ Widget explorePage(GoRouterState state) => ViewModelHost(
       TeamSearchViewModel(teamRepository: c.read(), authRepository: c.read()),
   builder: (_, vm) => ViewModelHost(
     create: (c) => PlayerSearchViewModel(profileRepository: c.read()),
-    builder: (_, players) => ExploreScreen(
-      viewModel: vm,
-      players: players,
-      initialQuery: state.uri.queryParameters['q'] ?? '',
-      initialFilter: ExploreFilter.values
-          .where((f) => f.name == state.uri.queryParameters['only'])
-          .firstOrNull,
+    builder: (_, players) => ViewModelHost(
+      create: (c) => exploreViewModel(c),
+      builder: (_, explore) => ExploreScreen(
+        viewModel: vm,
+        players: players,
+        explore: explore,
+        initialQuery: state.uri.queryParameters['q'] ?? '',
+        initialFilter: ExploreFilter.values
+            .where((f) => f.name == state.uri.queryParameters['only'])
+            .firstOrNull,
+      ),
     ),
   ),
 );
+
+ExploreViewModel exploreViewModel(BuildContext c, {String? ranking}) =>
+    ExploreViewModel(
+      tournamentRepository: c.read(),
+      rankingRepository: c.read(),
+      teamRepository: c.read(),
+      authRepository: c.read(),
+      initialRanking: ranking,
+    );
+
+/// Every division's ranking; `?d=club-mixed` opens on one.
+Widget rankingsPage(GoRouterState state) {
+  final key = state.uri.queryParameters['d'];
+  return ViewModelHost(
+    create: (c) => exploreViewModel(c, ranking: key),
+    builder: (_, vm) => RankingsScreen(viewModel: vm),
+  );
+}
 
 PlayerProfileViewModel playerProfileViewModel(BuildContext c, String uid) =>
     PlayerProfileViewModel(

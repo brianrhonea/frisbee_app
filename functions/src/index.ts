@@ -10,6 +10,7 @@ export * as discord from "./discord/functions";
 export * as follows from "./follows/functions";
 export * as meetings from "./meetings/functions";
 export * as notifications from "./notifications/triggers";
+export * as rankings from "./rankings/functions";
 export * as tournaments from "./tournaments/functions";
 
 initializeApp();
