@@ -232,6 +232,7 @@ void main() {
           eventRepository: events,
           tournamentRepository: repo,
           authRepository: as('owner'),
+          clock: () => DateTime(2026, 11, 1),
           random: Random(2),
         );
         await pumpEventQueue();
