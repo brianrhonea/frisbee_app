@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ForVisitors } from "@/components/ForVisitors";
 
 export const metadata: Metadata = {
   title: "Learn to play ultimate",
@@ -223,12 +224,14 @@ export default function Learn() {
         </section>
       </article>
 
-      <div className="cta-card">
-        <p>Ready to play? Join Stall 10 to find pickup and keep up with your team.</p>
-        <Link className="btn btn-primary btn-small" href="/sign-up">
-          Sign up free
-        </Link>
-      </div>
+      <ForVisitors>
+        <div className="cta-card">
+          <p>Ready to play? Join Stall 10 to find pickup and keep up with your team.</p>
+          <Link className="btn btn-primary btn-small" href="/sign-up">
+            Sign up free
+          </Link>
+        </div>
+      </ForVisitors>
     </div>
   );
 }

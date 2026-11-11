@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Avatar } from "./Avatar";
 import { LocalTime } from "./LocalTime";
 import { MemberImage } from "./MemberImage";
+import { PostActions } from "./PostActions";
 
 function workoutLine(w: NonNullable<PublicPost["workout"]>): string {
   const parts: string[] = [];
@@ -27,47 +28,42 @@ function linkLabel(url: string): string {
 /** Only web links become anchors (never javascript: or other schemes). */
 const isWebLink = (url: string) => /^https?:\/\//i.test(url);
 
-/**
- * A player's post. `standalone` drops the link to itself; `member` is a
- * signed-in view (photos through Storage, no sign-up prompt).
- */
-export function PostCard({ post, standalone = false, member = false }: { post: PublicPost; standalone?: boolean; member?: boolean }) {
+/** Who wrote [post] and when, linking to their profile and the post. */
+function PostHead({ post, standalone, note }: { post: PublicPost; standalone: boolean; note?: string }) {
   const author = post.authorName || "A player";
-  const links = (post.links ?? []).filter(isWebLink);
   const who = (
     <>
       <Avatar name={author} url={post.authorPhotoUrl} />
       <b>{author}</b>
     </>
   );
+  const time = <LocalTime iso={post.createdAt} style="relative" />;
   return (
-    <article className="post">
-      {post.repostOf && (
-        <p className="post-repost">
-          Reposted from{" "}
-          <Link href={`/players/${encodeURIComponent(post.repostOf.authorId)}`}>
-            {post.repostOf.authorName || "a player"}
-          </Link>
-        </p>
+    <header className="post-head">
+      {post.authorId ? (
+        <Link href={`/players/${encodeURIComponent(post.authorId)}`} className="post-author">
+          {who}
+        </Link>
+      ) : (
+        <span className="post-author">{who}</span>
       )}
-      <header className="post-head">
-        {post.authorId ? (
-          <Link href={`/players/${encodeURIComponent(post.authorId)}`} className="post-author">
-            {who}
-          </Link>
-        ) : (
-          <span className="post-author">{who}</span>
-        )}
-        {standalone ? (
-          <span className="post-time">
-            <LocalTime iso={post.createdAt} style="relative" />
-          </span>
-        ) : (
-          <Link className="post-time" href={`/posts/${encodeURIComponent(post.id)}`}>
-            <LocalTime iso={post.createdAt} style="relative" />
-          </Link>
-        )}
-      </header>
+      {note && <span className="post-reposted">{note}</span>}
+      {standalone ? (
+        <span className="post-time">{time}</span>
+      ) : (
+        <Link className="post-time" href={`/posts/${encodeURIComponent(post.id)}`}>
+          {time}
+        </Link>
+      )}
+    </header>
+  );
+}
+
+/** A post's own content: text, workout, event, photos and links. */
+function PostContent({ post }: { post: PublicPost }) {
+  const links = (post.links ?? []).filter(isWebLink);
+  return (
+    <>
       {post.tournamentName && <p className="post-tag">{post.tournamentName}</p>}
       {post.body && <p className="post-body">{post.body}</p>}
       {post.workout && (
@@ -102,7 +98,7 @@ export function PostCard({ post, standalone = false, member = false }: { post: P
         <div className={`post-images n${Math.min(post.images.length, 4)}`}>
           {post.images.slice(0, 4).map((img) => (
             <a key={img.path} href={img.url} target="_blank" rel="noopener">
-              <MemberImage path={img.path} url={img.url} alt={img.name ?? ""} signedIn={member} />
+              <MemberImage path={img.path} url={img.url} alt={img.name ?? ""} />
             </a>
           ))}
         </div>
@@ -118,28 +114,41 @@ export function PostCard({ post, standalone = false, member = false }: { post: P
           ))}
         </ul>
       ) : null}
-      <footer className="post-counts">
-        <span>
-          {post.likeCount} {post.likeCount === 1 ? "like" : "likes"}
-        </span>
-        <span>
-          {post.repostCount} {post.repostCount === 1 ? "repost" : "reposts"}
-        </span>
-        {post.commentCount ? (
-          <span>
-            {post.commentCount} {post.commentCount === 1 ? "comment" : "comments"}
-          </span>
-        ) : null}
-        {member ? (
-          <a className="post-join" href={`stall10://open/p/${encodeURIComponent(post.id)}`}>
-            Like and reply in the app
-          </a>
-        ) : (
-          <Link className="post-join" href="/sign-up">
-            Sign up to like and reply
-          </Link>
-        )}
-      </footer>
+    </>
+  );
+}
+
+/**
+ * A player's post. A repost shows the reposter's note over the original
+ * as it is now, as the app does. `standalone` drops the link to itself.
+ * Likes and reposts (PostActions) follow whoever is signed in.
+ */
+export function PostCard({ post, standalone = false }: { post: PublicPost; standalone?: boolean }) {
+  if (!post.repostOf) {
+    return (
+      <article className="post">
+        <PostHead post={post} standalone={standalone} />
+        <PostContent post={post} />
+        <PostActions post={post} />
+      </article>
+    );
+  }
+  const original = post.original;
+  return (
+    <article className="post">
+      <PostHead post={post} standalone={standalone} note="reposted" />
+      {post.body && <p className="post-body">{post.body}</p>}
+      {original ? (
+        <div className="post-original">
+          <PostHead post={original} standalone={false} />
+          <PostContent post={original} />
+        </div>
+      ) : (
+        <p className="post-original post-missing">
+          {post.repostOf.authorName ? `${post.repostOf.authorName}'s post` : "This post"} was deleted.
+        </p>
+      )}
+      <PostActions post={post} />
     </article>
   );
 }

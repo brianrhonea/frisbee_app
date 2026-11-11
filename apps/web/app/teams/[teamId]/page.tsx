@@ -4,6 +4,7 @@ import Link from "next/link";
 import { cache } from "react";
 import { Avatar } from "@/components/Avatar";
 import { EventItem } from "@/components/EventItem";
+import { ForVisitors } from "@/components/ForVisitors";
 import { LocalTime } from "@/components/LocalTime";
 import { getPublic } from "@/lib/api";
 import { listingSubtitle } from "@/lib/site";
@@ -43,12 +44,14 @@ export default async function Team({ params }: Props) {
       </header>
       {team.description && <p className="bio">{team.description}</p>}
 
-      <div className="cta-card">
-        <p>{group ? "Join this group on Stall 10." : "Follow this team on Stall 10."}</p>
-        <Link className="btn btn-primary btn-small" href={`/sign-up?next=${encodeURIComponent(`/teams/${teamId}`)}`}>
-          {group ? "Sign up to join" : "Sign up to follow"}
-        </Link>
-      </div>
+      <ForVisitors>
+        <div className="cta-card">
+          <p>{group ? "Join this group on Stall 10." : "Follow this team on Stall 10."}</p>
+          <Link className="btn btn-primary btn-small" href={`/sign-up?next=${encodeURIComponent(`/teams/${teamId}`)}`}>
+            {group ? "Sign up to join" : "Sign up to follow"}
+          </Link>
+        </div>
+      </ForVisitors>
 
       {privateGroup ? (
         <p className="empty">Only members see this group&apos;s posts and events.</p>

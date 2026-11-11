@@ -21,6 +21,8 @@ export interface MeRepository {
   followedUsers(uid: string): Promise<string[]>;
   /** Newest posts by [authors] before [before] ms if given, merged. */
   postsBy(authors: string[], before: number | null, limit: number): Promise<Doc[]>;
+  /** One post (a repost's original); readable by anyone signed in. */
+  post(id: string): Promise<Doc | null>;
 }
 
 const doc = (d: { id: string; data: () => Data | undefined }): Doc => ({ id: d.id, data: plain(d.data() ?? {}) as Data });
@@ -59,6 +61,11 @@ export class FirestoreMeRepository implements MeRepository {
   async followedUsers(uid: string) {
     const snap = await this.db.collection(`users/${uid}/follows`).where("type", "==", "user").get();
     return snap.docs.map((d) => d.get("targetId")).filter((id): id is string => typeof id === "string" && id !== "");
+  }
+
+  async post(id: string): Promise<Doc | null> {
+    const snap = await this.db.doc(`posts/${id}`).get();
+    return snap.exists ? { id: snap.id, data: plain(snap.data() ?? {}) as Data } : null;
   }
 
   async postsBy(authors: string[], before: number | null, limit: number) {

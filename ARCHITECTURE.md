@@ -196,6 +196,11 @@ sequenceDiagram
   `needsUsername`, teams with the caller's role, upcoming events they may
   see per `sees(e)`, and a paged feed of their posts and the people they
   follow). The website's signed-in home page.
+- Posts: `PUT|DELETE /v1/posts/:id/like` → `{liked, likeCount}`;
+  `PUT|DELETE /v1/posts/:id/repost` (`{note?}`) → `{reposted,
+  repostCount}`; `GET /v1/posts/state?ids=a,b` → the caller's likes and
+  reposts by id (≤ 50). A repost's likes and reposts go to its original.
+  `GET /v1/feed?before=` → the community feed, paged, for members.
 - Public (no token; the website server): `GET /v1/public/feed`,
   `/players/:uid`, `/posts/:id`, `/teams/:id`, `/events`, `/search`.
   Visitors get one page (`next: null`); paging is for members.
@@ -359,7 +364,7 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 | 2 | Teams | join (code, link, open group, request/approve), invites, leave, remove, roles, permissions, transfer, edit details, community links, create team in community | Rule functions ported in `apps/api/src/teams/access.ts`, run in transactions (`MembershipService`); `use_api_membership` flag. Still direct: `migrateTiersToRoles` (edits chat rooms, item 10), `deleteTeam`, roster | **Migrated** (fallback kept) |
 | 3 | Users | profile edit, username claim, privacy settings, delete account (callable today) | `apps/api/src/profiles`; `use_api_profiles` flag. Still direct: `publishSummary`, header photo, `users/{uid}` settings (owner-only, unvalidated); delete account stays a callable | **Migrated** details, privacy, visibility, username (fallback kept) |
 | 4 | Media | upload URLs + server-side compression (§6) | `apps/api/src/media`: sniffing, sharp compression, HEIC via ffmpeg (`ffmpegHeicDecoder`), `transcodeJobs/{id}` + `transcode.ts` for the Cloud Run job; needs `STORAGE_BUCKET`. Not yet: the job's entry point and queue, signed URLs verified against real Storage, app callers (posts/chat/avatars still upload directly) | **API built**, app not switched |
-| 5 | Posts | posts, team posts, comments, likes, reposts | Uses media | |
+| 5 | Posts | posts, team posts, comments, likes, reposts | Likes and reposts in `apps/api/src/posts` (the website uses them; the app still writes directly). Not yet: creating/editing posts, team posts, comments | **Likes and reposts in the API**, app not switched |
 | 6 | Follows | follow, requests, accept | | |
 | 7 | Events | team/personal events, RSVPs, polls | | |
 | 8 | Leagues & tournaments | hosted tournaments, leagues, signups, drafts | Some already callables; move them to the API | |

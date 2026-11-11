@@ -4,6 +4,22 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.3.0 — 2026-11-11
+
+**Added**
+- Members like and repost posts (with an optional note) on every feed,
+  profile and post page; a repost's likes and reposts go to its original,
+  as in the app. Replies stay in the app ("Reply in the app").
+- Reposts show the original post under the reposter's note.
+- Members page through the community feed ("Older posts").
+
+**Changed**
+- Navigation follows who's signed in: members get Home, Community,
+  Explore, Events and Learn, and an account menu (dashboard, public
+  profile, log out); visitors get Community, Explore, Events, Learn and
+  About, with Log in and Sign up.
+- Sign-up prompts show only to visitors.
+
 ## 0.2.0 — 2026-11-11
 
 **Added**

@@ -138,6 +138,35 @@ describe("public reads", () => {
     expect(asked.posts.map((p: { id: string }) => p.id)).toEqual(first.posts.map((p: { id: string }) => p.id));
   });
 
+  it("shows a repost with its original as it is now, or null once deleted", async () => {
+    t.repo.profileMap.set("pub2", { name: "Lee", private: false });
+    t.repo.postsList = [
+      post("p1", "pub2"),
+      post("p2", "pub", { kind: "repost", body: "note", repostOf: { postId: "p1", authorId: "pub2", authorName: "Lee" } }),
+      post("p3", "pub", { kind: "repost", repostOf: { postId: "gone", authorId: "pub2", authorName: "Lee" } }),
+    ];
+    const posts = (await t.get("/v1/public/feed")).json().posts;
+    const byId = Object.fromEntries(posts.map((p: { id: string }) => [p.id, p]));
+    expect(byId.p2.original).toMatchObject({ id: "p1", body: "post p1", likeCount: 2 });
+    expect(byId.p2.original).not.toHaveProperty("likedBy");
+    expect(byId.p3.original).toBeNull();
+    expect(byId.p1).not.toHaveProperty("original");
+  });
+
+  it("pages the community feed for members only (GET /v1/feed)", async () => {
+    t.repo.postsList = Array.from({ length: 25 }, (_, i) => post(`p${i + 1}`, "pub"));
+    expect((await t.get("/v1/feed")).statusCode).toBe(401);
+    const auth = { authorization: "Bearer token:m1" };
+    const first = await t.get("/v1/feed", auth);
+    expect(first.headers["cache-control"]).toBe("private, no-store");
+    const body = first.json();
+    expect(body.posts).toHaveLength(20);
+    expect(body.next).toBe(now - 20_000);
+    const second = (await t.get(`/v1/feed?before=${body.next}`, auth)).json();
+    expect(second.posts.map((p: { id: string }) => p.id)).toEqual(["p21", "p22", "p23", "p24", "p25"]);
+    expect(second.next).toBeNull();
+  });
+
   it("refuses a private author's post", async () => {
     t.repo.postsList = [post("p2", "priv")];
     expect((await t.get("/v1/public/posts/p2")).statusCode).toBe(404);

@@ -7,3 +7,4 @@ export * from "./media.js";
 export * from "./membership.js";
 export * from "./profile.js";
 export * from "./me.js";
+export * from "./posts.js";

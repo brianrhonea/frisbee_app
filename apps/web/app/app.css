@@ -224,3 +224,56 @@ button.btn:disabled { opacity: 0.6; cursor: default; }
   }
   .site-header nav a { white-space: nowrap; }
 }
+
+/* Likes and reposts (PostActions) and reposts' originals */
+.post-reposted { color: var(--muted); font-size: 0.85rem; margin-right: auto; }
+.post-original {
+  margin-top: 12px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--field);
+}
+.post-original .avatar { width: 30px !important; height: 30px !important; font-size: 13px !important; }
+.post-missing { color: var(--muted); font-style: italic; }
+.post-actions { gap: 6px 8px; }
+.post-action {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+  background: transparent; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer;
+}
+.post-action:hover:not(:disabled) { color: var(--ink); border-color: var(--muted); }
+.post-action.on { color: var(--lime); border-color: var(--lime); background: var(--accent-soft); }
+.post-action:disabled { cursor: default; opacity: 0.6; }
+.repost-form { display: grid; gap: 8px; margin-top: 12px; }
+.repost-form label { font-weight: 600; font-size: 0.9rem; }
+.repost-form textarea {
+  width: 100%; box-sizing: border-box; resize: vertical; font: inherit; color: var(--ink);
+  background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+}
+.repost-buttons { display: flex; justify-content: flex-end; gap: 8px; }
+.post-error { color: var(--danger); font-size: 0.85rem; margin: 8px 0 0; }
+.pager { flex-direction: column; align-items: center; gap: 8px; }
+.pager .empty { padding: 0; }
+
+/* Header: the current page, and members' account menu */
+.site-header nav a.active { color: var(--ink); }
+.account-menu { position: relative; }
+.account-menu summary {
+  display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none;
+  padding: 4px 10px 4px 4px; border-radius: 999px; border: 1px solid var(--line);
+  font-weight: 600; color: var(--ink);
+}
+.account-menu summary::-webkit-details-marker { display: none; }
+.account-menu summary::after { content: "▾"; color: var(--muted); font-size: 0.8em; }
+.account-name { max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-list {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; min-width: 200px;
+  display: grid; padding: 6px; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--line); box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
+}
+.account-list a, .account-list button {
+  text-align: left; padding: 9px 12px; border-radius: 8px; border: 0; background: none;
+  color: var(--ink); font: inherit; text-decoration: none; cursor: pointer;
+}
+.account-list a:hover, .account-list button:hover { background: var(--field); }
+@media (max-width: 560px) {
+  .account-name { display: none; }
+}

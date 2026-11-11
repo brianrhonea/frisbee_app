@@ -2,6 +2,7 @@ import type { MeHome, MyEvent, MyTeam, PublicImage, PublicPost, PublicProfile } 
 import type { Caller } from "../auth.js";
 import { eventView, parseBefore, postView, profileView } from "../browse/model.js";
 import type { Data, Doc } from "../browse/repository.js";
+import { nextCursor, originalsOf, withOriginal } from "../browse/reposts.js";
 import { can, isOrg, kindOf, mapOf, roleIn, strings } from "../teams/access.js";
 import type { MeRepository } from "./repository.js";
 
@@ -110,12 +111,12 @@ export class MeService {
   /** Posts are readable by anyone signed in (firestore.rules), so no privacy filter here. */
   private async feed(authors: string[], before: number | null) {
     const docs = await this.repo.postsBy(authors, before, feedPageSize);
-    const posts = docs.map((d) => {
+    const show = (d: Doc) => {
       const view = postView(d.data);
       return { ...view, id: d.id, images: this.images(view.images) } as PublicPost;
-    });
-    const last = docs.at(-1)?.data.createdAt;
-    const next = docs.length === feedPageSize && typeof last === "string" ? Date.parse(last) : null;
-    return { posts, next };
+    };
+    const originals = await originalsOf(docs, (id) => this.repo.post(id));
+    const posts = docs.map((d) => withOriginal(show(d), d, originals, show));
+    return { posts, next: nextCursor(docs, feedPageSize) };
   }
 }

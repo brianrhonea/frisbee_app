@@ -39,6 +39,9 @@ class FakeMe implements MeRepository {
       .filter((p) => authors.includes(String(p.data.authorId)) && (!before || Date.parse(String(p.data.createdAt)) < before))
       .slice(0, limit);
   }
+  async post(id: string) {
+    return this.posts.find((p) => p.id === id) ?? null;
+  }
 }
 
 function setup() {
@@ -130,6 +133,17 @@ describe("GET /v1/me/home", () => {
     const second = (await t.get(`/v1/me/home?before=${first.next}`, "me")).json().feed;
     expect(second.posts.map((p: { id: string }) => p.id)).toEqual(["p20", "p21", "p22", "p23", "p24"]);
     expect(second.next).toBeNull();
+  });
+
+  it("feed: a repost carries its original, even from someone they don't follow", async () => {
+    t.repo.follows.set("me", ["f1"]);
+    t.repo.posts = [
+      { id: "r_o1_f1", data: { authorId: "f1", kind: "repost", body: "see", createdAt: iso(now - 1000), repostOf: { postId: "o1", authorId: "x", authorName: "X" } } },
+      { id: "o1", data: { authorId: "x", body: "original", likedBy: ["a", "b"], createdAt: iso(now - 5000) } },
+    ];
+    const [repost] = (await t.get("/v1/me/home", "me")).json().feed.posts;
+    expect(repost.id).toBe("r_o1_f1");
+    expect(repost.original).toMatchObject({ id: "o1", body: "original", likeCount: 2 });
   });
 });
 

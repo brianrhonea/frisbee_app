@@ -26,7 +26,12 @@ platform other than iOS and Android uses it.
   returns no cursor to them); everything else asks them to sign up.
 - **Members:** the browser calls the API with the user's ID token
   (`lib/client.ts`, `NEXT_PUBLIC_API_BASE_URL`): `GET /v1/me/home` for the
-  dashboard, `POST /v1/me/username` for the username step. It uses Firebase
+  dashboard, `POST /v1/me/username` for the username step, likes and
+  reposts on every post (`components/PostActions.tsx`; the buttons' state
+  comes from one batched `GET /v1/posts/state` per page, `lib/postState.ts`,
+  so the cached server-rendered pages stay the same for everyone), and
+  `GET /v1/feed` for older community posts. The header's links and the
+  sign-up prompts (`ForVisitors`) follow who's signed in. It uses Firebase
   only to sign in, to load photos visitors can't see (Storage
   `getDownloadURL`), and later for live listeners (chat, feeds, live stats).
 - **Version:** `version` in `package.json`, shown in the footer. Bump it

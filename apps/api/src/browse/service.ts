@@ -18,6 +18,7 @@ import {
   isPrivateProfile,
   isPublicTeamPost,
   listingView,
+  parseBefore,
   postAuthors,
   postView,
   profileView,
@@ -26,6 +27,7 @@ import {
   validId,
 } from "./model.js";
 import type { BrowseRepository, Data, Doc } from "./repository.js";
+import { nextCursor, originalsOf, withOriginal } from "./reposts.js";
 
 /**
  * What anyone may see, signed in or not: the same allow-lists and privacy
@@ -53,12 +55,16 @@ export class BrowseService {
     return { ...view, id: d.id, images: this.images(view.images) } as PublicPost;
   }
 
-  /** [docs] as public posts: those whose authors (and reposts' originals) aren't private. */
+  /**
+   * [docs] as public posts: those whose authors (and reposts' originals')
+   * aren't private. A repost carries its original as it is now, or null
+   * once that's deleted.
+   */
   private async publicPosts(docs: Doc[]): Promise<PublicPost[]> {
     const people = await this.repo.profiles(docs.flatMap((d) => postAuthors(d.data)));
-    return docs
-      .filter((d) => postAuthors(d.data).every((id) => !isPrivateProfile(people.get(id))))
-      .map((d) => this.post(d));
+    const shown = docs.filter((d) => postAuthors(d.data).every((id) => !isPrivateProfile(people.get(id))));
+    const originals = await originalsOf(shown, (id) => this.repo.post(id));
+    return shown.map((d) => withOriginal(this.post(d), d, originals, (o) => this.post(o)));
   }
 
 
@@ -71,6 +77,15 @@ export class BrowseService {
   async feed(): Promise<PostPage> {
     const docs = await this.repo.posts(null);
     return { posts: await this.publicPosts(docs), next: null };
+  }
+
+  /**
+   * The community feed for a signed-in member (`GET /v1/feed`): the same
+   * posts, a page at a time, as the app's community feed reads them.
+   */
+  async feedPage(before: unknown): Promise<PostPage> {
+    const docs = await this.repo.posts(parseBefore(before));
+    return { posts: await this.publicPosts(docs), next: nextCursor(docs) };
   }
 
   /** One post, unless its author is private. */

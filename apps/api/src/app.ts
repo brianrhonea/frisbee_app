@@ -14,6 +14,8 @@ import type { HeicDecoder } from "./media/image.js";
 import { uploadRoutes } from "./media/routes.js";
 import { type TranscodeQueue, UploadService } from "./media/service.js";
 import type { MediaStorage } from "./media/storage.js";
+import { postRoutes } from "./posts/routes.js";
+import { PostService } from "./posts/service.js";
 import { profileRoutes } from "./profiles/routes.js";
 import { ProfileService } from "./profiles/service.js";
 import type { DocStore } from "./store.js";
@@ -37,7 +39,7 @@ export interface AppDeps {
     imageUrl: (path: string) => string;
     webServerKey?: string;
   };
-  /** Transactional document access; enables the membership and profile routes. */
+  /** Transactional document access; enables the membership, profile and post routes. */
   store?: DocStore;
   /** Cloud Storage; with [store], enables /v1/uploads. */
   media?: MediaStorage;
@@ -107,6 +109,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
     profileRoutes(app, new ProfileService(deps.store, deps.users));
+    postRoutes(app, new PostService(deps.store, deps.users, deps.now));
     if (deps.media) {
       const uploads = new UploadService(deps.store, deps.media, { heic: deps.heic, queue: deps.transcodeQueue, now: deps.now });
       uploadRoutes(app, uploads);

@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { requireCaller } from "../auth.js";
 import { ApiError } from "../errors.js";
 import type { RateLimiter } from "../limits/limiter.js";
 import { browseLimit } from "../limits/model.js";
@@ -45,6 +46,13 @@ export function browseRoutes(app: FastifyInstance, browse: BrowseService, opts: 
   app.get<Q>("/v1/public/feed", { config }, async (req, reply) => {
     await admit(req);
     return send(reply, await browse.feed());
+  });
+
+  // Members page through the community feed (visitors get one page above).
+  app.get<Q>("/v1/feed", async (req, reply) => {
+    requireCaller(req);
+    const before = req.query.before === undefined ? undefined : Number(req.query.before);
+    return reply.header("cache-control", "private, no-store").send(await browse.feedPage(before));
   });
 
   app.get<Q>("/v1/public/posts/:id", { config }, async (req, reply) => {

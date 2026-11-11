@@ -43,6 +43,11 @@ export interface PublicPost {
   workout?: PublicWorkout;
   event?: PublicPostEvent;
   repostOf?: { postId: string; authorId: string; authorName?: string };
+  /**
+   * For a repost: the post it shares, as it is now (null once it's deleted
+   * or hidden). Likes and reposts of a repost count toward this original.
+   */
+  original?: PublicPost | null;
   tournamentKey?: string;
   tournamentName?: string;
   commentCount?: number;

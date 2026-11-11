@@ -7,6 +7,24 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.3.0 — 2026-11-11
+
+**Added**
+- Likes and reposts (`PUT|DELETE /v1/posts/:id/like`,
+  `PUT|DELETE /v1/posts/:id/repost` with an optional note), with the posts
+  rule's checks: only the caller added or removed, 20,000 at most, no
+  reposting your own post, the flood mute, and the repost
+  (`r_{original}_{uid}`, the fields the app writes) and the original's
+  `repostedBy` in one transaction. Liking or reposting a repost acts on its
+  original, as in the app.
+- `GET /v1/posts/state?ids=`: the caller's likes and reposts of up to 50
+  posts, for the website's buttons.
+- `GET /v1/feed?before=`: the community feed a page at a time, for members.
+
+**Changed**
+- Reposts carry their original (`original`, null once deleted) in the
+  public reads and `/v1/me/home`.
+
 ## 0.2.0 — 2026-11-11
 
 **Added**

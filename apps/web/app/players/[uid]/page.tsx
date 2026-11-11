@@ -2,6 +2,7 @@ import type { ProfilePage, StatTotals } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cache } from "react";
+import { ForVisitors } from "@/components/ForVisitors";
 import { LocalTime } from "@/components/LocalTime";
 import { PostCard } from "@/components/PostCard";
 import { DashboardLayout, ProfileCard, StatTiles, TeamList } from "@/components/ProfileDashboard";
@@ -39,9 +40,11 @@ export default async function Player({ params }: Props) {
   const first = name.split(" ")[0];
   const seasons = Object.entries(profile.stats ?? {}).sort(([a], [b]) => b.localeCompare(a));
   const follow = (
-    <Link className="btn btn-primary btn-small" href={`/sign-up?next=${encodeURIComponent(`/players/${uid}`)}`}>
-      Sign up to follow
-    </Link>
+    <ForVisitors>
+      <Link className="btn btn-primary btn-small" href={`/sign-up?next=${encodeURIComponent(`/players/${uid}`)}`}>
+        Sign up to follow
+      </Link>
+    </ForVisitors>
   );
 
   if (profile.private) {
@@ -131,10 +134,12 @@ export default async function Player({ params }: Props) {
             ))}
           </div>
         )}
-        <div className="cta-card">
-          <p>Sign up to see more from {first} and follow along.</p>
-          {follow}
-        </div>
+        <ForVisitors>
+          <div className="cta-card">
+            <p>Sign up to see more from {first} and follow along.</p>
+            {follow}
+          </div>
+        </ForVisitors>
       </DashboardLayout>
     </div>
   );

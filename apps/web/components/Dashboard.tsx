@@ -133,7 +133,7 @@ export function Dashboard({ user }: { user: User }) {
         ) : (
           <div className="stack">
             {posts.map((p) => (
-              <PostCard key={p.id} post={p} member />
+              <PostCard key={p.id} post={p} />
             ))}
           </div>
         )}
