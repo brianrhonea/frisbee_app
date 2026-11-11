@@ -204,6 +204,112 @@ void main() {
     }
   });
 
+  group('one format for every division', () {
+    HostedTournamentFormViewModel newLeague() => HostedTournamentFormViewModel(
+      hostId: 'club',
+      tournamentRepository: repo,
+      teamRepository: teams,
+      authRepository: as('me'),
+      type: HostedType.league,
+    );
+
+    /// Mini League April 2027: 8 weeks from Saturday April 3, games at
+    /// 6pm, 3v3 with 4 on a roster, 25-minute timed games.
+    Future<String> miniLeague() async {
+      teams.teams['club'] = team('club', TeamKind.organization, 'me');
+      final f = newLeague();
+      await pumpEventQueue();
+      f.name = 'Mini League April 2027';
+      f.setFirstNight(DateTime(2027, 4, 3));
+      f.setSeason(const LeagueSeason(weeks: 8));
+      f.setFirstGame(18, 0);
+      f.setFieldSize(3);
+      f.setFormat(f.format.copyWith(minRoster: () => 4));
+      f.setSettings(
+        f.settings.copyWith(scoring: ScoringMode.time, gameMinutes: 25),
+      );
+      f.setOpen(Division.women, true);
+      expect(f.problem, isNull);
+      await f.save.execute();
+      expect(f.save.result, isA<Ok<String>>(), reason: '${f.save.result}');
+      f.dispose();
+      return repo.tournaments.keys.single;
+    }
+
+    test('ticked divisions open with the same format', () async {
+      final id = await miniLeague();
+      final t = repo.tournaments[id]!;
+      expect(t.format!.settings.playersOnField, 3);
+      expect(t.endsOn, DateTime(2027, 5, 22));
+      final ds = repo.divisions[id]!.values.toList();
+      expect(ds.map((d) => d.label), ['League Mixed', 'League Women']);
+      for (final d in ds) {
+        expect(d.settings.playersOnField, 3);
+        expect(d.effectiveMinRoster, 4);
+        expect(d.settings.timed, isTrue);
+        expect(d.settings.gameMinutes, 25);
+        expect(d.settings.scoreLabel, '25 min timed');
+        // Saturdays at 6pm, from the first night.
+        expect(d.settings.startsAt, DateTime(2027, 4, 3, 18));
+        // The season has playoffs, so a bracket follows the table.
+        expect(t.season!.hasPlayoffs, isTrue);
+        expect(d.settings.format, TournamentFormat.singleElim);
+      }
+      expect(t.divisions.map((d) => d.label), ['League Mixed', 'League Women']);
+    });
+
+    test(
+      'a format change reaches every division; empty ones can close',
+      () async {
+        final id = await miniLeague();
+        final f = HostedTournamentFormViewModel(
+          tournamentId: id,
+          tournamentRepository: repo,
+          teamRepository: teams,
+          authRepository: as('me'),
+        );
+        await pumpEventQueue();
+        expect(f.divisions, {Division.mixed, Division.women});
+        expect(f.settings.playersOnField, 3);
+        // Mixed has a team in it now, so it stays.
+        final mixed = repo.divisions[id]!.values.first;
+        repo.divisions[id]![mixed.id] = mixed.copyWith(seeds: ['t1']);
+        repo.tournaments[id] = repo.tournaments[id]!.copyWith(name: 'x');
+        final f2 = HostedTournamentFormViewModel(
+          tournamentId: id,
+          tournamentRepository: repo,
+          teamRepository: teams,
+          authRepository: as('me'),
+        );
+        await pumpEventQueue();
+        f.dispose();
+        expect(f2.lockedReason(Division.mixed), isNotNull);
+        f2.setOpen(Division.mixed, false);
+        expect(f2.isOpen(Division.mixed), isTrue);
+        f2.setOpen(Division.women, false);
+        f2.setFieldSize(4);
+        await f2.save.execute();
+        expect(f2.save.result, isA<Ok<String>>(), reason: '${f2.save.result}');
+        f2.dispose();
+        final left = repo.divisions[id]!.values.single;
+        expect(left.label, 'League Mixed');
+        expect(left.settings.playersOnField, 4);
+        expect(left.seeds, ['t1']);
+        expect(repo.tournaments[id]!.divisions.single.id, left.id);
+      },
+    );
+
+    test('at least one division', () async {
+      teams.teams['club'] = team('club', TeamKind.organization, 'me');
+      final f = newLeague();
+      await pumpEventQueue();
+      f.name = 'Empty';
+      f.setOpen(Division.mixed, false);
+      expect(f.problem, 'Open at least one division.');
+      f.dispose();
+    });
+  });
+
   test('league divisions take teams of their division and level', () {
     TournamentDivision division(Division d, CompetitionLevel l) =>
         TournamentDivision(

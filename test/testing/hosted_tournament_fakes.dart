@@ -190,6 +190,39 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
   }
 
   @override
+  Future<Result<void>> saveDivisions(
+    HostedTournament tournament,
+    List<TournamentDivision> list,
+  ) async {
+    log.add('divisions');
+    final mine = divisions.putIfAbsent(tournament.id, () => {});
+    final t = tournaments[tournament.id] ?? tournament;
+    final summaries = [...t.divisions];
+    for (final d in list) {
+      final id = d.isNew ? 'd${++_next}' : d.id;
+      final old = mine[id];
+      final saved = old == null
+          ? d.copyWith(id: id)
+          : old.copyWith(
+              level: d.level,
+              maxTeams: d.maxTeams,
+              minRoster: () => d.minRoster,
+              settings: d.settings,
+            );
+      mine[id] = saved;
+      final i = summaries.indexWhere((s) => s.id == id);
+      if (i < 0) {
+        summaries.add(saved.summary);
+      } else {
+        summaries[i] = saved.summary;
+      }
+    }
+    tournaments[tournament.id] = t.copyWith(divisions: summaries);
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
   Future<Result<void>> deleteDivision(
     HostedTournament tournament,
     String divisionId,

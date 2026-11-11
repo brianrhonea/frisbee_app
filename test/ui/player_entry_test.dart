@@ -97,16 +97,12 @@ void main() {
     f.feeAmount = '20';
     f.feeInstructions = 'Venmo @host';
     f.setFeeDue(DateTime(2027, 4, 1));
+    f.setFieldSize(4);
+    f.setFormat(f.format.copyWith(maxTeams: 8));
     await f.save.execute();
     final id = (f.save.result as Ok<String>).value;
     f.dispose();
     final vm = await page('director', id);
-    await vm.saveDivision.execute(
-      vm.newDivision().copyWith(
-        settings: vm.newDivision().settings.copyWith(playersOnField: 4),
-        maxTeams: 8,
-      ),
-    );
     await vm.setStatus.execute(HostedStatus.registration);
     await pumpEventQueue();
     vm.dispose();
@@ -686,21 +682,12 @@ void main() {
         season ??
             const LeagueSeason(weeks: 5, playoffWeeks: 1, playoffTeams: 4),
       );
+      f.setFieldSize(4);
+      f.setFirstGame(18, 30);
+      f.setFormat(f.format.copyWith(maxTeams: 8, minRoster: () => 4));
       await f.save.execute();
       final id = (f.save.result as Ok<String>).value;
       f.dispose();
-      final vm = await page('director', id);
-      await vm.saveDivision.execute(
-        vm.newDivision().copyWith(
-          settings: vm.newDivision().settings.copyWith(
-            playersOnField: 4,
-            startsAt: DateTime(2027, 6, 3, 18, 30),
-          ),
-          minRoster: () => 4,
-          maxTeams: 8,
-        ),
-      );
-      vm.dispose();
       return id;
     }
 
@@ -792,12 +779,12 @@ void main() {
     );
 
     test(
-      'new divisions: tournaments are 7v7, leagues are weekly evenings',
+      'new divisions play the event format: a day event, or weekly evenings',
       () async {
         final tid = await hostHat();
         final hat = await page('director', tid);
         final d = hat.newDivision();
-        expect(d.settings.playersOnField, 7);
+        expect(d.settings.playersOnField, 4);
         expect(d.settings.startsAt.hour, 9);
         hat.dispose();
         final lid = await hostLeague();

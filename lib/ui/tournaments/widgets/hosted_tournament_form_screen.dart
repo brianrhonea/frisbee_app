@@ -8,6 +8,7 @@ import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/hosted_tournament_form_viewmodel.dart';
+import 'event_format_section.dart';
 
 const _currencies = ['USD', 'CAD', 'EUR', 'GBP', 'AUD', 'MXN'];
 
@@ -283,14 +284,6 @@ class _HostedTournamentFormScreenState
           (n) => '$n',
           (n) => vm.setSeason(s.copyWith(playoffWeeks: n)),
         ),
-      Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(
-          'Each division sets its own game night, field size and roster '
-          'minimum on the event page.',
-          style: theme.textTheme.bodySmall,
-        ),
-      ),
     ];
   }
 
@@ -429,6 +422,7 @@ class _HostedTournamentFormScreenState
                   ),
                   onChanged: (v) => vm.description = v,
                 ),
+                EventFormatSection(viewModel: vm),
                 const SizedBox(height: 16),
                 Text('Who can play', style: theme.textTheme.titleSmall),
                 const SizedBox(height: 8),
@@ -550,9 +544,9 @@ class _HostedTournamentFormScreenState
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: Text(
-                      "It starts as a draft only your managers see. Add "
-                      'divisions on its page, then publish it to open '
-                      '${vm.takesPlayers ? 'signups' : 'registration'}.',
+                      'It starts as a draft only your managers see. Open '
+                      'registration on its page when you are ready for '
+                      '${vm.takesPlayers ? 'signups' : 'teams'}.',
                       style: theme.textTheme.bodySmall,
                     ),
                   ),

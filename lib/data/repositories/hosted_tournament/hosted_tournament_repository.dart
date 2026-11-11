@@ -74,6 +74,14 @@ abstract class HostedTournamentRepository {
     TournamentDivision division,
   );
 
+  /// Creates the new [divisions] and gives the others their (shared)
+  /// format, level, team cap and roster minimum, in one write with the
+  /// tournament's division list. Teams, seeds and results are untouched.
+  Future<Result<void>> saveDivisions(
+    HostedTournament tournament,
+    List<TournamentDivision> divisions,
+  );
+
   /// Removes a division with no games, and its entry in the tournament's
   /// list.
   Future<Result<void>> deleteDivision(

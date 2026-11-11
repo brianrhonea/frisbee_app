@@ -5,14 +5,15 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
 /// Hosting a tournament or a league, or editing its details: name, dates,
-/// place, who can play and the fee, and for a league its season. Divisions
-/// are set up on its page.
+/// place, who can play and the fee, for a league its season, the one format
+/// every division plays, and which divisions are open (checkboxes).
 ///
 /// A new event is a tournament or a league, and teams apply to it or
 /// individual players sign up (a hat tournament is a tournament that takes
@@ -38,6 +39,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     }
     _startsOn = start;
     _endsOn = start.add(const Duration(days: 1));
+    _format = EventFormat.usual(_draft);
     save = Command0<String>(_save);
     final id = tournamentId;
     if (id == null) {
@@ -54,6 +56,18 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
         if (t != null && _hostSub == null) _watchHost(t.hostId);
         notifyListeners();
       }, onError: _onError);
+      _divisionsSub = _repo.watchDivisions(id).listen((l) {
+        final first = _divisions == null;
+        _divisions = l;
+        if (first) {
+          _wanted = {for (final d in l) d.division};
+          // Older events kept a format on each division.
+          if (_existing?.format == null && l.isNotEmpty) {
+            _format = EventFormat.of(l.first);
+          }
+        }
+        notifyListeners();
+      }, onError: _onError);
     }
   }
 
@@ -64,8 +78,14 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   final AuthRepository _auth;
   StreamSubscription<Team?>? _hostSub;
   StreamSubscription<HostedTournament?>? _tournamentSub;
+  StreamSubscription<List<TournamentDivision>>? _divisionsSub;
 
   late final Command0<String> save;
+
+  /// The existing event's divisions, once loaded.
+  List<TournamentDivision>? _divisions;
+  Set<Division> _wanted = {Division.mixed};
+  late EventFormat _format;
 
   Team? _host;
   HostedTournament? _existing;
@@ -103,6 +123,83 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   bool get isLeague => _kind == HostedKind.league;
   bool get takesPlayers => _entryType == TournamentEntryType.players;
 
+  /// What every division plays.
+  EventFormat get format => _format;
+  TournamentSettings get settings => _format.settings;
+
+  void setFormat(EventFormat f) {
+    _format = f;
+    notifyListeners();
+  }
+
+  void setSettings(TournamentSettings s) =>
+      setFormat(_format.copyWith(settings: s));
+
+  /// A new field size also moves the roster minimum when it was still the
+  /// usual one for the old size, so a 4v4 league asks for 4.
+  void setFieldSize(int n) {
+    final usual =
+        _format.minRoster == null ||
+        _format.minRoster == settings.playersOnField;
+    setFormat(
+      _format.copyWith(
+        settings: settings.copyWith(playersOnField: n),
+        minRoster: usual ? () => n : null,
+      ),
+    );
+  }
+
+  /// When the first game starts each day or night.
+  void setFirstGame(int hour, int minute) {
+    final s = settings.startsAt;
+    setSettings(
+      settings.copyWith(
+        startsAt: DateTime(s.year, s.month, s.day, hour, minute),
+      ),
+    );
+  }
+
+  /// The divisions that will be open.
+  Set<Division> get divisions => _wanted;
+
+  bool isOpen(Division d) => _wanted.contains(d);
+
+  /// Why [d] can't be closed: it already has teams or players.
+  String? lockedReason(Division d) {
+    final existing = _divisions?.where((x) => x.division == d).firstOrNull;
+    if (existing == null) return null;
+    if (existing.seeds.isNotEmpty || existing.teams.isNotEmpty) {
+      return 'It has teams. Remove them on the event page first.';
+    }
+    return null;
+  }
+
+  void setOpen(Division d, bool open) {
+    if (!open && lockedReason(d) != null) return;
+    _wanted = open ? {..._wanted, d} : ({..._wanted}..remove(d));
+    notifyListeners();
+  }
+
+  /// Whether divisions still take format changes: their schedules aren't
+  /// out yet.
+  bool get formatEditable {
+    final s = _existing?.status ?? HostedStatus.draft;
+    return s.index < HostedStatus.scheduled.index;
+  }
+
+  /// This event as it stands in the form, for working out its format.
+  HostedTournament get _draft => HostedTournament(
+    id: '',
+    hostId: hostId ?? '',
+    hostName: '',
+    name: name,
+    startsOn: _startsOn,
+    endsOn: _endsOn,
+    kind: _kind,
+    entryType: _entryType,
+    season: isLeague ? _season : null,
+  );
+
   /// The fee is per player when players sign up, per team otherwise.
   String get feeName => takesPlayers ? 'Entry fee' : 'Bid fee';
 
@@ -136,6 +233,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     _entryType = t.entryType;
     draftMode = t.draftMode;
     _season = t.season ?? const LeagueSeason();
+    if (t.format case final f?) _format = f;
     final fee = t.bidFee;
     _hasFee = fee != null;
     if (fee != null) {
@@ -171,6 +269,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     } else {
       _endsOn = _startsOn.add(const Duration(days: 1));
     }
+    _format = EventFormat.usual(_draft);
     notifyListeners();
   }
 
@@ -236,6 +335,10 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     if (_hasFee && feeCents == null) {
       return 'Enter the ${feeName.toLowerCase()}, e.g. 250.';
     }
+    if (_wanted.isEmpty) return 'Open at least one division.';
+    if (_wanted.length > HostedTournament.maxDivisions) {
+      return 'Up to ${HostedTournament.maxDivisions} divisions.';
+    }
     if (isLeague && _season.playoffTeams > 0) {
       if (_season.playoffWeeks < 1) {
         return 'Give the playoffs at least one week.';
@@ -278,28 +381,61 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
           kind: _kind,
           entryType: _entryType,
         );
-    return _repo.saveTournament(
-      base.copyWith(
-        name: name.trim(),
-        hostName: host.name,
-        hostOfficial: host.official,
-        description: description.trim(),
-        location: location.trim(),
-        startsOn: _startsOn,
-        endsOn: () => _endsOn,
-        visibility: visibility,
-        bidFee: () => fee,
-        season: () => isLeague ? _season : null,
-        draftMode: draftMode,
-      ),
-      user,
+    var t = base.copyWith(
+      name: name.trim(),
+      hostName: host.name,
+      hostOfficial: host.official,
+      description: description.trim(),
+      location: location.trim(),
+      startsOn: _startsOn,
+      endsOn: () => _endsOn,
+      visibility: visibility,
+      bidFee: () => fee,
+      season: () => isLeague ? _season : null,
+      draftMode: draftMode,
     );
+    final format = _format.on(t);
+    t = t.copyWith(format: format);
+    final saved = await _repo.saveTournament(t, user);
+    if (saved case Error(:final error)) return Result.error(error);
+    final id = (saved as Ok<String>).value;
+    t = (_existing ?? t).copyWith(id: id, format: format);
+    final existing = _divisions ?? const <TournamentDivision>[];
+    // Close the unticked ones that have nothing in them yet.
+    for (final d in existing) {
+      if (_wanted.contains(d.division) || lockedReason(d.division) != null) {
+        continue;
+      }
+      final r = await _repo.deleteDivision(t, d.id);
+      if (r case Error(:final error)) return Result.error(error);
+      t = t.copyWith(
+        divisions: [
+          for (final s in t.divisions)
+            if (s.id != d.id) s,
+        ],
+      );
+    }
+    // Open the new ones, and give the rest the format while it can change.
+    final changes = [
+      if (formatEditable)
+        for (final d in existing)
+          if (_wanted.contains(d.division)) format.restamp(d),
+      for (final g in EventFormat.divisionChoices)
+        if (_wanted.contains(g) && !existing.any((d) => d.division == g))
+          format.divisionFor(g),
+    ];
+    if (changes.isNotEmpty) {
+      final r = await _repo.saveDivisions(t, changes);
+      if (r case Error(:final error)) return Result.error(error);
+    }
+    return Result.ok(id);
   }
 
   @override
   void dispose() {
     _hostSub?.cancel();
     _tournamentSub?.cancel();
+    _divisionsSub?.cancel();
     super.dispose();
   }
 }

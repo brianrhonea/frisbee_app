@@ -317,6 +317,38 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
   });
 
   @override
+  Future<Result<void>> saveDivisions(
+    HostedTournament tournament,
+    List<TournamentDivision> divisions,
+  ) => guard(() async {
+    final col = _divisions(tournament.id);
+    final batch = _db.batch();
+    final summaries = {for (final d in tournament.divisions) d.id: d};
+    final order = [for (final d in tournament.divisions) d.id];
+    for (final d in divisions) {
+      if (d.isNew) {
+        final ref = col.doc();
+        batch.set(ref, d.toMap());
+        summaries[ref.id] = d.copyWith(id: ref.id).summary;
+        order.add(ref.id);
+      } else {
+        batch.update(col.doc(d.id), {
+          'level': d.level.name,
+          'maxTeams': d.maxTeams,
+          'minRoster': d.minRoster,
+          'settings': d.settings.toMap(),
+        });
+        summaries[d.id] = d.summary;
+        if (!order.contains(d.id)) order.add(d.id);
+      }
+    }
+    batch.update(_doc(tournament.id), {
+      'divisions': [for (final id in order) summaries[id]!.toMap()],
+    });
+    await batch.commit();
+  });
+
+  @override
   Future<Result<void>> deleteDivision(
     HostedTournament tournament,
     String divisionId,

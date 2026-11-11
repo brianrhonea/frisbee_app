@@ -3589,6 +3589,17 @@ describe("hosted tournaments", () => {
     await assertFails(updateDoc(tRef(DIRECTOR), { hostOfficial: "yes" }));
   });
 
+  it("an event's shared format is checked", async () => {
+    const fresh = { ...tournament({ status: "draft" }), createdAt: serverTimestamp() };
+    const format = { settings: { playersOnField: 3, scoring: "time" }, level: "league", maxTeams: 8, minRoster: 4 };
+    await assertSucceeds(setDoc(tRef(DIRECTOR), { ...fresh, format }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { format: { ...format, maxTeams: 100 } }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { format: { ...format, minRoster: 1 } }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { format: { ...format, level: "pro" } }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { format: { ...format, extra: true } }));
+    await assertSucceeds(updateDoc(tRef(DIRECTOR), { format: null }));
+  });
+
   it("nobody creates a team that's already official", async () => {
     await assertFails(
       setDoc(doc(db(OUTSIDER), "teams", "fake10"), {

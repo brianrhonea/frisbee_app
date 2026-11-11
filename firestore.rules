@@ -1563,13 +1563,27 @@ service cloud.firestore {
               && s.skipDates is list && s.skipDates.size() <= 10);
       }
 
+      // The format every division plays (EventFormat).
+      function validFormat(f) {
+        return f == null
+          || (f is map
+              && f.keys().hasOnly(['settings', 'level', 'maxTeams', 'minRoster'])
+              && f.settings is map
+              && f.level in ['club', 'college', 'youth', 'league', 'pickup']
+              && f.maxTeams is int && f.maxTeams >= 2 && f.maxTeams <= 64
+              && (f.get('minRoster', null) == null
+                  || (f.minRoster is int && f.minRoster >= 2
+                      && f.minRoster <= 30)));
+      }
+
       function validHosted(t) {
         return t.keys().hasOnly([
                  'hostId', 'hostName', 'hostKind', 'name', 'startsOn', 'endsOn',
                  'description', 'location', 'visibility', 'entryType', 'status',
                  'bidFee', 'kind', 'season', 'draftMode', 'divisions',
-                 'hostOfficial', 'createdBy', 'createdAt'])
+                 'hostOfficial', 'format', 'createdBy', 'createdAt'])
           && t.get('hostOfficial', false) is bool
+          && validFormat(t.get('format', null))
           && t.get('kind', 'tournament') in ['tournament', 'league']
           && validSeason(t.get('season', null))
           && (t.get('kind', 'tournament') == 'league'

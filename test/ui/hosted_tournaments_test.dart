@@ -98,14 +98,14 @@ void main() {
       form.feeAmount = '${fee.amountCents / 100}';
       form.setFeeDue(fee.dueAt);
     }
+    // One Club Mixed division, opened by the form with the event's format.
+    form.setFormat(form.format.copyWith(maxTeams: 4));
     await form.save.execute();
     final id = (form.save.result as Ok<String>).value;
     form.dispose();
     final vm = await page('director', id);
     expect(vm.isManager, isTrue);
     expect(vm.tournament!.status, HostedStatus.draft);
-    final d = vm.newDivision().copyWith(maxTeams: 4);
-    await vm.saveDivision.execute(d);
     await pumpEventQueue();
     expect(vm.divisions, hasLength(1));
     expect(vm.division!.label, 'Club Mixed');

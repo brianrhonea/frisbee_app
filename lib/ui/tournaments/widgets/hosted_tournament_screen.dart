@@ -296,19 +296,9 @@ class _OverviewTab extends StatelessWidget {
   final HostedTournamentViewModel viewModel;
   final PlayerSignupsViewModel? signups;
 
-  Future<void> _editDivision(
-    BuildContext context,
-    TournamentDivision initial,
-  ) async {
-    final t = viewModel.tournament!;
-    final d = await showDivisionDialog(
-      context,
-      initial: initial,
-      league: t.isLeague,
-      players: t.takesPlayers,
-    );
-    if (d != null) viewModel.saveDivision.execute(d);
-  }
+  /// The format and which divisions are open live in the event form.
+  void _editFormat(BuildContext context) =>
+      context.push(Routes.editTournament(viewModel.tournamentId));
 
   Future<void> _apply(
     BuildContext context, {
@@ -343,7 +333,7 @@ class _OverviewTab extends StatelessWidget {
     final division = b.divisionId;
     switch (b.action) {
       case GuideAction.addDivision:
-        await _editDivision(context, vm.newDivision());
+        _editFormat(context);
       case GuideAction.openRegistration:
         await vm.setStatus.execute(HostedStatus.registration);
       case GuideAction.closeRegistration:
@@ -436,20 +426,17 @@ class _OverviewTab extends StatelessWidget {
             'Divisions',
             trailing: vm.isManager
                 ? TextButton.icon(
-                    onPressed:
-                        t.divisions.length >= HostedTournament.maxDivisions
-                        ? null
-                        : () => _editDivision(context, vm.newDivision()),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add'),
+                    onPressed: () => _editFormat(context),
+                    icon: const Icon(Icons.tune),
+                    label: const Text('Format & divisions'),
                   )
                 : null,
           ),
           if (vm.divisions.isEmpty)
             Text(
               vm.isManager
-                  ? 'Add the divisions you run, e.g. Club Mixed and Club '
-                        'Open. Each has its own teams, format and schedule.'
+                  ? 'Tick the divisions you run, e.g. Mixed and Women. They '
+                        'all play the format you set.'
                   : 'No divisions yet.',
               style: theme.textTheme.bodyMedium,
             ),
@@ -467,14 +454,14 @@ class _OverviewTab extends StatelessWidget {
                     '${d.settings.playersOnField}v${d.settings.playersOnField}',
                     if (!t.takesPlayers) '${d.effectiveMinRoster}+ roster',
                     t.isLeague ? 'weekly' : d.settings.format.label,
-                    'game to ${d.settings.scoreCap}',
+                    d.settings.scoreLabel,
                   ].join(' · '),
                 ),
                 trailing: vm.isManager
                     ? PopupMenuButton<String>(
                         onSelected: (v) async {
                           if (v == 'edit') {
-                            _editDivision(context, d);
+                            _editFormat(context);
                           } else if (await confirmDialog(
                             context,
                             title: 'Remove ${d.label}?',
@@ -486,7 +473,10 @@ class _OverviewTab extends StatelessWidget {
                           }
                         },
                         itemBuilder: (_) => const [
-                          PopupMenuItem(value: 'edit', child: Text('Edit')),
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Format & divisions'),
+                          ),
                           PopupMenuItem(value: 'delete', child: Text('Remove')),
                         ],
                       )
@@ -876,8 +866,8 @@ class _ScheduleTab extends StatelessWidget {
           children: [
             _DivisionPicker(viewModel: vm),
             Text(
-              '${d.label} · ${d.settings.format.label} · game to '
-              '${d.settings.scoreCap} · ${d.settings.fields} '
+              '${d.label} · ${d.settings.format.label} · '
+              '${d.settings.scoreLabel} · ${d.settings.fields} '
               '${d.settings.fields == 1 ? 'field' : 'fields'}',
               style: theme.textTheme.bodyMedium,
             ),
@@ -1119,7 +1109,7 @@ class _GameSheet extends StatelessWidget {
                   [
                     if (g.startsAt != null) gameTime(g.startsAt),
                     'Field ${g.field}',
-                    if (vm.division case final d?) 'to ${d.settings.scoreCap}',
+                    if (vm.division case final d?) d.settings.scoreLabel,
                   ].join(' · '),
                 ),
                 const SizedBox(height: 16),

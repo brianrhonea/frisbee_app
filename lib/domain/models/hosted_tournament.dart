@@ -291,11 +291,22 @@ class HostedTournament {
     this.season,
     this.draftMode = DraftMode.balanced,
     this.divisions = const [],
+    this.format,
     this.createdBy,
     this.createdAt,
   });
 
   static const maxDivisions = 12;
+
+  /// The format every division plays (set once for the event). Null for
+  /// events from before it was shared; see [formatOr].
+  final EventFormat? format;
+
+  /// [format], else one made from [division]'s settings (older events),
+  /// else the usual one for this kind of event.
+  EventFormat formatOr([TournamentDivision? division]) =>
+      format ??
+      (division == null ? EventFormat.usual(this) : EventFormat.of(division));
 
   /// Empty until saved.
   final String id;
@@ -372,6 +383,7 @@ class HostedTournament {
     LeagueSeason? Function()? season,
     DraftMode? draftMode,
     List<DivisionSummary>? divisions,
+    EventFormat? format,
   }) => HostedTournament(
     id: id ?? this.id,
     hostId: hostId,
@@ -391,6 +403,7 @@ class HostedTournament {
     season: season != null ? season() : this.season,
     draftMode: draftMode ?? this.draftMode,
     divisions: divisions ?? this.divisions,
+    format: format ?? this.format,
     createdBy: createdBy,
     createdAt: createdAt,
   );
@@ -432,6 +445,7 @@ class HostedTournament {
       for (final d in (map['divisions'] as List?) ?? const [])
         if (d is Map) DivisionSummary.fromMap(Map<String, dynamic>.from(d)),
     ],
+    format: EventFormat.fromMap(map['format']),
     createdBy: map['createdBy'] as String?,
     createdAt: parseDate(map['createdAt']),
   );
@@ -455,6 +469,180 @@ class HostedTournament {
     'season': season?.toMap(),
     'draftMode': draftMode.name,
     'divisions': [for (final d in divisions) d.toMap()],
+    'format': format?.toMap(),
+  };
+}
+
+/// What every division of an event plays: its level, team cap, roster
+/// minimum, and game rules ([settings]: field size, scoring, game length,
+/// fields and the first game's time). Divisions copy it when they're added
+/// and again whenever the host changes it, until their schedule is out.
+class EventFormat {
+  const EventFormat({
+    required this.settings,
+    this.level = CompetitionLevel.club,
+    this.maxTeams = 16,
+    this.minRoster,
+  });
+
+  /// The divisions a host can open: one per gender division, all at the
+  /// event's [level].
+  static const divisionChoices = Division.values;
+
+  final TournamentSettings settings;
+  final CompetitionLevel level;
+  final int maxTeams;
+
+  /// Players a registered team needs; null means the field size.
+  final int? minRoster;
+
+  int get effectiveMinRoster => minRoster ?? settings.playersOnField;
+
+  factory EventFormat.of(TournamentDivision d) => EventFormat(
+    settings: d.settings,
+    level: d.level,
+    maxTeams: d.maxTeams,
+    minRoster: d.minRoster,
+  );
+
+  /// A weekly 7v7 league night, or a two-day club tournament.
+  factory EventFormat.usual(HostedTournament t) {
+    final s = t.startsOn;
+    if (t.isLeague) {
+      return EventFormat(
+        level: CompetitionLevel.league,
+        maxTeams: 8,
+        settings: TournamentSettings(
+          startsAt: DateTime(s.year, s.month, s.day, 18, 30),
+          format: TournamentFormat.roundRobin,
+          playersOnField: 7,
+          gameMinutes: 60,
+          breakMinutes: 10,
+          scoreCap: 15,
+          timeoutsPerHalf: 2,
+          fields: 2,
+        ),
+      );
+    }
+    final first = DateTime(s.year, s.month, s.day, 9);
+    return EventFormat(
+      maxTeams: 16,
+      settings: TournamentSettings(
+        playersOnField: 7,
+        startsAt: first,
+        format: TournamentFormat.poolsPlacement,
+        poolCount: 4,
+        gameMinutes: 90,
+        breakMinutes: 15,
+        scoreCap: 15,
+        timeoutsPerHalf: 2,
+        fields: 4,
+        laterDays: daysAfter(first, t.endsOn),
+      ),
+    );
+  }
+
+  /// Each day after [first] up to [last], starting at [first]'s time.
+  static List<DateTime> daysAfter(DateTime first, DateTime? last) {
+    if (last == null) return const [];
+    final end = DateTime(last.year, last.month, last.day);
+    return [
+      for (
+        var d = DateTime(
+          first.year,
+          first.month,
+          first.day + 1,
+          first.hour,
+          first.minute,
+        );
+        !DateTime(d.year, d.month, d.day).isAfter(end);
+        d = DateTime(d.year, d.month, d.day + 1, d.hour, d.minute)
+      )
+        d,
+    ].take(6).toList();
+  }
+
+  /// This format on [t]'s dates: the first game on its first day at the
+  /// same time, every later day for a tournament, and for a league the
+  /// format its season needs (a bracket after the table when it has
+  /// playoffs).
+  EventFormat on(HostedTournament t) {
+    final s = t.startsOn;
+    final first = DateTime(
+      s.year,
+      s.month,
+      s.day,
+      settings.startsAt.hour,
+      settings.startsAt.minute,
+    );
+    final season = t.season;
+    return copyWith(
+      settings: settings.copyWith(
+        startsAt: first,
+        laterDays: t.isLeague ? const [] : daysAfter(first, t.endsOn),
+        format: t.isLeague
+            ? (season?.hasPlayoffs ?? false)
+                  ? TournamentFormat.singleElim
+                  : TournamentFormat.roundRobin
+            : null,
+      ),
+    );
+  }
+
+  /// A new [division] playing this format.
+  TournamentDivision divisionFor(Division division) => TournamentDivision(
+    id: '',
+    division: division,
+    level: level,
+    maxTeams: maxTeams,
+    minRoster: minRoster,
+    settings: settings,
+  );
+
+  /// [d] playing this format; its teams, seeds and results stay.
+  TournamentDivision restamp(TournamentDivision d) => d.copyWith(
+    level: level,
+    maxTeams: maxTeams < d.seeds.length ? d.seeds.length : maxTeams,
+    minRoster: () => minRoster,
+    settings: settings,
+  );
+
+  EventFormat copyWith({
+    TournamentSettings? settings,
+    CompetitionLevel? level,
+    int? maxTeams,
+    int? Function()? minRoster,
+  }) => EventFormat(
+    settings: settings ?? this.settings,
+    level: level ?? this.level,
+    maxTeams: maxTeams ?? this.maxTeams,
+    minRoster: minRoster != null ? minRoster() : this.minRoster,
+  );
+
+  static EventFormat? fromMap(Object? raw) {
+    if (raw is! Map) return null;
+    final map = Map<String, dynamic>.from(raw);
+    final s = map['settings'];
+    if (s is! Map) return null;
+    return EventFormat(
+      settings: TournamentSettings.fromMap(Map<String, dynamic>.from(s)),
+      level: enumByName(
+        CompetitionLevel.values,
+        map['level'],
+        CompetitionLevel.club,
+      ),
+      maxTeams: map['maxTeams'] is num ? (map['maxTeams'] as num).toInt() : 16,
+      minRoster: map['minRoster'] is num
+          ? (map['minRoster'] as num).toInt()
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'settings': settings.toMap(),
+    'level': level.name,
+    'maxTeams': maxTeams,
+    'minRoster': minRoster,
   };
 }
 

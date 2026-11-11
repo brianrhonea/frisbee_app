@@ -728,72 +728,20 @@ class HostedTournamentViewModel extends ChangeNotifier {
     );
   }
 
-  /// A new division's defaults. A tournament: full-field 7v7, game to 15
-  /// like club ultimate, starting 9am each day. A league: a weekly evening
-  /// round robin, starting at 6:30pm on its first night, two fields.
+  /// A new Mixed division playing the event's format (or, for events from
+  /// before it was shared, the usual one: 7v7 from 9am each day for a
+  /// tournament, a weekly 6:30pm round robin for a league).
   TournamentDivision newDivision() {
-    final t = _tournament;
-    final start = t?.startsOn ?? _now();
-    if (t != null && t.isLeague) {
-      return TournamentDivision(
-        id: '',
-        division: Division.mixed,
-        level: CompetitionLevel.league,
-        maxTeams: 8,
-        settings: TournamentSettings(
-          startsAt: DateTime(start.year, start.month, start.day, 18, 30),
-          format: t.season?.hasPlayoffs == true
-              ? TournamentFormat.singleElim
-              : TournamentFormat.roundRobin,
-          playersOnField: 7,
-          gameMinutes: 60,
-          breakMinutes: 10,
-          scoreCap: 15,
-          timeoutsPerHalf: 2,
-          fields: 2,
-        ),
-      );
-    }
-    final first = DateTime(start.year, start.month, start.day, 9);
-    final end = t?.endsOn;
-    return TournamentDivision(
-      id: '',
-      division: Division.mixed,
-      level: CompetitionLevel.club,
-      maxTeams: 16,
-      settings: TournamentSettings(
-        playersOnField: 7,
-        startsAt: first,
-        format: TournamentFormat.poolsPlacement,
-        poolCount: 4,
-        gameMinutes: 90,
-        breakMinutes: 15,
-        scoreCap: 15,
-        timeoutsPerHalf: 2,
-        fields: 4,
-        laterDays: daysAfter(first, end),
-      ),
-    );
-  }
-
-  /// Each day after [first] up to [last], starting at [first]'s time.
-  static List<DateTime> daysAfter(DateTime first, DateTime? last) {
-    if (last == null) return const [];
-    final days = <DateTime>[];
-    for (
-      var d = DateTime(
-        first.year,
-        first.month,
-        first.day + 1,
-        first.hour,
-        first.minute,
-      );
-      !DateTime(d.year, d.month, d.day).isAfter(last) && days.length < 6;
-      d = DateTime(d.year, d.month, d.day + 1, d.hour, d.minute)
-    ) {
-      days.add(d);
-    }
-    return days;
+    final t =
+        _tournament ??
+        HostedTournament(
+          id: '',
+          hostId: '',
+          hostName: '',
+          name: '',
+          startsOn: _now(),
+        );
+    return t.formatOr().on(t).divisionFor(Division.mixed);
   }
 
   Future<Result<void>> _saveDivision(TournamentDivision d) async {

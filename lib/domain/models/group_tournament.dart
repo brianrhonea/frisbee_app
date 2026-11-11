@@ -1,5 +1,16 @@
 import 'model_utils.dart';
 
+/// How a game ends: first to a score (with a time cap), or after a set
+/// time, most points winning. A timed game tied at the horn plays one more
+/// point, so every game still has a winner.
+enum ScoringMode {
+  points('Game to a score'),
+  time('Timed');
+
+  const ScoringMode(this.label);
+  final String label;
+}
+
 /// How a community group's tournament is played.
 enum TournamentFormat {
   roundRobin('Round robin', 'Everyone plays everyone; best record wins'),
@@ -104,9 +115,18 @@ class TournamentSettings {
     this.fields = 1,
     this.idealEndsAt,
     this.laterDays = const [],
+    this.scoring = ScoringMode.points,
   });
 
   static const fieldSizes = [3, 4, 5, 6, 7];
+
+  /// First to [scoreCap], or [gameMinutes] on the clock.
+  final ScoringMode scoring;
+
+  bool get timed => scoring == ScoringMode.time;
+
+  /// "to 11", or "25 min timed".
+  String get scoreLabel => timed ? '$gameMinutes min timed' : 'to $scoreCap';
 
   /// Most teams a tournament can have (the rules allow 64).
   static const maxTeams = 64;
@@ -149,8 +169,13 @@ class TournamentSettings {
   String get summary => [
     if (laterDays.isNotEmpty) '${days.length} days',
     '${playersOnField}v$playersOnField',
-    'to $scoreCap',
-    '$gameMinutes min',
+    if (timed) ...[
+      '$gameMinutes min timed',
+      'tied at time: one more point',
+    ] else ...[
+      'to $scoreCap',
+      '$gameMinutes min',
+    ],
     '$timeoutsPerHalf timeout${timeoutsPerHalf == 1 ? '' : 's'} per half',
   ].join(' · ');
 
@@ -166,6 +191,7 @@ class TournamentSettings {
     DateTime? startsAt,
     DateTime? Function()? idealEndsAt,
     List<DateTime>? laterDays,
+    ScoringMode? scoring,
   }) => TournamentSettings(
     format: format ?? this.format,
     playersOnField: playersOnField ?? this.playersOnField,
@@ -178,29 +204,31 @@ class TournamentSettings {
     startsAt: startsAt ?? this.startsAt,
     idealEndsAt: idealEndsAt != null ? idealEndsAt() : this.idealEndsAt,
     laterDays: laterDays ?? this.laterDays,
+    scoring: scoring ?? this.scoring,
   );
 
-  factory TournamentSettings.fromMap(Map<String, dynamic> map) =>
-      TournamentSettings(
-        format: enumByName(
-          TournamentFormat.values,
-          map['format'],
-          TournamentFormat.poolsSingleElim,
-        ),
-        playersOnField: _int(map['playersOnField'], 5),
-        poolCount: _int(map['poolCount'], 2),
-        gameMinutes: _int(map['gameMinutes'], 40),
-        breakMinutes: _int(map['breakMinutes'], 10),
-        scoreCap: _int(map['scoreCap'], 11),
-        timeoutsPerHalf: _int(map['timeoutsPerHalf'], 1),
-        fields: _int(map['fields'], 1),
-        startsAt: parseDate(map['startsAt']) ?? DateTime(1970),
-        idealEndsAt: parseDate(map['idealEndsAt']),
-        laterDays: [
-          for (final d in (map['laterDays'] as List?) ?? const [])
-            ?parseDate(d),
-        ],
-      );
+  factory TournamentSettings.fromMap(
+    Map<String, dynamic> map,
+  ) => TournamentSettings(
+    format: enumByName(
+      TournamentFormat.values,
+      map['format'],
+      TournamentFormat.poolsSingleElim,
+    ),
+    playersOnField: _int(map['playersOnField'], 5),
+    poolCount: _int(map['poolCount'], 2),
+    gameMinutes: _int(map['gameMinutes'], 40),
+    breakMinutes: _int(map['breakMinutes'], 10),
+    scoreCap: _int(map['scoreCap'], 11),
+    timeoutsPerHalf: _int(map['timeoutsPerHalf'], 1),
+    fields: _int(map['fields'], 1),
+    startsAt: parseDate(map['startsAt']) ?? DateTime(1970),
+    idealEndsAt: parseDate(map['idealEndsAt']),
+    laterDays: [
+      for (final d in (map['laterDays'] as List?) ?? const []) ?parseDate(d),
+    ],
+    scoring: enumByName(ScoringMode.values, map['scoring'], ScoringMode.points),
+  );
 
   Map<String, dynamic> toMap() => {
     'format': format.name,
@@ -214,6 +242,7 @@ class TournamentSettings {
     'startsAt': startsAt,
     'idealEndsAt': idealEndsAt,
     'laterDays': laterDays,
+    'scoring': scoring.name,
   };
 }
 
