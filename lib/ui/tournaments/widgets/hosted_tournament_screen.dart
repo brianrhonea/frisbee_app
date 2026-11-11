@@ -13,9 +13,10 @@ import '../../core/ui/status_views.dart';
 import '../../follow/widgets/follow_button.dart';
 import '../../group_tournaments/widgets/tournament_widgets.dart';
 import '../../teams/widgets/team_post_widgets.dart';
+import '../view_models/event_guide.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
-import 'hosted_status_badge.dart';
+import 'event_guide_cards.dart';
 import 'player_signups_tab.dart';
 import 'tournament_dialogs.dart';
 
@@ -181,14 +182,22 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
                   const Tab(text: 'Overview'),
                   Tab(text: players ? 'Players' : 'Teams'),
                   const Tab(text: 'Schedule'),
-                  const Tab(text: 'Results'),
+                  Tab(text: t.isLeague ? 'Standings' : 'Results'),
                   const Tab(text: 'News'),
                 ],
               ),
             ),
             body: TabBarView(
               children: [
-                _OverviewTab(viewModel: vm, signups: signups),
+                // Redrawn as signups load too: the guide counts them.
+                if (signups case final s?)
+                  ListenableBuilder(
+                    listenable: s,
+                    builder: (_, _) =>
+                        _OverviewTab(viewModel: vm, signups: signups),
+                  )
+                else
+                  _OverviewTab(viewModel: vm),
                 if (players)
                   PlayersTab(viewModel: vm, signups: signups!)
                 else
@@ -326,116 +335,102 @@ class _OverviewTab extends StatelessWidget {
     }
   }
 
+  /// Does what a guide button says: a dialog, a status change, a tab or
+  /// a screen.
+  Future<void> _act(BuildContext context, GuideButton b) async {
+    final vm = viewModel;
+    final tabs = DefaultTabController.of(context);
+    final division = b.divisionId;
+    switch (b.action) {
+      case GuideAction.addDivision:
+        await _editDivision(context, vm.newDivision());
+      case GuideAction.openRegistration:
+        await vm.setStatus.execute(HostedStatus.registration);
+      case GuideAction.closeRegistration:
+        await vm.setStatus.execute(HostedStatus.seeding);
+      case GuideAction.reviewPlayers || GuideAction.reviewTeams:
+        tabs.animateTo(1);
+      case GuideAction.draftTeams:
+        if (division != null) {
+          context.push(Routes.tournamentDraft(vm.tournamentId, division));
+        }
+      case GuideAction.captainsDraft || GuideAction.watchDraft:
+        if (division != null) {
+          context.push(Routes.tournamentLiveDraft(vm.tournamentId, division));
+        }
+      case GuideAction.createTeams:
+        final d = vm.divisionById(division);
+        if (d == null) return;
+        if (await confirmDialog(
+          context,
+          title: 'Create ${d.teams.length} teams?',
+          message:
+              'Each team is created with its captain as owner and the other '
+              "players as members. You won't be able to redraft afterwards; "
+              'rosters are managed on each team.',
+          confirmLabel: 'Create teams',
+        )) {
+          await vm.createTeams.execute(d.id);
+        }
+      case GuideAction.publishSchedule:
+        if (division != null) vm.selectDivision(division);
+        tabs.animateTo(2);
+      case GuideAction.schedule:
+        tabs.animateTo(2);
+      case GuideAction.results:
+        tabs.animateTo(3);
+      case GuideAction.signUp:
+        final sign = signups;
+        if (sign == null) return;
+        final a = await showPlayerSignupDialog(
+          context,
+          divisions: vm.divisions,
+          initial: sign.mine?.status == SignupStatus.withdrawn
+              ? null
+              : sign.mine,
+          fee: vm.tournament?.entryFee,
+        );
+        if (a != null) await sign.signUp.execute(a);
+      case GuideAction.apply:
+        await _apply(context);
+      case GuideAction.acceptInvite:
+        final invite = vm.myEntries
+            .where((e) => e.status == EntryStatus.invited)
+            .firstOrNull;
+        if (invite != null) await _apply(context, invite: invite);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
     final t = vm.tournament!;
     final theme = Theme.of(context);
     final fee = t.bidFee;
+    final guide = EventGuide.of(vm, signups);
     return ConstrainedContent(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              HostedStatusBadge(status: t.status),
-              Chip(
-                avatar: Icon(
-                  t.visibility == TournamentVisibility.public
-                      ? Icons.public
-                      : Icons.mail_outline,
-                  size: 18,
-                ),
-                label: Text(t.visibility.label),
-              ),
-              if (t.isLeague)
-                const Chip(
-                  avatar: Icon(Icons.calendar_month_outlined, size: 18),
-                  label: Text('League'),
-                ),
-              if (t.takesPlayers)
-                Chip(
-                  avatar: const Icon(Icons.person_add_alt_outlined, size: 18),
-                  label: Text(
-                    t.isLeague ? 'Players sign up' : 'Hat tournament',
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.groups_outlined),
-            title: Text('Hosted by ${t.hostName}'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(Routes.teamOver(t.hostId)),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.event_outlined),
-            title: Text(hostedDates(t)),
-          ),
-          if (t.location.isNotEmpty)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.place_outlined),
-              title: Text(t.location),
-            ),
-          if (t.description.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(t.description, style: theme.textTheme.bodyMedium),
-          ],
-          if (t.season case final season?) ...[
-            const _Section('Season'),
-            Card(
-              margin: EdgeInsets.zero,
-              child: ListTile(
-                leading: const Icon(Icons.calendar_month_outlined),
-                title: Text(
-                  '${season.weeks} weeks'
-                  '${season.gamesPerNight > 1 ? ', ${season.gamesPerNight} games a night' : ''}',
-                ),
-                subtitle: Text(
-                  season.hasPlayoffs
-                      ? 'Top ${season.playoffTeams} make the playoffs in the '
-                            'last ${season.playoffWeeks} '
-                            '${season.playoffWeeks == 1 ? 'week' : 'weeks'}.'
-                      : 'Regular season only, no playoffs.',
-                ),
-              ),
+          EventHeader(tournament: t),
+          const SizedBox(height: 16),
+          GuideCard(guide: guide, onAction: (b) => _act(context, b)),
+          if (vm.isManager && guide.steps.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            HostChecklist(
+              steps: guide.steps,
+              onAction: (b) => _act(context, b),
             ),
           ],
-          if (fee != null) ...[
-            _Section(t.takesPlayers ? 'Entry fee' : 'Bid fee'),
-            Card(
-              margin: EdgeInsets.zero,
-              child: ListTile(
-                leading: const Icon(Icons.payments_outlined),
-                title: Text(
-                  '${fee.label} per ${t.takesPlayers ? 'player' : 'team'}',
-                ),
-                subtitle: Text(
-                  [
-                    if (fee.instructions.isNotEmpty) fee.instructions,
-                    if (fee.dueAt != null)
-                      'Due ${DateFormat.yMMMd().format(fee.dueAt!)}',
-                    'Pay the host directly; they mark '
-                        '${t.takesPlayers ? 'players' : 'teams'} paid.',
-                  ].join('\n'),
-                ),
-                isThreeLine: true,
-              ),
-            ),
-          ],
-          if (vm.isManager) _HostSteps(viewModel: vm),
-          if (t.takesPlayers && signups != null)
-            ListenableBuilder(
-              listenable: signups!,
-              builder: (_, _) =>
-                  PlayerSignupCard(viewModel: vm, signups: signups!),
+          // Their signup, until they're on a team.
+          if (t.takesPlayers &&
+              signups != null &&
+              signups!.isSignedUp &&
+              vm.myTeamIds.isEmpty)
+            PlayerSignupCard(
+              viewModel: vm,
+              signups: signups!,
+              showSignUp: false,
             ),
           _Section(
             'Divisions',
@@ -465,7 +460,10 @@ class _OverviewTab extends StatelessWidget {
                 title: Text(d.label),
                 subtitle: Text(
                   [
-                    '${d.seeds.length} of ${d.maxTeams} teams',
+                    if (!t.takesPlayers)
+                      '${d.seeds.length} of ${d.maxTeams} teams'
+                    else if (d.teams.isNotEmpty)
+                      '${d.teams.length} teams',
                     '${d.settings.playersOnField}v${d.settings.playersOnField}',
                     if (!t.takesPlayers) '${d.effectiveMinRoster}+ roster',
                     t.isLeague ? 'weekly' : d.settings.format.label,
@@ -605,109 +603,6 @@ class _OverviewTab extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-/// The host's next step, by status.
-class _HostSteps extends StatelessWidget {
-  const _HostSteps({required this.viewModel});
-
-  final HostedTournamentViewModel viewModel;
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = viewModel;
-    final t = vm.tournament!;
-    final busy = vm.setStatus.running;
-    final (
-      String text,
-      List<(String, HostedStatus)> actions,
-    ) = switch (t.status) {
-      HostedStatus.draft => (
-        vm.divisions.isEmpty
-            ? 'Only your managers can see this draft. Add a division, then '
-                  'publish it to open registration.'
-            : 'Only your managers can see this draft. Publish it to open '
-                  'registration${t.visibility == TournamentVisibility.inviteOnly ? ' and invite teams' : ''}.',
-        [
-          if (vm.divisions.isNotEmpty)
-            ('Publish and open registration', HostedStatus.registration),
-        ],
-      ),
-      HostedStatus.registration => (
-        t.takesPlayers
-            ? 'Registration is open. Accept players on the Players tab, then '
-                  'close registration to draft teams.'
-            : 'Registration is open. Accept teams on the Teams tab, then '
-                  'close registration to seed.',
-        [('Close registration', HostedStatus.seeding)],
-      ),
-      HostedStatus.seeding => (
-        t.takesPlayers
-            ? 'Draft each division\'s teams on the Players tab, then publish '
-                  'its schedule on the Schedule tab.'
-            : 'Seed each division on the Teams tab, then publish its '
-                  'schedule on the Schedule tab.',
-        [('Reopen registration', HostedStatus.registration)],
-      ),
-      HostedStatus.scheduled => (
-        'Schedules are out. Captains report scores; it goes live with the '
-            'first final score.',
-        [('Mark live', HostedStatus.live)],
-      ),
-      HostedStatus.live => (
-        'Games are on. Results are saved as each division finishes.',
-        [('Mark final', HostedStatus.finished)],
-      ),
-      HostedStatus.finished => (
-        'Final. Results stay up on the Results tab.',
-        [('Reopen', HostedStatus.live)],
-      ),
-    };
-    return Card(
-      margin: const EdgeInsets.only(top: 16),
-      color: Theme.of(context).colorScheme.secondaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Next step', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
-            Text(text),
-            if (vm.unpaidCount > 0 && t.bidFee != null && !t.takesPlayers)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  '${vm.unpaidCount} accepted '
-                  '${vm.unpaidCount == 1 ? 'team hasn\'t' : 'teams haven\'t'} '
-                  'paid the bid fee.',
-                ),
-              ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final (i, (label, status)) in actions.indexed)
-                  i == 0
-                      ? FilledButton(
-                          onPressed: busy
-                              ? null
-                              : () => vm.setStatus.execute(status),
-                          child: Text(label),
-                        )
-                      : OutlinedButton(
-                          onPressed: busy
-                              ? null
-                              : () => vm.setStatus.execute(status),
-                          child: Text(label),
-                        ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

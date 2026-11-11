@@ -30,6 +30,7 @@ class PlayerSignupCard extends StatelessWidget {
     required this.viewModel,
     required this.signups,
     this.now,
+    this.showSignUp = true,
   });
 
   final HostedTournamentViewModel viewModel;
@@ -37,6 +38,10 @@ class PlayerSignupCard extends StatelessWidget {
 
   /// For tests.
   final DateTime Function()? now;
+
+  /// False where the page's guide already offers signing up: the card
+  /// then only shows an existing signup.
+  final bool showSignUp;
 
   Future<void> _signUp(BuildContext context) async {
     final t = viewModel.tournament!;
@@ -58,6 +63,7 @@ class PlayerSignupCard extends StatelessWidget {
     final fee = t.entryFee;
     final mine = signups.mine;
     final isIn = signups.isSignedUp;
+    if (!isIn && !showSignUp) return const SizedBox.shrink();
     final open =
         t.status.acceptsEntries &&
         t.visibility == TournamentVisibility.public &&

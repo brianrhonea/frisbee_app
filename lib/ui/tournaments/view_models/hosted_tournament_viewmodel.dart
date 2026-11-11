@@ -115,12 +115,14 @@ class HostedTournamentViewModel extends ChangeNotifier {
       }, onError: _onError),
       _repo.watchDivisions(tournamentId).listen((d) {
         _divisions = {for (final x in d) x.id: x};
+        _watchPublished();
         _pickDivision();
         _syncCaptains();
         notifyListeners();
       }, onError: (Object _) {}),
       _repo.watchEntries(tournamentId).listen((e) {
         _entries = e;
+        _pickDivision();
         _watchMyPayments();
         _dropWithdrawn();
         _syncCaptains();
@@ -129,6 +131,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
       if (_uid.isNotEmpty)
         _teams.watchMyTeams(_uid).listen((teams) {
           _myTeams = teams;
+          _pickDivision();
           _watchMyPayments();
           notifyListeners();
         }, onError: (Object _) {}),
@@ -149,6 +152,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
   StreamSubscription<List<TeamPost>>? _newsSub;
   StreamSubscription<List<GroupGame>>? _gamesSub;
   final _myPaymentSubs = <String, StreamSubscription<EntryPayment?>>{};
+  final _publishedSubs = <String, StreamSubscription<List<GroupGame>>>{};
+  final _published = <String, bool>{};
+  bool _pickedByUser = false;
 
   HostedTournament? _tournament;
   Team? _host;
@@ -355,17 +361,92 @@ class HostedTournamentViewModel extends ChangeNotifier {
 
   void selectDivision(String id) {
     if (id == _divisionId || !_divisions.containsKey(id)) return;
+    _pickedByUser = true;
     _divisionId = id;
     _watchGames();
     notifyListeners();
   }
 
+  /// Shows the user's own division until they pick another, else the
+  /// first.
   void _pickDivision() {
+    final mine = _pickedByUser ? null : myDivisionId;
+    if (mine != null && mine != _divisionId) {
+      _divisionId = mine;
+      _watchGames();
+      return;
+    }
     if (_divisionId != null && _divisions.containsKey(_divisionId)) return;
     final first = divisions.firstOrNull;
     if (first == null) return;
     _divisionId = first.id;
     _watchGames();
+  }
+
+  /// Whether each division's schedule is out, for the host's checklist
+  /// (the selected division's games are watched in full anyway).
+  void _watchPublished() {
+    for (final id in [..._publishedSubs.keys]) {
+      if (!_divisions.containsKey(id)) {
+        _publishedSubs.remove(id)?.cancel();
+        _published.remove(id);
+      }
+    }
+    for (final id in _divisions.keys) {
+      _publishedSubs[id] ??= _repo.watchGames(tournamentId, id).listen((g) {
+        if (_published[id] == g.isNotEmpty) return;
+        _published[id] = g.isNotEmpty;
+        notifyListeners();
+      }, onError: (Object _) {});
+    }
+  }
+
+  /// Whether [divisionId]'s schedule is published.
+  bool publishedIn(String divisionId) => divisionId == _divisionId
+      ? _games.isNotEmpty
+      : _published[divisionId] ?? false;
+
+  /// The teams the user plays on here: drafted onto (player entry), or an
+  /// accepted team they're a member of (team entry).
+  Set<String> get myTeamIds => {
+    for (final d in _divisions.values)
+      for (final t in d.teams)
+        if (t.playerIds.contains(_uid)) t.id,
+    for (final e in _entries)
+      if (e.status == EntryStatus.accepted &&
+          _myTeams.any((t) => t.id == e.teamId))
+        e.teamId,
+  };
+
+  /// The division the user plays in, if any.
+  String? get myDivisionId {
+    final mine = myTeamIds;
+    if (mine.isEmpty) return null;
+    for (final d in divisions) {
+      if (d.seeds.any(mine.contains) ||
+          d.teams.any((t) => mine.contains(t.id))) {
+        return d.id;
+      }
+    }
+    return null;
+  }
+
+  /// The user's next game to play in the selected division.
+  GroupGame? get myNextGame {
+    final mine = myTeamIds;
+    return gamesToPlay(_games)
+        .where((g) => mine.contains(g.teamA) || mine.contains(g.teamB))
+        .firstOrNull;
+  }
+
+  /// The user's team in [g]: the other team is the opponent.
+  String? myTeamIn(GroupGame g) {
+    final mine = myTeamIds;
+    return mine.contains(g.teamA)
+        ? g.teamA
+        : mine.contains(g.teamB)
+        ? g.teamB
+        : null;
   }
 
   void _watchGames() {
@@ -1115,6 +1196,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
     _newsSub?.cancel();
     _gamesSub?.cancel();
     for (final s in _myPaymentSubs.values) {
+      s.cancel();
+    }
+    for (final s in _publishedSubs.values) {
       s.cancel();
     }
     _followSlot.dispose();

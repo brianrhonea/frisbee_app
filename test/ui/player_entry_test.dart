@@ -1034,7 +1034,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('League'), findsOneWidget);
-      expect(find.text('Players sign up'), findsOneWidget);
+      expect(find.text('Players sign up · balanced teams'), findsOneWidget);
       await tester.tap(find.text('Players'));
       await tester.pumpAndSettle();
       expect(find.text('Make the teams'), findsOneWidget);
@@ -1072,9 +1072,8 @@ void main() {
       expect(find.text('Hat tournament'), findsOneWidget);
       expect(find.text('Players'), findsOneWidget);
       expect(find.text('Teams'), findsNothing);
-      expect(find.text('Entry fee'), findsOneWidget);
-      expect(find.text(r'$20 per player'), findsOneWidget);
-      expect(find.text('Play in Hat Day'), findsOneWidget);
+      expect(find.textContaining(r'$20 per player'), findsOneWidget);
+      expect(find.text('Sign up to play'), findsOneWidget);
       expect(find.text(r'Sign up · $20'), findsOneWidget);
       expect(find.text('Apply with a team'), findsNothing);
 
