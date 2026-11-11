@@ -1,13 +1,10 @@
 import type { EventsPage } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 import { EventItem } from "@/components/EventItem";
 import { LocalTime } from "@/components/LocalTime";
 import { getPublic } from "@/lib/api";
-
-// Rendered per request (not at build, which has no API); the fetch is
-// still cached for 60 seconds (lib/api.ts).
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Events",
@@ -15,6 +12,9 @@ export const metadata: Metadata = {
 };
 
 export default async function Events() {
+  // Render per request, not at build (which has no API). Unlike
+  // `dynamic = "force-dynamic"`, this keeps the fetch's 60-second cache.
+  await connection();
   const { events, tournaments } = await getPublic<EventsPage>("/v1/public/events");
   return (
     <div className="page">

@@ -42,7 +42,9 @@ function message(e: unknown): string {
 
 /** Only same-site paths, so a link can't send people elsewhere after signing in. */
 function safeNext(next: string | null): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/home";
+  // Not "//host" or "/\host" (browsers treat both as another site), and
+  // no backslashes anywhere.
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/home";
 }
 
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
