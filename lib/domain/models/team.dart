@@ -220,7 +220,13 @@ class Team {
     this.orgLinked = false,
     this.orgMembers = const {},
     this.orgRoles = const {},
+    this.official = false,
   });
+
+  /// An official organizer, e.g. Stall 10: its events carry a verified
+  /// badge. Set only from the Firebase console or admin tools; the rules
+  /// never let the app write it.
+  final bool official;
 
   /// Team roles that copy a community role (team role id → community role
   /// id), e.g. Woof Captain. Who has them follows the community: the
@@ -484,6 +490,7 @@ class Team {
         if (map['orgRoles'] case final Map m)
           for (final e in m.entries) '${e.key}': '${e.value}',
       },
+      official: map['official'] == true,
     );
   }
 
@@ -547,6 +554,7 @@ class Team {
     orgLinked: orgLinked ?? this.orgLinked,
     orgMembers: orgMembers ?? this.orgMembers,
     orgRoles: orgRoles ?? this.orgRoles,
+    official: official,
   );
 }
 
@@ -712,6 +720,7 @@ class TeamListing {
     this.description = '',
     this.requiresApproval = false,
     this.location,
+    this.official = false,
   });
 
   factory TeamListing.of(Team team) => TeamListing(
@@ -724,6 +733,7 @@ class TeamListing {
     description: team.description,
     requiresApproval: team.requiresApproval,
     location: team.location,
+    official: team.official,
   );
 
   final String id;
@@ -735,6 +745,9 @@ class TeamListing {
   final String description;
   final bool requiresApproval;
   final GroupLocation? location;
+
+  /// Copied from [Team.official].
+  final bool official;
 
   bool get isCommunity => kind.isGroupLike;
 
@@ -763,6 +776,7 @@ class TeamListing {
       kind == team.kind &&
       description == team.description &&
       requiresApproval == team.requiresApproval &&
+      official == team.official &&
       location == (team.isPrivateGroup ? null : team.location);
 
   factory TeamListing.fromMap(String id, Map<String, dynamic> map) =>
@@ -780,6 +794,7 @@ class TeamListing {
         description: map['description'] as String? ?? '',
         requiresApproval: map['requiresApproval'] as bool? ?? false,
         location: GroupLocation.fromMap(map['location']),
+        official: map['official'] == true,
       );
 
   Map<String, dynamic> toMap() => {
@@ -794,6 +809,7 @@ class TeamListing {
       // A private group's location is for members only.
       location: isPrivateGroup ? null : location,
     ),
+    if (official) 'official': true,
     'keywords': searchKeywords('$name $city'),
   };
 }

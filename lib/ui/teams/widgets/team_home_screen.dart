@@ -903,6 +903,12 @@ class _Hero extends StatelessWidget {
                                   color: c.muted,
                                 ),
                               ),
+                              if (summary.official) ...[
+                                const SizedBox(height: 6),
+                                const OfficialBadge(
+                                  label: 'Official organizer',
+                                ),
+                              ],
                             ],
                           ),
                         ),

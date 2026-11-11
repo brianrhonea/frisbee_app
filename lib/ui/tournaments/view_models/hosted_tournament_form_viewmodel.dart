@@ -272,6 +272,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
           hostId: host.id,
           hostName: host.name,
           hostKind: host.kind,
+          hostOfficial: host.official,
           name: '',
           startsOn: _startsOn,
           kind: _kind,
@@ -281,6 +282,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
       base.copyWith(
         name: name.trim(),
         hostName: host.name,
+        hostOfficial: host.official,
         description: description.trim(),
         location: location.trim(),
         startsOn: _startsOn,

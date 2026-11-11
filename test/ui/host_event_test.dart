@@ -10,6 +10,7 @@ import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournament_form_vi
 import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournament_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournaments_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/widgets/host_event_screen.dart';
+import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
 import '../testing/hosted_tournament_fakes.dart';
@@ -53,6 +54,59 @@ void main() {
     vm.dispose();
   });
 
+  test(
+    'official organizers like Stall 10 come first, in their own section',
+    () async {
+      teams.teams['club'] = team('club', TeamKind.organization, 'me');
+      teams.teams['group'] = team('group', TeamKind.community, 'me');
+      teams.teams['squad'] = team('squad', TeamKind.team, 'me');
+      teams.teams['stall10'] = Team.fromMap('stall10', {
+        ...team('stall10', TeamKind.organization, 'me').toEditableMap(),
+        'kind': 'organization',
+        'ownerId': 'me',
+        'members': {'me': 'owner'},
+        'official': true,
+      });
+      final vm = HostEventViewModel(
+        teamRepository: teams,
+        authRepository: as('me'),
+      );
+      await pumpEventQueue();
+      expect(vm.sections.map((s) => s.kind), [
+        HostSectionKind.official,
+        HostSectionKind.organizations,
+        HostSectionKind.groups,
+        HostSectionKind.teams,
+      ]);
+      expect(vm.sections.first.teams.single.id, 'stall10');
+      expect(vm.hosts.map((t) => t.id), ['stall10', 'club', 'group', 'squad']);
+      vm.dispose();
+    },
+  );
+
+  test('an official host badges the events it hosts', () async {
+    teams.teams['stall10'] = Team.fromMap('stall10', {
+      ...team('stall10', TeamKind.organization, 'me').toEditableMap(),
+      'kind': 'organization',
+      'ownerId': 'me',
+      'members': {'me': 'owner'},
+      'official': true,
+    });
+    final form = HostedTournamentFormViewModel(
+      hostId: 'stall10',
+      tournamentRepository: repo,
+      teamRepository: teams,
+      authRepository: as('me'),
+      type: HostedType.league,
+    );
+    await pumpEventQueue();
+    form.name = 'Summer League';
+    await form.save.execute();
+    expect(form.save.result, isA<Ok<String>>(), reason: '${form.save.result}');
+    expect(repo.tournaments.values.single.hostOfficial, isTrue);
+    form.dispose();
+  });
+
   testWidgets('with no host, it offers to start a club or group', (
     tester,
   ) async {
@@ -67,7 +121,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.textContaining('You don'), findsOneWidget);
+    expect(find.textContaining("You don't run"), findsOneWidget);
     expect(find.text('Start a school or club'), findsOneWidget);
     expect(find.text('Start a community group'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());

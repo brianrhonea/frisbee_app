@@ -279,6 +279,7 @@ class HostedTournament {
     required this.name,
     required this.startsOn,
     this.hostKind = TeamKind.community,
+    this.hostOfficial = false,
     this.endsOn,
     this.description = '',
     this.location = '',
@@ -303,6 +304,10 @@ class HostedTournament {
   final String hostId;
   final String hostName;
   final TeamKind hostKind;
+
+  /// Hosted by an official organizer ([Team.official]), e.g. Stall 10.
+  /// The rules only allow it when the host team is official.
+  final bool hostOfficial;
   final String name;
   final DateTime startsOn;
   final DateTime? endsOn;
@@ -356,6 +361,7 @@ class HostedTournament {
     String? id,
     String? name,
     String? hostName,
+    bool? hostOfficial,
     DateTime? startsOn,
     DateTime? Function()? endsOn,
     String? description,
@@ -371,6 +377,7 @@ class HostedTournament {
     hostId: hostId,
     hostName: hostName ?? this.hostName,
     hostKind: hostKind,
+    hostOfficial: hostOfficial ?? this.hostOfficial,
     name: name ?? this.name,
     startsOn: startsOn ?? this.startsOn,
     endsOn: endsOn != null ? endsOn() : this.endsOn,
@@ -396,6 +403,7 @@ class HostedTournament {
     hostId: map['hostId'] as String? ?? '',
     hostName: map['hostName'] as String? ?? '',
     hostKind: enumByName(TeamKind.values, map['hostKind'], TeamKind.community),
+    hostOfficial: map['hostOfficial'] == true,
     name: map['name'] as String? ?? '',
     startsOn: parseDate(map['startsOn']) ?? DateTime(2000),
     endsOn: parseDate(map['endsOn']),
@@ -433,6 +441,7 @@ class HostedTournament {
     'hostId': hostId,
     'hostName': hostName,
     'hostKind': hostKind.name,
+    'hostOfficial': hostOfficial,
     'name': name,
     'startsOn': startsOn,
     'endsOn': endsOn,

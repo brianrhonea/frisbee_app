@@ -404,6 +404,46 @@ class Tag extends StatelessWidget {
   }
 }
 
+/// The mark of an official organizer (Team.official), e.g. Stall 10, and
+/// the events it hosts.
+class OfficialBadge extends StatelessWidget {
+  const OfficialBadge({super.key, this.label = 'Official'});
+
+  /// Null for the icon alone.
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final icon = Icon(Icons.verified, size: 15, color: c.accent);
+    final text = label;
+    if (text == null) return Tooltip(message: 'Official', child: icon);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(5, 2, 8, 2),
+      decoration: BoxDecoration(
+        color: c.accentSoft,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icon,
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+              color: c.ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// A big number over a small caption, e.g. "24 / ROSTERED".
 class StatBlock extends StatelessWidget {
   const StatBlock({super.key, required this.value, required this.label});

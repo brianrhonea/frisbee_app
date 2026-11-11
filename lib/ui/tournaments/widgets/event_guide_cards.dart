@@ -54,6 +54,7 @@ class EventHeader extends StatelessWidget {
           runSpacing: 6,
           children: [
             HostedStatusBadge(status: t.status),
+            if (t.hostOfficial) const OfficialBadge(),
             Tag(t.type.label),
             if (t.takesPlayers)
               Tag(

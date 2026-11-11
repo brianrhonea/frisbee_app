@@ -1568,7 +1568,8 @@ service cloud.firestore {
                  'hostId', 'hostName', 'hostKind', 'name', 'startsOn', 'endsOn',
                  'description', 'location', 'visibility', 'entryType', 'status',
                  'bidFee', 'kind', 'season', 'draftMode', 'divisions',
-                 'createdBy', 'createdAt'])
+                 'hostOfficial', 'createdBy', 'createdAt'])
+          && t.get('hostOfficial', false) is bool
           && t.get('kind', 'tournament') in ['tournament', 'league']
           && validSeason(t.get('season', null))
           && (t.get('kind', 'tournament') == 'league'
@@ -1588,17 +1589,26 @@ service cloud.firestore {
           && t.divisions is list && t.divisions.size() <= 12;
       }
 
+      // Only an official host (Team.official, which only the console
+      // or admin tools set) badges its events as official.
+      function officialHost(t) {
+        return !t.get('hostOfficial', false)
+          || get(teamPath(t.hostId)).data.get('official', false) == true;
+      }
+
       allow read: if signedIn() && visible(resource.data);
       allow create: if signedIn()
         && manages(request.resource.data)
         && request.resource.data.createdBy == uid()
         && request.resource.data.createdAt == request.time
-        && validHosted(request.resource.data);
+        && validHosted(request.resource.data)
+        && officialHost(request.resource.data);
       allow update: if signedIn()
         && manages(resource.data)
         && request.resource.data.hostId == resource.data.hostId
         && !('createdBy' in changed()) && !('createdAt' in changed())
-        && validHosted(request.resource.data);
+        && validHosted(request.resource.data)
+        && officialHost(request.resource.data);
       allow delete: if signedIn() && manages(resource.data);
 
       // Divisions: format, seeds and which uids report each team's scores.
@@ -1882,8 +1892,9 @@ service cloud.firestore {
       function validListing(d, team) {
         return d.keys().hasOnly([
                  'name', 'division', 'level', 'city', 'keywords', 'kind',
-                 'description', 'requiresApproval', 'location'])
+                 'description', 'requiresApproval', 'location', 'official'])
           && d.name == team.name
+          && d.get('official', false) == team.get('official', false)
           && d.division == team.division
           && d.level == team.level
           && d.city == team.get('city', '')

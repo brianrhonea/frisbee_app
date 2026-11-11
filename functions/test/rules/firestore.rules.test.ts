@@ -3569,6 +3569,37 @@ describe("hosted tournaments", () => {
     await assertSucceeds(updateDoc(tRef(DIRECTOR), { bidFee: null }));
   });
 
+  it("only an official host badges its events, and the app can't make a host official", async () => {
+    const fresh = { ...tournament({ status: "draft" }), createdAt: serverTimestamp() };
+    await assertFails(setDoc(tRef(DIRECTOR), { ...fresh, hostOfficial: true }));
+    await assertSucceeds(setDoc(tRef(DIRECTOR), { ...fresh, hostOfficial: false }));
+    // Owners can't mark their own team official, nor list it so.
+    await assertFails(updateDoc(doc(db(DIRECTOR), "teams", HOST), { official: true }));
+    await assertFails(
+      setDoc(doc(db(DIRECTOR), "teamDirectory", HOST), {
+        name: "Denver Ultimate", division: "mixed", level: "club", city: "", kind: "community",
+        description: "", requiresApproval: false, location: null, keywords: [], official: true,
+      }),
+    );
+    // Once the console sets it, the host's events may carry the badge.
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "teams", HOST), { official: true }),
+    );
+    await assertSucceeds(updateDoc(tRef(DIRECTOR), { hostOfficial: true }));
+    await assertFails(updateDoc(tRef(DIRECTOR), { hostOfficial: "yes" }));
+  });
+
+  it("nobody creates a team that's already official", async () => {
+    await assertFails(
+      setDoc(doc(db(OUTSIDER), "teams", "fake10"), {
+        name: "Stall 10", division: "mixed", level: "club", city: "", kind: "organization",
+        description: "", requiresApproval: false, location: null,
+        ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" }, memberIds: [OUTSIDER],
+        memberNames: { [OUTSIDER]: "Me" }, createdAt: serverTimestamp(), official: true,
+      }),
+    );
+  });
+
   it("drafts are hidden; published tournaments are public to signed-in users", async () => {
     await seed({ status: "draft" });
     await assertFails(getDoc(tRef(OUTSIDER)));

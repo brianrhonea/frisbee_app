@@ -55,10 +55,35 @@ class HostEventViewModel extends ChangeNotifier {
 
   Object? get error => _error;
 
-  /// Where the user can host, groups and clubs first.
-  List<Team> get hosts => [
-    ..._hosts.where((t) => t.kind.isGroupLike),
-    ..._hosts.where((t) => !t.kind.isGroupLike),
+  /// Where the user can host: official organizers first, then schools
+  /// and clubs, groups, and teams.
+  List<Team> get hosts => [for (final s in sections) ...s.teams];
+
+  /// [hosts] in labelled sections, empty ones left out.
+  List<HostSection> get sections => [
+    for (final s in [
+      HostSection(
+        HostSectionKind.official,
+        _hosts.where((t) => t.official).toList(),
+      ),
+      HostSection(
+        HostSectionKind.organizations,
+        _hosts
+            .where((t) => !t.official && t.kind == TeamKind.organization)
+            .toList(),
+      ),
+      HostSection(
+        HostSectionKind.groups,
+        _hosts
+            .where((t) => !t.official && t.kind == TeamKind.community)
+            .toList(),
+      ),
+      HostSection(
+        HostSectionKind.teams,
+        _hosts.where((t) => !t.official && t.kind == TeamKind.team).toList(),
+      ),
+    ])
+      if (s.teams.isNotEmpty) s,
   ];
 
   @override
@@ -66,4 +91,32 @@ class HostEventViewModel extends ChangeNotifier {
     _sub.cancel();
     super.dispose();
   }
+}
+
+enum HostSectionKind {
+  official(
+    'Official organizer',
+    'Events you run for an official organizer like Stall 10 carry its '
+        'verified badge.',
+  ),
+  organizations(
+    'Your schools and clubs',
+    'Host for everyone in the school or club, across its teams.',
+  ),
+  groups(
+    'Your community groups',
+    'Pickup and hat events for the group to sign up to.',
+  ),
+  teams('Your teams', 'Host as a team, for example your own tournament.');
+
+  const HostSectionKind(this.title, this.blurb);
+  final String title;
+  final String blurb;
+}
+
+/// Hosts of one kind the user can host as.
+class HostSection {
+  const HostSection(this.kind, this.teams);
+  final HostSectionKind kind;
+  final List<Team> teams;
 }

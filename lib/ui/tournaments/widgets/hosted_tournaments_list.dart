@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../routing/routes.dart';
+import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/tone.dart';
 import '../view_models/hosted_tournaments_viewmodel.dart';
@@ -59,7 +60,15 @@ class HostedTournamentCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: const CircleAvatar(child: Icon(Icons.emoji_events_outlined)),
-        title: Text(t.name),
+        title: Row(
+          children: [
+            Flexible(child: Text(t.name)),
+            if (t.hostOfficial) ...[
+              const SizedBox(width: 6),
+              const OfficialBadge(label: null),
+            ],
+          ],
+        ),
         subtitle: Text(
           [
             [hostedDates(t), if (t.location.isNotEmpty) t.location].join(' · '),

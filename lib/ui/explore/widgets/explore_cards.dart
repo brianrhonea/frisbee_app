@@ -81,7 +81,20 @@ class TournamentTile extends StatelessWidget {
         ),
         child: Icon(Icons.emoji_events_outlined, size: 20, color: c.ink),
       ),
-      title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(
+              t.name,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (t.hostOfficial) ...[
+            const SizedBox(width: 6),
+            const OfficialBadge(label: null),
+          ],
+        ],
+      ),
       subtitle: Text(
         [
           details,
