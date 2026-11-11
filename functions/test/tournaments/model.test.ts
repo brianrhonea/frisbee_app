@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  changedGameEvent,
   changedDetails,
   entryChange,
   entryRecord,
   eventDetails,
   eventIdFor,
+  gameTeams,
+  isLeagueGameEvent,
+  leagueEventId,
+  leagueGameEvent,
   newEvent,
+  newLeagueGameEvent,
   recordUpdate,
 } from "../../src/tournaments/model";
 
@@ -88,5 +94,86 @@ describe("tournament entries on team schedules", () => {
   it("updates the records only for what the host changed", () => {
     expect(recordUpdate(tournament, { ...tournament, status: "live" })).toBeNull();
     expect(recordUpdate(tournament, { ...tournament, hostName: "ATX" })).toEqual({ hostName: "ATX" });
+  });
+});
+
+describe("league games on team schedules", () => {
+  const league = { name: "Thursday Night", location: "City Park", hostName: "Denver Ultimate" };
+  const names = { a: "Reds", b: "Blues" };
+  const game = {
+    teamA: "a",
+    teamB: "b",
+    startsAt: new Date("2027-06-03T18:30:00Z"),
+    field: 2,
+    label: "Week 1",
+  };
+  const make = (over: Record<string, unknown> = {}, teamId = "a") =>
+    leagueGameEvent({ tournamentId: "t1", tournament: league, game: { ...game, ...over }, teamId, names, minutes: 60 });
+
+  it("names the event for the opponent, with place, field and week", () => {
+    expect(make()).toEqual({
+      title: "vs Blues",
+      type: "game",
+      startsAt: game.startsAt,
+      endsAt: new Date("2027-06-03T19:30:00Z"),
+      location: "City Park · Field 2",
+      notes: "Week 1 · Thursday Night",
+      tournamentId: "t1",
+      leagueGame: true,
+    });
+    expect(make({}, "b")?.title).toBe("vs Reds");
+  });
+
+  it("gives each game its own stable id per division, so republishing updates it", () => {
+    expect(leagueEventId("t1", "d1", "g001")).toBe("league_t1_d1_g001");
+    expect(leagueEventId("t1", "d2", "g001")).not.toBe(leagueEventId("t1", "d1", "g001"));
+  });
+
+  it("is only for games between two known teams that have a start time", () => {
+    expect(make({ teamB: null })).toBeNull();
+    expect(make({ teamA: null, teamB: null })).toBeNull();
+    expect(make({ startsAt: null })).toBeNull();
+    expect(make({}, "stranger")).toBeNull();
+    expect(gameTeams({ teamA: "a", teamB: null })).toEqual(["a"]);
+    expect(gameTeams(undefined)).toEqual([]);
+  });
+
+  it("copes with a missing field, name or place", () => {
+    const bare = leagueGameEvent({
+      tournamentId: "t1",
+      tournament: { name: "L" },
+      game: { teamA: "a", teamB: "z", startsAt: game.startsAt },
+      teamId: "a",
+      names: {},
+      minutes: 0,
+    });
+    expect(bare).toMatchObject({ title: "vs TBD", location: "", notes: "L" });
+    // A game is at least a minute long.
+    expect((bare!.endsAt as Date).getTime() - game.startsAt.getTime()).toBe(60_000);
+  });
+
+  it("changes only what moved, and nothing for a score report", () => {
+    const wanted = make()!;
+    const current = { ...newLeagueGameEvent(wanted, undefined), rsvps: { u: "yes" } };
+    expect(changedGameEvent(current, wanted)).toBeNull();
+    expect(changedGameEvent(current, make({ field: 3 })!)).toEqual({ location: "City Park · Field 3" });
+    const later = new Date("2027-06-03T19:30:00Z");
+    expect(changedGameEvent(current, make({ startsAt: later })!)).toMatchObject({
+      startsAt: later,
+      endsAt: new Date("2027-06-03T20:30:00Z"),
+    });
+    expect(changedGameEvent(undefined, wanted)).toBe(wanted);
+  });
+
+  it("starts with no responses, for everyone on an organization's schedule", () => {
+    const event = newLeagueGameEvent(make()!, { kind: "organization" });
+    expect(event).toMatchObject({ rsvps: {}, reactions: {}, votes: {}, poll: null, public: false, audience: ["everyone"] });
+    expect(newLeagueGameEvent(make()!, { kind: "team" })).not.toHaveProperty("audience");
+  });
+
+  it("is told apart from other events, which notifications still announce", () => {
+    expect(isLeagueGameEvent(make()!)).toBe(true);
+    expect(isLeagueGameEvent(newEvent("t1", league, undefined))).toBe(false);
+    expect(isLeagueGameEvent(undefined)).toBe(false);
   });
 });

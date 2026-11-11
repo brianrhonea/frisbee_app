@@ -119,3 +119,82 @@ function millisOrNull(v: unknown): number | null {
 function millis(v: unknown): number {
   return millisOrNull(v) ?? Number.NaN;
 }
+
+// ---- League games on team schedules ----------------------------------------
+// Each scheduled league game appears as a Game event on both teams'
+// schedules, kept by the `leagueGameEvents` trigger. The event id names the
+// division and game, so republishing the schedule (which rewrites games under
+// the same ids) updates the events rather than doubling them.
+
+/** The event id one league game gets on each team's schedule. */
+export const leagueEventId = (tournamentId: string, divisionId: string, gameId: string): string =>
+  `league_${tournamentId}_${divisionId}_${gameId}`;
+
+/**
+ * Whether an event was made from a league game. Notifications skip them: a
+ * published season would otherwise send everyone a notice per game.
+ */
+export const isLeagueGameEvent = (event: Data | undefined): boolean => event?.leagueGame === true;
+
+const teamOf = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
+
+/** The teams a game names (nothing for one still waiting on a bracket result). */
+export function gameTeams(game: Data | undefined): string[] {
+  return [teamOf(game?.teamA), teamOf(game?.teamB)].filter((t): t is string => t !== null);
+}
+
+/**
+ * The event [teamId] gets for [game], or null when it shouldn't have one:
+ * the game isn't between two known teams or has no start time. [names] are
+ * the teams' names by id and [minutes] the game's length.
+ */
+export function leagueGameEvent(args: {
+  tournamentId: string;
+  tournament: Data;
+  game: Data;
+  teamId: string;
+  names: Record<string, string>;
+  minutes: number;
+}): Data | null {
+  const { tournamentId, tournament, game, teamId, names, minutes } = args;
+  const teams = gameTeams(game);
+  const startsAt = game.startsAt ?? null;
+  if (teams.length !== 2 || !teams.includes(teamId) || millisOrNull(startsAt) === null) return null;
+  const opponent = teams.find((t) => t !== teamId) as string;
+  const start = millisOrNull(startsAt) as number;
+  const place = clip(tournament.location, 160);
+  const field = typeof game.field === "number" ? `Field ${game.field}` : "";
+  return {
+    title: `vs ${clip(names[opponent], 80) || "TBD"}`,
+    type: "game",
+    startsAt,
+    endsAt: new Date(start + Math.max(minutes, 1) * 60_000),
+    location: [place, field].filter(Boolean).join(" · "),
+    notes: [clip(game.label, 60), clip(tournament.name, 100)].filter(Boolean).join(" · "),
+    tournamentId,
+    leagueGame: true,
+  };
+}
+
+/** Which fields of an event differ from what the game now says. */
+export function changedGameEvent(current: Data | undefined, wanted: Data): Data | null {
+  if (!current) return wanted;
+  const update: Data = {};
+  for (const key of ["title", "type", "startsAt", "endsAt", "location", "notes", "tournamentId", "leagueGame"]) {
+    if (!same(current[key], wanted[key])) update[key] = wanted[key];
+  }
+  return Object.keys(update).length > 0 ? update : null;
+}
+
+/** A new league game event: no RSVPs yet, for everyone on the team. */
+export function newLeagueGameEvent(details: Data, team: Data | undefined): Data {
+  return {
+    ...details,
+    poll: null,
+    public: false,
+    rsvps: {},
+    reactions: {},
+    votes: {},
+    ...(team?.kind === "organization" ? { audience: ["everyone"] } : {}),
+  };
+}

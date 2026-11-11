@@ -119,6 +119,9 @@ describe("stored docs", () => {
   it("only counts public club-style tournaments that are under way or final", () => {
     expect(countsForRankings({ visibility: "public", entryType: "teams", status: "finished" })).toBe(true);
     expect(countsForRankings({ visibility: "public", status: "live" })).toBe(true);
+    expect(countsForRankings({ visibility: "public", kind: "tournament", status: "live" })).toBe(true);
+    // A weekly league isn't a tournament, even one where teams apply.
+    expect(countsForRankings({ visibility: "public", entryType: "teams", kind: "league", status: "finished" })).toBe(false);
     expect(countsForRankings({ visibility: "inviteOnly", entryType: "teams", status: "finished" })).toBe(false);
     expect(countsForRankings({ visibility: "public", entryType: "players", status: "finished" })).toBe(false);
     expect(countsForRankings({ visibility: "public", entryType: "teams", status: "scheduled" })).toBe(false);

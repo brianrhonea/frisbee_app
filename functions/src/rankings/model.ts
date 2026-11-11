@@ -192,6 +192,8 @@ export function countsForRankings(t: Data): boolean {
   return (
     t.visibility === "public" &&
     (t.entryType ?? "teams") === "teams" &&
+    // A weekly league isn't a tournament: its standings aren't comparable.
+    (t.kind ?? "tournament") === "tournament" &&
     (t.status === "live" || t.status === "finished")
   );
 }

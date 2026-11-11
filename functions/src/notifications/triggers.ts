@@ -13,6 +13,7 @@ import {
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { invitees, type MeetingDoc, meetingChange, type MeetingTeam, startedRecipients } from "../meetings/model";
+import { isLeagueGameEvent } from "../tournaments/model";
 import { deliver } from "./deliver";
 import {
   chatNotice,
@@ -126,6 +127,8 @@ export const teamEvent = onDocumentWrittenWithAuthContext(
     const after = event.data?.after.data() as Data | undefined;
     const change = eventChange(before, after);
     if (!change) return;
+    // A league's games go on schedules in bulk; no notice for each.
+    if (isLeagueGameEvent(after ?? before)) return;
     const start = millis((after ?? before)?.startsAt);
     if (start === undefined || start < Date.now()) return;
     const { teamId, eventId } = event.params;
