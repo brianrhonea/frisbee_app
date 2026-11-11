@@ -101,7 +101,7 @@ class EventFormatSection extends StatelessWidget {
             text: (v) => '$v teams',
           ),
         ),
-        if (!vm.takesPlayers) ...[
+        if (!vm.takesPlayers || vm.teamEntry) ...[
           const SizedBox(height: 8),
           number(
             'Roster minimum',

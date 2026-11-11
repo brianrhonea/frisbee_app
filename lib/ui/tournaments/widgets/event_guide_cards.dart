@@ -56,6 +56,7 @@ class EventHeader extends StatelessWidget {
             HostedStatusBadge(status: t.status),
             if (t.hostOfficial) const OfficialBadge(),
             Tag(t.type.label),
+            if (t.mixedEntry) const Tag('Teams can reserve a spot'),
             if (t.takesPlayers)
               Tag(
                 t.draftMode == DraftMode.captains
@@ -87,6 +88,9 @@ class EventHeader extends StatelessWidget {
             '${fee.label} per ${t.takesPlayers ? 'player' : 'team'}'
             '${fee.instructions.isEmpty ? '' : ' · ${fee.instructions}'}',
           ),
+        if (t.mixedEntry)
+          if (t.teamFee case final f?)
+            fact(Icons.groups_2_outlined, '${f.label} per team spot'),
         if (t.description.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(t.description, style: TextStyle(color: c.ink, fontSize: 14)),
@@ -234,6 +238,7 @@ IconData _icon(GuideAction a) => switch (a) {
   GuideAction.createTeams => Icons.group_add_outlined,
   GuideAction.publishSchedule ||
   GuideAction.schedule => Icons.calendar_month_outlined,
+  GuideAction.reserveTeam => Icons.group_add_outlined,
   GuideAction.signUp ||
   GuideAction.apply ||
   GuideAction.acceptInvite => Icons.how_to_reg_outlined,

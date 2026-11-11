@@ -9,6 +9,7 @@ import {
   snakeIndex,
   startProblem,
   teamsFromDraft,
+  withDrafted,
 } from "../../src/tournaments/draft_model";
 
 const p = (uid: string, skill: number, gender: "mmp" | "wmp" | null = null): PoolPlayer => ({
@@ -100,5 +101,25 @@ describe("teamsFromDraft", () => {
     expect(teams[0]).toMatchObject({ name: "Team Ana", captainId: "a", playerIds: ["a", "x"] });
     expect(teams[1].playerIds).toEqual(["b", "y", "z"]);
     expect(teams[1].playerNames).toEqual({ b: "Ben", y: "Yo", z: "Zed" });
+  });
+});
+
+describe("withDrafted", () => {
+  it("swaps the drafted teams and keeps registered ones", () => {
+    const division = { seeds: ["reg", "team1", "team2"], captains: { reg: ["c"], team1: ["a"], team2: ["b"] } };
+    const out = withDrafted(division, ["team1", "team2"], [
+      { id: "team1", captainId: "x" },
+      { id: "team2", captainId: "y" },
+      { id: "team3", captainId: null },
+    ]);
+    expect(out.seeds).toEqual(["reg", "team1", "team2", "team3"]);
+    expect(out.captains).toEqual({ reg: ["c"], team1: ["x"], team2: ["y"], team3: [] });
+  });
+
+  it("drops drafted teams that are gone and replaces in place", () => {
+    const out = withDrafted({ seeds: ["team2", "reg", "team1"] }, ["team1", "team2"], [{ id: "real1" }]);
+    expect(out.seeds).toEqual(["reg", "real1"]);
+    const inPlace = withDrafted({ seeds: ["team2", "reg", "team1"] }, ["team1", "team2"], [{ id: "r1" }, { id: "r2" }]);
+    expect(inPlace.seeds).toEqual(["r2", "reg", "r1"]);
   });
 });

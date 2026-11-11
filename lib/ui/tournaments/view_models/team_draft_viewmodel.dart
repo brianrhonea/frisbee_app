@@ -144,13 +144,23 @@ class TeamDraftViewModel extends ChangeNotifier {
     final d = _division;
     if (d == null) return 2;
     final perTeam = (d.settings.playersOnField * 1.5).round();
-    return (players.length / perTeam).round().clamp(2, d.maxTeams);
+    return (players.length / perTeam).round().clamp(2, maxTeams);
   }
 
   /// How many teams the next deal makes (or the saved teams have).
   int get teamCount =>
       _teamCount ?? (_teams.isNotEmpty ? _teams.length : suggestedTeamCount);
-  int get maxTeams => _division?.maxTeams ?? 2;
+  /// Spots left for drafted teams: teams that reserved their own spot
+  /// take theirs first.
+  int get maxTeams {
+    final d = _division;
+    if (d == null) return 2;
+    final left = d.maxTeams - d.registeredSeeds.length;
+    return left < 2 ? 2 : left;
+  }
+
+  /// Teams that registered on their own in this division.
+  int get registeredTeams => _division?.registeredSeeds.length ?? 0;
 
   void _onError(Object e) {
     _error = e;
@@ -280,9 +290,14 @@ class TeamDraftViewModel extends ChangeNotifier {
     if (_teams.length < 2) {
       return Result.error(Exception('Make at least two teams.'));
     }
-    if (_teams.length > d.maxTeams) {
+    if (_teams.length + d.registeredSeeds.length > d.maxTeams) {
+      final reg = d.registeredSeeds.length;
       return Result.error(
-        Exception('This division takes up to ${d.maxTeams} teams.'),
+        Exception(
+          'This division takes up to ${d.maxTeams} teams'
+          '${reg == 0 ? '' : ', and $reg registered on their own'}. '
+          'Raise the cap or draft fewer teams.',
+        ),
       );
     }
     final empty = _teams.where((t) => t.playerIds.isEmpty).firstOrNull;

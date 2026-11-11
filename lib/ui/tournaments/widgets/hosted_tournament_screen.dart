@@ -7,6 +7,7 @@ import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/tournament_engine/generator.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
+import '../../../utils/result.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -30,6 +31,20 @@ String hostedDates(HostedTournament t) {
       ? f.format(t.startsOn)
       : '${f.format(t.startsOn)} – ${f.format(end)}';
 }
+
+/// The tabs of an event's page.
+enum EventTab { overview, players, teams, schedule, results, news }
+
+/// [t]'s tabs: Players where people sign up on their own, Teams where
+/// teams enter (both, when teams can reserve spots too).
+List<EventTab> eventTabs(HostedTournament t, {required bool hasSignups}) => [
+  EventTab.overview,
+  if (t.takesPlayers && hasSignups) EventTab.players,
+  if (t.takesTeams || !hasSignups) EventTab.teams,
+  EventTab.schedule,
+  EventTab.results,
+  EventTab.news,
+];
 
 /// A hosted tournament: overview and bids, teams and seeds, schedule,
 /// results and news, by division.
@@ -153,10 +168,9 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
           );
         }
         final follow = vm.follow;
-        // Players sign up one by one; teams are drafted from them.
-        final players = t.takesPlayers && signups != null;
+        final tabs = eventTabs(t, hasSignups: signups != null);
         return DefaultTabController(
-          length: 5,
+          length: tabs.length,
           child: Scaffold(
             appBar: AppBar(
               title: Text(t.name),
@@ -179,32 +193,43 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 tabs: [
-                  const Tab(text: 'Overview'),
-                  Tab(text: players ? 'Players' : 'Teams'),
-                  const Tab(text: 'Schedule'),
-                  Tab(text: t.isLeague ? 'Standings' : 'Results'),
-                  const Tab(text: 'News'),
+                  for (final tab in tabs)
+                    Tab(
+                      text: switch (tab) {
+                        EventTab.overview => 'Overview',
+                        EventTab.players => 'Players',
+                        EventTab.teams => 'Teams',
+                        EventTab.schedule => 'Schedule',
+                        EventTab.results =>
+                          t.isLeague ? 'Standings' : 'Results',
+                        EventTab.news => 'News',
+                      },
+                    ),
                 ],
               ),
             ),
             body: TabBarView(
               children: [
-                // Redrawn as signups load too: the guide counts them.
-                if (signups case final s?)
-                  ListenableBuilder(
-                    listenable: s,
-                    builder: (_, _) =>
-                        _OverviewTab(viewModel: vm, signups: signups),
-                  )
-                else
-                  _OverviewTab(viewModel: vm),
-                if (players)
-                  PlayersTab(viewModel: vm, signups: signups!)
-                else
-                  _TeamsTab(viewModel: vm),
-                _ScheduleTab(viewModel: vm),
-                _ResultsTab(viewModel: vm),
-                _NewsTab(viewModel: vm),
+                for (final tab in tabs)
+                  switch (tab) {
+                    // Redrawn as signups load too: the guide counts them.
+                    EventTab.overview => switch (signups) {
+                      final s? => ListenableBuilder(
+                        listenable: s,
+                        builder: (_, _) =>
+                            _OverviewTab(viewModel: vm, signups: signups),
+                      ),
+                      null => _OverviewTab(viewModel: vm),
+                    },
+                    EventTab.players => PlayersTab(
+                      viewModel: vm,
+                      signups: signups!,
+                    ),
+                    EventTab.teams => _TeamsTab(viewModel: vm),
+                    EventTab.schedule => _ScheduleTab(viewModel: vm),
+                    EventTab.results => _ResultsTab(viewModel: vm),
+                    EventTab.news => _NewsTab(viewModel: vm),
+                  },
               ],
             ),
           ),
@@ -300,6 +325,48 @@ class _OverviewTab extends StatelessWidget {
   void _editFormat(BuildContext context) =>
       context.push(Routes.editTournament(viewModel.tournamentId));
 
+  /// Starts a team and reserves it a spot, then offers to invite players.
+  Future<void> _reserve(BuildContext context) async {
+    final vm = viewModel;
+    if (signups?.isSignedUp ?? false) {
+      showErrorSnackBar(
+        context,
+        Result<void>.error(
+          Exception(
+            "You're signed up on your own. Withdraw first to bring a team.",
+          ),
+        ),
+      );
+      return;
+    }
+    final t = vm.tournament!;
+    final r = await showReserveSpotDialog(
+      context,
+      divisions: vm.divisions,
+      fee: t.spotFee,
+      minRoster: t.formatOr(vm.divisions.firstOrNull).effectiveMinRoster,
+    );
+    if (r == null || !context.mounted) return;
+    await vm.reserveSpot.execute(r);
+    if (!context.mounted) return;
+    final result = vm.reserveSpot.result;
+    vm.reserveSpot.clearResult();
+    if (result case Ok(:final value)) {
+      if (await confirmDialog(
+        context,
+        title: 'Spot reserved',
+        message:
+            '${r.name} is in, waiting for the host to accept it. Invite '
+            'your players now: they join the team with its link.',
+        confirmLabel: 'Invite players',
+      )) {
+        if (context.mounted) context.push(Routes.teamMembers(value));
+      }
+    } else {
+      showErrorSnackBar(context, result);
+    }
+  }
+
   Future<void> _apply(
     BuildContext context, {
     TournamentEntry? invite,
@@ -330,6 +397,12 @@ class _OverviewTab extends StatelessWidget {
   Future<void> _act(BuildContext context, GuideButton b) async {
     final vm = viewModel;
     final tabs = DefaultTabController.of(context);
+    final order = eventTabs(vm.tournament!, hasSignups: signups != null);
+    void go(EventTab tab) {
+      final i = order.indexOf(tab);
+      if (i >= 0) tabs.animateTo(i);
+    }
+
     final division = b.divisionId;
     switch (b.action) {
       case GuideAction.addDivision:
@@ -338,8 +411,10 @@ class _OverviewTab extends StatelessWidget {
         await vm.setStatus.execute(HostedStatus.registration);
       case GuideAction.closeRegistration:
         await vm.setStatus.execute(HostedStatus.seeding);
-      case GuideAction.reviewPlayers || GuideAction.reviewTeams:
-        tabs.animateTo(1);
+      case GuideAction.reviewPlayers:
+        go(EventTab.players);
+      case GuideAction.reviewTeams:
+        go(EventTab.teams);
       case GuideAction.draftTeams:
         if (division != null) {
           context.push(Routes.tournamentDraft(vm.tournamentId, division));
@@ -364,14 +439,28 @@ class _OverviewTab extends StatelessWidget {
         }
       case GuideAction.publishSchedule:
         if (division != null) vm.selectDivision(division);
-        tabs.animateTo(2);
+        go(EventTab.schedule);
       case GuideAction.schedule:
-        tabs.animateTo(2);
+        go(EventTab.schedule);
       case GuideAction.results:
-        tabs.animateTo(3);
+        go(EventTab.results);
+      case GuideAction.reserveTeam:
+        await _reserve(context);
       case GuideAction.signUp:
         final sign = signups;
         if (sign == null) return;
+        if (vm.myActiveEntry case final e?) {
+          showErrorSnackBar(
+            context,
+            Result<void>.error(
+              Exception(
+                "You're on ${e.teamName}, which is entered here, so you "
+                "don't sign up on your own.",
+              ),
+            ),
+          );
+          return;
+        }
         final a = await showPlayerSignupDialog(
           context,
           divisions: vm.divisions,
@@ -396,7 +485,7 @@ class _OverviewTab extends StatelessWidget {
     final vm = viewModel;
     final t = vm.tournament!;
     final theme = Theme.of(context);
-    final fee = t.bidFee;
+    final fee = t.spotFee;
     final guide = EventGuide.of(vm, signups);
     return ConstrainedContent(
       child: ListView(
@@ -483,7 +572,8 @@ class _OverviewTab extends StatelessWidget {
                     : null,
               ),
             ),
-          if (!t.takesPlayers && (vm.myEntries.isNotEmpty || vm.canApply)) ...[
+          if (t.takesTeams &&
+              (vm.myEntries.isNotEmpty || vm.canApply || vm.canReserve)) ...[
             const _Section('Your teams'),
             for (final e in vm.myEntries)
               Card(
@@ -512,6 +602,16 @@ class _OverviewTab extends StatelessWidget {
                           'Captains: ${[for (final c in e.captainIds) vm.myTeam(e.teamId)?.nameOf(c) ?? 'Member'].join(', ')}',
                           style: theme.textTheme.bodySmall,
                         ),
+                      if (vm.playersShort(e.teamId) case final short?
+                          when short > 0 && e.status != EntryStatus.withdrawn)
+                        Text(
+                          'Needs $short more '
+                          '${short == 1 ? 'player' : 'players'} for the '
+                          'roster minimum.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
                       Wrap(
                         spacing: 8,
                         children: [
@@ -527,6 +627,13 @@ class _OverviewTab extends StatelessWidget {
                             TextButton(
                               onPressed: () => _apply(context, editing: e),
                               child: const Text('Captains'),
+                            ),
+                          if (e.status.isActive ||
+                              e.status == EntryStatus.accepted)
+                            TextButton(
+                              onPressed: () =>
+                                  context.push(Routes.teamMembers(e.teamId)),
+                              child: const Text('Invite players'),
                             ),
                           if (e.status.isActive ||
                               e.status == EntryStatus.accepted)
@@ -567,11 +674,27 @@ class _OverviewTab extends StatelessWidget {
                   ),
                 ),
               ),
-            if (vm.canApply) ...[
+            if (vm.canReserve && vm.myActiveEntry == null) ...[
               FilledButton.icon(
+                onPressed: () => _reserve(context),
+                icon: const Icon(Icons.group_add_outlined),
+                label: Text(
+                  t.spotFee == null
+                      ? 'Reserve a team spot'
+                      : 'Reserve a team spot · ${t.spotFee!.label}',
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (vm.canApply && vm.myActiveEntry == null) ...[
+              (t.mixedEntry ? OutlinedButton.icon : FilledButton.icon)(
                 onPressed: () => _apply(context),
                 icon: const Icon(Icons.how_to_reg_outlined),
-                label: const Text('Apply with a team'),
+                label: Text(
+                  t.mixedEntry
+                      ? 'Use a team you already run'
+                      : 'Apply with a team',
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -615,7 +738,7 @@ class _TeamsTabState extends State<_TeamsTab> {
   HostedTournamentViewModel get vm => widget.viewModel;
 
   Widget _entryTile(TournamentEntry e) {
-    final fee = vm.tournament?.bidFee;
+    final fee = vm.tournament?.spotFee;
     final menu = <(String, EntryStatus)>[
       if (e.status != EntryStatus.accepted) ('Accept', EntryStatus.accepted),
       if (e.status != EntryStatus.waitlisted)
@@ -657,7 +780,8 @@ class _TeamsTabState extends State<_TeamsTab> {
     final d = vm.division;
     if (d == null) return _noDivisions(vm);
     final theme = Theme.of(context);
-    final fee = vm.tournament?.bidFee;
+    final spotFee = vm.tournament?.spotFee;
+    final fee = spotFee;
     final seeds = vm.seedsOf(d.id);
     final shown = [
       for (final id in seeds)
@@ -676,6 +800,8 @@ class _TeamsTabState extends State<_TeamsTab> {
     // decide on them again. They can apply again, or be invited.
     final out = vm.entriesIn(d.id, status: EntryStatus.declined);
     Widget seedTile(String id, int index) {
+      // Drafted teams' players pay one by one, not as a team.
+      final fee = d.draftedIds.contains(id) ? null : spotFee;
       final overdue = fee != null && vm.isOverdue(id);
       return ListTile(
         key: ValueKey(id),

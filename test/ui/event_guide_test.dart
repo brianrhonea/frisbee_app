@@ -44,6 +44,7 @@ void main() {
     bool noDivision = false,
     List<TournamentTeam> drafted = const [],
     List<String> seeds = const [],
+    bool teamEntry = false,
   }) {
     final d = TournamentDivision(
       id: div,
@@ -63,6 +64,8 @@ void main() {
       entryType: entry,
       kind: kind,
       draftMode: draft,
+      teamEntry: teamEntry,
+      teamFee: teamEntry ? const BidFee(amountCents: 6000) : null,
       bidFee: const BidFee(amountCents: 2000),
       divisions: noDivision ? const [] : [d.summary],
     );
@@ -319,6 +322,61 @@ void main() {
       expect(g.body, contains('Field 2'));
       expect(g.button?.label, 'Report the score');
       expect(g.needsYou, isTrue);
+    });
+  });
+
+  group('players and teams together', () {
+    test('a player can sign up or reserve a team spot', () async {
+      event(teamEntry: true, kind: HostedKind.league);
+      final g = await guideFor('pat');
+      expect(g.title, 'Sign up to play');
+      expect(g.secondary?.action, GuideAction.reserveTeam);
+      expect(g.secondary?.label, contains(r'$60'));
+    });
+
+    test(
+      'a captain with a reserved spot sees their team, not a signup',
+      () async {
+        event(teamEntry: true, kind: HostedKind.league);
+        teams.teams['reds'] = team('reds', 'cap');
+        repo.entries[id] = {
+          'reds': const TournamentEntry(
+            teamId: 'reds',
+            teamName: 'Reds',
+            divisionId: div,
+            captainIds: ['cap'],
+          ),
+        };
+        final g = await guideFor('cap');
+        expect(g.title, 'Spot reserved');
+        expect(g.body, contains('Invite 6 more players'));
+      },
+    );
+
+    test('the host reviews teams and players, and drafts only where players '
+        'signed up', () async {
+      event(teamEntry: true, kind: HostedKind.league);
+      teams.teams['reds'] = team('reds', 'cap');
+      repo.entries[id] = {
+        'reds': const TournamentEntry(
+          teamId: 'reds',
+          teamName: 'Reds',
+          divisionId: div,
+          captainIds: ['cap'],
+        ),
+      };
+      var g = await guideFor('director');
+      expect(g.body, contains('1 waiting for you'));
+      expect(g.button?.action, GuideAction.reviewTeams);
+      // Closed with only a registered team: nothing to draft.
+      event(
+        teamEntry: true,
+        kind: HostedKind.league,
+        status: HostedStatus.seeding,
+        seeds: ['reds'],
+      );
+      g = await guideFor('director');
+      expect(g.title, 'Publish the schedule');
     });
   });
 

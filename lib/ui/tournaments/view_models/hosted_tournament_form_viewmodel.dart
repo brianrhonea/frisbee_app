@@ -107,6 +107,10 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   TournamentEntryType _entryType = TournamentEntryType.teams;
   DraftMode draftMode = DraftMode.balanced;
   LeagueSeason _season = const LeagueSeason();
+  bool _teamEntry = false;
+
+  /// What a team pays to reserve a spot, as typed.
+  String teamFeeAmount = '';
 
   bool get loaded => _loaded || _error != null;
   Object? get error => _error;
@@ -203,6 +207,17 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   /// The fee is per player when players sign up, per team otherwise.
   String get feeName => takesPlayers ? 'Entry fee' : 'Bid fee';
 
+  /// Players sign up, and teams can also reserve a whole spot.
+  bool get teamEntry => takesPlayers && _teamEntry;
+
+  void setTeamEntry(bool v) {
+    _teamEntry = v;
+    notifyListeners();
+  }
+
+  /// The team spot fee in cents, or null when it isn't a valid amount.
+  int? get teamFeeCents => _cents(teamFeeAmount);
+
   /// Only members of the host with Manage events may host.
   bool get canHost {
     final uid = _auth.currentUser?.uid;
@@ -232,6 +247,12 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     _kind = t.kind;
     _entryType = t.entryType;
     draftMode = t.draftMode;
+    _teamEntry = t.teamEntry;
+    if (t.teamFee case final f?) {
+      teamFeeAmount = (f.amountCents / 100).toStringAsFixed(
+        f.amountCents % 100 == 0 ? 0 : 2,
+      );
+    }
     _season = t.season ?? const LeagueSeason();
     if (t.format case final f?) _format = f;
     final fee = t.bidFee;
@@ -324,8 +345,10 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   }
 
   /// The fee in cents, or null when [feeAmount] isn't a valid amount.
-  int? get feeCents {
-    final v = double.tryParse(feeAmount.trim().replaceAll(r'$', ''));
+  int? get feeCents => _cents(feeAmount);
+
+  static int? _cents(String amount) {
+    final v = double.tryParse(amount.trim().replaceAll(r'$', ''));
     if (v == null || v < 0 || v > 100000) return null;
     return (v * 100).round();
   }
@@ -334,6 +357,9 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     if (name.trim().isEmpty) return 'Give it a name.';
     if (_hasFee && feeCents == null) {
       return 'Enter the ${feeName.toLowerCase()}, e.g. 250.';
+    }
+    if (_hasFee && teamEntry && teamFeeCents == null) {
+      return 'Enter the team spot fee, e.g. 300.';
     }
     if (_wanted.isEmpty) return 'Open at least one division.';
     if (_wanted.length > HostedTournament.maxDivisions) {
@@ -391,6 +417,15 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
       endsOn: () => _endsOn,
       visibility: visibility,
       bidFee: () => fee,
+      teamEntry: teamEntry,
+      teamFee: () => fee != null && teamEntry
+          ? BidFee(
+              amountCents: teamFeeCents!,
+              currency: fee.currency,
+              instructions: fee.instructions,
+              dueAt: fee.dueAt,
+            )
+          : null,
       season: () => isLeague ? _season : null,
       draftMode: draftMode,
     );

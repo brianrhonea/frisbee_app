@@ -352,13 +352,7 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
     log.add('draft ${division.id} ${teams.length}');
     final map = divisions.putIfAbsent(tournamentId, () => {});
     final d = map[division.id] ?? division;
-    map[division.id] = d.copyWith(
-      teams: teams,
-      seeds: [for (final t in teams) t.id],
-      captains: {
-        for (final t in teams) t.id: [?t.captainId],
-      },
-    );
+    map[division.id] = d.withDrafted(teams);
     _changed();
     return const Result.ok(null);
   }
@@ -606,13 +600,7 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
           playerNames: t.playerNames,
         ),
     ];
-    divisions[tournamentId]![divisionId] = d.copyWith(
-      teams: made,
-      seeds: [for (final t in made) t.id],
-      captains: {
-        for (final t in made) t.id: [?t.captainId],
-      },
-    );
+    divisions[tournamentId]![divisionId] = d.withDrafted(made);
     for (final t in made) {
       entries.putIfAbsent(tournamentId, () => {})[t.id] = TournamentEntry(
         teamId: t.id,

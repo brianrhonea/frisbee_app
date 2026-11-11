@@ -5,6 +5,8 @@
 // league's entries. Everything here is pure so it can be tested; the
 // callable in callables.ts does the reads and the one batch write.
 
+import { withDrafted } from "./draft_model";
+
 export type Data = Record<string, unknown>;
 
 /** A team the host drafted: `divisions/{id}.teams` in the app. */
@@ -197,16 +199,25 @@ export function leagueEntry(team: DraftTeam, divisionId: string, updatedAt: unkn
   };
 }
 
-/** The division's drafted teams, seeds and captains once they have real ids. */
+/**
+ * The division's drafted teams, seeds and captains once they have real
+ * ids. Teams that registered on their own keep their seeds and captains.
+ */
 export function madeTeams(
   teams: DraftTeam[],
   tournamentId: string,
+  division: Data = {},
 ): {
   teams: Data[];
   seeds: string[];
   captains: Record<string, string[]>;
 } {
   const real = teams.map((t) => ({ ...t, id: leagueTeamId(tournamentId, t.id) }));
+  const merged = withDrafted(
+    division,
+    teams.map((t) => t.id),
+    real,
+  );
   return {
     teams: real.map((t) => ({
       id: t.id,
@@ -215,7 +226,6 @@ export function madeTeams(
       playerIds: t.playerIds,
       playerNames: t.playerNames,
     })),
-    seeds: real.map((t) => t.id),
-    captains: Object.fromEntries(real.map((t) => [t.id, t.captainId ? [t.captainId] : []])),
+    ...merged,
   };
 }

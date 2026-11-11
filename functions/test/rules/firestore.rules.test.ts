@@ -3600,6 +3600,21 @@ describe("hosted tournaments", () => {
     await assertSucceeds(updateDoc(tRef(DIRECTOR), { format: null }));
   });
 
+  it("teams enter a player-signup event only when it lets them reserve spots", async () => {
+    await seed({ entryType: "players" });
+    await assertFails(setDoc(entryRef(CAPTAIN), entry()));
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "tournaments", T), {
+        teamEntry: true,
+        teamFee: { amountCents: 6000, currency: "USD", instructions: "", dueAt: null },
+      }),
+    );
+    await assertSucceeds(setDoc(entryRef(CAPTAIN), entry()));
+    // Only player-signup events take team spots this way.
+    await assertFails(updateDoc(tRef(DIRECTOR), { entryType: "teams" }));
+    await assertSucceeds(updateDoc(tRef(DIRECTOR), { teamEntry: false, teamFee: null }));
+  });
+
   it("nobody creates a team that's already official", async () => {
     await assertFails(
       setDoc(doc(db(OUTSIDER), "teams", "fake10"), {

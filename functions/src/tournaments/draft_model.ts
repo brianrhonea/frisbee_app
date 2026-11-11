@@ -106,6 +106,44 @@ export function startProblem(args: {
   return null;
 }
 
+/**
+ * A division's seeds and captains with [teams] in place of the drafted
+ * teams it had ([before], in order). Teams that registered on their own
+ * keep their seeds and captains: a league can take both. A drafted team
+ * replaced by one at the same position keeps its seed.
+ */
+export function withDrafted(
+  division: { seeds?: unknown; captains?: unknown },
+  before: string[],
+  teams: { id: string; captainId?: string | null }[],
+): { seeds: string[]; captains: Record<string, string[]> } {
+  const fresh = teams.map((t) => t.id);
+  const seeds = Array.isArray(division.seeds) ? division.seeds.filter((s): s is string => typeof s === "string") : [];
+  const out: string[] = [];
+  const used = new Set<string>();
+  for (const s of seeds) {
+    const i = before.indexOf(s);
+    if (i >= 0) {
+      if (i < fresh.length && !used.has(fresh[i])) {
+        out.push(fresh[i]);
+        used.add(fresh[i]);
+      }
+    } else if (!fresh.includes(s) && !out.includes(s)) {
+      out.push(s);
+    }
+  }
+  for (const f of fresh) if (!used.has(f)) out.push(f);
+  const old = (division.captains ?? {}) as Record<string, unknown>;
+  const captains: Record<string, string[]> = {};
+  for (const [id, uids] of Object.entries(old)) {
+    if (!before.includes(id) && !fresh.includes(id) && Array.isArray(uids)) {
+      captains[id] = uids.filter((u): u is string => typeof u === "string");
+    }
+  }
+  for (const t of teams) captains[t.id] = t.captainId ? [t.captainId] : [];
+  return { seeds: out, captains };
+}
+
 /** The drafted teams: each captain first on their own team, then their picks in order. */
 export function teamsFromDraft(args: {
   captains: readonly { uid: string; name: string }[];

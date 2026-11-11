@@ -8,6 +8,109 @@ import '../../core/ui/error_message.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
 
+/// Names a new team and picks its division, to reserve it a spot in an
+/// event that takes both players and teams.
+Future<({String name, String divisionId})?> showReserveSpotDialog(
+  BuildContext context, {
+  required List<TournamentDivision> divisions,
+  required int minRoster,
+  BidFee? fee,
+}) => showDialog<({String name, String divisionId})>(
+  context: context,
+  builder: (_) =>
+      _ReserveDialog(divisions: divisions, minRoster: minRoster, fee: fee),
+);
+
+class _ReserveDialog extends StatefulWidget {
+  const _ReserveDialog({
+    required this.divisions,
+    required this.minRoster,
+    this.fee,
+  });
+
+  final List<TournamentDivision> divisions;
+  final int minRoster;
+  final BidFee? fee;
+
+  @override
+  State<_ReserveDialog> createState() => _ReserveDialogState();
+}
+
+class _ReserveDialogState extends State<_ReserveDialog> {
+  final _name = TextEditingController();
+  late String? divisionId = widget.divisions.firstOrNull?.id;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fee = widget.fee;
+    final ready = _name.text.trim().isNotEmpty && divisionId != null;
+    return AlertDialog(
+      title: const Text('Reserve a team spot'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _name,
+              autofocus: true,
+              maxLength: 60,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(labelText: 'Team name'),
+              onChanged: (_) => setState(() {}),
+            ),
+            if (widget.divisions.length > 1)
+              DropdownButtonFormField<String>(
+                initialValue: divisionId,
+                decoration: const InputDecoration(labelText: 'Division'),
+                items: [
+                  for (final d in widget.divisions)
+                    DropdownMenuItem(
+                      value: d.id,
+                      child: Text(
+                        d.isFull ? '${d.label} (full: waitlist)' : d.label,
+                      ),
+                    ),
+                ],
+                onChanged: (v) => setState(() => divisionId = v),
+              ),
+            const SizedBox(height: 12),
+            Text(
+              'You start the team and captain it. Invite at least '
+              '${widget.minRoster} players before the season starts.'
+              '${fee == null ? '' : ' The spot is ${fee.label}'
+                        '${fee.instructions.isEmpty ? '' : ': ${fee.instructions}'}.'}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: ready
+              ? () => Navigator.pop(context, (
+                  name: _name.text.trim(),
+                  divisionId: divisionId!,
+                ))
+              : null,
+          child: const Text('Reserve'),
+        ),
+      ],
+    );
+  }
+}
+
 /// A team admin enters one of [teams] (or answers an invite for it):
 /// picks the division and who reports scores.
 Future<EntryApplication?> showApplyDialog(

@@ -1581,7 +1581,12 @@ service cloud.firestore {
                  'hostId', 'hostName', 'hostKind', 'name', 'startsOn', 'endsOn',
                  'description', 'location', 'visibility', 'entryType', 'status',
                  'bidFee', 'kind', 'season', 'draftMode', 'divisions',
-                 'hostOfficial', 'format', 'createdBy', 'createdAt'])
+                 'hostOfficial', 'format', 'teamEntry', 'teamFee',
+                 'createdBy', 'createdAt'])
+          // Teams reserving spots alongside players who sign up.
+          && t.get('teamEntry', false) is bool
+          && (!t.get('teamEntry', false) || t.entryType == 'players')
+          && validBidFee(t.get('teamFee', null))
           && t.get('hostOfficial', false) is bool
           && validFormat(t.get('format', null))
           && t.get('kind', 'tournament') in ['tournament', 'league']
@@ -1773,6 +1778,8 @@ service cloud.firestore {
           return teamAdmin(teamId)
             && request.resource.data.status == 'applied'
             && t.status == 'registration'
+            // Player-entry events take teams only when they reserve spots.
+            && (t.entryType != 'players' || t.get('teamEntry', false))
             && (t.visibility == 'public'
                 || (resource != null && resource.data.status == 'invited'));
         }

@@ -287,6 +287,8 @@ class HostedTournament {
     this.entryType = TournamentEntryType.teams,
     this.status = HostedStatus.draft,
     this.bidFee,
+    this.teamEntry = false,
+    this.teamFee,
     this.kind = HostedKind.tournament,
     this.season,
     this.draftMode = DraftMode.balanced,
@@ -331,6 +333,14 @@ class HostedTournament {
   /// Null when it's free to enter. For player entry this is the per-player
   /// [EntryFee]; for team entry it's the team's bid fee.
   final BidFee? bidFee;
+
+  /// Players sign up, and teams can also reserve a whole spot (and invite
+  /// their own players). The rest of the spots are drafted from the
+  /// players who signed up on their own.
+  final bool teamEntry;
+
+  /// What a team pays to reserve a spot, when [teamEntry].
+  final BidFee? teamFee;
   final HostedKind kind;
 
   /// Leagues only.
@@ -350,7 +360,17 @@ class HostedTournament {
   bool get takesPlayers => entryType == TournamentEntryType.players;
 
   /// A one-off hat tournament.
-  bool get isHat => takesPlayers && !isLeague;
+  bool get isHat => takesPlayers && !isLeague && !teamEntry;
+
+  /// Teams can enter: every team-entry event, and player events that also
+  /// let teams reserve a spot.
+  bool get takesTeams => !takesPlayers || teamEntry;
+
+  /// Both: players sign up on their own and teams reserve spots.
+  bool get mixedEntry => takesPlayers && teamEntry;
+
+  /// What a team pays to enter (its bid fee or spot fee), if anything.
+  BidFee? get spotFee => takesPlayers ? (teamEntry ? teamFee : null) : bidFee;
 
   /// What kind of event it is, for lists.
   HostedType get type => isLeague
@@ -380,6 +400,8 @@ class HostedTournament {
     TournamentVisibility? visibility,
     HostedStatus? status,
     BidFee? Function()? bidFee,
+    bool? teamEntry,
+    BidFee? Function()? teamFee,
     LeagueSeason? Function()? season,
     DraftMode? draftMode,
     List<DivisionSummary>? divisions,
@@ -399,6 +421,8 @@ class HostedTournament {
     entryType: entryType,
     status: status ?? this.status,
     bidFee: bidFee != null ? bidFee() : this.bidFee,
+    teamEntry: teamEntry ?? this.teamEntry,
+    teamFee: teamFee != null ? teamFee() : this.teamFee,
     kind: kind,
     season: season != null ? season() : this.season,
     draftMode: draftMode ?? this.draftMode,
@@ -434,6 +458,8 @@ class HostedTournament {
     ),
     status: enumByName(HostedStatus.values, map['status'], HostedStatus.draft),
     bidFee: BidFee.fromMap(map['bidFee']),
+    teamEntry: map['teamEntry'] == true,
+    teamFee: BidFee.fromMap(map['teamFee']),
     kind: enumByName(HostedKind.values, map['kind'], HostedKind.tournament),
     season: LeagueSeason.fromMap(map['season']),
     draftMode: enumByName(
@@ -465,6 +491,8 @@ class HostedTournament {
     'entryType': entryType.name,
     'status': status.name,
     'bidFee': bidFee?.toMap(),
+    'teamEntry': teamEntry,
+    'teamFee': teamFee?.toMap(),
     'kind': kind.name,
     'season': season?.toMap(),
     'draftMode': draftMode.name,
@@ -725,6 +753,48 @@ class TournamentDivision {
 
   /// Every uid who reports scores for some team.
   Set<String> get captainIds => {for (final c in captains.values) ...c};
+
+  /// Ids of the teams the host drafted (as opposed to ones that
+  /// registered on their own).
+  Set<String> get draftedIds => {for (final t in teams) t.id};
+
+  /// Teams that registered on their own and are in (a league can take
+  /// these alongside drafted ones).
+  List<String> get registeredSeeds => [
+    for (final id in seeds)
+      if (!draftedIds.contains(id)) id,
+  ];
+
+  /// This division with [drafted] as its drafted teams. Registered teams
+  /// keep their seeds and captains; a drafted team replaced by one at the
+  /// same position keeps its seed (mirrors withDrafted in
+  /// functions/src/tournaments/draft_model.ts).
+  TournamentDivision withDrafted(List<TournamentTeam> drafted) {
+    final before = [for (final t in teams) t.id];
+    final fresh = [for (final t in drafted) t.id];
+    final out = <String>[];
+    final used = <String>{};
+    for (final s in seeds) {
+      final i = before.indexOf(s);
+      if (i >= 0) {
+        if (i < fresh.length && used.add(fresh[i])) out.add(fresh[i]);
+      } else if (!fresh.contains(s) && !out.contains(s)) {
+        out.add(s);
+      }
+    }
+    for (final f in fresh) {
+      if (used.add(f)) out.add(f);
+    }
+    return copyWith(
+      teams: drafted,
+      seeds: out,
+      captains: {
+        for (final e in captains.entries)
+          if (!before.contains(e.key) && !fresh.contains(e.key)) e.key: e.value,
+        for (final t in drafted) t.id: [?t.captainId],
+      },
+    );
+  }
 
   TournamentDivision copyWith({
     String? id,

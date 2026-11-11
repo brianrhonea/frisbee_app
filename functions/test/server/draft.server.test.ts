@@ -134,6 +134,27 @@ describe("captains' draft callables", { timeout: 60_000 }, () => {
     });
   });
 
+  it("keeps teams that registered on their own through the draft and team creation", async () => {
+    const id = await league();
+    const args = { tournamentId: id, divisionId: DIV };
+    // A team reserved its spot before the draft.
+    await db.doc(`tournaments/${id}/divisions/${DIV}`).update({
+      seeds: ["reserved"],
+      captains: { reserved: ["cap"] },
+    });
+    await call(startDraft, "director", { ...args, captainIds: ["p0", "p1"] });
+    for (let i = 0; i < 4; i++) await call(draftControl, "director", { ...args, action: "autopick" });
+    await call(finishDraft, "director", args);
+    let division = (await db.doc(`tournaments/${id}/divisions/${DIV}`).get()).data();
+    expect(division?.seeds).toEqual(["reserved", "team1", "team2"]);
+    expect(division?.captains.reserved).toEqual(["cap"]);
+    await call(createLeagueTeams, "director", args);
+    division = (await db.doc(`tournaments/${id}/divisions/${DIV}`).get()).data();
+    expect(division?.seeds).toEqual(["reserved", `league_${id}_team1`, `league_${id}_team2`]);
+    expect(division?.captains.reserved).toEqual(["cap"]);
+    expect(Object.keys(division?.captains ?? {})).toHaveLength(3);
+  });
+
   it("cancelling clears the draft so it can start again", async () => {
     const id = await league();
     const args = { tournamentId: id, divisionId: DIV };

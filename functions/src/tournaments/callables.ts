@@ -100,7 +100,7 @@ export const createLeagueTeams = onCall({ enforceAppCheck }, async (req) => {
     }
     batch.set(tournamentRef.collection("entries").doc(teamId), leagueEntry(team, divisionId, now));
   }
-  batch.update(divisionRef, madeTeams(drafted, tournamentId));
+  batch.update(divisionRef, madeTeams(drafted, tournamentId, division));
   await batch.commit();
   logger.info("League teams created", { tournamentId, divisionId, teams: drafted.length, by: uid });
   return { created: drafted.length - existing.size, teams: refs.map((r, i) => ({ teamId: r.id, name: drafted[i].name })) };

@@ -1134,4 +1134,104 @@ void main() {
       sign!.dispose();
     });
   });
+
+  group('players sign up and teams reserve spots', () {
+    /// A 3v3 league: players pay $20 to sign up, teams $60 a spot, and a
+    /// team needs 4 players.
+    Future<String> hostMixed() async {
+      final f = await form();
+      f.setKind(HostedKind.league);
+      f.setEntryType(TournamentEntryType.players);
+      f.setTeamEntry(true);
+      f.name = 'Mini League';
+      f.setFieldSize(3);
+      f.setFormat(f.format.copyWith(minRoster: () => 4, maxTeams: 6));
+      f.setHasFee(true);
+      f.feeAmount = '20';
+      expect(f.problem, 'Enter the team spot fee, e.g. 300.');
+      f.teamFeeAmount = '60';
+      expect(f.problem, isNull);
+      await f.save.execute();
+      final id = (f.save.result as Ok<String>).value;
+      f.dispose();
+      final vm = await page('director', id);
+      await vm.setStatus.execute(HostedStatus.registration);
+      await pumpEventQueue();
+      vm.dispose();
+      return id;
+    }
+
+    test('the event keeps both fees and takes both', () async {
+      final t = repo.tournaments[await hostMixed()]!;
+      expect(t.takesPlayers, isTrue);
+      expect(t.takesTeams, isTrue);
+      expect(t.mixedEntry, isTrue);
+      expect(t.isHat, isFalse);
+      expect(t.entryFee!.label, r'$20');
+      expect(t.spotFee!.label, r'$60');
+      expect(eventTabs(t, hasSignups: true), contains(EventTab.players));
+      expect(eventTabs(t, hasSignups: true), contains(EventTab.teams));
+    });
+
+    test('a captain starts a team and reserves its spot', () async {
+      final id = await hostMixed();
+      final cap = await page('cap', id);
+      expect(cap.canReserve, isTrue);
+      final div = cap.divisions.single;
+      await cap.reserveSpot.execute((name: 'Reds', divisionId: div.id));
+      final made = cap.reserveSpot.result;
+      expect(made, isA<Ok<String>>(), reason: '$made');
+      final teamId = (made as Ok<String>).value;
+      final team = teams.teams[teamId]!;
+      expect(team.ownerId, 'cap');
+      expect(team.division, div.division);
+      expect(team.level, div.level);
+      final entry = repo.entries[id]![teamId]!;
+      expect(entry.status, EntryStatus.applied);
+      expect(entry.captainIds, ['cap']);
+      await pumpEventQueue();
+      // One of four so far.
+      expect(cap.playersShort(teamId), 3);
+      expect(cap.myActiveEntry?.teamId, teamId);
+      cap.dispose();
+    });
+
+    test("teams can't reserve spots where only players sign up", () async {
+      final id = await hostHat();
+      final cap = await page('cap', id);
+      expect(cap.canReserve, isFalse);
+      await cap.reserveSpot.execute((
+        name: 'Reds',
+        divisionId: cap.divisions.single.id,
+      ));
+      expect(cap.reserveSpot.result, isA<Error<String>>());
+      cap.dispose();
+    });
+
+    test('a drafted team keeps registered teams in the seeds', () {
+      final d = TournamentDivision(
+        id: 'd',
+        division: Division.mixed,
+        level: CompetitionLevel.league,
+        settings: TournamentSettings(startsAt: DateTime(2027)),
+        seeds: const ['reg', 'team1'],
+        captains: const {
+          'reg': ['c'],
+          'team1': ['a'],
+        },
+        teams: const [TournamentTeam(id: 'team1', name: 'A', captainId: 'a')],
+      );
+      final next = d.withDrafted(const [
+        TournamentTeam(id: 'team1', name: 'A', captainId: 'x'),
+        TournamentTeam(id: 'team2', name: 'B', captainId: 'y'),
+      ]);
+      expect(next.seeds, ['reg', 'team1', 'team2']);
+      expect(next.captains, {
+        'reg': ['c'],
+        'team1': ['x'],
+        'team2': ['y'],
+      });
+      expect(next.registeredSeeds, ['reg']);
+    });
+  });
 }

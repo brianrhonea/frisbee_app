@@ -468,15 +468,15 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
     String tournamentId,
     TournamentDivision division,
     List<TournamentTeam> teams,
-  ) => guard(
-    () => _divisions(tournamentId).doc(division.id).update({
-      'teams': [for (final t in teams) t.toMap()],
-      'seeds': [for (final t in teams) t.id],
-      'captains': {
-        for (final t in teams) t.id: [?t.captainId],
-      },
-    }),
-  );
+  ) => guard(() {
+    // Registered teams keep their seeds; only the drafted ones change.
+    final d = division.withDrafted(teams);
+    return _divisions(tournamentId).doc(division.id).update({
+      'teams': [for (final t in d.teams) t.toMap()],
+      'seeds': d.seeds,
+      'captains': d.captains,
+    });
+  });
 
   @override
   Future<Result<void>> publishSchedule(

@@ -86,6 +86,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
       (s) => _repo.setStatus(tournamentId, s),
     );
     apply = Command1<void, EntryApplication>(_apply);
+    reserveSpot = Command1<String, ({String name, String divisionId})>(
+      _reserveSpot,
+    );
     invite = Command1<void, ({TeamListing team, String divisionId})>(_invite);
     decide = Command1<void, EntryDecision>(_decide);
     updateCaptains =
@@ -170,6 +173,10 @@ class HostedTournamentViewModel extends ChangeNotifier {
 
   late final Command1<void, HostedStatus> setStatus;
   late final Command1<void, EntryApplication> apply;
+
+  /// Starts a new team and reserves it a spot (events that take both
+  /// players and teams). Returns the new team's id, for inviting players.
+  late final Command1<String, ({String name, String divisionId})> reserveSpot;
   late final Command1<void, ({TeamListing team, String divisionId})> invite;
   late final Command1<void, EntryDecision> decide;
   late final Command1<void, ({TournamentEntry entry, List<String> captainIds})>
@@ -340,11 +347,45 @@ class HostedTournamentViewModel extends ChangeNotifier {
   bool get canApply {
     final t = _tournament;
     return t != null &&
-        !t.takesPlayers &&
+        t.takesTeams &&
         t.status.acceptsEntries &&
         t.visibility == TournamentVisibility.public &&
         teamsToEnter.isNotEmpty &&
         divisions.isNotEmpty;
+  }
+
+  /// Whether the user can start a team here and reserve it a spot: events
+  /// that take both players and teams, while registration is open.
+  bool get canReserve {
+    final t = _tournament;
+    return t != null &&
+        t.mixedEntry &&
+        t.status.acceptsEntries &&
+        t.visibility == TournamentVisibility.public &&
+        divisions.isNotEmpty;
+  }
+
+  /// The user's team that's entered here, if any: someone on a registered
+  /// team doesn't also sign up on their own (they'd end up on two teams).
+  TournamentEntry? get myActiveEntry => myEntries
+      .where(
+        (e) =>
+            e.status == EntryStatus.applied ||
+            e.status == EntryStatus.accepted ||
+            e.status == EntryStatus.waitlisted,
+      )
+      .firstOrNull;
+
+  /// How many players [teamId] still needs to reach its division's roster
+  /// minimum, or null if that isn't known (only its admins see it).
+  int? playersShort(String teamId) {
+    final e = entryOf(teamId);
+    final team = myTeam(teamId);
+    if (e == null || team == null) return null;
+    final min = _divisions[e.divisionId]?.effectiveMinRoster;
+    if (min == null) return null;
+    final short = min - team.members.length;
+    return short > 0 ? short : 0;
   }
 
   // ---- Divisions and entries ---------------------------------------------
@@ -504,7 +545,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
 
   /// Unpaid once the bid fee's due date has passed.
   bool isOverdue(String teamId) {
-    final due = _tournament?.bidFee?.dueAt;
+    final due = _tournament?.spotFee?.dueAt;
     return due != null && !isPaid(teamId) && _now().isAfter(due);
   }
 
@@ -554,7 +595,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
     if (t == null || team == null) {
       return Result.error(Exception('Pick one of your teams.'));
     }
-    if (t.takesPlayers) {
+    if (!t.takesTeams) {
       return Result.error(
         Exception(
           'Players sign up one by one here; teams are drawn from them.',
@@ -583,7 +624,8 @@ class HostedTournamentViewModel extends ChangeNotifier {
     final minimum =
         _divisions[a.divisionId]?.effectiveMinRoster ??
         TournamentDivision.defaultMinRoster;
-    if (players < minimum) {
+    // Where teams reserve spots they fill their roster afterwards.
+    if (players < minimum && !t.mixedEntry) {
       return Result.error(RosterTooSmallException(team.name, players, minimum));
     }
     return _repo.saveEntry(
@@ -595,6 +637,47 @@ class HostedTournamentViewModel extends ChangeNotifier {
         captainIds: a.captainIds,
       ),
     );
+  }
+
+  Future<Result<String>> _reserveSpot(
+    ({String name, String divisionId}) r,
+  ) async {
+    final t = _tournament;
+    final d = _divisions[r.divisionId];
+    final me = _auth.currentUser;
+    if (t == null || d == null || me == null) {
+      return Result.error(Exception('Pick a division.'));
+    }
+    if (!canReserve) {
+      return Result.error(Exception("Teams can't reserve spots here."));
+    }
+    final name = r.name.trim();
+    if (name.isEmpty) return Result.error(Exception('Name your team.'));
+    // A team of the division's kind, so it fits the league.
+    final made = await _teams.createTeam(
+      NewTeam(name: name, division: d.division, level: d.level),
+      me,
+    );
+    final String teamId;
+    switch (made) {
+      case Ok(:final value):
+        teamId = value;
+      case Error(:final error):
+        return Result.error(error);
+    }
+    final saved = await _repo.saveEntry(
+      tournamentId,
+      TournamentEntry(
+        teamId: teamId,
+        teamName: name,
+        divisionId: d.id,
+        captainIds: [me.uid],
+      ),
+    );
+    return switch (saved) {
+      Ok() => Result.ok(teamId),
+      Error(:final error) => Result.error(error),
+    };
   }
 
   Future<Result<void>> _invite(({TeamListing team, String divisionId}) i) {

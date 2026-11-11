@@ -29,6 +29,9 @@ enum GuideAction {
   publishSchedule,
   signUp,
   apply,
+
+  /// Start a team and reserve it a spot (events taking players and teams).
+  reserveTeam,
   acceptInvite,
 
   /// The captains' draft the user is in.
@@ -115,17 +118,18 @@ class EventGuide {
     final after = status.index >= HostedStatus.seeding.index;
     final noun = players ? 'players' : 'teams';
 
-    final pending = players
-        ? (signups?.signups ?? const <PlayerSignup>[])
-              .where((s) => s.status == SignupStatus.applied)
-              .length
-        : vm.entriesWith(EntryStatus.applied).length;
+    final all = signups?.signups ?? const <PlayerSignup>[];
+    final pendingPlayers = players
+        ? all.where((s) => s.status == SignupStatus.applied).length
+        : 0;
+    final pendingTeams = t.takesTeams
+        ? vm.entriesWith(EntryStatus.applied).length
+        : 0;
+    final pending = pendingPlayers + pendingTeams;
     final accepted = players
-        ? (signups?.signups ?? const <PlayerSignup>[])
-              .where((s) => s.status == SignupStatus.accepted)
-              .length
+        ? all.where((s) => s.status == SignupStatus.accepted).length
         : vm.entriesWith(EntryStatus.accepted).length;
-    final review = players
+    final review = players && (pendingPlayers > 0 || pendingTeams == 0)
         ? GuideAction.reviewPlayers
         : GuideAction.reviewTeams;
 
@@ -194,9 +198,18 @@ class EventGuide {
     // 3. Teams.
     final GuideStep teams;
     if (players) {
+      // Where teams also reserve spots, only divisions with players who
+      // signed up on their own need a draft.
       final undrafted = [
         for (final d in divisions)
-          if (d.teams.isEmpty) d,
+          if (d.teams.isEmpty &&
+              (!t.mixedEntry ||
+                  all.any(
+                    (s) =>
+                        s.divisionId == d.id &&
+                        s.status == SignupStatus.accepted,
+                  )))
+            d,
       ];
       final uncreated = t.isLeague
           ? [
@@ -394,7 +407,10 @@ class EventGuide {
       );
     }
 
-    if (t.takesPlayers && signups != null) {
+    // Someone on a registered team follows their team, not a signup.
+    if (t.takesPlayers &&
+        signups != null &&
+        !(t.mixedEntry && vm.myActiveEntry != null)) {
       final s = signups.mine;
       final open =
           t.status.acceptsEntries &&
@@ -420,6 +436,15 @@ class EventGuide {
               owes ? 'Sign up · ${fee.label}' : 'Sign up',
               GuideAction.signUp,
             ),
+            secondary: vm.canReserve
+                ? _button(
+                    t.spotFee == null
+                        ? 'Or reserve a spot for your team'
+                        : 'Or reserve a spot for your team · '
+                              '${t.spotFee!.label}',
+                    GuideAction.reserveTeam,
+                  )
+                : null,
             needsYou: true,
           );
         case SignupStatus.applied:
@@ -456,7 +481,7 @@ class EventGuide {
       }
     }
 
-    if (!t.takesPlayers) {
+    if (t.takesTeams) {
       final entries = vm.myEntries;
       final invite = entries
           .where((e) => e.status == EntryStatus.invited)
@@ -478,12 +503,18 @@ class EventGuide {
           )
           .firstOrNull;
       if (applied != null) {
+        final short = vm.playersShort(applied.teamId) ?? 0;
         return EventGuide(
           eyebrow: applied.teamName,
           title: applied.status == EntryStatus.waitlisted
               ? 'On the waitlist'
+              : t.mixedEntry
+              ? 'Spot reserved'
               : 'Applied',
-          body: 'The host reviews applications and accepts teams.',
+          body:
+              'The host reviews applications and accepts teams.'
+              '${short > 0 ? ' Invite $short more ${short == 1 ? 'player' : 'players'} to reach the roster minimum.' : ''}',
+          needsYou: short > 0,
         );
       }
       if (vm.canApply) {

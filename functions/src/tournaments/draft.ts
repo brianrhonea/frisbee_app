@@ -24,6 +24,7 @@ import {
   type PoolPlayer,
   startProblem,
   teamsFromDraft,
+  withDrafted,
 } from "./draft_model";
 import { canManageEvents, type Data, teamsCreated, draftTeams } from "./league";
 
@@ -291,11 +292,13 @@ export const finishDraft = onCall({ enforceAppCheck }, async (req) => {
       names: (l.draft.pool ?? {}) as Record<string, string>,
     });
     made = teams.length;
-    tx.update(db.doc(`tournaments/${c.tournamentId}/divisions/${c.divisionId}`), {
-      teams,
-      seeds: teams.map((t) => t.id),
-      captains: Object.fromEntries(teams.map((t) => [t.id, t.captainId ? [t.captainId] : []])),
-    });
+    const divisionRef = db.doc(`tournaments/${c.tournamentId}/divisions/${c.divisionId}`);
+    const division = (await tx.get(divisionRef)).data() ?? {};
+    const before = Array.isArray(division.teams)
+      ? (division.teams as { id?: unknown }[]).map((t) => String(t?.id ?? ""))
+      : [];
+    // Registered teams keep their seeds; only the drafted ones change.
+    tx.update(divisionRef, { teams, ...withDrafted(division, before, teams) });
     tx.update(draftRef(c), { status: "finished" });
   });
   logger.info("Draft finished", { tournamentId: c.tournamentId, divisionId: c.divisionId, teams: made });

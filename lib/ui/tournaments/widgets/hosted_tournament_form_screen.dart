@@ -32,6 +32,7 @@ class _HostedTournamentFormScreenState
   final _description = TextEditingController();
   final _fee = TextEditingController();
   final _instructions = TextEditingController();
+  final _teamFee = TextEditingController();
   bool _filled = false;
 
   @override
@@ -43,7 +44,14 @@ class _HostedTournamentFormScreenState
   @override
   void dispose() {
     vm.save.removeListener(_onSave);
-    for (final c in [_name, _location, _description, _fee, _instructions]) {
+    for (final c in [
+      _name,
+      _location,
+      _description,
+      _fee,
+      _instructions,
+      _teamFee,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -73,6 +81,7 @@ class _HostedTournamentFormScreenState
     _description.text = vm.description;
     _fee.text = vm.feeAmount;
     _instructions.text = vm.feeInstructions;
+    _teamFee.text = vm.teamFeeAmount;
   }
 
   /// New events pick a type once: a tournament or a league, and whether
@@ -136,6 +145,17 @@ class _HostedTournamentFormScreenState
           }, style: theme.textTheme.bodySmall),
         ),
         if (vm.entryType == TournamentEntryType.players) ...[
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Teams can also reserve a spot'),
+            subtitle: const Text(
+              'A captain pays the team fee, names their team and invites '
+              'their own players. Everyone else signs up on their own and '
+              'is drafted into the remaining spots.',
+            ),
+            value: vm.teamEntry,
+            onChanged: vm.setTeamEntry,
+          ),
           SegmentedButton<DraftMode>(
             segments: [
               for (final m in DraftMode.values)
@@ -447,7 +467,11 @@ class _HostedTournamentFormScreenState
                   contentPadding: EdgeInsets.zero,
                   title: Text(vm.feeName),
                   subtitle: Text(
-                    vm.takesPlayers
+                    vm.teamEntry
+                        ? 'What each player who signs up pays, and what a '
+                              'team pays to reserve a spot. They pay you '
+                              'directly; you mark them paid.'
+                        : vm.takesPlayers
                         ? 'What each player pays to sign up. Players pay '
                               'you directly; you mark them paid.'
                         : 'What each team pays to hold its spot. Teams pay '
@@ -467,7 +491,7 @@ class _HostedTournamentFormScreenState
                             decimal: true,
                           ),
                           decoration: InputDecoration(
-                            labelText: 'Amount',
+                            labelText: vm.teamEntry ? 'Per player' : 'Amount',
                             hintText: '250',
                             errorText:
                                 _fee.text.isNotEmpty && vm.feeCents == null
@@ -497,6 +521,25 @@ class _HostedTournamentFormScreenState
                       ),
                     ],
                   ),
+                  if (vm.teamEntry)
+                    TextField(
+                      controller: _teamFee,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Per team spot',
+                        hintText: '300',
+                        errorText:
+                            _teamFee.text.isNotEmpty && vm.teamFeeCents == null
+                            ? 'Enter an amount'
+                            : null,
+                      ),
+                      onChanged: (v) {
+                        vm.teamFeeAmount = v;
+                        setState(() {});
+                      },
+                    ),
                   TextField(
                     controller: _instructions,
                     maxLength: 500,
