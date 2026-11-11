@@ -2,6 +2,7 @@ import type { PublicPost } from "@stall10/shared";
 import Link from "next/link";
 import { Avatar } from "./Avatar";
 import { LocalTime } from "./LocalTime";
+import { MemberImage } from "./MemberImage";
 
 function workoutLine(w: NonNullable<PublicPost["workout"]>): string {
   const parts: string[] = [];
@@ -26,8 +27,11 @@ function linkLabel(url: string): string {
 /** Only web links become anchors (never javascript: or other schemes). */
 const isWebLink = (url: string) => /^https?:\/\//i.test(url);
 
-/** A player's post. `standalone` drops the link to itself. */
-export function PostCard({ post, standalone = false }: { post: PublicPost; standalone?: boolean }) {
+/**
+ * A player's post. `standalone` drops the link to itself; `member` is a
+ * signed-in view (photos through Storage, no sign-up prompt).
+ */
+export function PostCard({ post, standalone = false, member = false }: { post: PublicPost; standalone?: boolean; member?: boolean }) {
   const author = post.authorName || "A player";
   const links = (post.links ?? []).filter(isWebLink);
   const who = (
@@ -98,7 +102,7 @@ export function PostCard({ post, standalone = false }: { post: PublicPost; stand
         <div className={`post-images n${Math.min(post.images.length, 4)}`}>
           {post.images.slice(0, 4).map((img) => (
             <a key={img.path} href={img.url} target="_blank" rel="noopener">
-              <img src={img.url} alt={img.name ?? ""} loading="lazy" />
+              <MemberImage path={img.path} url={img.url} alt={img.name ?? ""} signedIn={member} />
             </a>
           ))}
         </div>
@@ -126,9 +130,15 @@ export function PostCard({ post, standalone = false }: { post: PublicPost; stand
             {post.commentCount} {post.commentCount === 1 ? "comment" : "comments"}
           </span>
         ) : null}
-        <Link className="post-join" href="/sign-up">
-          Sign up to like and reply
-        </Link>
+        {member ? (
+          <a className="post-join" href={`stall10://open/p/${encodeURIComponent(post.id)}`}>
+            Like and reply in the app
+          </a>
+        ) : (
+          <Link className="post-join" href="/sign-up">
+            Sign up to like and reply
+          </Link>
+        )}
       </footer>
     </article>
   );

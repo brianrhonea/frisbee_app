@@ -41,11 +41,10 @@ export function browseRoutes(app: FastifyInstance, browse: BrowseService, opts: 
   const send = (reply: FastifyReply, body: unknown) => reply.header("cache-control", cacheControl).send(body);
   const config = { public: true };
   type Q = { Querystring: Record<string, string | undefined>; Params: Record<string, string> };
-  const num = (v: string | undefined) => (v === undefined ? undefined : Number(v));
 
   app.get<Q>("/v1/public/feed", { config }, async (req, reply) => {
     await admit(req);
-    return send(reply, await browse.feed(num(req.query.before)));
+    return send(reply, await browse.feed());
   });
 
   app.get<Q>("/v1/public/posts/:id", { config }, async (req, reply) => {
@@ -55,7 +54,7 @@ export function browseRoutes(app: FastifyInstance, browse: BrowseService, opts: 
 
   app.get<Q>("/v1/public/players/:uid", { config }, async (req, reply) => {
     await admit(req);
-    return send(reply, await browse.profile(req.params.uid, num(req.query.before)));
+    return send(reply, await browse.profile(req.params.uid));
   });
 
   app.get<Q>("/v1/public/teams/:id", { config }, async (req, reply) => {

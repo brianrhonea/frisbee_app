@@ -4,7 +4,9 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="wrap">
-        <span>© {new Date().getFullYear()} Stall 10</span>
+        <span>
+          © {new Date().getFullYear()} Stall 10 <span className="version">· web v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+        </span>
         <nav aria-label="Footer">
           <Link href="/about">About</Link>
           <Link href="/help">Help</Link>

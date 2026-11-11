@@ -131,3 +131,96 @@
 }
 button.btn { cursor: pointer; font: inherit; }
 button.btn:disabled { opacity: 0.6; cursor: default; }
+
+/* Cards and the profile dashboard (components/ProfileDashboard.tsx) */
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: 18px;
+}
+.card-title { font-size: 1rem; margin: 0 0 12px; }
+.small { font-size: 0.88rem; }
+.pill {
+  display: inline-block; margin: 6px 0 0; padding: 2px 10px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--lime); font-size: 0.78rem; font-weight: 600;
+}
+.dash { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 24px; align-items: start; }
+.dash-side, .dash-main { display: grid; gap: 16px; min-width: 0; }
+.dash-main > .section-title { margin: 8px 0 -4px; }
+.dash-loading { color: var(--muted); }
+.profile-card { text-align: center; }
+.profile-card h1 { font-size: 1.5rem; margin: 12px 0 0; overflow-wrap: anywhere; }
+.profile-card .handle { margin: 2px 0 0; }
+.profile-card .bio { margin: 12px 0 0; text-align: left; }
+.profile-card .profile-facts { justify-content: center; margin-top: 10px; }
+.profile-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tile {
+  display: grid; place-items: center; padding: 10px 4px; border-radius: 12px;
+  background: var(--field); border: 1px solid var(--line);
+}
+.tile b { font-size: 1.35rem; color: var(--lime); line-height: 1.2; }
+.tile small { color: var(--muted); font-size: 0.75rem; }
+.team-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.team-list a {
+  display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 10px; text-decoration: none;
+}
+.team-list a:hover { background: var(--field); }
+.team-list span { display: grid; min-width: 0; }
+.team-list b, .team-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-list small { color: var(--muted); font-size: 0.8rem; }
+.game-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.game-list li { display: grid; }
+.game-list small { color: var(--muted); }
+.username-step { border-color: var(--lime); }
+.username-row { display: flex; align-items: center; gap: 8px; }
+.username-row > span { color: var(--muted); font-weight: 700; }
+.username-row input {
+  flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--field); color: var(--ink); font: inherit;
+}
+.username-row input:focus { outline: 2px solid var(--lime); outline-offset: 1px; }
+.username-step .form-error { margin-top: 8px; }
+.image-missing {
+  display: grid; place-items: center; min-height: 120px; color: var(--muted);
+  font-size: 0.85rem; background: var(--field);
+}
+
+/* Home for visitors (app/page.tsx) */
+.home-hero { max-width: 720px; padding: 24px 0 8px; }
+.home-hero h1 { font-size: clamp(2rem, 5vw, 3rem); line-height: 1.1; margin: 6px 0 12px; }
+.home-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 4px; }
+.home-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; margin-top: 16px; }
+.home-grid > aside { gap: 12px; }
+.home-grid > aside > .section-title { margin: 32px 0 0; }
+.locked { border-style: dashed; }
+.locked h3, .learn-card h3 { margin: 0 0 4px; font-size: 1rem; }
+.locked p, .learn-card p { margin: 0 0 6px; }
+.learn-card { background: var(--accent-soft); }
+
+/* Learn (app/learn/page.tsx) */
+.learn-toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 24px; }
+.learn-toc li { margin: 2px 0; }
+.learn-toc a, .learn-body a { color: var(--lime); }
+.learn-body section { margin-top: 32px; scroll-margin-top: 80px; }
+.learn-body h2 { font-size: 1.3rem; margin: 0 0 8px; }
+.learn-body p, .learn-body li { color: var(--ink-soft); }
+.learn-body ul { padding-left: 20px; }
+.glossary { display: grid; gap: 10px; margin: 0; }
+.glossary dt { font-weight: 700; }
+.glossary dd { margin: 0; color: var(--ink-soft); }
+
+@media (max-width: 860px) {
+  .dash, .home-grid { grid-template-columns: 1fr; }
+  .learn-toc ol { columns: 1; }
+}
+.version { opacity: 0.7; font-size: 0.85em; }
+
+/* Phones: the site links wrap onto a scrollable second row. */
+@media (max-width: 900px) {
+  .site-header .wrap { flex-wrap: wrap; height: auto; padding-top: 12px; row-gap: 6px; }
+  .site-header nav {
+    display: flex; order: 3; width: 100%; overflow-x: auto; gap: 20px;
+    padding-bottom: 10px; scrollbar-width: none;
+  }
+  .site-header nav a { white-space: nowrap; }
+}

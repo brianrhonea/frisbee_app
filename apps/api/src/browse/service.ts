@@ -18,8 +18,6 @@ import {
   isPrivateProfile,
   isPublicTeamPost,
   listingView,
-  pageSize,
-  parseBefore,
   postAuthors,
   postView,
   profileView,
@@ -63,15 +61,16 @@ export class BrowseService {
       .map((d) => this.post(d));
   }
 
-  private nextCursor(docs: Doc[]): number | null {
-    const last = docs.at(-1)?.data.createdAt;
-    return docs.length === pageSize && typeof last === "string" ? Date.parse(last) : null;
-  }
 
-  /** The community feed: the newest posts from public profiles. */
-  async feed(before: unknown): Promise<PostPage> {
-    const docs = await this.repo.posts(parseBefore(before));
-    return { posts: await this.publicPosts(docs), next: this.nextCursor(docs) };
+
+  /**
+   * The community feed: the newest page of posts from public profiles.
+   * Visitors get one page; members read further in their own feed
+   * (`/v1/me/home`), so there's no cursor here.
+   */
+  async feed(): Promise<PostPage> {
+    const docs = await this.repo.posts(null);
+    return { posts: await this.publicPosts(docs), next: null };
   }
 
   /** One post, unless its author is private. */
@@ -84,14 +83,15 @@ export class BrowseService {
   }
 
   /** A player's profile and, unless it's private, their newest posts. */
-  async profile(uid: unknown, before: unknown): Promise<ProfilePage> {
+  /** A player's profile and, unless it's private, their newest page of posts (one page, as the feed). */
+  async profile(uid: unknown): Promise<ProfilePage> {
     if (!validId(uid)) throw new ApiError("not_found", "No such player.");
     const data = (await this.repo.profiles([uid])).get(uid);
     if (!data) throw new ApiError("not_found", "No such player.");
     const profile = { ...profileView(data), id: uid } as PublicProfile;
     if (data.private === true) return { profile, posts: [], next: null };
-    const docs = await this.repo.posts(parseBefore(before), uid);
-    return { profile, posts: await this.publicPosts(docs), next: this.nextCursor(docs) };
+    const docs = await this.repo.posts(null, uid);
+    return { profile, posts: await this.publicPosts(docs), next: null };
   }
 
   /** A team or group's page: its listing and, unless it's a private group, public posts and upcoming events. */

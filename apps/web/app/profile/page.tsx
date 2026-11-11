@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { MembersOnly } from "@/components/MembersOnly";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Your profile", robots: { index: false } };
-
+// A member's own profile dashboard is their home page.
 export default function Profile() {
-  return <MembersOnly what="Editing your profile" />;
+  redirect("/");
 }

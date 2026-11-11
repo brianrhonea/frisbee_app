@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { compressImage, UnreadableImage } from "../src/media/image.js";
+import { mediaFolder } from "../src/media/service.js";
 import { sniffMediaType } from "../src/media/sniff.js";
 import { nextStatus, posterArgs, runTranscodeJob, transcodeArgs } from "../src/media/transcode.js";
 import { FakeMediaStorage, FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
@@ -253,23 +254,23 @@ describe("uploads API", () => {
   it("checks size limits and types up front", async () => {
     expect((await call("/v1/uploads", { purpose: "avatar", contentType: "image/jpeg", size: 11 * 1024 * 1024 })).statusCode).toBe(400);
     expect((await call("/v1/uploads", { purpose: "avatar", contentType: "video/mp4", size: 1000 })).statusCode).toBe(400);
-    expect((await call("/v1/uploads", { purpose: "post", contentType: "application/pdf", size: 1000 })).statusCode).toBe(400);
+    expect((await call("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "application/pdf", size: 1000 })).statusCode).toBe(400);
   });
 
   it("team photos and film need manageTeam (storage.rules)", async () => {
-    const body = { purpose: "teamVideo", contentType: "video/quicktime", size: 1000, targetId: "t1" };
+    const body = { purpose: "teamVideo", itemId: "i1", contentType: "video/quicktime", size: 1000, targetId: "t1" };
     expect((await call("/v1/uploads", body, "p1")).statusCode).toBe(403);
     expect((await call("/v1/uploads", body, "mgr")).statusCode).toBe(201);
     expect((await call("/v1/uploads", { ...body, targetId: "nope" }, "owner")).statusCode).toBe(404);
   });
 
   it("chat files need write access to the room, or a place in the conversation", async () => {
-    const room = { purpose: "chat", contentType: "image/jpeg", size: 1000, targetId: "teams/t1/chats/c1" };
+    const room = { purpose: "chat", itemId: "i1", contentType: "image/jpeg", size: 1000, targetId: "teams/t1/chats/c1" };
     expect((await call("/v1/uploads", room, "p1")).statusCode).toBe(201);
     expect((await call("/v1/uploads", room, "mgr")).statusCode).toBe(403);
     expect((await call("/v1/uploads", room, "owner")).statusCode).toBe(201);
     expect((await call("/v1/uploads", room, "stranger")).statusCode).toBe(403);
-    const dm = { purpose: "chat", contentType: "image/jpeg", size: 1000, targetId: "conversations/u1_u2" };
+    const dm = { purpose: "chat", itemId: "i1", contentType: "image/jpeg", size: 1000, targetId: "conversations/u1_u2" };
     expect((await call("/v1/uploads", dm, "u1")).statusCode).toBe(201);
     expect((await call("/v1/uploads", dm, "u3")).statusCode).toBe(403);
     store.put("conversations/g-abc", { participants: ["u1", "u5"] });
@@ -277,23 +278,28 @@ describe("uploads API", () => {
     expect((await call("/v1/uploads", group, "u5")).statusCode).toBe(201);
     expect((await call("/v1/uploads", group, "u3")).statusCode).toBe(403);
     expect((await call("/v1/uploads", { ...dm, targetId: undefined }, "u1")).statusCode).toBe(400);
+    // Every purpose but avatar names the post, video or message.
+    const noItem = await call("/v1/uploads", { purpose: "post", contentType: "image/jpeg", size: 1000 }, "u1");
+    expect(noItem.statusCode).toBe(400);
+    expect(noItem.json().error.fields).toHaveProperty("itemId");
+    expect((await call("/v1/uploads", { purpose: "post", itemId: "a/b", contentType: "image/jpeg", size: 1000 }, "u1")).statusCode).toBe(400);
   });
 
   it("compresses a photo on complete and deletes the raw file", async () => {
     const data = await jpeg();
-    const { id, done } = await upload({ purpose: "post", contentType: "image/jpeg", size: data.length }, data);
+    const { id, done } = await upload({ purpose: "post", itemId: "i1", contentType: "image/jpeg", size: data.length }, data);
     expect(done!.statusCode).toBe(200);
     expect(done!.json()).toEqual({
       id,
       status: "ready",
-      path: `media/u1/${id}.jpg`,
-      thumbPath: `media/u1/${id}_thumb.jpg`,
+      path: `users/u1/posts/i1/${id}/${id}.jpg`,
+      thumbPath: `users/u1/posts/i1/${id}/${id}_thumb.jpg`,
       contentType: "image/jpeg",
       width: 1920,
       height: 960,
     });
     expect(storage.files.has(`uploads/raw/u1/${id}`)).toBe(false);
-    expect(storage.files.get(`media/u1/${id}.jpg`)?.contentType).toBe("image/jpeg");
+    expect(storage.files.get(`users/u1/posts/i1/${id}/${id}.jpg`)?.contentType).toBe("image/jpeg");
     expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "ready", sniffedType: "image/jpeg" });
     // Completing again just answers.
     expect((await call(`/v1/uploads/${id}/complete`)).json().status).toBe("ready");
@@ -309,35 +315,54 @@ describe("uploads API", () => {
   });
 
   it("refuses files that aren't media, and checks the real size", async () => {
-    const junk = await upload({ purpose: "post", contentType: "image/png", size: 10 }, Buffer.from("MZ executable"));
+    const junk = await upload({ purpose: "post", itemId: "i1", contentType: "image/png", size: 10 }, Buffer.from("MZ executable"));
     expect(junk.done!.json().error.message).toBe("That file isn't a photo or video we can use.");
     const big = Buffer.concat([await jpeg(), Buffer.alloc(10 * 1024 * 1024)]);
-    const tooBig = await upload({ purpose: "post", contentType: "image/jpeg", size: 1000 }, big);
+    const tooBig = await upload({ purpose: "post", itemId: "i1", contentType: "image/jpeg", size: 1000 }, big);
     expect(tooBig.done!.json().error.message).toBe("That file is too big. The most is 10 MB.");
   });
 
   it("queues a video for transcoding", async () => {
-    const { id, done } = await upload({ purpose: "post", contentType: "video/quicktime", size: 1000 }, samples["video/quicktime"]);
+    const { id, done } = await upload({ purpose: "post", itemId: "i1", contentType: "video/quicktime", size: 1000 }, samples["video/quicktime"]);
     expect(done!.json()).toEqual({ id, status: "processing" });
     expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "processing", sniffedType: "video/quicktime" });
     expect(store.doc(`transcodeJobs/${id}`)).toMatchObject({
       input: `uploads/raw/u1/${id}`,
-      output: `media/u1/${id}.mp4`,
-      poster: `media/u1/${id}_poster.jpg`,
+      output: `users/u1/posts/i1/${id}/${id}.mp4`,
+      poster: `users/u1/posts/i1/${id}/${id}_poster.jpg`,
       status: "queued",
     });
     expect(queued).toEqual([id]);
   });
 
   it("refuses ids that aren't one document id", async () => {
-    const body = { purpose: "teamImage", contentType: "image/jpeg", size: 10, targetId: "t1/chats/c1" };
+    const body = { purpose: "teamImage", itemId: "i1", contentType: "image/jpeg", size: 10, targetId: "t1/chats/c1" };
     expect((await call("/v1/uploads", body, "owner")).statusCode).toBe(400);
   });
 
   it("only the uploader completes it, and only once it's there", async () => {
-    const res = await call("/v1/uploads", { purpose: "post", contentType: "image/jpeg", size: 10 });
+    const res = await call("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "image/jpeg", size: 10 });
     const { id } = res.json();
     expect((await call(`/v1/uploads/${id}/complete`, {}, "u2")).statusCode).toBe(404);
     expect((await call(`/v1/uploads/${id}/complete`)).statusCode).toBe(412);
+  });
+});
+
+describe("mediaFolder: the app's Storage layout, so storage.rules apply", () => {
+  it("puts each purpose's files where the app does", () => {
+    expect(mediaFolder("u1", "avatar", undefined, undefined, "up")).toBe("users/u1/profile");
+    expect(mediaFolder("u1", "post", undefined, "p1", "up")).toBe("users/u1/posts/p1/up");
+    expect(mediaFolder("u1", "teamImage", "t1", "tp1", "up")).toBe("teams/t1/posts/tp1/up");
+    expect(mediaFolder("u1", "teamVideo", "t1", "v1", "up")).toBe("teams/t1/videos/v1");
+    expect(mediaFolder("u1", "chat", "teams/t1/chats/r1", "m1", "up")).toBe("teams/t1/chats/r1/u1/m1");
+    expect(mediaFolder("u1", "chat", "conversations/u1_u2", "m1", "up")).toBe("conversations/u1_u2/u1/m1");
+  });
+
+  it("never lets an id reach another folder", () => {
+    expect(() => mediaFolder("u1", "post", undefined, "..", "up")).toThrow("Invalid id.");
+    expect(() => mediaFolder("u1", "post", undefined, undefined, "up")).toThrow("Invalid id.");
+    expect(() => mediaFolder("u1", "teamVideo", "t1/x", "v1", "up")).toThrow("Invalid id.");
+    expect(() => mediaFolder("u1", "chat", "teams/../chats/r1", "m1", "up")).toThrow("Invalid id.");
+    expect(() => mediaFolder("u1", "chat", "users/u2", "m1", "up")).toThrow("Say which chat this is for.");
   });
 });

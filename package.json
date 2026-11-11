@@ -8,7 +8,8 @@
   },
   "scripts": {
     "build": "pnpm -r --filter=!@stall10/web build",
-    "test": "pnpm -r --filter=!@stall10/web test",
+    "test": "pnpm -r --filter=!@stall10/web test && node scripts/check-versions.mjs",
+    "check:versions": "node scripts/check-versions.mjs",
     "typecheck": "pnpm -r typecheck",
     "dev:api": "pnpm --filter @stall10/shared build && pnpm --filter @stall10/api dev",
     "test:api:emulator": "pnpm --filter @stall10/api test:emulator"

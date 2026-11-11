@@ -2,19 +2,14 @@ import type { ProfilePage, StatTotals } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cache } from "react";
-import { Avatar } from "@/components/Avatar";
 import { LocalTime } from "@/components/LocalTime";
 import { PostCard } from "@/components/PostCard";
+import { DashboardLayout, ProfileCard, StatTiles, TeamList } from "@/components/ProfileDashboard";
 import { getPublic } from "@/lib/api";
 
-type Props = {
-  params: Promise<{ uid: string }>;
-  searchParams: Promise<{ before?: string }>;
-};
+type Props = { params: Promise<{ uid: string }> };
 
-const load = cache((uid: string, before?: number) =>
-  getPublic<ProfilePage>(`/v1/public/players/${encodeURIComponent(uid)}`, { before }),
-);
+const load = cache((uid: string) => getPublic<ProfilePage>(`/v1/public/players/${encodeURIComponent(uid)}`));
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { profile } = await load((await params).uid);
@@ -36,141 +31,111 @@ const statColumns: Array<[keyof StatTotals, string]> = [
   ["throwaways", "Turns"],
 ];
 
-export default async function Player({ params, searchParams }: Props) {
+/** Anyone's profile as a dashboard: who they are on the left, what they've done on the right. */
+export default async function Player({ params }: Props) {
   const { uid } = await params;
-  const before = Number((await searchParams).before) || undefined;
-  const { profile, posts, next } = await load(uid, before);
+  const { profile, posts } = await load(uid);
   const name = profile.name || "Player";
+  const first = name.split(" ")[0];
   const seasons = Object.entries(profile.stats ?? {}).sort(([a], [b]) => b.localeCompare(a));
-  const facts = [
-    profile.pronouns,
-    profile.hometown,
-    profile.school,
-    profile.throwingHand && `Throws ${profile.throwingHand}`,
-    profile.playingSince && `Playing since ${profile.playingSince}`,
-  ].filter(Boolean);
+  const follow = (
+    <Link className="btn btn-primary btn-small" href={`/sign-up?next=${encodeURIComponent(`/players/${uid}`)}`}>
+      Sign up to follow
+    </Link>
+  );
+
+  if (profile.private) {
+    return (
+      <div className="page page-wide">
+        <DashboardLayout side={<ProfileCard profile={profile} actions={follow} />}>
+          <div className="card">
+            <h2 className="card-title">This profile is private</h2>
+            <p className="muted small">
+              {first} shares their stats, teams and posts with the people they approve. Ask to follow in the Stall 10
+              app.
+            </p>
+          </div>
+        </DashboardLayout>
+      </div>
+    );
+  }
+
+  const side = (
+    <>
+      <ProfileCard profile={profile} actions={follow} />
+      {profile.visibility?.stats !== false && <StatTiles stats={profile.stats} />}
+      {profile.visibility?.teams !== false && (
+        <TeamList teams={(profile.teams ?? []).map((t) => ({ id: t.id, name: t.name, subtitle: t.subtitle }))} />
+      )}
+    </>
+  );
 
   return (
-    <div className="page">
-      <header className="profile-head">
-        <Avatar name={name} url={profile.photoUrl} size={84} />
-        <div>
-          <h1>{name}</h1>
-          {profile.username && <p className="muted" style={{ margin: 0 }}>@{profile.username}</p>}
-          {facts.length > 0 && (
-            <ul className="profile-facts">
-              {facts.map((f) => (
-                <li key={String(f)}>{f}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </header>
-
-      {profile.private ? (
-        <p className="empty">This profile is private.</p>
-      ) : (
-        <>
-          {profile.bio && <p className="bio">{profile.bio}</p>}
-          <div className="cta-card">
-            <p>Follow {name.split(" ")[0]} on Stall 10.</p>
-            <Link className="btn btn-primary btn-small" href={`/sign-up?next=${encodeURIComponent(`/players/${uid}`)}`}>
-              Sign up to follow
-            </Link>
-          </div>
-
-          {profile.teams && profile.teams.length > 0 && (
-            <>
-              <h2 className="section-title">Teams</h2>
-              <div className="stack">
-                {profile.teams.map((t) => (
-                  <Link key={t.id} className="row-card" href={`/teams/${encodeURIComponent(t.id)}`}>
-                    <Avatar name={t.name} />
-                    <span>
-                      <b>{t.name}</b>
-                      <small>
-                        {[t.subtitle, t.number !== undefined ? `#${t.number}` : null, t.position]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </small>
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </>
-          )}
-
-          {seasons.length > 0 && (
-            <>
-              <h2 className="section-title">Stats</h2>
-              <div className="table-scroll">
-                <table className="stats-table">
-                  <thead>
-                    <tr>
-                      <th>Season</th>
-                      {statColumns.map(([, label]) => (
-                        <th key={label}>{label}</th>
+    <div className="page page-wide">
+      <DashboardLayout side={side}>
+        {seasons.length > 0 && (
+          <div className="card">
+            <h2 className="card-title">Career</h2>
+            <div className="table-scroll">
+              <table className="stats-table">
+                <thead>
+                  <tr>
+                    <th>Season</th>
+                    {statColumns.map(([, label]) => (
+                      <th key={label}>{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {seasons.map(([season, s]) => (
+                    <tr key={season}>
+                      <td>{season}</td>
+                      {statColumns.map(([k]) => (
+                        <td key={k}>{s[k] ?? 0}</td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {seasons.map(([season, s]) => (
-                      <tr key={season}>
-                        <td>{season}</td>
-                        {statColumns.map(([k]) => (
-                          <td key={k}>{s[k] ?? 0}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
-          {profile.games && profile.games.length > 0 && (
-            <>
-              <h2 className="section-title">Recent games</h2>
-              <div className="stack">
-                {profile.games.map((g, i) => (
-                  <div key={i} className="row-card">
-                    <span>
-                      <b>
-                        {g.teamName ?? "Team"} vs {g.opponent ?? "opponent"}
-                        {g.ourScore !== undefined && g.theirScore !== undefined
-                          ? ` · ${g.ourScore}–${g.theirScore}`
-                          : ""}
-                      </b>
-                      <small>
-                        <LocalTime iso={g.date} />
-                        {g.line ? ` · ${g.line}` : ""}
-                      </small>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          <h2 className="section-title">Posts</h2>
-          {posts.length === 0 ? (
-            <p className="empty">No posts yet.</p>
-          ) : (
-            <div className="stack">
-              {posts.map((p) => (
-                <PostCard key={p.id} post={p} />
-              ))}
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-          {next !== null && (
-            <nav className="pager">
-              <Link className="btn" href={`/players/${encodeURIComponent(uid)}?before=${next}`}>
-                Older posts
-              </Link>
-            </nav>
-          )}
-        </>
-      )}
+          </div>
+        )}
+
+        {profile.games && profile.games.length > 0 && (
+          <div className="card">
+            <h2 className="card-title">Recent games</h2>
+            <ul className="game-list">
+              {profile.games.map((g, i) => (
+                <li key={i}>
+                  <b>
+                    {g.teamName ?? "Team"} vs {g.opponent ?? "opponent"}
+                    {g.ourScore !== undefined && g.theirScore !== undefined ? ` · ${g.ourScore}–${g.theirScore}` : ""}
+                  </b>
+                  <small>
+                    <LocalTime iso={g.date} />
+                    {g.line ? ` · ${g.line}` : ""}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <h2 className="section-title">Posts</h2>
+        {posts.length === 0 ? (
+          <p className="empty">No posts yet.</p>
+        ) : (
+          <div className="stack">
+            {posts.map((p) => (
+              <PostCard key={p.id} post={p} />
+            ))}
+          </div>
+        )}
+        <div className="cta-card">
+          <p>Sign up to see more from {first} and follow along.</p>
+          {follow}
+        </div>
+      </DashboardLayout>
     </div>
   );
 }

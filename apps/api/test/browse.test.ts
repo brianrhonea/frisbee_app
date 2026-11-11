@@ -129,14 +129,13 @@ describe("public reads", () => {
     expect(p.workout).toEqual({ activity: "run" });
   });
 
-  it("pages with a cursor when a page is full", async () => {
+  it("gives visitors one page: no cursor, and a cursor is ignored", async () => {
     t.repo.postsList = Array.from({ length: 25 }, (_, i) => post(`p${i + 1}`, "pub"));
     const first = (await t.get("/v1/public/feed")).json();
     expect(first.posts).toHaveLength(20);
-    expect(first.next).toBe(now - 20_000);
-    const second = (await t.get(`/v1/public/feed?before=${first.next}`)).json();
-    expect(second.posts.map((p: { id: string }) => p.id)).toEqual(["p21", "p22", "p23", "p24", "p25"]);
-    expect(second.next).toBeNull();
+    expect(first.next).toBeNull();
+    const asked = (await t.get(`/v1/public/feed?before=${now - 20_000}`)).json();
+    expect(asked.posts.map((p: { id: string }) => p.id)).toEqual(first.posts.map((p: { id: string }) => p.id));
   });
 
   it("refuses a private author's post", async () => {

@@ -146,7 +146,7 @@ describe("App Check", () => {
 describe("misc", () => {
   it("answers /health without auth", async () => {
     const { app } = setup({ enforceAppCheck: true });
-    expect((await app.inject({ url: "/health" })).json()).toEqual({ ok: true });
+    expect((await app.inject({ url: "/health" })).json()).toMatchObject({ ok: true });
   });
 
   it("404s unknown routes in the error shape", async () => {

@@ -44,7 +44,7 @@ function message(e: unknown): string {
 function safeNext(next: string | null): string {
   // Not "//host" or "/\host" (browsers treat both as another site), and
   // no backslashes anywhere.
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/home";
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/";
 }
 
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {

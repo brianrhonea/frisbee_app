@@ -225,9 +225,30 @@ sequenceDiagram
   match today's `storage.rules`: 10 MB images, 100 MB post/chat video,
   500 MB team film.
 
-  Flow (to build):
+  **Where files live** (decided 2026-11-11): the project's Firebase
+  Storage bucket, in the folders the app already uses. Documents keep
+  referencing a file by its `path` (e.g. a post's `images[].path`), and
+  `storage.rules` decides who may read it, so the API, the app and the
+  website all reach the same files:
+
+  | Purpose | Folder | Who reads (storage.rules) |
+  |---|---|---|
+  | `avatar` | `users/{uid}/profile/` | anyone signed in |
+  | `post` | `users/{uid}/posts/{postId}/{uploadId}/` | anyone signed in; visitors if the author is public |
+  | `teamImage` | `teams/{teamId}/posts/{postId}/{uploadId}/` | members; visitors for public posts of non-private teams |
+  | `teamVideo` | `teams/{teamId}/videos/{videoId}/` | members |
+  | `chat` | `teams/{t}/chats/{room}/{uid}/{messageId}/`, `conversations/{c}/{uid}/{messageId}/` | the room's readers; the conversation |
+
+  Processed files are named after the upload id: `{id}.jpg` (or `.png`),
+  `{id}_thumb.jpg`, `{id}.mp4`, `{id}_poster.jpg` (`mediaFolder` in
+  `apps/api/src/media/service.ts`, `mediaFolders` in shared). Visitors'
+  pages get Storage REST URLs, which apply the rules; members' pages ask
+  Storage for a link when a file isn't public.
+
+  Flow (API built; no client calls it yet):
   1. Client asks the API for an upload (`POST /v1/uploads`: purpose, type,
-     size, target; `createUploadRequestSchema`). The API checks permission
+     size, target, and `itemId`, the post, video or message it belongs to;
+     `createUploadRequestSchema`). The API checks permission
      and limits, records `uploads/{id}` (status `pending`), and returns a
      short-lived signed URL to `uploads/raw/{uid}/{id}`.
   2. Client uploads straight to Storage; media never passes through the

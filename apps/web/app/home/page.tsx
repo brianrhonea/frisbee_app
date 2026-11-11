@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { MembersOnly } from "@/components/MembersOnly";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Home", robots: { index: false } };
-
+// The member's home is the dashboard at /.
 export default function Home() {
-  return <MembersOnly what="Your home feed" />;
+  redirect("/");
 }

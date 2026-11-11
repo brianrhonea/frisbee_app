@@ -5,6 +5,9 @@ import { errorHandler } from "./errors.js";
 import type { BrowseRepository } from "./browse/repository.js";
 import { browseRoutes } from "./browse/routes.js";
 import { BrowseService } from "./browse/service.js";
+import type { MeRepository } from "./me/repository.js";
+import { meRoutes } from "./me/routes.js";
+import { MeService } from "./me/service.js";
 import type { RateLimiter } from "./limits/limiter.js";
 import { type LoggerOptions, traceLoggerFactory } from "./logging.js";
 import type { HeicDecoder } from "./media/image.js";
@@ -19,12 +22,15 @@ import { membershipRoutes } from "./teams/membership_routes.js";
 import type { TeamRepository } from "./teams/repository.js";
 import { teamRoutes } from "./teams/routes.js";
 import { TeamService } from "./teams/service.js";
+import { apiVersion, versionHeader } from "./version.js";
 
 export interface AppDeps {
   verifier: TokenVerifier;
   users: UserLookup;
   teams: TeamRepository;
   /** The website's public reads (`/v1/public/*`); off when not given. */
+  /** The signed-in member's dashboard (`/v1/me/home`); off when not given. */
+  me?: { repo: MeRepository; imageUrl: (path: string) => string };
   browse?: {
     repo: BrowseRepository;
     limiter: RateLimiter;
@@ -90,8 +96,13 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerCors(app, deps.corsOrigins ?? []);
   registerAuth(app, deps.verifier, deps.enforceAppCheck ?? false);
 
-  app.get("/health", async () => ({ ok: true }));
+  // Every answer says which API version gave it, for tracking changes.
+  app.addHook("onSend", async (_req, reply) => {
+    reply.header(versionHeader, apiVersion);
+  });
+  app.get("/health", async () => ({ ok: true, version: apiVersion }));
   teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now));
+  if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now));
   if (deps.browse) browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now), deps.browse);
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));

@@ -6,3 +6,4 @@ export * from "./team_name.js";
 export * from "./media.js";
 export * from "./membership.js";
 export * from "./profile.js";
+export * from "./me.js";

@@ -10,7 +10,7 @@ export function HeaderAuth() {
   if (user) {
     return (
       <>
-        <Link className="link" href="/home">{user.displayName || "Home"}</Link>
+        <Link className="link" href="/">{user.displayName || "Home"}</Link>
         <button className="btn btn-small" type="button" onClick={() => signOut(firebaseAuth()!)}>
           Log out
         </button>

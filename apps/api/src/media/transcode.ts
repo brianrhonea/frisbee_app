@@ -91,10 +91,10 @@ export interface TranscodeJob {
   poster: string;
 }
 
-/** Where a job's outputs go, for an upload by [uid]. */
-export const videoOutputs = (uid: string, id: string) => ({
-  output: `media/${uid}/${id}.mp4`,
-  poster: `media/${uid}/${id}_poster.jpg`,
+/** Where a job's outputs go: upload [id]'s folder (mediaFolder). */
+export const videoOutputs = (folder: string, id: string) => ({
+  output: `${folder}/${id}.mp4`,
+  poster: `${folder}/${id}_poster.jpg`,
 });
 
 export interface TranscodeDeps {

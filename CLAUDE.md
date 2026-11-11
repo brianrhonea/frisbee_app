@@ -166,6 +166,15 @@ data back without the user confirming they have permission. The old code is
 in git history. play.usaultimate.org's robots.txt also disallows
 Claude/Anthropic agents, so never fetch it.
 
+## Versions
+
+Every app/API change bumps its version and adds a changelog entry:
+`apps/api/package.json` + `apps/api/CHANGELOG.md`, `apps/web/package.json`
++ `apps/web/CHANGELOG.md`, `apps/mobile/pubspec.yaml` + `docs/CHANGELOG.md`.
+`pnpm test` (`pnpm check:versions`) fails when the current version has no
+entry. The API reports its version in `GET /health` and the
+`x-stall10-api-version` header; the website shows its version in the footer.
+
 ## Checks
 
 ```

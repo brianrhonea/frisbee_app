@@ -8,6 +8,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { FirestoreBrowseRepository } from "./browse/repository.js";
 import { FirestoreRateLimiter } from "./limits/limiter.js";
+import { FirestoreMeRepository } from "./me/repository.js";
 import { buildApp, trustHops } from "./app.js";
 import { parseCorsOrigins } from "./cors.js";
 import { cloudLoggingOptions } from "./logging.js";
@@ -30,6 +31,8 @@ const emulated = Boolean(process.env.FIRESTORE_EMULATOR_HOST || process.env.FIRE
 const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 1);
 
 let credentialChecked = false;
+
+const imageUrl = storageUrl(process.env.STORAGE_BUCKET || `${projectId}.firebasestorage.app`);
 
 const app = buildApp({
   logger: cloudLoggingOptions(),
@@ -64,10 +67,11 @@ const app = buildApp({
     },
   },
   teams: new FirestoreTeamRepository(db),
+  me: { repo: new FirestoreMeRepository(db), imageUrl },
   browse: {
     repo: new FirestoreBrowseRepository(db),
     limiter: new FirestoreRateLimiter(db),
-    imageUrl: storageUrl(process.env.STORAGE_BUCKET || `${projectId}.firebasestorage.app`),
+    imageUrl,
     webServerKey: process.env.WEB_SERVER_KEY || undefined,
   },
   store: new FirestoreDocStore(db),

@@ -114,16 +114,42 @@ export const uploadLimits: Record<UploadPurpose, { image: number; video: number 
   teamVideo: { image: 10 * MB, video: 500 * MB },
 };
 
+/**
+ * Where each purpose's files live in Cloud Storage: the app's layout, which
+ * storage.rules guards for reads and documents store as `path`. Processed
+ * files are named after the upload id ({id}.jpg, {id}_thumb.jpg, {id}.mp4,
+ * {id}_poster.jpg) in the purpose's folder.
+ */
+export const mediaFolders: Record<UploadPurpose, string> = {
+  avatar: "users/{uid}/profile",
+  post: "users/{uid}/posts/{itemId}/{uploadId}",
+  teamImage: "teams/{teamId}/posts/{itemId}/{uploadId}",
+  teamVideo: "teams/{teamId}/videos/{itemId}",
+  chat: "teams/{teamId}/chats/{roomId}/{uid}/{itemId} or conversations/{convId}/{uid}/{itemId}",
+};
+
 /** Body of `POST /v1/uploads`: asks for a signed URL to upload one file. */
 export const createUploadRequestSchema = z
   .strictObject({
     purpose: z.enum(uploadPurposes),
     contentType: z.enum([...acceptedImageTypes, ...acceptedVideoTypes]),
     size: z.number().int().positive(),
-    /** The team, post or conversation it's for, when the purpose has one. */
+    /** The team (teamImage, teamVideo) or chat (chat: `teams/{t}/chats/{r}` or `conversations/{c}`) it's for. */
     targetId: z.string().min(1).max(128).optional(),
+    /**
+     * The post, team post, video or message the file belongs to (every
+     * purpose but avatar). With [targetId] it picks the file's folder, the
+     * same layout the app uses (mediaFolders), so Storage's read rules apply.
+     */
+    itemId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,128}$/)
+      .optional(),
   })
   .superRefine((u, ctx) => {
+    if (u.purpose !== "avatar" && !u.itemId) {
+      ctx.addIssue({ code: "custom", path: ["itemId"], message: "Say which post, video or message this is for." });
+    }
     const limits = uploadLimits[u.purpose];
     const max = isImageType(u.contentType) ? limits.image : limits.video;
     if (max == null) {

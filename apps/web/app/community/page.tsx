@@ -1,6 +1,7 @@
 import type { PostPage } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 import { PostCard } from "@/components/PostCard";
 import { getPublic } from "@/lib/api";
 
@@ -9,11 +10,10 @@ export const metadata: Metadata = {
   description: "What ultimate players are posting on Stall 10.",
 };
 
-type Props = { searchParams: Promise<{ before?: string }> };
-
-export default async function Community({ searchParams }: Props) {
-  const before = Number((await searchParams).before) || undefined;
-  const page = await getPublic<PostPage>("/v1/public/feed", { before });
+export default async function Community() {
+  // Per request, not at build (no API then); the read stays cached 60s.
+  await connection();
+  const page = await getPublic<PostPage>("/v1/public/feed");
   return (
     <div className="page">
       <div className="page-head">
@@ -21,7 +21,7 @@ export default async function Community({ searchParams }: Props) {
         <p>What players are posting on Stall 10.</p>
       </div>
       {page.posts.length === 0 ? (
-        <p className="empty">{before ? "That's everything." : "No posts yet."}</p>
+        <p className="empty">No posts yet.</p>
       ) : (
         <div className="stack">
           {page.posts.map((p) => (
@@ -29,13 +29,12 @@ export default async function Community({ searchParams }: Props) {
           ))}
         </div>
       )}
-      {page.next !== null && (
-        <nav className="pager">
-          <Link className="btn" href={`/community?before=${page.next}`}>
-            Older posts
-          </Link>
-        </nav>
-      )}
+      <div className="cta-card">
+        <p>That&apos;s the latest. Sign up to follow players and see your whole feed.</p>
+        <Link className="btn btn-primary btn-small" href="/sign-up">
+          Sign up free
+        </Link>
+      </div>
     </div>
   );
 }

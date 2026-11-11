@@ -19,6 +19,33 @@ import { sniffBytes, sniffMediaType } from "./sniff.js";
 import type { MediaStorage } from "./storage.js";
 import { nextStatus, videoOutputs } from "./transcode.js";
 
+/**
+ * The Storage folder for an upload's processed files: the app's own layout
+ * (mediaFolders in packages/shared), so storage.rules decide who reads them
+ * and documents keep referencing them by `path`. Every id is one path
+ * segment. [targetId] was checked by checkTarget.
+ */
+export function mediaFolder(uid: string, purpose: UploadPurpose, targetId: string | undefined, itemId: string | undefined, uploadId: string): string {
+  const item = () => docIdParam(itemId);
+  switch (purpose) {
+    case "avatar":
+      return `users/${uid}/profile`;
+    case "post":
+      return `users/${uid}/posts/${item()}/${uploadId}`;
+    case "teamImage":
+      return `teams/${docIdParam(targetId)}/posts/${item()}/${uploadId}`;
+    case "teamVideo":
+      return `teams/${docIdParam(targetId)}/videos/${item()}`;
+    case "chat": {
+      const room = targetId?.match(/^teams\/([^/]+)\/chats\/([^/]+)$/);
+      if (room) return `teams/${docIdParam(room[1])}/chats/${docIdParam(room[2])}/${uid}/${item()}`;
+      const conv = targetId?.match(/^conversations\/([^/]+)$/);
+      if (conv) return `conversations/${docIdParam(conv[1])}/${uid}/${item()}`;
+      throw new ApiError("invalid_argument", "Say which chat this is for.");
+    }
+  }
+}
+
 /** Signed upload URLs last this long. */
 const urlLifetimeMs = 15 * 60_000;
 
@@ -111,12 +138,13 @@ export class UploadService {
   async create(caller: Caller, body: unknown): Promise<CreateUploadResponse> {
     const parsed = createUploadRequestSchema.safeParse(body ?? {});
     if (!parsed.success) throw fromZod(parsed.error);
-    const { purpose, contentType, size, targetId } = parsed.data;
+    const { purpose, contentType, size, targetId, itemId } = parsed.data;
     await this.checkTarget(caller.uid, purpose, targetId);
     const limits = uploadLimits[purpose];
     // The URL takes up to the purpose's largest limit for the declared kind.
     const maxBytes = (isImageType(contentType) ? limits.image : limits.video) ?? limits.image;
     const id = this.store.newId("uploads");
+    const folder = mediaFolder(caller.uid, purpose, targetId, itemId, id);
     const rawPath = `uploads/raw/${caller.uid}/${id}`;
     const expiresAt = new Date(this.now() + urlLifetimeMs);
     const signed = await this.storage.signedUploadUrl(rawPath, contentType, maxBytes, expiresAt);
@@ -127,6 +155,8 @@ export class UploadService {
         contentType,
         size,
         targetId: targetId ?? null,
+        itemId: itemId ?? null,
+        folder,
         status: "pending" satisfies UploadStatus,
         rawPath,
         createdAt: serverTime,
@@ -144,6 +174,7 @@ export class UploadService {
     if (status !== "pending") return answer(id, upload);
     const rawPath = String(upload.rawPath);
     const purpose = upload.purpose as UploadPurpose;
+    const folder = String(upload.folder);
 
     const size = await this.storage.size(rawPath);
     if (size == null) throw new ApiError("failed_precondition", "The file hasn't finished uploading.");
@@ -160,7 +191,7 @@ export class UploadService {
     }
 
     if (type != null && isVideoType(type)) {
-      const out = videoOutputs(caller.uid, id);
+      const out = videoOutputs(folder, id);
       await this.store.transact(async (tx) => {
         tx.update(`uploads/${id}`, {
           status: nextStatus(status, "video_queued"),
@@ -191,8 +222,8 @@ export class UploadService {
       throw new ApiError("invalid_argument", message);
     }
     const { image, thumb } = compressed;
-    const path = `media/${caller.uid}/${id}.${image.contentType === "image/png" ? "png" : "jpg"}`;
-    const thumbPath = `media/${caller.uid}/${id}_thumb.jpg`;
+    const path = `${folder}/${id}.${image.contentType === "image/png" ? "png" : "jpg"}`;
+    const thumbPath = `${folder}/${id}_thumb.jpg`;
     await this.storage.write(path, image.data, image.contentType);
     await this.storage.write(thumbPath, thumb.data, thumb.contentType);
     const done: Data = {

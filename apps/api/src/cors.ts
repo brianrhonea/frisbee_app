@@ -51,7 +51,11 @@ export function registerCors(app: FastifyInstance, origins: string[]) {
     const origin = req.headers.origin;
     const ok = typeof origin === "string" && allowed(origin);
     reply.header("vary", "Origin");
-    if (ok) reply.header("access-control-allow-origin", origin);
+    if (ok) {
+      reply.header("access-control-allow-origin", origin);
+      // Lets the website read which API version answered.
+      reply.header("access-control-expose-headers", "x-stall10-api-version");
+    }
 
     const preflight = req.method === "OPTIONS" && req.headers["access-control-request-method"] !== undefined;
     if (!preflight) return;

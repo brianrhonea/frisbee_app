@@ -80,17 +80,17 @@ describe("uploads on the emulators", () => {
     await bucket.file(`uploads/raw/up-user/${id}`).save(photo, { contentType: "image/jpeg", resumable: false });
 
     const done = await call(`/v1/uploads/${id}/complete`);
-    expect(done.json()).toMatchObject({ status: "ready", width: 1920, height: 1280, path: `media/up-user/${id}.jpg` });
-    const [saved] = await bucket.file(`media/up-user/${id}.jpg`).download();
+    expect(done.json()).toMatchObject({ status: "ready", width: 1920, height: 1280, path: `users/up-user/profile/${id}.jpg` });
+    const [saved] = await bucket.file(`users/up-user/profile/${id}.jpg`).download();
     expect((await sharp(saved).metadata()).width).toBe(1920);
-    const [meta] = await bucket.file(`media/up-user/${id}.jpg`).getMetadata();
+    const [meta] = await bucket.file(`users/up-user/profile/${id}.jpg`).getMetadata();
     expect(meta.cacheControl).toBe("public, max-age=31536000, immutable");
     expect((await bucket.file(`uploads/raw/up-user/${id}`).exists())[0]).toBe(false);
     expect((await db.doc(`uploads/${id}`).get()).get("status")).toBe("ready");
   });
 
   it("rejects a file whose bytes aren't media", async () => {
-    const res = await call("/v1/uploads", { purpose: "post", contentType: "image/png", size: 20 });
+    const res = await call("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "image/png", size: 20 });
     const { id } = res.json();
     await bucket.file(`uploads/raw/up-user/${id}`).save(Buffer.from("definitely not a png"), { resumable: false });
     const done = await call(`/v1/uploads/${id}/complete`);
