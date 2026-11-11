@@ -6,6 +6,7 @@ import { getAppCheck } from "firebase-admin/app-check";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { buildApp } from "./app.js";
+import { FirestoreDocStore } from "./firestore_store.js";
 import { FirestoreTeamRepository } from "./teams/repository.js";
 
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "frisbee-app-brianrhonea-dev";
@@ -37,6 +38,7 @@ const app = buildApp({
     },
   },
   teams: new FirestoreTeamRepository(db),
+  store: new FirestoreDocStore(db),
 });
 
 const port = Number(process.env.PORT ?? 8787);
