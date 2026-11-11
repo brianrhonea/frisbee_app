@@ -52,6 +52,7 @@ import '../data/repositories/user_post/user_post_repository.dart';
 import '../data/repositories/user_post/user_post_repository_firebase.dart';
 import '../data/services/attachment_storage.dart';
 import '../data/services/auth_service.dart';
+import '../data/services/api_client.dart';
 import '../data/services/api_search.dart';
 import '../data/services/feature_flags.dart';
 import '../data/services/file_picker_service.dart';
@@ -70,6 +71,8 @@ import '../firebase_options.dart';
 /// Services and repositories backed by Firebase.
 List<SingleChildWidget> get firebaseProviders => [
   ChangeNotifierProvider(create: (_) => FeatureFlags()..start()),
+  // The Stall 10 API (apps/api); null when the build has no API_BASE_URL.
+  Provider<ApiClient?>(create: (_) => ApiClient.fromEnvironment()),
   Provider(
     create: (_) => CallableClient(
       projectId: DefaultFirebaseOptions.currentPlatform.projectId,
@@ -105,6 +108,8 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) => TeamRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
       search: context.read<ApiSearch>(),
+      api: context.read<ApiClient?>(),
+      flags: context.read<FeatureFlags>(),
     ),
   ),
   Provider<PlayRepository>(create: (_) => PlayRepositoryFirebase()),

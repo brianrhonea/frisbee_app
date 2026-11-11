@@ -22,6 +22,9 @@ class FeatureFlags extends ChangeNotifier {
     'use_api_search': false,
     // Shrink photos before upload (ImageCompressor).
     'compress_images': true,
+    // Create teams through the Stall 10 API (apps/api) when the build has
+    // an API_BASE_URL. Off sends them straight to Firestore again.
+    'use_api_teams': true,
   };
 
   /// Flags fixed in code, for tests.
@@ -37,6 +40,7 @@ class FeatureFlags extends ChangeNotifier {
 
   bool get useApiSearch => _flag('use_api_search');
   bool get compressImages => _flag('compress_images');
+  bool get useApiTeams => _flag('use_api_teams');
 
   bool _flag(String key) => _values[key] ?? defaults[key] ?? false;
 

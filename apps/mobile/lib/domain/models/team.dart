@@ -698,6 +698,21 @@ class NewTeam {
     'leagueId': ?leagueId,
   };
 
+  /// The body of the API's `POST /v1/teams` (CreateTeamRequest in
+  /// packages/shared/src/team.ts). A team in a community isn't made
+  /// through the API yet.
+  Map<String, Object?> toRequest() => {
+    'name': name,
+    'division': division.name,
+    'level': level.name,
+    'city': city,
+    'kind': kind.name,
+    'description': description,
+    'requiresApproval': requiresApproval,
+    'location': location?.toMap(),
+    'leagueId': ?leagueId,
+  };
+
   NewTeam inCommunity(Team org) => NewTeam(
     name: name,
     division: division,

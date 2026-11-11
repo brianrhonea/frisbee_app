@@ -1,0 +1,62 @@
+# Checks the Node workspace (packages/shared, apps/api, apps/web) on every
+# push and pull request that touches it. The Flutter app is checked by
+# Codemagic; firebase/functions by the deploy workflow.
+
+name: CI (API, web, shared)
+
+on:
+  push:
+    paths:
+      - "apps/api/**"
+      - "apps/web/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - ".github/workflows/ci-node.yml"
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - "apps/web/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - ".github/workflows/ci-node.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @stall10/shared build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm --filter @stall10/api build
+      - run: pnpm --filter @stall10/web build
+
+  api-emulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @stall10/shared build
+      - run: npm install -g firebase-tools
+      - run: pnpm test:api:emulator

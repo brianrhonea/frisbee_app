@@ -1,0 +1,12 @@
+# Node workspaces. apps/mobile is Flutter (pub), and firebase/functions stays
+# a standalone npm project because `firebase deploy` uploads only that folder.
+packages:
+  - apps/api
+  - apps/web
+  - packages/*
+
+# Which dependencies may run install scripts (pnpm blocks unlisted ones).
+allowBuilds:
+  esbuild: true
+  "@firebase/util": false
+  protobufjs: false

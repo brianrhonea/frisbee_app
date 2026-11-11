@@ -337,19 +337,29 @@ CollectionReference<Map<String, dynamic>> chatFolders(
   String teamId,
 ) => db.collection('teams').doc(teamId).collection('chatFolders');
 
-/// Fields for a room being created by [uid].
-Map<String, dynamic> newRoomData(ChatRoom room, String uid) => {
+/// Fields for a room being created by [uid]. [createdAt] defaults to the
+/// server's time.
+Map<String, dynamic> newRoomData(
+  ChatRoom room,
+  String uid, {
+  Object? createdAt,
+}) => {
   ...room.toMap(),
   'kind': room.kind.name,
   'createdBy': uid,
-  'createdAt': FieldValue.serverTimestamp(),
+  'createdAt': createdAt ?? FieldValue.serverTimestamp(),
 };
 
-/// Fields for a folder being created by [uid].
-Map<String, dynamic> newFolderData(ChatFolder folder, String uid) => {
+/// Fields for a folder being created by [uid]. [createdAt] defaults to the
+/// server's time.
+Map<String, dynamic> newFolderData(
+  ChatFolder folder,
+  String uid, {
+  Object? createdAt,
+}) => {
   ...folder.toMap(),
   'createdBy': uid,
-  'createdAt': FieldValue.serverTimestamp(),
+  'createdAt': createdAt ?? FieldValue.serverTimestamp(),
 };
 
 /// Deletes a room's attachments, then its messages, then the room.

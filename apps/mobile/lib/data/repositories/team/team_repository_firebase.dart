@@ -14,8 +14,10 @@ import '../../../domain/models/team_name.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../domain/models/team_video.dart';
 import '../../../utils/result.dart';
+import '../../services/api_client.dart';
 import '../../services/api_search.dart';
 import '../../services/attachment_storage.dart';
+import '../../services/feature_flags.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
 import '../chat/chat_repository_firebase.dart';
@@ -43,7 +45,9 @@ class InviteCodeExpiredException implements Exception {
 /// it via `joins/{uid}`. Chat rooms are in `chats` (see
 /// [ChatRepositoryFirebase]). `teamDirectory/{teamId}` is the public
 /// listing anyone signed in can search; it mirrors the team's details.
-/// All writes are validated by `firestore.rules`.
+/// Writes are validated by `firestore.rules`, except creating a team,
+/// which goes through the Stall 10 API ([ApiClient], `POST /v1/teams`) when
+/// the build has one and the `use_api_teams` flag is on.
 class TeamRepositoryFirebase implements TeamRepository {
   TeamRepositoryFirebase({
     required AttachmentStorage attachments,
@@ -51,7 +55,11 @@ class TeamRepositoryFirebase implements TeamRepository {
     Random? random,
     SharedStreams? sharedStreams,
     ApiSearch? search,
-  }) : _files = attachments,
+    ApiClient? api,
+    FeatureFlags? flags,
+  }) : _api = api,
+       _flags = flags,
+       _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
        _random = random ?? Random.secure(),
        _shared = sharedStreams ?? SharedStreams.instance,
@@ -59,6 +67,13 @@ class TeamRepositoryFirebase implements TeamRepository {
 
   /// Searches through the rate-limited Cloud Function when it's turned on.
   final ApiSearch? _search;
+
+  /// The Stall 10 API, when this build has one ([ApiClient.fromEnvironment]).
+  final ApiClient? _api;
+  final FeatureFlags? _flags;
+
+  /// The API to create teams through, or null to write Firestore directly.
+  ApiClient? get _teamsApi => (_flags?.useApiTeams ?? true) ? _api : null;
 
   /// Chat attachments and post photos go with the team.
   final AttachmentStorage _files;
@@ -150,18 +165,15 @@ class TeamRepositoryFirebase implements TeamRepository {
   CollectionReference<Map<String, dynamic>> _invites(String uid) =>
       _db.collection('users').doc(uid).collection('teamInvites');
 
-  Map<String, dynamic> _teamDoc(NewTeam team, AppUser owner) => {
-    ...team.toMap(),
-    'ownerId': owner.uid,
-    'members': {owner.uid: TeamRole.owner.name},
-    'memberIds': [owner.uid],
-    'memberNames': {owner.uid: owner.label},
-    'createdAt': FieldValue.serverTimestamp(),
-  };
-
   @override
   Future<Result<String>> createTeam(NewTeam team, AppUser owner) =>
       guard(() async {
+        // The API checks the name and writes the same documents
+        // (newTeamDocs), as the signed-in user, whoever [owner] says.
+        if (_teamsApi case final api? when team.orgId == null) {
+          final res = await api.post('/v1/teams', team.toRequest());
+          return res['id']! as String;
+        }
         await _ensureNameFree(team.name, team.kind, team.division);
         final ref = _teams.doc();
         await _newTeamBatch(ref, team, owner).commit();
@@ -315,24 +327,17 @@ class TeamRepositoryFirebase implements TeamRepository {
     NewTeam team,
     AppUser owner,
   ) {
-    {
-      // Every team starts with General and a few voice channels.
-      final batch = _db.batch()
-        ..set(ref, _teamDoc(team, owner))
-        ..set(_directory.doc(ref.id), team.listing(ref.id).toMap())
-        ..set(
-          chatRooms(_db, ref.id).doc(ChatRoom.generalId),
-          newRoomData(ChatRoom.general(), owner.uid),
-        )
-        ..set(
-          chatFolders(_db, ref.id).doc(ChatRoom.voiceFolderId),
-          newFolderData(ChatRoom.defaultVoiceFolder(), owner.uid),
-        );
-      for (final r in ChatRoom.defaultVoiceRooms()) {
-        batch.set(chatRooms(_db, ref.id).doc(r.id), newRoomData(r, owner.uid));
-      }
-      return batch;
+    final batch = _db.batch();
+    final docs = newTeamDocs(
+      ref.id,
+      team,
+      owner,
+      createdAt: FieldValue.serverTimestamp(),
+    );
+    for (final MapEntry(:key, :value) in docs.entries) {
+      batch.set(_db.doc(key), value);
     }
+    return batch;
   }
 
   @override
@@ -895,3 +900,42 @@ class TeamRepositoryFirebase implements TeamRepository {
             .commit(),
   );
 }
+
+/// Every document a new team starts with, by path: the team (its creator
+/// the sole owner), its directory listing, General and the default voice
+/// channels. [createdAt] is each timestamp (the server's time when
+/// writing). The API writes the same documents (apps/api/src/teams/
+/// documents.ts); test/data/new_team_docs_test.dart and the API's tests
+/// check both against packages/shared/fixtures/team_create.json.
+Map<String, Map<String, dynamic>> newTeamDocs(
+  String teamId,
+  NewTeam team,
+  AppUser owner, {
+  required Object createdAt,
+}) => {
+  'teams/$teamId': {
+    ...team.toMap(),
+    'ownerId': owner.uid,
+    'members': {owner.uid: TeamRole.owner.name},
+    'memberIds': [owner.uid],
+    'memberNames': {owner.uid: owner.label},
+    'createdAt': createdAt,
+  },
+  'teamDirectory/$teamId': team.listing(teamId).toMap(),
+  'teams/$teamId/chats/${ChatRoom.generalId}': newRoomData(
+    ChatRoom.general(),
+    owner.uid,
+    createdAt: createdAt,
+  ),
+  'teams/$teamId/chatFolders/${ChatRoom.voiceFolderId}': newFolderData(
+    ChatRoom.defaultVoiceFolder(),
+    owner.uid,
+    createdAt: createdAt,
+  ),
+  for (final r in ChatRoom.defaultVoiceRooms())
+    'teams/$teamId/chats/${r.id}': newRoomData(
+      r,
+      owner.uid,
+      createdAt: createdAt,
+    ),
+};
