@@ -80,7 +80,7 @@ flowchart LR
     W["apps/web<br/>Next.js on Vercel"]
   end
 
-  subgraph API["apps/api (Cloud Run)"]
+  subgraph API["apps/api (Cloud Run, in the Firebase project)"]
     R[Routes /v1] --> S[Services<br/>rules + validation]
     S --> RP[Repositories<br/>firebase-admin]
   end
@@ -89,7 +89,8 @@ flowchart LR
   W -->|HTTPS JSON<br/>ID token| R
   M -->|sign in| AU[(Firebase Auth)]
   W -->|sign in| AU
-  M -.->|realtime reads<br/>while migrating, see §11| FS
+  M -.->|reads: live listeners<br/>chat, feeds, live stats| FS
+  M -->|upload to signed URL| ST
 
   RP --> FS[(Cloud Firestore)]
   RP --> ST[(Cloud Storage)]
@@ -179,16 +180,44 @@ sequenceDiagram
   follows, events, chat. The data model stays as documented in
   `docs/ARCHITECTURE.md`; the API writes the same shapes the app wrote, so
   migrated and unmigrated code can run side by side.
-- **Cloud Storage** holds images and video. Target flow (to build, see §11):
-  1. Client asks the API for an upload (`POST /v1/uploads` with purpose,
-     type and size). The API checks permission and limits and returns a
-     short-lived signed URL to a `uploads/raw/...` path.
-  2. Client uploads straight to Storage (no media through the API).
-  3. Compression runs server side (images: sharp to WebP/AVIF at fixed
-     sizes; video: transcode to H.264/HLS) and writes the final object;
-     the API (or a Storage-finalize function) records it on the document.
-  4. Raw uploads expire with a lifecycle rule.
-  Until then the app keeps compressing photos on the device
+- **Reads and writes** (decided 2026-11-11): every write is validated by
+  and goes through the API. Reads come from a cache (§7) or Firebase:
+  chat, feed updates and live stats stay as Firestore listeners straight
+  from the app, guarded by the read rules.
+- **Cloud Storage** holds images and video, always compressed to one
+  standard before they're saved (decided 2026-11-11; spec in
+  `packages/shared/src/media.ts`):
+
+  | | Accepted uploads | Saved as |
+  |---|---|---|
+  | Images | PNG, JPEG (`.png`, `.jpg`, `.jpeg`) | JPEG, quality 80, longest edge ≤ 1920 px, upright, metadata (GPS) stripped; a PNG with transparency stays PNG. Plus a 480 px JPEG thumbnail. |
+  | Video | MP4, MKV (`.mp4`, `.mkv`) | MP4: H.264 High + AAC 128 kbps, ≤ 1080p, ≤ 30 fps, CRF 23 capped at 5 Mbps, faststart. Plus a 480 px JPEG poster. |
+
+  MKV is accepted but never stored: iOS can't play it natively, so
+  everything is saved as MP4 or JPEG/PNG. Upload limits before compression
+  match today's `storage.rules`: 10 MB images, 100 MB post/chat video,
+  500 MB team film.
+
+  Flow (to build):
+  1. Client asks the API for an upload (`POST /v1/uploads`: purpose, type,
+     size, target; `createUploadRequestSchema`). The API checks permission
+     and limits, records `uploads/{id}` (status `pending`), and returns a
+     short-lived signed URL to `uploads/raw/{uid}/{id}`.
+  2. Client uploads straight to Storage; media never passes through the
+     API as JSON.
+  3. Client calls `POST /v1/uploads/{id}/complete`. The API checks the
+     real type by its bytes (not the extension), then:
+     - **images:** compresses in the request (sharp) and saves the final
+       object; the answer carries its path.
+     - **videos:** queues a transcode (status `processing`) run by a Cloud
+       Run job with ffmpeg in the same project; the job saves the MP4 and
+       poster and sets status `ready` (or `failed`). The app follows
+       `uploads/{id}` with a listener to show progress.
+  4. Only the API's service account can write outside `uploads/raw/`
+     (storage.rules); raw files are deleted after processing, and a
+     lifecycle rule clears abandoned ones after a day.
+
+  Until this is built the app keeps compressing photos on the device
   (`ImageCompressor`) and uploading under `storage.rules`.
 - **Rules** stay deployed and keep protecting reads and any write the app
   still makes. After a feature's API-only build is the oldest in use, its
@@ -215,7 +244,8 @@ In order of preference:
 |---|---|---|---|---|
 | apps/mobile (iOS) | Codemagic (`codemagic.yaml`, `working_directory: apps/mobile`) | TestFlight / App Store | `development` → TestFlight | `main` → App Store |
 | apps/mobile (Android) | Codemagic (to add) | Play Store | | |
-| apps/api | Container build (to add) | **Cloud Run** in each Firebase project (recommended: same project and region as Firestore, ADC, no keys) | `frisbee-app-brianrhonea-dev` | `frisbee-app-brianrhonea` |
+| apps/api | Container build (to add) | **Cloud Run in each Firebase project** (decided 2026-11-11): same project and region as Firestore, its own service account (ADC, no keys), optionally behind a Firebase Hosting rewrite (`/api/**`) | `frisbee-app-brianrhonea-dev` | `frisbee-app-brianrhonea` |
+| Video transcoding | Same container image, run as a job | Cloud Run job in each Firebase project | dev | prod |
 | apps/web | Vercel (Root Directory `apps/web`) | Vercel | preview deployments | production |
 | firebase/ | GitHub Actions (`deploy-backend.yml`) | Firebase | `--project dev` | `--project prod` |
 
@@ -261,36 +291,40 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 | 1 | Teams | create team / group / organization | `POST /v1/teams` | **Migrated** (fallback kept) |
 | 2 | Teams | join (code, link, open group, request/approve), invites, leave, remove, roles, permissions, transfer, edit details, community links, create team in community | Membership is guarded only by rules today; the highest-value move | Next |
 | 3 | Users | profile edit, username claim, privacy settings, delete account (callable today) | | |
-| 4 | Media | upload URLs + server-side compression (§6) | Needed by posts, chat, avatars, team film | |
+| 4 | Media | upload URLs + server-side compression (§6) | Needed by posts, chat, avatars, team film | Spec decided and in `packages/shared` |
 | 5 | Posts | posts, team posts, comments, likes, reposts | Uses media | |
 | 6 | Follows | follow, requests, accept | | |
 | 7 | Events | team/personal events, RSVPs, polls | | |
 | 8 | Leagues & tournaments | hosted tournaments, leagues, signups, drafts | Some already callables; move them to the API | |
 | 9 | Search & browse | `api-search`, `browse-*` callables → API GETs with caching | Website (phase 3) depends on these | |
-| 10 | Chat & DMs | send, edit, react; rooms and folders | Realtime; see §11 | |
+| 10 | Chat & DMs | send, edit, react; rooms and folders | Writes via the API; reads stay Firestore listeners (§11.2) | |
 | 11 | Meetings & voice | LiveKit tokens (callable today) | | |
 | — | Stays on device | theme, workout recording, playbook drawing (until saved) | | n/a |
 
-## 11. Open decisions
+## 11. Decisions
 
-1. **Realtime reads.** Chat, feeds and live game stats rely on Firestore
-   listeners. Recommendation: writes go through the API, while realtime
-   *reads* stay as Firestore listeners guarded by read rules until there's
-   a reason to replace them (SSE/WebSockets from the API would mean
-   rebuilding fan-out, offline cache and reconnects). Alternative: API-only
-   reads with polling or a push channel.
-2. **Media pipeline.** Where compression runs (in the API request, a
-   Storage-finalize Cloud Function, or a Cloud Run job for video), formats
-   and sizes, and whether video goes through Transcoder API or ffmpeg.
-3. **API host.** Cloud Run (recommended) vs. a Cloud Functions v2
-   `onRequest` wrapper vs. Vercel functions. Cloud Run keeps the API next
-   to Firestore with the project's identity and no cold-start limits per
-   route.
+Decided (2026-11-11):
+
+1. **API host:** Cloud Run in each Firebase project (dev and prod), next
+   to Firestore with the project's own identity. Video transcoding runs as
+   a Cloud Run job in the same project.
+2. **Reads and writes:** every write is verified by and goes through the
+   API. Reads come from a cache or straight from Firebase; chat, feed
+   updates and live stats keep Firestore listeners (no WebSockets from
+   the API).
+3. **Media:** images and video go to Cloud Storage, compressed to one
+   standard before saving. Accepted: PNG, JPEG, MP4, MKV. Saved as JPEG
+   (PNG if transparent) and MP4/H.264 (§6, `packages/shared/src/media.ts`).
+
+Still open:
+
 4. **Closing client write rules.** When to drop the fallback and lock each
    rule, given TestFlight/App Store builds still in use.
 5. **Generated Dart types.** Hand-written Dart models today; consider
    generating them from the zod schemas (JSON Schema → Dart) once there
    are many endpoints.
+6. **Transcode cost.** ffmpeg on Cloud Run (recommended: CPU minutes only)
+   vs. the Transcoder API ($0.015/min); revisit if video volume grows.
 
 ## 12. Known issues
 
