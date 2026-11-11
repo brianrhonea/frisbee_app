@@ -14,12 +14,13 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --exclude \"test/**/*.emulator.test.ts\"",
-    "test:emulator": "firebase --config ../../firebase/firebase.json emulators:exec --only firestore,auth --project demo-stall10 \"vitest run --no-file-parallelism test/teams.emulator.test.ts test/membership.emulator.test.ts test/profiles.emulator.test.ts\""
+    "test:emulator": "firebase --config ../../firebase/firebase.json emulators:exec --only firestore,auth,storage --project demo-stall10 \"vitest run --no-file-parallelism test/teams.emulator.test.ts test/membership.emulator.test.ts test/profiles.emulator.test.ts test/uploads.emulator.test.ts\""
   },
   "dependencies": {
     "@stall10/shared": "workspace:*",
     "fastify": "^5.12.0",
     "firebase-admin": "^14.5.0",
+    "sharp": "^0.34.5",
     "zod": "^4.6.0"
   },
   "devDependencies": {

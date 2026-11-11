@@ -1,5 +1,7 @@
+import { readFile, writeFile } from "node:fs/promises";
 import type { CreateTeamInput, NameListing } from "@stall10/shared";
 import type { Caller, TokenVerifier, UserLookup } from "../src/auth.js";
+import type { MediaStorage } from "../src/media/storage.js";
 import type { Owner } from "../src/teams/documents.js";
 import type { TeamRepository } from "../src/teams/repository.js";
 import { AlreadyExists, type Data, type DocStore, deleteField, serverTime, type Tx } from "../src/store.js";
@@ -127,5 +129,36 @@ export class FakeStore implements DocStore {
       throw e;
     }
     return result;
+  }
+}
+
+/** Cloud Storage in memory. Signed URLs are fake ("signed:" + path). */
+export class FakeMediaStorage implements MediaStorage {
+  files = new Map<string, { data: Buffer; contentType?: string }>();
+  signed: Array<{ path: string; contentType: string; maxBytes: number; expiresAt: Date }> = [];
+
+  async signedUploadUrl(path: string, contentType: string, maxBytes: number, expiresAt: Date) {
+    this.signed.push({ path, contentType, maxBytes, expiresAt });
+    return { url: `signed:${path}`, headers: { "content-type": contentType, "x-goog-content-length-range": `0,${maxBytes}` } };
+  }
+  async size(path: string) {
+    return this.files.get(path)?.data.length ?? null;
+  }
+  async read(path: string, bytes?: number) {
+    const f = this.files.get(path);
+    if (!f) throw new Error(`no ${path}`);
+    return bytes ? f.data.subarray(0, bytes) : f.data;
+  }
+  async write(path: string, data: Buffer, contentType: string) {
+    this.files.set(path, { data, contentType });
+  }
+  async downloadTo(path: string, file: string) {
+    await writeFile(file, await this.read(path));
+  }
+  async uploadFrom(file: string, path: string, contentType: string) {
+    this.files.set(path, { data: await readFile(file), contentType });
+  }
+  async delete(path: string) {
+    this.files.delete(path);
   }
 }

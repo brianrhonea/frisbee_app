@@ -187,6 +187,8 @@ sequenceDiagram
   /v1/teams/:org/link-requests/:team`; `PUT|DELETE
   /v1/teams/:org/linked-teams/:team`; `POST /v1/teams/:org/linked-teams` →
   `{id}`.
+- Media: `POST /v1/uploads` → `{id, uploadUrl, headers, expiresAt}`;
+  `POST /v1/uploads/:id/complete` → `{id, status, path?, thumbPath?, …}`.
 - Profile: `POST /v1/me/username` → `{username}`; `PUT
   /v1/me/profile/details`; `PUT /v1/me/profile/privacy`; `PUT
   /v1/me/profile/visibility`.
@@ -316,7 +318,7 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 | 1 | Teams | create team / group / organization | `POST /v1/teams` | **Migrated** (fallback kept) |
 | 2 | Teams | join (code, link, open group, request/approve), invites, leave, remove, roles, permissions, transfer, edit details, community links, create team in community | Rule functions ported in `apps/api/src/teams/access.ts`, run in transactions (`MembershipService`); `use_api_membership` flag. Still direct: `migrateTiersToRoles` (edits chat rooms, item 10), `deleteTeam`, roster | **Migrated** (fallback kept) |
 | 3 | Users | profile edit, username claim, privacy settings, delete account (callable today) | `apps/api/src/profiles`; `use_api_profiles` flag. Still direct: `publishSummary`, header photo, `users/{uid}` settings (owner-only, unvalidated); delete account stays a callable | **Migrated** details, privacy, visibility, username (fallback kept) |
-| 4 | Media | upload URLs + server-side compression (§6) | Needed by posts, chat, avatars, team film | Spec decided and in `packages/shared` |
+| 4 | Media | upload URLs + server-side compression (§6) | `apps/api/src/media`: sniffing, sharp compression, HEIC via ffmpeg (`ffmpegHeicDecoder`), `transcodeJobs/{id}` + `transcode.ts` for the Cloud Run job; needs `STORAGE_BUCKET`. Not yet: the job's entry point and queue, signed URLs verified against real Storage, app callers (posts/chat/avatars still upload directly) | **API built**, app not switched |
 | 5 | Posts | posts, team posts, comments, likes, reposts | Uses media | |
 | 6 | Follows | follow, requests, accept | | |
 | 7 | Events | team/personal events, RSVPs, polls | | |

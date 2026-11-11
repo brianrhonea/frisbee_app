@@ -5,8 +5,11 @@ import { initializeApp } from "firebase-admin/app";
 import { getAppCheck } from "firebase-admin/app-check";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { buildApp } from "./app.js";
 import { FirestoreDocStore } from "./firestore_store.js";
+import { ffmpegHeicDecoder } from "./media/image.js";
+import { FirebaseMediaStorage } from "./media/storage.js";
 import { FirestoreTeamRepository } from "./teams/repository.js";
 
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "frisbee-app-brianrhonea-dev";
@@ -39,6 +42,11 @@ const app = buildApp({
   },
   teams: new FirestoreTeamRepository(db),
   store: new FirestoreDocStore(db),
+  // Uploads need the bucket named (STORAGE_BUCKET, e.g. <project>.firebasestorage.app).
+  media: process.env.STORAGE_BUCKET
+    ? new FirebaseMediaStorage(getStorage(firebase).bucket(process.env.STORAGE_BUCKET))
+    : undefined,
+  heic: ffmpegHeicDecoder(),
 });
 
 const port = Number(process.env.PORT ?? 8787);

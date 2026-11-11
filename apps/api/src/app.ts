@@ -1,6 +1,10 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { errorHandler } from "./errors.js";
+import type { HeicDecoder } from "./media/image.js";
+import { uploadRoutes } from "./media/routes.js";
+import { type TranscodeQueue, UploadService } from "./media/service.js";
+import type { MediaStorage } from "./media/storage.js";
 import { profileRoutes } from "./profiles/routes.js";
 import { ProfileService } from "./profiles/service.js";
 import type { DocStore } from "./store.js";
@@ -16,6 +20,10 @@ export interface AppDeps {
   teams: TeamRepository;
   /** Transactional document access; enables the membership and profile routes. */
   store?: DocStore;
+  /** Cloud Storage; with [store], enables /v1/uploads. */
+  media?: MediaStorage;
+  heic?: HeicDecoder;
+  transcodeQueue?: TranscodeQueue;
   enforceAppCheck?: boolean;
   logger?: boolean;
   now?: () => number;
@@ -39,6 +47,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
     profileRoutes(app, new ProfileService(deps.store, deps.users));
+    if (deps.media) {
+      const uploads = new UploadService(deps.store, deps.media, { heic: deps.heic, queue: deps.transcodeQueue, now: deps.now });
+      uploadRoutes(app, uploads);
+    }
   }
   return app;
 }

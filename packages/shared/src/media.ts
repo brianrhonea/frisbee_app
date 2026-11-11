@@ -137,3 +137,34 @@ export const createUploadRequestSchema = z
     }
   });
 export type CreateUploadRequest = z.input<typeof createUploadRequestSchema>;
+
+/**
+ * An upload's life (uploads/{id}.status): `pending` until the client says
+ * it's uploaded, then `ready` (images, compressed in the request) or
+ * `processing` (videos, until the transcode job ends in `ready` or
+ * `failed`). A file that isn't what it claims is `failed`.
+ */
+export const uploadStatuses = ["pending", "processing", "ready", "failed"] as const;
+export type UploadStatus = (typeof uploadStatuses)[number];
+
+/** Answer to `POST /v1/uploads`: PUT the file to [uploadUrl] with [headers]. */
+export interface CreateUploadResponse {
+  id: string;
+  uploadUrl: string;
+  /** Send exactly these with the PUT (the URL is signed for them). */
+  headers: Record<string, string>;
+  /** ISO 8601; ask again after this. */
+  expiresAt: string;
+}
+
+/** Answer to `POST /v1/uploads/{id}/complete`. */
+export interface CompleteUploadResponse {
+  id: string;
+  status: UploadStatus;
+  /** The saved file and its thumbnail or poster (Storage paths), once ready. */
+  path?: string;
+  thumbPath?: string;
+  contentType?: string;
+  width?: number;
+  height?: number;
+}
