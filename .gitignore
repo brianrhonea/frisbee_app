@@ -30,8 +30,8 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
-/coverage/
+build/
+coverage/
 
 # Symbolication related
 app.*.symbols
@@ -40,9 +40,9 @@ app.*.symbols
 app.*.map.json
 
 # Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
 
 # Firebase
 .firebase/
@@ -56,17 +56,26 @@ secrets.local.json
 *.local.json
 .env
 .env.*
-android/app/google-services.json
-android/app/google-services.*.json
+google-services.json
+google-services.*.json
 GoogleService-Info*.plist
-ios/Runner/GoogleService-Info.plist
-ios/Flutter/Secrets.xcconfig
-macos/Runner/GoogleService-Info.plist
+**/ios/Flutter/Secrets.xcconfig
 # App Store Connect API keys / signing material
 *.p8
 *.p12
 *.mobileprovision
-lib/firebase_options.generated.dart
+**/lib/firebase_options.generated.dart
 
 # Android Gradle build output
-android/build/
+**/android/build/
+
+# Node / Next.js (apps/api, apps/web, packages/*)
+node_modules/
+dist/
+.next/
+.vercel/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+# Firebase Functions build output
+firebase/functions/lib/
