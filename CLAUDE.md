@@ -120,9 +120,13 @@ cd apps/mobile && flutter run -d chrome -t lib/main_web.dart --dart-define-from-
 bash firebase/scripts/build_site.sh && cd firebase && firebase emulators:start --only hosting
 ```
 
-Phase 3 replaces it with `apps/web` (Next.js on Vercel) talking only to the
-API. Store URLs are placeholders in `apps/mobile/lib/config/store_links.dart`
-and `firebase/hosting/about.html` / `join.html`; keep them in step. The
+Phase 3 replaces it with `apps/web` (Next.js on Vercel; see
+`apps/web/README.md`): the public pages are ported and read through the
+API's `/v1/public/*`; the member area is next. Its env lives in the
+gitignored `apps/web/.env.local` (template `.env.example`). Store URLs are
+placeholders in `apps/mobile/lib/config/store_links.dart`,
+`apps/web/lib/site.ts` and `firebase/hosting/about.html` / `join.html`
+(and `apps/web/content/about.html`); keep them in step. The
 deploy workflow builds the site from the `FIREBASE_WEB_API_KEY_DEV` /
 `_PROD` repository secrets and skips hosting without them. The web API key
 ends up in public JS (normal for Firebase web), so never commit `build/`.

@@ -73,9 +73,43 @@ export interface PublicProfile {
   throwingHand?: string;
   playingSince?: number;
   visibility?: { stats: boolean; teams: boolean; games: boolean };
-  teams?: unknown[];
-  stats?: Record<string, unknown>;
-  games?: unknown[];
+  teams?: ProfileTeam[];
+  /** Season (the year, e.g. "2026") → totals. */
+  stats?: Record<string, StatTotals>;
+  /** Newest first, at most 5. */
+  games?: ProfileGame[];
+}
+
+/** A team on a player's profile (ProfileTeam in the app). */
+export interface ProfileTeam {
+  id: string;
+  name: string;
+  kind?: "team" | "community" | "organization";
+  subtitle?: string;
+  role?: string;
+  number?: number;
+  position?: string;
+}
+
+export interface StatTotals {
+  games?: number;
+  points?: number;
+  goals?: number;
+  assists?: number;
+  blocks?: number;
+  completions?: number;
+  throwaways?: number;
+  catches?: number;
+  drops?: number;
+}
+
+export interface ProfileGame {
+  date?: string;
+  teamName?: string;
+  opponent?: string;
+  ourScore?: number;
+  theirScore?: number;
+  line?: string;
 }
 
 export interface ProfilePage extends PostPage {

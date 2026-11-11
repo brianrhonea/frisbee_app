@@ -1,9 +1,19 @@
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
-  // Phase 3: every read and write goes through apps/api
-  // (NEXT_PUBLIC_API_BASE_URL); the site never talks to Firestore directly.
+  // Reads and writes go through apps/api (API_BASE_URL on the server).
+  // The browser talks to Firebase only to sign in, and later for live
+  // listeners (chat, feeds, live stats), as ARCHITECTURE.md §4 describes.
   reactStrictMode: true,
+  async headers() {
+    return [
+      {
+        // Universal links: iOS wants JSON, but the file has no extension.
+        source: "/.well-known/apple-app-site-association",
+        headers: [{ key: "Content-Type", value: "application/json" }],
+      },
+    ];
+  },
 };
 
 export default config;
