@@ -69,7 +69,12 @@ async function readable(input: Buffer, type: AcceptedImageType, heic?: HeicDecod
     return input;
   } catch {
     if (!heic) throw new UnreadableImage("HEIC images can't be read here yet.");
-    return heic.toPng(input);
+    try {
+      return await heic.toPng(input);
+    } catch (e) {
+      // A damaged file, or no ffmpeg: either way the photo can't be used.
+      throw new UnreadableImage(String(e));
+    }
   }
 }
 

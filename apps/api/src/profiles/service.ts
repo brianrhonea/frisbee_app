@@ -44,14 +44,19 @@ export class ProfileService {
     private readonly users: UserLookup,
   ) {}
 
-  /** The directory fields every profile write carries (_base in the app). */
-  private async base(caller: Caller, username: string | null, tags: string[]): Promise<Data> {
+  /** The caller's name and photo as their Auth record has them. */
+  private async who(caller: Caller): Promise<{ name: string; photoUrl: string | null }> {
     const user = await this.users.lookup(caller.uid);
     const name = clip(callerLabel({ uid: caller.uid, ...(user ?? { name: caller.name, email: caller.email }) }), profileLimits.name);
+    return { name, photoUrl: user?.photoUrl ?? null };
+  }
+
+  /** The directory fields every profile write carries (_base in the app). */
+  private static base(who: { name: string; photoUrl: string | null }, username: string | null, tags: string[]): Data {
     return {
-      name,
-      keywords: profileKeywords(name, username),
-      photoUrl: user?.photoUrl ?? null,
+      name: who.name,
+      keywords: profileKeywords(who.name, username),
+      photoUrl: who.photoUrl,
       tags,
       updatedAt: serverTime,
     };
@@ -94,11 +99,12 @@ export class ProfileService {
   /** Saves what the player wrote about themselves, on the private doc if the profile is private. */
   async saveDetails(caller: Caller, body: unknown): Promise<void> {
     const { tags, ...details } = parse(profileDetailsRequestSchema, body);
-    const profile = await this.store.get(p.profile(caller.uid));
-    const username = usernameOf(profile);
-    const isPrivate = profile?.private === true;
-    const base = await this.base(caller, username, isPrivate ? [] : tags);
+    const who = await this.who(caller);
     await this.store.transact(async (tx) => {
+      // Read in the transaction, so a privacy change can't slip between.
+      const profile = await tx.get(p.profile(caller.uid));
+      const isPrivate = profile?.private === true;
+      const base = ProfileService.base(who, usernameOf(profile), isPrivate ? [] : tags);
       if (isPrivate) {
         tx.merge(p.profile(caller.uid), base);
         tx.merge(p.hidden(caller.uid), { ...details, tags, updatedAt: serverTime });
@@ -115,11 +121,11 @@ export class ProfileService {
    */
   async setPrivate(caller: Caller, body: unknown): Promise<void> {
     const { private: makePrivate } = parse(profilePrivacyRequestSchema, body);
-    const before = await this.store.get(p.profile(caller.uid));
-    const base = await this.base(caller, usernameOf(before), []);
+    const who = await this.who(caller);
     await this.store.transact(async (tx) => {
       const profile = (await tx.get(p.profile(caller.uid))) ?? {};
       const hidden = (await tx.get(p.hidden(caller.uid))) ?? {};
+      const base = ProfileService.base(who, usernameOf(profile), []);
       if ((profile.private === true) === makePrivate && Object.keys(profile).length > 0) return;
       if (makePrivate) {
         const moved: Data = {};
@@ -143,8 +149,6 @@ export class ProfileService {
    */
   async saveVisibility(caller: Caller, body: unknown): Promise<void> {
     const { visibility, tags } = parse(profileVisibilityRequestSchema, body);
-    const profile = await this.store.get(p.profile(caller.uid));
-    const isPrivate = profile?.private === true;
     const fields: Data = {
       visibility,
       tags,
@@ -152,8 +156,11 @@ export class ProfileService {
       ...(!visibility.games && { games: [] }),
       ...(!visibility.teams && { teams: [] }),
     };
-    const base = await this.base(caller, usernameOf(profile), tags);
+    const who = await this.who(caller);
     await this.store.transact(async (tx) => {
+      const profile = await tx.get(p.profile(caller.uid));
+      const isPrivate = profile?.private === true;
+      const base = ProfileService.base(who, usernameOf(profile), tags);
       if (isPrivate) tx.merge(p.hidden(caller.uid), { ...fields, updatedAt: serverTime });
       else tx.merge(p.profile(caller.uid), { ...base, ...fields });
     });

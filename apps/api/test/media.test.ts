@@ -108,6 +108,11 @@ describe("compressImage", () => {
     expect([image.contentType, image.width, image.height]).toEqual(["image/jpeg", 100, 80]);
   });
 
+  it("treats a failing HEIC decoder as an unreadable photo", async () => {
+    const broken = { toPng: async () => Promise.reject(new Error("ffmpeg exited 1")) };
+    await expect(compressImage(samples["image/heic"], "image/heic", { heic: broken })).rejects.toBeInstanceOf(UnreadableImage);
+  });
+
   it("refuses bytes that aren't an image", async () => {
     await expect(compressImage(Buffer.from("nope"), "image/jpeg")).rejects.toBeInstanceOf(UnreadableImage);
   });
@@ -322,6 +327,11 @@ describe("uploads API", () => {
       status: "queued",
     });
     expect(queued).toEqual([id]);
+  });
+
+  it("refuses ids that aren't one document id", async () => {
+    const body = { purpose: "teamImage", contentType: "image/jpeg", size: 10, targetId: "t1/chats/c1" };
+    expect((await call("/v1/uploads", body, "owner")).statusCode).toBe(400);
   });
 
   it("only the uploader completes it, and only once it's there", async () => {

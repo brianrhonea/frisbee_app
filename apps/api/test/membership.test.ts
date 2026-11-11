@@ -122,6 +122,15 @@ describe("join with a code or link (join)", () => {
   });
 });
 
+describe("ids in the path", () => {
+  it("refuses one that isn't a single document id, even sent as %2F", async () => {
+    s.store.put("teams/t1/chats/x", { name: "room" });
+    const res = await s.call("POST", "/v1/teams/t1%2Fchats%2Fx/members", "new", {});
+    expect(res.statusCode).toBe(400);
+    expect(s.store.doc("teams/t1/chats/x")).toEqual({ name: "room" });
+  });
+});
+
 describe("join an open group (joinOpenGroup)", () => {
   it("adds anyone to an open group", async () => {
     s.store.put(T, group());

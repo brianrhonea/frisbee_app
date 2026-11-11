@@ -1,10 +1,15 @@
 import type { JoinByCodeResponse } from "@stall10/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requireCaller } from "../auth.js";
+import { docIdParam } from "../ids.js";
 import type { MembershipService } from "./membership.js";
 
 type Params = { teamId: string; uid: string; orgId: string };
-const params = (req: FastifyRequest) => req.params as Params;
+/** The path's ids, each checked to be one document id. */
+const params = (req: FastifyRequest) => {
+  const raw = req.params as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, docIdParam(v)])) as Params;
+};
 
 /** Team membership and management (MembershipService). Answers {} unless noted. */
 export function membershipRoutes(app: FastifyInstance, m: MembershipService) {

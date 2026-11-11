@@ -11,6 +11,7 @@ import {
 } from "@stall10/shared";
 import type { Caller } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
+import { docIdParam } from "../ids.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { can, isMember, mapOf, roleIn, strings } from "../teams/access.js";
 import { compressImage, type HeicDecoder, UnreadableImage } from "./image.js";
@@ -61,7 +62,7 @@ export class UploadService {
         return;
       case "teamImage":
       case "teamVideo": {
-        const team = targetId ? await this.store.get(`teams/${targetId}`) : null;
+        const team = targetId ? await this.store.get(`teams/${docIdParam(targetId)}`) : null;
         if (!team) throw new ApiError("not_found", "That team doesn't exist anymore.");
         if (!can(team, uid, "manageTeam")) throw denied("You can't add photos or film to this team.");
         return;
