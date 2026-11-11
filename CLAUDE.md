@@ -63,9 +63,11 @@ Two Firebase projects:
 - `frisbee-app-brianrhonea` (prod): App Store builds from `main`.
   `secrets.prod.local.json` (`"FIREBASE_ENV": "prod"`).
 
-Prod native config copies are `apps/mobile/android/app/google-services.prod.json`
-and the root `GoogleService-Info.plist` (dev: `GoogleService-Info.dev.plist`),
-all gitignored. Run the Firebase CLI from `firebase/` (it finds
+Local native config files (`apps/mobile/android/app/google-services.json`)
+are the dev project's; prod copies are
+`apps/mobile/android/app/google-services.prod.json` and the root
+`GoogleService-Info.plist` (dev: `GoogleService-Info.dev.plist`), all
+gitignored. Run the Firebase CLI from `firebase/` (it finds
 `firebase.json` there); it defaults to dev. Deploy to production only with
 `--project prod`, and only when the user asks.
 
@@ -76,6 +78,7 @@ The app (always pass the secrets file; run from `apps/mobile`):
 ```
 cd apps/mobile
 flutter run -d windows --dart-define-from-file=secrets.local.json
+flutter build windows --dart-define-from-file=secrets.local.json
 flutter build ipa --dart-define-from-file=secrets.local.json   # Codemagic does this
 ```
 
@@ -104,8 +107,12 @@ Today: Firebase Hosting serves `firebase/build/site` (gitignored), built by
 app (`apps/mobile/lib/main_web.dart`, `lib/routing/web_router.dart`,
 `lib/ui/web/`, `lib/ui/browse/`) at `/`, and the static pages in
 `firebase/hosting/` (`/about`, `/help`, `/terms`, `/privacy`, `/cookies`,
-invite fallbacks) beside it. Signed-out visitors browse through the
-`browse` Cloud Functions. The legal pages are drafts: fill in the
+invite fallbacks) beside it. Signed-out visitors browse the community
+feed, search, public profiles, team pages and events through the `browse`
+Cloud Functions (allow-listed public fields, rate-limited per hashed IP;
+Firestore rules stay sign-in-only), and liking, following or joining asks
+them to sign up. Members get their home feed and the app's screens; other
+paths show "get the app". The legal pages are drafts: fill in the
 [bracketed] details and get them reviewed before launch.
 
 ```
@@ -117,8 +124,8 @@ Phase 3 replaces it with `apps/web` (Next.js on Vercel) talking only to the
 API. Store URLs are placeholders in `apps/mobile/lib/config/store_links.dart`
 and `firebase/hosting/about.html` / `join.html`; keep them in step. The
 deploy workflow builds the site from the `FIREBASE_WEB_API_KEY_DEV` /
-`_PROD` repository secrets and skips hosting without them. Never commit
-`build/`.
+`_PROD` repository secrets and skips hosting without them. The web API key
+ends up in public JS (normal for Firebase web), so never commit `build/`.
 
 ## Architecture
 

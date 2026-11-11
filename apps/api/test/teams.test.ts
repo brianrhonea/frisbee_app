@@ -2,16 +2,17 @@ import { searchKeywords } from "@stall10/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { tooFastMessage } from "../src/teams/service.js";
-import { FakeTeamRepository, FakeVerifier } from "./fakes.js";
+import { FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.UTC(2026, 10, 11, 12);
 
 function setup(opts: { enforceAppCheck?: boolean } = {}) {
   const teams = new FakeTeamRepository();
-  const app = buildApp({ verifier: new FakeVerifier(), teams, now: () => now, ...opts });
+  const users = new FakeUsers();
+  const app = buildApp({ verifier: new FakeVerifier(), users, teams, now: () => now, ...opts });
   const post = (body: unknown, headers: Record<string, string> = { authorization: "Bearer token:u1:Pat" }) =>
     app.inject({ method: "POST", url: "/v1/teams", payload: body as object, headers });
-  return { app, teams, post };
+  return { app, teams, users, post };
 }
 
 const team = { name: "The Haze", division: "open", level: "club", city: "Austin" };
@@ -33,6 +34,18 @@ describe("POST /v1/teams", () => {
         input: expect.objectContaining({ name: "The Haze", kind: "team", leagueId: null }),
       },
     ]);
+  });
+
+  it("names the owner from their Auth record, not a stale token", async () => {
+    t.users.records.set("u1", { name: "Pat Lee", email: "pat@x.test" });
+    expect((await t.post(team)).statusCode).toBe(201);
+    expect(t.teams.created[0].owner).toEqual({ uid: "u1", label: "Pat Lee" });
+  });
+
+  it("falls back to the email when the account has no name", async () => {
+    t.users.records.set("u1", { email: "pat@x.test" });
+    await t.post(team);
+    expect(t.teams.created[0].owner.label).toBe("pat@x.test");
   });
 
   it("needs a signed-in caller", async () => {

@@ -22,6 +22,16 @@ declare module "fastify" {
   }
 }
 
+/**
+ * The Auth user record's current name and email. ID tokens can lag behind
+ * it by up to an hour (sign-up sets the name after creating the user, and
+ * renames don't refresh the token), so names written to documents come
+ * from here, not the token.
+ */
+export interface UserLookup {
+  lookup(uid: string): Promise<{ name?: string; email?: string } | null>;
+}
+
 /** The name the app shows for [caller] (AppUser.label in the app). */
 export function callerLabel(caller: Caller): string {
   return caller.name ? caller.name : (caller.email ?? "Player");

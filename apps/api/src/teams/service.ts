@@ -5,7 +5,7 @@ import {
   teamNameClashes,
   teamNameProbe,
 } from "@stall10/shared";
-import { type Caller, callerLabel } from "../auth.js";
+import { type Caller, callerLabel, type UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import type { TeamRepository } from "./repository.js";
 
@@ -28,6 +28,7 @@ export function tooFastMessage(until: number, now: number): string {
 export class TeamService {
   constructor(
     private readonly repo: TeamRepository,
+    private readonly users: UserLookup,
     private readonly now: () => number = Date.now,
   ) {}
 
@@ -36,10 +37,11 @@ export class TeamService {
     if (!parsed.success) throw fromZod(parsed.error);
     const input: CreateTeamInput = parsed.data;
 
-    const [until, leagueOk, listings] = await Promise.all([
+    const [until, leagueOk, listings, user] = await Promise.all([
       this.repo.mutedUntil(caller.uid),
       input.leagueId == null ? true : this.repo.leagueTakesTeams(input.leagueId),
       this.repo.listingsWithKeywords(teamNameProbe(input.name), nameCheckLimit),
+      this.users.lookup(caller.uid),
     ]);
     const now = this.now();
     if (until != null && until > now) {
@@ -55,6 +57,7 @@ export class TeamService {
       throw new ApiError("already_exists", nameTakenMessage(clash.name, input.kind, input.division));
     }
 
-    return this.repo.createTeam(input, { uid: caller.uid, label: callerLabel(caller) });
+    const label = callerLabel({ uid: caller.uid, ...(user ?? { name: caller.name, email: caller.email }) });
+    return this.repo.createTeam(input, { uid: caller.uid, label });
   }
 }

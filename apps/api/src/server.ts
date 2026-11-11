@@ -26,6 +26,16 @@ const app = buildApp({
       await appCheck.verifyToken(token);
     },
   },
+  users: {
+    async lookup(uid) {
+      try {
+        const u = await auth.getUser(uid);
+        return { name: u.displayName, email: u.email };
+      } catch {
+        return null;
+      }
+    },
+  },
   teams: new FirestoreTeamRepository(db),
 });
 

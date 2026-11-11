@@ -1,5 +1,5 @@
 import type { CreateTeamInput, NameListing } from "@stall10/shared";
-import type { Caller, TokenVerifier } from "../src/auth.js";
+import type { Caller, TokenVerifier, UserLookup } from "../src/auth.js";
 import type { Owner } from "../src/teams/documents.js";
 import type { TeamRepository } from "../src/teams/repository.js";
 
@@ -13,6 +13,15 @@ export class FakeVerifier implements TokenVerifier {
 
   async verifyAppCheck(token: string): Promise<void> {
     if (token !== "good") throw new Error("bad app check");
+  }
+}
+
+/** Auth user records by uid; unknown users fall back to the token. */
+export class FakeUsers implements UserLookup {
+  records = new Map<string, { name?: string; email?: string }>();
+
+  async lookup(uid: string) {
+    return this.records.get(uid) ?? null;
   }
 }
 

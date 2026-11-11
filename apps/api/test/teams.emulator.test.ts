@@ -26,6 +26,12 @@ const app = buildApp({
     },
     async verifyAppCheck() {},
   },
+  users: {
+    async lookup(uid) {
+      const u = await auth.getUser(uid);
+      return { name: u.displayName, email: u.email };
+    },
+  },
   teams: new FirestoreTeamRepository(db),
 });
 
@@ -106,6 +112,15 @@ describe("POST /v1/teams on the emulators", () => {
     await db.doc("limits/u1").set({ mutedUntil: Timestamp.fromMillis(Date.now() + 10 * 60_000) });
     expect((await post({ name: "Muted Team", division: "open", level: "club" })).statusCode).toBe(429);
     await db.doc("limits/u1").delete();
+  });
+
+  it("names the owner as they are now, even with an older token", async () => {
+    // Renamed after the token was minted: the token still says "Pat Lee".
+    await auth.updateUser("u1", { displayName: "Pat Renamed" });
+    const res = await post({ name: "Renamed Team", division: "open", level: "club" });
+    expect(res.statusCode).toBe(201);
+    const team = await db.doc(`teams/${res.json().id}`).get();
+    expect(team.get("memberNames")).toEqual({ u1: "Pat Renamed" });
   });
 
   it("rejects a forged token", async () => {
