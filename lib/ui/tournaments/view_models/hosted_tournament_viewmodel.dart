@@ -102,6 +102,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
     delete = Command0<void>(() => _repo.deleteTournament(tournamentId));
     saveDivision = Command1<void, TournamentDivision>(_saveDivision);
     deleteDivision = Command1<void, String>(_deleteDivision);
+    createTeams = Command1<void, String>(_createTeams);
     postNews = Command1<void, ({String title, String body})>(_postNews);
     _subs = [
       _repo.watchTournament(tournamentId).listen((t) {
@@ -177,6 +178,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
   late final Command0<void> delete;
   late final Command1<void, TournamentDivision> saveDivision;
   late final Command1<void, String> deleteDivision;
+  late final Command1<void, String> createTeams;
   late final Command1<void, ({String title, String body})> postNews;
 
   List<Command<void>> get commands => [
@@ -195,6 +197,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
     delete,
     saveDivision,
     deleteDivision,
+    createTeams,
     postNews,
   ];
 
@@ -736,6 +739,43 @@ class HostedTournamentViewModel extends ChangeNotifier {
     };
   }
 
+  /// A league that takes players turns the host's drafted teams into real
+  /// teams (with chat and a roster) before the schedule is published.
+  bool get needsTeamsCreated {
+    final t = _tournament;
+    final d = division;
+    return t != null &&
+        t.isLeague &&
+        t.takesPlayers &&
+        d != null &&
+        !d.teamsCreated;
+  }
+
+  Future<Result<void>> _createTeams(String divisionId) async {
+    final t = _tournament;
+    final d = _divisions[divisionId];
+    if (t == null || d == null) {
+      return Result.error(Exception('Pick a division.'));
+    }
+    if (!isManager) {
+      return Result.error(Exception('Only the host can do that.'));
+    }
+    if (!t.isLeague || !t.takesPlayers) {
+      return Result.error(
+        Exception('Only leagues where players sign up make teams.'),
+      );
+    }
+    if (d.teams.length < 2) {
+      return Result.error(Exception('Draft at least two teams first.'));
+    }
+    if (_divisionId == divisionId && _games.isNotEmpty) {
+      return Result.error(
+        Exception('The schedule is published. Create the teams before it.'),
+      );
+    }
+    return _repo.createLeagueTeams(tournamentId, divisionId);
+  }
+
   Future<Result<void>> _deleteDivision(String id) async {
     final t = _tournament;
     if (t == null) return Result.error(Exception('Tournament not loaded.'));
@@ -776,6 +816,14 @@ class HostedTournamentViewModel extends ChangeNotifier {
     final d = division;
     if (t == null || d == null) {
       return (plan: null, problem: 'Add a division first.');
+    }
+    if (needsTeamsCreated) {
+      return (
+        plan: null,
+        problem:
+            "Create the league's teams first: on the Players tab, draft "
+            'teams, then Create teams.',
+      );
     }
     try {
       // A league gets its weekly season; anything else the usual schedule.

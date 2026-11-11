@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../domain/models/app_user.dart';
@@ -5,16 +7,21 @@ import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/tournament_engine/progress.dart';
 import '../../../utils/result.dart';
+import '../../services/callable_client.dart';
 import '../../services/firestore_utils.dart';
 import 'hosted_tournament_repository.dart';
 
 /// `tournaments/{id}` with `divisions/{divisionId}/games`, `entries` and
 /// `payments` subcollections. firestore.rules checks who writes what.
 class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
-  HostedTournamentRepositoryFirebase({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+  HostedTournamentRepositoryFirebase({
+    FirebaseFirestore? firestore,
+    CallableClient? functions,
+  }) : _db = firestore ?? FirebaseFirestore.instance,
+       _functions = functions;
 
   final FirebaseFirestore _db;
+  final CallableClient? _functions;
 
   CollectionReference<Map<String, dynamic>> get _tournaments =>
       _db.collection('tournaments');
@@ -91,28 +98,79 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
   @override
   Stream<List<HostedTournament>> watchUpcoming({int limit = 50}) {
     final today = DateTime.now();
-    return _tournaments
-        .where(
-          'status',
-          whereIn: [
-            HostedStatus.registration.name,
-            HostedStatus.seeding.name,
-            HostedStatus.scheduled.name,
-            HostedStatus.live.name,
-          ],
-        )
+    final midnight = DateTime(today.year, today.month, today.day);
+    final open = [
+      HostedStatus.registration.name,
+      HostedStatus.seeding.name,
+      HostedStatus.scheduled.name,
+      HostedStatus.live.name,
+    ];
+    // Ones that start soon or just started.
+    final starting = _tournaments
+        .where('status', whereIn: open)
         .where(
           'startsOn',
-          isGreaterThanOrEqualTo: DateTime(
-            today.year,
-            today.month,
-            today.day,
-          ).subtract(const Duration(days: 7)),
+          isGreaterThanOrEqualTo: midnight.subtract(const Duration(days: 7)),
         )
         .orderBy('startsOn')
-        .limit(limit)
-        .snapshots()
-        .map(_list);
+        .limit(limit);
+    // A league that began weeks ago still runs until its last night.
+    final running = _tournaments
+        .where('status', whereIn: open)
+        .where('endsOn', isGreaterThanOrEqualTo: midnight)
+        .orderBy('endsOn')
+        .limit(limit);
+    return _merged(
+      starting.snapshots().map(_list),
+      // Without its index yet, the first query still lists everything else.
+      running.snapshots().map(_list).handleError((Object _) {}),
+      limit,
+    );
+  }
+
+  /// [a] and [b] combined as each updates: tournaments once each, soonest
+  /// first, at most [limit].
+  Stream<List<HostedTournament>> _merged(
+    Stream<List<HostedTournament>> a,
+    Stream<List<HostedTournament>> b,
+    int limit,
+  ) {
+    late final StreamController<List<HostedTournament>> out;
+    StreamSubscription<List<HostedTournament>>? subA;
+    StreamSubscription<List<HostedTournament>>? subB;
+    var latestA = const <HostedTournament>[];
+    var latestB = const <HostedTournament>[];
+    var gotA = false;
+    void emit() {
+      if (!gotA) return;
+      final byId = {
+        for (final t in [...latestA, ...latestB]) t.id: t,
+      };
+      out.add(
+        (byId.values.toList()..sort((x, y) => x.startsOn.compareTo(y.startsOn)))
+            .take(limit)
+            .toList(),
+      );
+    }
+
+    out = StreamController<List<HostedTournament>>(
+      onListen: () {
+        subA = a.listen((v) {
+          latestA = v;
+          gotA = true;
+          emit();
+        }, onError: out.addError);
+        subB = b.listen((v) {
+          latestB = v;
+          emit();
+        }, onError: (Object _) {});
+      },
+      onCancel: () async {
+        await subA?.cancel();
+        await subB?.cancel();
+      },
+    );
+    return out.stream;
   }
 
   @override
@@ -344,8 +402,7 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
       'teams': [for (final t in teams) t.toMap()],
       'seeds': [for (final t in teams) t.id],
       'captains': {
-        for (final t in teams)
-          t.id: [?t.captainId],
+        for (final t in teams) t.id: [?t.captainId],
       },
     }),
   );
@@ -373,6 +430,19 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
       }
       await batch.commit();
     }
+  });
+
+  @override
+  Future<Result<void>> createLeagueTeams(
+    String tournamentId,
+    String divisionId,
+  ) => guard(() async {
+    final functions = _functions;
+    if (functions == null) throw const CallableException('Not available.');
+    await functions.call('tournaments-createLeagueTeams', {
+      'tournamentId': tournamentId,
+      'divisionId': divisionId,
+    });
   });
 
   @override

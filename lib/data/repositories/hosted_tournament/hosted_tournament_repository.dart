@@ -125,6 +125,16 @@ abstract class HostedTournamentRepository {
     List<GroupGame> games,
   );
 
+  /// A league's host turns the drafted teams into real teams (the server
+  /// does it, since the app can't put other people on a team it creates):
+  /// each captain owns theirs and the other players are its members. The
+  /// division's teams, seeds and captains then use the real teams' ids.
+  /// Only before the schedule is published; asking again changes nothing.
+  Future<Result<void>> createLeagueTeams(
+    String tournamentId,
+    String divisionId,
+  );
+
   /// A captain reports a score; the other captain confirms it.
   Future<Result<void>> reportScore(
     String tournamentId,

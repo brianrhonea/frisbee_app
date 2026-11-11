@@ -836,6 +836,224 @@ void main() {
     });
   });
 
+  group('a league where players sign up', () {
+    /// A player league with 8 accepted players drafted into 2 saved teams.
+    Future<String> draftedLeague() async {
+      final f = await form();
+      f.setKind(HostedKind.league);
+      f.setEntryType(TournamentEntryType.players);
+      f.name = 'Thursday Night';
+      f.setFirstNight(DateTime(2027, 6, 3));
+      f.setSeason(
+        const LeagueSeason(weeks: 4, playoffWeeks: 1, playoffTeams: 2),
+      );
+      await f.save.execute();
+      final id = (f.save.result as Ok<String>).value;
+      f.dispose();
+      final host = await page('director', id);
+      await host.saveDivision.execute(
+        host.newDivision().copyWith(
+          settings: host.newDivision().settings.copyWith(playersOnField: 4),
+          maxTeams: 4,
+        ),
+      );
+      await host.setStatus.execute(HostedStatus.registration);
+      await pumpEventQueue();
+      host.dispose();
+      final division = repo.divisions[id]!.keys.single;
+      for (var i = 0; i < 8; i++) {
+        repo.signups.putIfAbsent(id, () => {})['p$i'] = PlayerSignup(
+          uid: 'p$i',
+          name: 'Player $i',
+          divisionId: division,
+          skill: 1 + i % 5,
+          status: SignupStatus.accepted,
+        );
+      }
+      final draft = TeamDraftViewModel(
+        tournamentId: id,
+        divisionId: division,
+        tournamentRepository: repo,
+        seed: 3,
+      );
+      await pumpEventQueue();
+      draft.setTeamCount(2);
+      await draft.draft.execute();
+      await draft.save.execute();
+      expect(draft.save.completed, isTrue);
+      draft.dispose();
+      return id;
+    }
+
+    test('the schedule waits until the teams are made', () async {
+      final id = await draftedLeague();
+      final host = await page('director', id);
+      expect(host.needsTeamsCreated, isTrue);
+      final (:plan, :problem) = host.preview();
+      expect(plan, isNull);
+      expect(problem, contains('Create the league'));
+      await host.publish.execute();
+      expect(host.publish.error, isTrue);
+      expect(repo.games, isEmpty);
+      host.dispose();
+    });
+
+    test('creating teams gives them real ids, entries and captains', () async {
+      final id = await draftedLeague();
+      final before = repo.divisions[id]!.values.single;
+      final names = [for (final t in before.teams) t.name];
+      final host = await page('director', id);
+      await host.createTeams.execute(before.id);
+      await pumpEventQueue();
+      expect(host.createTeams.completed, isTrue);
+
+      final d = host.division!;
+      expect(d.teamsCreated, isTrue);
+      expect(d.teams.map((t) => t.name), names);
+      expect(
+        d.teams.map((t) => t.id),
+        everyElement(startsWith(TournamentDivision.leagueTeamPrefix)),
+      );
+      expect(d.seeds, [for (final t in d.teams) t.id]);
+      expect(d.captains.keys, d.seeds);
+      for (final t in d.teams) {
+        final entry = repo.entries[id]![t.id]!;
+        expect(entry.status, EntryStatus.accepted);
+        expect(entry.captainIds, [t.captainId]);
+        expect(host.teamName(t.id), t.name);
+      }
+      // Now the schedule can be published, and by the real ids.
+      expect(host.needsTeamsCreated, isFalse);
+      await host.publish.execute();
+      await pumpEventQueue();
+      expect(host.publish.completed, isTrue);
+      expect(
+        host.games.expand((g) => [g.teamA, g.teamB]).whereType<String>(),
+        everyElement(startsWith(TournamentDivision.leagueTeamPrefix)),
+      );
+      // Once the schedule is out, the teams can't be made again.
+      await host.createTeams.execute(d.id);
+      expect(host.createTeams.error, isTrue);
+      host.dispose();
+    });
+
+    test('creating twice before publishing is harmless', () async {
+      final id = await draftedLeague();
+      final host = await page('director', id);
+      final division = repo.divisions[id]!.keys.single;
+      await host.createTeams.execute(division);
+      final first = repo.divisions[id]!.values.single.seeds;
+      await host.createTeams.execute(division);
+      expect(host.createTeams.completed, isTrue);
+      expect(repo.divisions[id]!.values.single.seeds, first);
+      host.dispose();
+    });
+
+    test(
+      'only the host, only leagues, only drafted teams, and the server can refuse',
+      () async {
+        final id = await draftedLeague();
+        final division = repo.divisions[id]!.keys.single;
+        final player = await page('p1', id);
+        await player.createTeams.execute(division);
+        expect(player.createTeams.error, isTrue);
+        expect(repo.divisions[id]!.values.single.teamsCreated, isFalse);
+        player.dispose();
+
+        final host = await page('director', id);
+        repo.createTeamsError = Exception('A player is on more than one team.');
+        await host.createTeams.execute(division);
+        expect(
+          (host.createTeams.result as Error).error.toString(),
+          contains('more than one'),
+        );
+        repo.createTeamsError = null;
+
+        await repo.saveDraftTeams(id, host.division!, const []);
+        await pumpEventQueue();
+        await host.createTeams.execute(division);
+        expect(
+          (host.createTeams.result as Error).error.toString(),
+          contains('at least two'),
+        );
+        host.dispose();
+
+        final hat = await hostHat();
+        final hatHost = await page('director', hat);
+        await hatHost.createTeams.execute(repo.divisions[hat]!.keys.single);
+        expect(hatHost.createTeams.error, isTrue);
+        hatHost.dispose();
+      },
+    );
+
+    test('the draft is read-only once the teams are made', () async {
+      final id = await draftedLeague();
+      final division = repo.divisions[id]!.keys.single;
+      final host = await page('director', id);
+      await host.createTeams.execute(division);
+      await pumpEventQueue();
+      host.dispose();
+
+      final draft = TeamDraftViewModel(
+        tournamentId: id,
+        divisionId: division,
+        tournamentRepository: repo,
+      );
+      await pumpEventQueue();
+      expect(draft.created, isTrue);
+      final ids = [for (final t in draft.teams) t.id];
+      draft.setTeamCount(3);
+      draft.rename(ids.first, 'Nope');
+      draft.movePlayer(draft.teams.first.playerIds.first, teamId: null);
+      expect(draft.teams.map((t) => t.id), ids);
+      expect(draft.teams.first.name, isNot('Nope'));
+      expect(draft.unassigned, isEmpty);
+      await draft.draft.execute();
+      expect(draft.draft.error, isTrue);
+      await draft.save.execute();
+      expect(draft.save.error, isTrue);
+      draft.dispose();
+    });
+
+    testWidgets('the host makes the teams from the Players tab', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(900, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final id = await tester.runAsync(draftedLeague);
+      final vm = await tester.runAsync(() => page('director', id!));
+      final sign = await tester.runAsync(
+        () => signups('director', id!, manager: true),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: HostedTournamentScreen(viewModel: vm!, signups: sign),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('League'), findsOneWidget);
+      expect(find.text('Players sign up'), findsOneWidget);
+      await tester.tap(find.text('Players'));
+      await tester.pumpAndSettle();
+      expect(find.text('Make the teams'), findsOneWidget);
+
+      await tester.tap(find.text('Create teams'));
+      await tester.pumpAndSettle();
+      expect(find.text('Create 2 teams?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Create teams').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Make the teams'), findsNothing);
+      expect(find.textContaining('These are real teams'), findsOneWidget);
+      expect(find.text('View teams'), findsOneWidget);
+      expect(repo.divisions[id]!.values.single.teamsCreated, isTrue);
+      await tester.pumpWidget(const SizedBox());
+      vm.dispose();
+      sign!.dispose();
+    });
+  });
+
   group('the page', () {
     testWidgets('players see a signup card and sign up', (tester) async {
       tester.view.physicalSize = const Size(900, 1600);

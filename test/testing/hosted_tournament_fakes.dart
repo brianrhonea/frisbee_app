@@ -343,6 +343,54 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
     return const Result.ok(null);
   }
 
+  /// Set to make [createLeagueTeams] fail, like the server refusing.
+  Exception? createTeamsError;
+
+  @override
+  Future<Result<void>> createLeagueTeams(
+    String tournamentId,
+    String divisionId,
+  ) async {
+    log.add('create teams $divisionId');
+    final error = createTeamsError;
+    if (error != null) return Result.error(error);
+    final d = divisions[tournamentId]?[divisionId];
+    if (d == null) return Result.error(Exception('No division.'));
+    if (d.teamsCreated) return const Result.ok(null);
+    if (games[_key(tournamentId, divisionId)]?.isNotEmpty ?? false) {
+      return Result.error(Exception('The schedule is published.'));
+    }
+    // What the server does: real ids, accepted entries, captains reporting.
+    final made = [
+      for (final t in d.teams)
+        TournamentTeam(
+          id: '${TournamentDivision.leagueTeamPrefix}${tournamentId}_${t.id}',
+          name: t.name,
+          captainId: t.captainId,
+          playerIds: t.playerIds,
+          playerNames: t.playerNames,
+        ),
+    ];
+    divisions[tournamentId]![divisionId] = d.copyWith(
+      teams: made,
+      seeds: [for (final t in made) t.id],
+      captains: {
+        for (final t in made) t.id: [?t.captainId],
+      },
+    );
+    for (final t in made) {
+      entries.putIfAbsent(tournamentId, () => {})[t.id] = TournamentEntry(
+        teamId: t.id,
+        teamName: t.name,
+        divisionId: divisionId,
+        status: EntryStatus.accepted,
+        captainIds: [?t.captainId],
+      );
+    }
+    _changed();
+    return const Result.ok(null);
+  }
+
   @override
   Future<Result<void>> reportScore(
     String tournamentId,

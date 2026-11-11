@@ -468,6 +468,15 @@ class TournamentDivision {
   /// The roster size a team must reach: the host's setting, or the default.
   int get effectiveMinRoster => minRoster ?? defaultMinRoster;
 
+  /// Ids of the real teams a league makes from its drafted ones start with
+  /// this (functions/src/tournaments/league.ts).
+  static const leagueTeamPrefix = 'league_';
+
+  /// Every drafted team has become a real team (a league that takes
+  /// players): from then on rosters are managed on the teams themselves.
+  bool get teamsCreated =>
+      teams.isNotEmpty && teams.every((t) => t.id.startsWith(leagueTeamPrefix));
+
   final String id;
   final Division division;
   final CompetitionLevel level;

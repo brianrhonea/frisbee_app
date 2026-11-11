@@ -105,3 +105,5 @@ export const tournamentSchedule = onDocumentUpdated("tournaments/{tournamentId}"
   }
   await writer.close();
 });
+
+export { createLeagueTeams } from "./callables";

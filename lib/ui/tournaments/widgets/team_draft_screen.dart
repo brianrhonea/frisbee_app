@@ -109,17 +109,19 @@ class _TeamDraftScreenState extends State<TeamDraftScreen> {
         return Scaffold(
           appBar: AppBar(title: Text('Draft teams · ${d.label}')),
           body: _body(context),
-          bottomNavigationBar: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: FilledButton(
-                onPressed: vm.save.running || vm.teams.isEmpty
-                    ? null
-                    : () => vm.save.execute(),
-                child: Text(vm.dirty ? 'Save teams' : 'Teams saved'),
-              ),
-            ),
-          ),
+          bottomNavigationBar: vm.created
+              ? null
+              : SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: FilledButton(
+                      onPressed: vm.save.running || vm.teams.isEmpty
+                          ? null
+                          : () => vm.save.execute(),
+                      child: Text(vm.dirty ? 'Save teams' : 'Teams saved'),
+                    ),
+                  ),
+                ),
         );
       },
     );
@@ -141,7 +143,19 @@ class _TeamDraftScreenState extends State<TeamDraftScreen> {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
-          if (vm.locked)
+          if (vm.created)
+            const Card(
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                leading: Icon(Icons.groups_outlined),
+                title: Text("The league's teams are made"),
+                subtitle: Text(
+                  'Each captain owns their team and the players are its '
+                  'members. Manage rosters on the teams themselves.',
+                ),
+              ),
+            )
+          else if (vm.locked)
             Card(
               margin: EdgeInsets.zero,
               child: ListTile(

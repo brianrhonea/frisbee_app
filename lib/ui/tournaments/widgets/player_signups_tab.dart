@@ -281,7 +281,13 @@ class _PlayersTabState extends State<PlayersTab> {
                         Routes.tournamentDraft(vm.tournamentId, d.id),
                       ),
                 icon: const Icon(Icons.groups_outlined),
-                label: Text(d.teams.isEmpty ? 'Draft teams' : 'Edit teams'),
+                label: Text(
+                  d.teams.isEmpty
+                      ? 'Draft teams'
+                      : d.teamsCreated
+                      ? 'View teams'
+                      : 'Edit teams',
+                ),
               ),
           ],
         ),
@@ -293,7 +299,63 @@ class _PlayersTabState extends State<PlayersTab> {
               : 'Teams are drawn once registration closes.',
           style: theme.textTheme.bodyMedium,
         ),
-      if (vm.isManager && vm.isPublished)
+      if (vm.isManager &&
+          vm.tournament!.isLeague &&
+          d.teams.isNotEmpty &&
+          !d.teamsCreated &&
+          !vm.isPublished)
+        Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          color: theme.colorScheme.secondaryContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Make the teams', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 4),
+                const Text(
+                  'A league plays as real teams, each with chat, a roster '
+                  'and its games on the schedule. Create them from your '
+                  'drafted teams before you publish the schedule.',
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: vm.createTeams.running
+                      ? null
+                      : () async {
+                          if (await confirmDialog(
+                            context,
+                            title: 'Create ${d.teams.length} teams?',
+                            message:
+                                'Each team is created with its captain as '
+                                'owner and the other players as members. '
+                                "You won't be able to redraft afterwards; "
+                                'rosters are managed on each team.',
+                            confirmLabel: 'Create teams',
+                          )) {
+                            vm.createTeams.execute(d.id);
+                          }
+                        },
+                  icon: const Icon(Icons.groups_2_outlined),
+                  label: Text(
+                    vm.createTeams.running ? 'Creating…' : 'Create teams',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      if (vm.isManager && d.teamsCreated)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            'These are real teams: each captain owns theirs and manages '
+            'its roster.',
+            style: theme.textTheme.bodySmall,
+          ),
+        ),
+      if (vm.isManager && vm.isPublished && !d.teamsCreated)
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(
@@ -313,6 +375,13 @@ class _PlayersTabState extends State<PlayersTab> {
                   '${team.nameOf(id)}${id == team.captainId ? ' (C)' : ''}',
               ].join(', '),
             ),
+            // Members open their team (others can't read it).
+            trailing: d.teamsCreated && team.playerIds.contains(vm.uid)
+                ? const Icon(Icons.chevron_right)
+                : null,
+            onTap: d.teamsCreated && team.playerIds.contains(vm.uid)
+                ? () => context.push(Routes.teamOver(team.id))
+                : null,
           ),
         ),
     ];

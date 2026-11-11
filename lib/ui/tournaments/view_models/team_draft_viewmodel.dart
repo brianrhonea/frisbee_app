@@ -87,6 +87,10 @@ class TeamDraftViewModel extends ChangeNotifier {
   /// teams can be renamed and captains changed.
   bool get locked => _locked;
 
+  /// A league has made real teams from these: rosters live on those teams
+  /// now, so nothing here can change.
+  bool get created => _division?.teamsCreated ?? false;
+
   /// Unsaved changes.
   bool get dirty => _dirty;
 
@@ -148,6 +152,7 @@ class TeamDraftViewModel extends ChangeNotifier {
   }
 
   void _set(List<TournamentTeam> teams) {
+    if (created) return;
     _teams = teams;
     _dirty = true;
     notifyListeners();
@@ -158,7 +163,7 @@ class TeamDraftViewModel extends ChangeNotifier {
   /// Sets how many teams to draft into. Teams that go away drop their
   /// players back to unassigned.
   void setTeamCount(int count) {
-    if (_locked) return;
+    if (_locked || created) return;
     final n = count.clamp(2, maxTeams).toInt();
     _teamCount = n;
     if (n > _teams.length) {
@@ -217,6 +222,7 @@ class TeamDraftViewModel extends ChangeNotifier {
   ];
 
   Future<Result<void>> _draft() async {
+    if (created) return Result.error(Exception(_createdMessage));
     if (_locked) {
       return Result.error(
         Exception('The schedule is published, so teams can only be adjusted.'),
@@ -244,9 +250,13 @@ class TeamDraftViewModel extends ChangeNotifier {
     return _draft();
   }
 
+  static const _createdMessage =
+      "The league's teams are made. Manage rosters on each team.";
+
   Future<Result<void>> _save() async {
     final d = _division;
     if (d == null) return Result.error(Exception('Pick a division.'));
+    if (created) return Result.error(Exception(_createdMessage));
     if (_locked &&
         !listEquals(
           [for (final t in _teams) t.id]..sort(),

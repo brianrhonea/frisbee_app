@@ -677,7 +677,7 @@ class _HostSteps extends StatelessWidget {
             Text('Next step', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(text),
-            if (vm.unpaidCount > 0 && t.bidFee != null)
+            if (vm.unpaidCount > 0 && t.bidFee != null && !t.takesPlayers)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
@@ -1016,9 +1016,24 @@ class _ScheduleTab extends StatelessWidget {
                       !DateUtils.isSameDay(games[i - 1].startsAt, g.startsAt)))
                 Padding(
                   padding: const EdgeInsets.only(top: 12, bottom: 8),
-                  child: Text(
-                    gameDay(g.startsAt!),
-                    style: theme.textTheme.titleSmall,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        vm.tournament?.isLeague == true
+                            ? '${g.stage == GameStage.pool ? 'Week ${g.round}' : 'Playoffs'} · ${gameDay(g.startsAt!)}'
+                            : gameDay(g.startsAt!),
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      if (vm.tournament?.isLeague == true &&
+                          g.stage == GameStage.pool)
+                        if (byesIn(d.seeds, games, g.round) case final byes
+                            when byes.isNotEmpty)
+                          Text(
+                            'Bye: ${byes.map(vm.teamName).join(', ')}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                    ],
                   ),
                 ),
               _HostedGameTile(viewModel: vm, game: g),
@@ -1057,14 +1072,20 @@ class _PublishCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             if (plan == null)
-              Text(problem ?? 'Accept at least two teams first.')
+              Text(
+                problem ??
+                    (vm.tournament!.takesPlayers
+                        ? 'Draft and save at least two teams first.'
+                        : 'Accept at least two teams first.'),
+              )
             else
               Text(
                 '${d.seeds.length} teams · ${plan.games.length} games'
                 '${d.settings.format.hasPools && d.settings.format != TournamentFormat.roundRobin ? ' · ${d.settings.poolCount} pools' : ''}\n'
                 '${[for (final day in days) '${DateFormat('EEE').format(day.startsAt)} ${DateFormat.jm().format(day.startsAt)}–${DateFormat.jm().format(day.endsAt)}'].join(' · ')}',
               ),
-            if (d.seeds.length >= 2 &&
+            if (!vm.tournament!.isLeague &&
+                d.seeds.length >= 2 &&
                 d.settings.format != suggestedFormat(d.seeds.length))
               Text(
                 'Tip: for ${d.seeds.length} teams, '
@@ -1332,7 +1353,7 @@ class _ResultsTab extends StatelessWidget {
               ),
           ],
           if (pools.isNotEmpty) ...[
-            const _Section('Pools'),
+            _Section(vm.tournament?.isLeague == true ? 'Standings' : 'Pools'),
             for (final e in pools.entries) ...[
               if (pools.length > 1)
                 Padding(

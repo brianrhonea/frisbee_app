@@ -149,7 +149,9 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (_) => GroupTournamentRepositoryFirebase(),
   ),
   Provider<HostedTournamentRepository>(
-    create: (_) => HostedTournamentRepositoryFirebase(),
+    create: (context) => HostedTournamentRepositoryFirebase(
+      functions: context.read<CallableClient>(),
+    ),
   ),
   Provider<RankingRepository>(create: (_) => RankingRepositoryFirebase()),
   Provider<ChatRepository>(

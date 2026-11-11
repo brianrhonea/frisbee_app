@@ -439,9 +439,19 @@ service cloud.firestore {
           && links.size() <= 20;
       }
 
-      // Only once the owner is the last one on it (see soleOwner).
+      // Only once the owner is the last one on it (see soleOwner), and not
+      // while it plays in a league: its games and standings refer to it.
       allow delete: if signedIn() && resource.data.ownerId == uid()
-        && soleOwner();
+        && soleOwner() && !inActiveLeague();
+
+      // A team a league made (createLeagueTeams) carries its league's id.
+      // It stays until the league is final or deleted.
+      function inActiveLeague() {
+        let league = resource.data.get('leagueId', null);
+        return league != null
+          && exists(/databases/$(database)/documents/tournaments/$(league))
+          && get(/databases/$(database)/documents/tournaments/$(league)).data.status != 'finished';
+      }
 
       // Deleting is for a team that's the owner's alone: they remove
       // everyone else or hand it on first, so no one's team vanishes.
@@ -513,6 +523,7 @@ service cloud.firestore {
       function markDeleting() {
         return roleIn(resource.data) == 'owner'
           && soleOwner()
+          && !inActiveLeague()
           && changed().hasOnly(['deletingAt'])
           && request.resource.data.get('deletingAt', request.time) == request.time;
       }

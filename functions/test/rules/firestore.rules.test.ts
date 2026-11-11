@@ -145,6 +145,69 @@ describe("team delete", () => {
   });
 });
 
+describe("a league's team", () => {
+  // createLeagueTeams (functions/src/tournaments/callables.ts) writes these:
+  // the captain owns it and the league's id is on it.
+  const LEAGUE = "league_t1_team1";
+  const CAP = "leagueCaptain";
+  const MATE = "leagueMate";
+  const leagueTeam = (extra: Record<string, unknown> = {}) => ({
+    name: "Reds - Thursday Night",
+    division: "mixed",
+    level: "league",
+    city: "Denver",
+    ownerId: CAP,
+    members: { [CAP]: "owner", [MATE]: "player" },
+    memberIds: [CAP, MATE],
+    memberNames: { [CAP]: "Cap", [MATE]: "Mate" },
+    leagueId: "t1",
+    leagueHostId: "host1",
+    ...extra,
+  });
+  const seedLeague = (status: string | null) =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", LEAGUE), leagueTeam());
+      if (status) {
+        await setDoc(doc(fs, "tournaments", "t1"), { hostId: "host1", name: "Thursday Night", status });
+      }
+    });
+
+  it("its captain-owner manages it like any team, despite the league fields", async () => {
+    await seedLeague("live");
+    const ref = doc(db(CAP), "teams", LEAGUE);
+    await assertSucceeds(updateDoc(ref, { name: "Crimson - Thursday Night", city: "Boulder" }));
+    await assertSucceeds(
+      setDoc(doc(db(CAP), "teams", LEAGUE, "roster", "r1"), { name: "Sub", number: 9, position: "hybrid", userId: null }),
+    );
+    // Teammates can read it but not rename it, and nobody can forge a league id.
+    await assertSucceeds(getDoc(doc(db(MATE), "teams", LEAGUE)));
+    await assertFails(updateDoc(doc(db(MATE), "teams", LEAGUE), { name: "Mine" }));
+    await assertFails(updateDoc(ref, { leagueId: "other" }));
+    await assertFails(updateDoc(ref, { ownerId: MATE }));
+  });
+
+  it("can't be deleted by its owner while the league runs", async () => {
+    await seedLeague("live");
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), "teams", LEAGUE), { members: { [CAP]: "owner" }, memberIds: [CAP] }),
+    );
+    await assertFails(deleteDoc(doc(db(CAP), "teams", LEAGUE)));
+    await assertFails(updateDoc(doc(db(CAP), "teams", LEAGUE), { deletingAt: serverTimestamp() }));
+  });
+
+  it("can be deleted once the league is final, or if the league is gone", async () => {
+    for (const status of ["finished", null]) {
+      await env.clearFirestore();
+      await seedLeague(status);
+      await env.withSecurityRulesDisabled((ctx) =>
+        updateDoc(doc(ctx.firestore(), "teams", LEAGUE), { members: { [CAP]: "owner" }, memberIds: [CAP] }),
+      );
+      await assertSucceeds(deleteDoc(doc(db(CAP), "teams", LEAGUE)));
+    }
+  });
+});
+
 describe("join", () => {
   const joinUpdate = {
     [`members.${OUTSIDER}`]: "player",
