@@ -190,11 +190,14 @@ sequenceDiagram
 
   | | Accepted uploads | Saved as |
   |---|---|---|
-  | Images | PNG, JPEG (`.png`, `.jpg`, `.jpeg`) | JPEG, quality 80, longest edge ≤ 1920 px, upright, metadata (GPS) stripped; a PNG with transparency stays PNG. Plus a 480 px JPEG thumbnail. |
-  | Video | MP4, MKV (`.mp4`, `.mkv`) | MP4: H.264 High + AAC 128 kbps, ≤ 1080p, ≤ 30 fps, CRF 23 capped at 5 Mbps, faststart. Plus a 480 px JPEG poster. |
+  | Images | Every native photo type on the supported devices: JPEG, PNG, HEIC/HEIF (iPhone, newer Android, macOS), WebP (Android, web), GIF | JPEG, quality 80, longest edge ≤ 1920 px, upright, metadata (GPS) stripped; an image with transparency is saved as PNG. A GIF keeps its first frame. Plus a 480 px JPEG thumbnail. |
+  | Video | Every native video type: MP4, MOV (iPhone, macOS), M4V, MKV, WebM (Android, browsers), 3GP (older Android) | MP4: H.264 High + AAC 128 kbps, ≤ 1080p, ≤ 30 fps, CRF 23 capped at 5 Mbps, faststart. Plus a 480 px JPEG poster. |
 
-  MKV is accepted but never stored: iOS can't play it natively, so
-  everything is saved as MP4 or JPEG/PNG. Upload limits before compression
+  Rule (2026-11-11): always accept the native file types of the supported
+  devices (iOS, Android, and Windows/macOS through the website), and
+  always save one standard format so everything plays natively
+  everywhere. HEIC needs an HEVC-capable decoder (libheif/ffmpeg; sharp's
+  prebuilt binaries can't read it). Upload limits before compression
   match today's `storage.rules`: 10 MB images, 100 MB post/chat video,
   500 MB team film.
 
@@ -313,17 +316,22 @@ Decided (2026-11-11):
    updates and live stats keep Firestore listeners (no WebSockets from
    the API).
 3. **Media:** images and video go to Cloud Storage, compressed to one
-   standard before saving. Accepted: PNG, JPEG, MP4, MKV. Saved as JPEG
-   (PNG if transparent) and MP4/H.264 (§6, `packages/shared/src/media.ts`).
+   standard before saving. Accepted: every native type on iOS, Android and
+   Windows/macOS browsers (JPEG, PNG, HEIC/HEIF, WebP, GIF; MP4, MOV, M4V,
+   MKV, WebM, 3GP). Saved as JPEG (PNG if transparent) and MP4/H.264 (§6,
+   `packages/shared/src/media.ts`).
+4. **Platforms:** Flutter only for iOS and Android. Windows, macOS and
+   every other desktop use the Next.js website, which becomes the full
+   member app, not only public pages (phase 3, started 2026-11-11).
 
 Still open:
 
-4. **Closing client write rules.** When to drop the fallback and lock each
+5. **Closing client write rules.** When to drop the fallback and lock each
    rule, given TestFlight/App Store builds still in use.
-5. **Generated Dart types.** Hand-written Dart models today; consider
+6. **Generated Dart types.** Hand-written Dart models today; consider
    generating them from the zod schemas (JSON Schema → Dart) once there
    are many endpoints.
-6. **Transcode cost.** ffmpeg on Cloud Run (recommended: CPU minutes only)
+7. **Transcode cost.** ffmpeg on Cloud Run (recommended: CPU minutes only)
    vs. the Transcoder API ($0.015/min); revisit if video volume grows.
 
 ## 12. Known issues

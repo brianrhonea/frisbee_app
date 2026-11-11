@@ -10,8 +10,16 @@ describe("mediaTypeFor", () => {
     ["photo.jpeg", "image/jpeg"],
     ["clip.mp4", "video/mp4"],
     ["game.MKV", "video/x-matroska"],
-    ["photo.heic", null],
-    ["clip.mov", null],
+    ["IMG_0001.HEIC", "image/heic"],
+    ["photo.heif", "image/heif"],
+    ["photo.webp", "image/webp"],
+    ["anim.gif", "image/gif"],
+    ["IMG_0002.MOV", "video/quicktime"],
+    ["clip.m4v", "video/x-m4v"],
+    ["screen.webm", "video/webm"],
+    ["old.3gp", "video/3gpp"],
+    ["doc.pdf", null],
+    ["clip.avi", null],
     ["noext", null],
   ])("%s → %s", (name, type) => {
     expect(mediaTypeFor(name)).toBe(type);
@@ -26,9 +34,14 @@ describe("createUploadRequestSchema", () => {
     expect(ok({ purpose: "teamVideo", contentType: "video/x-matroska", size: 400 * MB, targetId: "t1" }).success).toBe(true);
   });
 
+  it("accepts iPhone photos and video", () => {
+    expect(ok({ purpose: "post", contentType: "image/heic", size: MB }).success).toBe(true);
+    expect(ok({ purpose: "post", contentType: "video/quicktime", size: 50 * MB }).success).toBe(true);
+  });
+
   it("refuses other types", () => {
-    expect(ok({ purpose: "post", contentType: "image/heic", size: 1 }).success).toBe(false);
-    expect(ok({ purpose: "post", contentType: "video/quicktime", size: 1 }).success).toBe(false);
+    expect(ok({ purpose: "post", contentType: "application/pdf", size: 1 }).success).toBe(false);
+    expect(ok({ purpose: "post", contentType: "video/x-msvideo", size: 1 }).success).toBe(false);
   });
 
   it("refuses files over the purpose's limit", () => {

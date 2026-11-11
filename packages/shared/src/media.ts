@@ -3,19 +3,46 @@
 // plays and shows natively on iOS, Android and the web.
 import { z } from "zod";
 
-/** Accepted uploads: PNG and JPEG photos, MP4 and MKV videos. */
-export const acceptedImageTypes = ["image/png", "image/jpeg"] as const;
-export const acceptedVideoTypes = ["video/mp4", "video/x-matroska"] as const;
+/**
+ * Accepted uploads: every photo and video format the supported devices
+ * make natively — iOS (HEIC, MOV), Android (JPEG, WebP, HEIC, MP4, 3GP,
+ * WebM) and Windows/macOS through the website (PNG, JPEG, GIF, WebP, HEIC,
+ * MP4, MOV, MKV, WebM). Everything is converted to [mediaStandard].
+ */
+export const acceptedImageTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+  "image/webp",
+  "image/gif",
+] as const;
+export const acceptedVideoTypes = [
+  "video/mp4",
+  "video/quicktime",
+  "video/x-m4v",
+  "video/x-matroska",
+  "video/webm",
+  "video/3gpp",
+] as const;
 export type AcceptedImageType = (typeof acceptedImageTypes)[number];
 export type AcceptedVideoType = (typeof acceptedVideoTypes)[number];
 export type AcceptedMediaType = AcceptedImageType | AcceptedVideoType;
 
 /** File extensions for each accepted type (pickers and sniffing). */
 export const mediaExtensions: Record<AcceptedMediaType, readonly string[]> = {
+  "image/jpeg": ["jpg", "jpeg", "jfif"],
   "image/png": ["png"],
-  "image/jpeg": ["jpg", "jpeg"],
+  "image/heic": ["heic"],
+  "image/heif": ["heif"],
+  "image/webp": ["webp"],
+  "image/gif": ["gif"],
   "video/mp4": ["mp4"],
+  "video/quicktime": ["mov"],
+  "video/x-m4v": ["m4v"],
   "video/x-matroska": ["mkv"],
+  "video/webm": ["webm"],
+  "video/3gpp": ["3gp"],
 };
 
 /** The content type for a file name, or null if it isn't accepted. */
@@ -40,7 +67,12 @@ const MB = 1024 * 1024;
  */
 export const mediaStandard = {
   image: {
-    /** JPEG; a PNG with transparency stays PNG so it keeps it. */
+    /**
+     * JPEG; an image with transparency (PNG, WebP, GIF) is saved as PNG so
+     * it keeps it. A GIF keeps its first frame only. HEIC/HEIF need a
+     * decoder with HEVC support (sharp's prebuilt binaries lack it; use
+     * libheif via ffmpeg or a sharp build with libheif).
+     */
     format: "image/jpeg",
     transparentFormat: "image/png",
     /** Longest edge, in pixels; smaller images aren't enlarged. */
