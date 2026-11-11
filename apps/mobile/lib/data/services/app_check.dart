@@ -6,7 +6,7 @@ final _log = Logger('AppCheck');
 
 /// Firebase App Check: proves requests come from this app on a real
 /// device, so Firestore, Storage and Cloud Functions can turn away scripts
-/// and fake traffic once enforcement is on (docs/app-check.md).
+/// and fake traffic once enforcement is on (firebase/docs/app-check.md).
 abstract final class AppCheck {
   /// A debug token registered in the Firebase console, from
   /// `APP_CHECK_DEBUG_TOKEN` in secrets.local.json. Debug builds and

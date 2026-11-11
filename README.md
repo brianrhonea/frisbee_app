@@ -1,8 +1,8 @@
 # Stall 10
 
-**Version 0.0.4** · [User guide](docs/user-guide.md) · [Architecture](docs/ARCHITECTURE.md) · [Version log](docs/CHANGELOG.md) · [iOS release](docs/ios-release.md) · [Cloud limits](docs/cloud-limits.md)
+**Version 0.0.4** · [User guide](docs/user-guide.md) · [Architecture](ARCHITECTURE.md) · [Current-state architecture](docs/ARCHITECTURE.md) · [Version log](docs/CHANGELOG.md) · [iOS release](docs/ios-release.md) · [Cloud limits](docs/cloud-limits.md)
 
-An ultimate frisbee team app built with Flutter + Firebase for Android, iOS, macOS and Windows. The website is a separate project. (The Dart package is still named `frisbee_app`.)
+An ultimate frisbee team app. A monorepo: the Flutter app for iOS and Android (`apps/mobile`, Dart package `frisbee_app`), a Node.js API both clients call (`apps/api`), the Next.js website (`apps/web`, phase 3), shared TypeScript (`packages/`), and the Firebase project (`firebase/`). See [ARCHITECTURE.md](ARCHITECTURE.md) and [CLAUDE.md](CLAUDE.md) for commands.
 
 **Features**
 - Sign in with email/password, Google and Apple (Google/Apple are hidden on Windows, which has no plugin support)
@@ -18,14 +18,14 @@ An ultimate frisbee team app built with Flutter + Firebase for Android, iOS, mac
 
 ## Versioning
 
-The version is in `pubspec.yaml` (`version: 0.0.11+11`) and `appVersion` in `lib/ui/core/ui/brand.dart`, and shows at the bottom of Settings. Each release bumps the patch version and adds an entry to [docs/CHANGELOG.md](docs/CHANGELOG.md) (developer log) and [docs/release-notes.md](docs/release-notes.md) (what testers see); `test/version_test.dart` checks the version, pubspec and changelog agree.
+The version is in `apps/mobile/pubspec.yaml` (`version: 0.0.11+11`) and `appVersion` in `apps/mobile/lib/ui/core/ui/brand.dart`, and shows at the bottom of Settings. Each release bumps the patch version and adds an entry to [docs/CHANGELOG.md](docs/CHANGELOG.md) (developer log) and [docs/release-notes.md](docs/release-notes.md) (what testers see); `apps/mobile/test/version_test.dart` checks the version, pubspec and changelog agree.
 
 ## Architecture
 
 The app follows the [Flutter app architecture guide](https://docs.flutter.dev/app-architecture) (MVVM):
 
 ```
-lib/
+apps/mobile/lib/
   config/dependencies.dart    provider wiring (services -> repositories)
   data/services/              thin wrappers over Firebase SDKs
   data/repositories/<x>/      abstract repository + Firebase implementation
@@ -34,12 +34,14 @@ lib/
   ui/<feature>/view_models/   ChangeNotifier ViewModels exposing Commands
   ui/<feature>/widgets/       Views, no business logic
   utils/                      Result, Command, platform support
-functions/                    Cloud Functions (TypeScript), deployed by group
-firestore.rules               security rules (the trust boundary for membership and privacy)
+apps/api/                     Node.js API: routes -> services -> repositories (firebase-admin)
+packages/shared/              API types and zod schemas shared by the API and the website
+firebase/functions/           Cloud Functions (TypeScript), deployed by group
+firebase/firestore.rules      security rules (the trust boundary for membership and privacy)
 docs/                         architecture, user guide, version log, iOS release steps
 ```
 
-Team membership changes are written by the client and validated by `firestore.rules`, so they work on every platform. (`cloud_functions` has no Windows plugin, which is why team actions are not callables.)
+Most team membership changes are still written by the client and validated by `firebase/firestore.rules`; they move to the API one feature at a time (ARCHITECTURE.md §10). Creating a team already goes through the API when the build has `API_BASE_URL`.
 
 ## One-time setup
 
@@ -65,16 +67,16 @@ In the [Firebase console](https://console.firebase.google.com/project/frisbee-ap
 Then deploy the security rules and indexes:
 
 ```
-firebase deploy --only firestore:rules,firestore:indexes,storage
+cd firebase && firebase deploy --only firestore:rules,firestore:indexes,storage
 ```
 
 The Storage rules read chat rooms from Firestore; accept the prompt to let
 them (or grant it under Storage > Rules).
 
-Notifications are sent by the Cloud Functions in `functions/src/notifications` (Firestore triggers and an hourly reminder job). Deploy only that group:
+Notifications are sent by the Cloud Functions in `firebase/functions/src/notifications` (Firestore triggers and an hourly reminder job). Deploy only that group:
 
 ```
-firebase deploy --only functions:notifications
+cd firebase && firebase deploy --only functions:notifications
 ```
 
 iOS push also needs an APNs key uploaded to Firebase (see [iOS release](docs/ios-release.md)). Android needs nothing extra. Windows has no push (FCM has no Windows plugin); notifications still show in the app's feed.
@@ -83,7 +85,7 @@ iOS push also needs an APNs key uploaded to Firebase (see [iOS release](docs/ios
 
 API keys are kept out of git (see `CLAUDE.md`). On a fresh clone:
 
-1. Copy `secrets.example.json` to `secrets.local.json` and fill in the Firebase API keys
+1. In `apps/mobile`, copy `secrets.example.json` to `secrets.local.json` and fill in the Firebase API keys
    (Firebase console > Project settings > Your apps).
 2. Download `google-services.json` to `android/app/` (and `GoogleService-Info.plist` to
    `ios/Runner/` and `macos/Runner/` on a Mac), or run
@@ -92,23 +94,31 @@ API keys are kept out of git (see `CLAUDE.md`). On a fresh clone:
 ## Running
 
 ```
+cd apps/mobile
 flutter run -d windows --dart-define-from-file=secrets.local.json
 flutter run -d <android-device> --dart-define-from-file=secrets.local.json
 ```
+
+The API (Node 22, pnpm): `pnpm install && pnpm dev:api` from the repo root
+(copy `apps/api/.env.example` to `apps/api/.env` first). Point the app at it
+with `"API_BASE_URL": "http://localhost:8787"` in `secrets.local.json`
+(`http://10.0.2.2:8787` from the Android emulator).
 
 VS Code launch configs in `.vscode/launch.json` pass the file for you.
 
 Against local emulators (needs Java 21+ for the Firestore emulator):
 
 ```
-cd functions && npm run serve          # auth, firestore, functions emulators
-flutter run -d windows --dart-define-from-file=secrets.local.json --dart-define=USE_EMULATORS=true
+cd firebase/functions && npm run serve # auth, firestore, functions emulators
+cd apps/mobile && flutter run -d windows --dart-define-from-file=secrets.local.json --dart-define=USE_EMULATORS=true
 ```
 
 ## Tests
 
 ```
-flutter analyze && flutter test        # models, ViewModels, router redirect, widgets
-cd functions && npm test               # functions logic (notifications, browse, api, ...)
-cd functions && npm run test:rules     # Firestore security rules (needs Java for the emulator)
+cd apps/mobile && flutter analyze && flutter test   # models, ViewModels, router redirect, widgets
+pnpm typecheck && pnpm test            # API and shared package (fakes)
+pnpm test:api:emulator                 # API against the Firestore/Auth emulators
+cd firebase/functions && npm test      # functions logic (notifications, browse, api, ...)
+cd firebase/functions && npm run test:rules     # Firestore security rules (needs Java for the emulator)
 ```

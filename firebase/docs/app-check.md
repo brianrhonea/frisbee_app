@@ -1,5 +1,9 @@
 # App Check and abuse protection
 
+Paths are relative to `firebase/` unless they start with `apps/`. The
+Stall 10 API (`apps/api`) checks App Check the same way, with the same
+`ENFORCE_APP_CHECK` switch.
+
 ## What protects what
 
 | Layer | Stops | Where |
@@ -38,6 +42,6 @@ tells them "You're going too fast".
 ## Turning on server search
 
 Deploy the `api` functions to the project, then set `use_api_search: true`
-in the Firestore document `meta/flags` (see docs/rollback.md). Later,
+in the Firestore document `meta/flags` (see firebase/docs/rollback.md). Later,
 once every app build in use searches through the function, firestore.rules
 can deny `list` queries on `profiles` and `teamDirectory` to clients.

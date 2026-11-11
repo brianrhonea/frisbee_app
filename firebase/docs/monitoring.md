@@ -27,7 +27,7 @@ which has gcloud and is already signed in:
    ```
    git clone https://github.com/brianrhonea/frisbee_app.git && cd frisbee_app
    git checkout hardening/scale-and-abuse   # or development once merged
-   bash scripts/monitoring/setup-alerts.sh dev +1XXXXXXXXXX
+   bash firebase/scripts/monitoring/setup-alerts.sh dev +1XXXXXXXXXX
    ```
 3. Google texts you a code. Type it when the script asks.
 4. Once it works on dev, run it again with `prod` and the same number.
@@ -36,7 +36,7 @@ The `api` functions must be deployed first, or the API check alerts right
 away. Running the script again is safe: anything that exists is skipped.
 
 Thresholds are environment variables, for example
-`READS_PER_5MIN=250000 bash scripts/monitoring/setup-alerts.sh prod +1…`.
+`READS_PER_5MIN=250000 bash firebase/scripts/monitoring/setup-alerts.sh prod +1…`.
 To change a threshold that's already set, edit the policy in the console
 (Monitoring → Alerting) or delete it and re-run the script.
 

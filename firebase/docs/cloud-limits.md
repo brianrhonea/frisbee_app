@@ -178,7 +178,7 @@ Rough estimates for planning, not measurements. The debug read counter
 
 - **Firebase console → Usage and billing** for Firestore reads, Storage
   and Functions; **LiveKit dashboard** for minutes and bandwidth.
-- The text alerts in `docs/monitoring.md` cover read spikes (100,000 in 5
+- The text alerts in `firebase/docs/monitoring.md` cover read spikes (100,000 in 5
   minutes), function floods and mass mutes.
 - **First to run out at today's size:**
   1. **LiveKit minutes:** voice channels and meetings share 5,000 a

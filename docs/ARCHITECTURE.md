@@ -1,4 +1,15 @@
-# Stall 10 architecture
+# Stall 10 architecture (current state, before the API)
+
+> **Monorepo note (November 2026).** The repo is now a monorepo and the
+> target architecture, phases and migration status are in the root
+> [`ARCHITECTURE.md`](../ARCHITECTURE.md). This document still describes how
+> each feature works today. Paths below are as they were before the move:
+> `lib/`, `test/`, `web/` are now under `apps/mobile/`; `functions/`,
+> `hosting/`, `firestore.rules`, `storage.rules`, `firebase.json` are under
+> `firebase/`; `scripts/build_site.sh` and `scripts/monitoring/` are under
+> `firebase/scripts/`; `docs/rollback.md`, `docs/monitoring.md`,
+> `docs/app-check.md` and `docs/cloud-limits.md` are under `firebase/docs/`.
+> Creating a team now goes through the API when the build has one.
 
 How the app is put together as of version 0.0.12 (plus the
 `hardening/scale-and-abuse` branch). It starts with what the app is and

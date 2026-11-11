@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 /// Kill switches for newer behaviour, read live from the `meta/flags`
 /// document. Editing that document in the Firebase console turns a feature
 /// off (or on) in every running app at once, with no new build: the
-/// one-click rollback for the app side (docs/rollback.md).
+/// one-click rollback for the app side (firebase/docs/rollback.md).
 ///
 /// Until the document loads (or when a key is missing) [defaults] apply.
 class FeatureFlags extends ChangeNotifier {
