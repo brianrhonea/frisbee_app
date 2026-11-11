@@ -60,7 +60,15 @@ enum TeamSection {
   /// Sections a team or community group has, in display order. Groups
   /// don't keep a roster, plays, videos or stats. Any of them can host
   /// tournaments.
-  static List<TeamSection> forKind(TeamKind kind) => switch (kind) {
+  static List<TeamSection> forKind(TeamKind kind, {bool league = false}) =>
+      league ? const [chat, members] : _forKind(kind);
+
+  /// [team]'s sections: a league team ([Team.isLeagueTeam]) only has its
+  /// chat and members.
+  static List<TeamSection> forTeam(Team team) =>
+      forKind(team.kind, league: team.isLeagueTeam);
+
+  static List<TeamSection> _forKind(TeamKind kind) => switch (kind) {
     TeamKind.team => values.where((s) => s != teams).toList(),
     TeamKind.community => const [events, chat, tournaments, members],
     TeamKind.organization => const [teams, events, chat, tournaments, members],
@@ -246,7 +254,7 @@ class TeamSectionScreen extends StatelessWidget {
                   ),
           );
         }
-        if (!TeamSection.forKind(team.kind).contains(section)) {
+        if (!TeamSection.forTeam(team).contains(section)) {
           return Scaffold(
             appBar: AppBar(leading: leading),
             body: EmptyView(

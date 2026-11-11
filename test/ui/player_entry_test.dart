@@ -10,6 +10,7 @@ import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournament_form_vi
 import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournament_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/view_models/player_signups_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/view_models/team_draft_viewmodel.dart';
+import 'package:frisbee_app/ui/teams/widgets/team_section_screen.dart';
 import 'package:frisbee_app/ui/tournaments/widgets/hosted_tournament_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -1184,6 +1185,13 @@ void main() {
       final teamId = (made as Ok<String>).value;
       final team = teams.teams[teamId]!;
       expect(team.ownerId, 'cap');
+      // A league team: just chat and members.
+      expect(team.leagueId, id);
+      expect(team.isLeagueTeam, isTrue);
+      expect(TeamSection.forTeam(team), [
+        TeamSection.chat,
+        TeamSection.members,
+      ]);
       expect(team.division, div.division);
       expect(team.level, div.level);
       final entry = repo.entries[id]![teamId]!;

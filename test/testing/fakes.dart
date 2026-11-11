@@ -500,6 +500,7 @@ class FakeTeamRepository implements TeamRepository {
       location: team.location,
       orgId: team.orgId,
       orgName: team.orgName,
+      leagueId: team.leagueId,
     );
     if (team.kind.isGroupLike) {
       listings[id] = team.listing(id);

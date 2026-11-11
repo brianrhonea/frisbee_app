@@ -384,9 +384,11 @@ service cloud.firestore {
       allow create: if signedIn() && notMuted()
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
-             'memberIds', 'memberNames', 'createdAt', 'orgId', 'orgName'])
+             'memberIds', 'memberNames', 'createdAt', 'orgId', 'orgName',
+             'leagueId'])
         && validTeamFields(request.resource.data)
         && validOrgRef(request.resource.data)
+        && validLeagueRef(request.resource.data)
         && request.resource.data.ownerId == uid()
         && request.resource.data.members == {(uid()): 'owner'}
         && request.resource.data.memberIds == [uid()]
@@ -415,6 +417,15 @@ service cloud.firestore {
 
       // The community a team asks to join (or leaves). Only Cloud Functions
       // set orgLinked and orgMembers, once the community lists the team.
+      // A league team started to reserve a spot (Team.leagueId) names an
+      // event that takes team spots.
+      function validLeagueRef(t) {
+        let path = /databases/$(database)/documents/tournaments/$(t.get('leagueId', 'none'));
+        return t.get('leagueId', null) == null
+          || (t.leagueId is string && t.leagueId.size() <= 60
+              && exists(path)
+              && get(path).data.get('teamEntry', false) == true);
+      }
       function validOrgRef(t) {
         return t.get('orgId', null) == null
           || (t.orgId is string && t.orgId.size() > 0 && t.orgId.size() <= 40

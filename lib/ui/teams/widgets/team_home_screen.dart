@@ -338,7 +338,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         final section = widget.section;
         if (team != null &&
             section != null &&
-            TeamSection.forKind(team.kind).contains(section)) {
+            TeamSection.forTeam(team).contains(section)) {
           return Scaffold(
             appBar: mobile
                 ? AppBar(
@@ -414,41 +414,92 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 onJoin: _join,
               ),
               const SizedBox(height: 16),
-              SideColumnLayout(
-                main: [
-                  _about(summary),
-                  if (!vm.isMember) _joinCard(summary),
-                  if (vm.contentError != null)
-                    Text(
-                      errorMessage(vm.contentError),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+              if (team != null && team.isLeagueTeam)
+                // A league team is its chat and members; the league page
+                // has its games.
+                SideColumnLayout(
+                  main: [
+                    _about(summary),
+                    _leagueCard(team),
+                    _MembersCard(team: team),
+                  ],
+                  side: [_details(summary)],
+                  narrow: [
+                    _about(summary),
+                    _leagueCard(team),
+                    _MembersCard(team: team),
+                    _details(summary),
+                  ],
+                )
+              else
+                SideColumnLayout(
+                  main: [
+                    _about(summary),
+                    if (!vm.isMember) _joinCard(summary),
+                    if (vm.contentError != null)
+                      Text(
+                        errorMessage(vm.contentError),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
-                    ),
-                  if (team != null) _MembersCard(team: team),
-                  ..._posts(context),
-                ],
-                side: [
-                  ..._events(context),
-                  ..._tournaments(context),
-                  _details(summary),
-                ],
-                narrow: [
-                  _about(summary),
-                  if (!vm.isMember) _joinCard(summary),
-                  ..._events(context),
-                  ..._tournaments(context),
-                  if (team != null) _MembersCard(team: team),
-                  ..._posts(context),
-                  _details(summary),
-                ],
-              ),
+                    if (team != null) _MembersCard(team: team),
+                    ..._posts(context),
+                  ],
+                  side: [
+                    ..._events(context),
+                    ..._tournaments(context),
+                    _details(summary),
+                  ],
+                  narrow: [
+                    _about(summary),
+                    if (!vm.isMember) _joinCard(summary),
+                    ..._events(context),
+                    ..._tournaments(context),
+                    if (team != null) _MembersCard(team: team),
+                    ..._posts(context),
+                    _details(summary),
+                  ],
+                ),
             ],
           ),
         );
       },
     );
   }
+
+  /// Where a league team's games are: the league's page, plus its chat.
+  Widget _leagueCard(Team team) => SectionCard(
+    title: 'League team',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Your games, standings and schedule are on the league page. '
+          'Talk to your team in chat.',
+          style: TextStyle(color: AppColors.of(context).muted, fontSize: 13.5),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton.icon(
+              onPressed: () => context.push(Routes.tournament(team.leagueId!)),
+              icon: const Icon(Icons.emoji_events_outlined),
+              label: const Text('League page'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  goWithinTeam(context, TeamSection.chat.route(team.id)),
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: const Text('Chat'),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 
   Widget _menu(Team team) {
     final noun = team.kind.noun;
@@ -963,7 +1014,12 @@ class _Hero extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 if (vm.isMember)
-                  _TeamTabs(teamId: teamId, kind: summary.kind, selected: null)
+                  _TeamTabs(
+                    teamId: teamId,
+                    kind: summary.kind,
+                    league: vm.team?.isLeagueTeam ?? false,
+                    selected: null,
+                  )
                 else
                   const SizedBox(height: 8),
               ],
@@ -981,7 +1037,11 @@ class _TeamTabs extends StatelessWidget {
     required this.teamId,
     required this.kind,
     required this.selected,
+    this.league = false,
   });
+
+  /// A league team: just chat and members.
+  final bool league;
 
   final String teamId;
   final TeamKind kind;
@@ -991,7 +1051,7 @@ class _TeamTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sections = TeamSection.forKind(kind);
+    final sections = TeamSection.forKind(kind, league: league);
     final current = selected;
     return UnderlineTabs(
       labels: ['Overview', for (final s in sections) s.labelFor(kind)],
@@ -1060,6 +1120,7 @@ class _SectionHeader extends StatelessWidget {
             _TeamTabs(
               teamId: viewModel.teamId,
               kind: summary.kind,
+              league: viewModel.team?.isLeagueTeam ?? false,
               selected: section,
             ),
           ],

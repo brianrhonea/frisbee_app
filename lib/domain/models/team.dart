@@ -221,7 +221,15 @@ class Team {
     this.orgMembers = const {},
     this.orgRoles = const {},
     this.official = false,
+    this.leagueId,
   });
+
+  /// The league (a hosted event's id) this team was made for: drafted by
+  /// the league, or started to reserve a spot in it. A league team is just
+  /// a chat and its members; the league runs its games.
+  final String? leagueId;
+
+  bool get isLeagueTeam => leagueId != null;
 
   /// An official organizer, e.g. Stall 10: its events carry a verified
   /// badge. Set only from the Firebase console or admin tools; the rules
@@ -491,6 +499,7 @@ class Team {
           for (final e in m.entries) '${e.key}': '${e.value}',
       },
       official: map['official'] == true,
+      leagueId: map['leagueId'] as String?,
     );
   }
 
@@ -555,6 +564,7 @@ class Team {
     orgMembers: orgMembers ?? this.orgMembers,
     orgRoles: orgRoles ?? this.orgRoles,
     official: official,
+    leagueId: leagueId,
   );
 }
 
@@ -654,6 +664,7 @@ class NewTeam {
     this.location,
     this.orgId,
     this.orgName = '',
+    this.leagueId,
   });
 
   final String name;
@@ -664,6 +675,9 @@ class NewTeam {
   final String description;
   final bool requiresApproval;
   final GroupLocation? location;
+
+  /// The league it's started for, to reserve a spot ([Team.leagueId]).
+  final String? leagueId;
 
   /// The community it's made in, if any (a team only).
   final String? orgId;
@@ -681,6 +695,7 @@ class NewTeam {
       location: location,
     ),
     if (orgId case final id?) ...{'orgId': id, 'orgName': orgName},
+    'leagueId': ?leagueId,
   };
 
   NewTeam inCommunity(Team org) => NewTeam(

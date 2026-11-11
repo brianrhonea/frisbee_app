@@ -663,7 +663,12 @@ class HostedTournamentViewModel extends ChangeNotifier {
     if (name.isEmpty) return Result.error(Exception('Name your team.'));
     // A team of the division's kind, so it fits the league.
     final made = await _teams.createTeam(
-      NewTeam(name: name, division: d.division, level: d.level),
+      NewTeam(
+        name: name,
+        division: d.division,
+        level: d.level,
+        leagueId: tournamentId,
+      ),
       me,
     );
     final String teamId;
