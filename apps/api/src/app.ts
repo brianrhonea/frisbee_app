@@ -1,6 +1,10 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { errorHandler } from "./errors.js";
+import type { BrowseRepository } from "./browse/repository.js";
+import { browseRoutes } from "./browse/routes.js";
+import { BrowseService } from "./browse/service.js";
+import type { RateLimiter } from "./limits/limiter.js";
 import type { TeamRepository } from "./teams/repository.js";
 import { teamRoutes } from "./teams/routes.js";
 import { TeamService } from "./teams/service.js";
@@ -9,6 +13,13 @@ export interface AppDeps {
   verifier: TokenVerifier;
   users: UserLookup;
   teams: TeamRepository;
+  /** The website's public reads (`/v1/public/*`); off when not given. */
+  browse?: {
+    repo: BrowseRepository;
+    limiter: RateLimiter;
+    imageUrl: (path: string) => string;
+    webServerKey?: string;
+  };
   enforceAppCheck?: boolean;
   logger?: boolean;
   now?: () => number;
@@ -29,5 +40,6 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   app.get("/health", async () => ({ ok: true }));
   teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now));
+  if (deps.browse) browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now), deps.browse);
   return app;
 }

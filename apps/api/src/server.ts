@@ -6,6 +6,8 @@ import { getAppCheck } from "firebase-admin/app-check";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { buildApp } from "./app.js";
+import { FirestoreBrowseRepository } from "./browse/repository.js";
+import { FirestoreRateLimiter } from "./limits/limiter.js";
 import { FirestoreTeamRepository } from "./teams/repository.js";
 
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "frisbee-app-brianrhonea-dev";
@@ -37,7 +39,24 @@ const app = buildApp({
     },
   },
   teams: new FirestoreTeamRepository(db),
+  browse: {
+    repo: new FirestoreBrowseRepository(db),
+    limiter: new FirestoreRateLimiter(db),
+    imageUrl: storageUrl(process.env.FIREBASE_STORAGE_BUCKET ?? `${projectId}.firebasestorage.app`),
+    webServerKey: process.env.WEB_SERVER_KEY || undefined,
+  },
 });
+
+/**
+ * Storage's REST URL for [path]: it applies storage.rules to an
+ * unauthenticated read, so visitors only get photos the rules let them
+ * see (public authors' post photos).
+ */
+function storageUrl(bucket: string) {
+  const host = process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+  const base = host ? `http://${host}` : "https://firebasestorage.googleapis.com";
+  return (path: string) => `${base}/v0/b/${bucket}/o/${encodeURIComponent(path)}?alt=media`;
+}
 
 const port = Number(process.env.PORT ?? 8787);
 app.listen({ port, host: "0.0.0.0" }).then(

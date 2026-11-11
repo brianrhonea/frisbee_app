@@ -20,6 +20,14 @@ declare module "fastify" {
   interface FastifyRequest {
     caller: Caller | null;
   }
+  interface FastifyContextConfig {
+    /**
+     * Open to anyone, signed in or not (the website's public pages): no App
+     * Check (browsers visiting the site have none), and a bad token is
+     * treated as a visitor instead of an error.
+     */
+    public?: boolean;
+  }
 }
 
 /**
@@ -46,15 +54,16 @@ export function registerAuth(app: FastifyInstance, verifier: TokenVerifier, enfo
   app.decorateRequest("caller", null);
   app.addHook("onRequest", async (req) => {
     if (req.url === "/health") return;
+    const open = req.routeOptions.config?.public === true;
     const appCheck = req.headers[appCheckHeader];
     if (typeof appCheck === "string" && appCheck) {
       try {
         await verifier.verifyAppCheck(appCheck);
       } catch (e) {
-        if (enforceAppCheck) throw new ApiError("unauthenticated", "This app couldn't be verified. Update it and try again.");
+        if (enforceAppCheck && !open) throw new ApiError("unauthenticated", "This app couldn't be verified. Update it and try again.");
         req.log.warn({ err: e }, "invalid App Check token");
       }
-    } else if (enforceAppCheck) {
+    } else if (enforceAppCheck && !open) {
       throw new ApiError("unauthenticated", "This app couldn't be verified. Update it and try again.");
     }
 
@@ -64,7 +73,7 @@ export function registerAuth(app: FastifyInstance, verifier: TokenVerifier, enfo
     try {
       req.caller = await verifier.verifyIdToken(match[1]);
     } catch {
-      throw new ApiError("unauthenticated", "Your session has expired. Sign in again.");
+      if (!open) throw new ApiError("unauthenticated", "Your session has expired. Sign in again.");
     }
   });
 }

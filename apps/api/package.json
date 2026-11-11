@@ -14,7 +14,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --exclude \"test/**/*.emulator.test.ts\"",
-    "test:emulator": "firebase --config ../../firebase/firebase.json emulators:exec --only firestore,auth --project demo-stall10 \"vitest run test/teams.emulator.test.ts\""
+    "test:emulator": "firebase --config ../../firebase/firebase.json emulators:exec --only firestore,auth --project demo-stall10 \"vitest run emulator.test --no-file-parallelism\""
   },
   "dependencies": {
     "@stall10/shared": "workspace:*",
