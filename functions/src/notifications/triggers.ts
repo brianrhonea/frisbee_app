@@ -8,6 +8,7 @@ import { logger } from "firebase-functions";
 import {
   onDocumentCreated,
   onDocumentUpdated,
+  onDocumentWritten,
   onDocumentWrittenWithAuthContext,
 } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -15,6 +16,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { invitees, type MeetingDoc, meetingChange, type MeetingTeam, startedRecipients } from "../meetings/model";
 import { isLeagueGameEvent } from "../tournaments/model";
 import { deliver } from "./deliver";
+import { draftDeliveries, signupDecisionNotice } from "./league";
 import {
   chatNotice,
   commentLikeNotice,
@@ -242,6 +244,36 @@ export const groupJoinRequest = onDocumentCreated(
     );
   },
 );
+
+const eventName = async (tournamentId: string): Promise<string> =>
+  String((await getFirestore().doc(`tournaments/${tournamentId}`).get()).get("name") ?? "");
+
+/** A captains' draft started, the turn passed, or the teams are set. */
+export const leagueDraft = onDocumentWritten("tournaments/{tournamentId}/drafts/{divisionId}", async (event) => {
+  const after = event.data?.after.data();
+  if (!after) return;
+  const { tournamentId, divisionId } = event.params;
+  const deliveries = draftDeliveries({
+    tournamentId,
+    divisionId,
+    eventName: await eventName(tournamentId),
+    before: event.data?.before.data(),
+    after,
+  });
+  const db = getFirestore();
+  const messaging = getMessaging();
+  await Promise.all(deliveries.map((d) => deliver(db, messaging, d.uids, d.notice)));
+});
+
+/** The host accepted, waitlisted or declined a player's signup: that player. */
+export const signupDecision = onDocumentUpdated("tournaments/{tournamentId}/signups/{userId}", async (event) => {
+  const { tournamentId, userId } = event.params;
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (before?.status === after?.status) return;
+  const notice = signupDecisionNotice({ tournamentId, eventName: await eventName(tournamentId), before, after });
+  if (notice) await deliver(getFirestore(), getMessaging(), [userId], notice);
+});
 
 /** An invitation to join a team or group: the person invited. */
 export const teamInvite = onDocumentWrittenWithAuthContext(
