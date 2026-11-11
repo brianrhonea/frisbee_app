@@ -247,8 +247,8 @@ In order of preference:
 |---|---|---|---|---|
 | apps/mobile (iOS) | Codemagic (`codemagic.yaml`, `working_directory: apps/mobile`) | TestFlight / App Store | `development` → TestFlight | `main` → App Store |
 | apps/mobile (Android) | Codemagic (to add) | Play Store | | |
-| apps/api | Container build (to add) | **Cloud Run in each Firebase project** (decided 2026-11-11): same project and region as Firestore, its own service account (ADC, no keys), optionally behind a Firebase Hosting rewrite (`/api/**`) | `frisbee-app-brianrhonea-dev` | `frisbee-app-brianrhonea` |
-| Video transcoding | Same container image, run as a job | Cloud Run job in each Firebase project | dev | prod |
+| apps/api | `apps/api/Dockerfile` (target `api`), GitHub Actions (`deploy-api.yml`; rollback `rollback-api.yml`) | **Cloud Run in each Firebase project** (decided 2026-11-11): service `api`, same project and region as Firestore (us-central1 unless Firestore says otherwise), its own service account `api-runtime` (ADC, no keys), scales to zero; config in `apps/api/deploy/service.yaml`, one-time setup in `apps/api/DEPLOY.md`; optionally behind a Firebase Hosting rewrite (`/api/**`) | `frisbee-app-brianrhonea-dev` | `frisbee-app-brianrhonea` |
+| Video transcoding | Same Dockerfile, target `media` (adds ffmpeg); to add | Cloud Run job in each Firebase project (`apps/api/DEPLOY.md`) | dev | prod |
 | apps/web | Vercel (Root Directory `apps/web`) | Vercel | preview deployments | production |
 | firebase/ | GitHub Actions (`deploy-backend.yml`) | Firebase | `--project dev` | `--project prod` |
 

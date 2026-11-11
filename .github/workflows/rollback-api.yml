@@ -1,0 +1,85 @@
+# One-click API rollback: Actions → "Roll back API" → Run workflow.
+# Leave "release" empty to go back to the API release before the latest
+# one, or name any api-release-<env>-<time> tag. Redeploys that release's
+# image (by digest, no rebuild) with that commit's service.yaml.
+#
+# Faster still, without GitHub: point traffic at an earlier revision with
+# `gcloud run services update-traffic` (apps/api/DEPLOY.md). Data written
+# since isn't touched.
+
+name: Roll back API
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Firebase project
+        type: choice
+        options: [dev, prod]
+        default: dev
+      release:
+        description: API release tag to restore (empty = the one before the latest)
+        type: string
+        default: ""
+      reason:
+        description: Why (shown in the run summary)
+        type: string
+        default: ""
+
+concurrency:
+  group: api-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.pick.outputs.tag }}
+      image: ${{ steps.pick.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: pick
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          RELEASE: ${{ inputs.release }}
+        run: |
+          git fetch --force --tags origin
+          if [ -n "$RELEASE" ]; then
+            tag="$RELEASE"
+          else
+            # Tags sort by time: the newest is live, take the one before.
+            tag=$(git tag --list "api-release-$ENVIRONMENT-*" --sort=-refname | sed -n 2p)
+          fi
+          if [ -z "$tag" ] || ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::No API release to roll back to (looked for '$tag')."
+            exit 1
+          fi
+          case "$tag" in api-release-$ENVIRONMENT-*) ;; *)
+            echo "::error::$tag isn't an API release for $ENVIRONMENT."; exit 1;;
+          esac
+          image=$(git tag --list --format='%(contents)' "$tag" | sed -n 's/^image: //p' | head -1)
+          case "$image" in *@sha256:*) ;; *)
+            echo "::error::$tag doesn't record an image digest."; exit 1;;
+          esac
+          echo "Rolling the $ENVIRONMENT API back to $tag ($image)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+  rollback:
+    needs: pick
+    uses: ./.github/workflows/_deploy-api.yml
+    permissions:
+      contents: write
+      id-token: write
+    with:
+      environment: ${{ inputs.environment }}
+      ref: ${{ needs.pick.outputs.tag }}
+      image: ${{ needs.pick.outputs.image }}
+      tag: false
+      reason: "Rollback to ${{ needs.pick.outputs.tag }}. ${{ inputs.reason }}"
+    secrets:
+      # Only this environment's key (if any). The && || picks between two
+      # non-empty names, so a missing prod key can't fall back to dev's.
+      GCP_SA_KEY: ${{ secrets[inputs.environment == 'prod' && 'FIREBASE_SA_PROD' || 'FIREBASE_SA_DEV'] }}

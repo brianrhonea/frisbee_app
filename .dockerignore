@@ -1,0 +1,31 @@
+# Docker build context for apps/api/Dockerfile (built from the repo root).
+# Allow-list: only what the API image needs is sent; everything else
+# (apps/mobile, apps/web, firebase/, secrets, native Firebase config) never
+# leaves the machine.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!packages/shared/
+!apps/api/
+
+# Never, even inside the allowed folders.
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+**/*.local.json
+**/google-services*.json
+**/GoogleService-Info*.plist
+**/*service-account*.json
+**/*.p8
+**/*.p12
+**/*.pem
+**/*.key
+**/*.log
+**/*.tsbuildinfo
+apps/api/Dockerfile
+apps/api/deploy
+apps/api/test
+packages/shared/test
