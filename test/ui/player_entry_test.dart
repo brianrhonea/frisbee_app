@@ -350,6 +350,41 @@ void main() {
       host.dispose();
     });
 
+    test("a signup's name is never their email", () async {
+      final id = await hostHat();
+      final division = repo.divisions[id]!.keys.single;
+      final bare = PlayerSignupsViewModel(
+        tournamentId: id,
+        tournamentRepository: repo,
+        authRepository: FakeAuthRepository(
+          user: const AppUser(uid: 'e1', email: 'secret@example.com'),
+        ),
+      );
+      await pumpEventQueue();
+      await bare.signUp.execute((divisionId: division, skill: 3, gender: null));
+      expect(repo.signups[id]!['e1']!.name, 'Player');
+      final named = PlayerSignupsViewModel(
+        tournamentId: id,
+        tournamentRepository: repo,
+        authRepository: FakeAuthRepository(
+          user: const AppUser(
+            uid: 'e2',
+            email: 'x@example.com',
+            username: 'frisbee_fan',
+          ),
+        ),
+      );
+      await pumpEventQueue();
+      await named.signUp.execute((
+        divisionId: division,
+        skill: 3,
+        gender: null,
+      ));
+      expect(repo.signups[id]!['e2']!.name, 'frisbee_fan');
+      bare.dispose();
+      named.dispose();
+    });
+
     test('team applications are refused for player entry', () async {
       final id = await hostHat();
       teams.teams['t1'] = Team(
@@ -562,6 +597,51 @@ void main() {
     });
 
     test(
+      'once the schedule is out teams can be adjusted, not added or removed',
+      () async {
+        final id = await withPlayers(count: 12);
+        final first = await draftPage(id);
+        first.setTeamCount(4);
+        await first.draft.execute();
+        await first.save.execute();
+        first.dispose();
+        final host = await page('director', id);
+        await host.publish.execute();
+        await pumpEventQueue();
+        expect(host.isPublished, isTrue);
+        host.dispose();
+
+        final vm = await draftPage(id);
+        expect(vm.locked, isTrue);
+        final ids = [for (final t in vm.teams) t.id];
+        vm.setTeamCount(2);
+        expect(vm.teams, hasLength(4));
+        await vm.draft.execute();
+        expect(vm.draft.error, isTrue);
+        await vm.reshuffle.execute();
+        expect(vm.reshuffle.error, isTrue);
+        expect(vm.teams.map((t) => t.id), ids);
+
+        // Moving a player, renaming and a new captain still save.
+        final from = vm.teams.first;
+        final to = vm.teams.last;
+        final moved = from.playerIds.last;
+        vm.movePlayer(moved, teamId: to.id);
+        vm.rename(from.id, 'Renamed');
+        vm.setCaptain(to.id, moved);
+        await vm.save.execute();
+        expect(vm.save.completed, isTrue);
+        final d = repo.divisions[id]!.values.single;
+        expect(d.seeds, ids);
+        expect(d.teams.last.playerIds, contains(moved));
+        expect(d.teams.first.name, 'Renamed');
+        expect(d.captains[to.id], [moved]);
+        expect(repo.games.values.single, isNotEmpty);
+        vm.dispose();
+      },
+    );
+
+    test(
       'drafted teams play: the schedule uses them and captains report',
       () async {
         final id = await withPlayers(count: 12);
@@ -678,6 +758,59 @@ void main() {
       vm.dispose();
     });
 
+    test(
+      "a division saved before the season changed still publishes right",
+      () async {
+        final id = await hostLeague();
+        // The host drops the playoffs after the division was saved.
+        final t = repo.tournaments[id]!;
+        repo.tournaments[id] = t.copyWith(
+          season: () =>
+              const LeagueSeason(weeks: 4, playoffWeeks: 0, playoffTeams: 0),
+        );
+        final host = await page('director', id);
+        expect(
+          host.division!.settings.format,
+          TournamentFormat.singleElim,
+          reason: 'the stored format is stale',
+        );
+        expect(host.formatOf(host.division!), TournamentFormat.roundRobin);
+        await repo.saveDivision(
+          host.tournament!,
+          host.division!.copyWith(seeds: ['a', 'b', 'c', 'd']),
+        );
+        await pumpEventQueue();
+        await host.publish.execute();
+        await pumpEventQueue();
+        expect(
+          repo.divisions[id]!.values.single.settings.format,
+          TournamentFormat.roundRobin,
+        );
+        expect(host.games.every((g) => g.stage.name == 'pool'), isTrue);
+        host.dispose();
+      },
+    );
+
+    test(
+      'new divisions: tournaments are 7v7, leagues are weekly evenings',
+      () async {
+        final tid = await hostHat();
+        final hat = await page('director', tid);
+        final d = hat.newDivision();
+        expect(d.settings.playersOnField, 7);
+        expect(d.settings.startsAt.hour, 9);
+        hat.dispose();
+        final lid = await hostLeague();
+        final league = await page('director', lid);
+        final l = league.newDivision();
+        expect(l.level, CompetitionLevel.league);
+        expect(l.settings.startsAt, DateTime(2027, 6, 3, 18, 30));
+        expect(l.settings.format, TournamentFormat.singleElim);
+        expect(l.settings.laterDays, isEmpty);
+        league.dispose();
+      },
+    );
+
     test('publishing a league schedules its weekly season', () async {
       final id = await hostLeague();
       final host = await page('director', id);
@@ -784,6 +917,8 @@ void main() {
       expect(find.text('Sam Lee'), findsOneWidget);
       expect(find.textContaining('2 signed up · 1 accepted'), findsOneWidget);
       expect(find.text('Draft teams'), findsOneWidget);
+      // Organisers play too.
+      expect(find.text('Play in Hat Day'), findsOneWidget);
       expect(find.byType(Switch), findsNWidgets(2));
 
       await tester.tap(find.byType(Switch).first);

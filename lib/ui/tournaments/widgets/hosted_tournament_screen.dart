@@ -431,7 +431,7 @@ class _OverviewTab extends StatelessWidget {
             ),
           ],
           if (vm.isManager) _HostSteps(viewModel: vm),
-          if (t.takesPlayers && signups != null && !vm.isManager)
+          if (t.takesPlayers && signups != null)
             ListenableBuilder(
               listenable: signups!,
               builder: (_, _) =>

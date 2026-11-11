@@ -108,28 +108,18 @@ class _TeamDraftScreenState extends State<TeamDraftScreen> {
         }
         return Scaffold(
           appBar: AppBar(title: Text('Draft teams · ${d.label}')),
-          body: vm.locked
-              ? const EmptyView(
-                  icon: Icons.lock_outline,
-                  title: 'Teams are locked in',
-                  message:
-                      'The schedule is published. Remove it on the Schedule '
-                      'tab to change the teams.',
-                )
-              : _body(context),
-          bottomNavigationBar: vm.locked
-              ? null
-              : SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: FilledButton(
-                      onPressed: vm.save.running || vm.teams.isEmpty
-                          ? null
-                          : () => vm.save.execute(),
-                      child: Text(vm.dirty ? 'Save teams' : 'Teams saved'),
-                    ),
-                  ),
-                ),
+          body: _body(context),
+          bottomNavigationBar: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: FilledButton(
+                onPressed: vm.save.running || vm.teams.isEmpty
+                    ? null
+                    : () => vm.save.execute(),
+                child: Text(vm.dirty ? 'Save teams' : 'Teams saved'),
+              ),
+            ),
+          ),
         );
       },
     );
@@ -151,71 +141,84 @@ class _TeamDraftScreenState extends State<TeamDraftScreen> {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text('Teams', style: theme.textTheme.titleSmall),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: 'Fewer teams',
-                        onPressed: vm.teamCount <= 2
-                            ? null
-                            : () => vm.setTeamCount(vm.teamCount - 1),
-                        icon: const Icon(Icons.remove_circle_outline),
-                      ),
-                      Text(
-                        '${vm.teamCount}',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      IconButton(
-                        tooltip: 'More teams',
-                        onPressed: vm.teamCount >= vm.maxTeams
-                            ? null
-                            : () => vm.setTeamCount(vm.teamCount + 1),
-                        icon: const Icon(Icons.add_circle_outline),
-                      ),
-                    ],
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.icon(
-                        onPressed: vm.draft.running
-                            ? null
-                            : () => vm.draft.execute(),
-                        icon: const Icon(Icons.auto_fix_high),
-                        label: Text(
-                          vm.teams.isEmpty ? 'Deal teams' : 'Deal again',
-                        ),
-                      ),
-                      if (vm.teams.isNotEmpty)
-                        OutlinedButton.icon(
-                          onPressed: vm.reshuffle.running
+          if (vm.locked)
+            Card(
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                leading: const Icon(Icons.lock_outline),
+                title: const Text('The schedule is published'),
+                subtitle: const Text(
+                  'You can move players, rename teams and change captains, '
+                  'but not add or remove teams.',
+                ),
+              ),
+            )
+          else
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('Teams', style: theme.textTheme.titleSmall),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: 'Fewer teams',
+                          onPressed: vm.teamCount <= 2
                               ? null
-                              : () => vm.reshuffle.execute(),
-                          icon: const Icon(Icons.shuffle),
-                          label: const Text('Shuffle'),
+                              : () => vm.setTeamCount(vm.teamCount - 1),
+                          icon: const Icon(Icons.remove_circle_outline),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Players are dealt strongest first, each to the team with '
-                    'the fewest players and the lowest total skill. '
-                    'Dealing again replaces the rosters below.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
+                        Text(
+                          '${vm.teamCount}',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        IconButton(
+                          tooltip: 'More teams',
+                          onPressed: vm.teamCount >= vm.maxTeams
+                              ? null
+                              : () => vm.setTeamCount(vm.teamCount + 1),
+                          icon: const Icon(Icons.add_circle_outline),
+                        ),
+                      ],
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: vm.draft.running
+                              ? null
+                              : () => vm.draft.execute(),
+                          icon: const Icon(Icons.auto_fix_high),
+                          label: Text(
+                            vm.teams.isEmpty ? 'Deal teams' : 'Deal again',
+                          ),
+                        ),
+                        if (vm.teams.isNotEmpty)
+                          OutlinedButton.icon(
+                            onPressed: vm.reshuffle.running
+                                ? null
+                                : () => vm.reshuffle.execute(),
+                            icon: const Icon(Icons.shuffle),
+                            label: const Text('Shuffle'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Players are dealt strongest first, each to the team with '
+                      'the fewest players and the lowest total skill. '
+                      'Dealing again replaces the rosters below.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
           if (stale.isNotEmpty) ...[
             const SizedBox(height: 12),
             Card(

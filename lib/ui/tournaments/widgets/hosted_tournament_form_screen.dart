@@ -190,6 +190,49 @@ class _HostedTournamentFormScreenState
           ),
         ],
       ),
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Skipped weeks', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final d in s.skipDates)
+                  InputChip(
+                    label: Text(DateFormat.MMMd().format(d)),
+                    onDeleted: () => vm.setSeason(
+                      s.copyWith(skipDates: [...s.skipDates]..remove(d)),
+                    ),
+                  ),
+                if (s.skipDates.length < LeagueSeason.maxSkipDates)
+                  ActionChip(
+                    avatar: const Icon(Icons.add, size: 18),
+                    label: const Text('Skip a week'),
+                    onPressed: () async {
+                      final d = await showDatePicker(
+                        context: context,
+                        initialDate: vm.startsOn,
+                        firstDate: vm.startsOn,
+                        lastDate: DateTime(vm.startsOn.year + 2),
+                        helpText: 'A night with no games',
+                      );
+                      if (d == null) return;
+                      final day = DateTime(d.year, d.month, d.day);
+                      if (!s.skipDates.contains(day)) {
+                        vm.setSeason(
+                          s.copyWith(skipDates: [...s.skipDates, day]),
+                        );
+                      }
+                    },
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
       chips<int>(
         'Games a night',
         const [1, 2],

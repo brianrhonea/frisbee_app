@@ -245,12 +245,11 @@ class _PlayersTabState extends State<PlayersTab> {
                       : 'The host is still setting up divisions.',
                   style: theme.textTheme.bodyMedium,
                 ),
-              if (!vm.isManager)
-                PlayerSignupCard(
-                  viewModel: vm,
-                  signups: signups,
-                  now: widget.now,
-                ),
+              PlayerSignupCard(
+                viewModel: vm,
+                signups: signups,
+                now: widget.now,
+              ),
               if (d != null && (vm.isManager || published))
                 ..._teams(context, d, published),
               if (vm.isManager && d != null) ..._manage(context, t, d),
@@ -273,9 +272,10 @@ class _PlayersTabState extends State<PlayersTab> {
         child: Row(
           children: [
             Expanded(child: Text('Teams', style: theme.textTheme.titleMedium)),
-            if (vm.isManager && !vm.isPublished)
+            if (vm.isManager)
               FilledButton.icon(
-                onPressed: signups.acceptedIn(d.id).length < 2
+                onPressed:
+                    signups.acceptedIn(d.id).length < 2 && d.teams.isEmpty
                     ? null
                     : () => context.push(
                         Routes.tournamentDraft(vm.tournamentId, d.id),
@@ -297,7 +297,8 @@ class _PlayersTabState extends State<PlayersTab> {
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(
-            'The schedule is published, so teams are locked in.',
+            'The schedule is published: you can still move players, rename '
+            'teams and change captains, but not add or remove teams.',
             style: theme.textTheme.bodySmall,
           ),
         ),

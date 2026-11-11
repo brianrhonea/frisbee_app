@@ -158,6 +158,13 @@ class PlayerSignupsViewModel extends ChangeNotifier {
     if (a.skill < PlayerSignup.minSkill || a.skill > PlayerSignup.maxSkill) {
       return Result.error(Exception('Rate your skill from 1 to 5.'));
     }
+    // The name is copied onto teams anyone signed in can read, so never
+    // their email.
+    final name = switch ((me.displayName, me.username)) {
+      (final n?, _) when n.trim().isNotEmpty => n.trim(),
+      (_, final u?) when u.trim().isNotEmpty => u.trim(),
+      _ => 'Player',
+    };
     // Keep their place if they're editing (or coming back).
     final before = _mine;
     final keep = before != null && before.status != SignupStatus.withdrawn;
@@ -165,7 +172,7 @@ class PlayerSignupsViewModel extends ChangeNotifier {
       tournamentId,
       PlayerSignup(
         uid: me.uid,
-        name: me.label,
+        name: name,
         divisionId: a.divisionId,
         skill: a.skill,
         gender: a.gender,

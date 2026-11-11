@@ -622,11 +622,32 @@ class HostedTournamentViewModel extends ChangeNotifier {
     );
   }
 
-  /// A new division's defaults: game to 15 like club ultimate, starting
-  /// 9am each day of the tournament.
+  /// A new division's defaults. A tournament: full-field 7v7, game to 15
+  /// like club ultimate, starting 9am each day. A league: a weekly evening
+  /// round robin, starting at 6:30pm on its first night, two fields.
   TournamentDivision newDivision() {
     final t = _tournament;
     final start = t?.startsOn ?? _now();
+    if (t != null && t.isLeague) {
+      return TournamentDivision(
+        id: '',
+        division: Division.mixed,
+        level: CompetitionLevel.league,
+        maxTeams: 8,
+        settings: TournamentSettings(
+          startsAt: DateTime(start.year, start.month, start.day, 18, 30),
+          format: t.season?.hasPlayoffs == true
+              ? TournamentFormat.singleElim
+              : TournamentFormat.roundRobin,
+          playersOnField: 7,
+          gameMinutes: 60,
+          breakMinutes: 10,
+          scoreCap: 15,
+          timeoutsPerHalf: 2,
+          fields: 2,
+        ),
+      );
+    }
     final first = DateTime(start.year, start.month, start.day, 9);
     final end = t?.endsOn;
     return TournamentDivision(
@@ -635,6 +656,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
       level: CompetitionLevel.club,
       maxTeams: 16,
       settings: TournamentSettings(
+        playersOnField: 7,
         startsAt: first,
         format: TournamentFormat.poolsPlacement,
         poolCount: 4,
@@ -763,6 +785,19 @@ class HostedTournamentViewModel extends ChangeNotifier {
     }
   }
 
+  /// The format [d]'s games follow. A league's comes from its season (no
+  /// playoffs is a round robin, otherwise a bracket after it), however the
+  /// division was saved before the season changed.
+  TournamentFormat formatOf(TournamentDivision d) {
+    final season = _tournament?.season;
+    if (_tournament?.isLeague == true && season != null) {
+      return season.hasPlayoffs
+          ? TournamentFormat.singleElim
+          : TournamentFormat.roundRobin;
+    }
+    return d.settings.format;
+  }
+
   Future<Result<void>> _publish() async {
     final t = _tournament;
     final d = division;
@@ -770,7 +805,11 @@ class HostedTournamentViewModel extends ChangeNotifier {
     if (t == null || d == null || plan == null) {
       return Result.error(Exception(problem ?? 'Nothing to publish.'));
     }
-    final r = await _repo.publishSchedule(tournamentId, d, plan.games);
+    final r = await _repo.publishSchedule(
+      tournamentId,
+      d.copyWith(settings: d.settings.copyWith(format: formatOf(d))),
+      plan.games,
+    );
     if (r is Error) return r;
     if (t.status.index < HostedStatus.scheduled.index) {
       return _repo.setStatus(tournamentId, HostedStatus.scheduled);
@@ -982,7 +1021,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
     final d = division;
     if (!isManager || _recording || t == null || d == null) return;
     if (d.placements.isNotEmpty) return;
-    final places = placementsOf(d.settings.format, d.seeds, _games);
+    final places = placementsOf(formatOf(d), d.seeds, _games);
     if (places.isEmpty) return;
     _recording = true;
     _repo

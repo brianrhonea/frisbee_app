@@ -82,7 +82,9 @@ class TeamDraftViewModel extends ChangeNotifier {
   HostedTournament? get tournament => _tournament;
   TournamentDivision? get division => _division;
 
-  /// Once the schedule is published the teams are locked in.
+  /// Once the schedule is published its games refer to the teams, so teams
+  /// can't be added, removed or dealt again, but players can still move,
+  /// teams can be renamed and captains changed.
   bool get locked => _locked;
 
   /// Unsaved changes.
@@ -156,6 +158,7 @@ class TeamDraftViewModel extends ChangeNotifier {
   /// Sets how many teams to draft into. Teams that go away drop their
   /// players back to unassigned.
   void setTeamCount(int count) {
+    if (_locked) return;
     final n = count.clamp(2, maxTeams).toInt();
     _teamCount = n;
     if (n > _teams.length) {
@@ -215,7 +218,9 @@ class TeamDraftViewModel extends ChangeNotifier {
 
   Future<Result<void>> _draft() async {
     if (_locked) {
-      return Result.error(Exception("The schedule is published."));
+      return Result.error(
+        Exception('The schedule is published, so teams can only be adjusted.'),
+      );
     }
     final count = _teamCount ?? suggestedTeamCount;
     if (players.length < 2) {
@@ -242,9 +247,13 @@ class TeamDraftViewModel extends ChangeNotifier {
   Future<Result<void>> _save() async {
     final d = _division;
     if (d == null) return Result.error(Exception('Pick a division.'));
-    if (_locked) {
+    if (_locked &&
+        !listEquals(
+          [for (final t in _teams) t.id]..sort(),
+          [for (final t in d.teams) t.id]..sort(),
+        )) {
       return Result.error(
-        Exception('The schedule is published; teams are locked in.'),
+        Exception('The schedule is published, so teams can only be adjusted.'),
       );
     }
     if (_teams.length < 2) {
