@@ -10,7 +10,9 @@ import '../../../domain/models/username.dart';
 import '../../../utils/password_policy.dart';
 import '../../../utils/result.dart';
 import '../../services/account_service.dart';
+import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
+import '../../services/feature_flags.dart';
 import '../../services/shared_streams.dart';
 import 'auth_repository.dart';
 
@@ -19,8 +21,12 @@ class AuthRepositoryFirebase extends AuthRepository {
     required AuthService authService,
     required AccountService accountService,
     FirebaseFirestore? firestore,
+    ApiClient? api,
+    FeatureFlags? flags,
   }) : _authService = authService,
        _accounts = accountService,
+       _api = api,
+       _flags = flags,
        _firestore = firestore ?? FirebaseFirestore.instance {
     _subscription = _authService.userChanges().listen(_onUserChanged);
   }
@@ -28,6 +34,11 @@ class AuthRepositoryFirebase extends AuthRepository {
   final AuthService _authService;
   final AccountService _accounts;
   final FirebaseFirestore _firestore;
+
+  /// Claims usernames through the Stall 10 API when the build has one and
+  /// `use_api_profiles` is on.
+  final ApiClient? _api;
+  final FeatureFlags? _flags;
   final _log = Logger('AuthRepository');
   late final StreamSubscription<User?> _subscription;
 
@@ -247,6 +258,18 @@ class AuthRepositoryFirebase extends AuthRepository {
     final handle = Username.normalize(username);
     if (Username.problem(handle) case final problem?) {
       throw ArgumentError(problem);
+    }
+    if ((_flags?.useApiProfiles ?? true) ? _api : null case final api?) {
+      try {
+        await api.post('/v1/me/username', {'username': handle});
+      } on ApiException catch (e) {
+        if (e.code == 'already_exists') throw UsernameTakenException(handle);
+        rethrow;
+      }
+      _username = handle;
+      _currentUser = user.withUsername(handle);
+      notifyListeners();
+      return;
     }
     final nameRef = _firestore.collection('usernames').doc(handle);
     final profileRef = _profiles.doc(user.uid);

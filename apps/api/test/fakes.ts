@@ -2,7 +2,7 @@ import type { CreateTeamInput, NameListing } from "@stall10/shared";
 import type { Caller, TokenVerifier, UserLookup } from "../src/auth.js";
 import type { Owner } from "../src/teams/documents.js";
 import type { TeamRepository } from "../src/teams/repository.js";
-import { AlreadyExists, type Data, type DocStore, serverTime, type Tx } from "../src/store.js";
+import { AlreadyExists, type Data, type DocStore, deleteField, serverTime, type Tx } from "../src/store.js";
 
 /** Accepts tokens "token:<uid>[:<name>]" and App Check token "good". */
 export class FakeVerifier implements TokenVerifier {
@@ -19,7 +19,7 @@ export class FakeVerifier implements TokenVerifier {
 
 /** Auth user records by uid; unknown users fall back to the token. */
 export class FakeUsers implements UserLookup {
-  records = new Map<string, { name?: string; email?: string }>();
+  records = new Map<string, { name?: string; email?: string; photoUrl?: string }>();
 
   async lookup(uid: string) {
     return this.records.get(uid) ?? null;
@@ -88,6 +88,16 @@ export class FakeStore implements DocStore {
     return v;
   }
 
+  /** Top-level fields of [data] onto [d]; deleteField removes one. */
+  private apply(d: Data, data: Data): Data {
+    const out = { ...d };
+    for (const [k, v] of Object.entries(data)) {
+      if (v === deleteField) delete out[k];
+      else out[k] = this.stamp(v);
+    }
+    return out;
+  }
+
   async transact<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
     const writes: Array<() => void> = [];
     const tx: Tx = {
@@ -102,8 +112,9 @@ export class FakeStore implements DocStore {
         writes.push(() => {
           const d = this.docs.get(path);
           if (!d) throw new Error(`update of missing ${path}`);
-          this.docs.set(path, { ...d, ...(this.stamp(data) as Data) });
+          this.docs.set(path, this.apply(d, data));
         }),
+      merge: (path, data) => writes.push(() => this.docs.set(path, this.apply(this.docs.get(path) ?? {}, data))),
       delete: (path) => writes.push(() => this.docs.delete(path)),
     };
     const result = await fn(tx);

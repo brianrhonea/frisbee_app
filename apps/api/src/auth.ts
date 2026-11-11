@@ -29,7 +29,7 @@ declare module "fastify" {
  * from here, not the token.
  */
 export interface UserLookup {
-  lookup(uid: string): Promise<{ name?: string; email?: string } | null>;
+  lookup(uid: string): Promise<{ name?: string; email?: string; photoUrl?: string } | null>;
 }
 
 /** The name the app shows for [caller] (AppUser.label in the app). */

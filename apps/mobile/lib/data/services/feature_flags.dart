@@ -29,6 +29,9 @@ class FeatureFlags extends ChangeNotifier {
     // invite codes, communities) through the API when the build has one.
     // Off writes Firestore directly again, under firestore.rules.
     'use_api_membership': true,
+    // Profile details, privacy, visibility and username claims through
+    // the API when the build has one.
+    'use_api_profiles': true,
   };
 
   /// Flags fixed in code, for tests.
@@ -46,6 +49,7 @@ class FeatureFlags extends ChangeNotifier {
   bool get compressImages => _flag('compress_images');
   bool get useApiTeams => _flag('use_api_teams');
   bool get useApiMembership => _flag('use_api_membership');
+  bool get useApiProfiles => _flag('use_api_profiles');
 
   bool _flag(String key) => _values[key] ?? defaults[key] ?? false;
 

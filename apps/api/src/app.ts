@@ -1,6 +1,8 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { errorHandler } from "./errors.js";
+import { profileRoutes } from "./profiles/routes.js";
+import { ProfileService } from "./profiles/service.js";
 import type { DocStore } from "./store.js";
 import { MembershipService } from "./teams/membership.js";
 import { membershipRoutes } from "./teams/membership_routes.js";
@@ -12,7 +14,7 @@ export interface AppDeps {
   verifier: TokenVerifier;
   users: UserLookup;
   teams: TeamRepository;
-  /** Transactional document access; enables the membership routes. */
+  /** Transactional document access; enables the membership and profile routes. */
   store?: DocStore;
   enforceAppCheck?: boolean;
   logger?: boolean;
@@ -34,6 +36,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   app.get("/health", async () => ({ ok: true }));
   teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now));
-  if (deps.store) membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
+  if (deps.store) {
+    membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
+    profileRoutes(app, new ProfileService(deps.store, deps.users));
+  }
   return app;
 }

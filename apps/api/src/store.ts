@@ -13,6 +13,9 @@ export type Data = Record<string, unknown>;
  */
 export const serverTime: unique symbol = Symbol("serverTime");
 
+/** Removes the field (FieldValue.delete()); for update and merge only. */
+export const deleteField: unique symbol = Symbol("deleteField");
+
 /** Reads and writes inside one transaction. Every read comes before any write. */
 export interface Tx {
   get(path: string): Promise<Data | null>;
@@ -21,6 +24,8 @@ export interface Tx {
   set(path: string, data: Data): void;
   /** Replaces the given top-level fields; the document must exist. */
   update(path: string, data: Data): void;
+  /** Sets the given top-level fields, creating the document if needed (set with merge). */
+  merge(path: string, data: Data): void;
   delete(path: string): void;
 }
 

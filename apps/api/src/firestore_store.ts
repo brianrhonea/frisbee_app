@@ -1,5 +1,5 @@
 import { FieldValue, type Firestore, Timestamp, type Transaction } from "firebase-admin/firestore";
-import { AlreadyExists, type Data, type DocStore, serverTime, type Tx } from "./store.js";
+import { AlreadyExists, type Data, type DocStore, deleteField, serverTime, type Tx } from "./store.js";
 
 /** Timestamps → Date, recursively, so services see plain data. */
 function fromFirestore(v: unknown): unknown {
@@ -14,6 +14,7 @@ function fromFirestore(v: unknown): unknown {
 /** serverTime → FieldValue.serverTimestamp(), recursively. */
 function toFirestore(v: unknown): unknown {
   if (v === serverTime) return FieldValue.serverTimestamp();
+  if (v === deleteField) return FieldValue.delete();
   if (Array.isArray(v)) return v.map(toFirestore);
   if (v && typeof v === "object" && Object.getPrototypeOf(v) === Object.prototype) {
     return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, toFirestore(x)]));
@@ -57,6 +58,7 @@ export class FirestoreDocStore implements DocStore {
       create: (path, data) => void t.create(db.doc(path), toData(data)),
       set: (path, data) => void t.set(db.doc(path), toData(data)),
       update: (path, data) => void t.update(db.doc(path), toData(data)),
+      merge: (path, data) => void t.set(db.doc(path), toData(data), { merge: true }),
       delete: (path) => void t.delete(db.doc(path)),
     };
   }

@@ -31,7 +31,7 @@ const app = buildApp({
     async lookup(uid) {
       try {
         const u = await auth.getUser(uid);
-        return { name: u.displayName, email: u.email };
+        return { name: u.displayName, email: u.email, photoUrl: u.photoURL };
       } catch {
         return null;
       }

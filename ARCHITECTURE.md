@@ -187,6 +187,9 @@ sequenceDiagram
   /v1/teams/:org/link-requests/:team`; `PUT|DELETE
   /v1/teams/:org/linked-teams/:team`; `POST /v1/teams/:org/linked-teams` →
   `{id}`.
+- Profile: `POST /v1/me/username` → `{username}`; `PUT
+  /v1/me/profile/details`; `PUT /v1/me/profile/privacy`; `PUT
+  /v1/me/profile/visibility`.
 
 **Tests:** `pnpm test` (fakes, fast) and `pnpm test:api:emulator`
 (Firestore and Auth emulators, real ID tokens).
@@ -312,7 +315,7 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 |---|---|---|---|---|
 | 1 | Teams | create team / group / organization | `POST /v1/teams` | **Migrated** (fallback kept) |
 | 2 | Teams | join (code, link, open group, request/approve), invites, leave, remove, roles, permissions, transfer, edit details, community links, create team in community | Rule functions ported in `apps/api/src/teams/access.ts`, run in transactions (`MembershipService`); `use_api_membership` flag. Still direct: `migrateTiersToRoles` (edits chat rooms, item 10), `deleteTeam`, roster | **Migrated** (fallback kept) |
-| 3 | Users | profile edit, username claim, privacy settings, delete account (callable today) | | |
+| 3 | Users | profile edit, username claim, privacy settings, delete account (callable today) | `apps/api/src/profiles`; `use_api_profiles` flag. Still direct: `publishSummary`, header photo, `users/{uid}` settings (owner-only, unvalidated); delete account stays a callable | **Migrated** details, privacy, visibility, username (fallback kept) |
 | 4 | Media | upload URLs + server-side compression (§6) | Needed by posts, chat, avatars, team film | Spec decided and in `packages/shared` |
 | 5 | Posts | posts, team posts, comments, likes, reposts | Uses media | |
 | 6 | Follows | follow, requests, accept | | |

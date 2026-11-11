@@ -14,6 +14,7 @@ import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/model_utils.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_name.dart';
+import 'package:frisbee_app/domain/models/username.dart';
 
 const _update = bool.fromEnvironment('UPDATE_FIXTURES');
 const _fixtures = '../../packages/shared/fixtures';
@@ -169,6 +170,25 @@ final _roleCases = <Map<String, Object?>>[
   },
 ];
 
+/// Profile names and usernames (profileKeywords, Username).
+const _profiles = <(String, String?)>[
+  ('Pat Lee', 'pat_lee'),
+  ('Pat Lee', null),
+  ('Ana María', 'ana.maria'),
+  ('X', 'averyveryverylongname'),
+];
+const _usernames = [
+  ' @Pat_Lee ',
+  'ab',
+  'abcdefghijklmnopqrstu',
+  'pat lee',
+  '.pat',
+  'pat.',
+  'p..at',
+  'Admin',
+  'ok.name_1',
+];
+
 const _names = [
   'TX B.Q.Q.',
   'Texas BQQ',
@@ -286,6 +306,27 @@ void main() {
           };
         }(),
     ]);
+  });
+
+  test('profile and username rules match packages/shared/fixtures', () {
+    _check('profile_names.json', {
+      'keywords': [
+        for (final (name, username) in _profiles)
+          {
+            'name': name,
+            'username': username,
+            'keywords': profileKeywords(name, username),
+          },
+      ],
+      'usernames': [
+        for (final u in _usernames)
+          {
+            'input': u,
+            'normalized': Username.normalize(u),
+            'problem': Username.problem(u),
+          },
+      ],
+    });
   });
 
   test('team name rules match packages/shared/fixtures', () {
