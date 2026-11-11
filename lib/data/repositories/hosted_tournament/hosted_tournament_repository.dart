@@ -1,6 +1,7 @@
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/hosted_tournament.dart';
+import '../../../domain/models/live_draft.dart';
 import '../../../domain/tournament_engine/progress.dart';
 import '../../../utils/result.dart';
 
@@ -48,6 +49,16 @@ abstract class HostedTournamentRepository {
 
   /// One player's own signup; null if they haven't signed up.
   Stream<PlayerSignup?> watchSignup(String tournamentId, String uid);
+
+  /// A division's captains' draft board; null until it starts.
+  Stream<LiveDraft?> watchDraft(String tournamentId, String divisionId);
+
+  /// Everyone's skill and gender in a draft, for the host and its
+  /// captains. Null for anyone else, who isn't allowed to read it.
+  Stream<Map<String, DraftDetail>?> watchDraftDetails(
+    String tournamentId,
+    String divisionId,
+  );
 
   /// Creates the tournament when [HostedTournament.isNew], otherwise saves
   /// it. Returns its id.
@@ -135,6 +146,33 @@ abstract class HostedTournamentRepository {
     String divisionId,
   );
 
+  /// The host starts a captains' draft with [captainIds] (the server
+  /// shuffles them into a random order). [pickSeconds] 0 means no limit.
+  Future<Result<void>> startDraft(
+    String tournamentId,
+    String divisionId,
+    List<String> captainIds, {
+    int pickSeconds = 0,
+  });
+
+  /// The captain on the clock (or the host) picks [uid].
+  Future<Result<void>> draftPick(
+    String tournamentId,
+    String divisionId,
+    String uid,
+  );
+
+  /// The host's pause, resume, undo and auto-pick (for a captain who's
+  /// out of time).
+  Future<Result<void>> draftControl(
+    String tournamentId,
+    String divisionId,
+    DraftControl action,
+  );
+
+  /// The host turns the picks into the division's teams.
+  Future<Result<void>> finishDraft(String tournamentId, String divisionId);
+
   /// A captain reports a score; the other captain confirms it.
   Future<Result<void>> reportScore(
     String tournamentId,
@@ -170,3 +208,6 @@ abstract class HostedTournamentRepository {
   /// drafts and payments.
   Future<Result<void>> deleteTournament(String tournamentId);
 }
+
+/// What the host can do to a running draft.
+enum DraftControl { pause, resume, undo, autopick }

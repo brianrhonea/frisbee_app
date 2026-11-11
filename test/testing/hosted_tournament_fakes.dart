@@ -4,6 +4,8 @@ import 'package:frisbee_app/data/repositories/hosted_tournament/hosted_tournamen
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/group_tournament.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
+import 'package:frisbee_app/domain/models/live_draft.dart';
+import 'package:frisbee_app/domain/models/team.dart' show Division;
 import 'package:frisbee_app/domain/tournament_engine/progress.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -321,8 +323,7 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
       teams: teams,
       seeds: [for (final t in teams) t.id],
       captains: {
-        for (final t in teams)
-          t.id: [?t.captainId],
+        for (final t in teams) t.id: [?t.captainId],
       },
     );
     _changed();
@@ -339,6 +340,200 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
     this.games[_key(tournamentId, division.id)] = [...games];
     divisions.putIfAbsent(tournamentId, () => {})[division.id] = division
         .copyWith(placements: const []);
+    _changed();
+    return const Result.ok(null);
+  }
+
+  /// Captains' drafts by `tournament/division`, as the server keeps them.
+  final Map<String, LiveDraft> drafts = {};
+
+  @override
+  Stream<LiveDraft?> watchDraft(String tournamentId, String divisionId) =>
+      _watch(() => drafts[_key(tournamentId, divisionId)]);
+
+  @override
+  Stream<Map<String, DraftDetail>?> watchDraftDetails(
+    String tournamentId,
+    String divisionId,
+  ) => _watch(() {
+    if (drafts[_key(tournamentId, divisionId)] == null) return null;
+    return {
+      for (final s in signups[tournamentId]?.values ?? const <PlayerSignup>[])
+        s.uid: (skill: s.skill, gender: s.gender),
+    };
+  });
+
+  /// Set to make the draft calls fail, like the server refusing.
+  Exception? draftError;
+
+  Result<void> _draftChange(
+    String tournamentId,
+    String divisionId,
+    LiveDraft Function(LiveDraft d) change,
+  ) {
+    final error = draftError;
+    if (error != null) return Result.error(error);
+    final key = _key(tournamentId, divisionId);
+    final d = drafts[key];
+    if (d == null) return Result.error(Exception('The draft has not started.'));
+    try {
+      drafts[key] = change(d);
+    } on Exception catch (e) {
+      return Result.error(e);
+    }
+    _changed();
+    return const Result.ok(null);
+  }
+
+  LiveDraft _with(LiveDraft d, {DraftStatus? status, List<DraftPick>? picks}) =>
+      LiveDraft(
+        divisionId: d.divisionId,
+        status: status ?? d.status,
+        captains: d.captains,
+        picks: picks ?? d.picks,
+        pool: d.pool,
+        pickSeconds: d.pickSeconds,
+        mixed: d.mixed,
+        turnStartedAt: DateTime(2027),
+      );
+
+  @override
+  Future<Result<void>> startDraft(
+    String tournamentId,
+    String divisionId,
+    List<String> captainIds, {
+    int pickSeconds = 0,
+  }) async {
+    log.add('start draft $divisionId');
+    final error = draftError;
+    if (error != null) return Result.error(error);
+    final accepted = {
+      for (final s in signups[tournamentId]?.values ?? const <PlayerSignup>[])
+        if (s.divisionId == divisionId && s.status == SignupStatus.accepted)
+          s.uid: s,
+    };
+    if (captainIds.length < 2 ||
+        captainIds.any((c) => !accepted.containsKey(c))) {
+      return Result.error(Exception('Pick at least 2 accepted captains.'));
+    }
+    drafts[_key(tournamentId, divisionId)] = LiveDraft(
+      divisionId: divisionId,
+      status: DraftStatus.live,
+      captains: [
+        for (final c in captainIds)
+          DraftCaptain(uid: c, name: accepted[c]!.name),
+      ],
+      pool: {
+        for (final s in accepted.values)
+          if (!captainIds.contains(s.uid)) s.uid: s.name,
+      },
+      pickSeconds: pickSeconds,
+      mixed: divisions[tournamentId]?[divisionId]?.division == Division.mixed,
+      turnStartedAt: DateTime(2027),
+    );
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> draftPick(
+    String tournamentId,
+    String divisionId,
+    String uid,
+  ) async {
+    log.add('pick $uid');
+    return _draftChange(tournamentId, divisionId, (d) {
+      if (d.status != DraftStatus.live) {
+        throw Exception('The draft is not running.');
+      }
+      if (!d.pool.containsKey(uid) || d.pickedIds.contains(uid)) {
+        throw Exception('That player cannot be picked.');
+      }
+      final picks = [...d.picks, DraftPick(uid: uid, captainId: d.onTheClock!)];
+      return _with(
+        d,
+        picks: picks,
+        status: picks.length >= d.pool.length
+            ? DraftStatus.done
+            : DraftStatus.live,
+      );
+    });
+  }
+
+  @override
+  Future<Result<void>> draftControl(
+    String tournamentId,
+    String divisionId,
+    DraftControl action,
+  ) async {
+    log.add('draft ${action.name}');
+    return _draftChange(tournamentId, divisionId, (d) {
+      switch (action) {
+        case DraftControl.pause:
+          return _with(d, status: DraftStatus.paused);
+        case DraftControl.resume:
+          return _with(d, status: DraftStatus.live);
+        case DraftControl.undo:
+          if (d.picks.isEmpty) throw Exception('Nothing to undo.');
+          return _with(
+            d,
+            picks: d.picks.sublist(0, d.picks.length - 1),
+            status: d.status == DraftStatus.paused
+                ? DraftStatus.paused
+                : DraftStatus.live,
+          );
+        case DraftControl.autopick:
+          final next = d.available.firstOrNull;
+          if (next == null || d.onTheClock == null) {
+            throw Exception('Nobody is left to pick.');
+          }
+          final picks = [
+            ...d.picks,
+            DraftPick(uid: next.key, captainId: d.onTheClock!),
+          ];
+          return _with(
+            d,
+            picks: picks,
+            status: picks.length >= d.pool.length
+                ? DraftStatus.done
+                : DraftStatus.live,
+          );
+      }
+    });
+  }
+
+  @override
+  Future<Result<void>> finishDraft(
+    String tournamentId,
+    String divisionId,
+  ) async {
+    log.add('finish draft $divisionId');
+    final d = drafts[_key(tournamentId, divisionId)];
+    final division = divisions[tournamentId]?[divisionId];
+    if (d == null || division == null) {
+      return Result.error(Exception('The draft has not started.'));
+    }
+    final teams = [
+      for (final (i, c) in d.captains.indexed)
+        TournamentTeam(
+          id: 'team${i + 1}',
+          name: 'Team ${c.name}',
+          captainId: c.uid,
+          playerIds: d.teamOf(c.uid),
+          playerNames: {for (final id in d.teamOf(c.uid)) id: d.nameOf(id)},
+        ),
+    ];
+    divisions[tournamentId]![divisionId] = division.copyWith(
+      teams: teams,
+      seeds: [for (final t in teams) t.id],
+      captains: {
+        for (final t in teams) t.id: [?t.captainId],
+      },
+    );
+    drafts[_key(tournamentId, divisionId)] = _with(
+      d,
+      status: DraftStatus.finished,
+    );
     _changed();
     return const Result.ok(null);
   }

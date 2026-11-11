@@ -133,6 +133,26 @@ class _HostedTournamentFormScreenState
                   'teams, which become real teams with chat and a roster.',
           }, style: theme.textTheme.bodySmall),
         ),
+        if (vm.entryType == TournamentEntryType.players) ...[
+          SegmentedButton<DraftMode>(
+            segments: [
+              for (final m in DraftMode.values)
+                ButtonSegment(value: m, label: Text(m.label)),
+            ],
+            selected: {vm.draftMode},
+            onSelectionChanged: (s) => vm.setDraftMode(s.first),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Text(
+              vm.draftMode == DraftMode.captains
+                  ? 'You choose the captains, who take turns picking '
+                        'players in a live draft. Each captain owns their team.'
+                  : 'The app deals teams evened out by skill and gender.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+        ],
       ],
     );
   }

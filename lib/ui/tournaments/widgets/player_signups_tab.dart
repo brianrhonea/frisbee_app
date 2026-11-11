@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../domain/models/hosted_tournament.dart';
+import '../../../domain/models/live_draft.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/status_views.dart';
@@ -122,6 +123,25 @@ class PlayerSignupCard extends StatelessWidget {
                   if (mine.gender != null) mine.gender!.label,
                 ].join(' · '),
               ),
+              if (signups.myDraft case final draft?
+                  when draft.status != DraftStatus.finished)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => context.push(
+                      Routes.tournamentLiveDraft(
+                        viewModel.tournamentId,
+                        mine.divisionId,
+                      ),
+                    ),
+                    icon: const Icon(Icons.how_to_reg_outlined),
+                    label: Text(
+                      draft.captains.any((c) => c.uid == signups.uid)
+                          ? "The draft is live: you're a captain"
+                          : 'The draft is live: watch it',
+                    ),
+                  ),
+                ),
               if (fee != null &&
                   (mine.status == SignupStatus.accepted ||
                       mine.status == SignupStatus.applied))
@@ -278,12 +298,17 @@ class _PlayersTabState extends State<PlayersTab> {
                     signups.acceptedIn(d.id).length < 2 && d.teams.isEmpty
                     ? null
                     : () => context.push(
-                        Routes.tournamentDraft(vm.tournamentId, d.id),
+                        d.teams.isEmpty &&
+                                vm.tournament!.draftMode == DraftMode.captains
+                            ? Routes.tournamentLiveDraft(vm.tournamentId, d.id)
+                            : Routes.tournamentDraft(vm.tournamentId, d.id),
                       ),
                 icon: const Icon(Icons.groups_outlined),
                 label: Text(
                   d.teams.isEmpty
-                      ? 'Draft teams'
+                      ? vm.tournament!.draftMode == DraftMode.captains
+                            ? "Captains' draft"
+                            : 'Draft teams'
                       : d.teamsCreated
                       ? 'View teams'
                       : 'Edit teams',

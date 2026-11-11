@@ -781,7 +781,7 @@ class _SignupDialogState extends State<_SignupDialog> {
               ],
               const SizedBox(height: 12),
               Text(
-                'Only the host sees your skill and gender match.',
+                'Only the host, and the captains if they draft the teams, see your skill and gender match.',
                 style: theme.textTheme.bodySmall,
               ),
             ],

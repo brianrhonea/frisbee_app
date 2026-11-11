@@ -7,10 +7,12 @@ import '../ui/tournaments/view_models/hosted_tournament_form_viewmodel.dart';
 import '../ui/tournaments/view_models/hosted_tournament_viewmodel.dart';
 import '../ui/tournaments/view_models/hosted_tournaments_viewmodel.dart';
 import '../ui/tournaments/view_models/player_signups_viewmodel.dart';
+import '../ui/tournaments/view_models/live_draft_viewmodel.dart';
 import '../ui/tournaments/view_models/team_draft_viewmodel.dart';
 import '../ui/tournaments/widgets/hosted_tournament_form_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournament_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournaments_list.dart';
+import '../ui/tournaments/widgets/live_draft_screen.dart';
 import '../ui/tournaments/widgets/team_draft_screen.dart';
 import 'routes.dart';
 
@@ -88,6 +90,24 @@ List<GoRoute> hostedTournamentRoutes() => [
                   tournamentRepository: c.read(),
                 ),
                 builder: (_, vm) => TeamDraftScreen(viewModel: vm),
+              );
+            },
+          ),
+          GoRoute(
+            path: 'live-draft/:divisionId',
+            builder: (_, state) {
+              final id = state.pathParameters['tournamentId']!;
+              final division = state.pathParameters['divisionId']!;
+              return ViewModelHost(
+                key: ValueKey('live-draft-$id-$division'),
+                create: (c) => LiveDraftViewModel(
+                  tournamentId: id,
+                  divisionId: division,
+                  tournamentRepository: c.read(),
+                  teamRepository: c.read(),
+                  authRepository: c.read(),
+                ),
+                builder: (_, vm) => LiveDraftScreen(viewModel: vm),
               );
             },
           ),

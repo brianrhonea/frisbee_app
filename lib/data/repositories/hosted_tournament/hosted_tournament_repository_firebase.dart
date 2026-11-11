@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/hosted_tournament.dart';
+import '../../../domain/models/live_draft.dart';
 import '../../../domain/tournament_engine/progress.dart';
 import '../../../utils/result.dart';
 import '../../services/callable_client.dart';
@@ -232,6 +233,38 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
           );
 
   @override
+  Stream<LiveDraft?> watchDraft(String tournamentId, String divisionId) =>
+      _drafts(tournamentId)
+          .doc(divisionId)
+          .snapshots()
+          .map(
+            (d) =>
+                d.exists ? LiveDraft.fromMap(d.id, plainData(d.data())) : null,
+          );
+
+  @override
+  Stream<Map<String, DraftDetail>?> watchDraftDetails(
+    String tournamentId,
+    String divisionId,
+  ) => _drafts(tournamentId)
+      .doc(divisionId)
+      .collection('details')
+      .doc('pool')
+      .snapshots()
+      .map<Map<String, DraftDetail>?>(
+        (d) => d.exists
+            ? LiveDraft.detailsFromMap(plainData(d.data()))
+            : <String, DraftDetail>{},
+      )
+      // Players who aren't captains can't read it; that's fine.
+      .transform(
+        StreamTransformer<
+          Map<String, DraftDetail>?,
+          Map<String, DraftDetail>?
+        >.fromHandlers(handleError: (e, s, sink) => sink.add(null)),
+      );
+
+  @override
   Stream<List<GroupGame>> watchGames(String tournamentId, String divisionId) =>
       _games(tournamentId, divisionId)
           .orderBy('order')
@@ -444,6 +477,62 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
       'divisionId': divisionId,
     });
   });
+
+  Future<void> _call(String name, Map<String, Object?> data) async {
+    final functions = _functions;
+    if (functions == null) throw const CallableException('Not available.');
+    await functions.call('tournaments-$name', data);
+  }
+
+  @override
+  Future<Result<void>> startDraft(
+    String tournamentId,
+    String divisionId,
+    List<String> captainIds, {
+    int pickSeconds = 0,
+  }) => guard(
+    () => _call('startDraft', {
+      'tournamentId': tournamentId,
+      'divisionId': divisionId,
+      'captainIds': captainIds,
+      'pickSeconds': pickSeconds,
+    }),
+  );
+
+  @override
+  Future<Result<void>> draftPick(
+    String tournamentId,
+    String divisionId,
+    String uid,
+  ) => guard(
+    () => _call('draftPick', {
+      'tournamentId': tournamentId,
+      'divisionId': divisionId,
+      'uid': uid,
+    }),
+  );
+
+  @override
+  Future<Result<void>> draftControl(
+    String tournamentId,
+    String divisionId,
+    DraftControl action,
+  ) => guard(
+    () => _call('draftControl', {
+      'tournamentId': tournamentId,
+      'divisionId': divisionId,
+      'action': action.name,
+    }),
+  );
+
+  @override
+  Future<Result<void>> finishDraft(String tournamentId, String divisionId) =>
+      guard(
+        () => _call('finishDraft', {
+          'tournamentId': tournamentId,
+          'divisionId': divisionId,
+        }),
+      );
 
   @override
   Future<Result<void>> reportScore(

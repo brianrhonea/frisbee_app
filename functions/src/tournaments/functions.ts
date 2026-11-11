@@ -187,3 +187,4 @@ export const leagueGameEvents = onDocumentWritten(
 );
 
 export { createLeagueTeams } from "./callables";
+export { draftControl, draftPick, finishDraft, startDraft } from "./draft";

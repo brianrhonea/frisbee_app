@@ -3766,6 +3766,23 @@ describe("hosted tournaments", () => {
       await assertFails(deleteDoc(draftRef(PLAYER)));
       await assertSucceeds(deleteDoc(draftRef(DIRECTOR)));
     });
+
+    it("a draft's skills and genders are for managers and its captains only", async () => {
+      await seedPlayers();
+      const pool = (uid: string) => doc(db(uid), "tournaments", T, "drafts", DIV, "details", "pool");
+      await asServer(async (fs) => {
+        await setDoc(doc(fs, "tournaments", T, "drafts", DIV), { status: "live", picks: [], captainIds: [PLAYER] });
+        await setDoc(doc(fs, "tournaments", T, "drafts", DIV, "details", "pool"), { players: { x: { skill: 5 } } });
+        await setDoc(doc(fs, "tournaments", T, "signups", COACH), { ...signup(), status: "accepted", createdAt: new Date(), updatedAt: new Date() });
+      });
+      await assertSucceeds(getDoc(pool(DIRECTOR)));
+      await assertSucceeds(getDoc(pool(PLAYER)));
+      // An accepted player who isn't a captain sees the board but not the skills.
+      await assertSucceeds(getDoc(draftRef(COACH)));
+      await assertFails(getDoc(pool(COACH)));
+      await assertFails(getDoc(pool(OUTSIDER)));
+      await assertFails(setDoc(pool(DIRECTOR), { players: {} }));
+    });
   });
 
   it("captains report and confirm; others can't; managers override", async () => {

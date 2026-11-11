@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
 import '../../../domain/models/hosted_tournament.dart';
+import '../../../domain/models/live_draft.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
@@ -38,6 +39,7 @@ class PlayerSignupsViewModel extends ChangeNotifier {
       _subs = [
         _repo.watchSignup(tournamentId, _uid).listen((s) {
           _mine = s;
+          _watchMyDraft();
           notifyListeners();
         }, onError: (Object _) {}),
         _repo.watchPayment(tournamentId, _uid).listen((p) {
@@ -59,6 +61,9 @@ class PlayerSignupsViewModel extends ChangeNotifier {
 
   bool _manager = false;
   PlayerSignup? _mine;
+  LiveDraft? _myDraft;
+  StreamSubscription<LiveDraft?>? _draftSub;
+  String? _draftDivision;
   EntryPayment? _myPayment;
   List<PlayerSignup> _signups = const [];
   Map<String, EntryPayment> _payments = const {};
@@ -76,6 +81,26 @@ class PlayerSignupsViewModel extends ChangeNotifier {
   /// This user's own signup; null if they haven't signed up (or withdrew
   /// and it was deleted).
   PlayerSignup? get mine => _mine;
+
+  /// The captains' draft in this player's division, if one has started.
+  /// Only accepted players can read it.
+  LiveDraft? get myDraft => _myDraft;
+
+  void _watchMyDraft() {
+    final division = _mine?.status == SignupStatus.accepted
+        ? _mine!.divisionId
+        : null;
+    if (division == _draftDivision) return;
+    _draftDivision = division;
+    _draftSub?.cancel();
+    _draftSub = null;
+    _myDraft = null;
+    if (division == null) return;
+    _draftSub = _repo.watchDraft(tournamentId, division).listen((d) {
+      _myDraft = d;
+      notifyListeners();
+    }, onError: (Object _) {});
+  }
 
   /// Signed up and still in the running, or already in.
   bool get isSignedUp =>
@@ -216,6 +241,7 @@ class PlayerSignupsViewModel extends ChangeNotifier {
     }
     _signupsSub?.cancel();
     _paymentsSub?.cancel();
+    _draftSub?.cancel();
     super.dispose();
   }
 }
