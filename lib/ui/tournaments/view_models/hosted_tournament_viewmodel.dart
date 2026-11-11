@@ -45,17 +45,18 @@ enum HostedGameAction {
 /// schedules, results and news. The host's managers (Manage events) run
 /// it; team admins apply and pick captains; captains report scores;
 /// everyone else follows along.
-/// A team can't register for a tournament with fewer than
-/// [TournamentEntry.minRoster] players on its roster.
+/// A team can't register for a division with fewer than its
+/// [TournamentDivision.effectiveMinRoster] players on its roster.
 class RosterTooSmallException implements Exception {
-  const RosterTooSmallException(this.teamName, this.players);
+  const RosterTooSmallException(this.teamName, this.players, this.minimum);
 
   final String teamName;
   final int players;
+  final int minimum;
 
   @override
   String toString() =>
-      '$teamName needs at least ${TournamentEntry.minRoster} players on its '
+      '$teamName needs at least $minimum players on its '
       "roster to register (it has $players). Add players on the team's "
       'Roster tab, then try again.';
 }
@@ -456,8 +457,11 @@ class HostedTournamentViewModel extends ChangeNotifier {
     } on Exception catch (e) {
       return Result.error(e);
     }
-    if (players < TournamentEntry.minRoster) {
-      return Result.error(RosterTooSmallException(team.name, players));
+    final minimum =
+        _divisions[a.divisionId]?.effectiveMinRoster ??
+        TournamentDivision.defaultMinRoster;
+    if (players < minimum) {
+      return Result.error(RosterTooSmallException(team.name, players, minimum));
     }
     return _repo.saveEntry(
       tournamentId,

@@ -1538,11 +1538,31 @@ service cloud.firestore {
               && (f.dueAt == null || f.dueAt is timestamp));
       }
 
+      // A league's weekly season (LeagueSeason).
+      function validSeason(s) {
+        return s == null
+          || (s.keys().hasOnly(['weeks', 'playoffWeeks', 'playoffTeams',
+                                'gamesPerNight', 'skipDates'])
+              && s.weeks is int && s.weeks >= 1 && s.weeks <= 26
+              && s.playoffWeeks is int && s.playoffWeeks >= 0
+              && s.playoffWeeks <= 3 && s.playoffWeeks <= s.weeks
+              && s.playoffTeams is int && s.playoffTeams in [0, 2, 4, 8]
+              && s.gamesPerNight is int && s.gamesPerNight >= 1
+              && s.gamesPerNight <= 2
+              && s.skipDates is list && s.skipDates.size() <= 10);
+      }
+
       function validHosted(t) {
         return t.keys().hasOnly([
                  'hostId', 'hostName', 'hostKind', 'name', 'startsOn', 'endsOn',
                  'description', 'location', 'visibility', 'entryType', 'status',
-                 'bidFee', 'divisions', 'createdBy', 'createdAt'])
+                 'bidFee', 'kind', 'season', 'draftMode', 'divisions',
+                 'createdBy', 'createdAt'])
+          && t.get('kind', 'tournament') in ['tournament', 'league']
+          && validSeason(t.get('season', null))
+          && (t.get('kind', 'tournament') == 'league'
+              || t.get('season', null) == null)
+          && t.get('draftMode', 'balanced') in ['balanced', 'captains']
           && t.name is string && t.name.size() > 0 && t.name.size() <= 100
           && validString(t.hostName, 100)
           && t.hostKind in ['team', 'community', 'organization']
@@ -1577,7 +1597,12 @@ service cloud.firestore {
         }
         function validDivision(d) {
           return d.keys().hasOnly(['division', 'level', 'settings', 'maxTeams',
-                                   'seeds', 'captains', 'placements'])
+                                   'seeds', 'captains', 'placements',
+                                   'minRoster', 'teams'])
+            && (d.get('minRoster', null) == null
+                || (d.minRoster is int && d.minRoster >= 2
+                    && d.minRoster <= 30))
+            && d.get('teams', []) is list && d.get('teams', []).size() <= 32
             && d.division in ['mixed', 'open', 'women', 'masters']
             && d.level in ['club', 'college', 'youth', 'league', 'pickup']
             && d.settings is map
@@ -1737,10 +1762,85 @@ service cloud.firestore {
         allow delete: if signedIn() && manages(current());
       }
 
-      // Bid fee payments: the host's managers mark them; the team's admins
-      // can see their own.
+      // A player's signup for a player-entry tournament or league, keyed by
+      // uid (PlayerSignup). Skill and gender are private to the player and
+      // the host's managers. Managers accept, waitlist and decline; the
+      // player signs up, edits their answers while still waiting, withdraws,
+      // and can sign back up. Whether they've paid is in payments/{uid}.
+      match /signups/{userId} {
+        function signupPath(id) {
+          return /databases/$(database)/documents/tournaments/$(tournamentId)/signups/$(id);
+        }
+        function validSignup(s) {
+          return s.keys().hasOnly(['name', 'divisionId', 'skill', 'gender',
+                                   'status', 'createdAt', 'updatedAt'])
+            && s.name is string && s.name.size() > 0 && s.name.size() <= 100
+            && s.divisionId is string && s.divisionId.size() > 0
+            && s.divisionId.size() <= 100
+            && s.skill is int && s.skill >= 1 && s.skill <= 5
+            && s.get('gender', null) in [null, 'mmp', 'wmp']
+            && s.status in ['applied', 'accepted', 'waitlisted', 'declined',
+                            'withdrawn']
+            && s.updatedAt == request.time;
+        }
+        function playerSignsUp() {
+          let t = current();
+          return uid() == userId
+            && t.entryType == 'players'
+            && t.status == 'registration'
+            && t.visibility == 'public'
+            && request.resource.data.status == 'applied'
+            && request.resource.data.createdAt == request.time
+            && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/divisions/$(request.resource.data.divisionId));
+        }
+        // Back in after withdrawing, or fixing answers while waiting.
+        function playerEdits() {
+          let was = resource.data.status;
+          let now = request.resource.data.status;
+          return uid() == userId
+            && current().status == 'registration'
+            && ((was in ['applied', 'waitlisted'] && now == was)
+                || (was == 'withdrawn' && now == 'applied'))
+            && changed().hasOnly(['name', 'divisionId', 'skill', 'gender',
+                                  'status', 'updatedAt']);
+        }
+        function playerWithdraws() {
+          return uid() == userId
+            && request.resource.data.status == 'withdrawn'
+            && resource.data.status != 'withdrawn'
+            && changed().hasOnly(['status', 'updatedAt']);
+        }
+        function hostDecides() {
+          return manages(current())
+            && changed().hasOnly(['status', 'updatedAt']);
+        }
+
+        allow read: if signedIn() && (uid() == userId || manages(current()));
+        allow create: if signedIn() && validSignup(request.resource.data)
+          && playerSignsUp();
+        allow update: if signedIn() && validSignup(request.resource.data)
+          && (playerEdits() || playerWithdraws() || hostDecides());
+        allow delete: if signedIn() && manages(current());
+      }
+
+      // The live captains' draft for a division. Only the server writes it
+      // (functions/src/tournaments/draft.ts); managers and accepted players
+      // in that division can watch.
+      match /drafts/{divisionId} {
+        allow read: if signedIn() && visible(current())
+          && (manages(current())
+              || (exists(/databases/$(database)/documents/tournaments/$(tournamentId)/signups/$(uid()))
+                  && get(/databases/$(database)/documents/tournaments/$(tournamentId)/signups/$(uid())).data.status == 'accepted'
+                  && get(/databases/$(database)/documents/tournaments/$(tournamentId)/signups/$(uid())).data.divisionId == divisionId));
+        allow write: if false;
+      }
+
+      // Entry fee payments (per team, or per player in player entry): the
+      // host's managers mark them; a team's admins or the player can see
+      // their own.
       match /payments/{teamId} {
-        allow read: if signedIn() && (manages(current()) || teamAdmin(teamId));
+        allow read: if signedIn()
+          && (uid() == teamId || manages(current()) || teamAdmin(teamId));
         allow create, update: if signedIn() && manages(current())
           && request.resource.data.keys().hasOnly(['paid', 'paidAt', 'note'])
           && request.resource.data.paid is bool

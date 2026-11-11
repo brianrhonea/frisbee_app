@@ -54,9 +54,9 @@ void main() {
     // Four club teams; capN owns teamN.
     for (var i = 1; i <= 4; i++) {
       teams.teams['t$i'] = team('t$i', 'cap$i', more: {'p$i': TeamRole.player});
-      // Enough to register (TournamentEntry.minRoster).
+      // Enough to register (TournamentDivision.defaultMinRoster).
       teams.roster['t$i'] = [
-        for (var n = 1; n <= TournamentEntry.minRoster; n++)
+        for (var n = 1; n <= TournamentDivision.defaultMinRoster; n++)
           RosterPlayer(id: 't$i-$n', name: 'Player $n'),
       ];
     }
@@ -432,8 +432,8 @@ void main() {
     outsider.dispose();
   });
 
-  test('a team needs ${TournamentEntry.minRoster} players on its roster to '
-      'register', () async {
+  test('a team needs ${TournamentDivision.defaultMinRoster} players on its '
+      'roster to register', () async {
     final id = await host();
     teams.roster['t1'] = teams.roster['t1']!.take(6).toList();
     final cap = await page('cap1', id);

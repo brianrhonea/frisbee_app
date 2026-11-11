@@ -61,6 +61,132 @@ void main() {
     });
   });
 
+  group('leagues and player entry', () {
+    test('a plain tournament has no kind, season or draft settings stored', () {
+      final t = HostedTournament.fromMap('x1', tournament().toMap());
+      expect(t.kind, HostedKind.tournament);
+      expect(t.isLeague, isFalse);
+      expect(t.season, isNull);
+      expect(t.draftMode, DraftMode.balanced);
+      // Older docs have none of the new fields.
+      final old = HostedTournament.fromMap('x1', {
+        ...tournament().toMap()
+          ..remove('kind')
+          ..remove('season')
+          ..remove('draftMode'),
+      });
+      expect(old.kind, HostedKind.tournament);
+      expect(old.draftMode, DraftMode.balanced);
+    });
+
+    test('a league round-trips its season, kind and draft mode', () {
+      final league = tournament().copyWith(
+        season: () => LeagueSeason(
+          weeks: 10,
+          playoffWeeks: 2,
+          playoffTeams: 8,
+          gamesPerNight: 2,
+          skipDates: [DateTime(2027, 7, 4)],
+        ),
+        draftMode: DraftMode.captains,
+      );
+      final leagueMap = {...league.toMap(), 'kind': 'league'};
+      final back = HostedTournament.fromMap('x1', leagueMap);
+      expect(back.isLeague, isTrue);
+      expect(back.season, league.season);
+      expect(back.season!.regularWeeks, 8);
+      expect(back.draftMode, DraftMode.captains);
+    });
+
+    test('a season without playoffs is all regular season', () {
+      const s = LeagueSeason(weeks: 6, playoffWeeks: 2, playoffTeams: 0);
+      expect(s.hasPlayoffs, isFalse);
+      expect(s.regularWeeks, 6);
+    });
+
+    test('a stored season is clamped to what the rules allow', () {
+      final s = LeagueSeason.fromMap({
+        'weeks': 99,
+        'playoffWeeks': 9,
+        'playoffTeams': 4,
+        'gamesPerNight': 7,
+      })!;
+      expect(s.weeks, LeagueSeason.maxWeeks);
+      expect(s.playoffWeeks, LeagueSeason.maxPlayoffWeeks);
+      expect(s.gamesPerNight, LeagueSeason.maxGamesPerNight);
+    });
+
+    test('player entry takes an entry fee per player', () {
+      final hat = HostedTournament(
+        id: 'h1',
+        hostId: 'g1',
+        hostName: 'Denver Ultimate',
+        name: 'Hat Day',
+        startsOn: DateTime(2027, 6, 1),
+        entryType: TournamentEntryType.players,
+        bidFee: const EntryFee(amountCents: 2000),
+      );
+      expect(hat.takesPlayers, isTrue);
+      expect(hat.isHat, isTrue);
+      expect(hat.entryFee?.label, r'$20');
+      expect(hat.copyWith(season: () => const LeagueSeason()).isHat, isTrue);
+    });
+
+    test('min roster falls back to the old full-roster default', () {
+      final d = TournamentDivision(
+        id: 'd1',
+        division: Division.mixed,
+        level: CompetitionLevel.league,
+        settings: settings,
+      );
+      expect(d.effectiveMinRoster, TournamentDivision.defaultMinRoster);
+      expect(d.copyWith(minRoster: () => 4).effectiveMinRoster, 4);
+      final back = TournamentDivision.fromMap(
+        'd1',
+        d.copyWith(minRoster: () => 4).toMap(),
+      );
+      expect(back.minRoster, 4);
+      expect(TournamentDivision.fromMap('d1', d.toMap()).minRoster, isNull);
+    });
+
+    test('a division keeps its drafted teams', () {
+      const team = TournamentTeam(
+        id: 'a',
+        name: 'Red',
+        captainId: 'p1',
+        playerIds: ['p1', 'p2'],
+        playerNames: {'p1': 'Pat', 'p2': 'Sam'},
+      );
+      final d = TournamentDivision(
+        id: 'd1',
+        division: Division.mixed,
+        level: CompetitionLevel.league,
+        settings: settings,
+      ).copyWith(teams: [team]);
+      final back = TournamentDivision.fromMap('d1', d.toMap());
+      expect(back.teams.single.playerIds, ['p1', 'p2']);
+      expect(back.teams.single.captainId, 'p1');
+    });
+
+    test('a signup round-trips; skill is clamped and gender is optional', () {
+      const s = PlayerSignup(
+        uid: 'u1',
+        name: 'Pat',
+        divisionId: 'd1',
+        skill: 4,
+        gender: GenderMatch.wmp,
+      );
+      final back = PlayerSignup.fromMap('u1', s.toMap());
+      expect(back.skill, 4);
+      expect(back.gender, GenderMatch.wmp);
+      expect(back.status, SignupStatus.applied);
+      expect(back.copyWith(gender: () => null).gender, isNull);
+      final wild = PlayerSignup.fromMap('u1', {'skill': 99, 'gender': '?'});
+      expect(wild.skill, PlayerSignup.maxSkill);
+      expect(wild.gender, isNull);
+    });
+  });
+
   group('TournamentDivision', () {
     final div = TournamentDivision(
       id: 'd1',

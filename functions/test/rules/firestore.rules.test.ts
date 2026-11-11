@@ -3563,6 +3563,145 @@ describe("hosted tournaments", () => {
     await assertSucceeds(getDoc(payRef("cap2", "team2")));
   });
 
+  describe("leagues and player entry", () => {
+    const signupRef = (uid: string, who = uid) => doc(db(uid), "tournaments", T, "signups", who);
+    const draftRef = (uid: string) => doc(db(uid), "tournaments", T, "drafts", DIV);
+    const signup = (extra: Record<string, unknown> = {}) => ({
+      name: "Pat",
+      divisionId: DIV,
+      skill: 3,
+      gender: "mmp",
+      status: "applied",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      ...extra,
+    });
+    const season = (extra: Record<string, unknown> = {}) => ({
+      weeks: 8, playoffWeeks: 1, playoffTeams: 4, gamesPerNight: 1, skipDates: [], ...extra,
+    });
+    const seedPlayers = (t: Record<string, unknown> = {}) =>
+      seed({ entryType: "players", ...t });
+    type ServerDb = Parameters<typeof doc>[0];
+    const asServer = (fn: (fs: ServerDb) => Promise<unknown>) =>
+      env.withSecurityRulesDisabled((ctx) => fn(ctx.firestore() as unknown as ServerDb));
+
+    it("a league carries a valid season; a plain tournament doesn't", async () => {
+      const fresh = { ...tournament({ status: "draft" }), createdAt: serverTimestamp() };
+      await assertSucceeds(setDoc(tRef(DIRECTOR), { ...fresh, kind: "league", season: season() }));
+      await assertSucceeds(updateDoc(tRef(DIRECTOR), { season: season({ weeks: 10, playoffTeams: 8 }) }));
+      await assertFails(updateDoc(tRef(DIRECTOR), { season: season({ weeks: 0 }) }));
+      await assertFails(updateDoc(tRef(DIRECTOR), { season: season({ weeks: 27 }) }));
+      await assertFails(updateDoc(tRef(DIRECTOR), { season: season({ playoffTeams: 3 }) }));
+      await assertFails(updateDoc(tRef(DIRECTOR), { season: season({ playoffWeeks: 4 }) }));
+      await assertFails(updateDoc(tRef(DIRECTOR), { season: season({ gamesPerNight: 3 }) }));
+      await assertFails(updateDoc(tRef(DIRECTOR), { season: { ...season(), extra: 1 } }));
+      await assertFails(updateDoc(tRef(DIRECTOR), { kind: "season" }));
+      await assertSucceeds(updateDoc(tRef(DIRECTOR), { draftMode: "captains" }));
+      await assertFails(updateDoc(tRef(DIRECTOR), { draftMode: "lottery" }));
+      await assertFails(setDoc(tRef(DIRECTOR, "x2"), { ...fresh, kind: "tournament", season: season() }));
+    });
+
+    it("divisions take a min roster and drafted teams", async () => {
+      await seedPlayers();
+      await assertSucceeds(updateDoc(divRef(DIRECTOR), { minRoster: 4 }));
+      await assertSucceeds(updateDoc(divRef(DIRECTOR), { minRoster: null }));
+      await assertFails(updateDoc(divRef(DIRECTOR), { minRoster: 1 }));
+      await assertFails(updateDoc(divRef(DIRECTOR), { minRoster: 31 }));
+      await assertFails(updateDoc(divRef(DIRECTOR), { minRoster: "7" }));
+      const team = { id: "a", name: "Red", captainId: "p1", playerIds: ["p1"], playerNames: { p1: "Pat" } };
+      await assertSucceeds(updateDoc(divRef(DIRECTOR), { teams: [team] }));
+      await assertFails(updateDoc(divRef(CAPTAIN), { teams: [team] }));
+      await assertFails(updateDoc(divRef(DIRECTOR), { teams: Array.from({ length: 33 }, () => team) }));
+    });
+
+    it("players sign up for themselves while registration is open", async () => {
+      await seedPlayers();
+      await assertFails(setDoc(signupRef(PLAYER, OUTSIDER), signup()));
+      await assertFails(setDoc(signupRef(PLAYER), signup({ status: "accepted" })));
+      await assertFails(setDoc(signupRef(PLAYER), signup({ skill: 6 })));
+      await assertFails(setDoc(signupRef(PLAYER), signup({ skill: 0 })));
+      await assertFails(setDoc(signupRef(PLAYER), signup({ gender: "x" })));
+      await assertFails(setDoc(signupRef(PLAYER), signup({ divisionId: "nope" })));
+      await assertFails(setDoc(signupRef(PLAYER), { ...signup(), paid: true }));
+      await assertSucceeds(setDoc(signupRef(PLAYER), signup()));
+      await assertSucceeds(setDoc(signupRef(OUTSIDER), signup({ gender: null })));
+    });
+
+    it("no signups for team-entry tournaments, invite-only ones or once registration closes", async () => {
+      await seed();
+      await assertFails(setDoc(signupRef(PLAYER), signup()));
+      await asServer((fs) => setDoc(doc(fs, "tournaments", T), tournament({ entryType: "players", visibility: "inviteOnly" })));
+      await assertFails(setDoc(signupRef(PLAYER), signup()));
+      await asServer((fs) => setDoc(doc(fs, "tournaments", T), tournament({ entryType: "players", status: "seeding" })));
+      await assertFails(setDoc(signupRef(PLAYER), signup()));
+    });
+
+    it("signups are private to the player and the host's managers", async () => {
+      await seedPlayers();
+      await assertSucceeds(setDoc(signupRef(PLAYER), signup()));
+      await assertSucceeds(getDoc(signupRef(PLAYER)));
+      await assertSucceeds(getDoc(signupRef(DIRECTOR, PLAYER)));
+      await assertFails(getDoc(signupRef(OUTSIDER, PLAYER)));
+      await assertFails(getDoc(signupRef(HOST_MEMBER, PLAYER)));
+    });
+
+    it("a player can edit while waiting and withdraw, but not accept or change anything else", async () => {
+      await seedPlayers();
+      await assertSucceeds(setDoc(signupRef(PLAYER), signup()));
+      await assertSucceeds(updateDoc(signupRef(PLAYER), { skill: 4, updatedAt: serverTimestamp() }));
+      await assertFails(updateDoc(signupRef(PLAYER), { status: "accepted", updatedAt: serverTimestamp() }));
+      await assertFails(updateDoc(signupRef(PLAYER), { createdAt: new Date(), updatedAt: serverTimestamp() }));
+      await assertFails(updateDoc(signupRef(OUTSIDER, PLAYER), { skill: 5, updatedAt: serverTimestamp() }));
+      await assertSucceeds(updateDoc(signupRef(PLAYER), { status: "withdrawn", updatedAt: serverTimestamp() }));
+      // Back in while registration is open.
+      await assertSucceeds(updateDoc(signupRef(PLAYER), { status: "applied", updatedAt: serverTimestamp() }));
+    });
+
+    it("an accepted player can withdraw but can't re-rate themselves", async () => {
+      await seedPlayers();
+      await assertSucceeds(setDoc(signupRef(PLAYER), signup()));
+      await assertSucceeds(updateDoc(signupRef(DIRECTOR, PLAYER), { status: "accepted", updatedAt: serverTimestamp() }));
+      await assertFails(updateDoc(signupRef(PLAYER), { skill: 1, updatedAt: serverTimestamp() }));
+      await assertSucceeds(updateDoc(signupRef(PLAYER), { status: "withdrawn", updatedAt: serverTimestamp() }));
+    });
+
+    it("managers decide signups and nothing else on them", async () => {
+      await seedPlayers();
+      await assertSucceeds(setDoc(signupRef(PLAYER), signup()));
+      await assertFails(updateDoc(signupRef(HOST_MEMBER, PLAYER), { status: "accepted", updatedAt: serverTimestamp() }));
+      await assertFails(updateDoc(signupRef(DIRECTOR, PLAYER), { skill: 5, updatedAt: serverTimestamp() }));
+      await assertSucceeds(updateDoc(signupRef(DIRECTOR, PLAYER), { status: "waitlisted", updatedAt: serverTimestamp() }));
+      await assertSucceeds(updateDoc(signupRef(DIRECTOR, PLAYER), { status: "accepted", updatedAt: serverTimestamp() }));
+      await assertFails(deleteDoc(signupRef(PLAYER)));
+      await assertSucceeds(deleteDoc(signupRef(DIRECTOR, PLAYER)));
+    });
+
+    it("a player reads their own entry-fee payment but can't write it", async () => {
+      await seedPlayers();
+      await assertFails(setDoc(payRef(PLAYER, PLAYER), { paid: true, paidAt: null, note: "" }));
+      await assertSucceeds(setDoc(payRef(DIRECTOR, PLAYER), { paid: true, paidAt: new Date(), note: "Venmo" }));
+      await assertSucceeds(getDoc(payRef(PLAYER, PLAYER)));
+      await assertFails(getDoc(payRef(OUTSIDER, PLAYER)));
+      await assertSucceeds(getDoc(payRef(DIRECTOR, PLAYER)));
+      await assertFails(updateDoc(payRef(PLAYER, PLAYER), { paid: false }));
+    });
+
+    it("drafts are read-only: managers and accepted players in the division watch", async () => {
+      await seedPlayers();
+      await asServer(async (fs) => {
+        await setDoc(doc(fs, "tournaments", T, "drafts", DIV), { status: "live", picks: [] });
+        await setDoc(doc(fs, "tournaments", T, "signups", PLAYER), { ...signup(), status: "accepted", createdAt: new Date(), updatedAt: new Date() });
+        await setDoc(doc(fs, "tournaments", T, "signups", COACH), { ...signup(), status: "applied", createdAt: new Date(), updatedAt: new Date() });
+      });
+      await assertSucceeds(getDoc(draftRef(DIRECTOR)));
+      await assertSucceeds(getDoc(draftRef(PLAYER)));
+      await assertFails(getDoc(draftRef(COACH)));
+      await assertFails(getDoc(draftRef(OUTSIDER)));
+      await assertFails(setDoc(draftRef(DIRECTOR), { status: "done", picks: [] }));
+      await assertFails(updateDoc(draftRef(PLAYER), { picks: ["p"] }));
+    });
+  });
+
   it("captains report and confirm; others can't; managers override", async () => {
     await seed();
     await env.withSecurityRulesDisabled((ctx) =>

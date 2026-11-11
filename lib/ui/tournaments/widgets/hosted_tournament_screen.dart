@@ -184,6 +184,19 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
 
 // ---- Shared pieces ---------------------------------------------------------
 
+/// "Teams need at least 7 players on their roster to register." When
+/// divisions differ, the range.
+String _rosterNote(List<TournamentDivision> divisions) {
+  final mins = {
+    for (final d in divisions) d.effectiveMinRoster,
+    if (divisions.isEmpty) TournamentDivision.defaultMinRoster,
+  }.toList()..sort();
+  final need = mins.length == 1
+      ? 'at least ${mins.first}'
+      : 'at least ${mins.first}-${mins.last} (by division)';
+  return 'Teams need $need players on their roster to register.';
+}
+
 class _Section extends StatelessWidget {
   const _Section(this.title, {this.trailing});
 
@@ -499,8 +512,7 @@ class _OverviewTab extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'Teams need at least ${TournamentEntry.minRoster} players '
-                  'on their roster to register.',
+                  _rosterNote(vm.divisions),
                   style: theme.textTheme.bodySmall,
                 ),
               ),

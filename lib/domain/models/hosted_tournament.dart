@@ -23,6 +23,122 @@ enum TournamentEntryType {
   players,
 }
 
+/// What kind of event a hosted tournament is. A league runs a weekly
+/// season (with optional playoffs) instead of one weekend.
+enum HostedKind {
+  tournament('Tournament'),
+  league('League');
+
+  const HostedKind(this.label);
+  final String label;
+}
+
+/// How teams are built from individual signups (player entry).
+enum DraftMode {
+  /// The app deals balanced teams from skill and gender.
+  balanced('Balanced teams', 'Teams are dealt automatically, evened by skill'),
+
+  /// The host picks captains, who take turns drafting players.
+  captains('Captains draft', 'Captains take turns picking players');
+
+  const DraftMode(this.label, this.summary);
+  final String label;
+  final String summary;
+}
+
+/// A league's season: how many weeks it runs and how the playoffs work.
+/// The first night and its start time come from the division's
+/// `settings.startsAt`; each following week is seven days on.
+class LeagueSeason {
+  const LeagueSeason({
+    this.weeks = 8,
+    this.playoffWeeks = 1,
+    this.playoffTeams = 4,
+    this.gamesPerNight = 1,
+    this.skipDates = const [],
+  });
+
+  static const maxWeeks = 26;
+  static const maxPlayoffWeeks = 3;
+  static const playoffSizes = [0, 2, 4, 8];
+  static const maxGamesPerNight = 2;
+  static const maxSkipDates = 10;
+
+  /// Total weeks, playoffs included.
+  final int weeks;
+  final int playoffWeeks;
+
+  /// 0 for no playoffs.
+  final int playoffTeams;
+  final int gamesPerNight;
+
+  /// Weeks with no games (holidays), as the date of that night.
+  final List<DateTime> skipDates;
+
+  bool get hasPlayoffs => playoffTeams > 0 && playoffWeeks > 0;
+
+  /// Regular-season weeks.
+  int get regularWeeks => hasPlayoffs ? weeks - playoffWeeks : weeks;
+
+  LeagueSeason copyWith({
+    int? weeks,
+    int? playoffWeeks,
+    int? playoffTeams,
+    int? gamesPerNight,
+    List<DateTime>? skipDates,
+  }) => LeagueSeason(
+    weeks: weeks ?? this.weeks,
+    playoffWeeks: playoffWeeks ?? this.playoffWeeks,
+    playoffTeams: playoffTeams ?? this.playoffTeams,
+    gamesPerNight: gamesPerNight ?? this.gamesPerNight,
+    skipDates: skipDates ?? this.skipDates,
+  );
+
+  static LeagueSeason? fromMap(Object? raw) {
+    if (raw is! Map) return null;
+    return LeagueSeason(
+      weeks: ((raw['weeks'] as num?)?.toInt() ?? 8).clamp(1, maxWeeks),
+      playoffWeeks: ((raw['playoffWeeks'] as num?)?.toInt() ?? 0).clamp(
+        0,
+        maxPlayoffWeeks,
+      ),
+      playoffTeams: (raw['playoffTeams'] as num?)?.toInt() ?? 0,
+      gamesPerNight: ((raw['gamesPerNight'] as num?)?.toInt() ?? 1).clamp(
+        1,
+        maxGamesPerNight,
+      ),
+      skipDates: [
+        for (final d in (raw['skipDates'] as List?) ?? const [])
+          if (parseDate(d) != null) parseDate(d)!,
+      ],
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'weeks': weeks,
+    'playoffWeeks': playoffWeeks,
+    'playoffTeams': playoffTeams,
+    'gamesPerNight': gamesPerNight,
+    'skipDates': skipDates,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is LeagueSeason &&
+      other.weeks == weeks &&
+      other.playoffWeeks == playoffWeeks &&
+      other.playoffTeams == playoffTeams &&
+      other.gamesPerNight == gamesPerNight &&
+      other.skipDates.length == skipDates.length &&
+      [
+        for (var i = 0; i < skipDates.length; i++) skipDates[i],
+      ].every((d) => other.skipDates.contains(d));
+
+  @override
+  int get hashCode =>
+      Object.hash(weeks, playoffWeeks, playoffTeams, gamesPerNight);
+}
+
 /// Where a hosted tournament is in its life.
 enum HostedStatus {
   /// Only the host's managers can see it.
@@ -106,6 +222,10 @@ class BidFee {
   int get hashCode => Object.hash(amountCents, currency, instructions, dueAt);
 }
 
+/// What each player pays to enter a player-entry event. Same shape as a
+/// team's [BidFee], and still stored under `bidFee`.
+typedef EntryFee = BidFee;
+
 /// A division's name, copied onto the tournament so lists don't need to
 /// read every division.
 class DivisionSummary {
@@ -156,6 +276,9 @@ class HostedTournament {
     this.entryType = TournamentEntryType.teams,
     this.status = HostedStatus.draft,
     this.bidFee,
+    this.kind = HostedKind.tournament,
+    this.season,
+    this.draftMode = DraftMode.balanced,
     this.divisions = const [],
     this.createdBy,
     this.createdAt,
@@ -179,13 +302,31 @@ class HostedTournament {
   final TournamentEntryType entryType;
   final HostedStatus status;
 
-  /// Null when it's free to enter.
+  /// Null when it's free to enter. For player entry this is the per-player
+  /// [EntryFee]; for team entry it's the team's bid fee.
   final BidFee? bidFee;
+  final HostedKind kind;
+
+  /// Leagues only.
+  final LeagueSeason? season;
+
+  /// How player-entry teams are built.
+  final DraftMode draftMode;
   final List<DivisionSummary> divisions;
   final String? createdBy;
   final DateTime? createdAt;
 
   bool get isNew => id.isEmpty;
+  bool get isLeague => kind == HostedKind.league;
+
+  /// Individuals sign up and teams are generated (a hat tournament, or a
+  /// league that takes players).
+  bool get takesPlayers => entryType == TournamentEntryType.players;
+
+  /// A one-off hat tournament.
+  bool get isHat => takesPlayers && !isLeague;
+
+  EntryFee? get entryFee => bidFee;
 
   /// What follows and tagged posts use, the same shape as group
   /// tournaments: `tournament_{hostId}_{id}`.
@@ -205,6 +346,8 @@ class HostedTournament {
     TournamentVisibility? visibility,
     HostedStatus? status,
     BidFee? Function()? bidFee,
+    LeagueSeason? Function()? season,
+    DraftMode? draftMode,
     List<DivisionSummary>? divisions,
   }) => HostedTournament(
     id: id ?? this.id,
@@ -220,6 +363,9 @@ class HostedTournament {
     entryType: entryType,
     status: status ?? this.status,
     bidFee: bidFee != null ? bidFee() : this.bidFee,
+    kind: kind,
+    season: season != null ? season() : this.season,
+    draftMode: draftMode ?? this.draftMode,
     divisions: divisions ?? this.divisions,
     createdBy: createdBy,
     createdAt: createdAt,
@@ -250,6 +396,13 @@ class HostedTournament {
     ),
     status: enumByName(HostedStatus.values, map['status'], HostedStatus.draft),
     bidFee: BidFee.fromMap(map['bidFee']),
+    kind: enumByName(HostedKind.values, map['kind'], HostedKind.tournament),
+    season: LeagueSeason.fromMap(map['season']),
+    draftMode: enumByName(
+      DraftMode.values,
+      map['draftMode'],
+      DraftMode.balanced,
+    ),
     divisions: [
       for (final d in (map['divisions'] as List?) ?? const [])
         if (d is Map) DivisionSummary.fromMap(Map<String, dynamic>.from(d)),
@@ -272,6 +425,9 @@ class HostedTournament {
     'entryType': entryType.name,
     'status': status.name,
     'bidFee': bidFee?.toMap(),
+    'kind': kind.name,
+    'season': season?.toMap(),
+    'draftMode': draftMode.name,
     'divisions': [for (final d in divisions) d.toMap()],
   };
 }
@@ -289,10 +445,28 @@ class TournamentDivision {
     this.seeds = const [],
     this.captains = const {},
     this.placements = const [],
+    this.minRoster,
+    this.teams = const [],
   });
 
   /// Whole numbers only; the engine handles up to [TournamentSettings.maxTeams].
   static const teamCaps = [4, 6, 8, 10, 12, 16, 20, 24, 32];
+
+  static const maxMinRoster = 30;
+
+  /// What divisions needed before it was a setting: a full club roster.
+  static const defaultMinRoster = 7;
+
+  /// Players a team needs on its roster to apply or accept an invite. Null
+  /// means [defaultMinRoster]; the form sets it from the field size.
+  final int? minRoster;
+
+  /// Teams built from individual signups (player entry). Empty until the
+  /// host drafts them.
+  final List<TournamentTeam> teams;
+
+  /// The roster size a team must reach: the host's setting, or the default.
+  int get effectiveMinRoster => minRoster ?? defaultMinRoster;
 
   final String id;
   final Division division;
@@ -338,6 +512,8 @@ class TournamentDivision {
     List<String>? seeds,
     Map<String, List<String>>? captains,
     List<String>? placements,
+    int? Function()? minRoster,
+    List<TournamentTeam>? teams,
   }) => TournamentDivision(
     id: id ?? this.id,
     division: division ?? this.division,
@@ -347,6 +523,8 @@ class TournamentDivision {
     seeds: seeds ?? this.seeds,
     captains: captains ?? this.captains,
     placements: placements ?? this.placements,
+    minRoster: minRoster != null ? minRoster() : this.minRoster,
+    teams: teams ?? this.teams,
   );
 
   /// Moves the team at seed index [from] to [to] (0-based, as
@@ -379,6 +557,11 @@ class TournamentDivision {
         placements: [
           for (final p in (map['placements'] as List?) ?? const []) '$p',
         ],
+        minRoster: (map['minRoster'] as num?)?.toInt(),
+        teams: [
+          for (final t in (map['teams'] as List?) ?? const [])
+            if (t is Map) TournamentTeam.fromMap(Map<String, dynamic>.from(t)),
+        ],
       );
 
   Map<String, dynamic> toMap() => {
@@ -389,6 +572,8 @@ class TournamentDivision {
     'seeds': seeds,
     'captains': captains,
     'placements': placements,
+    'minRoster': minRoster,
+    'teams': [for (final t in teams) t.toMap()],
   };
 }
 
@@ -425,9 +610,6 @@ class TournamentEntry {
   });
 
   static const maxCaptains = 4;
-
-  /// Players a team needs on its roster to apply or accept an invite.
-  static const minRoster = 7;
 
   final String teamId;
   final String teamName;
@@ -508,6 +690,109 @@ class EntryPayment {
     'paid': paid,
     'paidAt': paidAt,
     'note': note,
+  };
+}
+
+/// Where a player's signup stands (player entry).
+enum SignupStatus {
+  applied('Signed up'),
+  accepted('Accepted'),
+  waitlisted('Waitlist'),
+  declined('Declined'),
+  withdrawn('Withdrawn');
+
+  const SignupStatus(this.label);
+  final String label;
+
+  bool get isActive => this == applied || this == waitlisted;
+}
+
+/// Who a player is matched against in mixed divisions: the usual
+/// "gender match" labels used for line calls.
+enum GenderMatch {
+  mmp('MMP'),
+  wmp('WMP');
+
+  const GenderMatch(this.label);
+  final String label;
+}
+
+/// A player's signup for a player-entry tournament or league, at
+/// `tournaments/{id}/signups/{uid}`. Skill and gender are private: only the
+/// host's managers and the player can read it. Whether they've paid lives
+/// in `payments/{uid}`, which only the host writes.
+class PlayerSignup {
+  const PlayerSignup({
+    required this.uid,
+    required this.name,
+    required this.divisionId,
+    this.skill = 3,
+    this.gender,
+    this.status = SignupStatus.applied,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  static const minSkill = 1;
+  static const maxSkill = 5;
+
+  final String uid;
+  final String name;
+  final String divisionId;
+
+  /// Self-rated, 1 (new) to 5 (very experienced).
+  final int skill;
+
+  /// Mixed divisions only; null otherwise.
+  final GenderMatch? gender;
+  final SignupStatus status;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  PlayerSignup copyWith({
+    String? name,
+    String? divisionId,
+    int? skill,
+    GenderMatch? Function()? gender,
+    SignupStatus? status,
+  }) => PlayerSignup(
+    uid: uid,
+    name: name ?? this.name,
+    divisionId: divisionId ?? this.divisionId,
+    skill: skill ?? this.skill,
+    gender: gender != null ? gender() : this.gender,
+    status: status ?? this.status,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
+
+  factory PlayerSignup.fromMap(String uid, Map<String, dynamic> map) =>
+      PlayerSignup(
+        uid: uid,
+        name: map['name'] as String? ?? '',
+        divisionId: map['divisionId'] as String? ?? '',
+        skill: ((map['skill'] as num?)?.toInt() ?? 3).clamp(minSkill, maxSkill),
+        gender: switch (map['gender']) {
+          'mmp' => GenderMatch.mmp,
+          'wmp' => GenderMatch.wmp,
+          _ => null,
+        },
+        status: enumByName(
+          SignupStatus.values,
+          map['status'],
+          SignupStatus.applied,
+        ),
+        createdAt: parseDate(map['createdAt']),
+        updatedAt: parseDate(map['updatedAt']),
+      );
+
+  /// Everything but createdAt/updatedAt, which the repository stamps.
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'divisionId': divisionId,
+    'skill': skill,
+    'gender': gender?.name,
+    'status': status.name,
   };
 }
 
