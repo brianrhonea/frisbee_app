@@ -42,6 +42,13 @@ abstract class HostedTournamentRepository {
   /// In schedule order.
   Stream<List<GroupGame>> watchGames(String tournamentId, String divisionId);
 
+  /// Every player's signup, by name; host managers only (skill and gender
+  /// are private).
+  Stream<List<PlayerSignup>> watchSignups(String tournamentId);
+
+  /// One player's own signup; null if they haven't signed up.
+  Stream<PlayerSignup?> watchSignup(String tournamentId, String uid);
+
   /// Creates the tournament when [HostedTournament.isNew], otherwise saves
   /// it. Returns its id.
   Future<Result<String>> saveTournament(
@@ -85,8 +92,30 @@ abstract class HostedTournamentRepository {
     TournamentDivision? division,
   });
 
-  /// Host managers mark a team paid or unpaid.
+  /// Host managers mark a team (or, for player entry, a player: the id is
+  /// their uid) paid or unpaid.
   Future<Result<void>> savePayment(String tournamentId, EntryPayment payment);
+
+  /// A player signs up, or changes their answers or signs back up after
+  /// withdrawing. Rules only allow it while registration is open.
+  Future<Result<void>> saveSignup(String tournamentId, PlayerSignup signup);
+
+  /// A host manager accepts, waitlists or declines a signup, or the player
+  /// withdraws it.
+  Future<Result<void>> setSignupStatus(
+    String tournamentId,
+    String uid,
+    SignupStatus status,
+  );
+
+  /// Saves the teams drafted from signups: the division's `teams`, its
+  /// seeds (team ids, in order) and each team's captain as the one who
+  /// reports its scores, in a single write.
+  Future<Result<void>> saveDraftTeams(
+    String tournamentId,
+    TournamentDivision division,
+    List<TournamentTeam> teams,
+  );
 
   /// Replaces a division's games with [games] (seeds and settings saved
   /// with them).
@@ -127,7 +156,7 @@ abstract class HostedTournamentRepository {
     List<SlotFill> fills,
   );
 
-  /// Deletes the tournament with its divisions, games, entries and
-  /// payments.
+  /// Deletes the tournament with its divisions, games, entries, signups,
+  /// drafts and payments.
   Future<Result<void>> deleteTournament(String tournamentId);
 }

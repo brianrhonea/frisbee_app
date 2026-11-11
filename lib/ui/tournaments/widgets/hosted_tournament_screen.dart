@@ -14,7 +14,9 @@ import '../../follow/widgets/follow_button.dart';
 import '../../group_tournaments/widgets/tournament_widgets.dart';
 import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
+import '../view_models/player_signups_viewmodel.dart';
 import 'hosted_status_badge.dart';
+import 'player_signups_tab.dart';
 import 'tournament_dialogs.dart';
 
 enum _Menu { edit, delete }
@@ -34,10 +36,15 @@ class HostedTournamentScreen extends StatefulWidget {
   const HostedTournamentScreen({
     super.key,
     required this.viewModel,
+    this.signups,
     this.fallbackHostId,
   });
 
   final HostedTournamentViewModel viewModel;
+
+  /// Players' signups, for player-entry tournaments and leagues; without
+  /// it the page only takes teams.
+  final PlayerSignupsViewModel? signups;
 
   /// A group whose hat tournament has this id, opened instead when
   /// there's no hosted tournament (follows don't say which it is).
@@ -49,7 +56,11 @@ class HostedTournamentScreen extends StatefulWidget {
 
 class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
   HostedTournamentViewModel get vm => widget.viewModel;
-  late final List<Command<void>> _commands = vm.commands;
+  PlayerSignupsViewModel? get signups => widget.signups;
+  late final List<Command<void>> _commands = [
+    ...vm.commands,
+    ...?signups?.commands,
+  ];
 
   @override
   void initState() {
@@ -57,15 +68,22 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
     for (final c in _commands) {
       c.addListener(_onCommand);
     }
+    vm.addListener(_syncManager);
+    _syncManager();
   }
 
   @override
   void dispose() {
+    vm.removeListener(_syncManager);
     for (final c in _commands) {
       c.removeListener(_onCommand);
     }
     super.dispose();
   }
+
+  /// The host loads after the tournament, so tell the signups when this
+  /// user turns out to manage it.
+  void _syncManager() => signups?.setManager(vm.isManager);
 
   void _onCommand() {
     if (vm.delete.completed) {
@@ -134,6 +152,8 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
           );
         }
         final follow = vm.follow;
+        // Players sign up one by one; teams are drafted from them.
+        final players = t.takesPlayers && signups != null;
         return DefaultTabController(
           length: 5,
           child: Scaffold(
@@ -154,22 +174,25 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
                     ],
                   ),
               ],
-              bottom: const TabBar(
+              bottom: TabBar(
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 tabs: [
-                  Tab(text: 'Overview'),
-                  Tab(text: 'Teams'),
-                  Tab(text: 'Schedule'),
-                  Tab(text: 'Results'),
-                  Tab(text: 'News'),
+                  const Tab(text: 'Overview'),
+                  Tab(text: players ? 'Players' : 'Teams'),
+                  const Tab(text: 'Schedule'),
+                  const Tab(text: 'Results'),
+                  const Tab(text: 'News'),
                 ],
               ),
             ),
             body: TabBarView(
               children: [
-                _OverviewTab(viewModel: vm),
-                _TeamsTab(viewModel: vm),
+                _OverviewTab(viewModel: vm, signups: signups),
+                if (players)
+                  PlayersTab(viewModel: vm, signups: signups!)
+                else
+                  _TeamsTab(viewModel: vm),
                 _ScheduleTab(viewModel: vm),
                 _ResultsTab(viewModel: vm),
                 _NewsTab(viewModel: vm),
@@ -259,15 +282,22 @@ Widget _noDivisions(HostedTournamentViewModel vm) => EmptyView(
 // ---- Overview --------------------------------------------------------------
 
 class _OverviewTab extends StatelessWidget {
-  const _OverviewTab({required this.viewModel});
+  const _OverviewTab({required this.viewModel, this.signups});
 
   final HostedTournamentViewModel viewModel;
+  final PlayerSignupsViewModel? signups;
 
   Future<void> _editDivision(
     BuildContext context,
     TournamentDivision initial,
   ) async {
-    final d = await showDivisionDialog(context, initial: initial);
+    final t = viewModel.tournament!;
+    final d = await showDivisionDialog(
+      context,
+      initial: initial,
+      league: t.isLeague,
+      players: t.takesPlayers,
+    );
     if (d != null) viewModel.saveDivision.execute(d);
   }
 
@@ -321,6 +351,18 @@ class _OverviewTab extends StatelessWidget {
                 ),
                 label: Text(t.visibility.label),
               ),
+              if (t.isLeague)
+                const Chip(
+                  avatar: Icon(Icons.calendar_month_outlined, size: 18),
+                  label: Text('League'),
+                ),
+              if (t.takesPlayers)
+                Chip(
+                  avatar: const Icon(Icons.person_add_alt_outlined, size: 18),
+                  label: Text(
+                    t.isLeague ? 'Players sign up' : 'Hat tournament',
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -346,19 +388,42 @@ class _OverviewTab extends StatelessWidget {
             const SizedBox(height: 4),
             Text(t.description, style: theme.textTheme.bodyMedium),
           ],
+          if (t.season case final season?) ...[
+            const _Section('Season'),
+            Card(
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                leading: const Icon(Icons.calendar_month_outlined),
+                title: Text(
+                  '${season.weeks} weeks'
+                  '${season.gamesPerNight > 1 ? ', ${season.gamesPerNight} games a night' : ''}',
+                ),
+                subtitle: Text(
+                  season.hasPlayoffs
+                      ? 'Top ${season.playoffTeams} make the playoffs in the '
+                            'last ${season.playoffWeeks} '
+                            '${season.playoffWeeks == 1 ? 'week' : 'weeks'}.'
+                      : 'Regular season only, no playoffs.',
+                ),
+              ),
+            ),
+          ],
           if (fee != null) ...[
-            const _Section('Bid fee'),
+            _Section(t.takesPlayers ? 'Entry fee' : 'Bid fee'),
             Card(
               margin: EdgeInsets.zero,
               child: ListTile(
                 leading: const Icon(Icons.payments_outlined),
-                title: Text('${fee.label} per team'),
+                title: Text(
+                  '${fee.label} per ${t.takesPlayers ? 'player' : 'team'}',
+                ),
                 subtitle: Text(
                   [
                     if (fee.instructions.isNotEmpty) fee.instructions,
                     if (fee.dueAt != null)
                       'Due ${DateFormat.yMMMd().format(fee.dueAt!)}',
-                    'Pay the host directly; they mark teams paid.',
+                    'Pay the host directly; they mark '
+                        '${t.takesPlayers ? 'players' : 'teams'} paid.',
                   ].join('\n'),
                 ),
                 isThreeLine: true,
@@ -366,6 +431,12 @@ class _OverviewTab extends StatelessWidget {
             ),
           ],
           if (vm.isManager) _HostSteps(viewModel: vm),
+          if (t.takesPlayers && signups != null && !vm.isManager)
+            ListenableBuilder(
+              listenable: signups!,
+              builder: (_, _) =>
+                  PlayerSignupCard(viewModel: vm, signups: signups!),
+            ),
           _Section(
             'Divisions',
             trailing: vm.isManager
@@ -393,8 +464,13 @@ class _OverviewTab extends StatelessWidget {
               child: ListTile(
                 title: Text(d.label),
                 subtitle: Text(
-                  '${d.seeds.length} of ${d.maxTeams} teams · '
-                  '${d.settings.format.label} · game to ${d.settings.scoreCap}',
+                  [
+                    '${d.seeds.length} of ${d.maxTeams} teams',
+                    '${d.settings.playersOnField}v${d.settings.playersOnField}',
+                    if (!t.takesPlayers) '${d.effectiveMinRoster}+ roster',
+                    t.isLeague ? 'weekly' : d.settings.format.label,
+                    'game to ${d.settings.scoreCap}',
+                  ].join(' · '),
                 ),
                 trailing: vm.isManager
                     ? PopupMenuButton<String>(
@@ -419,7 +495,7 @@ class _OverviewTab extends StatelessWidget {
                     : null,
               ),
             ),
-          if (vm.myEntries.isNotEmpty || vm.canApply) ...[
+          if (!t.takesPlayers && (vm.myEntries.isNotEmpty || vm.canApply)) ...[
             const _Section('Your teams'),
             for (final e in vm.myEntries)
               Card(
@@ -517,7 +593,8 @@ class _OverviewTab extends StatelessWidget {
                 ),
               ),
             ],
-          ] else if (t.status.acceptsEntries &&
+          ] else if (!t.takesPlayers &&
+              t.status.acceptsEntries &&
               t.visibility == TournamentVisibility.inviteOnly &&
               !vm.isManager) ...[
             const SizedBox(height: 16),
@@ -560,13 +637,19 @@ class _HostSteps extends StatelessWidget {
         ],
       ),
       HostedStatus.registration => (
-        'Registration is open. Accept teams on the Teams tab, then close '
-            'registration to seed.',
+        t.takesPlayers
+            ? 'Registration is open. Accept players on the Players tab, then '
+                  'close registration to draft teams.'
+            : 'Registration is open. Accept teams on the Teams tab, then '
+                  'close registration to seed.',
         [('Close registration', HostedStatus.seeding)],
       ),
       HostedStatus.seeding => (
-        'Seed each division on the Teams tab, then publish its schedule on '
-            'the Schedule tab.',
+        t.takesPlayers
+            ? 'Draft each division\'s teams on the Players tab, then publish '
+                  'its schedule on the Schedule tab.'
+            : 'Seed each division on the Teams tab, then publish its '
+                  'schedule on the Schedule tab.',
         [('Reopen registration', HostedStatus.registration)],
       ),
       HostedStatus.scheduled => (

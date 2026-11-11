@@ -74,6 +74,162 @@ class _HostedTournamentFormScreenState
     _instructions.text = vm.feeInstructions;
   }
 
+  /// New events pick a type once: a tournament or a league, and whether
+  /// teams apply or players sign up (players on a tournament make it a hat
+  /// tournament). An existing one just shows what it is.
+  Widget _typePicker(ThemeData theme) {
+    if (!vm.isNew) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Wrap(
+          spacing: 8,
+          children: [
+            Chip(label: Text(vm.kind.label)),
+            Chip(
+              label: Text(vm.takesPlayers ? 'Players sign up' : 'Teams apply'),
+            ),
+          ],
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SegmentedButton<HostedKind>(
+          segments: [
+            for (final k in HostedKind.values)
+              ButtonSegment(value: k, label: Text(k.label)),
+          ],
+          selected: {vm.kind},
+          onSelectionChanged: (s) => vm.setKind(s.first),
+        ),
+        const SizedBox(height: 8),
+        SegmentedButton<TournamentEntryType>(
+          segments: const [
+            ButtonSegment(
+              value: TournamentEntryType.teams,
+              label: Text('Teams apply'),
+            ),
+            ButtonSegment(
+              value: TournamentEntryType.players,
+              label: Text('Players sign up'),
+            ),
+          ],
+          selected: {vm.entryType},
+          onSelectionChanged: (s) => vm.setEntryType(s.first),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 8),
+          child: Text(switch ((vm.kind, vm.entryType)) {
+            (HostedKind.tournament, TournamentEntryType.teams) =>
+              'A weekend tournament for teams that apply.',
+            (HostedKind.tournament, TournamentEntryType.players) =>
+              'A hat tournament: players sign up and you draw balanced '
+                  'teams from them.',
+            (HostedKind.league, TournamentEntryType.teams) =>
+              'A weekly league for teams that apply, with a minimum roster.',
+            (HostedKind.league, TournamentEntryType.players) =>
+              'A weekly league: players sign up and you draw balanced '
+                  'teams, which become real teams with chat and a roster.',
+          }, style: theme.textTheme.bodySmall),
+        ),
+      ],
+    );
+  }
+
+  /// How long the season runs, and its playoffs.
+  List<Widget> _seasonSettings(ThemeData theme) {
+    final s = vm.season;
+    Widget chips<T>(
+      String label,
+      List<T> options,
+      T value,
+      String Function(T) text,
+      void Function(T) onChanged,
+    ) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final o in options)
+                ChoiceChip(
+                  label: Text(text(o)),
+                  selected: o == value,
+                  onSelected: (_) => onChanged(o),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+    return [
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Text('Season', style: theme.textTheme.titleSmall),
+          const Spacer(),
+          IconButton(
+            tooltip: 'Fewer weeks',
+            onPressed: s.weeks <= 1
+                ? null
+                : () => vm.setSeason(s.copyWith(weeks: s.weeks - 1)),
+            icon: const Icon(Icons.remove_circle_outline),
+          ),
+          Text('${s.weeks} weeks', style: theme.textTheme.titleMedium),
+          IconButton(
+            tooltip: 'More weeks',
+            onPressed: s.weeks >= LeagueSeason.maxWeeks
+                ? null
+                : () => vm.setSeason(s.copyWith(weeks: s.weeks + 1)),
+            icon: const Icon(Icons.add_circle_outline),
+          ),
+        ],
+      ),
+      chips<int>(
+        'Games a night',
+        const [1, 2],
+        s.gamesPerNight,
+        (n) => '$n',
+        (n) => vm.setSeason(s.copyWith(gamesPerNight: n)),
+      ),
+      chips<int>(
+        'Playoffs',
+        LeagueSeason.playoffSizes,
+        s.playoffTeams,
+        (n) => n == 0 ? 'None' : 'Top $n',
+        (n) => vm.setSeason(
+          s.copyWith(
+            playoffTeams: n,
+            playoffWeeks: n == 0
+                ? 0
+                : (s.playoffWeeks == 0 ? 1 : s.playoffWeeks),
+          ),
+        ),
+      ),
+      if (s.playoffTeams > 0)
+        chips<int>(
+          'Playoff weeks (the last weeks of the season)',
+          [for (var w = 1; w <= LeagueSeason.maxPlayoffWeeks; w++) w],
+          s.playoffWeeks,
+          (n) => '$n',
+          (n) => vm.setSeason(s.copyWith(playoffWeeks: n)),
+        ),
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          'Each division sets its own game night, field size and roster '
+          'minimum on the event page.',
+          style: theme.textTheme.bodySmall,
+        ),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -95,7 +251,11 @@ class _HostedTournamentFormScreenState
         final end = vm.endsOn;
         return Scaffold(
           appBar: AppBar(
-            title: Text(vm.isNew ? 'Host a tournament' : 'Edit tournament'),
+            title: Text(
+              vm.isNew
+                  ? 'Host ${vm.isLeague ? 'a league' : 'a tournament'}'
+                  : 'Edit ${vm.isLeague ? 'league' : 'tournament'}',
+            ),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -123,6 +283,7 @@ class _HostedTournamentFormScreenState
                             'Only members who manage events can host.',
                           ),
                   ),
+                _typePicker(theme),
                 TextField(
                   controller: _name,
                   maxLength: 100,
@@ -136,29 +297,52 @@ class _HostedTournamentFormScreenState
                     setState(() {});
                   },
                 ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.date_range_outlined),
-                  title: const Text('Dates'),
-                  subtitle: Text(
-                    end == null
-                        ? f.format(vm.startsOn)
-                        : '${f.format(vm.startsOn)} – ${f.format(end)}',
+                if (vm.isLeague) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_month_outlined),
+                    title: const Text('First night'),
+                    subtitle: Text(
+                      end == null
+                          ? f.format(vm.startsOn)
+                          : '${f.format(vm.startsOn)} – ${f.format(end)}',
+                    ),
+                    onTap: () async {
+                      final d = await showDatePicker(
+                        context: context,
+                        initialDate: vm.startsOn,
+                        firstDate: DateTime(vm.startsOn.year - 1),
+                        lastDate: DateTime(vm.startsOn.year + 2),
+                        helpText: 'First night of the season',
+                      );
+                      if (d != null) vm.setFirstNight(d);
+                    },
                   ),
-                  onTap: () async {
-                    final range = await showDateRangePicker(
-                      context: context,
-                      initialDateRange: DateTimeRange(
-                        start: vm.startsOn,
-                        end: end ?? vm.startsOn,
-                      ),
-                      firstDate: DateTime(vm.startsOn.year - 1),
-                      lastDate: DateTime(vm.startsOn.year + 2),
-                      helpText: 'First and last day',
-                    );
-                    if (range != null) vm.setDates(range.start, range.end);
-                  },
-                ),
+                  ..._seasonSettings(theme),
+                ] else
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.date_range_outlined),
+                    title: const Text('Dates'),
+                    subtitle: Text(
+                      end == null
+                          ? f.format(vm.startsOn)
+                          : '${f.format(vm.startsOn)} – ${f.format(end)}',
+                    ),
+                    onTap: () async {
+                      final range = await showDateRangePicker(
+                        context: context,
+                        initialDateRange: DateTimeRange(
+                          start: vm.startsOn,
+                          end: end ?? vm.startsOn,
+                        ),
+                        firstDate: DateTime(vm.startsOn.year - 1),
+                        lastDate: DateTime(vm.startsOn.year + 2),
+                        helpText: 'First and last day',
+                      );
+                      if (range != null) vm.setDates(range.start, range.end);
+                    },
+                  ),
                 TextField(
                   controller: _location,
                   maxLength: 200,
@@ -203,10 +387,13 @@ class _HostedTournamentFormScreenState
                 const SizedBox(height: 16),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Bid fee'),
-                  subtitle: const Text(
-                    'What each team pays to hold its spot. Teams pay you '
-                    'directly; you mark them paid.',
+                  title: Text(vm.feeName),
+                  subtitle: Text(
+                    vm.takesPlayers
+                        ? 'What each player pays to sign up. Players pay '
+                              'you directly; you mark them paid.'
+                        : 'What each team pays to hold its spot. Teams pay '
+                              'you directly; you mark them paid.',
                   ),
                   value: vm.hasFee,
                   onChanged: vm.setHasFee,
@@ -301,7 +488,7 @@ class _HostedTournamentFormScreenState
                     child: Text(
                       "It starts as a draft only your managers see. Add "
                       'divisions on its page, then publish it to open '
-                      'registration.',
+                      '${vm.takesPlayers ? 'signups' : 'registration'}.',
                       style: theme.textTheme.bodySmall,
                     ),
                   ),

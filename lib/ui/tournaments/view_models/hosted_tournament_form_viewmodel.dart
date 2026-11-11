@@ -10,8 +10,13 @@ import '../../../domain/models/team.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
-/// Hosting a tournament, or editing one's details: name, dates, place,
-/// who can play and the bid fee. Divisions are set up on its page.
+/// Hosting a tournament or a league, or editing its details: name, dates,
+/// place, who can play and the fee, and for a league its season. Divisions
+/// are set up on its page.
+///
+/// A new event is a tournament or a league, and teams apply to it or
+/// individual players sign up (a hat tournament is a tournament that takes
+/// players). That's fixed once it's created; everything else can change.
 class HostedTournamentFormViewModel extends ChangeNotifier {
   HostedTournamentFormViewModel({
     this.hostId,
@@ -74,6 +79,10 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   String currency = 'USD';
   String feeInstructions = '';
   DateTime? _feeDue;
+  HostedKind _kind = HostedKind.tournament;
+  TournamentEntryType _entryType = TournamentEntryType.teams;
+  DraftMode draftMode = DraftMode.balanced;
+  LeagueSeason _season = const LeagueSeason();
 
   bool get loaded => _loaded || _error != null;
   Object? get error => _error;
@@ -84,6 +93,14 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   DateTime? get endsOn => _endsOn;
   bool get hasFee => _hasFee;
   DateTime? get feeDue => _feeDue;
+  HostedKind get kind => _kind;
+  TournamentEntryType get entryType => _entryType;
+  LeagueSeason get season => _season;
+  bool get isLeague => _kind == HostedKind.league;
+  bool get takesPlayers => _entryType == TournamentEntryType.players;
+
+  /// The fee is per player when players sign up, per team otherwise.
+  String get feeName => takesPlayers ? 'Entry fee' : 'Bid fee';
 
   /// Only members of the host with Manage events may host.
   bool get canHost {
@@ -111,6 +128,10 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     _startsOn = t.startsOn;
     _endsOn = t.endsOn;
     visibility = t.visibility;
+    _kind = t.kind;
+    _entryType = t.entryType;
+    draftMode = t.draftMode;
+    _season = t.season ?? const LeagueSeason();
     final fee = t.bidFee;
     _hasFee = fee != null;
     if (fee != null) {
@@ -128,6 +149,55 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     final last = DateTime(end.year, end.month, end.day);
     _endsOn = last == _startsOn ? null : last;
     notifyListeners();
+  }
+
+  /// A league's first night; the season's last night follows from its
+  /// length.
+  void setFirstNight(DateTime night) {
+    _startsOn = DateTime(night.year, night.month, night.day);
+    _syncSeasonEnd();
+    notifyListeners();
+  }
+
+  void setKind(HostedKind k) {
+    if (!isNew) return;
+    _kind = k;
+    if (isLeague) {
+      _syncSeasonEnd();
+    } else {
+      _endsOn = _startsOn.add(const Duration(days: 1));
+    }
+    notifyListeners();
+  }
+
+  void setEntryType(TournamentEntryType t) {
+    if (!isNew) return;
+    _entryType = t;
+    notifyListeners();
+  }
+
+  void setDraftMode(DraftMode m) {
+    draftMode = m;
+    notifyListeners();
+  }
+
+  void setSeason(LeagueSeason s) {
+    _season = s;
+    _syncSeasonEnd();
+    notifyListeners();
+  }
+
+  /// A league's last night: its first plus a week for each of the season's
+  /// weeks, skipped weeks included.
+  void _syncSeasonEnd() {
+    if (!isLeague) return;
+    final nights = _season.weeks + _season.skipDates.length;
+    final last = DateTime(
+      _startsOn.year,
+      _startsOn.month,
+      _startsOn.day + 7 * (nights - 1),
+    );
+    _endsOn = last == _startsOn ? null : last;
   }
 
   void setVisibility(TournamentVisibility v) {
@@ -159,7 +229,17 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
 
   String? get problem {
     if (name.trim().isEmpty) return 'Give it a name.';
-    if (_hasFee && feeCents == null) return 'Enter the bid fee, e.g. 250.';
+    if (_hasFee && feeCents == null) {
+      return 'Enter the ${feeName.toLowerCase()}, e.g. 250.';
+    }
+    if (isLeague && _season.playoffTeams > 0) {
+      if (_season.playoffWeeks < 1) {
+        return 'Give the playoffs at least one week.';
+      }
+      if (_season.playoffWeeks >= _season.weeks) {
+        return 'Leave at least one week for the regular season.';
+      }
+    }
     return null;
   }
 
@@ -190,6 +270,8 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
           hostKind: host.kind,
           name: '',
           startsOn: _startsOn,
+          kind: _kind,
+          entryType: _entryType,
         );
     return _repo.saveTournament(
       base.copyWith(
@@ -201,6 +283,8 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
         endsOn: () => _endsOn,
         visibility: visibility,
         bidFee: () => fee,
+        season: () => isLeague ? _season : null,
+        draftMode: draftMode,
       ),
       user,
     );

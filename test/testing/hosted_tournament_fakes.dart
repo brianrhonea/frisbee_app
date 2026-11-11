@@ -21,6 +21,9 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
   /// tournamentId → teamId → payment.
   final payments = <String, Map<String, EntryPayment>>{};
 
+  /// tournamentId → uid → player signup.
+  final signups = <String, Map<String, PlayerSignup>>{};
+
   /// `tournamentId/divisionId` → games.
   final games = <String, List<GroupGame>>{};
 
@@ -127,6 +130,17 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
   @override
   Stream<EntryPayment?> watchPayment(String tournamentId, String teamId) =>
       _watch(() => payments[tournamentId]?[teamId]);
+
+  @override
+  Stream<List<PlayerSignup>> watchSignups(String tournamentId) => _watch(
+    () =>
+        [...?signups[tournamentId]?.values]
+          ..sort((a, b) => a.name.compareTo(b.name)),
+  );
+
+  @override
+  Stream<PlayerSignup?> watchSignup(String tournamentId, String uid) =>
+      _watch(() => signups[tournamentId]?[uid]);
 
   @override
   Stream<List<GroupGame>> watchGames(String tournamentId, String divisionId) =>
@@ -270,6 +284,52 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
   }
 
   @override
+  Future<Result<void>> saveSignup(
+    String tournamentId,
+    PlayerSignup signup,
+  ) async {
+    log.add('signup ${signup.uid} ${signup.status.name}');
+    signups.putIfAbsent(tournamentId, () => {})[signup.uid] = signup;
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> setSignupStatus(
+    String tournamentId,
+    String uid,
+    SignupStatus status,
+  ) async {
+    log.add('signup $uid ${status.name}');
+    final s = signups[tournamentId]?[uid];
+    if (s == null) return Result.error(Exception('No signup.'));
+    signups[tournamentId]![uid] = s.copyWith(status: status);
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> saveDraftTeams(
+    String tournamentId,
+    TournamentDivision division,
+    List<TournamentTeam> teams,
+  ) async {
+    log.add('draft ${division.id} ${teams.length}');
+    final map = divisions.putIfAbsent(tournamentId, () => {});
+    final d = map[division.id] ?? division;
+    map[division.id] = d.copyWith(
+      teams: teams,
+      seeds: [for (final t in teams) t.id],
+      captains: {
+        for (final t in teams)
+          t.id: [?t.captainId],
+      },
+    );
+    _changed();
+    return const Result.ok(null);
+  }
+
+  @override
   Future<Result<void>> publishSchedule(
     String tournamentId,
     TournamentDivision division,
@@ -347,6 +407,7 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
     divisions.remove(tournamentId);
     entries.remove(tournamentId);
     payments.remove(tournamentId);
+    signups.remove(tournamentId);
     games.removeWhere((k, _) => k.startsWith('$tournamentId/'));
     _changed();
     return const Result.ok(null);

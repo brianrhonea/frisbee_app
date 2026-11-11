@@ -167,6 +167,10 @@ abstract final class Routes {
       '$tournaments/new?host=${Uri.encodeQueryComponent(hostId)}';
   static String editTournament(String id) => '$tournaments/$id/edit';
 
+  /// The host turns a division's signed-up players into teams.
+  static String tournamentDraft(String id, String divisionId) =>
+      '$tournaments/$id/draft/$divisionId';
+
   // Community group tournament pages open over the tabs, like video pages;
   // use `context.push`.
   static const groupTournamentsPath = '/group-tournaments';

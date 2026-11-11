@@ -1829,7 +1829,9 @@ service cloud.firestore {
               || (exists(/databases/$(database)/documents/tournaments/$(tournamentId)/signups/$(uid()))
                   && get(/databases/$(database)/documents/tournaments/$(tournamentId)/signups/$(uid())).data.status == 'accepted'
                   && get(/databases/$(database)/documents/tournaments/$(tournamentId)/signups/$(uid())).data.divisionId == divisionId));
-        allow write: if false;
+        allow create, update: if false;
+        // So deleting the tournament can clear it.
+        allow delete: if signedIn() && manages(current());
       }
 
       // Entry fee payments (per team, or per player in player entry): the

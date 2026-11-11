@@ -3699,6 +3699,9 @@ describe("hosted tournaments", () => {
       await assertFails(getDoc(draftRef(OUTSIDER)));
       await assertFails(setDoc(draftRef(DIRECTOR), { status: "done", picks: [] }));
       await assertFails(updateDoc(draftRef(PLAYER), { picks: ["p"] }));
+      // Only managers can clear it (deleting the tournament).
+      await assertFails(deleteDoc(draftRef(PLAYER)));
+      await assertSucceeds(deleteDoc(draftRef(DIRECTOR)));
     });
   });
 

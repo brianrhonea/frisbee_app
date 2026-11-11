@@ -313,6 +313,7 @@ class HostedTournamentViewModel extends ChangeNotifier {
   bool get canApply {
     final t = _tournament;
     return t != null &&
+        !t.takesPlayers &&
         t.status.acceptsEntries &&
         t.visibility == TournamentVisibility.public &&
         teamsToEnter.isNotEmpty &&
@@ -374,8 +375,17 @@ class HostedTournamentViewModel extends ChangeNotifier {
   TournamentEntry? entryOf(String teamId) =>
       _entries.where((e) => e.teamId == teamId).firstOrNull;
 
-  String teamName(String? id) =>
-      id == null ? 'TBD' : (entryOf(id)?.teamName ?? 'Team');
+  String teamName(String? id) {
+    if (id == null) return 'TBD';
+    final entry = entryOf(id);
+    if (entry != null) return entry.teamName;
+    // Teams drafted from player signups have no entry, only the division.
+    for (final d in _divisions.values) {
+      final drafted = d.teams.where((t) => t.id == id).firstOrNull;
+      if (drafted != null) return drafted.name;
+    }
+    return 'Team';
+  }
 
   /// Accepted teams of [divisionId] in seed order.
   List<String> seedsOf(String divisionId) =>
@@ -441,6 +451,13 @@ class HostedTournamentViewModel extends ChangeNotifier {
     final team = myTeam(a.teamId);
     if (t == null || team == null) {
       return Result.error(Exception('Pick one of your teams.'));
+    }
+    if (t.takesPlayers) {
+      return Result.error(
+        Exception(
+          'Players sign up one by one here; teams are drawn from them.',
+        ),
+      );
     }
     if (a.captainIds.isEmpty) {
       return Result.error(Exception('Pick at least one captain.'));
@@ -673,7 +690,20 @@ class HostedTournamentViewModel extends ChangeNotifier {
         ),
       );
     }
-    final r = await _repo.saveDivision(t, d);
+    // A league's results come from its table and playoffs, so the format
+    // follows the season: no playoffs is a round robin, otherwise a bracket
+    // after it. The host doesn't pick one.
+    final season = t.season;
+    final saved = t.isLeague && season != null
+        ? d.copyWith(
+            settings: d.settings.copyWith(
+              format: season.hasPlayoffs
+                  ? TournamentFormat.singleElim
+                  : TournamentFormat.roundRobin,
+            ),
+          )
+        : d;
+    final r = await _repo.saveDivision(t, saved);
     if (r case Ok(:final value) when d.isNew) {
       _divisionId = value;
       _watchGames();
@@ -720,10 +750,14 @@ class HostedTournamentViewModel extends ChangeNotifier {
 
   /// The schedule [division] would get now, or why it can't have one.
   ({SchedulePlan? plan, String? problem}) preview() {
+    final t = _tournament;
     final d = division;
-    if (d == null) return (plan: null, problem: 'Add a division first.');
+    if (t == null || d == null) {
+      return (plan: null, problem: 'Add a division first.');
+    }
     try {
-      return (plan: scheduleFor(d.seeds, d.settings), problem: null);
+      // A league gets its weekly season; anything else the usual schedule.
+      return (plan: planFor(t, d, d.seeds), problem: null);
     } on ScheduleException catch (e) {
       return (plan: null, problem: e.message);
     }

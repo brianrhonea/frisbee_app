@@ -31,6 +31,12 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
   CollectionReference<Map<String, dynamic>> _payments(String id) =>
       _doc(id).collection('payments');
 
+  CollectionReference<Map<String, dynamic>> _signups(String id) =>
+      _doc(id).collection('signups');
+
+  CollectionReference<Map<String, dynamic>> _drafts(String id) =>
+      _doc(id).collection('drafts');
+
   CollectionReference<Map<String, dynamic>> _games(String id, String div) =>
       _divisions(id).doc(div).collection('games');
 
@@ -144,6 +150,26 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
           .map(
             (d) => d.exists
                 ? EntryPayment.fromMap(d.id, plainData(d.data()))
+                : null,
+          );
+
+  @override
+  Stream<List<PlayerSignup>> watchSignups(String tournamentId) =>
+      _signups(tournamentId).snapshots().map(
+        (snap) => [
+          for (final d in snap.docs)
+            PlayerSignup.fromMap(d.id, plainData(d.data())),
+        ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())),
+      );
+
+  @override
+  Stream<PlayerSignup?> watchSignup(String tournamentId, String uid) =>
+      _signups(tournamentId)
+          .doc(uid)
+          .snapshots()
+          .map(
+            (d) => d.exists
+                ? PlayerSignup.fromMap(d.id, plainData(d.data()))
                 : null,
           );
 
@@ -277,6 +303,54 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
       );
 
   @override
+  Future<Result<void>> saveSignup(String tournamentId, PlayerSignup signup) =>
+      guard(() async {
+        final ref = _signups(tournamentId).doc(signup.uid);
+        // createdAt is set once: rules allow it on create only.
+        final exists = (await ref.get()).exists;
+        if (exists) {
+          await ref.update({
+            ...signup.toMap(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          await ref.set({
+            ...signup.toMap(),
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      });
+
+  @override
+  Future<Result<void>> setSignupStatus(
+    String tournamentId,
+    String uid,
+    SignupStatus status,
+  ) => guard(
+    () => _signups(tournamentId).doc(uid).update({
+      'status': status.name,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }),
+  );
+
+  @override
+  Future<Result<void>> saveDraftTeams(
+    String tournamentId,
+    TournamentDivision division,
+    List<TournamentTeam> teams,
+  ) => guard(
+    () => _divisions(tournamentId).doc(division.id).update({
+      'teams': [for (final t in teams) t.toMap()],
+      'seeds': [for (final t in teams) t.id],
+      'captains': {
+        for (final t in teams)
+          t.id: [?t.captainId],
+      },
+    }),
+  );
+
+  @override
   Future<Result<void>> publishSchedule(
     String tournamentId,
     TournamentDivision division,
@@ -401,10 +475,14 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
     }
     final entries = await _entries(tournamentId).get();
     final payments = await _payments(tournamentId).get();
+    final signups = await _signups(tournamentId).get();
+    final drafts = await _drafts(tournamentId).get();
     await deleteDocs(_db, [
       ...refs,
       for (final d in entries.docs) d.reference,
       for (final d in payments.docs) d.reference,
+      for (final d in signups.docs) d.reference,
+      for (final d in drafts.docs) d.reference,
       _doc(tournamentId),
     ]);
   });
