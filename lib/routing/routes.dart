@@ -163,6 +163,10 @@ abstract final class Routes {
   /// if there's no hosted tournament [id].
   static String tournament(String id, {String? host}) =>
       '$tournaments/$id${host == null ? '' : '?host=${Uri.encodeQueryComponent(host)}'}';
+
+  /// Pick which group or club hosts a new tournament, hat tournament or
+  /// league.
+  static const hostEvent = '/tournaments/host';
   static String newTournament(String hostId) =>
       '$tournaments/new?host=${Uri.encodeQueryComponent(hostId)}';
   static String editTournament(String id) => '$tournaments/$id/edit';

@@ -353,9 +353,15 @@ class _Shortcuts extends StatelessWidget {
     final items = [
       (
         Icons.emoji_events_outlined,
-        'Find a tournament',
-        'Apply with your team, or follow results',
+        'Find a tournament or league',
+        'Apply with your team, sign up to play, or follow results',
         () => context.push(Routes.tournaments),
+      ),
+      (
+        Icons.sports_score_outlined,
+        'Host a league or tournament',
+        'Run it from your group or school or club',
+        () => context.push(Routes.hostEvent),
       ),
       (
         Icons.add_circle_outline,

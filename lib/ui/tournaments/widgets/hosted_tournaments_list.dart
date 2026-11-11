@@ -64,11 +64,13 @@ class HostedTournamentCard extends StatelessWidget {
           [
             [hostedDates(t), if (t.location.isNotEmpty) t.location].join(' · '),
             [
+              if (t.type != HostedType.tournament) t.type.label,
               if (showHost) t.hostName,
               if (divisions.isNotEmpty) divisions,
               if (t.visibility == TournamentVisibility.inviteOnly)
                 'Invite only',
-              if (t.bidFee case final f?) '${f.label} bid',
+              if (t.bidFee case final f?)
+                '${f.label} ${t.takesPlayers ? 'to play' : 'bid'}',
             ].join(' · '),
           ].join('\n'),
         ),
@@ -105,7 +107,7 @@ class HostedTournamentsSection extends StatelessWidget {
                 heroTag: 'host-tournament',
                 onPressed: () => context.push(Routes.newTournament(vm.hostId!)),
                 icon: const Icon(Icons.add),
-                label: const Text('Host a tournament'),
+                label: const Text('Host an event'),
               )
             : null;
         final Widget body;
@@ -130,10 +132,10 @@ class HostedTournamentsSection extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
                       vm.canHost
-                          ? 'Host a tournament: pick divisions, set a bid fee, '
-                                'take applications or invite teams, seed them '
-                                'and publish the schedule.'
-                          : 'No tournaments hosted here yet.',
+                          ? 'Host a tournament, a hat tournament or a league. '
+                                'Pick divisions, set a fee, take applications '
+                                'or player signups, then publish the schedule.'
+                          : 'No tournaments or leagues hosted here yet.',
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -160,7 +162,16 @@ class FindTournamentsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     return Scaffold(
-      appBar: AppBar(title: const Text('Tournaments')),
+      appBar: AppBar(
+        title: const Text('Tournaments & leagues'),
+        actions: [
+          TextButton.icon(
+            onPressed: () => context.push(Routes.hostEvent),
+            icon: const Icon(Icons.add),
+            label: const Text('Host'),
+          ),
+        ],
+      ),
       body: ListenableBuilder(
         listenable: vm,
         builder: (context, _) {
@@ -178,14 +189,38 @@ class FindTournamentsScreen extends StatelessWidget {
                   onChanged: vm.setQuery,
                 ),
                 const SizedBox(height: 12),
+                if (vm.filtersByType)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Wrap(
+                      spacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('All'),
+                          selected: vm.typeFilter == null,
+                          onSelected: (_) => vm.setTypeFilter(null),
+                        ),
+                        for (final e in vm.typeCounts.entries)
+                          ChoiceChip(
+                            label: Text('${e.key.label} (${e.value})'),
+                            selected: vm.typeFilter == e.key,
+                            onSelected: (_) => vm.setTypeFilter(e.key),
+                          ),
+                      ],
+                    ),
+                  ),
                 if (vm.filtersByStatus) HostedStatusFilterBar(viewModel: vm),
                 if (vm.tournaments.isEmpty)
-                  const EmptyView(
+                  EmptyView(
                     icon: Icons.emoji_events_outlined,
-                    title: 'No upcoming tournaments',
+                    title: 'No upcoming events',
                     message:
-                        'Teams, groups and schools/clubs host tournaments '
-                        'from their Tournaments section.',
+                        'Groups and schools or clubs host tournaments, hat '
+                        'tournaments and leagues. Start one with Host.',
+                    action: FilledButton(
+                      onPressed: () => context.push(Routes.hostEvent),
+                      child: const Text('Host an event'),
+                    ),
                   ),
                 for (final t in vm.tournaments)
                   HostedTournamentCard(tournament: t),

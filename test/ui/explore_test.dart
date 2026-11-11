@@ -214,7 +214,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Upcoming tournaments'), findsOneWidget);
+    expect(find.text('Tournaments & leagues'), findsOneWidget);
     expect(find.text('Lone Star Classic'), findsOneWidget);
     expect(find.text('Recent results'), findsOneWidget);
     expect(find.text('Fall Classic'), findsOneWidget);

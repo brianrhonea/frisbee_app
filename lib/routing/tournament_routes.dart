@@ -7,11 +7,13 @@ import '../ui/tournaments/view_models/hosted_tournament_form_viewmodel.dart';
 import '../ui/tournaments/view_models/hosted_tournament_viewmodel.dart';
 import '../ui/tournaments/view_models/hosted_tournaments_viewmodel.dart';
 import '../ui/tournaments/view_models/player_signups_viewmodel.dart';
+import '../ui/tournaments/view_models/host_event_viewmodel.dart';
 import '../ui/tournaments/view_models/live_draft_viewmodel.dart';
 import '../ui/tournaments/view_models/team_draft_viewmodel.dart';
 import '../ui/tournaments/widgets/hosted_tournament_form_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournament_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournaments_list.dart';
+import '../ui/tournaments/widgets/host_event_screen.dart';
 import '../ui/tournaments/widgets/live_draft_screen.dart';
 import '../ui/tournaments/widgets/team_draft_screen.dart';
 import 'routes.dart';
@@ -30,6 +32,17 @@ List<GoRoute> hostedTournamentRoutes() => [
       builder: (_, vm) => FindTournamentsScreen(viewModel: vm),
     ),
     routes: [
+      GoRoute(
+        path: 'host',
+        builder: (_, _) => ViewModelHost(
+          key: const ValueKey('host-event'),
+          create: (c) => HostEventViewModel(
+            teamRepository: c.read(),
+            authRepository: c.read(),
+          ),
+          builder: (_, vm) => HostEventScreen(viewModel: vm),
+        ),
+      ),
       GoRoute(
         path: 'new',
         builder: (_, state) {

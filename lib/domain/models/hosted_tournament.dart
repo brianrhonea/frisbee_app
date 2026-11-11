@@ -33,6 +33,16 @@ enum HostedKind {
   final String label;
 }
 
+/// The three kinds of hosted event, for filtering and badges.
+enum HostedType {
+  tournament('Tournament'),
+  hat('Hat tournament'),
+  league('League');
+
+  const HostedType(this.label);
+  final String label;
+}
+
 /// How teams are built from individual signups (player entry).
 enum DraftMode {
   /// The app deals balanced teams from skill and gender.
@@ -325,6 +335,13 @@ class HostedTournament {
 
   /// A one-off hat tournament.
   bool get isHat => takesPlayers && !isLeague;
+
+  /// What kind of event it is, for lists.
+  HostedType get type => isLeague
+      ? HostedType.league
+      : isHat
+      ? HostedType.hat
+      : HostedType.tournament;
 
   EntryFee? get entryFee => bidFee;
 

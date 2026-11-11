@@ -29,7 +29,7 @@ class UpcomingTournamentsCard extends StatelessWidget {
             .take(ExploreViewModel.previewCount)
             .toList();
         return SectionCard(
-          title: 'Upcoming tournaments',
+          title: 'Tournaments & leagues',
           action: CardLink(
             label: 'See all',
             onTap: () => context.push(Routes.tournaments),
@@ -41,8 +41,8 @@ class UpcomingTournamentsCard extends StatelessWidget {
                 const SkeletonList(count: 3, padding: EdgeInsets.zero)
               else if (list.isEmpty)
                 Text(
-                  'No tournaments coming up yet. Teams, groups and clubs '
-                  'host them from their Tournaments tab.',
+                  'Nothing coming up yet. Groups and clubs host tournaments '
+                  'and leagues from their Tournaments tab.',
                   style: TextStyle(fontSize: 12.5, color: c.muted),
                 )
               else
@@ -85,7 +85,11 @@ class TournamentTile extends StatelessWidget {
       subtitle: Text(
         [
           details,
-          [t.hostName, if (divisions.isNotEmpty) divisions].join(' · '),
+          [
+            if (t.type != HostedType.tournament) t.type.label,
+            t.hostName,
+            if (divisions.isNotEmpty) divisions,
+          ].join(' · '),
         ].join('\n'),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,

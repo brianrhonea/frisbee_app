@@ -71,11 +71,35 @@ class HostedTournamentsViewModel extends ChangeNotifier {
   Object? _error;
   String _query = '';
   HostedStatus? _status;
+  HostedType? _type;
 
   bool get loaded => _loaded || _error != null;
   Object? get error => _error;
   Team? get host => _host;
   String get query => _query;
+
+  /// The kind of event [tournaments] is narrowed to; null for all.
+  HostedType? get typeFilter => _type;
+
+  /// How many events of each kind there are, only for kinds some are.
+  Map<HostedType, int> get typeCounts {
+    final counts = <HostedType, int>{};
+    for (final t in _list) {
+      counts[t.type] = (counts[t.type] ?? 0) + 1;
+    }
+    return {
+      for (final e in HostedType.values)
+        e: ?counts[e],
+    };
+  }
+
+  /// Whether there's more than one kind to filter by.
+  bool get filtersByType => typeCounts.length > 1;
+
+  void setTypeFilter(HostedType? type) {
+    _type = type;
+    notifyListeners();
+  }
 
   /// The status [tournaments] is narrowed to; null for all.
   HostedStatus? get statusFilter => _status;
@@ -110,10 +134,14 @@ class HostedTournamentsViewModel extends ChangeNotifier {
   /// Matching [query] only.
   List<HostedTournament> get _matching {
     final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return _list;
+    final type = filtersByType ? _type : null;
     return [
       for (final t in _list)
-        if ('${t.name} ${t.hostName} ${t.location}'.toLowerCase().contains(q))
+        if ((type == null || t.type == type) &&
+            (q.isEmpty ||
+                '${t.name} ${t.hostName} ${t.location} ${t.type.label}'
+                    .toLowerCase()
+                    .contains(q)))
           t,
     ];
   }
