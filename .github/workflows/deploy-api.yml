@@ -1,0 +1,40 @@
+# One-click API deploy: Actions → "Deploy API" → Run workflow.
+# Builds apps/api into a container, pushes it to Artifact Registry and
+# deploys the Cloud Run service `api` in that Firebase project. Each deploy
+# is tagged api-release-<env>-<time> (the tag records the image digest), so
+# rollback-api.yml can put any earlier one back without rebuilding.
+# One-time setup per project: apps/api/DEPLOY.md.
+
+name: Deploy API
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Firebase project
+        type: choice
+        options: [dev, prod]
+        default: dev
+      ref:
+        description: Branch, tag or commit (dev usually deploys development, prod deploys main)
+        type: string
+        default: development
+
+concurrency:
+  group: api-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-api.yml
+    permissions:
+      contents: write
+      id-token: write
+    with:
+      environment: ${{ inputs.environment }}
+      ref: ${{ inputs.ref }}
+      tag: true
+    secrets:
+      # Only this environment's key (if any). The && || picks between two
+      # non-empty names, so a missing prod key can't fall back to dev's.
+      GCP_SA_KEY: ${{ secrets[inputs.environment == 'prod' && 'FIREBASE_SA_PROD' || 'FIREBASE_SA_DEV'] }}

@@ -14,6 +14,7 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig.base.json"
+      - ".dockerignore"
       - ".github/workflows/ci-node.yml"
   pull_request:
     paths:
@@ -24,6 +25,7 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig.base.json"
+      - ".dockerignore"
       - ".github/workflows/ci-node.yml"
 
 jobs:
@@ -60,3 +62,23 @@ jobs:
       - run: pnpm --filter @stall10/shared build
       - run: npm install -g firebase-tools
       - run: pnpm test:api:emulator
+
+  # The Cloud Run image (apps/api/Dockerfile) builds and serves.
+  api-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: DOCKER_BUILDKIT=1 docker build -f apps/api/Dockerfile --target api -t stall10-api .
+      - name: Smoke test
+        run: |
+          docker run -d --name api -p 8080:8080 -e FIREBASE_PROJECT_ID=demo-stall10 stall10-api
+          curl -fsS --retry 10 --retry-all-errors --retry-delay 1 localhost:8080/health
+          code=$(curl -s -o body.json -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' localhost:8080/v1/teams)
+          cat body.json
+          [ "$code" = 401 ] && grep -q '"unauthenticated"' body.json
+          [ "$(docker exec api id -u)" != 0 ]
+          # SIGTERM: closes cleanly (src/shutdown.ts) with exit code 0.
+          docker stop -t 10 api
+          docker logs api | tail -5
+          [ "$(docker inspect -f '{{.State.ExitCode}}' api)" = 0 ]

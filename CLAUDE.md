@@ -96,6 +96,14 @@ pnpm dev:api                         # builds @stall10/shared, then tsx watch on
 cd firebase && firebase emulators:start   # optional; set the emulator hosts in apps/api/.env
 ```
 
+The API deploys to Cloud Run (service `api`, one per Firebase project) from
+GitHub: Actions → **Deploy API** (`.github/workflows/deploy-api.yml`, dev or
+prod; prod needs the `prod` environment's approval), rolled back with
+**Roll back API**. It builds `apps/api/Dockerfile` from the repo root and
+applies `apps/api/deploy/service.yaml`; one-time setup per project (APIs,
+Artifact Registry, service accounts, Workload Identity Federation) is in
+`apps/api/DEPLOY.md`. Deploy only when the user asks.
+
 iOS App Store builds run on Codemagic (no Mac needed) from `apps/mobile`;
 see `docs/ios-release.md`. Pushes that don't touch `apps/mobile/` or
 `packages/` skip the iOS build.
