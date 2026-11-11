@@ -192,6 +192,25 @@ sequenceDiagram
 - Profile: `POST /v1/me/username` → `{username}`; `PUT
   /v1/me/profile/details`; `PUT /v1/me/profile/privacy`; `PUT
   /v1/me/profile/visibility`.
+- Dashboard: `GET /v1/me/home[?before=]` → `MeHome` (own profile with
+  `needsUsername`, teams with the caller's role, upcoming events they may
+  see per `sees(e)`, and a paged feed of their posts and the people they
+  follow). The website's signed-in home page.
+- Public (no token; the website server): `GET /v1/public/feed`,
+  `/players/:uid`, `/posts/:id`, `/teams/:id`, `/events`, `/search`.
+  Visitors get one page (`next: null`); paging is for members.
+- `GET /health` → `{ok, version}`; every response carries
+  `x-stall10-api-version`.
+
+**Versions:** each app has its own version, bumped with every change and
+logged in its changelog. `pnpm test` runs `scripts/check-versions.mjs`,
+which fails when the current version has no entry.
+
+| Part | Version in | Changelog |
+|---|---|---|
+| apps/api | `apps/api/package.json` | `apps/api/CHANGELOG.md` |
+| apps/web | `apps/web/package.json` (footer) | `apps/web/CHANGELOG.md` |
+| apps/mobile | `apps/mobile/pubspec.yaml` | `docs/CHANGELOG.md` |
 
 **Tests:** `pnpm test` (fakes, fast) and `pnpm test:api:emulator`
 (Firestore and Auth emulators, real ID tokens).
