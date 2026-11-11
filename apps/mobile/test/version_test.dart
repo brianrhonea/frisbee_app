@@ -12,7 +12,7 @@ void main() {
     ).firstMatch(pubspec)?.group(1);
     expect(version, appVersion);
 
-    final changelog = File('docs/CHANGELOG.md').readAsStringSync();
+    final changelog = File('../../docs/CHANGELOG.md').readAsStringSync();
     expect(changelog, contains('## $appVersion'));
   });
 }

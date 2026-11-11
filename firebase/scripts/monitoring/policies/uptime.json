@@ -1,7 +1,7 @@
 {
   "displayName": "${NAME}",
   "documentation": {
-    "content": "An uptime check has failed from more than one region for several minutes. See docs/monitoring.md; roll back with Actions → Roll back backend.",
+    "content": "An uptime check has failed from more than one region for several minutes. See firebase/docs/monitoring.md; roll back with Actions → Roll back backend.",
     "mimeType": "text/markdown"
   },
   "combiner": "OR",

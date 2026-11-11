@@ -3,12 +3,12 @@
 # Monitoring, free SMS channel). Run once per project from a shell with
 # gcloud signed in as a project owner:
 #
-#   scripts/monitoring/setup-alerts.sh dev  +15551234567
-#   scripts/monitoring/setup-alerts.sh prod +15551234567
+#   firebase/scripts/monitoring/setup-alerts.sh dev  +15551234567
+#   firebase/scripts/monitoring/setup-alerts.sh prod +15551234567
 #
 # The phone number is only passed to Google; it's never written to the
 # repo. Re-running is safe: things that already exist are skipped.
-# See docs/monitoring.md.
+# See firebase/docs/monitoring.md.
 set -euo pipefail
 
 env_name="${1:-}"
@@ -95,4 +95,4 @@ policy function-flood THRESHOLD="$REQUESTS_PER_5MIN"
 policy firestore-reads THRESHOLD="$READS_PER_5MIN"
 policy mutes THRESHOLD="$MUTES_PER_HOUR"
 
-echo "Done. Test it: see docs/monitoring.md."
+echo "Done. Test it: see firebase/docs/monitoring.md."
