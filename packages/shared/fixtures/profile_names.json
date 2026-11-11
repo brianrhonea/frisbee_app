@@ -1,0 +1,128 @@
+{
+  "keywords": [
+    {
+      "name": "Pat Lee",
+      "username": "pat_lee",
+      "keywords": [
+        "p",
+        "pa",
+        "pat",
+        "l",
+        "le",
+        "lee",
+        "pat_",
+        "pat_l",
+        "pat_le",
+        "pat_lee"
+      ]
+    },
+    {
+      "name": "Pat Lee",
+      "username": null,
+      "keywords": [
+        "p",
+        "pa",
+        "pat",
+        "l",
+        "le",
+        "lee"
+      ]
+    },
+    {
+      "name": "Ana María",
+      "username": "ana.maria",
+      "keywords": [
+        "a",
+        "an",
+        "ana",
+        "m",
+        "ma",
+        "mar",
+        "marí",
+        "maría",
+        "mari",
+        "maria",
+        "ana.",
+        "ana.m",
+        "ana.ma",
+        "ana.mar",
+        "ana.mari",
+        "ana.maria"
+      ]
+    },
+    {
+      "name": "X",
+      "username": "averyveryverylongname",
+      "keywords": [
+        "x",
+        "a",
+        "av",
+        "ave",
+        "aver",
+        "avery",
+        "averyv",
+        "averyve",
+        "averyver",
+        "averyvery",
+        "averyveryv",
+        "averyveryve",
+        "averyveryver",
+        "averyveryvery",
+        "averyveryveryl",
+        "averyveryverylo",
+        "averyveryverylon",
+        "averyveryverylong",
+        "averyveryverylongn",
+        "averyveryverylongna",
+        "averyveryverylongnam"
+      ]
+    }
+  ],
+  "usernames": [
+    {
+      "input": " @Pat_Lee ",
+      "normalized": "pat_lee",
+      "problem": null
+    },
+    {
+      "input": "ab",
+      "normalized": "ab",
+      "problem": "At least 3 characters"
+    },
+    {
+      "input": "abcdefghijklmnopqrstu",
+      "normalized": "abcdefghijklmnopqrstu",
+      "problem": "At most 20 characters"
+    },
+    {
+      "input": "pat lee",
+      "normalized": "pat lee",
+      "problem": "Use only letters, numbers, _ and ."
+    },
+    {
+      "input": ".pat",
+      "normalized": ".pat",
+      "problem": "Periods can't be first, last or doubled"
+    },
+    {
+      "input": "pat.",
+      "normalized": "pat.",
+      "problem": "Periods can't be first, last or doubled"
+    },
+    {
+      "input": "p..at",
+      "normalized": "p..at",
+      "problem": "Periods can't be first, last or doubled"
+    },
+    {
+      "input": "Admin",
+      "normalized": "admin",
+      "problem": "That username is reserved"
+    },
+    {
+      "input": "ok.name_1",
+      "normalized": "ok.name_1",
+      "problem": null
+    }
+  ]
+}

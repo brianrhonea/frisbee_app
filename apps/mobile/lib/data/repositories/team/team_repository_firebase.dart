@@ -47,7 +47,10 @@ class InviteCodeExpiredException implements Exception {
 /// listing anyone signed in can search; it mirrors the team's details.
 /// Writes are validated by `firestore.rules`, except creating a team,
 /// which goes through the Stall 10 API ([ApiClient], `POST /v1/teams`) when
-/// the build has one and the `use_api_teams` flag is on.
+/// the build has one and the `use_api_teams` flag is on, and membership and
+/// management (joining, invites, roles, details, invite codes and
+/// communities), which go through it when `use_api_membership` is on. The
+/// API checks what the rules did; the direct writes stay as the fallback.
 class TeamRepositoryFirebase implements TeamRepository {
   TeamRepositoryFirebase({
     required AttachmentStorage attachments,
@@ -74,6 +77,10 @@ class TeamRepositoryFirebase implements TeamRepository {
 
   /// The API to create teams through, or null to write Firestore directly.
   ApiClient? get _teamsApi => (_flags?.useApiTeams ?? true) ? _api : null;
+
+  /// The API for membership and management, or null to write Firestore.
+  ApiClient? get _membersApi =>
+      (_flags?.useApiMembership ?? true) ? _api : null;
 
   /// Chat attachments and post photos go with the team.
   final AttachmentStorage _files;
@@ -217,6 +224,16 @@ class TeamRepositoryFirebase implements TeamRepository {
     Team org,
     Set<String> roles,
   ) => guard(() async {
+    if (_membersApi case final api?) {
+      final res = await api.post('/v1/teams/${org.id}/linked-teams', {
+        'name': team.name,
+        'division': team.division.name,
+        'level': team.level.name,
+        'city': team.city,
+        'roles': roles.toList()..sort(),
+      });
+      return res['id']! as String;
+    }
     await _ensureNameFree(team.name, team.kind, team.division);
     final ref = _teams.doc();
     final linked = LinkedTeam(
@@ -239,7 +256,11 @@ class TeamRepositoryFirebase implements TeamRepository {
     TeamListing org,
     AppUser by,
   ) => guard(
-    () =>
+    () async => switch (_membersApi) {
+      final api? => api.put('/v1/teams/${team.id}/community', {
+        'orgId': org.id,
+      }),
+      null =>
         (_db.batch()
               ..update(_teams.doc(team.id), {
                 'orgId': org.id,
@@ -253,10 +274,15 @@ class TeamRepositoryFirebase implements TeamRepository {
                 'createdAt': FieldValue.serverTimestamp(),
               }))
             .commit(),
+    },
   );
 
   @override
   Future<Result<void>> leaveCommunity(Team team) => guard(() async {
+    if (_membersApi case final api?) {
+      await api.delete('/v1/teams/${team.id}/community');
+      return;
+    }
     final orgId = team.orgId;
     final batch = _db.batch()
       ..update(_teams.doc(team.id), {'orgId': null, 'orgName': ''});
@@ -288,7 +314,12 @@ class TeamRepositoryFirebase implements TeamRepository {
     TeamLinkRequest request,
     Set<String> roles,
   ) => guard(
-    () =>
+    () async => switch (_membersApi) {
+      final api? => api.post(
+        '/v1/teams/${org.id}/link-requests/${request.teamId}/accept',
+        {'roles': roles.toList()..sort()},
+      ),
+      null =>
         (_db.batch()
               ..update(_teams.doc(org.id), {
                 'linkedTeams.${request.teamId}': LinkedTeam(
@@ -300,21 +331,37 @@ class TeamRepositoryFirebase implements TeamRepository {
               })
               ..delete(_linkRequests(org.id).doc(request.teamId)))
             .commit(),
+    },
   );
 
   @override
-  Future<Result<void>> declineLinkRequest(String orgId, String teamId) =>
-      guard(() => _linkRequests(orgId).doc(teamId).delete());
+  Future<Result<void>> declineLinkRequest(String orgId, String teamId) => guard(
+    () async => switch (_membersApi) {
+      final api? => api.delete('/v1/teams/$orgId/link-requests/$teamId'),
+      null => _linkRequests(orgId).doc(teamId).delete(),
+    },
+  );
 
   @override
   Future<Result<void>> saveLinkedTeam(String orgId, LinkedTeam team) => guard(
-    () => _teams.doc(orgId).update({'linkedTeams.${team.id}': team.toMap()}),
+    () async => switch (_membersApi) {
+      final api? => api.put('/v1/teams/$orgId/linked-teams/${team.id}', {
+        'roles': team.roles.toList()..sort(),
+      }),
+      null => _teams.doc(orgId).update({
+        'linkedTeams.${team.id}': team.toMap(),
+      }),
+    },
   );
 
   @override
   Future<Result<void>> unlinkTeam(String orgId, String teamId) => guard(
-    () =>
-        _teams.doc(orgId).update({'linkedTeams.$teamId': FieldValue.delete()}),
+    () async => switch (_membersApi) {
+      final api? => api.delete('/v1/teams/$orgId/linked-teams/$teamId'),
+      null => _teams.doc(orgId).update({
+        'linkedTeams.$teamId': FieldValue.delete(),
+      }),
+    },
   );
 
   CollectionReference<Map<String, dynamic>> _linkRequests(String orgId) =>
@@ -363,6 +410,11 @@ class TeamRepositoryFirebase implements TeamRepository {
   @override
   Future<Result<String>> joinTeam(String inviteCode, AppUser user) =>
       guard(() async {
+        // The API checks the code is live and adds the signed-in user.
+        if (_membersApi case final api?) {
+          final res = await api.post('/v1/teams/join', {'code': inviteCode});
+          return res['teamId']! as String;
+        }
         final code = normalizeCode(inviteCode);
         final teamId = await _teamIdForCode(code);
         // joins/{uid} proves to the security rules that the caller knows
@@ -381,20 +433,34 @@ class TeamRepositoryFirebase implements TeamRepository {
   };
 
   @override
-  Future<Result<void>> joinGroup(String teamId, AppUser user) =>
-      guard(() => _teams.doc(teamId).update(_newMember(user)));
+  Future<Result<void>> joinGroup(String teamId, AppUser user) => guard(
+    () async => switch (_membersApi) {
+      final api? => api.post('/v1/teams/$teamId/members', {}),
+      null => _teams.doc(teamId).update(_newMember(user)),
+    },
+  );
 
   @override
   Future<Result<void>> requestToJoin(String teamId, AppUser user) => guard(
-    () => _requests(teamId).doc(user.uid).set({
-      'name': user.label,
-      'createdAt': FieldValue.serverTimestamp(),
-    }),
+    () async => switch (_membersApi) {
+      final api? => api.post('/v1/teams/$teamId/join-requests', {}),
+      null => _requests(teamId).doc(user.uid).set({
+        'name': user.label,
+        'createdAt': FieldValue.serverTimestamp(),
+      }),
+    },
   );
 
   @override
   Future<Result<void>> cancelJoinRequest(String teamId, String uid) =>
-      guard(() => _requests(teamId).doc(uid).delete());
+      _deleteRequest(teamId, uid);
+
+  Future<Result<void>> _deleteRequest(String teamId, String uid) => guard(
+    () async => switch (_membersApi) {
+      final api? => api.delete('/v1/teams/$teamId/join-requests/$uid'),
+      null => _requests(teamId).doc(uid).delete(),
+    },
+  );
 
   @override
   Stream<bool> watchMyJoinRequest(String teamId, String uid) =>
@@ -417,7 +483,12 @@ class TeamRepositoryFirebase implements TeamRepository {
     String teamId,
     GroupJoinRequest request,
   ) => guard(
-    () =>
+    () async => switch (_membersApi) {
+      final api? => api.post(
+        '/v1/teams/$teamId/join-requests/${request.uid}/approve',
+        {},
+      ),
+      null =>
         (_db.batch()
               ..update(_teams.doc(teamId), {
                 'members.${request.uid}': TeamRole.player.name,
@@ -428,22 +499,26 @@ class TeamRepositoryFirebase implements TeamRepository {
               })
               ..delete(_requests(teamId).doc(request.uid)))
             .commit(),
+    },
   );
 
   @override
   Future<Result<void>> declineJoinRequest(String teamId, String uid) =>
-      guard(() => _requests(teamId).doc(uid).delete());
+      _deleteRequest(teamId, uid);
 
   @override
   Future<Result<void>> inviteToTeam(Team team, String uid, AppUser from) =>
       guard(
-        () => _invites(uid).doc(team.id).set({
-          'teamName': team.name,
-          'kind': team.kind.name,
-          'invitedBy': from.uid,
-          'invitedByName': from.label,
-          'createdAt': FieldValue.serverTimestamp(),
-        }),
+        () async => switch (_membersApi) {
+          final api? => api.post('/v1/teams/${team.id}/invites', {'uid': uid}),
+          null => _invites(uid).doc(team.id).set({
+            'teamName': team.name,
+            'kind': team.kind.name,
+            'invitedBy': from.uid,
+            'invitedByName': from.label,
+            'createdAt': FieldValue.serverTimestamp(),
+          }),
+        },
       );
 
   @override
@@ -461,20 +536,32 @@ class TeamRepositoryFirebase implements TeamRepository {
   // batch; so is any request to join the user had pending.
   @override
   Future<Result<void>> acceptInvite(TeamInvite invite, AppUser user) => guard(
-    () =>
+    () async => switch (_membersApi) {
+      final api? => api.post('/v1/me/team-invites/${invite.teamId}/accept', {}),
+      null =>
         (_db.batch()
               ..update(_teams.doc(invite.teamId), _newMember(user))
               ..delete(_invites(user.uid).doc(invite.teamId))
               ..delete(_requests(invite.teamId).doc(user.uid)))
             .commit(),
+    },
   );
 
   @override
-  Future<Result<void>> declineInvite(String uid, String teamId) =>
-      guard(() => _invites(uid).doc(teamId).delete());
+  Future<Result<void>> declineInvite(String uid, String teamId) => guard(
+    () async => switch (_membersApi) {
+      final api? => api.delete('/v1/me/team-invites/$teamId'),
+      null => _invites(uid).doc(teamId).delete(),
+    },
+  );
 
   @override
   Future<Result<void>> updateTeam(Team team) => guard(() async {
+    // The API checks the name and rewrites the listing with the team.
+    if (_membersApi case final api?) {
+      await api.patch('/v1/teams/${team.id}', team.toEditableMap());
+      return;
+    }
     final listed = await _directory.doc(team.id).get();
     final before = listed.exists
         ? TeamListing.fromMap(listed.id, plainData(listed.data()))
@@ -531,8 +618,12 @@ class TeamRepositoryFirebase implements TeamRepository {
   );
 
   @override
-  Future<Result<void>> publishListing(Team team) =>
-      guard(() => _directory.doc(team.id).set(TeamListing.of(team).toMap()));
+  Future<Result<void>> publishListing(Team team) => guard(
+    () async => switch (_membersApi) {
+      final api? => api.put('/v1/teams/${team.id}/listing', {}),
+      null => _directory.doc(team.id).set(TeamListing.of(team).toMap()),
+    },
+  );
 
   @override
   Future<Result<InviteCode>> createInviteCode(String teamId, String uid) =>
@@ -551,6 +642,18 @@ class TeamRepositoryFirebase implements TeamRepository {
     Duration ttl,
     int length,
   ) async {
+    // The API makes the code and checks who may.
+    if (_membersApi case final api?) {
+      final res = await api.post('/v1/invite-codes', {
+        'teamId': teamId,
+        'ttl': ttl.inSeconds,
+      });
+      return InviteCode(
+        code: res['code']! as String,
+        teamId: res['teamId']! as String,
+        expiresAt: DateTime.parse(res['expiresAt']! as String).toLocal(),
+      );
+    }
     // Codes can't be overwritten, so a collision with an existing one
     // surfaces as permission-denied: try a fresh code.
     for (var attempt = 0; ; attempt++) {
@@ -576,7 +679,14 @@ class TeamRepositoryFirebase implements TeamRepository {
     String teamId,
     String uid,
     TeamRole role,
-  ) => guard(() => _teams.doc(teamId).update({'members.$uid': role.name}));
+  ) => guard(
+    () async => switch (_membersApi) {
+      final api? => api.put('/v1/teams/$teamId/members/$uid/role', {
+        'role': role.name,
+      }),
+      null => _teams.doc(teamId).update({'members.$uid': role.name}),
+    },
+  );
 
   @override
   Future<Result<void>> setStatKeeper(
@@ -584,11 +694,16 @@ class TeamRepositoryFirebase implements TeamRepository {
     String uid, {
     required bool on,
   }) => guard(
-    () => _teams.doc(teamId).update({
-      'statKeepers': on
-          ? FieldValue.arrayUnion([uid])
-          : FieldValue.arrayRemove([uid]),
-    }),
+    () async => switch (_membersApi) {
+      final api? => api.put('/v1/teams/$teamId/members/$uid/stat-keeper', {
+        'on': on,
+      }),
+      null => _teams.doc(teamId).update({
+        'statKeepers': on
+            ? FieldValue.arrayUnion([uid])
+            : FieldValue.arrayRemove([uid]),
+      }),
+    },
   );
 
   @override
@@ -597,23 +712,29 @@ class TeamRepositoryFirebase implements TeamRepository {
     required String ownerUid,
     required String newOwnerUid,
   }) => guard(
-    () => _teams.doc(teamId).update({
-      'ownerId': newOwnerUid,
-      'members.$newOwnerUid': TeamRole.owner.name,
-      'members.$ownerUid': TeamRole.player.name,
-    }),
+    () async => switch (_membersApi) {
+      final api? => api.post('/v1/teams/$teamId/owner', {'uid': newOwnerUid}),
+      null => _teams.doc(teamId).update({
+        'ownerId': newOwnerUid,
+        'members.$newOwnerUid': TeamRole.owner.name,
+        'members.$ownerUid': TeamRole.player.name,
+      }),
+    },
   );
 
   @override
   Future<Result<void>> removeMember(String teamId, String uid) => guard(
-    () => _teams.doc(teamId).update({
-      'members.$uid': FieldValue.delete(),
-      'memberNames.$uid': FieldValue.delete(),
-      'memberIds': FieldValue.arrayRemove([uid]),
-      'statKeepers': FieldValue.arrayRemove([uid]),
-      'memberRoles.$uid': FieldValue.delete(),
-      'memberPerms.$uid': FieldValue.delete(),
-    }),
+    () async => switch (_membersApi) {
+      final api? => api.delete('/v1/teams/$teamId/members/$uid'),
+      null => _teams.doc(teamId).update({
+        'members.$uid': FieldValue.delete(),
+        'memberNames.$uid': FieldValue.delete(),
+        'memberIds': FieldValue.arrayRemove([uid]),
+        'statKeepers': FieldValue.arrayRemove([uid]),
+        'memberRoles.$uid': FieldValue.delete(),
+        'memberPerms.$uid': FieldValue.delete(),
+      }),
+    },
   );
 
   @override
@@ -622,12 +743,21 @@ class TeamRepositoryFirebase implements TeamRepository {
     required Map<String, CustomRole> roles,
     required Map<String, Set<String>> memberRoles,
   }) => guard(
-    () => _teams.doc(team.id).update({
-      ...rolesData(
-        roles,
-        cleanMemberRoles(memberRoles, roles, team.members.keys),
-      ),
-    }),
+    () async => switch (_membersApi) {
+      // The API cleans who has which and works out memberPerms itself.
+      final api? => api.put('/v1/teams/${team.id}/roles', {
+        'roles': {for (final r in roles.values) r.id: r.toMap()},
+        'memberRoles': {
+          for (final e in memberRoles.entries) e.key: e.value.toList()..sort(),
+        },
+      }),
+      null => _teams.doc(team.id).update({
+        ...rolesData(
+          roles,
+          cleanMemberRoles(memberRoles, roles, team.members.keys),
+        ),
+      }),
+    },
   );
 
   @override

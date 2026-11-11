@@ -94,6 +94,8 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) => AuthRepositoryFirebase(
       authService: context.read<AuthService>(),
       accountService: context.read<AccountService>(),
+      api: context.read<ApiClient?>(),
+      flags: context.read<FeatureFlags>(),
     ),
   ),
   Provider(create: (_) => AttachmentStorage()),
@@ -117,6 +119,8 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) => ProfileRepositoryFirebase(
       search: context.read<ApiSearch>(),
       attachments: context.read<AttachmentStorage>(),
+      api: context.read<ApiClient?>(),
+      flags: context.read<FeatureFlags>(),
     ),
   ),
   Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),

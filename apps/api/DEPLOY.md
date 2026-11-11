@@ -186,8 +186,7 @@ on Production); never commit it.
 
 ```sh
 gcloud services enable secretmanager.googleapis.com
-openssl rand -base64 32 | tr -d '
-' | gcloud secrets create web-server-key --data-file=-
+openssl rand -hex 32 | tr -d '\n' | gcloud secrets create web-server-key --data-file=-
 gcloud secrets add-iam-policy-binding web-server-key --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor
 gcloud secrets versions access latest --secret=web-server-key   # copy into Vercel
 ```

@@ -47,28 +47,47 @@ class ApiClient {
 
   /// POSTs [body] as JSON to [path] (like `/v1/teams`) and returns the
   /// decoded JSON answer.
-  Future<Map<String, Object?>> post(
-    String path,
-    Map<String, Object?> body,
-  ) async {
+  Future<Map<String, Object?>> post(String path, Map<String, Object?> body) =>
+      send('POST', path, body);
+
+  /// PUTs [body] as JSON to [path]; returns the decoded answer.
+  Future<Map<String, Object?>> put(String path, Map<String, Object?> body) =>
+      send('PUT', path, body);
+
+  /// PATCHes [path] with [body] as JSON; returns the decoded answer.
+  Future<Map<String, Object?>> patch(String path, Map<String, Object?> body) =>
+      send('PATCH', path, body);
+
+  /// DELETEs [path] (no body); returns the decoded answer.
+  Future<Map<String, Object?>> delete(String path) => send('DELETE', path);
+
+  /// Sends [method] to [path], with [body] as JSON when given, and returns
+  /// the decoded JSON answer or throws [ApiException].
+  Future<Map<String, Object?>> send(
+    String method,
+    String path, [
+    Map<String, Object?>? body,
+  ]) async {
     final user = (_auth ?? FirebaseAuth.instance).currentUser;
     if (user == null) {
       throw const ApiException('unauthenticated', 'Not signed in.');
     }
     final idToken = await user.getIdToken();
+    final request = http.Request(method, _base.resolve(path))
+      ..headers.addAll({
+        'Authorization': 'Bearer $idToken',
+        ...await AppCheck.headers(),
+      });
+    if (body != null) {
+      request
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode(body);
+    }
     final http.Response response;
     try {
-      response = await _client
-          .post(
-            _base.resolve(path),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $idToken',
-              ...await AppCheck.headers(),
-            },
-            body: jsonEncode(body),
-          )
-          .timeout(_timeout);
+      response = await http.Response.fromStream(
+        await _client.send(request).timeout(_timeout),
+      ).timeout(_timeout);
     } on Exception {
       throw const ApiException(
         'unavailable',

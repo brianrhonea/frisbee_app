@@ -1,0 +1,95 @@
+[
+  {
+    "case": "roles, members cleaned, perms merged",
+    "members": [
+      "u1",
+      "u2",
+      "u3"
+    ],
+    "roles": {
+      "a": {
+        "name": " Coach ",
+        "color": 4280391411,
+        "position": 0,
+        "perms": [
+          "keepStats",
+          "manageTeam"
+        ]
+      },
+      "b": {
+        "name": "Chat",
+        "color": 0,
+        "position": 1,
+        "perms": [
+          "manageChats",
+          "moderate"
+        ]
+      },
+      "c": {
+        "name": "Fan",
+        "color": 0,
+        "position": 2,
+        "perms": []
+      }
+    },
+    "memberRoles": {
+      "u1": [
+        "b",
+        "a",
+        "gone"
+      ],
+      "u2": [
+        "c"
+      ],
+      "u3": [],
+      "left": [
+        "a"
+      ]
+    },
+    "saved": {
+      "roles": {
+        "a": {
+          "name": "Coach",
+          "color": 4280391411,
+          "position": 0,
+          "perms": [
+            "manageTeam",
+            "keepStats"
+          ]
+        },
+        "b": {
+          "name": "Chat",
+          "color": 0,
+          "position": 1,
+          "perms": [
+            "manageChats",
+            "moderate"
+          ]
+        },
+        "c": {
+          "name": "Fan",
+          "color": 0,
+          "position": 2,
+          "perms": []
+        }
+      },
+      "memberRoles": {
+        "u1": [
+          "a",
+          "b"
+        ],
+        "u2": [
+          "c"
+        ]
+      },
+      "memberPerms": {
+        "u1": [
+          "manageTeam",
+          "manageChats",
+          "moderate",
+          "keepStats"
+        ]
+      }
+    }
+  }
+]

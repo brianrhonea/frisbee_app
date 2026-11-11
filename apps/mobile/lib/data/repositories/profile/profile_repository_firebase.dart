@@ -9,8 +9,10 @@ import '../../../domain/models/model_utils.dart';
 import '../../../domain/models/player_profile.dart';
 import '../../../domain/models/username.dart';
 import '../../../utils/result.dart';
+import '../../services/api_client.dart';
 import '../../services/api_search.dart';
 import '../../services/attachment_storage.dart';
+import '../../services/feature_flags.dart';
 import '../../services/firestore_utils.dart';
 import 'profile_repository.dart';
 
@@ -23,12 +25,20 @@ import 'profile_repository.dart';
 /// there; the details, summary and tags go to `profiles/{uid}/private/
 /// details`, which firestore.rules opens only to the player and to people
 /// who follow them (a follow of a private profile needs the player's OK).
+///
+/// Details, privacy and visibility go through the Stall 10 API
+/// ([ApiClient]) when the build has one and `use_api_profiles` is on; the
+/// direct writes stay as the fallback.
 class ProfileRepositoryFirebase implements ProfileRepository {
   ProfileRepositoryFirebase({
     FirebaseFirestore? firestore,
     ApiSearch? search,
     AttachmentStorage? attachments,
-  }) : _db = firestore ?? FirebaseFirestore.instance,
+    ApiClient? api,
+    FeatureFlags? flags,
+  }) : _api = api,
+       _flags = flags,
+       _db = firestore ?? FirebaseFirestore.instance,
        _search = search,
        _attachments = attachments ?? AttachmentStorage();
 
@@ -36,6 +46,12 @@ class ProfileRepositoryFirebase implements ProfileRepository {
   final AttachmentStorage _attachments;
 
   final FirebaseFirestore _db;
+
+  final ApiClient? _api;
+  final FeatureFlags? _flags;
+
+  /// The API to write profiles through, or null to write Firestore.
+  ApiClient? get _profilesApi => (_flags?.useApiProfiles ?? true) ? _api : null;
 
   /// Searches through the rate-limited Cloud Function when it's turned on.
   final ApiSearch? _search;
@@ -136,6 +152,10 @@ class ProfileRepositoryFirebase implements ProfileRepository {
   @override
   Future<Result<void>> setPrivate(AppUser user, bool private) =>
       guard(() async {
+        if (_profilesApi case final api?) {
+          await api.put('/v1/me/profile/privacy', {'private': private});
+          return;
+        }
         final main = _profiles.doc(user.uid);
         final hidden = _hidden(user.uid);
         final batch = _db.batch();
@@ -198,6 +218,13 @@ class ProfileRepositoryFirebase implements ProfileRepository {
           if (!v.games) 'games': const <Object>[],
           if (!v.teams) 'teams': const <Object>[],
         };
+        if (_profilesApi case final api?) {
+          await api.put('/v1/me/profile/visibility', {
+            'visibility': v.toMap(),
+            'tags': tags,
+          });
+          return;
+        }
         if (private) {
           await _hidden(user.uid).set({
             ...fields,
@@ -217,6 +244,13 @@ class ProfileRepositoryFirebase implements ProfileRepository {
     ProfileDetails details, {
     required List<String> tags,
   }) => guard(() async {
+    if (_profilesApi case final api?) {
+      await api.put('/v1/me/profile/details', {
+        ...details.toMap(),
+        'tags': tags,
+      });
+      return;
+    }
     if (await _isPrivate(user.uid)) {
       final batch = _db.batch()
         ..set(

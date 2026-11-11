@@ -33,15 +33,23 @@ function communityFields(t: CreateTeamInput, location: GroupLocation | null) {
     : {};
 }
 
+/** The community a new team is made in (NewTeam.inCommunity in the app). */
+export interface OrgRef {
+  id: string;
+  name: string;
+}
+
 /**
  * Every document a new team starts with, by path, with [createdAt] as each
- * timestamp (FieldValue.serverTimestamp() when writing).
+ * timestamp (FieldValue.serverTimestamp() when writing). A team made in a
+ * community ([org]) names it (orgId, orgName).
  */
 export function newTeamDocuments<T>(
   teamId: string,
   t: CreateTeamInput,
   owner: Owner,
   createdAt: T,
+  org?: OrgRef,
 ): Record<string, Doc<T>> {
   // A private group's location is for members only.
   const privateGroup = isGroupLike(t.kind) && t.requiresApproval;
@@ -60,6 +68,7 @@ export function newTeamDocuments<T>(
     [`teams/${teamId}`]: {
       ...base,
       ...communityFields(t, t.location),
+      ...(org && { orgId: org.id, orgName: org.name }),
       ...(t.leagueId != null && { leagueId: t.leagueId }),
       ownerId: owner.uid,
       members: { [owner.uid]: "owner" },
