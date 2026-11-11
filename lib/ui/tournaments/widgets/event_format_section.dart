@@ -31,6 +31,7 @@ class EventFormatSection extends StatelessWidget {
     }) => DropdownButtonFormField<int>(
       key: ValueKey('$label$value'),
       initialValue: options.contains(value) ? value : null,
+      isExpanded: true,
       decoration: InputDecoration(labelText: label),
       items: [
         for (final o in {...options, value}.toList()..sort())
@@ -84,6 +85,7 @@ class EventFormatSection extends StatelessWidget {
           DropdownButtonFormField<CompetitionLevel>(
             key: ValueKey(f.level),
             initialValue: f.level,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: 'Level'),
             items: [
               for (final l in CompetitionLevel.values)

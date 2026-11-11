@@ -3610,6 +3610,15 @@ describe("hosted tournaments", () => {
       }),
     );
     await assertSucceeds(setDoc(entryRef(CAPTAIN), entry()));
+    // Reserving a spot with a brand-new league team, as the app does.
+    await assertSucceeds(
+      setDoc(doc(db(OUTSIDER), "teams", "fresh"), {
+        name: "Reds", division: "mixed", level: "league", city: "",
+        ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" }, memberIds: [OUTSIDER],
+        memberNames: { [OUTSIDER]: "Me" }, createdAt: serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(setDoc(entryRef(OUTSIDER, "fresh"), entry({ teamName: "Reds", captainIds: [OUTSIDER] })));
     // Only player-signup events take team spots this way.
     await assertFails(updateDoc(tRef(DIRECTOR), { entryType: "teams" }));
     await assertSucceeds(updateDoc(tRef(DIRECTOR), { teamEntry: false, teamFee: null }));

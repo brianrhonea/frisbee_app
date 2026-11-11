@@ -10,6 +10,7 @@ import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournament_form_vi
 import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournament_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournaments_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/widgets/host_event_screen.dart';
+import 'package:frisbee_app/ui/tournaments/widgets/hosted_tournament_form_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
@@ -298,6 +299,42 @@ void main() {
         expect(repo.tournaments[id]!.divisions.single.id, left.id);
       },
     );
+
+    testWidgets('the form lays out at phone width', (tester) async {
+      tester.view.physicalSize = const Size(390, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      teams.teams['club'] = team('club', TeamKind.organization, 'me');
+      final f = newLeague();
+      f.setEntryType(TournamentEntryType.players);
+      f.setTeamEntry(true);
+      f.setHasFee(true);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: HostedTournamentFormScreen(viewModel: f),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('League Women'),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byType(ListView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(find.text('Teams can also reserve a spot'), findsOneWidget);
+      expect(find.text('League Mixed'), findsOneWidget);
+      await tester.tap(find.text('Timed'));
+      await tester.pumpAndSettle();
+      expect(f.settings.timed, isTrue);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      f.dispose();
+    });
 
     test('at least one division', () async {
       teams.teams['club'] = team('club', TeamKind.organization, 'me');

@@ -1196,6 +1196,70 @@ void main() {
       cap.dispose();
     });
 
+    test(
+      'a division of only registered teams publishes without a draft',
+      () async {
+        final id = await hostMixed();
+        final div = repo.divisions[id]!.values.single.id;
+        for (final cap in ['c1', 'c2']) {
+          final vm = await page(cap, id);
+          await vm.reserveSpot.execute((name: 'Team $cap', divisionId: div));
+          expect(vm.reserveSpot.result, isA<Ok<String>>());
+          vm.dispose();
+        }
+        final host = await page('director', id);
+        for (final e in [...repo.entries[id]!.values]) {
+          await host.decide.execute((entry: e, status: EntryStatus.accepted));
+          await pumpEventQueue();
+        }
+        await host.setStatus.execute(HostedStatus.seeding);
+        await pumpEventQueue();
+        expect(host.needsTeamsCreated, isFalse);
+        expect(host.seedsOf(div), hasLength(2));
+        await host.publish.execute();
+        expect(
+          host.publish.result,
+          isA<Ok<void>>(),
+          reason: '${host.publish.result}',
+        );
+        expect(repo.games.values.expand((g) => g), isNotEmpty);
+        host.dispose();
+      },
+    );
+
+    test('a player on a reserved team is kept from signing up alone', () async {
+      final id = await hostMixed();
+      final cap = await page('cap', id);
+      await cap.reserveSpot.execute((
+        name: 'Reds',
+        divisionId: cap.divisions.single.id,
+      ));
+      final teamId = (cap.reserveSpot.result as Ok<String>).value;
+      cap.dispose();
+      // Pat joins by invite as a player, not an admin.
+      final t = teams.teams[teamId]!;
+      teams.teams[teamId] = t.copyWith(
+        members: {...t.members, 'pat': TeamRole.player},
+      );
+      final pat = await page('pat', id);
+      expect(pat.myEntries, isEmpty);
+      expect(pat.myActiveEntry?.teamId, teamId);
+      pat.dispose();
+    });
+
+    test("a division people signed up for can't be closed", () async {
+      final id = await hostMixed();
+      final div = repo.divisions[id]!.values.single;
+      repo.signups[id] = {
+        'pat': PlayerSignup(uid: 'pat', name: 'Pat', divisionId: div.id),
+      };
+      final f = await form(tournamentId: id);
+      expect(f.lockedReason(div.division), 'People have signed up for it.');
+      f.setOpen(div.division, false);
+      expect(f.isOpen(div.division), isTrue);
+      f.dispose();
+    });
+
     test("teams can't reserve spots where only players sign up", () async {
       final id = await hostHat();
       final cap = await page('cap', id);

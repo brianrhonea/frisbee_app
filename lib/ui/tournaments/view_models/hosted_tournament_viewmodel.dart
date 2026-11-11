@@ -367,12 +367,13 @@ class HostedTournamentViewModel extends ChangeNotifier {
 
   /// The user's team that's entered here, if any: someone on a registered
   /// team doesn't also sign up on their own (they'd end up on two teams).
-  TournamentEntry? get myActiveEntry => myEntries
+  TournamentEntry? get myActiveEntry => _entries
       .where(
         (e) =>
-            e.status == EntryStatus.applied ||
-            e.status == EntryStatus.accepted ||
-            e.status == EntryStatus.waitlisted,
+            _myTeams.any((t) => t.id == e.teamId) &&
+            (e.status == EntryStatus.applied ||
+                e.status == EntryStatus.accepted ||
+                e.status == EntryStatus.waitlisted),
       )
       .firstOrNull;
 
@@ -552,8 +553,15 @@ class HostedTournamentViewModel extends ChangeNotifier {
   /// Accepted teams (any division) that haven't paid.
   int get unpaidCount => [
     for (final e in entriesWith(EntryStatus.accepted))
-      if (!isPaid(e.teamId)) e,
+      if (!isPaid(e.teamId) && owesSpotFee(e.teamId)) e,
   ].length;
+
+  /// Whether [teamId] pays to enter as a team: not a league team drafted
+  /// from players who signed up (they each pay their own entry fee).
+  bool owesSpotFee(String teamId) =>
+      _tournament?.spotFee != null &&
+      !(_tournament!.takesPlayers &&
+          teamId.startsWith(TournamentDivision.leagueTeamPrefix));
 
   void _watchPayments() {
     _paymentsSub?.cancel();
@@ -874,7 +882,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
   }
 
   /// A league that takes players turns the host's drafted teams into real
-  /// teams (with chat and a roster) before the schedule is published.
+  /// teams (with chat and a roster) before the schedule is published. A
+  /// division where only registered teams play has none to make (when
+  /// teams can reserve spots).
   bool get needsTeamsCreated {
     final t = _tournament;
     final d = division;
@@ -882,7 +892,8 @@ class HostedTournamentViewModel extends ChangeNotifier {
         t.isLeague &&
         t.takesPlayers &&
         d != null &&
-        !d.teamsCreated;
+        !d.teamsCreated &&
+        (d.teams.isNotEmpty || !t.mixedEntry);
   }
 
   Future<Result<void>> _createTeams(String divisionId) async {

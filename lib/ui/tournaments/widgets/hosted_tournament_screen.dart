@@ -738,7 +738,7 @@ class _TeamsTabState extends State<_TeamsTab> {
   HostedTournamentViewModel get vm => widget.viewModel;
 
   Widget _entryTile(TournamentEntry e) {
-    final fee = vm.tournament?.spotFee;
+    final fee = vm.owesSpotFee(e.teamId) ? vm.tournament?.spotFee : null;
     final menu = <(String, EntryStatus)>[
       if (e.status != EntryStatus.accepted) ('Accept', EntryStatus.accepted),
       if (e.status != EntryStatus.waitlisted)
@@ -801,7 +801,9 @@ class _TeamsTabState extends State<_TeamsTab> {
     final out = vm.entriesIn(d.id, status: EntryStatus.declined);
     Widget seedTile(String id, int index) {
       // Drafted teams' players pay one by one, not as a team.
-      final fee = d.draftedIds.contains(id) ? null : spotFee;
+      final fee = d.draftedIds.contains(id) || !vm.owesSpotFee(id)
+          ? null
+          : spotFee;
       final overdue = fee != null && vm.isOverdue(id);
       return ListTile(
         key: ValueKey(id),

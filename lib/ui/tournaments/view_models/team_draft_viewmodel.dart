@@ -150,6 +150,7 @@ class TeamDraftViewModel extends ChangeNotifier {
   /// How many teams the next deal makes (or the saved teams have).
   int get teamCount =>
       _teamCount ?? (_teams.isNotEmpty ? _teams.length : suggestedTeamCount);
+
   /// Spots left for drafted teams: teams that reserved their own spot
   /// take theirs first.
   int get maxTeams {

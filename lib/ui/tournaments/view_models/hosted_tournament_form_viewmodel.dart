@@ -68,6 +68,16 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
         }
         notifyListeners();
       }, onError: _onError);
+      // Only managers read these; a division someone has signed up for
+      // or entered stays open.
+      _entriesSub = _repo.watchEntries(id).listen((l) {
+        _entries = l;
+        _syncTaken();
+      }, onError: (Object _) {});
+      _signupsSub = _repo.watchSignups(id).listen((l) {
+        _signups = l;
+        _syncTaken();
+      }, onError: (Object _) {});
     }
   }
 
@@ -79,6 +89,27 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
   StreamSubscription<Team?>? _hostSub;
   StreamSubscription<HostedTournament?>? _tournamentSub;
   StreamSubscription<List<TournamentDivision>>? _divisionsSub;
+  StreamSubscription<List<TournamentEntry>>? _entriesSub;
+  StreamSubscription<List<PlayerSignup>>? _signupsSub;
+
+  /// Division ids with teams or players in them that haven't withdrawn.
+  Set<String> _taken = {};
+  List<TournamentEntry> _entries = const [];
+  List<PlayerSignup> _signups = const [];
+
+  void _syncTaken() {
+    _taken = {
+      for (final e in _entries)
+        if (e.status != EntryStatus.withdrawn &&
+            e.status != EntryStatus.declined)
+          e.divisionId,
+      for (final s in _signups)
+        if (s.status != SignupStatus.withdrawn &&
+            s.status != SignupStatus.declined)
+          s.divisionId,
+    };
+    notifyListeners();
+  }
 
   late final Command0<String> save;
 
@@ -174,6 +205,9 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     if (existing == null) return null;
     if (existing.seeds.isNotEmpty || existing.teams.isNotEmpty) {
       return 'It has teams. Remove them on the event page first.';
+    }
+    if (_taken.contains(existing.id)) {
+      return 'People have signed up for it.';
     }
     return null;
   }
@@ -471,6 +505,8 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     _hostSub?.cancel();
     _tournamentSub?.cancel();
     _divisionsSub?.cancel();
+    _entriesSub?.cancel();
+    _signupsSub?.cancel();
     super.dispose();
   }
 }
