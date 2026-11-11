@@ -50,6 +50,10 @@ Vercel previews, or `http://localhost:*` for any local port. Leaving prod
 empty means no website can call the API from a browser (the apps don't
 need CORS).
 
+After the first deploy, check `TRUST_PROXY_HOPS`: call `<url>/health` and
+compare the `remoteAddress` in its "incoming request" log line with your
+own public IP. If it shows a Google address instead, raise the value.
+
 Other optional repository variables: `API_REGION` (default `us-central1`),
 `API_MAX_INSTANCES_DEV` / `_PROD` (3 / 10).
 
@@ -149,17 +153,18 @@ gcloud iam service-accounts create api-runtime --display-name="Stall 10 API (Clo
 # Firestore reads and writes.
 gcloud projects add-iam-policy-binding "$PROJECT" \
   --member="serviceAccount:$RUNTIME_SA" --role=roles/datastore.user
-# Firebase Auth: getUser (names on documents). verifyIdToken needs no role.
+# Firebase Auth: getUser today; account changes as features move to the API.
 gcloud projects add-iam-policy-binding "$PROJECT" \
-  --member="serviceAccount:$RUNTIME_SA" --role=roles/firebaseauth.viewer
+  --member="serviceAccount:$RUNTIME_SA" --role=roles/firebaseauth.admin
 # App Check token verification.
 gcloud projects add-iam-policy-binding "$PROJECT" \
   --member="serviceAccount:$RUNTIME_SA" --role=roles/firebaseappcheck.tokenVerifier
 ```
 
-`roles/firebaseauth.viewer` covers everything the API does with Auth
-today. When an endpoint starts changing accounts (custom claims, deleting
-users), grant `roles/firebaseauth.admin` instead.
+`roles/firebaseauth.admin` is there so endpoints that change accounts
+(custom claims, deleting users) work as they move over. For now the API
+only reads users, so `roles/firebaseauth.viewer` would be enough if you
+prefer the tighter role; verifying ID tokens needs no role.
 
 Storage (for the media pipeline, ARCHITECTURE.md §6): object admin on the
 project's bucket only, and permission to sign URLs as itself:

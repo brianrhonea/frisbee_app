@@ -78,5 +78,7 @@ jobs:
           cat body.json
           [ "$code" = 401 ] && grep -q '"unauthenticated"' body.json
           [ "$(docker exec api id -u)" != 0 ]
+          # SIGTERM: closes cleanly (src/shutdown.ts) with exit code 0.
           docker stop -t 10 api
           docker logs api | tail -5
+          [ "$(docker inspect -f '{{.State.ExitCode}}' api)" = 0 ]
