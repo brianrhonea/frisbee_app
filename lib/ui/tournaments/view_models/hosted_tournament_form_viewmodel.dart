@@ -25,6 +25,7 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required AuthRepository authRepository,
     DateTime Function()? now,
+    HostedType? type,
   }) : assert(hostId != null || tournamentId != null),
        _repo = tournamentRepository,
        _teams = teamRepository,
@@ -42,6 +43,9 @@ class HostedTournamentFormViewModel extends ChangeNotifier {
     if (id == null) {
       _watchHost(hostId!);
       _loaded = true;
+      // Started from "Host a league" (or a hat tournament).
+      if (type == HostedType.league) setKind(HostedKind.league);
+      if (type == HostedType.hat) setEntryType(TournamentEntryType.players);
     } else {
       _tournamentSub = _repo.watchTournament(id).listen((t) {
         if (t != null && _existing == null) _fill(t);

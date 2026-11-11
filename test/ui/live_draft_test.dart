@@ -9,6 +9,7 @@ import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournament_form_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournament_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/view_models/live_draft_viewmodel.dart';
+import 'package:frisbee_app/ui/tournaments/view_models/team_draft_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/widgets/live_draft_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -235,6 +236,70 @@ void main() {
       await host.start.execute();
       expect(host.start.error, isTrue);
       host.dispose();
+    });
+
+    test('a captain who opened the board early still sees skills', () async {
+      final (id, d) = await hat();
+      final early = await board('p0', id, d);
+      final watcher = await board('p5', id, d);
+      expect(early.details, isNull);
+      final host = await board('director', id, d);
+      host.toggleCaptain('p0');
+      host.toggleCaptain('p1');
+      await host.start.execute();
+      await pumpEventQueue();
+      expect(early.isCaptain, isTrue);
+      expect(early.details, isNotNull);
+      // A player who isn't a captain never asks for them.
+      expect(watcher.details, isNull);
+      for (final vm in [early, watcher, host]) {
+        vm.dispose();
+      }
+    });
+
+    test('a running draft can only be restarted by cancelling it', () async {
+      final (id, d) = await hat();
+      final host = await board('director', id, d);
+      host.toggleCaptain('p0');
+      host.toggleCaptain('p1');
+      await host.start.execute();
+      await pumpEventQueue();
+      expect(repo.drafts, hasLength(1));
+      await host.control.execute(DraftControl.cancel);
+      await pumpEventQueue();
+      expect(host.draft, isNull);
+      host.toggleCaptain('p2');
+      host.toggleCaptain('p3');
+      await host.start.execute();
+      await pumpEventQueue();
+      expect(host.draft!.captains.map((c) => c.uid), ['p2', 'p3']);
+      host.dispose();
+    });
+
+    test('teams from a captains draft are adjusted, not dealt again', () async {
+      final (id, d) = await hat();
+      final host = await board('director', id, d);
+      host.toggleCaptain('p0');
+      host.toggleCaptain('p1');
+      await host.start.execute();
+      await pumpEventQueue();
+      await host.control.execute(DraftControl.autopick);
+      await host.finish.execute();
+      await pumpEventQueue();
+      host.dispose();
+
+      final teams = TeamDraftViewModel(
+        tournamentId: id,
+        divisionId: d,
+        tournamentRepository: repo,
+      );
+      await pumpEventQueue();
+      expect(teams.fromCaptains, isTrue);
+      final before = [for (final t in teams.teams) t.playerIds];
+      await teams.draft.execute();
+      expect(teams.draft.error, isTrue);
+      expect([for (final t in teams.teams) t.playerIds], before);
+      teams.dispose();
     });
 
     testWidgets('the screen shows who is picking and lets them draft', (

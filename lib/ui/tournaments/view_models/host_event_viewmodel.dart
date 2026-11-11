@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/team.dart';
 
 /// Who can host a new tournament, hat tournament or league: the groups,
@@ -41,6 +42,17 @@ class HostEventViewModel extends ChangeNotifier {
   Object? _error;
 
   bool get loaded => _loaded;
+
+  HostedType _type = HostedType.league;
+
+  /// What the user is about to host; the form starts on it.
+  HostedType get type => _type;
+
+  void setType(HostedType t) {
+    _type = t;
+    notifyListeners();
+  }
+
   Object? get error => _error;
 
   /// Where the user can host, groups and clubs first.

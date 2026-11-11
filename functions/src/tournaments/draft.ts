@@ -132,11 +132,18 @@ function recordPick(tx: Transaction, c: Ctx, l: Loaded, uid: string): void {
   });
 }
 
-/** The host starts (or restarts) a division's draft with the captains they chose. */
+/**
+ * The host starts a division's draft with the captains they chose. A draft
+ * that's already there has to be cancelled first, so a second tap can't
+ * wipe the picks.
+ */
 export const startDraft = onCall({ enforceAppCheck }, async (req) => {
   const c = await context(req);
   requireManager(c);
   await requireOpen(c);
+  if ((await draftRef(c).get()).exists) {
+    throw new HttpsError("failed-precondition", "This division already has a draft. Cancel it to start over.");
+  }
   const captainIds = Array.isArray(c.data.captainIds) ? c.data.captainIds.map(String) : [];
   const pickSeconds = Math.min(600, Math.max(0, Math.floor(Number(c.data.pickSeconds ?? 0))));
 
@@ -155,7 +162,7 @@ export const startDraft = onCall({ enforceAppCheck }, async (req) => {
   if (problem) throw new HttpsError("failed-precondition", problem);
 
   // A random order, so nobody picks first just for being listed first.
-  const order = [...captainIds].sort(() => Math.random() - 0.5);
+  const order = shuffled(captainIds);
   const asCaptain = (id: string) => ({ uid: id, name: clipName(accepted.get(id)?.name) || "Captain" });
   const players = [...accepted.entries()].filter(([id]) => !captainIds.includes(id));
   const batch = db.batch();
@@ -201,12 +208,26 @@ export const draftPick = onCall({ enforceAppCheck }, async (req) => {
   return { ok: true };
 });
 
-/** The host pauses, resumes, undoes the last pick, or picks for a captain who's out of time. */
+/** Fisher-Yates: every order equally likely. */
+function shuffled<T>(list: readonly T[]): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * The host pauses, resumes, undoes the last pick, picks for a captain
+ * who's out of time, or cancels the draft (before it's finished) to start
+ * over with other captains.
+ */
 export const draftControl = onCall({ enforceAppCheck }, async (req) => {
   const c = await context(req);
   requireManager(c);
   const action = c.data.action;
-  if (!["pause", "resume", "undo", "autopick"].includes(String(action))) {
+  if (!["pause", "resume", "undo", "autopick", "cancel"].includes(String(action))) {
     throw new HttpsError("invalid-argument", "Unknown action.");
   }
   await getFirestore().runTransaction(async (tx) => {
@@ -214,6 +235,10 @@ export const draftControl = onCall({ enforceAppCheck }, async (req) => {
     const status = String(l.draft.status);
     if (status === "finished") throw new HttpsError("failed-precondition", "The draft is finished.");
     switch (action) {
+      case "cancel":
+        tx.delete(poolRef(c));
+        tx.delete(draftRef(c));
+        break;
       case "pause":
         if (status !== "live") throw new HttpsError("failed-precondition", "The draft isn't running.");
         tx.update(draftRef(c), { status: "paused" });

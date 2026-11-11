@@ -3782,6 +3782,9 @@ describe("hosted tournaments", () => {
       await assertFails(getDoc(pool(COACH)));
       await assertFails(getDoc(pool(OUTSIDER)));
       await assertFails(setDoc(pool(DIRECTOR), { players: {} }));
+      // Only managers clear it, when the division or tournament goes.
+      await assertFails(deleteDoc(pool(PLAYER)));
+      await assertSucceeds(deleteDoc(pool(DIRECTOR)));
     });
   });
 

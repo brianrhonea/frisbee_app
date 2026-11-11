@@ -1850,7 +1850,9 @@ service cloud.firestore {
           allow read: if signedIn() && visible(current())
             && (manages(current())
                 || uid() in get(/databases/$(database)/documents/tournaments/$(tournamentId)/drafts/$(divisionId)).data.captainIds);
-          allow write: if false;
+          allow create, update: if false;
+          // So deleting the division or tournament can clear it.
+          allow delete: if signedIn() && manages(current());
         }
       }
 

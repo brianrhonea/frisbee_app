@@ -378,6 +378,8 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
     if (d == null) return Result.error(Exception('The draft has not started.'));
     try {
       drafts[key] = change(d);
+    } on _Cancel {
+      drafts.remove(key);
     } on Exception catch (e) {
       return Result.error(e);
     }
@@ -407,6 +409,9 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
     log.add('start draft $divisionId');
     final error = draftError;
     if (error != null) return Result.error(error);
+    if (drafts.containsKey(_key(tournamentId, divisionId))) {
+      return Result.error(Exception('This division already has a draft.'));
+    }
     final accepted = {
       for (final s in signups[tournamentId]?.values ?? const <PlayerSignup>[])
         if (s.divisionId == divisionId && s.status == SignupStatus.accepted)
@@ -471,6 +476,8 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
       switch (action) {
         case DraftControl.pause:
           return _with(d, status: DraftStatus.paused);
+        case DraftControl.cancel:
+          throw const _Cancel();
         case DraftControl.resume:
           return _with(d, status: DraftStatus.live);
         case DraftControl.undo:
@@ -655,4 +662,9 @@ class FakeHostedTournamentRepository implements HostedTournamentRepository {
     _changed();
     return const Result.ok(null);
   }
+}
+
+/// Thrown inside a draft change to delete the draft (cancel).
+class _Cancel implements Exception {
+  const _Cancel();
 }

@@ -4,7 +4,10 @@ import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
+import 'package:frisbee_app/domain/models/group_tournament.dart';
 import 'package:frisbee_app/ui/tournaments/view_models/host_event_viewmodel.dart';
+import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournament_form_viewmodel.dart';
+import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournament_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournaments_viewmodel.dart';
 import 'package:frisbee_app/ui/tournaments/widgets/host_event_screen.dart';
 
@@ -122,5 +125,54 @@ void main() {
     vm.setQuery('league');
     expect(vm.tournaments.map((t) => t.id), ['c']);
     vm.dispose();
+  });
+
+  test('a host picker choice starts the form on that kind', () async {
+    teams.teams['club'] = team('club', TeamKind.organization, 'me');
+    HostedTournamentFormViewModel form(HostedType? type) =>
+        HostedTournamentFormViewModel(
+          hostId: 'club',
+          tournamentRepository: repo,
+          teamRepository: teams,
+          authRepository: as('me'),
+          type: type,
+        );
+    final league = form(HostedType.league);
+    expect(league.kind, HostedKind.league);
+    final hat = form(HostedType.hat);
+    expect(hat.kind, HostedKind.tournament);
+    expect(hat.entryType, TournamentEntryType.players);
+    final plain = form(null);
+    expect(plain.kind, HostedKind.tournament);
+    expect(plain.entryType, TournamentEntryType.teams);
+    for (final f in [league, hat, plain]) {
+      f.dispose();
+    }
+  });
+
+  test('league divisions take teams of their division and level', () {
+    TournamentDivision division(Division d, CompetitionLevel l) =>
+        TournamentDivision(
+          id: 'd',
+          division: d,
+          level: l,
+          settings: TournamentSettings(startsAt: DateTime(2027)),
+        );
+    final squad = team('s', TeamKind.team, 'me');
+    final fit = HostedTournamentViewModel.leagueFitProblem;
+    expect(fit(squad, division(Division.mixed, CompetitionLevel.club)), isNull);
+    expect(
+      fit(squad, division(Division.women, CompetitionLevel.club)),
+      contains('Women'),
+    );
+    expect(
+      fit(squad, division(Division.mixed, CompetitionLevel.college)),
+      contains('College'),
+    );
+    // A League-level division takes any level.
+    expect(
+      fit(squad, division(Division.mixed, CompetitionLevel.league)),
+      isNull,
+    );
   });
 }

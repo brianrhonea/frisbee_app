@@ -209,5 +209,6 @@ abstract class HostedTournamentRepository {
   Future<Result<void>> deleteTournament(String tournamentId);
 }
 
-/// What the host can do to a running draft.
-enum DraftControl { pause, resume, undo, autopick }
+/// What the host can do to a running draft. Cancel deletes it (before
+/// it's finished) so it can start over.
+enum DraftControl { pause, resume, undo, autopick, cancel }

@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../domain/models/hosted_tournament.dart' show HostedType;
 import '../ui/core/ui/view_model_host.dart';
 import '../ui/tournaments/view_models/hosted_tournament_form_viewmodel.dart';
 import '../ui/tournaments/view_models/hosted_tournament_viewmodel.dart';
@@ -47,10 +48,13 @@ List<GoRoute> hostedTournamentRoutes() => [
         path: 'new',
         builder: (_, state) {
           final host = state.uri.queryParameters['host'] ?? '';
+          final type = HostedType.values
+              .asNameMap()[state.uri.queryParameters['type']];
           return ViewModelHost(
-            key: ValueKey('host-tournament-$host'),
+            key: ValueKey('host-tournament-$host-${type?.name}'),
             create: (c) => HostedTournamentFormViewModel(
               hostId: host,
+              type: type,
               tournamentRepository: c.read(),
               teamRepository: c.read(),
               authRepository: c.read(),

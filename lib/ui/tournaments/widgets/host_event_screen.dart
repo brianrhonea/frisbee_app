@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/hosted_tournament.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/host_event_viewmodel.dart';
@@ -35,6 +36,24 @@ class HostEventScreen extends StatelessWidget {
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 16),
+                Text(
+                  'What are you hosting?',
+                  style: theme.textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<HostedType>(
+                  segments: [
+                    for (final t in [
+                      HostedType.league,
+                      HostedType.tournament,
+                      HostedType.hat,
+                    ])
+                      ButtonSegment(value: t, label: Text(t.label)),
+                  ],
+                  selected: {viewModel.type},
+                  onSelectionChanged: (s) => viewModel.setType(s.first),
+                ),
+                const SizedBox(height: 16),
                 if (hosts.isNotEmpty) ...[
                   Text('Host as', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 8),
@@ -47,7 +66,9 @@ class HostEventScreen extends StatelessWidget {
                         title: Text(t.name),
                         subtitle: Text(t.kind.label),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () => context.push(Routes.newTournament(t.id)),
+                        onTap: () => context.push(
+                          Routes.newTournament(t.id, type: viewModel.type.name),
+                        ),
                       ),
                     ),
                   const SizedBox(height: 16),

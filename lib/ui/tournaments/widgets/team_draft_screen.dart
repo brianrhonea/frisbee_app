@@ -167,6 +167,18 @@ class _TeamDraftScreenState extends State<TeamDraftScreen> {
                 ),
               ),
             )
+          else if (vm.fromCaptains)
+            const Card(
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                leading: Icon(Icons.how_to_reg_outlined),
+                title: Text("Drafted by the captains"),
+                subtitle: Text(
+                  'Move players, rename teams or change a captain below, '
+                  'then save.',
+                ),
+              ),
+            )
           else
             Card(
               margin: EdgeInsets.zero,

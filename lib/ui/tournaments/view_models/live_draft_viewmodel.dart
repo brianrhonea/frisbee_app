@@ -50,12 +50,9 @@ class LiveDraftViewModel extends ChangeNotifier {
       _repo.watchDraft(tournamentId, divisionId).listen((d) {
         _draft = d;
         _drafts = true;
+        _watchDetails();
         notifyListeners();
       }, onError: _onError),
-      _repo.watchDraftDetails(tournamentId, divisionId).listen((d) {
-        _details = d;
-        notifyListeners();
-      }, onError: (Object _) {}),
     ];
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_draft?.secondsLeft(_now()) != null) notifyListeners();
@@ -71,6 +68,8 @@ class LiveDraftViewModel extends ChangeNotifier {
   late final List<StreamSubscription<Object?>> _subs;
   StreamSubscription<Team?>? _hostSub;
   StreamSubscription<List<PlayerSignup>>? _signupsSub;
+  StreamSubscription<Map<String, DraftDetail>?>? _detailsSub;
+  String? _detailsKey;
   Timer? _timer;
 
   late final Command0<void> start;
@@ -135,7 +134,30 @@ class LiveDraftViewModel extends ChangeNotifier {
     _hostSub = _teams.watchTeam(hostId).listen((h) {
       final was = isManager;
       _host = h;
-      if (isManager != was) _watchSignups();
+      if (isManager != was) {
+        _watchSignups();
+        _watchDetails();
+      }
+      notifyListeners();
+    }, onError: (Object _) {});
+  }
+
+  /// Skill and gender are readable only once the draft exists and only by
+  /// the host and its captains, and a refused read ends the stream, so
+  /// listen again whenever that could have changed.
+  void _watchDetails() {
+    final d = _draft;
+    final key = d == null
+        ? null
+        : '$isManager|${[for (final c in d.captains) c.uid].join(',')}';
+    if (key == _detailsKey) return;
+    _detailsKey = key;
+    _detailsSub?.cancel();
+    _detailsSub = null;
+    _details = null;
+    if (d == null || !(isManager || isCaptain)) return;
+    _detailsSub = _repo.watchDraftDetails(tournamentId, divisionId).listen((x) {
+      _details = x;
       notifyListeners();
     }, onError: (Object _) {});
   }
@@ -264,6 +286,7 @@ class LiveDraftViewModel extends ChangeNotifier {
     }
     _hostSub?.cancel();
     _signupsSub?.cancel();
+    _detailsSub?.cancel();
     _timer?.cancel();
     super.dispose();
   }

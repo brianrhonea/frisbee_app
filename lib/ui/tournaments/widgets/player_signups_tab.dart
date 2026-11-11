@@ -90,8 +90,11 @@ class PlayerSignupCard extends StatelessWidget {
               Text(
                 [
                   if (fee != null) '${fee.label} entry fee.',
-                  'Sign up on your own; the host builds balanced teams from '
-                      'everyone who signs up.',
+                  t.draftMode == DraftMode.captains
+                      ? 'Sign up on your own; captains chosen by the host '
+                            'draft the teams.'
+                      : 'Sign up on your own; the host builds balanced teams '
+                            'from everyone who signs up.',
                 ].join(' '),
               ),
               const SizedBox(height: 12),

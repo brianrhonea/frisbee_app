@@ -293,6 +293,24 @@ class HostedTournamentViewModel extends ChangeNotifier {
       if (t.kind == TeamKind.team && t.has(_uid, TeamPermission.manageTeam)) t,
   ];
 
+  /// Why [team] can't play in a league's [division], or null. A league
+  /// division is for teams of its gender division and level (a College
+  /// Women division takes college women's teams); a division at the League
+  /// level takes teams of any level.
+  static String? leagueFitProblem(Team team, TournamentDivision? division) {
+    if (division == null) return null;
+    if (team.division != division.division) {
+      return '${division.label} is for ${division.division.label} teams; '
+          '${team.name} plays ${team.division.label}.';
+    }
+    if (division.level != CompetitionLevel.league &&
+        team.level != division.level) {
+      return '${division.label} is for ${division.level.label} teams; '
+          '${team.name} is ${team.level.label}.';
+    }
+    return null;
+  }
+
   Team? myTeam(String teamId) =>
       _myTeams.where((t) => t.id == teamId).firstOrNull;
 
@@ -469,6 +487,10 @@ class HostedTournamentViewModel extends ChangeNotifier {
       return Result.error(
         Exception('Pick up to ${TournamentEntry.maxCaptains} captains.'),
       );
+    }
+    if (t.isLeague) {
+      final problem = leagueFitProblem(team, _divisions[a.divisionId]);
+      if (problem != null) return Result.error(Exception(problem));
     }
     // Applying and accepting an invite both register the team.
     final int players;

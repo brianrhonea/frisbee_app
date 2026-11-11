@@ -111,4 +111,6 @@ Claude/Anthropic agents, so never fetch it.
 ```
 flutter analyze && flutter test
 cd functions && npm run build && npm test
+cd functions && npm run test:rules    # Firestore/Storage rules (emulator)
+cd functions && npm run test:server   # callables against the emulator
 ```

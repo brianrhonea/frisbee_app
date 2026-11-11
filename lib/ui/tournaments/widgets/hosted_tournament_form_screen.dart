@@ -124,13 +124,14 @@ class _HostedTournamentFormScreenState
             (HostedKind.tournament, TournamentEntryType.teams) =>
               'A weekend tournament for teams that apply.',
             (HostedKind.tournament, TournamentEntryType.players) =>
-              'A hat tournament: players sign up and you draw balanced '
-                  'teams from them.',
+              'A hat tournament: players sign up on their own and are '
+                  'drafted onto teams.',
             (HostedKind.league, TournamentEntryType.teams) =>
               'A weekly league for teams that apply, with a minimum roster.',
             (HostedKind.league, TournamentEntryType.players) =>
-              'A weekly league: players sign up and you draw balanced '
-                  'teams, which become real teams with chat and a roster.',
+              'A weekly league: players sign up on their own and are '
+                  'drafted onto teams, which become real teams with chat '
+                  'and a roster.',
           }, style: theme.textTheme.bodySmall),
         ),
         if (vm.entryType == TournamentEntryType.players) ...[

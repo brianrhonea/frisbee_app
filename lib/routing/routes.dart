@@ -167,8 +167,12 @@ abstract final class Routes {
   /// Pick which group or club hosts a new tournament, hat tournament or
   /// league.
   static const hostEvent = '/tournaments/host';
-  static String newTournament(String hostId) =>
-      '$tournaments/new?host=${Uri.encodeQueryComponent(hostId)}';
+
+  /// [type] (a `HostedType` name: tournament, hat or league) starts the
+  /// form on that kind of event.
+  static String newTournament(String hostId, {String? type}) =>
+      '$tournaments/new?host=${Uri.encodeQueryComponent(hostId)}'
+      '${type == null ? '' : '&type=$type'}';
   static String editTournament(String id) => '$tournaments/$id/edit';
 
   /// The host turns a division's signed-up players into teams.

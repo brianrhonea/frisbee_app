@@ -322,7 +322,13 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
     String divisionId,
   ) => guard(() async {
     final games = await _games(tournament.id, divisionId).get();
-    await deleteDocs(_db, [for (final d in games.docs) d.reference]);
+    final draft = _drafts(tournament.id).doc(divisionId);
+    await deleteDocs(_db, [
+      for (final d in games.docs) d.reference,
+      // A captains' draft, its private details first.
+      draft.collection('details').doc('pool'),
+      draft,
+    ]);
     await (_db.batch()
           ..delete(_divisions(tournament.id).doc(divisionId))
           ..update(_doc(tournament.id), {
@@ -641,7 +647,10 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
       for (final d in entries.docs) d.reference,
       for (final d in payments.docs) d.reference,
       for (final d in signups.docs) d.reference,
-      for (final d in drafts.docs) d.reference,
+      for (final d in drafts.docs) ...[
+        d.reference.collection('details').doc('pool'),
+        d.reference,
+      ],
       _doc(tournamentId),
     ]);
   });

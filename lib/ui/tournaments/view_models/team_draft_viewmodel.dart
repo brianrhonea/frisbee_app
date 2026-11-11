@@ -97,6 +97,12 @@ class TeamDraftViewModel extends ChangeNotifier {
   /// Mixed divisions balance each gender match across the teams.
   bool get mixed => _division?.division == Division.mixed;
 
+  /// The captains drafted these teams live, so dealing balanced teams
+  /// would throw their picks away; the host only adjusts them here.
+  bool get fromCaptains =>
+      _tournament?.draftMode == DraftMode.captains &&
+      (_division?.teams.isNotEmpty ?? false);
+
   List<TournamentTeam> get teams => _teams;
 
   /// The accepted players, who get drafted.
@@ -222,6 +228,11 @@ class TeamDraftViewModel extends ChangeNotifier {
   ];
 
   Future<Result<void>> _draft() async {
+    if (fromCaptains) {
+      return Result.error(
+        Exception("The captains drafted these teams. Adjust them instead."),
+      );
+    }
     if (created) return Result.error(Exception(_createdMessage));
     if (_locked) {
       return Result.error(

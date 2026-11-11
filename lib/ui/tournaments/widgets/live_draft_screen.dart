@@ -172,7 +172,7 @@ class _LiveDraftScreenState extends State<LiveDraftScreen> {
     return [
       _banner(draft),
       if (vm.isManager) ..._hostControls(draft),
-      if (draft.status == DraftStatus.finished) ...[
+      if (draft.status == DraftStatus.finished && vm.isManager) ...[
         const SizedBox(height: 8),
         FilledButton.icon(
           onPressed: () => context.push(
@@ -293,9 +293,28 @@ class _LiveDraftScreenState extends State<LiveDraftScreen> {
               icon: const Icon(Icons.flag_outlined),
               label: const Text('Finish'),
             ),
+          if (draft.status != DraftStatus.finished)
+            TextButton.icon(
+              onPressed: running ? null : _cancel,
+              icon: const Icon(Icons.close),
+              label: const Text('Cancel draft'),
+            ),
         ],
       ),
     ];
+  }
+
+  Future<void> _cancel() async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Cancel the draft?',
+      message:
+          'Every pick is thrown away. You can then choose captains and '
+          'start again.',
+      confirmLabel: 'Cancel draft',
+      destructive: true,
+    );
+    if (ok) await vm.control.execute(DraftControl.cancel);
   }
 
   Future<void> _finish() async {
