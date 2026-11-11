@@ -1,7 +1,10 @@
 import 'dart:math';
 
 import '../models/group_tournament.dart';
+import '../models/hosted_tournament.dart';
 import 'standings.dart';
+
+part 'season.dart';
 
 /// A generated schedule: every game with a field and start time.
 class SchedulePlan {
