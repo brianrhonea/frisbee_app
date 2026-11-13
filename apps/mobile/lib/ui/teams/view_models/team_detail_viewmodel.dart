@@ -234,6 +234,16 @@ class TeamDetailViewModel extends ChangeNotifier {
 
   int get paidCount => _roster.where((p) => p.paid).length;
 
+  /// Whether a roster spot is linked to the user's account.
+  bool get onRoster => _roster.any((p) => p.userId == uid);
+
+  /// A new roster spot for the user, linked to their account, to fill in.
+  RosterPlayer get selfDraft => RosterPlayer(
+    id: '',
+    name: _team?.memberNames[uid] ?? _auth.currentUser?.label ?? '',
+    userId: uid,
+  );
+
   /// Flips a player's Paid mark.
   void togglePaid(RosterPlayer p) =>
       savePlayer.execute(p.copyWith(paid: !p.paid));

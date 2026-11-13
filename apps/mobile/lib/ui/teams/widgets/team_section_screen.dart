@@ -97,6 +97,9 @@ enum TeamTab {
   schedule('Schedule'),
   chat('Chat'),
   roster('Roster'),
+
+  /// A community's teams (a school or club's), beside its members.
+  teams('Teams'),
   more('More');
 
   const TeamTab(this.label);
@@ -111,18 +114,18 @@ enum TeamTab {
     TeamSection.events => schedule,
     TeamSection.chat => chat,
     TeamSection.roster || TeamSection.members => roster,
+    TeamSection.teams => teams,
     TeamSection.playbook ||
     TeamSection.videos ||
     TeamSection.stats ||
-    TeamSection.tournaments ||
-    TeamSection.teams => more,
+    TeamSection.tournaments => more,
   };
 
   /// The tabs of a page with [sections] (from [TeamSection.forTeam]), in
   /// order: the feed, then each tab with a section under it.
   static List<TeamTab> forSections(List<TeamSection> sections) => [
     feed,
-    for (final t in [schedule, chat, roster, more])
+    for (final t in [schedule, chat, roster, teams, more])
       if (sections.any((s) => of(s) == t)) t,
   ];
 
@@ -137,6 +140,7 @@ enum TeamTab {
     schedule => TeamSection.events.route(teamId),
     chat => TeamSection.chat.route(teamId),
     roster => TeamSection.members.route(teamId),
+    teams => TeamSection.teams.route(teamId),
     more => Routes.teamSection(teamId, morePath),
   };
 }

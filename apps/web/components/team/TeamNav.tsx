@@ -11,7 +11,8 @@ import { useTeamHub } from "./TeamContext";
 /**
  * The hub's sections (spec §4): Feed, Schedule and Roster for everyone
  * signed in; Chat and More once the viewer is a member. A community calls
- * its roster Members and keeps no playbook, videos or stats.
+ * its roster Members, lists its teams under Teams, and keeps no playbook,
+ * videos or stats.
  */
 export function TeamNav() {
   const { teamId, kind, viewer } = useTeamHub();
@@ -23,6 +24,7 @@ export function TeamNav() {
     ["/schedule", "Schedule", true],
     ["/chat", "Chat", member],
     ["/roster", kind === "team" ? "Roster" : "Members", true],
+    ["/teams", "Teams", kind !== "team"],
     ["/more", kind === "team" ? "More" : "Tournaments", member],
   ];
   return (

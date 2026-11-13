@@ -10,7 +10,26 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
-## 0.0.17 (in TestFlight from `development`)
+## 0.0.18 (in TestFlight from `development`)
+
+**A tidier Teams tab**
+- Your own teams come first. Schools, clubs and other communities come
+  next, each with its teams tucked under it, so being in one doesn't fill
+  the tab.
+- One **+** button to join with a code, find a team, or start one.
+
+**Team pages**
+- Tabs, including **More**, now open right on the team page. The
+  header folds up into a slim bar with the team's name, and the tabs stay
+  just under it. Back takes you out of the team, not between tabs.
+- Coaches and captains who also play can **Add yourself** to the roster
+  in one tap (Roster → Players).
+
+**Communities**
+- A school or club's page has a **Teams** tab with all of its teams.
+- Admins can invite people straight to any of its teams from there.
+
+## 0.0.17
 
 **Learn to play**
 - New to ultimate? **Learn to play** walks through the rules in five

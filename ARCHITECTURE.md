@@ -176,14 +176,16 @@ sequenceDiagram
 - Joining: `POST /v1/teams/join` `{code}` → `{teamId}`;
   `POST /v1/teams/:id/members` (open group); `POST|DELETE
   /v1/teams/:id/join-requests[/:uid]`; `POST
-  /v1/teams/:id/join-requests/:uid/approve`; `POST /v1/teams/:id/invites`;
+  /v1/teams/:id/join-requests/:uid/approve`; `POST /v1/teams/:id/invites`
+  (the team's member managers, or its community's for a team it links);
   `POST /v1/me/team-invites/:teamId/accept`; `DELETE
   /v1/me/team-invites/:teamId`.
 - Members: `DELETE /v1/teams/:id/members/:uid` (leave/remove); `PUT
   /v1/teams/:id/members/:uid/role`; `PUT .../stat-keeper`; `POST
   /v1/teams/:id/owner`; `PUT /v1/teams/:id/roles`.
 - Roster: `GET /v1/teams/:id/roster` → `TeamRoster` (any signed-in
-  caller; a private group's only to its members).
+  caller; a private group's only to its members), with a community's
+  linked teams in `teams`.
 - Communities: `PUT|DELETE /v1/teams/:id/community`; `POST
   /v1/teams/:org/link-requests/:team/accept`; `DELETE
   /v1/teams/:org/link-requests/:team`; `PUT|DELETE

@@ -403,6 +403,32 @@ void main() {
       expect(find.textContaining('Not allowed'), findsOneWidget);
     });
 
+    test('a community admin invites to its team without a link', () async {
+      final people = FakeDirectMessageRepository()
+        ..profiles.add(const UserProfile(uid: 'sam', name: 'Sam Lee'));
+      final vm = InviteMembersViewModel(
+        team: teamWith(const {'owner': TeamRole.owner}),
+        teamRepository: teams,
+        directMessageRepository: people,
+        authRepository: auth,
+        withLink: false,
+        debounce: Duration.zero,
+      );
+      vm.search('sam');
+      await pumpEventQueue();
+      await vm.invite.execute(vm.results.single);
+      expect(vm.invite.result, isA<Ok<void>>());
+      expect(vm.link, isNull);
+      expect(teams.invites['sam']!.single.teamId, vm.team.id);
+      final dm = people.messages[Conversation.idFor(testUser.uid, 'sam')]!;
+      expect(
+        dm.single.text,
+        'I invited you to join Team on Stall 10. Accept it from your Teams '
+        'tab.',
+      );
+      vm.dispose();
+    });
+
     test("inviting someone to a team sends a fresh link", () async {
       final t = teamWith({testUser.uid: TeamRole.owner});
       teams.teams['t1'] = t;

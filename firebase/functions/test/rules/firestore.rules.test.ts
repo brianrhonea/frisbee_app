@@ -315,6 +315,33 @@ describe("team invites", () => {
     await assertFails(setDoc(doc(db(CAPTAIN), ...invitePath()), { ...invite(), teamName: "Other" }));
   });
 
+  it("a community's member managers invite to the teams it accepted", async () => {
+    const BOSS = "boss";
+    const FAN = "fan";
+    const seedOrg = (linked: boolean, listed: boolean) =>
+      env.withSecurityRulesDisabled(async (ctx) => {
+        const fs = ctx.firestore();
+        await setDoc(doc(fs, "teams", "org1"), {
+          name: "Org",
+          kind: "organization",
+          ownerId: BOSS,
+          members: { [BOSS]: "owner", [FAN]: "player" },
+          memberIds: [BOSS, FAN],
+          linkedTeams: listed ? { [TEAM]: { name: "Team", division: "mixed", roles: [] } } : {},
+        });
+        await updateDoc(doc(fs, "teams", TEAM), { orgId: "org1", orgLinked: linked });
+      });
+    await seedOrg(true, true);
+    await assertSucceeds(setDoc(doc(db(BOSS), ...invitePath()), invite(BOSS)));
+    await assertSucceeds(getDoc(doc(db(BOSS), ...invitePath())));
+    await assertFails(setDoc(doc(db(FAN), ...invitePath("other")), invite(FAN)));
+    // Not before the community accepts the team, nor once it's unlisted.
+    await seedOrg(false, true);
+    await assertFails(setDoc(doc(db(BOSS), ...invitePath("other")), invite(BOSS)));
+    await seedOrg(true, false);
+    await assertFails(setDoc(doc(db(BOSS), ...invitePath("other")), invite(BOSS)));
+  });
+
   it("only the invitee and the team's editors see an invite", async () => {
     await seedInvite();
     await assertSucceeds(getDoc(doc(db(OUTSIDER), ...invitePath())));

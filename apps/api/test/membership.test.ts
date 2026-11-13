@@ -246,6 +246,31 @@ describe("invites (teamInvites, acceptInvite)", () => {
     });
   });
 
+  it("a community's member managers invite to the teams it accepted", async () => {
+    s.store.put(T, { ...seedTeam(), orgId: "org", orgLinked: true });
+    s.store.put("teams/org", {
+      name: "UT Dallas",
+      kind: "organization",
+      memberIds: ["boss", "helper", "fan"],
+      members: { boss: "owner", helper: "player", fan: "player" },
+      memberPerms: { helper: ["manageMembers"] },
+      linkedTeams: { t1: { name: "The Haze", division: "mixed", roles: [] } },
+    });
+    expect((await s.call("POST", "/v1/teams/t1/invites", "boss", { uid: "new" })).statusCode).toBe(200);
+    expect(s.store.doc(I)).toMatchObject({ teamName: "The Haze", kind: "team", invitedBy: "boss" });
+    expect((await s.call("POST", "/v1/teams/t1/invites", "helper", { uid: "new2" })).statusCode).toBe(200);
+    // A plain community member can't.
+    expect((await s.call("POST", "/v1/teams/t1/invites", "fan", { uid: "new3" })).statusCode).toBe(403);
+  });
+
+  it("community admins can't invite to a team the community hasn't accepted or listed", async () => {
+    s.store.put("teams/org", { name: "UT Dallas", kind: "organization", memberIds: ["boss"], members: { boss: "owner" }, linkedTeams: {} });
+    s.store.put(T, { ...seedTeam(), orgId: "org", orgLinked: false });
+    expect((await s.call("POST", "/v1/teams/t1/invites", "boss", { uid: "new" })).statusCode).toBe(403);
+    s.store.put(T, { ...seedTeam(), orgId: "org", orgLinked: true });
+    expect((await s.call("POST", "/v1/teams/t1/invites", "boss", { uid: "new" })).statusCode).toBe(403);
+  });
+
   it("players can't invite", async () => {
     expect((await s.call("POST", "/v1/teams/t1/invites", "p1", { uid: "new" })).statusCode).toBe(403);
   });

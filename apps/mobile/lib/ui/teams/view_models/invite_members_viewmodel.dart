@@ -17,13 +17,16 @@ import '../../../utils/result.dart';
 /// invited gets an in-app invite plus the link as a direct message.
 /// A team's link expires after [expiry] (each one minted when first copied,
 /// shared or sent); a group's link just opens its page. Owners and
-/// organizers only (the rules check).
+/// organizers only (the rules check), or, without [withLink], a community's
+/// admins inviting to one of its teams: they can't make the team's links,
+/// so the message just says where to accept.
 class InviteMembersViewModel extends ChangeNotifier {
   InviteMembersViewModel({
     required this.team,
     required TeamRepository teamRepository,
     required DirectMessageRepository directMessageRepository,
     required AuthRepository authRepository,
+    this.withLink = true,
     this.debounce = const Duration(milliseconds: 300),
   }) : _teams = teamRepository,
        _people = directMessageRepository,
@@ -91,6 +94,10 @@ class InviteMembersViewModel extends ChangeNotifier {
   }
 
   final Team team;
+
+  /// Offers the invite link, and sends it with each invite.
+  final bool withLink;
+
   final TeamRepository _teams;
   final DirectMessageRepository _people;
   final AuthRepository _auth;
@@ -171,10 +178,17 @@ class InviteMembersViewModel extends ChangeNotifier {
     if (result is! Ok) return result;
     _invited.add(person.uid);
     notifyListeners();
-    // The link too, so they can join from a message or another device.
-    final link = await _createLink();
-    if (link case Error(:final error)) return Result.error(error);
-    final text = shareTextFor((link as Ok<Uri>).value);
+    final String text;
+    if (withLink) {
+      // The link too, so they can join from a message or another device.
+      final link = await _createLink();
+      if (link case Error(:final error)) return Result.error(error);
+      text = shareTextFor((link as Ok<Uri>).value);
+    } else {
+      text =
+          'I invited you to join ${team.name} on $appName. Accept it from '
+          'your Teams tab.';
+    }
     final convo = await _people.openConversation(user, person);
     return switch (convo) {
       Ok(:final value) => _people.sendMessage(value, author: user, text: text),

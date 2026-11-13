@@ -86,6 +86,23 @@ class CommunityTeamsViewModel extends ChangeNotifier {
   /// Lists teams, answers requests and says which roles get on each.
   bool get canManage => _org?.has(uid, TeamPermission.manageTeam) ?? false;
 
+  /// Invites people straight to any of its teams (Manage members).
+  bool get canInvite => _org?.has(uid, TeamPermission.manageMembers) ?? false;
+
+  /// [team] as a team to invite to: its admins' rules and the API check
+  /// the community's link, so only what the invite needs is filled in.
+  Team inviteTarget(LinkedTeam team) => Team(
+    id: team.id,
+    name: team.name,
+    division: team.division,
+    level: _org?.level ?? CompetitionLevel.college,
+    ownerId: '',
+    members: const {},
+    orgId: orgId,
+    orgName: _org?.name ?? '',
+    orgLinked: true,
+  );
+
   /// Only the owner makes roles, so only they may add one from here.
   bool get canMakeRoles => _org?.roleOf(uid) == TeamRole.owner;
 

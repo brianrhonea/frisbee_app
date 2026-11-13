@@ -100,6 +100,17 @@ export class MembershipService {
     return clip(callerLabel({ uid: caller.uid, ...(user ?? { name: caller.name, email: caller.email }) }), 80);
   }
 
+  /**
+   * communityInvites() in the teamInvites rule: a community's member
+   * managers also invite people to the teams it accepted (orgLinked, and
+   * listed in its linkedTeams), without being on them.
+   */
+  private async communityInvites(tx: Tx, team: Data, teamId: string, uid: string): Promise<boolean> {
+    if (team.orgLinked !== true || typeof team.orgId !== "string" || !team.orgId) return false;
+    const org = await tx.get(p.team(team.orgId));
+    return !!org && can(org, uid, "manageMembers") && Object.hasOwn(mapOf(org.linkedTeams), teamId);
+  }
+
   private async team(tx: Tx, id: string): Promise<Data> {
     const t = await tx.get(p.team(id));
     if (!t) throw notFound();
@@ -227,7 +238,9 @@ export class MembershipService {
     const by = await this.label(caller);
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
-      requirePermission(team, caller.uid, "manageMembers", `You can't invite people to this ${nounOf(team)}.`);
+      if (!can(team, caller.uid, "manageMembers") && !(await this.communityInvites(tx, team, teamId, caller.uid))) {
+        throw new ApiError("permission_denied", `You can't invite people to this ${nounOf(team)}.`);
+      }
       if (isMember(team, uid)) throw new ApiError("already_exists", `They're already in this ${nounOf(team)}.`);
       tx.set(p.invite(uid, teamId), {
         teamName: String(team.name ?? ""),

@@ -44,6 +44,29 @@ class TeamsViewModel extends ChangeNotifier {
 
   List<Team> get groups => _items.where((t) => t.isCommunity).toList();
 
+  /// The user's other teams, by name. A team that one of their
+  /// communities lists ([viaCommunity]) is shown under that community
+  /// instead, so a community's admins don't get one card per team.
+  List<Team> get yourTeams =>
+      teams.where((t) => !viaCommunity(t)).toList()..sort(_byName);
+
+  /// The user's communities (groups, schools and clubs), by name; each
+  /// lists its teams ([Team.sortedLinkedTeams]).
+  List<Team> get communities => groups..sort(_byName);
+
+  /// [team] is linked to one of the user's communities, which lists it.
+  bool viaCommunity(Team team) =>
+      team.inCommunity &&
+      _items.any(
+        (c) => c.id == team.orgId && c.linkedTeams.containsKey(team.id),
+      );
+
+  /// Whether the user is on the community's team [teamId].
+  bool isOn(String teamId) => _items.any((t) => t.id == teamId);
+
+  static int _byName(Team a, Team b) =>
+      a.name.toLowerCase().compareTo(b.name.toLowerCase());
+
   bool _loading = true;
   bool get loading => _loading;
 

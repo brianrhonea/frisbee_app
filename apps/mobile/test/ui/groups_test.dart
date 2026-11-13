@@ -289,10 +289,10 @@ void main() {
       await tester.pumpAndSettle();
       // Now a member: the group's tabs. Its More holds only tournaments;
       // the team-only sections aren't there.
-      for (final t in TeamTab.values) {
+      final group = TeamSection.forKind(TeamKind.community);
+      for (final t in TeamTab.forSections(group)) {
         expect(find.text(t.label), findsOneWidget);
       }
-      final group = TeamSection.forKind(TeamKind.community);
       expect(TeamTab.moreSections(group), [TeamSection.tournaments]);
       for (final s in [
         TeamSection.roster,

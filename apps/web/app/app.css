@@ -692,3 +692,22 @@ a.person:hover span { text-decoration: underline; }
   .team-banner-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .rsvp-columns { grid-template-columns: 1fr; }
 }
+
+/* Teams page: communities with their teams; invites. */
+.community-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.community-list > li { display: grid; gap: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.community-list > li:last-child { border-bottom: 0; padding-bottom: 0; }
+.community-head { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 10px; text-decoration: none; }
+.community-head:hover { background: var(--field); }
+.community-head span { display: grid; min-width: 0; }
+.community-head small { color: var(--muted); font-size: 0.8rem; }
+.team-list.nested { margin-left: 46px; }
+.link-button { justify-self: start; margin-left: 52px; background: none; border: 0; padding: 2px 0; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.team-row { display: flex; align-items: center; gap: 8px; }
+.team-row > a { flex: 1; min-width: 0; }
+.invite-panel { display: grid; gap: 10px; }
+.invite-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.invite-head .card-title { margin: 0; }
+.invite-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.invite-results li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.invite-results .person { min-width: 0; }

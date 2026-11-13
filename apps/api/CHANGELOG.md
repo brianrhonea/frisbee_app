@@ -7,6 +7,18 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.6.0 — 2026-11-13
+
+Communities and their teams.
+
+**Added**
+- `GET /v1/teams/:id/roster` also lists a community's teams (`teams`: id,
+  name, division), sorted by name; a team's list is empty.
+- `POST /v1/teams/:id/invites`: a community's member managers (Manage
+  members there) may invite people to any team it has accepted and still
+  lists, as well as the team's own. `firestore.rules` (`teamInvites`)
+  allow the same for the direct path.
+
 ## 0.5.0 — 2026-11-12
 
 Website parity, slice W2 (`docs/product-spec.md` §8.1): team pages.

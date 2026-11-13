@@ -15,20 +15,25 @@ import '../view_models/invite_members_viewmodel.dart';
 import '../../core/ui/app_search_field.dart';
 import '../../core/ui/skeleton.dart';
 
-/// Opens the people search for inviting members to [team].
-Future<void> showInviteMembers(BuildContext context, Team team) =>
-    showDialog<void>(
-      context: context,
-      builder: (_) => ViewModelHost(
-        create: (c) => InviteMembersViewModel(
-          team: team,
-          teamRepository: c.read(),
-          directMessageRepository: c.read(),
-          authRepository: c.read(),
-        ),
-        builder: (_, vm) => InviteMembersDialog(viewModel: vm),
-      ),
-    );
+/// Opens the people search for inviting members to [team]; without
+/// [withLink], just the search (a community admin inviting to its team).
+Future<void> showInviteMembers(
+  BuildContext context,
+  Team team, {
+  bool withLink = true,
+}) => showDialog<void>(
+  context: context,
+  builder: (_) => ViewModelHost(
+    create: (c) => InviteMembersViewModel(
+      team: team,
+      teamRepository: c.read(),
+      directMessageRepository: c.read(),
+      authRepository: c.read(),
+      withLink: withLink,
+    ),
+    builder: (_, vm) => InviteMembersDialog(viewModel: vm),
+  ),
+);
 
 /// The team's invite link to copy or share to any app, and people search:
 /// each person invited gets an in-app invite and the link in a message.
@@ -68,7 +73,13 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
     final c = AppColors.of(context);
     final group = vm.team.isCommunity;
     return AlertDialog(
-      title: Text(group ? 'Invite members' : 'Invite players'),
+      title: Text(
+        group
+            ? 'Invite members'
+            : vm.withLink
+            ? 'Invite players'
+            : 'Invite to ${vm.team.name}',
+      ),
       contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
       content: SizedBox(
         width: 420,
@@ -76,13 +87,15 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _LinkCard(viewModel: vm),
-            const SizedBox(height: 16),
-            Text(
-              'Or invite someone on Stall 10',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
+            if (vm.withLink) ...[
+              _LinkCard(viewModel: vm),
+              const SizedBox(height: 16),
+              Text(
+                'Or invite someone on Stall 10',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+            ],
             AppSearchField(hint: 'Search people by name', onChanged: vm.search),
             const SizedBox(height: 8),
             Expanded(
@@ -97,9 +110,11 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
                   }
                   String? note;
                   if (vm.query.length < InviteMembersViewModel.minQueryLength) {
-                    note =
-                        'Find people by name. They get an invite to accept '
-                        'and the link in a message.';
+                    note = vm.withLink
+                        ? 'Find people by name. They get an invite to accept '
+                              'and the link in a message.'
+                        : 'Find people by name. They get an invite to accept '
+                              'in their Teams tab, and a message.';
                   } else if (vm.results.isEmpty) {
                     note = 'No one by that name.';
                   }

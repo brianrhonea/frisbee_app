@@ -1,4 +1,11 @@
-import { type RosterMember, type RosterPerson, type RosterPlayer, rosterMax, type TeamRoster } from "@stall10/shared";
+import {
+  type RosterMember,
+  type RosterPerson,
+  type RosterPlayer,
+  type RosterTeam,
+  rosterMax,
+  type TeamRoster,
+} from "@stall10/shared";
 import type { Caller } from "../auth.js";
 import { ApiError } from "../errors.js";
 import { docIdParam } from "../ids.js";
@@ -16,7 +23,8 @@ const asMap = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ?
  * Who's on a team, for anyone signed in: the roster's players and the
  * members, each with their public profile card. The rules keep `roster/*`
  * and the team doc to members, so this reads them with the Admin SDK and
- * returns only names, numbers, positions, tiers and role names, never
+ * returns only names, numbers, positions, tiers, role names and a
+ * community's team names, never
  * permissions, stats keepers, paid marks or anything else on the team doc.
  * A private group (a community or organization that approves joins) shows
  * its members only to members, as its posts and events are (showsPublic
@@ -64,6 +72,7 @@ export class RosterService {
         .map(({ id, data }) => player(id, data, cards))
         .sort((a, b) => (a.number ?? 1e9) - (b.number ?? 1e9) || a.name.localeCompare(b.name)),
       members,
+      teams: kind === "team" ? [] : linkedTeams(team.linkedTeams),
     };
   }
 
@@ -87,6 +96,18 @@ const rank = (tier: string) => {
   const i = tierOrder.indexOf(tier);
   return i < 0 ? tierOrder.length : i;
 };
+
+/** A community's teams (linkedTeams: id → {name, division, roles}), without the roles. */
+function linkedTeams(raw: unknown): RosterTeam[] {
+  return Object.entries(asMap(raw))
+    .map(([id, v]) => {
+      const t = asMap(v);
+      const out: RosterTeam = { id, name: str(t.name) || "Team" };
+      if (str(t.division)) out.division = str(t.division);
+      return out;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 
 function player(id: string, d: Data, cards: Map<string, RosterPerson>): RosterPlayer {
   const out: RosterPlayer = { id, name: str(d.name) || "Player" };

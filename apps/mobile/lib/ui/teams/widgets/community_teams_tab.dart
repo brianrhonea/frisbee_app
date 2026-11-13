@@ -9,6 +9,7 @@ import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/community_teams_viewmodel.dart';
+import 'invite_members_dialog.dart';
 
 /// A school or club community's teams. Members see which ones their roles
 /// put them on; admins add teams, answer teams asking to join, and choose
@@ -186,6 +187,13 @@ class _CommunityTeamsTabState extends State<CommunityTeamsTab> {
                   joining: vm.isJoining(t),
                   roleNames: vm.roleNames(t),
                   onOpen: () => context.push(Routes.team(t.id)),
+                  onInvite: vm.canInvite
+                      ? () => showInviteMembers(
+                          context,
+                          vm.inviteTarget(t),
+                          withLink: false,
+                        )
+                      : null,
                   onEditAccess: vm.canManage ? () => _editAccess(t) : null,
                   onUnlink: vm.canManage ? () => _unlink(t) : null,
                 ),
@@ -204,6 +212,7 @@ class _TeamTile extends StatelessWidget {
     required this.joining,
     required this.roleNames,
     required this.onOpen,
+    this.onInvite,
     this.onEditAccess,
     this.onUnlink,
   });
@@ -213,6 +222,7 @@ class _TeamTile extends StatelessWidget {
   final bool joining;
   final List<String> roleNames;
   final VoidCallback onOpen;
+  final VoidCallback? onInvite;
   final VoidCallback? onEditAccess;
   final VoidCallback? onUnlink;
 
@@ -245,17 +255,30 @@ class _TeamTile extends StatelessWidget {
                 side: BorderSide.none,
                 backgroundColor: theme.colorScheme.secondaryContainer,
               ),
-            if (onEditAccess != null)
+            if (onInvite != null || onEditAccess != null)
               PopupMenuButton<String>(
                 tooltip: 'Team options',
-                onSelected: (v) =>
-                    (v == 'access' ? onEditAccess : onUnlink)?.call(),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'access', child: Text('Who gets on it')),
-                  PopupMenuItem(
-                    value: 'unlink',
-                    child: Text('Remove from community'),
-                  ),
+                onSelected: (v) => switch (v) {
+                  'invite' => onInvite,
+                  'access' => onEditAccess,
+                  _ => onUnlink,
+                }?.call(),
+                itemBuilder: (_) => [
+                  if (onInvite != null)
+                    const PopupMenuItem(
+                      value: 'invite',
+                      child: Text('Invite people'),
+                    ),
+                  if (onEditAccess != null)
+                    const PopupMenuItem(
+                      value: 'access',
+                      child: Text('Who gets on it'),
+                    ),
+                  if (onUnlink != null)
+                    const PopupMenuItem(
+                      value: 'unlink',
+                      child: Text('Remove from community'),
+                    ),
                 ],
               ),
           ],

@@ -1,8 +1,11 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/teams/view_models/create_team_viewmodel.dart';
 import 'package:frisbee_app/ui/teams/view_models/team_detail_viewmodel.dart';
 import 'package:frisbee_app/ui/teams/view_models/teams_viewmodel.dart';
+import 'package:frisbee_app/ui/core/themes/theme.dart';
+import 'package:frisbee_app/ui/teams/widgets/roster_tab.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
@@ -37,6 +40,53 @@ void main() {
     await pumpEventQueue();
     expect(list.teams.single.name, 'Ring');
     expect(list.roleIn(list.teams.single), TeamRole.owner);
+  });
+
+  test("a community's teams nest under it; the rest come first", () async {
+    Team team(
+      String id,
+      String name, {
+      String? orgId,
+      Set<String> via = const {},
+    }) => Team(
+      id: id,
+      name: name,
+      division: Division.open,
+      level: CompetitionLevel.college,
+      ownerId: 'o',
+      members: {testUser.uid: TeamRole.player},
+      orgId: orgId,
+      orgLinked: orgId != null,
+      orgName: orgId == null ? '' : 'Tech',
+      orgMembers: via,
+    );
+    teams.teams
+      ..['org'] = Team(
+        id: 'org',
+        name: 'Tech',
+        division: Division.mixed,
+        level: CompetitionLevel.college,
+        ownerId: testUser.uid,
+        kind: TeamKind.organization,
+        members: {testUser.uid: TeamRole.owner},
+        linkedTeams: const {
+          'w': LinkedTeam(id: 'w', name: 'Woof'),
+          'x': LinkedTeam(id: 'x', name: 'Whiplash'),
+        },
+      )
+      ..['w'] = team('w', 'Woof', orgId: 'org', via: {testUser.uid})
+      // On it through the team's own admins: still the community's.
+      ..['x'] = team('x', 'Whiplash', orgId: 'org')
+      // Linked, but the community no longer lists it.
+      ..['y'] = team('y', 'Yonder', orgId: 'org')
+      ..['c'] = team('c', 'Club Ring');
+    final vm = TeamsViewModel(teamRepository: teams, authRepository: auth);
+    addTearDown(vm.dispose);
+    await pumpEventQueue();
+    expect(vm.yourTeams.map((t) => t.name), ['Club Ring', 'Yonder']);
+    expect(vm.communities.map((t) => t.name), ['Tech']);
+    expect(vm.isOn('w'), isTrue);
+    expect(vm.isOn('zzz'), isFalse);
   });
 
   test('join reports errors for unknown codes', () async {
@@ -298,5 +348,45 @@ void main() {
       expect(teams.migrations, 0);
       vm.dispose();
     });
+  });
+  testWidgets("an owner who isn't on the roster adds themselves", (
+    tester,
+  ) async {
+    teams.teams['t1'] = teamWith({testUser.uid: TeamRole.owner});
+    final vm = TeamDetailViewModel(
+      teamId: 't1',
+      teamRepository: teams,
+      playRepository: FakePlayRepository(),
+      eventRepository: FakeEventRepository(),
+      authRepository: auth,
+    );
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: ListenableBuilder(
+          listenable: vm,
+          builder: (_, _) => RosterTab(viewModel: vm),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(vm.onRoster, isFalse);
+
+    await tester.tap(find.text('Add yourself'));
+    await tester.pumpAndSettle();
+    // A new spot, already linked to them.
+    expect(find.text('Add player'), findsWidgets);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Jersey number'),
+      '7',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final me = teams.roster['t1']!.single;
+    expect((me.userId, me.number), (testUser.uid, 7));
+    expect(vm.onRoster, isTrue);
+    expect(find.text('Add yourself'), findsNothing);
   });
 }

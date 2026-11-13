@@ -4,6 +4,21 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.7.0 — 2026-11-13
+
+Communities and their teams. Needs API 0.6.0.
+
+**Added**
+- A community's page has a **Teams** tab listing its teams. Its member
+  managers invite people to each one from there.
+- A team's member managers invite people by name from **Roster**.
+
+**Changed**
+- **Teams** groups like the app: your teams first, then each community
+  with its teams under it, folded when it has more than three. A team
+  one of your communities lists sits only under the community.
+  Read live from Firestore instead of `/v1/me/home`.
+
 ## 0.6.0 — 2026-11-12
 
 Website parity, slice W2 (`docs/product-spec.md` §8.1): team pages as a

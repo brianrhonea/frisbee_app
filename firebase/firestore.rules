@@ -271,10 +271,24 @@ service cloud.firestore {
       match /teamInvites/{teamId} {
         function team() { return get(teamPath(teamId)).data; }
 
+        // A community's member managers also invite people to the teams it
+        // accepted (orgLinked, and listed in its linkedTeams), without
+        // being on them (MembershipService.communityInvites in the API).
+        function communityInvites() {
+          let t = team();
+          return t.get('orgLinked', false) == true
+            && t.get('orgId', null) is string
+            && can(get(teamPath(t.orgId)).data, 'manageMembers')
+            && teamId in get(teamPath(t.orgId)).data.get('linkedTeams', {});
+        }
+        function canInvite() {
+          return can(team(), 'manageMembers') || communityInvites();
+        }
+
         allow read, delete: if signedIn()
-          && (uid() == userId || can(team(), 'manageMembers'));
+          && (uid() == userId || canInvite());
         allow create, update: if signedIn()
-          && can(team(), 'manageMembers')
+          && canInvite()
           && !(userId in team().memberIds)
           && request.resource.data.keys().hasOnly([
                'teamName', 'kind', 'invitedBy', 'invitedByName', 'createdAt'])

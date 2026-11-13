@@ -135,6 +135,40 @@ void main() {
     expect(teams.teams[woofId]!.members.containsKey(_member), isFalse);
   });
 
+  testWidgets('admins can invite people to its teams; members can\'t', (
+    tester,
+  ) async {
+    teams.teams['org'] = _org().copyWith(
+      linkedTeams: const {'w': LinkedTeam(id: 'w', name: 'Woof')},
+    );
+    final vm = CommunityTeamsViewModel(
+      orgId: 'org',
+      teamRepository: teams,
+      authRepository: auth,
+    );
+    addTearDown(vm.dispose);
+    await pump(tester, CommunityTeamsTab(viewModel: vm));
+    expect(vm.canInvite, isTrue);
+    await tester.tap(find.byTooltip('Team options'));
+    await tester.pumpAndSettle();
+    expect(find.text('Invite people'), findsOneWidget);
+    final target = vm.inviteTarget(vm.teams.single);
+    expect((target.id, target.name, target.orgId), ('w', 'Woof', 'org'));
+    expect(target.isCommunity, isFalse);
+
+    // A plain member has no team menu at all.
+    final member = CommunityTeamsViewModel(
+      orgId: 'org',
+      teamRepository: teams,
+      authRepository: FakeAuthRepository(
+        user: const AppUser(uid: _member, email: 'm@b.com'),
+      ),
+    );
+    addTearDown(member.dispose);
+    await tester.pump();
+    expect(member.canInvite, isFalse);
+  });
+
   testWidgets('a team asks to join; the community adds it with a role', (
     tester,
   ) async {

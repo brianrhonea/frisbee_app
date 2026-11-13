@@ -50,7 +50,10 @@ void goWithinTeam(BuildContext context, String location) {
 
 /// A team's home page. Members see a summary, tabs for each section, what's
 /// coming up and the team's posts; anyone else sees the public page. The
-/// tabs show their section in place, under a compact header.
+/// tabs show their section in place, under a compact header. On phones the
+/// header collapses (the banner and name shrink into a bar, the tabs stay
+/// pinned under it) when a tab other than the feed opens, or the feed
+/// scrolls; it's one page throughout, so back leaves the team.
 class TeamHomeScreen extends StatefulWidget {
   const TeamHomeScreen({
     super.key,
@@ -73,6 +76,12 @@ class TeamHomeScreen extends StatefulWidget {
 
 class _TeamHomeScreenState extends State<TeamHomeScreen> {
   TeamHomeViewModel get vm => widget.viewModel;
+
+  /// The phone page's outer scroll: how far its header has collapsed.
+  final _scroll = ScrollController();
+
+  /// Whether the phone page last showed the feed; null before it showed.
+  bool? _wasFeed;
 
   late final List<Command<void>> _commands = [
     vm.updateTeam,
@@ -99,7 +108,29 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       c.removeListener(_onCommand);
     }
     vm.joinTeam.removeListener(_onJoin);
+    _scroll.dispose();
     super.dispose();
+  }
+
+  /// Opens the header on the feed and collapses it on the other tabs:
+  /// animated when switching tabs, at once when the page first shows.
+  void _settleHeader(bool feed) {
+    if (_wasFeed == feed) return;
+    final animate = _wasFeed != null;
+    _wasFeed = feed;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final to = feed ? 0.0 : _scroll.position.maxScrollExtent;
+      if (animate) {
+        _scroll.animateTo(
+          to,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _scroll.jumpTo(to);
+      }
+    });
   }
 
   /// The "Deleting…" dialog, while it's up.
@@ -355,6 +386,9 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
               )
             : null;
         final more = TeamTab.moreSections(sections);
+        if (mobile && team != null && vm.isMember) {
+          return _phonePage(summary, team, sections, menu);
+        }
         if (widget.more && more.isNotEmpty) {
           return Scaffold(
             appBar: appBar,
@@ -393,50 +427,9 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 if (players)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: Center(
-                      child: SegmentedButton<TeamSection>(
-                        segments: const [
-                          ButtonSegment(
-                            value: TeamSection.members,
-                            label: Text('Members'),
-                          ),
-                          ButtonSegment(
-                            value: TeamSection.roster,
-                            label: Text('Players'),
-                          ),
-                        ],
-                        selected: {section},
-                        showSelectedIcon: false,
-                        onSelectionChanged: (s) =>
-                            goWithinTeam(context, s.single.route(vm.teamId)),
-                      ),
-                    ),
+                    child: Center(child: _rosterSwitch(section)),
                   ),
-                Expanded(
-                  child: ViewModelHost(
-                    key: ValueKey('team-sections-${vm.teamId}'),
-                    create: (c) => TeamDetailViewModel(
-                      teamId: vm.teamId,
-                      teamRepository: c.read(),
-                      playRepository: c.read(),
-                      eventRepository: c.read(),
-                      meetingRepository: c.read<MeetingRepository>(),
-                      authRepository: c.read(),
-                    ),
-                    builder: (_, detail) => ListenableBuilder(
-                      listenable: detail,
-                      builder: (context, _) => !detail.loaded
-                          ? const LoadingView()
-                          : detail.team == null
-                          ? ErrorView(error: detail.error)
-                          : TeamSectionBody(
-                              key: ValueKey(section),
-                              viewModel: detail,
-                              section: section,
-                            ),
-                    ),
-                  ),
-                ),
+                Expanded(child: _sectionBody(section)),
               ],
             ),
           );
@@ -464,55 +457,219 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 onJoin: _join,
               ),
               const SizedBox(height: 16),
-              if (team != null && team.isLeagueTeam)
-                // A league team is its chat and members; the league page
-                // has its games.
-                SideColumnLayout(
-                  main: [
-                    _about(summary),
-                    _leagueCard(team),
-                    _MembersCard(team: team),
-                  ],
-                  side: [_details(summary)],
-                  narrow: [
-                    _about(summary),
-                    _leagueCard(team),
-                    _MembersCard(team: team),
-                    _details(summary),
-                  ],
-                )
-              else
-                SideColumnLayout(
-                  main: [
-                    _about(summary),
-                    if (!vm.isMember) _joinCard(summary),
-                    if (vm.contentError != null)
-                      Text(
-                        errorMessage(vm.contentError),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    if (team != null) _MembersCard(team: team),
-                    ..._posts(context),
-                  ],
-                  side: [
-                    ..._events(context),
-                    ..._tournaments(context),
-                    _details(summary),
-                  ],
-                  narrow: [
-                    _about(summary),
-                    if (!vm.isMember) _joinCard(summary),
-                    ..._events(context),
-                    ..._tournaments(context),
-                    if (team != null) _MembersCard(team: team),
-                    ..._posts(context),
-                    _details(summary),
-                  ],
-                ),
+              _feed(summary, team),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  /// A section's content, e.g. the schedule, with its own view model.
+  Widget _sectionBody(TeamSection section) => ViewModelHost(
+    key: ValueKey('team-sections-${vm.teamId}'),
+    create: (c) => TeamDetailViewModel(
+      teamId: vm.teamId,
+      teamRepository: c.read(),
+      playRepository: c.read(),
+      eventRepository: c.read(),
+      meetingRepository: c.read<MeetingRepository>(),
+      authRepository: c.read(),
+    ),
+    builder: (_, detail) => ListenableBuilder(
+      listenable: detail,
+      builder: (context, _) => !detail.loaded
+          ? const LoadingView()
+          : detail.team == null
+          ? ErrorView(error: detail.error)
+          : TeamSectionBody(
+              key: ValueKey(section),
+              viewModel: detail,
+              section: section,
+            ),
+    ),
+  );
+
+  /// Members and Players side by side under Roster.
+  Widget _rosterSwitch(TeamSection section) => SegmentedButton<TeamSection>(
+    segments: const [
+      ButtonSegment(value: TeamSection.members, label: Text('Members')),
+      ButtonSegment(value: TeamSection.roster, label: Text('Players')),
+    ],
+    selected: {section},
+    showSelectedIcon: false,
+    onSelectionChanged: (s) => goWithinTeam(context, s.single.route(vm.teamId)),
+  );
+
+  /// A member's team page on a phone: a header that collapses into a bar
+  /// with the tabs pinned under it, and the open tab below.
+  Widget _phonePage(
+    TeamListing summary,
+    Team team,
+    List<TeamSection> sections,
+    Widget? menu,
+  ) {
+    final more = TeamTab.moreSections(sections);
+    final showMore = widget.more && more.isNotEmpty;
+    final section = !showMore && sections.contains(widget.section)
+        ? widget.section
+        : null;
+    final tab = showMore ? TeamTab.more : TeamTab.of(section);
+    final feed = tab == TeamTab.feed;
+    _settleHeader(feed);
+    final players =
+        section != null &&
+        TeamTab.of(section) == TeamTab.roster &&
+        sections.contains(TeamSection.roster);
+    final Widget body;
+    if (feed) {
+      body = ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+        children: [
+          if (vm.savePost.running)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: LinearProgressIndicator(),
+            ),
+          _HeroDetails(viewModel: vm, summary: summary),
+          const SizedBox(height: 16),
+          _feed(summary, team),
+        ],
+      );
+    } else if (section == null) {
+      body = _MoreList(teamId: vm.teamId, sections: more);
+    } else {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (players)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Center(child: _rosterSwitch(section)),
+            ),
+          Expanded(child: _sectionBody(section)),
+        ],
+      );
+    }
+    return Scaffold(
+      floatingActionButton: feed && vm.canPost
+          ? FloatingActionButton.extended(
+              onPressed: vm.savePost.running ? null : _editPost,
+              icon: const Icon(Icons.post_add),
+              label: const Text('New post'),
+            )
+          : null,
+      body: NestedScrollView(
+        controller: _scroll,
+        // The absorber keeps the scroll to the header's collapse, and its
+        // handle says how far the pinned header overlaps the tab below.
+        headerSliverBuilder: (context, _) => [
+          SliverOverlapAbsorber(
+            handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+            sliver: SliverPersistentHeader(
+              pinned: true,
+              delegate: _TeamHeaderDelegate(
+                topPadding: MediaQuery.paddingOf(context).top,
+                summary: summary,
+                founded: team.createdAt?.year,
+                colors: AppColors.of(context),
+                surface: Theme.of(context).colorScheme.surface,
+                leading: backOr(context, Routes.teams) ?? const BackButton(),
+                menu: menu,
+                tabs: _TeamTabs(
+                  teamId: vm.teamId,
+                  kind: summary.kind,
+                  league: team.isLeagueTeam,
+                  selected: tab,
+                ),
+              ),
+            ),
+          ),
+        ],
+        // The injector moves the tab below the pinned header; the tab's own
+        // list (the primary scroll view) fills the rest. This wrapper
+        // doesn't scroll itself.
+        body: Builder(
+          builder: (context) => CustomScrollView(
+            primary: false,
+            physics: const NeverScrollableScrollPhysics(),
+            slivers: [
+              SliverOverlapInjector(
+                handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                  context,
+                ),
+              ),
+              SliverFillRemaining(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: KeyedSubtree(
+                    key: ValueKey(section ?? tab),
+                    child: body,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The feed tab: about, what's coming up, members and posts.
+  Widget _feed(TeamListing summary, Team? team) {
+    return Builder(
+      builder: (context) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (team != null && team.isLeagueTeam)
+              // A league team is its chat and members; the league page
+              // has its games.
+              SideColumnLayout(
+                main: [
+                  _about(summary),
+                  _leagueCard(team),
+                  _MembersCard(team: team),
+                ],
+                side: [_details(summary)],
+                narrow: [
+                  _about(summary),
+                  _leagueCard(team),
+                  _MembersCard(team: team),
+                  _details(summary),
+                ],
+              )
+            else
+              SideColumnLayout(
+                main: [
+                  _about(summary),
+                  if (!vm.isMember) _joinCard(summary),
+                  if (vm.contentError != null)
+                    Text(
+                      errorMessage(vm.contentError),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  if (team != null) _MembersCard(team: team),
+                  ..._posts(context),
+                ],
+                side: [
+                  ..._events(context),
+                  ..._tournaments(context),
+                  _details(summary),
+                ],
+                narrow: [
+                  _about(summary),
+                  if (!vm.isMember) _joinCard(summary),
+                  ..._events(context),
+                  ..._tournaments(context),
+                  if (team != null) _MembersCard(team: team),
+                  ..._posts(context),
+                  _details(summary),
+                ],
+              ),
+          ],
         );
       },
     );
@@ -896,34 +1053,9 @@ class _Hero extends StatelessWidget {
         '${summary.division.label} ${summary.level.label}',
     ].join(' ').toUpperCase();
     final count = vm.memberCount;
-    final follow = switch (vm.follow) {
-      final f? => FollowControl(viewModel: f, showCount: true),
-      null => null,
-    };
+    final follow = _followOf(vm);
     final actions = <Widget>[
-      if (vm.team case final team? when team.inCommunity)
-        ActionChip(
-          avatar: const Icon(Icons.account_balance_outlined, size: 18),
-          label: Text(team.orgName.isEmpty ? 'Community' : team.orgName),
-          tooltip: 'Open the community',
-          onPressed: () => context.push(Routes.team(team.orgId!)),
-        ),
-      if (!mobile) ?follow,
-      if (vm.isMember)
-        OutlinedButton.icon(
-          onPressed: () =>
-              goWithinTeam(context, TeamSection.chat.route(teamId)),
-          icon: const Icon(Icons.chat_bubble_outline, size: 17),
-          label: const Text('Message'),
-        ),
-      if (vm.team case final team? when vm.canManageMembers)
-        FilledButton.icon(
-          onPressed: () => showInviteMembers(context, team),
-          icon: const Icon(Icons.person_add_alt, size: 18),
-          label: Text(
-            summary.isCommunity ? 'Invite members' : 'Invite players',
-          ),
-        ),
+      ..._teamActions(context, vm, summary, follow: mobile ? null : follow),
       ?menu,
     ];
     return Card(
@@ -1045,23 +1177,7 @@ class _Hero extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        vm.isMember
-                            ? '$count ${count == 1 ? 'member' : 'members'}'
-                                  ' · ${vm.upcomingEvents.length} upcoming'
-                            : summary.isCommunity
-                            ? 'Community group'
-                            : 'Team',
-                        style: TextStyle(fontSize: 12, color: c.muted),
-                      ),
-                    ),
-                    if (vm.myRole case final role?)
-                      Tag('You: ${role.labelFor(summary.kind)}'),
-                  ],
-                ),
+                _CountLine(viewModel: vm, summary: summary, count: count),
                 const SizedBox(height: 6),
                 if (vm.isMember)
                   _TeamTabs(
@@ -1079,6 +1195,308 @@ class _Hero extends StatelessWidget {
       ),
     );
   }
+}
+
+FollowControl? _followOf(TeamHomeViewModel vm) => switch (vm.follow) {
+  final f? => FollowControl(viewModel: f, showCount: true),
+  null => null,
+};
+
+/// The buttons under the team's name: its community, [follow], Message and
+/// Invite.
+List<Widget> _teamActions(
+  BuildContext context,
+  TeamHomeViewModel vm,
+  TeamListing summary, {
+  Widget? follow,
+}) => [
+  if (vm.team case final team? when team.inCommunity)
+    ActionChip(
+      avatar: const Icon(Icons.account_balance_outlined, size: 18),
+      label: Text(team.orgName.isEmpty ? 'Community' : team.orgName),
+      tooltip: 'Open the community',
+      onPressed: () => context.push(Routes.team(team.orgId!)),
+    ),
+  ?follow,
+  if (vm.isMember)
+    OutlinedButton.icon(
+      onPressed: () => goWithinTeam(context, TeamSection.chat.route(vm.teamId)),
+      icon: const Icon(Icons.chat_bubble_outline, size: 17),
+      label: const Text('Message'),
+    ),
+  if (vm.team case final team? when vm.canManageMembers)
+    FilledButton.icon(
+      onPressed: () => showInviteMembers(context, team),
+      icon: const Icon(Icons.person_add_alt, size: 18),
+      label: Text(summary.isCommunity ? 'Invite members' : 'Invite players'),
+    ),
+];
+
+/// How many members and upcoming events, and the user's role.
+class _CountLine extends StatelessWidget {
+  const _CountLine({
+    required this.viewModel,
+    required this.summary,
+    required this.count,
+  });
+
+  final TeamHomeViewModel viewModel;
+  final TeamListing summary;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            vm.isMember
+                ? '$count ${count == 1 ? 'member' : 'members'}'
+                      ' · ${vm.upcomingEvents.length} upcoming'
+                : summary.isCommunity
+                ? 'Community group'
+                : 'Team',
+            style: TextStyle(fontSize: 12, color: AppColors.of(context).muted),
+          ),
+        ),
+        if (vm.myRole case final role?)
+          Tag('You: ${role.labelFor(summary.kind)}'),
+      ],
+    );
+  }
+}
+
+/// The top of a phone's feed under the collapsing header: Follow, the
+/// action buttons, and the member count.
+class _HeroDetails extends StatelessWidget {
+  const _HeroDetails({required this.viewModel, required this.summary});
+
+  final TeamHomeViewModel viewModel;
+  final TeamListing summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final follow = _followOf(vm);
+    final actions = _teamActions(context, vm, summary);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (follow != null) ...[
+          Align(alignment: Alignment.centerLeft, child: follow),
+          const SizedBox(height: 12),
+        ],
+        if (actions.isNotEmpty) ...[
+          Row(
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(child: actions[i]),
+              ],
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+        _CountLine(viewModel: vm, summary: summary, count: vm.memberCount),
+      ],
+    );
+  }
+}
+
+/// A phone's team header. Open, it's the banner with the badge, name and
+/// subtitle below; scrolled (or on a tab other than the feed) it shrinks
+/// into a bar with back, a small badge, the name and the menu. The tabs
+/// stay pinned at its foot.
+class _TeamHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _TeamHeaderDelegate({
+    required this.topPadding,
+    required this.summary,
+    required this.founded,
+    required this.colors,
+    required this.surface,
+    required this.leading,
+    required this.menu,
+    required this.tabs,
+  });
+
+  static const _bar = 56.0;
+  static const _banner = 120.0;
+  static const _identity = 76.0;
+  static const _tabs = 44.0;
+
+  final double topPadding;
+  final TeamListing summary;
+  final int? founded;
+  final AppColors colors;
+  final Color surface;
+  final Widget leading;
+  final Widget? menu;
+  final Widget tabs;
+
+  @override
+  double get minExtent => topPadding + _bar + _tabs;
+
+  @override
+  double get maxExtent => topPadding + _banner + _identity + _tabs;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlaps) {
+    final c = colors;
+    final t = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
+    final iconColor = Color.lerp(c.onFeature, c.ink, t)!;
+    final banner = [
+      if (summary.city.isNotEmpty) summary.city,
+      if (summary.isOrganization)
+        'school or club'
+      else if (summary.isCommunity)
+        'pickup group'
+      else
+        '${summary.division.label} ${summary.level.label}',
+    ].join(' ').toUpperCase();
+    return Material(
+      color: surface,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // The banner, shrinking and fading as the header collapses.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: (topPadding + _banner) * (1 - t),
+            child: Opacity(
+              opacity: 1 - t,
+              child: CustomPaint(
+                painter: _BannerPainter(
+                  base: c.feature,
+                  accent: c.highlight,
+                  light: c.featureHighlight,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Flexible(child: Tag(banner, strong: true)),
+                      const Spacer(),
+                      if (founded != null)
+                        Text(
+                          'EST. $founded',
+                          style: TextStyle(
+                            color: c.onFeature,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // The badge and name under the banner, rising and fading out.
+          Positioned(
+            left: 16,
+            right: 16,
+            top: topPadding + _banner + 14 - shrinkOffset,
+            child: Opacity(
+              opacity: (1 - t * 1.8).clamp(0.0, 1.0),
+              child: Row(
+                children: [
+                  TeamBadge(size: 48, community: summary.isCommunity),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          summary.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.9,
+                            height: 1.1,
+                            color: c.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          summary.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12.5, color: c.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // The bar: back and menu always; the small badge and name fade in.
+          Positioned(
+            top: topPadding,
+            left: 4,
+            right: 4,
+            height: _bar,
+            child: IconButtonTheme(
+              data: IconButtonThemeData(
+                style: IconButton.styleFrom(foregroundColor: iconColor),
+              ),
+              child: IconTheme(
+                data: IconThemeData(color: iconColor),
+                child: Row(
+                  children: [
+                    leading,
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Opacity(
+                        opacity: ((t - 0.55) / 0.45).clamp(0.0, 1.0),
+                        child: Row(
+                          children: [
+                            TeamBadge(size: 30, community: summary.isCommunity),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                summary.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.4,
+                                  color: c.ink,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    ?menu,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 0,
+            height: _tabs,
+            child: Align(alignment: Alignment.bottomLeft, child: tabs),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_TeamHeaderDelegate old) => true;
 }
 
 /// The page's [TeamTab]s. Switching tabs stays on the team page.

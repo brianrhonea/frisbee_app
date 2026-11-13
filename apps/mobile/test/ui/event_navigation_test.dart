@@ -149,8 +149,12 @@ void main() {
 
   Future<void> tapText(WidgetTester tester, String text) async {
     final f = find.text(text).first;
-    await tester.ensureVisible(f);
-    await tester.pumpAndSettle();
+    // Scrolling something already in view can tuck it under the team
+    // page's pinned header.
+    if (f.hitTestable().evaluate().isEmpty) {
+      await tester.ensureVisible(f);
+      await tester.pumpAndSettle();
+    }
     await tester.tap(f);
     await tester.pumpAndSettle();
   }

@@ -55,6 +55,7 @@ describe("roster", () => {
         { uid: "pat", name: "Pat Public", username: "pat", photoUrl: "https://img/p.jpg", tier: "player", roles: ["Captains", "Handlers"] },
         { uid: "quinn", name: "Quinn Quiet", private: true, tier: "player", roles: [] },
       ],
+      teams: [],
     });
   });
 
@@ -79,8 +80,19 @@ describe("roster", () => {
   it("keeps a private organization's members to its members too", async () => {
     s.store.put("teams/o1", { name: "City League", kind: "organization", requiresApproval: true, memberIds: ["olive"], members: { olive: "owner" } });
     expect((await s.get("/v1/teams/o1/roster")).statusCode).toBe(403);
-    s.store.put("teams/o2", { name: "Open League", kind: "organization", requiresApproval: false, memberIds: ["olive"], members: { olive: "owner" } });
-    expect((await s.get("/v1/teams/o2/roster")).json()).toMatchObject({ kind: "organization", members: [{ uid: "olive" }] });
+    s.store.put("teams/o2", {
+      name: "Open League",
+      kind: "organization",
+      requiresApproval: false,
+      memberIds: ["olive"],
+      members: { olive: "owner" },
+      linkedTeams: { z: { name: "Zephyr", division: "open", roles: ["r1"] }, a: { name: "Aces", roles: [] } },
+    });
+    expect((await s.get("/v1/teams/o2/roster")).json()).toMatchObject({
+      kind: "organization",
+      members: [{ uid: "olive" }],
+      teams: [{ id: "a", name: "Aces" }, { id: "z", name: "Zephyr", division: "open" }],
+    });
   });
 
   it("answers 404 for a missing team and 400 for a bad id", async () => {

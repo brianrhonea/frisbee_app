@@ -66,6 +66,20 @@ class RosterTab extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 96),
           children: [
+            // Admins who also play: one tap to a spot linked to them.
+            if (canEdit && viewModel.team != null && !viewModel.onRoster)
+              Card.outlined(
+                margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                child: ListTile(
+                  leading: const Icon(Icons.person_pin_outlined),
+                  title: const Text("You're not on the roster"),
+                  subtitle: const Text('Add yourself if you play.'),
+                  trailing: FilledButton.tonal(
+                    onPressed: () => _edit(context, viewModel.selfDraft),
+                    child: const Text('Add yourself'),
+                  ),
+                ),
+              ),
             if (showStatus && viewModel.roster.isNotEmpty)
               _PaidCard(viewModel: viewModel),
             if (viewModel.roster.isEmpty)

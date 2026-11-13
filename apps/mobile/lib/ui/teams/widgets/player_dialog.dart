@@ -12,6 +12,7 @@ class PlayerDialog extends StatefulWidget {
     this.linkedElsewhere = const {},
   });
 
+  /// The player to edit, or a new one filled in (an empty id).
   final RosterPlayer? initial;
 
   /// Team members (uid → name) the player can be linked to, so their stats
@@ -61,7 +62,10 @@ class _PlayerDialogState extends State<PlayerDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.initial == null ? 'Add player' : 'Edit player'),
+      // A filled-in new spot (e.g. adding yourself) has no id yet.
+      title: Text(
+        (widget.initial?.id ?? '').isEmpty ? 'Add player' : 'Edit player',
+      ),
       content: SizedBox(
         width: 380,
         child: Form(

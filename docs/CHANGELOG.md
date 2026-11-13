@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.18  | 2026-11-13 | `development`                           |                     |
 | 0.0.17  | 2026-11-12 | `development`                           |                     |
 | 0.0.16  | 2026-11-12 | `development`                           | `9ba6ea0` and later |
 | 0.0.15  | 2026-11-12 | `feature/leagues`, `monorepo`           | `e3bac8b` and later |
@@ -31,6 +32,42 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.18 — A tidier Teams tab; one team page; communities list their teams
+
+Needs API 0.6.0 for community admins' invites (the rules allow the direct
+path too). Deploy `firestore.rules`.
+
+**Changed**
+- **Teams tab** (`TeamsScreen`): Invitations, then **Your teams** (teams
+  you joined yourself, "Part of X" when a community links them), then
+  **Communities**, each with its teams nested and folded past three
+  (`_CommunityCard`). A team one of your communities lists
+  (`TeamsViewModel.viaCommunity`) sits only under the community, even if
+  you own it.
+- One **+** button (Join with a code, Find a team or community, Start
+  one) replaces Search, Join and the New button.
+- **Team page on phones** (`TeamHomeScreen._phonePage`): one page for
+  every tab, More included. The header (`_TeamHeaderDelegate`, a pinned
+  `SliverPersistentHeader` in a `NestedScrollView` with an overlap
+  absorber) folds from the banner, badge and name into a bar (back, small
+  badge, name, menu) with the tabs pinned under it: animated when a tab
+  other than the feed opens, and as the feed scrolls. Follow, Message and
+  Invite moved to the top of the feed (`_HeroDetails`). Before, each tab
+  rebuilt the page with a different header, which read as a new page with
+  a back arrow. Tablets and desktops are unchanged.
+
+**Added**
+- A community's page has a **Teams** tab (`TeamTab.teams`) for its
+  linked teams (`CommunityTeamsTab`).
+- **Add yourself** on Roster → Players: admins who aren't on the roster
+  get a spot filled in with their name and linked to their account
+  (`TeamDetailViewModel.selfDraft`, `onRoster`).
+- Community admins with Manage members invite people to any of its teams
+  from that tab (**Invite people** in a team's menu). The invite dialog
+  runs without a link there (`InviteMembersViewModel.withLink`): the
+  community's admins can't make the team's links, so the message says to
+  accept from the Teams tab. `firestore.rules`: `teamInvites` lets them.
 
 ## 0.0.17 — Learn to play in the app
 

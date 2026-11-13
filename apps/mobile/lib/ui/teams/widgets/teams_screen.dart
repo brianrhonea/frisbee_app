@@ -88,26 +88,15 @@ class _TeamsScreenState extends State<TeamsScreen> {
         leading: ProfileButton.leading(context),
         title: const Text('Teams'),
         actions: [
-          IconButton(
-            tooltip: 'Find a team',
-            icon: const Icon(Icons.search),
-            onPressed: () =>
-                context.go(Routes.explore(only: ExploreFilter.teams)),
-          ),
           ListenableBuilder(
             listenable: vm.joinTeam,
-            builder: (context, _) => TextButton.icon(
-              onPressed: vm.joinTeam.running ? null : _join,
-              icon: const Icon(Icons.group_add_outlined),
-              label: const Text('Join'),
+            builder: (context, _) => IconButton(
+              tooltip: 'Join, find or start a team',
+              icon: const Icon(Icons.add),
+              onPressed: vm.joinTeam.running ? null : _add,
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _create,
-        icon: const Icon(Icons.add),
-        label: const Text('New'),
       ),
       body: ListenableBuilder(
         listenable: Listenable.merge([vm, vm.acceptInvite, vm.declineInvite]),
@@ -151,11 +140,11 @@ class _TeamsScreenState extends State<TeamsScreen> {
               ),
             );
           }
-          final teams = vm.teams;
-          final groups = vm.groups;
+          final teams = vm.yourTeams;
+          final communities = vm.communities;
           return ConstrainedContent(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 if (invites.isNotEmpty) ...[
                   const _Heading('Invitations'),
@@ -163,14 +152,18 @@ class _TeamsScreenState extends State<TeamsScreen> {
                   const SizedBox(height: 8),
                 ],
                 if (teams.isNotEmpty) ...[
-                  if (groups.isNotEmpty) const _Heading('My teams'),
+                  const _Heading('Your teams'),
                   for (final t in teams) _TeamCard(team: t, role: vm.roleIn(t)),
                 ],
-                if (groups.isNotEmpty) ...[
+                if (communities.isNotEmpty) ...[
                   if (teams.isNotEmpty) const SizedBox(height: 8),
-                  const _Heading('My groups'),
-                  for (final g in groups)
-                    _TeamCard(team: g, role: vm.roleIn(g)),
+                  const _Heading('Communities'),
+                  for (final c in communities)
+                    _CommunityCard(
+                      community: c,
+                      role: vm.roleIn(c),
+                      isOn: vm.isOn,
+                    ),
                 ],
               ],
             ),
@@ -178,6 +171,51 @@ class _TeamsScreenState extends State<TeamsScreen> {
         },
       ),
     );
+  }
+
+  /// The one add button: join with a code, find a team or community, or
+  /// start one.
+  Future<void> _add() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.vpn_key_outlined),
+              title: const Text('Join with a code'),
+              subtitle: const Text('From a team invite or link'),
+              onTap: () => Navigator.pop(context, 'join'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.search),
+              title: const Text('Find a team or community'),
+              onTap: () => Navigator.pop(context, 'find'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_circle_outline),
+              title: const Text('Start one'),
+              subtitle: const Text(
+                'A team, a community group, or a school or club',
+              ),
+              onTap: () => Navigator.pop(context, 'create'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'join':
+        await _join();
+      case 'find':
+        context.go(Routes.explore(only: ExploreFilter.teams));
+      case 'create':
+        await _create();
+    }
   }
 
   Future<void> _create() async {
@@ -258,11 +296,107 @@ class _TeamCard extends StatelessWidget {
                 : Text(team.name.isEmpty ? '?' : team.name[0].toUpperCase()),
           ),
           title: Text(team.name),
-          subtitle: Text(TeamListing.of(team).subtitle),
+          subtitle: Text(
+            [
+              TeamListing.of(team).subtitle,
+              if (team.inCommunity && team.orgName.isNotEmpty)
+                'Part of ${team.orgName}',
+            ].where((s) => s.isNotEmpty).join(' · '),
+          ),
           trailing: role == null
               ? null
               : Chip(label: Text(role!.labelFor(team.kind))),
           onTap: () => context.go(Routes.team(team.id)),
+        ),
+      ),
+    );
+  }
+}
+
+/// A community with its teams under it: shown when it has [_shownTeams] or
+/// fewer, folded behind "Show teams" when it has more.
+class _CommunityCard extends StatefulWidget {
+  const _CommunityCard({
+    required this.community,
+    required this.role,
+    required this.isOn,
+  });
+
+  final Team community;
+  final TeamRole? role;
+
+  /// Whether the user is on the team with this id.
+  final bool Function(String teamId) isOn;
+
+  @override
+  State<_CommunityCard> createState() => _CommunityCardState();
+}
+
+const _shownTeams = 3;
+
+class _CommunityCardState extends State<_CommunityCard> {
+  late bool _open = widget.community.linkedTeams.length <= _shownTeams;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final c = widget.community;
+    final teams = c.sortedLinkedTeams;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              leading: CircleAvatar(
+                child: Icon(
+                  c.isOrganization
+                      ? Icons.account_balance_outlined
+                      : Icons.diversity_3_outlined,
+                ),
+              ),
+              title: Text(c.name),
+              subtitle: Text(
+                [
+                  TeamListing.of(c).subtitle,
+                  if (teams.isNotEmpty)
+                    '${teams.length} team${teams.length == 1 ? '' : 's'}',
+                ].where((s) => s.isNotEmpty).join(' · '),
+              ),
+              trailing: widget.role == null
+                  ? null
+                  : Chip(label: Text(widget.role!.labelFor(c.kind))),
+              onTap: () => context.go(Routes.team(c.id)),
+            ),
+            if (_open)
+              for (final t in teams)
+                ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.fromLTRB(72, 0, 16, 0),
+                  leading: const Icon(Icons.shield_outlined, size: 20),
+                  title: Text(t.name),
+                  subtitle: Text(t.division.label),
+                  trailing: widget.isOn(t.id)
+                      ? Text(
+                          "You're on it",
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        )
+                      : null,
+                  onTap: () => context.go(Routes.team(t.id)),
+                ),
+            if (teams.length > _shownTeams)
+              TextButton(
+                onPressed: () => setState(() => _open = !_open),
+                child: Text(
+                  _open ? 'Hide teams' : 'Show ${teams.length} teams',
+                ),
+              ),
+          ],
         ),
       ),
     );

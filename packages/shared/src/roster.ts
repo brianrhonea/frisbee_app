@@ -33,11 +33,20 @@ export interface RosterMember extends RosterPerson {
   roles: string[];
 }
 
+/** A team a community lists (its `linkedTeams`). */
+export interface RosterTeam {
+  id: string;
+  name: string;
+  division?: string;
+}
+
 export interface TeamRoster {
   kind: "team" | "community" | "organization";
   /** Empty for a community or organization: they keep no roster. */
   players: RosterPlayer[];
   members: RosterMember[];
+  /** A community's teams, by name; empty for a team. */
+  teams: RosterTeam[];
 }
 
 /** Most players and members the roster lists. */

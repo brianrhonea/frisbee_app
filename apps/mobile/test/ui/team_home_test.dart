@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
@@ -279,17 +280,82 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    testWidgets("on a phone, tabs stay on the page and fold the header", (
+      tester,
+    ) async {
+      addTeam({testUser.uid: TeamRole.coach, 'owner': TeamRole.owner});
+      // A phone; wide enough for the test font's square letters.
+      tester.view.physicalSize = const Size(560, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final vm = homeVm();
+      addTearDown(vm.dispose);
+      final router = GoRouter(
+        initialLocation: '/teams/t1',
+        routes: [
+          GoRoute(
+            path: '/teams/:teamId',
+            builder: (_, state) => TeamHomeScreen(
+              viewModel: vm,
+              section: TeamSection.fromPath(
+                state.uri.queryParameters['section'],
+              ),
+              more: state.uri.queryParameters['section'] == TeamTab.morePath,
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+      );
+      await tester.pumpAndSettle();
+      final scroll = tester
+          .widget<NestedScrollView>(find.byType(NestedScrollView))
+          .controller!;
+      expect(scroll.offset, 0);
+      expect(find.text('Fees due Friday.'), findsOneWidget);
+
+      await tester.tap(find.text('More'));
+      await tester.pumpAndSettle();
+      // Same page: the header folded up, the tabs and the list below it.
+      expect(find.byType(TeamHomeScreen), findsOneWidget);
+      expect(router.routerDelegate.currentConfiguration.matches, hasLength(1));
+      expect(scroll.offset, greaterThan(0));
+      expect(scroll.offset, scroll.position.maxScrollExtent);
+      // Nothing below is tucked under the folded header.
+      expect(find.text('Playbook').hitTestable(), findsOneWidget);
+      expect(find.text('Feed'), findsOneWidget);
+
+      await tester.tap(find.text('Feed'));
+      await tester.pumpAndSettle();
+      expect(scroll.offset, 0);
+      expect(find.text('Fees due Friday.'), findsOneWidget);
+
+      // Scrolling the feed folds it too.
+      await tester.drag(find.byType(ListView).first, const Offset(0, -400));
+      await tester.pumpAndSettle();
+      expect(scroll.offset, scroll.position.maxScrollExtent);
+    });
+
     testWidgets('members get section links, events and posts', (tester) async {
       addTeam({testUser.uid: TeamRole.coach, 'owner': TeamRole.owner});
       await pump(tester, homeVm());
 
-      // Five tabs; the other sections are under More.
-      expect(TeamTab.forSections(TeamSection.forKind(TeamKind.team)), [
-        ...TeamTab.values,
+      // Five tabs (Teams is a community's); the other sections are under
+      // More.
+      final tabs = TeamTab.forSections(TeamSection.forKind(TeamKind.team));
+      expect(tabs, [
+        TeamTab.feed,
+        TeamTab.schedule,
+        TeamTab.chat,
+        TeamTab.roster,
+        TeamTab.more,
       ]);
-      for (final t in TeamTab.values) {
+      for (final t in tabs) {
         expect(find.text(t.label), findsOneWidget);
       }
+      expect(find.text('Teams'), findsNothing);
       expect(find.text('Playbook'), findsNothing);
       expect(find.text('Members'), findsNothing);
       expect(find.text('Practice'), findsOneWidget);

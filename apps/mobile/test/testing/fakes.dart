@@ -905,8 +905,26 @@ class FakeTeamRepository implements TeamRepository {
   }
 
   @override
-  Future<Result<void>> savePlayer(String teamId, RosterPlayer player) async =>
-      const Result.ok(null);
+  Future<Result<void>> savePlayer(String teamId, RosterPlayer player) async {
+    final list = roster[teamId] ?? const <RosterPlayer>[];
+    final saved = player.id.isEmpty
+        ? RosterPlayer(
+            id: 'p${list.length + 1}',
+            name: player.name,
+            number: player.number,
+            position: player.position,
+            userId: player.userId,
+            paid: player.paid,
+          )
+        : player;
+    roster[teamId] = [
+      for (final p in list)
+        if (p.id != saved.id) p,
+      saved,
+    ];
+    _rosterChanges.add(null);
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<void>> deletePlayer(String teamId, String playerId) async =>
