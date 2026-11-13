@@ -30,6 +30,7 @@ import '../ui/core/ui/view_model_host.dart';
 import '../ui/core/ui/slide_over_page.dart';
 import '../ui/settings/widgets/follow_requests_screen.dart';
 import '../ui/settings/widgets/settings_screen.dart';
+import '../ui/learn/widgets/learn_screen.dart';
 import '../ui/shell/view_models/shell_viewmodel.dart';
 import '../ui/shell/widgets/app_shell.dart';
 import '../ui/playbook/view_models/play_editor_viewmodel.dart';
@@ -165,6 +166,7 @@ GoRouter router(AuthRepository auth) => GoRouter(
         builder: (_, vm) => RecordWorkoutScreen(viewModel: vm),
       ),
     ),
+    GoRoute(path: Routes.learn, builder: (_, _) => const LearnScreen()),
     // Settings, from the gear on the user's profile: slides over the page
     // (a panel on wide screens), and its sections slide over it.
     GoRoute(

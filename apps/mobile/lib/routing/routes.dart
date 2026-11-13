@@ -81,6 +81,9 @@ abstract final class Routes {
   /// Records a run or ride with GPS, over the shell; use `context.push`.
   static const recordWorkout = '/record';
 
+  /// Learn to play: the rules for beginners, over the page (`context.push`).
+  static const learn = '/learn';
+
   /// A post's page; [comment] puts the cursor in the comment box.
   static String post(String id, {bool comment = false}) =>
       '$postsPath/$id${comment ? '?comment=1' : ''}';

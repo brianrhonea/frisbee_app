@@ -115,6 +115,16 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
               SettingsGroup(
+                children: [
+                  SettingsTile(
+                    icon: Icons.menu_book_outlined,
+                    title: 'Learn to play',
+                    subtitle: 'The rules of ultimate',
+                    onTap: () => context.push(Routes.learn),
+                  ),
+                ],
+              ),
+              SettingsGroup(
                 title: 'Legal & your data',
                 children: [
                   SettingsTile(

@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.17  | 2026-11-12 | `development`                           |                     |
 | 0.0.16  | 2026-11-12 | `development`                           | `9ba6ea0` and later |
 | 0.0.15  | 2026-11-12 | `feature/leagues`, `monorepo`           | `e3bac8b` and later |
 | 0.0.14  | 2026-11-06 | `development`                           |                     |
@@ -30,6 +31,19 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.17 — Learn to play in the app
+
+The rules for beginners were only on the website (`/learn`). No data
+changes.
+
+**Added**
+- **Learn to play** (`/learn`, `LearnScreen`): the website's beginner's
+  guide to the rules as a native page, with jump-to-section chips and
+  links to Explore and Find events. The text is in
+  `lib/ui/learn/learn_content.dart`; keep it in step with
+  `apps/web/app/learn/page.tsx`.
+- Opens from Explore's **Jump in** card and from **Settings**.
 
 ## 0.0.16 — New navigation: five tabs and a five-tab team page
 

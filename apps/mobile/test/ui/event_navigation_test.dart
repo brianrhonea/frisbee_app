@@ -31,6 +31,7 @@ import 'package:frisbee_app/routing/open_link.dart';
 import 'package:frisbee_app/routing/router.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
+import 'package:frisbee_app/ui/learn/widgets/learn_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_detail_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_editor_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/my_event_detail_screen.dart';
@@ -498,6 +499,30 @@ void main() {
     // The tabs are still there to leave by.
     await tapText(tester, 'Home');
     expect(find.byType(HomeScreen), findsOneWidget);
+  });
+
+  testWidgets('Learn to play opens from Settings and goes back there', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final router = GoRouter.of(tester.element(find.byType(HomeScreen)));
+    router.go(Routes.profile);
+    await tester.pumpAndSettle();
+    unawaited(router.push(Routes.settings));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Learn to play'));
+    await tapText(tester, 'Learn to play');
+    expect(find.byType(LearnScreen), findsOneWidget);
+    expect(find.text('Ultimate in five minutes'), findsOneWidget);
+
+    // The contents jump to a section.
+    await tapText(tester, 'Turnovers');
+    expect(find.text('the thrower is stalled out.'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(LearnScreen), findsNothing);
+    expect(find.byType(SettingsScreen), findsOneWidget);
   });
 
   testWidgets('a team left on its roster does not hijack event links', (

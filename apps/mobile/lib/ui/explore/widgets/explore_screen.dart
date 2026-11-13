@@ -357,6 +357,12 @@ class _Shortcuts extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       (
+        Icons.menu_book_outlined,
+        'Learn to play',
+        'The rules of ultimate in five minutes',
+        () => context.push(Routes.learn),
+      ),
+      (
         Icons.emoji_events_outlined,
         'Find a tournament or league',
         'Apply with your team, sign up to play, or follow results',

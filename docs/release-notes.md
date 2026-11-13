@@ -10,7 +10,14 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
-## 0.0.16 (in TestFlight from `development`)
+## 0.0.17 (in TestFlight from `development`)
+
+**Learn to play**
+- New to ultimate? **Learn to play** walks through the rules in five
+  minutes: the field, the stall count, turnovers, spirit of the game and
+  the words you'll hear. Find it in **Explore** and in **Settings**.
+
+## 0.0.16
 
 **A simpler layout**
 - Five tabs at the bottom: **Home**, **Explore**, **Events**, **Teams**

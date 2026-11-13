@@ -223,6 +223,8 @@ void main() {
     expect(find.text('Open 4'), findsOneWidget);
     expect(find.text('Open 5'), findsNothing);
     expect(find.widgetWithText(ChoiceChip, 'Tournaments'), findsOneWidget);
+    // The rules are a tap away.
+    expect(find.text('Learn to play'), findsOneWidget);
   });
 
   testWidgets('the Rankings page lists every ranked team', (tester) async {
