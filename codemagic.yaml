@@ -2,9 +2,12 @@
 # docs/ios-release.md.
 #
 # Monorepo: the Flutter app is in apps/mobile. Scripts run there
-# (working_directory); artifact paths stay relative to the repo root.
-# Pushes that only touch apps/api, apps/web, firebase/ or docs skip the build
-# (when: changeset); the first build after this is added always runs.
+# (working_directory). The IPA is listed both from the repo root and from
+# apps/mobile: after the move, builds finished green but nothing reached
+# TestFlight, as if the artifact path matched nothing and there was nothing
+# to upload. "Check the IPA" fails the build if none was made.
+# Pushes that only touch apps/api, apps/web, firebase/ or docs (not this
+# file) skip the build (when: changeset).
 #
 #   development branch -> TestFlight, talking to the dev Firebase project
 #                         (frisbee-app-brianrhonea-dev)
@@ -59,6 +62,7 @@ workflows:
         includes:
           - 'apps/mobile/'
           - 'packages/'
+          - 'codemagic.yaml'
     scripts: &scripts
       - name: Write secrets files
         script: |
@@ -103,8 +107,13 @@ workflows:
             --dart-define-from-file=secrets.local.json \
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/Users/builder/export_options.plist
+      - name: Check the IPA
+        script: |
+          set -euo pipefail
+          ls -l build/ios/ipa/*.ipa
     artifacts: &artifacts
       - apps/mobile/build/ios/ipa/*.ipa
+      - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
