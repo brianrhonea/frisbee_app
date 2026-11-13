@@ -35,6 +35,7 @@ import 'package:frisbee_app/ui/schedule/widgets/event_detail_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_editor_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/my_event_detail_screen.dart';
 import 'package:frisbee_app/ui/schedule/widgets/team_events_tab.dart';
+import 'package:frisbee_app/ui/teams/widgets/members_tab.dart';
 import 'package:frisbee_app/ui/teams/widgets/roster_tab.dart';
 import 'package:frisbee_app/ui/teams/widgets/team_home_screen.dart';
 import 'package:frisbee_app/ui/teams/widgets/team_section_screen.dart';
@@ -488,9 +489,7 @@ void main() {
     expect(find.text('Host'), findsOneWidget);
   });
 
-  testWidgets('the avatar opens the profile, which has no tab', (
-    tester,
-  ) async {
+  testWidgets('the avatar opens the profile, which has no tab', (tester) async {
     await pumpApp(tester);
     expect(find.text('Profile'), findsNothing);
     await tester.tap(find.byTooltip('My profile'));
@@ -507,7 +506,10 @@ void main() {
     await pumpApp(tester);
     await tapText(tester, 'Teams');
     await tapText(tester, 'Northside Flyers');
+    // Roster opens on the members, with the players beside them.
     await tapText(tester, 'Roster');
+    expect(find.byType(MembersTab), findsOneWidget);
+    await tapText(tester, 'Players');
     expect(find.byType(RosterTab), findsOneWidget);
 
     await tapText(tester, 'Home');
@@ -517,11 +519,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(HomeScreen), findsOneWidget);
 
-    // The Teams tab kept its place on the roster tab; Overview returns to
-    // the team summary on the same page.
+    // The Teams tab kept its place on the roster tab; Feed returns to the
+    // team summary on the same page.
     await tapText(tester, 'Teams');
     expect(find.byType(RosterTab), findsOneWidget);
-    await tapText(tester, 'Overview');
+    await tapText(tester, 'Feed');
     expect(find.byType(RosterTab), findsNothing);
     expect(find.byType(TeamHomeScreen), findsOneWidget);
   });
@@ -538,11 +540,11 @@ void main() {
     expect(find.byType(TeamHomeScreen), findsOneWidget);
   });
 
-  testWidgets('events from Team Events return to it', (tester) async {
+  testWidgets('events from the team schedule return to it', (tester) async {
     await pumpApp(tester);
     await tapText(tester, 'Teams');
     await tapText(tester, 'Northside Flyers');
-    await tapText(tester, 'Team Events');
+    await tapText(tester, 'Schedule');
     // The tab shows in place on the team page, as a list with no calendar.
     expect(find.byType(TeamHomeScreen), findsOneWidget);
     expect(find.byType(TeamEventsTab), findsOneWidget);
@@ -555,6 +557,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(EventDetailScreen), findsNothing);
     expect(find.byType(TeamEventsTab), findsOneWidget);
+  });
+
+  testWidgets('More lists the other sections and opens them', (tester) async {
+    await pumpApp(tester);
+    await tapText(tester, 'Teams');
+    await tapText(tester, 'Northside Flyers');
+    await tapText(tester, 'More');
+    for (final label in ['Playbook', 'Videos', 'Stats', 'Tournaments']) {
+      expect(find.text(label), findsOneWidget);
+    }
+    await tapText(tester, 'Playbook');
+    final home = tester.widget<TeamHomeScreen>(find.byType(TeamHomeScreen));
+    expect(home.section, TeamSection.playbook);
+    // Still under More.
+    expect(find.text('More'), findsOneWidget);
   });
 
   testWidgets('old ?tab= team links open the matching section', (tester) async {

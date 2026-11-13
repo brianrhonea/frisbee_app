@@ -140,6 +140,7 @@ Widget teamPage(GoRouterState state) {
     builder: (_, vm) => TeamHomeScreen(
       viewModel: vm,
       section: TeamSection.fromPath(state.uri.queryParameters['section']),
+      more: state.uri.queryParameters['section'] == TeamTab.morePath,
     ),
   );
 }

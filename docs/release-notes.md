@@ -10,7 +10,20 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
-## 0.0.15 (in TestFlight from `development`)
+## 0.0.16 (in TestFlight from `development`)
+
+**A simpler layout**
+- Five tabs at the bottom: **Home**, **Explore**, **Events**, **Teams**
+  and **Messages**.
+- **Events** has your schedule and, under **Find events**, tournaments
+  and leagues to join.
+- Your **profile and settings** open from your picture at the top left.
+- Every team and group page has the same five tabs: **Feed**,
+  **Schedule**, **Chat**, **Roster** and **More**. Roster has the members
+  and, on teams, the players; More has the playbook, videos, stats and
+  tournaments.
+
+## 0.0.15
 
 **Leagues and hat tournaments**
 - Teams, groups and schools/clubs can host a **league** or a **hat

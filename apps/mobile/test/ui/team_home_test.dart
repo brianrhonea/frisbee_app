@@ -283,10 +283,15 @@ void main() {
       addTeam({testUser.uid: TeamRole.coach, 'owner': TeamRole.owner});
       await pump(tester, homeVm());
 
-      for (final s in TeamSection.forKind(TeamKind.team)) {
-        expect(find.text(s.label), findsOneWidget);
+      // Five tabs; the other sections are under More.
+      expect(TeamTab.forSections(TeamSection.forKind(TeamKind.team)), [
+        ...TeamTab.values,
+      ]);
+      for (final t in TeamTab.values) {
+        expect(find.text(t.label), findsOneWidget);
       }
-      expect(find.text('Schedule'), findsNothing);
+      expect(find.text('Playbook'), findsNothing);
+      expect(find.text('Members'), findsNothing);
       expect(find.text('Practice'), findsOneWidget);
       expect(find.text('Fees due Friday.'), findsOneWidget);
       expect(find.text('New post'), findsOneWidget);

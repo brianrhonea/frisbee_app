@@ -52,12 +52,20 @@ void goWithinTeam(BuildContext context, String location) {
 /// coming up and the team's posts; anyone else sees the public page. The
 /// tabs show their section in place, under a compact header.
 class TeamHomeScreen extends StatefulWidget {
-  const TeamHomeScreen({super.key, required this.viewModel, this.section});
+  const TeamHomeScreen({
+    super.key,
+    required this.viewModel,
+    this.section,
+    this.more = false,
+  });
 
   final TeamHomeViewModel viewModel;
 
-  /// The open tab; null for the overview.
+  /// The open section; null for the feed (the overview) or More.
   final TeamSection? section;
+
+  /// Whether the More tab's list of sections is open.
+  final bool more;
 
   @override
   State<TeamHomeScreen> createState() => _TeamHomeScreenState();
@@ -336,26 +344,74 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         final team = vm.team;
         final menu = team == null ? null : _menu(team);
         final section = widget.section;
-        if (team != null &&
-            section != null &&
-            TeamSection.forTeam(team).contains(section)) {
+        final sections = team == null
+            ? const <TeamSection>[]
+            : TeamSection.forTeam(team);
+        final appBar = mobile
+            ? AppBar(
+                leading: leading,
+                title: Text(summary.name),
+                actions: [?menu],
+              )
+            : null;
+        final more = TeamTab.moreSections(sections);
+        if (widget.more && more.isNotEmpty) {
           return Scaffold(
-            appBar: mobile
-                ? AppBar(
-                    leading: leading,
-                    title: Text(summary.name),
-                    actions: [?menu],
-                  )
-                : null,
+            appBar: appBar,
             body: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _SectionHeader(
                   viewModel: vm,
                   summary: summary,
-                  section: section,
+                  tab: TeamTab.more,
                   menu: mobile ? null : menu,
                 ),
+                Expanded(
+                  child: _MoreList(teamId: vm.teamId, sections: more),
+                ),
+              ],
+            ),
+          );
+        }
+        if (team != null && section != null && sections.contains(section)) {
+          // A team's players sit beside its members under Roster.
+          final players =
+              TeamTab.of(section) == TeamTab.roster &&
+              sections.contains(TeamSection.roster);
+          return Scaffold(
+            appBar: appBar,
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SectionHeader(
+                  viewModel: vm,
+                  summary: summary,
+                  tab: TeamTab.of(section),
+                  menu: mobile ? null : menu,
+                ),
+                if (players)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Center(
+                      child: SegmentedButton<TeamSection>(
+                        segments: const [
+                          ButtonSegment(
+                            value: TeamSection.members,
+                            label: Text('Members'),
+                          ),
+                          ButtonSegment(
+                            value: TeamSection.roster,
+                            label: Text('Players'),
+                          ),
+                        ],
+                        selected: {section},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (s) =>
+                            goWithinTeam(context, s.single.route(vm.teamId)),
+                      ),
+                    ),
+                  ),
                 Expanded(
                   child: ViewModelHost(
                     key: ValueKey('team-sections-${vm.teamId}'),
@@ -386,13 +442,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           );
         }
         return Scaffold(
-          appBar: mobile
-              ? AppBar(
-                  leading: leading,
-                  title: Text(summary.name),
-                  actions: [?menu],
-                )
-              : null,
+          appBar: appBar,
           floatingActionButton: mobile && vm.canPost
               ? FloatingActionButton.extended(
                   onPressed: vm.savePost.running ? null : _editPost,
@@ -1018,7 +1068,7 @@ class _Hero extends StatelessWidget {
                     teamId: teamId,
                     kind: summary.kind,
                     league: vm.team?.isLeagueTeam ?? false,
-                    selected: null,
+                    selected: TeamTab.feed,
                   )
                 else
                   const SizedBox(height: 8),
@@ -1031,7 +1081,7 @@ class _Hero extends StatelessWidget {
   }
 }
 
-/// Overview plus a tab per section. Switching tabs stays on the team page.
+/// The page's [TeamTab]s. Switching tabs stays on the team page.
 class _TeamTabs extends StatelessWidget {
   const _TeamTabs({
     required this.teamId,
@@ -1045,37 +1095,56 @@ class _TeamTabs extends StatelessWidget {
 
   final String teamId;
   final TeamKind kind;
-
-  /// Null for the overview.
-  final TeamSection? selected;
+  final TeamTab selected;
 
   @override
   Widget build(BuildContext context) {
-    final sections = TeamSection.forKind(kind, league: league);
-    final current = selected;
+    final tabs = TeamTab.forSections(TeamSection.forKind(kind, league: league));
     return UnderlineTabs(
-      labels: ['Overview', for (final s in sections) s.labelFor(kind)],
-      selected: current == null ? 0 : sections.indexOf(current) + 1,
-      onSelect: (i) => goWithinTeam(
-        context,
-        i == 0 ? Routes.team(teamId) : sections[i - 1].route(teamId),
-      ),
+      labels: [for (final t in tabs) t.label],
+      selected: tabs.indexOf(selected),
+      onSelect: (i) => goWithinTeam(context, tabs[i].route(teamId)),
     );
   }
 }
 
-/// The top of a section tab: the team's badge and name, then the tabs.
+/// The More tab: the team's other sections, one row each.
+class _MoreList extends StatelessWidget {
+  const _MoreList({required this.teamId, required this.sections});
+
+  final String teamId;
+  final List<TeamSection> sections;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedContent(
+    maxWidth: 720,
+    child: ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        for (final s in sections)
+          ListTile(
+            leading: Icon(s.icon),
+            title: Text(s.label),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => goWithinTeam(context, s.route(teamId)),
+          ),
+      ],
+    ),
+  );
+}
+
+/// The top of a tab: the team's badge and name, then the tabs.
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
     required this.viewModel,
     required this.summary,
-    required this.section,
+    required this.tab,
     required this.menu,
   });
 
   final TeamHomeViewModel viewModel;
   final TeamListing summary;
-  final TeamSection section;
+  final TeamTab tab;
   final Widget? menu;
 
   @override
@@ -1121,7 +1190,7 @@ class _SectionHeader extends StatelessWidget {
               teamId: viewModel.teamId,
               kind: summary.kind,
               league: viewModel.team?.isLeagueTeam ?? false,
-              selected: section,
+              selected: tab,
             ),
           ],
         ),

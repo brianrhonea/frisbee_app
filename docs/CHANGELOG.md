@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.16  | 2026-11-12 | `development`                           | `9ba6ea0` and later |
 | 0.0.15  | 2026-11-12 | `feature/leagues`, `monorepo`           | `e3bac8b` and later |
 | 0.0.14  | 2026-11-06 | `development`                           |                     |
 | 0.0.13  | 2026-11-05 | `hardening/scale-and-abuse`             | `09d17af` and later |
@@ -29,6 +30,26 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.16 — New navigation: five tabs and a five-tab team page
+
+Step 1 of the rework in `docs/product-spec.md` (§3, §4). No data changes.
+
+**Changed**
+- **Tabs** (`ShellSection`): Home, Explore, **Events**, Teams, Messages.
+  The profile keeps its shell branch but has no tab; on phones an avatar
+  (`ProfileButton`) at the top left of each tab's first page opens it,
+  and no tab looks selected there.
+- **Events tab** (`/schedule`): My schedule (moved from Home's branch) and
+  Find events (`?view=find`, the tournaments and leagues list), under
+  `EventsTabs`. `/tournaments` still opens on its own.
+- **Team and community pages** (`TeamTab`): Feed, Schedule, Chat, Roster,
+  More, over the unchanged `TeamSection`s and their links. Roster opens on
+  members, with a Members / Players switch on teams; More
+  (`?section=more`) lists Playbook, Videos, Stats, Tournaments and, for
+  schools/clubs, Teams. "Team Events" is now Schedule everywhere.
+- Breadcrumbs say Home, Events and Teams; the desktop sidebar drops its
+  Team calendar link.
 
 ## 0.0.15 — Leagues and hat tournaments; monorepo; API paths
 

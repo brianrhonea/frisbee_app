@@ -287,18 +287,20 @@ void main() {
 
       await tester.tap(find.text('Join'));
       await tester.pumpAndSettle();
-      // Now a member: the group's sections, without the team-only ones.
-      expect(find.text('Events'), findsOneWidget);
-      expect(find.text('Chat'), findsOneWidget);
-      expect(find.text('Members'), findsOneWidget);
-      expect(find.text('Tournaments'), findsOneWidget);
+      // Now a member: the group's tabs. Its More holds only tournaments;
+      // the team-only sections aren't there.
+      for (final t in TeamTab.values) {
+        expect(find.text(t.label), findsOneWidget);
+      }
+      final group = TeamSection.forKind(TeamKind.community);
+      expect(TeamTab.moreSections(group), [TeamSection.tournaments]);
       for (final s in [
         TeamSection.roster,
         TeamSection.playbook,
         TeamSection.videos,
         TeamSection.stats,
       ]) {
-        expect(find.text(s.label), findsNothing);
+        expect(group, isNot(contains(s)));
       }
       expect(find.text('You: Member'), findsWidgets);
       expect(find.textContaining('2 members · '), findsOneWidget);

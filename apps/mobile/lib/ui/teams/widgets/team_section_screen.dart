@@ -27,9 +27,10 @@ import 'members_tab.dart';
 import 'roster_tab.dart';
 
 /// The parts of a team members open from its home page, in display order.
+/// The page groups them into [TeamTab]s.
 enum TeamSection {
   teams('Teams', Icons.shield_outlined, 'teams'),
-  events('Team Events', Icons.event_outlined, 'events'),
+  events('Schedule', Icons.event_outlined, 'events'),
   chat('Chat', Icons.chat_bubble_outline, 'chat'),
   roster('Roster', Icons.badge_outlined, 'roster'),
   playbook('Playbook', Icons.draw_outlined, 'playbook'),
@@ -74,9 +75,9 @@ enum TeamSection {
     TeamKind.organization => const [teams, events, chat, tournaments, members],
   };
 
-  /// "Team Events" is just "Events" in a group or community.
-  String labelFor(TeamKind kind) =>
-      this == events && kind.isGroupLike ? 'Events' : label;
+  /// The section's name on a [kind]'s page; the same for every kind now
+  /// that team events are the Schedule.
+  String labelFor(TeamKind kind) => label;
 
   /// The section named [path] (e.g. `?section=events`), if any.
   static TeamSection? fromPath(String? path) =>
@@ -89,8 +90,59 @@ enum TeamSection {
       : values.where((s) => s.name == tab).firstOrNull;
 }
 
-/// One section's content, e.g. the Team Events list or the roster: a tab
-/// of the team page. Reports failed actions in a snack bar.
+/// The five tabs of a team or community's page (docs/product-spec.md §4),
+/// each showing one or more [TeamSection]s.
+enum TeamTab {
+  feed('Feed'),
+  schedule('Schedule'),
+  chat('Chat'),
+  roster('Roster'),
+  more('More');
+
+  const TeamTab(this.label);
+  final String label;
+
+  /// The More tab's `?section=`: a list of the sections it holds.
+  static const morePath = 'more';
+
+  /// The tab [section] is under; the feed for the overview (null).
+  static TeamTab of(TeamSection? section) => switch (section) {
+    null => feed,
+    TeamSection.events => schedule,
+    TeamSection.chat => chat,
+    TeamSection.roster || TeamSection.members => roster,
+    TeamSection.playbook ||
+    TeamSection.videos ||
+    TeamSection.stats ||
+    TeamSection.tournaments ||
+    TeamSection.teams => more,
+  };
+
+  /// The tabs of a page with [sections] (from [TeamSection.forTeam]), in
+  /// order: the feed, then each tab with a section under it.
+  static List<TeamTab> forSections(List<TeamSection> sections) => [
+    feed,
+    for (final t in [schedule, chat, roster, more])
+      if (sections.any((s) => of(s) == t)) t,
+  ];
+
+  /// The sections listed under More on a page with [sections].
+  static List<TeamSection> moreSections(List<TeamSection> sections) =>
+      sections.where((s) => of(s) == more).toList();
+
+  /// Where the tab opens. Roster opens on the members, who every kind has;
+  /// a team's players are beside them.
+  String route(String teamId) => switch (this) {
+    feed => Routes.team(teamId),
+    schedule => TeamSection.events.route(teamId),
+    chat => TeamSection.chat.route(teamId),
+    roster => TeamSection.members.route(teamId),
+    more => Routes.teamSection(teamId, morePath),
+  };
+}
+
+/// One section's content, e.g. the schedule or the roster: a tab of the
+/// team page. Reports failed actions in a snack bar.
 class TeamSectionBody extends StatefulWidget {
   const TeamSectionBody({
     super.key,
