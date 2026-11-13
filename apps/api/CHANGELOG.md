@@ -7,6 +7,30 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.4.0 — 2026-11-12
+
+Website parity, slice W1 (`docs/product-spec.md` §8.1): what the website
+needs to post, comment and follow. The app still writes these directly.
+
+**Added**
+- Posts: `POST /v1/posts` (a text post, with photos from the caller's
+  finished `post` uploads for that post id), `PATCH /v1/posts/:id` (the
+  author changes the words, links or photos; a repost only its note;
+  dropped photos are deleted from Storage), `DELETE /v1/posts/:id` (with
+  its photos; a repost also leaves the original's `repostedBy`). The posts
+  rule's checks: 5,000 characters, 5 http(s) links, 4 photos, words or a
+  photo, the author only, the flood mute.
+- Comments: `POST /v1/posts/:id/comments` (replies one level deep, with
+  `replyToName` when answering a reply; not on reposts), `PATCH` and
+  `DELETE /v1/posts/:id/comments/:commentId` (its author edits; its author
+  or the post's author deletes), `PUT|DELETE .../like`.
+- Follows: `PUT /v1/follows` (players, teams, tournaments, with the
+  target's own name and photo; a private profile gets a follow request),
+  `PATCH|DELETE /v1/follows/:key`, `DELETE /v1/follows/requests/:owner`,
+  `POST /v1/me/follow-requests/:uid/accept`,
+  `DELETE /v1/me/follow-requests/:uid`, `DELETE /v1/me/followers/:uid`.
+- Notifications: `POST /v1/me/notifications/read` and `/delete` by id.
+
 ## 0.3.0 — 2026-11-11
 
 **Added**

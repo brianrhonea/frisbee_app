@@ -8,3 +8,4 @@ export * from "./membership.js";
 export * from "./profile.js";
 export * from "./me.js";
 export * from "./posts.js";
+export * from "./follows.js";

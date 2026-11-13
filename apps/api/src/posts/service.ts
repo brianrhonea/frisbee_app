@@ -12,24 +12,16 @@ import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
-import { tooFastMessage } from "../teams/service.js";
+import { authorOf, checkNotMuted, clip, nameMax, text } from "./author.js";
 
 const p = {
   post: (id: string) => `posts/${id}`,
-  profile: (uid: string) => `profiles/${uid}`,
-  limits: (uid: string) => `limits/${uid}`,
 };
 
-/** Longest author name on a post (validString(authorName, 80)). */
-const nameMax = 80;
-/** Longest author photo URL (validString(authorPhotoUrl, 2000)). */
-const photoMax = 2000;
+export const people = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 
-const clip = (s: string, max: number) => (s.length > max ? s.substring(0, max) : s);
-const people = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
-const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-
-function validId(v: unknown): v is string {
+export function validId(v: unknown): v is string {
   try {
     docIdParam(v);
     return true;
@@ -38,7 +30,7 @@ function validId(v: unknown): v is string {
   }
 }
 
-const noPost = () => new ApiError("not_found", "This post was deleted.");
+export const noPost = () => new ApiError("not_found", "This post was deleted.");
 
 /** A post and the one its likes and reposts count toward. */
 interface Target {
@@ -95,36 +87,14 @@ export class PostService {
     });
   }
 
-  /**
-   * The name and photo a post shows for the caller: their Auth display
-   * name, else their profile's name or username. Never their email (the
-   * app's AppUser.label falls back to it; posts are public).
-   */
-  private async author(caller: Caller): Promise<{ name: string; photoUrl: string | null }> {
-    const [user, profile] = await Promise.all([this.users.lookup(caller.uid), this.store.get(p.profile(caller.uid))]);
-    const username = text(profile?.username);
-    const name = text(user?.name) || text(profile?.name) || (username ? `@${username}` : "") || "Player";
-    const photo = user?.photoUrl ?? (typeof profile?.photoUrl === "string" ? profile.photoUrl : null);
-    return { name: clip(name, nameMax), photoUrl: photo && photo.length <= photoMax ? photo : null };
-  }
-
-  /** notMuted(): the flood mute the functions set on limits/{uid}. */
-  private async checkNotMuted(uid: string) {
-    const until = (await this.store.get(p.limits(uid)))?.mutedUntil;
-    const now = this.now();
-    if (until instanceof Date && until.getTime() > now) {
-      throw new ApiError("resource_exhausted", tooFastMessage(until.getTime(), now));
-    }
-  }
-
   /** Reposts the post (its original, for a repost) with an optional note. Again is a no-op. */
   async repost(caller: Caller, rawId: unknown, body: unknown): Promise<RepostResult> {
     const id = docIdParam(rawId);
     const parsed = repostRequestSchema.safeParse(body ?? {});
     if (!parsed.success) throw fromZod(parsed.error);
     const note = parsed.data.note?.trim() ?? "";
-    await this.checkNotMuted(caller.uid);
-    const me = await this.author(caller);
+    await checkNotMuted(this.store, caller.uid, this.now());
+    const me = await authorOf(this.store, this.users, caller);
     return this.store.transact(async (tx) => {
       const t = await this.target(tx, id);
       const authorId = t.data.authorId;

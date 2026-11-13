@@ -14,7 +14,10 @@ import type { HeicDecoder } from "./media/image.js";
 import { uploadRoutes } from "./media/routes.js";
 import { type TranscodeQueue, UploadService } from "./media/service.js";
 import type { MediaStorage } from "./media/storage.js";
-import { postRoutes } from "./posts/routes.js";
+import { followRoutes } from "./follows/routes.js";
+import { FollowService } from "./follows/service.js";
+import { PostEditor } from "./posts/editor.js";
+import { postEditorRoutes, postRoutes } from "./posts/routes.js";
 import { PostService } from "./posts/service.js";
 import { profileRoutes } from "./profiles/routes.js";
 import { ProfileService } from "./profiles/service.js";
@@ -110,6 +113,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
     profileRoutes(app, new ProfileService(deps.store, deps.users));
     postRoutes(app, new PostService(deps.store, deps.users, deps.now));
+    postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now));
+    followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
     if (deps.media) {
       const uploads = new UploadService(deps.store, deps.media, { heic: deps.heic, queue: deps.transcodeQueue, now: deps.now });
       uploadRoutes(app, uploads);
