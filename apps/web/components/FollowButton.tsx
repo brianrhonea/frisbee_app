@@ -25,7 +25,7 @@ export function FollowButton({
   groupId?: string;
   /** A private player profile: following asks first. */
   isPrivate?: boolean;
-  /** Where sign-up returns visitors to. */
+  /** Where sign-up returns visitors to; without it visitors see nothing (the page asks them itself). */
   signUpNext?: string;
 }) {
   const { user } = useAuth();
@@ -37,10 +37,11 @@ export function FollowButton({
 
   if (user === undefined) return null;
   if (!user) {
+    if (!signUpNext) return null;
     return (
       <Link
         className="btn btn-primary btn-small"
-        href={`/sign-up${signUpNext ? `?next=${encodeURIComponent(signUpNext)}` : ""}`}
+        href={`/sign-up?next=${encodeURIComponent(signUpNext)}`}
       >
         Sign up to follow
       </Link>

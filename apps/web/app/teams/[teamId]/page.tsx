@@ -4,6 +4,7 @@ import Link from "next/link";
 import { cache } from "react";
 import { Avatar } from "@/components/Avatar";
 import { EventItem } from "@/components/EventItem";
+import { FollowButton } from "@/components/FollowButton";
 import { ForVisitors } from "@/components/ForVisitors";
 import { LocalTime } from "@/components/LocalTime";
 import { getPublic } from "@/lib/api";
@@ -41,6 +42,7 @@ export default async function Team({ params }: Props) {
           {subtitle && <p className="muted" style={{ margin: 0 }}>{subtitle}</p>}
           {team.location?.address && <p className="muted" style={{ margin: 0 }}>{team.location.address}</p>}
         </div>
+        <FollowButton type="team" targetId={teamId} />
       </header>
       {team.description && <p className="bio">{team.description}</p>}
 
