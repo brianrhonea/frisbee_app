@@ -17,6 +17,16 @@ export class ApiError extends Error {
   }
 }
 
+/** GETs a public API route (`/v1/public/...`) from the browser; null if it fails. */
+export async function getPublicInBrowser<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(new URL(path, base));
+    return res.ok ? ((await res.json()) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Calls the API as the signed-in [user]: their Firebase ID token, and an
  * App Check token when this site has one. Answers are never cached.

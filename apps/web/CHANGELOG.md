@@ -4,6 +4,20 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.4.0 — 2026-11-12
+
+**Changed**
+- New layout with the app's five tabs: Home, Explore, Events, Teams and
+  Messages, in a left sidebar (icons only on tablets) and along the bottom
+  on phones. Members get a Profile link; Learn, About and Help sit under
+  the tabs; the account menu is at the bottom of the sidebar.
+- Wide screens show what's coming up, and a sign-up card for visitors, in
+  a right column.
+
+**Added**
+- Teams (`/teams`): your teams and groups; visitors get a sign-up prompt.
+- Messages (`/messages`): points to the app until messages come to the web.
+
 ## 0.3.1 â€” 2026-11-12
 
 **Fixed**

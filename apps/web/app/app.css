@@ -215,16 +215,6 @@ button.btn:disabled { opacity: 0.6; cursor: default; }
 }
 .version { opacity: 0.7; font-size: 0.85em; }
 
-/* Phones: the site links wrap onto a scrollable second row. */
-@media (max-width: 900px) {
-  .site-header .wrap { flex-wrap: wrap; height: auto; padding-top: 12px; row-gap: 6px; }
-  .site-header nav {
-    display: flex; order: 3; width: 100%; overflow-x: auto; gap: 20px;
-    padding-bottom: 10px; scrollbar-width: none;
-  }
-  .site-header nav a { white-space: nowrap; }
-}
-
 /* Likes and reposts (PostActions) and reposts' originals */
 .post-reposted { color: var(--muted); font-size: 0.85rem; margin-right: auto; }
 .post-original {
@@ -253,8 +243,7 @@ button.btn:disabled { opacity: 0.6; cursor: default; }
 .pager { flex-direction: column; align-items: center; gap: 8px; }
 .pager .empty { padding: 0; }
 
-/* Header: the current page, and members' account menu */
-.site-header nav a.active { color: var(--ink); }
+/* Members' account menu */
 .account-menu { position: relative; }
 .account-menu summary {
   display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none;
@@ -276,4 +265,94 @@ button.btn:disabled { opacity: 0.6; cursor: default; }
 .account-list a:hover, .account-list button:hover { background: var(--field); }
 @media (max-width: 560px) {
   .account-name { display: none; }
+}
+
+/* The frame (AppFrame): tabs in a left sidebar, the page, and upcoming
+   events on the right. Tablets get an icon-only sidebar; phones a top bar
+   and the tabs along the bottom, like the app. */
+.frame {
+  display: grid; grid-template-columns: 248px minmax(0, 1fr);
+  max-width: 1440px; margin: 0 auto; min-height: 100vh;
+}
+.frame.with-aside { grid-template-columns: 248px minmax(0, 1fr) 300px; }
+.frame-main { min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line); }
+.frame-main > main { flex: 1; }
+.frame.with-aside .frame-main { border-right: 1px solid var(--line); }
+.frame .wrap { width: min(var(--wrap), 100% - 40px); }
+
+.side-nav {
+  position: sticky; top: 0; height: 100vh; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 18px; padding: 18px 14px;
+  overflow-y: auto;
+}
+.side-nav .brand { padding: 4px 10px; }
+.side-tabs { display: grid; gap: 2px; }
+.nav-item {
+  display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 999px;
+  color: var(--ink-soft); text-decoration: none; font-weight: 600; font-size: 17px;
+}
+.nav-item:hover { background: var(--field); color: var(--ink); }
+.nav-item.active { color: var(--ink); font-weight: 800; background: var(--accent-soft); }
+.nav-item.active svg { color: var(--lime); }
+.side-secondary { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 0 12px; }
+.side-secondary a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 600; }
+.side-secondary a:hover { color: var(--ink); }
+.side-account { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding: 0 4px; }
+.side-account .account-list { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; }
+.side-account .account-menu summary { padding-right: 14px; }
+
+.frame-aside {
+  position: sticky; top: 0; height: 100vh; box-sizing: border-box; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px; padding: 20px 18px;
+}
+.frame-aside .card { padding: 16px 18px; }
+.aside-events { display: grid; gap: 10px; margin-bottom: 8px; }
+
+.top-bar, .tab-bar { display: none; }
+
+@media (max-width: 1200px) {
+  .frame.with-aside { grid-template-columns: 248px minmax(0, 1fr); }
+  .frame-aside { display: none; }
+  .frame.with-aside .frame-main { border-right: 0; }
+}
+
+/* Tablets: icons only. */
+@media (max-width: 1000px) {
+  .frame, .frame.with-aside { grid-template-columns: 76px minmax(0, 1fr); }
+  .side-nav { align-items: center; padding: 18px 8px; }
+  .side-nav .brand span, .nav-item span, .side-secondary, .side-account .account-name { display: none; }
+  .nav-item { padding: 12px; }
+  .side-account { padding: 0; align-items: center; }
+  .side-account .account-menu summary { padding: 4px; }
+  .side-account .account-menu summary::after { display: none; }
+  .side-account .link { font-size: 13px; }
+  .side-account .btn-small { padding: 8px 10px; font-size: 13px; }
+}
+
+/* Phones: a top bar, and the tabs along the bottom. */
+@media (max-width: 640px) {
+  .frame, .frame.with-aside { display: block; }
+  .side-nav { display: none; }
+  .frame-main { border: 0; }
+  .top-bar {
+    position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px;
+    height: 56px; padding: 0 16px; border-bottom: 1px solid var(--line);
+    background: var(--header-bg); backdrop-filter: saturate(160%) blur(14px);
+    -webkit-backdrop-filter: saturate(160%) blur(14px);
+  }
+  .top-bar .account-list { right: 0; }
+  .frame-main { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .tab-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    background: var(--header-bg); border-top: 1px solid var(--line);
+    backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px);
+  }
+  .tab-item {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0;
+    color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 600;
+  }
+  .tab-item.active { color: var(--ink); }
+  .tab-item.active svg { color: var(--lime); }
 }

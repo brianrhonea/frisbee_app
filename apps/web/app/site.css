@@ -104,23 +104,8 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
 
 :focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 
-/* Header --------------------------------------------------------------- */
+/* Brand and header actions --------------------------------------------------------------- */
 
-.site-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--header-bg);
-  backdrop-filter: saturate(160%) blur(14px);
-  -webkit-backdrop-filter: saturate(160%) blur(14px);
-  border-bottom: 1px solid var(--line);
-}
-.site-header .wrap {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-  height: 68px;
-}
 .brand {
   display: flex;
   align-items: center;
@@ -131,14 +116,6 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
   text-decoration: none;
 }
 .brand img { border-radius: 9px; }
-.site-header nav { display: flex; gap: 24px; }
-.site-header nav a {
-  color: var(--muted);
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 15px;
-}
-.site-header nav a:hover { color: var(--ink); }
 .header-actions {
   margin-left: auto;
   display: flex;
@@ -382,7 +359,6 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
   .phone { transform: none; }
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
   .band-inner { grid-template-columns: 1fr; padding: 36px 28px; }
-  .site-header nav { display: none; }
 }
 
 @media (max-width: 560px) {
