@@ -4,6 +4,13 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.3.1 — 2026-11-12
+
+**Fixed**
+- The build compiles `@stall10/shared` first, so it works on a fresh
+  checkout such as Vercel's (it failed with "Can't resolve
+  '@stall10/shared'").
+
 ## 0.3.0 — 2026-11-11
 
 **Added**
