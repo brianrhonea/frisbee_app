@@ -12,6 +12,7 @@ import '../ui/auth/widgets/choose_username_screen.dart';
 import '../ui/auth/widgets/sign_in_screen.dart';
 import '../ui/auth/widgets/sign_up_screen.dart';
 import '../ui/core/ui/view_model_host.dart';
+import '../ui/events/widgets/events_tabs.dart';
 import '../ui/home/view_models/home_viewmodel.dart';
 import '../ui/home/widgets/home_screen.dart';
 import '../ui/posts/view_models/post_detail_viewmodel.dart';
@@ -22,6 +23,11 @@ import '../ui/explore/widgets/rankings_screen.dart';
 import '../ui/explore/widgets/explore_screen.dart';
 import '../ui/profile/view_models/player_profile_viewmodel.dart';
 import '../ui/profile/widgets/profile_screen.dart';
+import '../ui/schedule/view_models/schedule_viewmodel.dart';
+import '../ui/schedule/widgets/schedule_screen.dart';
+import '../ui/shell/widgets/app_shell.dart';
+import '../ui/tournaments/view_models/hosted_tournaments_viewmodel.dart';
+import '../ui/tournaments/widgets/hosted_tournaments_list.dart';
 import '../ui/teams/view_models/team_home_viewmodel.dart';
 import '../ui/teams/view_models/team_search_viewmodel.dart';
 import '../ui/teams/widgets/team_home_screen.dart';
@@ -171,4 +177,41 @@ Widget postPage(GoRouterState state) {
       focusComment: state.uri.queryParameters['comment'] == '1',
     ),
   );
+}
+
+/// The Events tab: the user's schedule, or tournaments and leagues to find
+/// (`?view=find`), under the same tabs.
+Widget eventsPage(GoRouterState state) {
+  final view = EventsView.fromQuery(state.uri.queryParameters['view']);
+  final tabs = EventsTabs(selected: view);
+  return switch (view) {
+    EventsView.schedule => ViewModelHost(
+      key: const ValueKey('events-schedule'),
+      create: (c) => ScheduleViewModel(
+        authRepository: c.read(),
+        teamRepository: c.read(),
+        eventRepository: c.read(),
+        meetingRepository: c.read<MeetingRepository>(),
+      ),
+      builder: (context, vm) => ScheduleScreen(
+        viewModel: vm,
+        title: 'Events',
+        leading: ProfileButton.leading(context),
+        bottom: tabs,
+      ),
+    ),
+    EventsView.find => ViewModelHost(
+      key: const ValueKey('events-find'),
+      create: (c) => HostedTournamentsViewModel(
+        tournamentRepository: c.read(),
+        authRepository: c.read(),
+      ),
+      builder: (context, vm) => FindTournamentsScreen(
+        viewModel: vm,
+        title: 'Events',
+        leading: ProfileButton.leading(context),
+        bottom: tabs,
+      ),
+    ),
+  };
 }

@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/auth/auth_repository.dart';
-import '../data/repositories/meeting/meeting_repository.dart';
 import '../domain/models/model_utils.dart';
 import '../domain/models/team.dart';
 import '../ui/chat/view_models/chat_room_settings_viewmodel.dart';
@@ -46,11 +45,9 @@ import '../ui/teams/view_models/join_link_viewmodel.dart';
 import '../ui/teams/widgets/join_link_screen.dart';
 import '../ui/schedule/view_models/event_detail_viewmodel.dart';
 import '../ui/schedule/view_models/event_editor_viewmodel.dart';
-import '../ui/schedule/view_models/schedule_viewmodel.dart';
 import '../ui/schedule/view_models/my_event_detail_viewmodel.dart';
 import '../ui/schedule/widgets/event_detail_screen.dart';
 import '../ui/schedule/widgets/event_editor_screen.dart';
-import '../ui/schedule/widgets/schedule_screen.dart';
 import '../ui/schedule/widgets/my_event_detail_screen.dart';
 import '../ui/stats/view_models/game_tracker_viewmodel.dart';
 import '../ui/stats/view_models/stats_viewmodel.dart';
@@ -571,23 +568,9 @@ GoRouter router(AuthRepository auth) => GoRouter(
         ),
       ),
       branches: [
-        // Community: the feed and the user's schedule.
+        // Home: the feed.
         StatefulShellBranch(
-          routes: [
-            GoRoute(path: Routes.home, builder: (_, _) => homePage()),
-            GoRoute(
-              path: Routes.schedule,
-              builder: (_, _) => ViewModelHost(
-                create: (c) => ScheduleViewModel(
-                  authRepository: c.read(),
-                  teamRepository: c.read(),
-                  eventRepository: c.read(),
-                  meetingRepository: c.read<MeetingRepository>(),
-                ),
-                builder: (_, vm) => ScheduleScreen(viewModel: vm),
-              ),
-            ),
-          ],
+          routes: [GoRoute(path: Routes.home, builder: (_, _) => homePage())],
         ),
         // Explore: search and player profiles.
         StatefulShellBranch(
@@ -611,7 +594,16 @@ GoRouter router(AuthRepository auth) => GoRouter(
             ),
           ],
         ),
-        // My team: the user's teams and every team page.
+        // Events: the user's schedule, and tournaments and leagues to find.
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: Routes.schedule,
+              builder: (_, state) => eventsPage(state),
+            ),
+          ],
+        ),
+        // Teams: the user's teams and communities, and every team page.
         StatefulShellBranch(
           routes: [
             GoRoute(

@@ -26,7 +26,12 @@ abstract final class Routes {
   static const createGroup = '/teams/new?kind=community';
   static const createCommunity = '/teams/new?kind=organization';
   static const searchTeams = '/teams/search';
+
+  /// The Events tab: the user's schedule.
   static const schedule = '/schedule';
+
+  /// The Events tab's tournaments and leagues to find.
+  static const findEvents = '/schedule?view=find';
   static const profile = '/profile';
 
   /// Settings, sliding over the page; its sections open from it.

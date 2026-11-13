@@ -16,7 +16,7 @@ import '../view_models/player_search_viewmodel.dart';
 import 'explore_cards.dart';
 import '../../core/ui/app_search_field.dart';
 import '../../core/ui/skeleton.dart';
-import '../../shell/widgets/app_shell.dart' show SearchField;
+import '../../shell/widgets/app_shell.dart' show ProfileButton, SearchField;
 
 /// Explore: search players, teams, groups and tournaments in one box; see
 /// upcoming tournaments, recent results and rankings; and jump to
@@ -106,7 +106,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget build(BuildContext context) {
     final mobile = ScreenSize.of(context).isMobile;
     return Scaffold(
-      appBar: mobile ? AppBar(title: const Text('Explore')) : null,
+      appBar: mobile
+          ? AppBar(
+              leading: ProfileButton.leading(context),
+              title: const Text('Explore'),
+            )
+          : null,
       body: PageScroll(
         children: [
           if (!mobile)

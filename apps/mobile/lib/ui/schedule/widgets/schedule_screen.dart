@@ -9,11 +9,23 @@ import '../view_models/schedule_viewmodel.dart';
 import 'event_editor_screen.dart';
 import 'schedule_widgets.dart';
 
-/// Schedule tab: a week of personal and team events, day by day.
+/// A week of personal and team events, day by day: the Events tab's
+/// schedule.
 class ScheduleScreen extends StatefulWidget {
-  const ScheduleScreen({super.key, required this.viewModel});
+  const ScheduleScreen({
+    super.key,
+    required this.viewModel,
+    this.title = 'Schedule',
+    this.leading,
+    this.bottom,
+  });
 
   final ScheduleViewModel viewModel;
+
+  /// The app bar's title, leading widget and bottom (the Events tabs).
+  final String title;
+  final Widget? leading;
+  final PreferredSizeWidget? bottom;
 
   @override
   State<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -77,7 +89,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Schedule'),
+        leading: widget.leading,
+        title: Text(widget.title),
+        bottom: widget.bottom,
         actions: [
           ListenableBuilder(
             listenable: vm,

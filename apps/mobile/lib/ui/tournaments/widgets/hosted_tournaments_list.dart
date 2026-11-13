@@ -163,16 +163,29 @@ class HostedTournamentsSection extends StatelessWidget {
 
 /// Upcoming tournaments anyone can find, apply to or follow.
 class FindTournamentsScreen extends StatelessWidget {
-  const FindTournamentsScreen({super.key, required this.viewModel});
+  const FindTournamentsScreen({
+    super.key,
+    required this.viewModel,
+    this.title = 'Tournaments & leagues',
+    this.leading,
+    this.bottom,
+  });
 
   final HostedTournamentsViewModel viewModel;
+
+  /// The app bar's title, leading widget and bottom (the Events tabs).
+  final String title;
+  final Widget? leading;
+  final PreferredSizeWidget? bottom;
 
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tournaments & leagues'),
+        leading: leading,
+        title: Text(title),
+        bottom: bottom,
         actions: [
           TextButton.icon(
             onPressed: () => context.push(Routes.hostEvent),

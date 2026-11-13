@@ -6,6 +6,7 @@ import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
+import '../../shell/widgets/app_shell.dart' show ProfileButton;
 import '../view_models/teams_viewmodel.dart';
 import 'join_team_dialog.dart';
 
@@ -84,6 +85,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: ProfileButton.leading(context),
         title: const Text('Teams'),
         actions: [
           IconButton(

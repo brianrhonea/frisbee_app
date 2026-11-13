@@ -19,6 +19,7 @@ import '../../core/ui/scroll_to_top.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/user_avatar.dart';
 import '../../core/ui/view_model_host.dart';
+import '../../shell/widgets/app_shell.dart' show ProfileButton;
 import '../view_models/direct_chat_viewmodel.dart';
 import '../view_models/inbox_viewmodel.dart';
 import 'direct_chat_screen.dart';
@@ -44,6 +45,7 @@ class InboxScreen extends StatelessWidget {
     if (size.isMobile) {
       return Scaffold(
         appBar: AppBar(
+          leading: ProfileButton.leading(context),
           title: const Text('Messages'),
           actions: [
             IconButton(

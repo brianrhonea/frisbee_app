@@ -470,11 +470,42 @@ void main() {
     expect(sent.text, contains('/p/p1'));
   });
 
+  testWidgets('the Events tab has the schedule and events to find', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tapText(tester, 'Events');
+    expect(find.text('My schedule'), findsOneWidget);
+    expect(find.text('New event'), findsOneWidget);
+
+    await tapText(tester, 'Find events');
+    expect(find.byTooltip('Next week'), findsNothing);
+    expect(find.text('Host'), findsOneWidget);
+
+    // Back on Home and returning, Events keeps its place.
+    await tapText(tester, 'Home');
+    await tapText(tester, 'Events');
+    expect(find.text('Host'), findsOneWidget);
+  });
+
+  testWidgets('the avatar opens the profile, which has no tab', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    expect(find.text('Profile'), findsNothing);
+    await tester.tap(find.byTooltip('My profile'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PlayerProfileScreen), findsOneWidget);
+    // The tabs are still there to leave by.
+    await tapText(tester, 'Home');
+    expect(find.byType(HomeScreen), findsOneWidget);
+  });
+
   testWidgets('a team left on its roster does not hijack event links', (
     tester,
   ) async {
     await pumpApp(tester);
-    await tapText(tester, 'Team');
+    await tapText(tester, 'Teams');
     await tapText(tester, 'Northside Flyers');
     await tapText(tester, 'Roster');
     expect(find.byType(RosterTab), findsOneWidget);
@@ -488,7 +519,7 @@ void main() {
 
     // The Teams tab kept its place on the roster tab; Overview returns to
     // the team summary on the same page.
-    await tapText(tester, 'Team');
+    await tapText(tester, 'Teams');
     expect(find.byType(RosterTab), findsOneWidget);
     await tapText(tester, 'Overview');
     expect(find.byType(RosterTab), findsNothing);
@@ -497,7 +528,7 @@ void main() {
 
   testWidgets('events from the team home page return to it', (tester) async {
     await pumpApp(tester);
-    await tapText(tester, 'Team');
+    await tapText(tester, 'Teams');
     await tapText(tester, 'Northside Flyers');
     expect(find.byType(TeamHomeScreen), findsOneWidget);
     await tapText(tester, 'Team practice');
@@ -509,7 +540,7 @@ void main() {
 
   testWidgets('events from Team Events return to it', (tester) async {
     await pumpApp(tester);
-    await tapText(tester, 'Team');
+    await tapText(tester, 'Teams');
     await tapText(tester, 'Northside Flyers');
     await tapText(tester, 'Team Events');
     // The tab shows in place on the team page, as a list with no calendar.

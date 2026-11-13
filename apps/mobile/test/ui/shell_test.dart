@@ -19,23 +19,20 @@ void main() {
       for (final c in breadcrumbs(path, name)) c.path,
     ];
 
-    expect(labels('/home'), ['Community']);
+    expect(labels('/home'), ['Home']);
     expect(labels('/messages'), ['Messages']);
     expect(labels('/explore'), ['Explore']);
+    expect(labels('/schedule'), ['Events']);
     expect(links('/explore'), [null], reason: "you're already there");
 
     // Pages opened from Explore lead back to it.
     expect(labels('/players/u2'), ['Explore', 'Player']);
 
-    expect(labels('/teams/t1'), ['My teams', 'Cascades']);
-    expect(labels('/teams/t1/roster'), ['My teams', 'Cascades', 'Roster']);
+    expect(labels('/teams/t1'), ['Teams', 'Cascades']);
+    expect(labels('/teams/t1/roster'), ['Teams', 'Cascades', 'Roster']);
     expect(links('/teams/t1/roster'), [Routes.teams, Routes.team('t1'), null]);
-    expect(labels('/teams/t1?section=roster'), [
-      'My teams',
-      'Cascades',
-      'Roster',
-    ]);
-    expect(labels('/teams/t9'), ['My teams', 'Team']);
+    expect(labels('/teams/t1?section=roster'), ['Teams', 'Cascades', 'Roster']);
+    expect(labels('/teams/t9'), ['Teams', 'Team']);
 
     expect(labels('/rankings?d=club-mixed'), ['Explore', 'Rankings']);
     expect(links('/rankings'), [Routes.explorePath, null]);

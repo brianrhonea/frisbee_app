@@ -17,11 +17,13 @@ import 'command_palette.dart';
 import 'notification_offers.dart';
 
 /// The app's top-level sections, in the order of the router's shell
-/// branches.
+/// branches. The first five are the tabs (docs/product-spec.md §3); the
+/// profile opens from the user's avatar instead.
 enum ShellSection {
-  community('Community', 'Home', Icons.home_outlined, Icons.home_rounded),
+  community('Home', 'Home', Icons.home_outlined, Icons.home_rounded),
   explore('Explore', 'Explore', Icons.explore_outlined, Icons.explore),
-  team('My team', 'Team', Icons.groups_outlined, Icons.groups_rounded),
+  events('Events', 'Events', Icons.event_outlined, Icons.event),
+  team('Teams', 'Teams', Icons.groups_outlined, Icons.groups_rounded),
   messages(
     'Messages',
     'Messages',
@@ -43,6 +45,9 @@ enum ShellSection {
   final String shortLabel;
   final IconData icon;
   final IconData activeIcon;
+
+  /// The sections shown as tabs: all but the profile.
+  static final tabs = values.where((s) => s != profile).toList();
 }
 
 /// The frame around every top-level page: a sidebar on desktops, an icon
@@ -102,24 +107,28 @@ class AppShell extends StatelessWidget {
       listenable: viewModel,
       builder: (context, _) {
         if (size.isMobile) {
+          // On the profile (not a tab) no tab looks selected: the bar needs
+          // an index, so tab 0 gets the unselected look.
+          final onTab = _section != ShellSection.profile;
+          final bar = NavigationBar(
+            selectedIndex: onTab ? _section.index : 0,
+            onDestinationSelected: (i) => _select(ShellSection.tabs[i]),
+            destinations: [
+              for (final s in ShellSection.tabs)
+                NavigationDestination(
+                  icon: _badged(s, Icon(s.icon)),
+                  selectedIcon: _badged(s, Icon(onTab ? s.activeIcon : s.icon)),
+                  label: s.shortLabel,
+                ),
+            ],
+          );
           return Scaffold(
             body: navigationShell,
             bottomNavigationBar: DecoratedBox(
               decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: c.border)),
               ),
-              child: NavigationBar(
-                selectedIndex: _section.index,
-                onDestinationSelected: (i) => _select(ShellSection.values[i]),
-                destinations: [
-                  for (final s in ShellSection.values)
-                    NavigationDestination(
-                      icon: _badged(s, Icon(s.icon)),
-                      selectedIcon: _badged(s, Icon(s.activeIcon)),
-                      label: s.shortLabel,
-                    ),
-                ],
-              ),
+              child: onTab ? bar : _unselected(context, bar),
             ),
           );
         }
@@ -156,6 +165,22 @@ class AppShell extends StatelessWidget {
     ),
   );
 
+  /// [bar] with its selected tab drawn like the others.
+  Widget _unselected(BuildContext context, NavigationBar bar) {
+    final theme = NavigationBarTheme.of(context);
+    final unselected = <WidgetState>{};
+    return NavigationBarTheme(
+      data: theme.copyWith(
+        indicatorColor: Colors.transparent,
+        labelTextStyle: WidgetStatePropertyAll(
+          theme.labelTextStyle?.resolve(unselected),
+        ),
+        iconTheme: WidgetStatePropertyAll(theme.iconTheme?.resolve(unselected)),
+      ),
+      child: bar,
+    );
+  }
+
   Widget _badged(ShellSection s, Widget icon) {
     final count = s == ShellSection.messages ? viewModel.unreadMessages : 0;
     return Badge(isLabelVisible: count > 0, label: Text('$count'), child: icon);
@@ -177,14 +202,14 @@ List<Crumb> breadcrumbs(String path, String? Function(String id) teamName) {
     if (uri.pathSegments.length == 2 && uri.pathSegments.first == 'teams')
       ?uri.queryParameters['section'],
   ];
-  const community = (label: 'Community', path: Routes.home);
+  const community = (label: 'Home', path: Routes.home);
   final explore = (label: 'Explore', path: Routes.explorePath);
-  const myTeams = (label: 'My teams', path: Routes.teams);
+  const myTeams = (label: 'Teams', path: Routes.teams);
   Crumb here(String label) => (label: label, path: null);
 
   final trail = switch (parts.firstOrNull) {
     null || 'home' => [community],
-    'schedule' => [community, here('Schedule')],
+    'schedule' => [(label: 'Events', path: Routes.schedule)],
     'explore' => [explore],
     'players' => [explore, here('Player')],
     'rankings' => [explore, here('Rankings')],
@@ -263,7 +288,7 @@ class _Sidebar extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 children: [
-                  for (final s in ShellSection.values)
+                  for (final s in ShellSection.tabs)
                     _SidebarItem(
                       icon: s.icon,
                       label: s.label,
@@ -282,12 +307,6 @@ class _Sidebar extends StatelessWidget {
                         team: t,
                         onTap: () => context.go(Routes.team(t.id)),
                       ),
-                    _SidebarItem(
-                      icon: Icons.calendar_today_outlined,
-                      label: 'Team calendar',
-                      dense: true,
-                      onTap: () => context.go(Routes.schedule),
-                    ),
                   ],
                 ],
               ),
@@ -354,7 +373,6 @@ class _SidebarItem extends StatelessWidget {
     required this.onTap,
     this.selected = false,
     this.count = 0,
-    this.dense = false,
   });
 
   final IconData icon;
@@ -362,7 +380,6 @@ class _SidebarItem extends StatelessWidget {
   final VoidCallback onTap;
   final bool selected;
   final int count;
-  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -378,20 +395,17 @@ class _SidebarItem extends StatelessWidget {
           hoverColor: c.onSidebar.withValues(alpha: 0.06),
           onTap: onTap,
           child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: dense ? 8 : 11,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
             child: Row(
               children: [
-                Icon(icon, size: dense ? 16 : 19, color: fg),
+                Icon(icon, size: 19, color: fg),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     label,
                     style: TextStyle(
                       color: fg,
-                      fontSize: dense ? 12.5 : 13.5,
+                      fontSize: 13.5,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
@@ -549,7 +563,7 @@ class _Rail extends StatelessWidget {
               child: const AppLogo(size: 34),
             ),
             const SizedBox(height: 22),
-            for (final s in ShellSection.values)
+            for (final s in ShellSection.tabs)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Tooltip(
@@ -758,11 +772,13 @@ class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final unread = maybeShellViewModel(context)?.unreadNotifications ?? 0;
+    final avatar = ProfileButton.leading(context);
     return AppBar(
       backgroundColor: c.sidebar,
       foregroundColor: c.onSidebar,
       automaticallyImplyLeading: false,
-      titleSpacing: 16,
+      leading: avatar,
+      titleSpacing: avatar == null ? 16 : 0,
       title: InkWell(
         onTap: () => context.go(Routes.home),
         child: AppWordmark(size: 28, color: c.onSidebar),
@@ -777,6 +793,38 @@ class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
         NotificationsButton(count: unread, color: c.onSidebar),
         const SizedBox(width: 4),
       ],
+    );
+  }
+}
+
+/// The user's avatar at the top left of a tab's first page on phones: it
+/// opens their profile and settings, which have no tab of their own.
+/// Nothing on larger screens, where the top bar has the avatar, or outside
+/// the app frame.
+class ProfileButton extends StatelessWidget {
+  const ProfileButton({super.key});
+
+  /// [ProfileButton] as an app bar's leading widget, or null where it shows
+  /// nothing (so the bar keeps its default back button).
+  static Widget? leading(BuildContext context) =>
+      ScreenSize.of(context).isMobile && maybeShellViewModel(context) != null
+      ? const ProfileButton()
+      : null;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = maybeShellViewModel(context);
+    if (vm == null || !ScreenSize.of(context).isMobile) {
+      return const SizedBox.shrink();
+    }
+    return IconButton(
+      tooltip: 'My profile',
+      onPressed: () => context.go(Routes.profile),
+      icon: PersonAvatar(
+        name: vm.userName,
+        photoUrl: vm.user?.photoUrl,
+        radius: 15,
+      ),
     );
   }
 }
