@@ -19,7 +19,8 @@ comments, follows, notifications and settings. Needs API 0.4.0.
   Enter sends.
 - **Follow** players, teams and groups from their pages, with a bell for
   post notifications; private profiles get "Ask to follow" and
-  "Requested".
+  "Requested". (Approved followers still see a private profile's page as
+  private here; the app shows it.)
 - **Notifications** (`/notifications`), live, with filters, an unread
   badge in the sidebar, mark-as-read as you look, follow back, and clear.
 - **Settings** (`/settings`): profile details, privacy and what your

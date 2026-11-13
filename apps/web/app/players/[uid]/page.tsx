@@ -49,8 +49,8 @@ export default async function Player({ params }: Props) {
           <div className="card">
             <h2 className="card-title">This profile is private</h2>
             <p className="muted small">
-              {first} shares their stats, teams and posts with the people they approve. Ask to follow, and once{" "}
-              {first} accepts, their posts show up in your Home feed.
+              {first} shares their stats, teams and posts with the people they approve. Ask to follow, and{" "}
+              {first} can accept you.
             </p>
           </div>
         </DashboardLayout>
