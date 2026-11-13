@@ -17,10 +17,10 @@ const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something 
 
 /**
  * A post's likes, reposts and comments. Members like and repost here (a
- * repost's go to its original, as in the app) and reply in the app;
- * visitors are asked to sign up.
+ * repost's go to its original, as in the app) and open the comments with
+ * [onComment]; visitors are asked to sign up.
  */
-export function PostActions({ post }: { post: PublicPost }) {
+export function PostActions({ post, onComment }: { post: PublicPost; onComment?: () => void }) {
   const { user } = useAuth();
   // What likes and reposts count toward: the post, or a repost's original.
   const target = post.repostOf ? post.original : post;
@@ -127,10 +127,13 @@ export function PostActions({ post }: { post: PublicPost }) {
             <span aria-hidden="true">↻</span> {plural(repostCount, "repost", "reposts")}
           </button>
         )}
-        {comments}
-        <Link className="post-join" href={`/p/${encodeURIComponent(target.id)}`}>
-          Reply in the app
-        </Link>
+        {onComment ? (
+          <button type="button" className="post-action" onClick={onComment}>
+            <span aria-hidden="true">💬</span> {plural(target.commentCount ?? 0, "comment", "comments")}
+          </button>
+        ) : (
+          comments
+        )}
       </footer>
       {composing && !reposted && (
         <form

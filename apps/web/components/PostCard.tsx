@@ -1,6 +1,12 @@
+"use client";
 import type { PublicPost } from "@stall10/shared";
 import Link from "next/link";
+import { type ReactNode, useState } from "react";
+import { ApiError, callApi } from "@/lib/client";
+import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
+import { Comments } from "./Comments";
+import { Composer } from "./Composer";
 import { LocalTime } from "./LocalTime";
 import { MemberImage } from "./MemberImage";
 import { PostActions } from "./PostActions";
@@ -28,8 +34,21 @@ function linkLabel(url: string): string {
 /** Only web links become anchors (never javascript: or other schemes). */
 const isWebLink = (url: string) => /^https?:\/\//i.test(url);
 
+/** The post's kind, as the posts rule names them. */
+const kindOf = (p: PublicPost) => (p.repostOf ? "repost" : p.workout ? "workout" : p.event ? "event" : "text");
+
 /** Who wrote [post] and when, linking to their profile and the post. */
-function PostHead({ post, standalone, note }: { post: PublicPost; standalone: boolean; note?: string }) {
+function PostHead({
+  post,
+  standalone,
+  note,
+  menu,
+}: {
+  post: PublicPost;
+  standalone: boolean;
+  note?: string;
+  menu?: ReactNode;
+}) {
   const author = post.authorName || "A player";
   const who = (
     <>
@@ -55,6 +74,7 @@ function PostHead({ post, standalone, note }: { post: PublicPost; standalone: bo
           {time}
         </Link>
       )}
+      {menu}
     </header>
   );
 }
@@ -118,26 +138,94 @@ function PostContent({ post }: { post: PublicPost }) {
   );
 }
 
+/** Edit and delete, for the post's author. */
+function OwnerMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  return (
+    <details className="post-menu">
+      <summary aria-label="Post options">⋯</summary>
+      <div className="menu-list">
+        <button
+          type="button"
+          onClick={(e) => {
+            (e.currentTarget.closest("details") as HTMLDetailsElement).open = false;
+            onEdit();
+          }}
+        >
+          Edit
+        </button>
+        <button type="button" className="danger" onClick={onDelete}>
+          Delete
+        </button>
+      </div>
+    </details>
+  );
+}
+
 /**
  * A player's post. A repost shows the reposter's note over the original
- * as it is now, as the app does. `standalone` drops the link to itself.
- * Likes and reposts (PostActions) follow whoever is signed in.
+ * as it is now, as the app does. `standalone` (the post's own page) drops
+ * the link to itself and opens its comments. Its author edits or deletes
+ * it in place; members like, repost and comment (PostActions, Comments).
  */
-export function PostCard({ post, standalone = false }: { post: PublicPost; standalone?: boolean }) {
+export function PostCard({ post: initial, standalone = false }: { post: PublicPost; standalone?: boolean }) {
+  const { user } = useAuth();
+  const [post, setPost] = useState(initial);
+  const [editing, setEditing] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const [showComments, setShowComments] = useState(standalone);
+  const [error, setError] = useState<string | null>(null);
+
+  if (deleted) return null;
+  const mine = !!user && user.uid === post.authorId;
+  const target = post.repostOf ? post.original : post;
+
+  async function remove() {
+    if (!user || !confirm(post.repostOf ? "Take back this repost?" : "Delete this post? This can't be undone.")) return;
+    setError(null);
+    try {
+      await callApi(user, `/v1/posts/${encodeURIComponent(post.id)}`, { method: "DELETE" });
+      setDeleted(true);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't delete it. Try again.");
+    }
+  }
+
+  const menu = mine && !editing ? <OwnerMenu onEdit={() => setEditing(true)} onDelete={() => void remove()} /> : undefined;
+  const editor = editing && (
+    <Composer
+      editing={{ id: post.id, body: post.body ?? "", links: post.links ?? [], images: post.images ?? [], kind: kindOf(post) }}
+      autoFocus
+      onCancel={() => setEditing(false)}
+      onSaved={(r) => {
+        setPost((p) => ({ ...p, images: r.images.map((i) => ({ ...i, url: p.images?.find((x) => x.path === i.path)?.url ?? "" })) }));
+        setEditing(false);
+      }}
+    />
+  );
+  const footer = (
+    <>
+      <PostActions post={post} onComment={target ? () => setShowComments((s) => !s) : undefined} />
+      {error && <p className="post-error">{error}</p>}
+      {showComments && target && (
+        <Comments postId={target.id} postAuthorId={target.authorId} autoFocus={!standalone} />
+      )}
+    </>
+  );
+
   if (!post.repostOf) {
     return (
       <article className="post">
-        <PostHead post={post} standalone={standalone} />
-        <PostContent post={post} />
-        <PostActions post={post} />
+        <PostHead post={post} standalone={standalone} menu={menu} />
+        {editor || <PostContent post={post} />}
+        {footer}
       </article>
     );
   }
   const original = post.original;
   return (
     <article className="post">
-      <PostHead post={post} standalone={standalone} note="reposted" />
-      {post.body && <p className="post-body">{post.body}</p>}
+      <PostHead post={post} standalone={standalone} note="reposted" menu={menu} />
+      {editor || (post.body && <p className="post-body">{post.body}</p>)}
       {original ? (
         <div className="post-original">
           <PostHead post={original} standalone={false} />
@@ -148,7 +236,7 @@ export function PostCard({ post, standalone = false }: { post: PublicPost; stand
           {post.repostOf.authorName ? `${post.repostOf.authorName}'s post` : "This post"} was deleted.
         </p>
       )}
-      <PostActions post={post} />
+      {footer}
     </article>
   );
 }

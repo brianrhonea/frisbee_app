@@ -51,5 +51,6 @@ export async function callApi<T>(user: User, path: string, init: { method?: stri
     const body = (await res.json().catch(() => null)) as ApiErrorBody | null;
     throw new ApiError(body?.error.message ?? "Something went wrong. Try again.", res.status, body?.error.code, body?.error.fields);
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }

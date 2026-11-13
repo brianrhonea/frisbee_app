@@ -2,13 +2,14 @@
 import { type FirebaseApp, getApps, initializeApp } from "firebase/app";
 import { type AppCheck, getToken, initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { type Auth, connectAuthEmulator, getAuth } from "firebase/auth";
+import { connectFirestoreEmulator, type Firestore, getFirestore } from "firebase/firestore";
 import { connectStorageEmulator, type FirebaseStorage, getStorage } from "firebase/storage";
 
 /**
- * Firebase in the browser: signing in, App Check, and reading stored photos
- * the member may see (Storage's rules decide). App data is read and written
- * through the API (lib/client.ts); live listeners (chat, live stats) will
- * read Firestore directly, as ARCHITECTURE.md §4 allows.
+ * Firebase in the browser: signing in, App Check, reading stored photos the
+ * member may see (Storage's rules decide), and the member area's reads from
+ * Firestore (lib/live.ts), which the rules guard as they do for the app.
+ * Every write goes through the API (lib/client.ts; ARCHITECTURE.md §4).
  *
  * Config comes from NEXT_PUBLIC_FIREBASE_* (apps/web/.env.local, or the
  * Vercel project's environment variables). The web API key ends up in the
@@ -28,6 +29,7 @@ export const authConfigured = Boolean(config.apiKey && config.projectId);
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let storage: FirebaseStorage | undefined;
+let db: Firestore | undefined;
 let appCheck: AppCheck | null | undefined;
 
 function firebaseApp(): FirebaseApp {
@@ -61,19 +63,43 @@ export function firebaseStorage(): FirebaseStorage | null {
 }
 
 /**
- * An App Check token for API calls, when this deployment has a reCAPTCHA
- * Enterprise site key (NEXT_PUBLIC_RECAPTCHA_SITE_KEY). Without one the
- * API only accepts the call while ENFORCE_APP_CHECK is off.
+ * Firestore, or null without config. Starts App Check first when this site
+ * has a site key, so reads carry its token if the project enforces it.
  */
-export async function appCheckToken(): Promise<string | null> {
+export function firestoreDb(): Firestore | null {
+  if (!authConfigured) return null;
+  if (!db) {
+    startAppCheck();
+    db = getFirestore(firebaseApp());
+    const emulator = process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST;
+    if (emulator) {
+      const [host, port] = emulator.split(":");
+      connectFirestoreEmulator(db, host, Number(port));
+    }
+  }
+  return db;
+}
+
+function startAppCheck(): AppCheck | null {
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   if (!authConfigured || !siteKey) return null;
   appCheck ??= initializeAppCheck(firebaseApp(), {
     provider: new ReCaptchaEnterpriseProvider(siteKey),
     isTokenAutoRefreshEnabled: true,
   });
+  return appCheck;
+}
+
+/**
+ * An App Check token for API calls, when this deployment has a reCAPTCHA
+ * Enterprise site key (NEXT_PUBLIC_RECAPTCHA_SITE_KEY). Without one the
+ * API only accepts the call while ENFORCE_APP_CHECK is off.
+ */
+export async function appCheckToken(): Promise<string | null> {
+  const check = startAppCheck();
+  if (!check) return null;
   try {
-    return (await getToken(appCheck)).token;
+    return (await getToken(check)).token;
   } catch {
     return null;
   }

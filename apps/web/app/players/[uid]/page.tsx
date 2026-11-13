@@ -2,6 +2,7 @@ import type { ProfilePage, StatTotals } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cache } from "react";
+import { FollowButton } from "@/components/FollowButton";
 import { ForVisitors } from "@/components/ForVisitors";
 import { LocalTime } from "@/components/LocalTime";
 import { PostCard } from "@/components/PostCard";
@@ -39,13 +40,7 @@ export default async function Player({ params }: Props) {
   const name = profile.name || "Player";
   const first = name.split(" ")[0];
   const seasons = Object.entries(profile.stats ?? {}).sort(([a], [b]) => b.localeCompare(a));
-  const follow = (
-    <ForVisitors>
-      <Link className="btn btn-primary btn-small" href={`/sign-up?next=${encodeURIComponent(`/players/${uid}`)}`}>
-        Sign up to follow
-      </Link>
-    </ForVisitors>
-  );
+  const follow = <FollowButton targetId={uid} isPrivate={profile.private} signUpNext={`/players/${uid}`} />;
 
   if (profile.private) {
     return (
@@ -54,8 +49,8 @@ export default async function Player({ params }: Props) {
           <div className="card">
             <h2 className="card-title">This profile is private</h2>
             <p className="muted small">
-              {first} shares their stats, teams and posts with the people they approve. Ask to follow in the Stall 10
-              app.
+              {first} shares their stats, teams and posts with the people they approve. Ask to follow, and once{" "}
+              {first} accepts, their posts show up in your Home feed.
             </p>
           </div>
         </DashboardLayout>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
 import { listingSubtitle } from "@/lib/site";
+import { Composer } from "./Composer";
 import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
 import { PostCard } from "./PostCard";
@@ -120,6 +121,10 @@ export function Dashboard({ user }: { user: User }) {
               ))}
             </div>
           )}
+        </div>
+
+        <div className="card composer-card">
+          <Composer onSaved={() => void load()} />
         </div>
 
         <h2 className="section-title">Your feed</h2>

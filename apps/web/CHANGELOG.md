@@ -4,7 +4,39 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
-## 0.4.0 � 2026-11-12
+## 0.5.0 — 2026-11-12
+
+Website parity, slice W1 (`docs/product-spec.md` §8.1): posting,
+comments, follows, notifications and settings. Needs API 0.4.0.
+
+**Added**
+- **Write posts** from Home: words, up to 4 photos (choose, drag in or
+  paste; they upload while you type, through `/v1/uploads`) and up to 5
+  links. Ctrl+Enter posts.
+- **Edit and delete** your posts from the ⋯ menu, in place.
+- **Comments** under every post, live: comment, reply (one level deep),
+  like, edit and delete your own; the post's author can delete any.
+  Enter sends.
+- **Follow** players, teams and groups from their pages, with a bell for
+  post notifications; private profiles get "Ask to follow" and
+  "Requested".
+- **Notifications** (`/notifications`), live, with filters, an unread
+  badge in the sidebar, mark-as-read as you look, follow back, and clear.
+- **Settings** (`/settings`): profile details, privacy and what your
+  profile shows, people you follow (a table with notification switches),
+  and follow requests.
+- Keyboard: `n` writes a post, `/` searches, `g` then `h`/`e`/`v`/`t`/`m`/`n`
+  goes to Home, Explore, Events, Teams, Messages or Notifications.
+
+**Changed**
+- Member pages read Firestore in the browser (live), as the app does;
+  every write goes through the API. `NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST`
+  points them at the emulator.
+
+**Fixed**
+- This changelog's 0.4.0 heading had a stray Windows-1252 byte.
+
+## 0.4.0 — 2026-11-12
 
 **Changed**
 - New layout with the app's five tabs: Home, Explore, Events, Teams and

@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { type ReactNode, useEffect } from "react";
 import { useAuth } from "./AuthProvider";
 import { HeaderAuth } from "./HeaderAuth";
 import { NavIcon, type NavIconName } from "./NavIcons";
+import { useUnreadCount } from "./Notifications";
 import { UpcomingAside } from "./UpcomingAside";
 
 type Tab = { href: string; label: string; icon: NavIconName; also?: string[] };
@@ -29,6 +30,47 @@ const secondary = [
 /** Pages that read best at full width, without the right column. */
 const fullWidth = ["/sign-in", "/sign-up", "/about", "/get-the-app", "/join", "/g", "/p"];
 
+/** Typing in a field, where single-key shortcuts mustn't fire. */
+function typing(target: EventTarget | null) {
+  const el = target as HTMLElement | null;
+  return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
+}
+
+/**
+ * Site-wide keys: `n` writes a post (Home's composer), `/` searches
+ * (Explore), `g` then a tab's first letter goes there.
+ */
+function useShortcuts(signedIn: boolean) {
+  const router = useRouter();
+  useEffect(() => {
+    let pendingG = 0;
+    const go: Record<string, string> = { h: "/", e: "/explore", v: "/events", t: "/teams", m: "/messages", n: "/notifications" };
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
+      if (pendingG && Date.now() - pendingG < 1200 && go[e.key]) {
+        pendingG = 0;
+        e.preventDefault();
+        router.push(go[e.key]!);
+        return;
+      }
+      pendingG = e.key === "g" ? Date.now() : 0;
+      if (e.key === "/") {
+        e.preventDefault();
+        const search = document.querySelector<HTMLInputElement>("input[type=search]");
+        if (search) search.focus();
+        else router.push("/explore");
+      } else if (e.key === "n" && signedIn) {
+        const composer = document.querySelector<HTMLTextAreaElement>(".composer textarea");
+        e.preventDefault();
+        if (composer) composer.focus();
+        else router.push("/");
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router, signedIn]);
+}
+
 const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 
 function isActive(path: string, tab: Tab) {
@@ -47,6 +89,9 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   const profile = user ? `/players/${encodeURIComponent(user.uid)}` : null;
   // Home has its own "Coming up" column, for visitors and members alike.
   const aside = path !== "/" && !fullWidth.some((p) => under(path, p));
+  const unread = useUnreadCount();
+  useShortcuts(!!user);
+  const badge = unread > 0 ? <span className="count-badge">{unread > 99 ? "99+" : unread}</span> : null;
 
   const tabLinks = (className: string) =>
     tabs.map((t) => {
@@ -73,6 +118,19 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
         </Link>
         <nav aria-label="Site" className="side-tabs">
           {tabLinks("nav-item")}
+          {user && (
+            <Link
+              href="/notifications"
+              className={path === "/notifications" ? "nav-item active" : "nav-item"}
+              aria-current={path === "/notifications" ? "page" : undefined}
+            >
+              <span className="icon-wrap">
+                <NavIcon name="bell" />
+                {badge}
+              </span>
+              <span>Notifications</span>
+            </Link>
+          )}
           {profile && (
             <Link
               href={profile}
@@ -81,6 +139,16 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
             >
               <NavIcon name="profile" />
               <span>Profile</span>
+            </Link>
+          )}
+          {user && (
+            <Link
+              href="/settings"
+              className={under(path, "/settings") ? "nav-item active" : "nav-item"}
+              aria-current={under(path, "/settings") ? "page" : undefined}
+            >
+              <NavIcon name="settings" />
+              <span>Settings</span>
             </Link>
           )}
         </nav>
@@ -103,6 +171,12 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
             <span>Stall 10</span>
           </Link>
           <div className="header-actions">
+            {user && (
+              <Link href="/notifications" className="icon-btn icon-wrap" aria-label={`Notifications${unread ? ` (${unread} new)` : ""}`}>
+                <NavIcon name="bell" />
+                {badge}
+              </Link>
+            )}
             <HeaderAuth />
           </div>
         </header>
