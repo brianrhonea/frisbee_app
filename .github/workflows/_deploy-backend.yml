@@ -2,6 +2,10 @@
 # Firebase backend (rules, indexes, hosting and the named function groups)
 # from one commit to one project.
 #
+# Monorepo: Firebase lives in firebase/ and the Flutter app in apps/mobile.
+# Release tags from before the move (rollbacks) have them at the repo root;
+# the Layout step picks the right paths for whichever commit is checked out.
+#
 # Hosting includes the website's Flutter web app (scripts/build_site.sh,
 # run by firebase.json's predeploy). It needs the Firebase web API key as the
 # repository secret FIREBASE_WEB_API_KEY_DEV / _PROD (the
@@ -55,14 +59,24 @@ jobs:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
 
+      - name: Layout
+        run: |
+          if [ -f firebase/firebase.json ]; then
+            echo "FB_DIR=firebase" >> "$GITHUB_ENV"
+            echo "MOBILE_DIR=apps/mobile" >> "$GITHUB_ENV"
+          else
+            echo "FB_DIR=." >> "$GITHUB_ENV"
+            echo "MOBILE_DIR=." >> "$GITHUB_ENV"
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: functions/package-lock.json
+          cache-dependency-path: '**/functions/package-lock.json'
 
       - name: Build and test functions
-        working-directory: functions
+        working-directory: ${{ env.FB_DIR }}/functions
         run: |
           npm ci
           npm run build
@@ -70,7 +84,7 @@ jobs:
 
       # For the website (scripts/build_site.sh); older commits don't have it.
       - name: Set up Flutter
-        if: hashFiles('scripts/build_site.sh') != ''
+        if: hashFiles('scripts/build_site.sh', 'firebase/scripts/build_site.sh') != ''
         uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -86,14 +100,19 @@ jobs:
         env:
           WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
         run: |
+          cd "$FB_DIR"
           targets="firestore:rules,firestore:indexes,storage"
           if [ ! -f scripts/build_site.sh ]; then
             targets="$targets,hosting"
+          elif [ ! -d "$GITHUB_WORKSPACE/$MOBILE_DIR/web" ]; then
+            # The Flutter web target is gone; the site moves to Vercel (apps/web).
+            echo "::warning::apps/mobile/web was removed; hosting (the website) left as deployed."
           elif [ -z "$WEB_API_KEY" ]; then
             echo "::warning::No FIREBASE_WEB_API_KEY_${PROJECT^^} secret; hosting (the website) left as deployed."
           else
             # The website's build reads the same keys as a local secrets file.
             file=$([ "$PROJECT" = prod ] && echo secrets.prod.local.json || echo secrets.local.json)
+            file="$GITHUB_WORKSPACE/$MOBILE_DIR/$file"
             jq -n --arg env "$PROJECT" --arg key "$WEB_API_KEY"               '{FIREBASE_ENV: $env, FIREBASE_WINDOWS_API_KEY: $key}' > "$file"
             targets="$targets,hosting"
           fi

@@ -3,6 +3,12 @@
 `codemagic.yaml` builds the app on a cloud Mac, signs it, and uploads it to
 TestFlight. These are the one-time setup steps, in order.
 
+The app lives in `apps/mobile` (monorepo; see `ARCHITECTURE.md`). Paths
+below such as `ios/Runner/...` and `secrets.local.json` are relative to
+`apps/mobile`; Codemagic runs every script there (`working_directory`).
+Pushes that change nothing under `apps/mobile/` or `packages/` skip the
+build.
+
 ## 1. Apple Developer Program
 
 1. Enroll at <https://developer.apple.com/programs/enroll/> ($99/year).

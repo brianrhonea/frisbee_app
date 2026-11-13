@@ -1,0 +1,151 @@
+[
+  {
+    "case": "team",
+    "team": {
+      "name": "The Haze",
+      "division": "open",
+      "level": "club",
+      "city": "Austin",
+      "ownerId": "u1"
+    },
+    "listing": {
+      "name": "The Haze",
+      "division": "open",
+      "level": "club",
+      "city": "Austin",
+      "keywords": [
+        "t",
+        "th",
+        "the",
+        "h",
+        "ha",
+        "haz",
+        "haze",
+        "a",
+        "au",
+        "aus",
+        "aust",
+        "austi",
+        "austin"
+      ]
+    }
+  },
+  {
+    "case": "official team without a city",
+    "team": {
+      "name": "Stall 10",
+      "division": "mixed",
+      "level": "league",
+      "official": true
+    },
+    "listing": {
+      "name": "Stall 10",
+      "division": "mixed",
+      "level": "league",
+      "city": "",
+      "official": true,
+      "keywords": [
+        "s",
+        "st",
+        "sta",
+        "stal",
+        "stall",
+        "1",
+        "10"
+      ]
+    }
+  },
+  {
+    "case": "open group with a location",
+    "team": {
+      "name": "Austin Pickup",
+      "division": "mixed",
+      "level": "pickup",
+      "city": "Austin",
+      "kind": "community",
+      "description": "Sundays",
+      "requiresApproval": false,
+      "location": {
+        "address": "Zilker",
+        "lat": 30.2,
+        "lng": -97.7
+      }
+    },
+    "listing": {
+      "name": "Austin Pickup",
+      "division": "mixed",
+      "level": "pickup",
+      "city": "Austin",
+      "kind": "community",
+      "description": "Sundays",
+      "requiresApproval": false,
+      "location": {
+        "address": "Zilker",
+        "lat": 30.2,
+        "lng": -97.7
+      },
+      "keywords": [
+        "a",
+        "au",
+        "aus",
+        "aust",
+        "austi",
+        "austin",
+        "p",
+        "pi",
+        "pic",
+        "pick",
+        "picku",
+        "pickup"
+      ]
+    }
+  },
+  {
+    "case": "private community hides its location",
+    "team": {
+      "name": "St. Mary’s High",
+      "division": "women",
+      "level": "youth",
+      "city": "New York",
+      "kind": "organization",
+      "description": "Go Saints",
+      "requiresApproval": true,
+      "location": {
+        "address": "1 Main St",
+        "lat": 40.7,
+        "lng": -74.0
+      }
+    },
+    "listing": {
+      "name": "St. Mary’s High",
+      "division": "women",
+      "level": "youth",
+      "city": "New York",
+      "kind": "organization",
+      "description": "Go Saints",
+      "requiresApproval": true,
+      "location": null,
+      "keywords": [
+        "s",
+        "st",
+        "m",
+        "ma",
+        "mar",
+        "mary",
+        "mary’",
+        "mary’s",
+        "h",
+        "hi",
+        "hig",
+        "high",
+        "n",
+        "ne",
+        "new",
+        "y",
+        "yo",
+        "yor",
+        "york"
+      ]
+    }
+  }
+]

@@ -1,0 +1,142 @@
+{
+  "case": "team made in a community",
+  "teamId": "team5",
+  "owner": {
+    "uid": "u5",
+    "displayName": "Coach K"
+  },
+  "org": {
+    "id": "org1",
+    "name": "St. Mary’s High"
+  },
+  "request": {
+    "name": "St. Mary’s JV",
+    "division": "women",
+    "level": "youth",
+    "city": "New York"
+  },
+  "docs": {
+    "teams/team5": {
+      "name": "St. Mary’s JV",
+      "division": "women",
+      "level": "youth",
+      "city": "New York",
+      "orgId": "org1",
+      "orgName": "St. Mary’s High",
+      "ownerId": "u5",
+      "members": {
+        "u5": "owner"
+      },
+      "memberIds": [
+        "u5"
+      ],
+      "memberNames": {
+        "u5": "Coach K"
+      },
+      "createdAt": "<serverTimestamp>"
+    },
+    "teamDirectory/team5": {
+      "name": "St. Mary’s JV",
+      "division": "women",
+      "level": "youth",
+      "city": "New York",
+      "keywords": [
+        "s",
+        "st",
+        "m",
+        "ma",
+        "mar",
+        "mary",
+        "mary’",
+        "mary’s",
+        "j",
+        "jv",
+        "n",
+        "ne",
+        "new",
+        "y",
+        "yo",
+        "yor",
+        "york"
+      ]
+    },
+    "teams/team5/chats/general": {
+      "name": "General",
+      "readRoles": [
+        "everyone"
+      ],
+      "writeRoles": [
+        "everyone"
+      ],
+      "readUsers": [],
+      "writeUsers": [],
+      "folderId": null,
+      "position": 0,
+      "kind": "text",
+      "createdBy": "u5",
+      "createdAt": "<serverTimestamp>"
+    },
+    "teams/team5/chatFolders/voice": {
+      "name": "Voice Channels",
+      "position": 1000,
+      "readRoles": [
+        "everyone"
+      ],
+      "writeRoles": [
+        "everyone"
+      ],
+      "readUsers": [],
+      "writeUsers": [],
+      "createdBy": "u5",
+      "createdAt": "<serverTimestamp>"
+    },
+    "teams/team5/chats/voice-lounge": {
+      "name": "Lounge",
+      "readRoles": [
+        "everyone"
+      ],
+      "writeRoles": [
+        "everyone"
+      ],
+      "readUsers": [],
+      "writeUsers": [],
+      "folderId": "voice",
+      "position": 0,
+      "kind": "voice",
+      "createdBy": "u5",
+      "createdAt": "<serverTimestamp>"
+    },
+    "teams/team5/chats/voice-sideline": {
+      "name": "Sideline",
+      "readRoles": [
+        "everyone"
+      ],
+      "writeRoles": [
+        "everyone"
+      ],
+      "readUsers": [],
+      "writeUsers": [],
+      "folderId": "voice",
+      "position": 1,
+      "kind": "voice",
+      "createdBy": "u5",
+      "createdAt": "<serverTimestamp>"
+    },
+    "teams/team5/chats/voice-film": {
+      "name": "Film Room",
+      "readRoles": [
+        "everyone"
+      ],
+      "writeRoles": [
+        "everyone"
+      ],
+      "readUsers": [],
+      "writeUsers": [],
+      "folderId": "voice",
+      "position": 2,
+      "kind": "voice",
+      "createdBy": "u5",
+      "createdAt": "<serverTimestamp>"
+    }
+  }
+}

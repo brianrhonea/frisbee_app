@@ -1,0 +1,278 @@
+[
+  {
+    "name": "TX B.Q.Q.",
+    "words": [
+      "texas",
+      "bqq"
+    ],
+    "key": "texasbqq",
+    "probe": [
+      "bqq"
+    ],
+    "keywords": [
+      "t",
+      "tx",
+      "b",
+      "q"
+    ]
+  },
+  {
+    "name": "Texas BQQ",
+    "words": [
+      "texas",
+      "bqq"
+    ],
+    "key": "texasbqq",
+    "probe": [
+      "bqq"
+    ],
+    "keywords": [
+      "t",
+      "te",
+      "tex",
+      "texa",
+      "texas",
+      "b",
+      "bq",
+      "bqq"
+    ]
+  },
+  {
+    "name": "The Haze",
+    "words": [
+      "haze"
+    ],
+    "key": "haze",
+    "probe": [
+      "haze"
+    ],
+    "keywords": [
+      "t",
+      "th",
+      "the",
+      "h",
+      "ha",
+      "haz",
+      "haze"
+    ]
+  },
+  {
+    "name": "St. Mary’s High",
+    "words": [
+      "saint",
+      "marys",
+      "high"
+    ],
+    "key": "saintmaryshigh",
+    "probe": [
+      "saint",
+      "st"
+    ],
+    "keywords": [
+      "s",
+      "st",
+      "m",
+      "ma",
+      "mar",
+      "mary",
+      "mary’",
+      "mary’s",
+      "h",
+      "hi",
+      "hig",
+      "high"
+    ]
+  },
+  {
+    "name": "New York Ultimate Club",
+    "words": [
+      "newyork",
+      "ultimate",
+      "club"
+    ],
+    "key": "newyorkultimateclub",
+    "probe": [
+      "newyork",
+      "ny",
+      "new"
+    ],
+    "keywords": [
+      "n",
+      "ne",
+      "new",
+      "y",
+      "yo",
+      "yor",
+      "york",
+      "u",
+      "ul",
+      "ult",
+      "ulti",
+      "ultim",
+      "ultima",
+      "ultimat",
+      "ultimate",
+      "c",
+      "cl",
+      "clu",
+      "club"
+    ]
+  },
+  {
+    "name": "univ of NC",
+    "words": [
+      "university",
+      "of",
+      "northcarolina"
+    ],
+    "key": "universityofnorthcarolina",
+    "probe": [
+      "northcarolina",
+      "nc",
+      "north"
+    ],
+    "keywords": [
+      "u",
+      "un",
+      "uni",
+      "univ",
+      "o",
+      "of",
+      "n",
+      "nc"
+    ]
+  },
+  {
+    "name": "Fish & Chips",
+    "words": [
+      "fish",
+      "and",
+      "chips"
+    ],
+    "key": "fishandchips",
+    "probe": [
+      "chips"
+    ],
+    "keywords": [
+      "f",
+      "fi",
+      "fis",
+      "fish",
+      "&",
+      "c",
+      "ch",
+      "chi",
+      "chip",
+      "chips"
+    ]
+  },
+  {
+    "name": "constructor",
+    "words": [
+      "constructor"
+    ],
+    "key": "constructor",
+    "probe": [
+      "constructor"
+    ],
+    "keywords": [
+      "c",
+      "co",
+      "con",
+      "cons",
+      "const",
+      "constr",
+      "constru",
+      "construc",
+      "construct",
+      "constructo",
+      "constructor"
+    ]
+  },
+  {
+    "name": "Mixed",
+    "words": [
+      "mixed"
+    ],
+    "key": "mixed",
+    "probe": [
+      "mixed"
+    ],
+    "keywords": [
+      "m",
+      "mi",
+      "mix",
+      "mixe",
+      "mixed"
+    ]
+  },
+  {
+    "name": "A-B-C dEF_ghi.jkl",
+    "words": [
+      "abc",
+      "def",
+      "ghi",
+      "jkl"
+    ],
+    "key": "abcdefghijkl",
+    "probe": [
+      "abc"
+    ],
+    "keywords": [
+      "a",
+      "b",
+      "c",
+      "d",
+      "de",
+      "def",
+      "g",
+      "gh",
+      "ghi",
+      "j",
+      "jk",
+      "jkl"
+    ]
+  },
+  {
+    "name": "Supercalifragilisticexpialidocious Disc Club",
+    "words": [
+      "supercalifragilisticexpialidocious",
+      "disc",
+      "club"
+    ],
+    "key": "supercalifragilisticexpialidociousdiscclub",
+    "probe": [
+      "supercalifragilistic"
+    ],
+    "keywords": [
+      "s",
+      "su",
+      "sup",
+      "supe",
+      "super",
+      "superc",
+      "superca",
+      "supercal",
+      "supercali",
+      "supercalif",
+      "supercalifr",
+      "supercalifra",
+      "supercalifrag",
+      "supercalifragi",
+      "supercalifragil",
+      "supercalifragili",
+      "supercalifragilis",
+      "supercalifragilist",
+      "supercalifragilisti",
+      "supercalifragilistic",
+      "d",
+      "di",
+      "dis",
+      "disc",
+      "c",
+      "cl",
+      "clu",
+      "club"
+    ]
+  }
+]

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.brianrhonea.frisbee_app",
+      "sha256_cert_fingerprints": [
+        "04:FF:73:6F:4B:14:4B:A4:60:0B:DF:BB:C5:6D:32:02:71:93:76:E3:AC:A5:39:9F:B1:70:0A:85:A9:C0:E6:2E"
+      ]
+    }
+  }
+]

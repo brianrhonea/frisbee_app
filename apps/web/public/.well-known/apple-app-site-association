@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["UR7V8Z48NR.com.brianrhonea.frisbeeApp"],
+        "components": [
+          { "/": "/join/*", "comment": "Join a team with its invite code" },
+          { "/": "/g/*", "comment": "Open a community group" },
+          { "/": "/p/*", "comment": "Open a post" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,571 @@
+[
+  {
+    "case": "team",
+    "teamId": "team1",
+    "owner": {
+      "uid": "u1",
+      "displayName": "Pat Lee",
+      "email": "pat@x.test"
+    },
+    "request": {
+      "name": "TX B.Q.Q.",
+      "division": "mixed",
+      "level": "club",
+      "city": "Austin"
+    },
+    "docs": {
+      "teams/team1": {
+        "name": "TX B.Q.Q.",
+        "division": "mixed",
+        "level": "club",
+        "city": "Austin",
+        "ownerId": "u1",
+        "members": {
+          "u1": "owner"
+        },
+        "memberIds": [
+          "u1"
+        ],
+        "memberNames": {
+          "u1": "Pat Lee"
+        },
+        "createdAt": "<serverTimestamp>"
+      },
+      "teamDirectory/team1": {
+        "name": "TX B.Q.Q.",
+        "division": "mixed",
+        "level": "club",
+        "city": "Austin",
+        "keywords": [
+          "t",
+          "tx",
+          "b",
+          "q",
+          "a",
+          "au",
+          "aus",
+          "aust",
+          "austi",
+          "austin"
+        ]
+      },
+      "teams/team1/chats/general": {
+        "name": "General",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": null,
+        "position": 0,
+        "kind": "text",
+        "createdBy": "u1",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/team1/chatFolders/voice": {
+        "name": "Voice Channels",
+        "position": 1000,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "createdBy": "u1",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/team1/chats/voice-lounge": {
+        "name": "Lounge",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 0,
+        "kind": "voice",
+        "createdBy": "u1",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/team1/chats/voice-sideline": {
+        "name": "Sideline",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 1,
+        "kind": "voice",
+        "createdBy": "u1",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/team1/chats/voice-film": {
+        "name": "Film Room",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 2,
+        "kind": "voice",
+        "createdBy": "u1",
+        "createdAt": "<serverTimestamp>"
+      }
+    }
+  },
+  {
+    "case": "league team, owner without a display name",
+    "teamId": "team2",
+    "owner": {
+      "uid": "u2",
+      "email": "sam@x.test"
+    },
+    "request": {
+      "name": "The Haze",
+      "division": "open",
+      "level": "league",
+      "leagueId": "league1"
+    },
+    "docs": {
+      "teams/team2": {
+        "name": "The Haze",
+        "division": "open",
+        "level": "league",
+        "city": "",
+        "leagueId": "league1",
+        "ownerId": "u2",
+        "members": {
+          "u2": "owner"
+        },
+        "memberIds": [
+          "u2"
+        ],
+        "memberNames": {
+          "u2": "sam@x.test"
+        },
+        "createdAt": "<serverTimestamp>"
+      },
+      "teamDirectory/team2": {
+        "name": "The Haze",
+        "division": "open",
+        "level": "league",
+        "city": "",
+        "keywords": [
+          "t",
+          "th",
+          "the",
+          "h",
+          "ha",
+          "haz",
+          "haze"
+        ]
+      },
+      "teams/team2/chats/general": {
+        "name": "General",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": null,
+        "position": 0,
+        "kind": "text",
+        "createdBy": "u2",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/team2/chatFolders/voice": {
+        "name": "Voice Channels",
+        "position": 1000,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "createdBy": "u2",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/team2/chats/voice-lounge": {
+        "name": "Lounge",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 0,
+        "kind": "voice",
+        "createdBy": "u2",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/team2/chats/voice-sideline": {
+        "name": "Sideline",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 1,
+        "kind": "voice",
+        "createdBy": "u2",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/team2/chats/voice-film": {
+        "name": "Film Room",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 2,
+        "kind": "voice",
+        "createdBy": "u2",
+        "createdAt": "<serverTimestamp>"
+      }
+    }
+  },
+  {
+    "case": "open community group with a location",
+    "teamId": "group1",
+    "owner": {
+      "uid": "u3"
+    },
+    "request": {
+      "name": "Austin Pickup",
+      "division": "mixed",
+      "level": "pickup",
+      "city": "Austin",
+      "kind": "community",
+      "description": "Sundays at the park.",
+      "requiresApproval": false,
+      "location": {
+        "address": "Zilker Park",
+        "lat": 30.2669,
+        "lng": -97.7729
+      }
+    },
+    "docs": {
+      "teams/group1": {
+        "name": "Austin Pickup",
+        "division": "mixed",
+        "level": "pickup",
+        "city": "Austin",
+        "kind": "community",
+        "description": "Sundays at the park.",
+        "requiresApproval": false,
+        "location": {
+          "address": "Zilker Park",
+          "lat": 30.2669,
+          "lng": -97.7729
+        },
+        "ownerId": "u3",
+        "members": {
+          "u3": "owner"
+        },
+        "memberIds": [
+          "u3"
+        ],
+        "memberNames": {
+          "u3": "Player"
+        },
+        "createdAt": "<serverTimestamp>"
+      },
+      "teamDirectory/group1": {
+        "name": "Austin Pickup",
+        "division": "mixed",
+        "level": "pickup",
+        "city": "Austin",
+        "kind": "community",
+        "description": "Sundays at the park.",
+        "requiresApproval": false,
+        "location": {
+          "address": "Zilker Park",
+          "lat": 30.2669,
+          "lng": -97.7729
+        },
+        "keywords": [
+          "a",
+          "au",
+          "aus",
+          "aust",
+          "austi",
+          "austin",
+          "p",
+          "pi",
+          "pic",
+          "pick",
+          "picku",
+          "pickup"
+        ]
+      },
+      "teams/group1/chats/general": {
+        "name": "General",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": null,
+        "position": 0,
+        "kind": "text",
+        "createdBy": "u3",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/group1/chatFolders/voice": {
+        "name": "Voice Channels",
+        "position": 1000,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "createdBy": "u3",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/group1/chats/voice-lounge": {
+        "name": "Lounge",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 0,
+        "kind": "voice",
+        "createdBy": "u3",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/group1/chats/voice-sideline": {
+        "name": "Sideline",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 1,
+        "kind": "voice",
+        "createdBy": "u3",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/group1/chats/voice-film": {
+        "name": "Film Room",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 2,
+        "kind": "voice",
+        "createdBy": "u3",
+        "createdAt": "<serverTimestamp>"
+      }
+    }
+  },
+  {
+    "case": "private school community hides its location",
+    "teamId": "org1",
+    "owner": {
+      "uid": "u4",
+      "displayName": "Coach K"
+    },
+    "request": {
+      "name": "St. Mary’s High",
+      "division": "women",
+      "level": "youth",
+      "city": "New York",
+      "kind": "organization",
+      "description": "",
+      "requiresApproval": true,
+      "location": {
+        "address": "1 Main St",
+        "lat": 40.7128,
+        "lng": -74.006
+      }
+    },
+    "docs": {
+      "teams/org1": {
+        "name": "St. Mary’s High",
+        "division": "women",
+        "level": "youth",
+        "city": "New York",
+        "kind": "organization",
+        "description": "",
+        "requiresApproval": true,
+        "location": {
+          "address": "1 Main St",
+          "lat": 40.7128,
+          "lng": -74.006
+        },
+        "ownerId": "u4",
+        "members": {
+          "u4": "owner"
+        },
+        "memberIds": [
+          "u4"
+        ],
+        "memberNames": {
+          "u4": "Coach K"
+        },
+        "createdAt": "<serverTimestamp>"
+      },
+      "teamDirectory/org1": {
+        "name": "St. Mary’s High",
+        "division": "women",
+        "level": "youth",
+        "city": "New York",
+        "kind": "organization",
+        "description": "",
+        "requiresApproval": true,
+        "location": null,
+        "keywords": [
+          "s",
+          "st",
+          "m",
+          "ma",
+          "mar",
+          "mary",
+          "mary’",
+          "mary’s",
+          "h",
+          "hi",
+          "hig",
+          "high",
+          "n",
+          "ne",
+          "new",
+          "y",
+          "yo",
+          "yor",
+          "york"
+        ]
+      },
+      "teams/org1/chats/general": {
+        "name": "General",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": null,
+        "position": 0,
+        "kind": "text",
+        "createdBy": "u4",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/org1/chatFolders/voice": {
+        "name": "Voice Channels",
+        "position": 1000,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "createdBy": "u4",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/org1/chats/voice-lounge": {
+        "name": "Lounge",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 0,
+        "kind": "voice",
+        "createdBy": "u4",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/org1/chats/voice-sideline": {
+        "name": "Sideline",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 1,
+        "kind": "voice",
+        "createdBy": "u4",
+        "createdAt": "<serverTimestamp>"
+      },
+      "teams/org1/chats/voice-film": {
+        "name": "Film Room",
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ],
+        "readUsers": [],
+        "writeUsers": [],
+        "folderId": "voice",
+        "position": 2,
+        "kind": "voice",
+        "createdBy": "u4",
+        "createdAt": "<serverTimestamp>"
+      }
+    }
+  }
+]

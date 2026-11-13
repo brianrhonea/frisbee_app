@@ -1,0 +1,240 @@
+# Shared by deploy-api.yml and rollback-api.yml: puts one API image on the
+# Cloud Run service `api` in one Firebase project, with the configuration in
+# apps/api/deploy/service.yaml. One-time setup per project: apps/api/DEPLOY.md.
+#
+# Deploys build the image from `ref`, push it to Artifact Registry and tag
+# the commit api-release-<env>-<time>; the tag's message records the image
+# digest. Rollbacks pass that digest as `image` and skip the build.
+#
+# Signing in to Google Cloud: Workload Identity Federation when the
+# repository variable GCP_WIF_PROVIDER_<ENV> is set (with
+# GCP_DEPLOYER_SA_<ENV>), so no key is stored in GitHub; otherwise the
+# existing FIREBASE_SA_<ENV> key secret, given the roles in DEPLOY.md.
+#
+# Repository variables (Settings → Secrets and variables → Actions →
+# Variables), all optional:
+#   API_REGION                  Cloud Run and Artifact Registry region (us-central1)
+#   API_CORS_ORIGINS_DEV/_PROD  browser origins allowed to call the API
+#   API_ENFORCE_APP_CHECK_DEV/_PROD   "true" to turn away requests without App Check
+#   API_MAX_INSTANCES_DEV/_PROD       instance cap (3 dev, 10 prod)
+#   GCP_WIF_PROVIDER_DEV/_PROD, GCP_DEPLOYER_SA_DEV/_PROD
+
+name: Deploy API (shared)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: dev or prod
+        required: true
+        type: string
+      ref:
+        description: Commit, branch or tag (its service.yaml is used; built unless image is set)
+        required: true
+        type: string
+      image:
+        description: Image digest to deploy instead of building (rollbacks)
+        required: false
+        type: string
+        default: ""
+      tag:
+        description: Tag the deployed commit as an API release
+        required: true
+        type: boolean
+      reason:
+        required: false
+        type: string
+        default: ""
+    secrets:
+      GCP_SA_KEY:
+        description: FIREBASE_SA_DEV or _PROD, when not using Workload Identity Federation
+        required: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Prod needs a reviewer's approval: Settings → Environments → prod →
+    # Required reviewers (the same environment the backend deploy uses).
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: write # to push the release tag
+      id-token: write # Workload Identity Federation
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Settings
+        id: cfg
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          REGION_VAR: ${{ vars.API_REGION }}
+          CORS_DEV: ${{ vars.API_CORS_ORIGINS_DEV }}
+          CORS_PROD: ${{ vars.API_CORS_ORIGINS_PROD }}
+          APP_CHECK_DEV: ${{ vars.API_ENFORCE_APP_CHECK_DEV }}
+          APP_CHECK_PROD: ${{ vars.API_ENFORCE_APP_CHECK_PROD }}
+          MAX_DEV: ${{ vars.API_MAX_INSTANCES_DEV }}
+          MAX_PROD: ${{ vars.API_MAX_INSTANCES_PROD }}
+          WIF_DEV: ${{ vars.GCP_WIF_PROVIDER_DEV }}
+          WIF_PROD: ${{ vars.GCP_WIF_PROVIDER_PROD }}
+          SA_DEV: ${{ vars.GCP_DEPLOYER_SA_DEV }}
+          SA_PROD: ${{ vars.GCP_DEPLOYER_SA_PROD }}
+          HAS_KEY: ${{ secrets.GCP_SA_KEY != '' }}
+        run: |
+          # Picked per environment here, not with `a && b || c` expressions,
+          # so an unset prod value can never fall back to dev's.
+          case "$ENVIRONMENT" in
+            dev)  project=frisbee-app-brianrhonea-dev; cors="$CORS_DEV"
+                  appcheck="${APP_CHECK_DEV:-false}"; max="${MAX_DEV:-3}"
+                  wif="$WIF_DEV"; sa="$SA_DEV" ;;
+            prod) project=frisbee-app-brianrhonea; cors="$CORS_PROD"
+                  appcheck="${APP_CHECK_PROD:-false}"; max="${MAX_PROD:-10}"
+                  wif="$WIF_PROD"; sa="$SA_PROD" ;;
+            *) echo "::error::environment must be dev or prod"; exit 1 ;;
+          esac
+          # An unset variable reads as empty: dev falls back to localhost.
+          [ "$ENVIRONMENT" = dev ] && [ -z "$cors" ] && cors=http://localhost:3000
+          [ -z "$cors" ] && echo "::warning::API_CORS_ORIGINS_${ENVIRONMENT^^} is empty: no website can call the API from a browser."
+          case "$appcheck" in true|false) ;; *) echo "::error::API_ENFORCE_APP_CHECK_* must be true or false"; exit 1 ;; esac
+          if [ -n "$wif" ]; then
+            [ -n "$sa" ] || { echo "::error::GCP_WIF_PROVIDER_${ENVIRONMENT^^} is set but GCP_DEPLOYER_SA_${ENVIRONMENT^^} isn't."; exit 1; }
+            auth=wif
+          elif [ "$HAS_KEY" = true ]; then
+            auth=key
+          else
+            echo "::error::No way to sign in to $project: set GCP_WIF_PROVIDER_${ENVIRONMENT^^} (see apps/api/DEPLOY.md) or the FIREBASE_SA_${ENVIRONMENT^^} secret."
+            exit 1
+          fi
+          region="${REGION_VAR:-us-central1}"
+          {
+            echo "project=$project"
+            echo "region=$region"
+            echo "repo=$region-docker.pkg.dev/$project/stall10/api"
+            echo "runtime_sa=api-runtime@$project.iam.gserviceaccount.com"
+            echo "cors=$cors"
+            echo "appcheck=$appcheck"
+            echo "max=$max"
+            echo "auth=$auth"
+            echo "wif=$wif"
+            echo "sa=$sa"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        if: inputs.image == ''
+      - uses: actions/setup-node@v4
+        if: inputs.image == ''
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Test
+        if: inputs.image == ''
+        run: |
+          pnpm install --frozen-lockfile --filter "@stall10/api..."
+          pnpm --filter @stall10/shared build
+          pnpm --filter @stall10/shared --filter @stall10/api typecheck
+          pnpm --filter @stall10/shared --filter @stall10/api test
+
+      - name: Sign in to Google Cloud (Workload Identity Federation)
+        if: steps.cfg.outputs.auth == 'wif'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ steps.cfg.outputs.wif }}
+          service_account: ${{ steps.cfg.outputs.sa }}
+
+      - name: Sign in to Google Cloud (key secret)
+        if: steps.cfg.outputs.auth == 'key'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push the image
+        id: build
+        if: inputs.image == ''
+        env:
+          REPO: ${{ steps.cfg.outputs.repo }}
+          REGION: ${{ steps.cfg.outputs.region }}
+        run: |
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          sha=$(git rev-parse --short=12 HEAD)
+          DOCKER_BUILDKIT=1 docker build -f apps/api/Dockerfile --target api \
+            --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
+            -t "$REPO:$sha" .
+          docker push "$REPO:$sha"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$REPO:$sha")
+          echo "image=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        env:
+          PROJECT_ID: ${{ steps.cfg.outputs.project }}
+          REGION: ${{ steps.cfg.outputs.region }}
+          RUNTIME_SA: ${{ steps.cfg.outputs.runtime_sa }}
+          CORS_ORIGINS: ${{ steps.cfg.outputs.cors }}
+          ENFORCE_APP_CHECK: ${{ steps.cfg.outputs.appcheck }}
+          MAX_INSTANCES: ${{ steps.cfg.outputs.max }}
+          IMAGE: ${{ inputs.image || steps.build.outputs.image }}
+          REPO: ${{ steps.cfg.outputs.repo }}
+        run: |
+          case "$IMAGE" in "$REPO@sha256:"*) ;; *)
+            echo "::error::Not an image digest from $REPO: '$IMAGE'"; exit 1 ;;
+          esac
+          vars='${REGION} ${PROJECT_ID} ${RUNTIME_SA} ${IMAGE} ${CORS_ORIGINS} ${ENFORCE_APP_CHECK} ${MAX_INSTANCES}'
+          envsubst "$vars" < apps/api/deploy/service.yaml > "$RUNNER_TEMP/service.yaml"
+          cat "$RUNNER_TEMP/service.yaml"
+          gcloud run services replace "$RUNNER_TEMP/service.yaml" \
+            --project "$PROJECT_ID" --region "$REGION" --quiet
+          # Send all traffic to the new revision, even if an emergency
+          # rollback had pinned an older one (DEPLOY.md).
+          gcloud run services update-traffic api --to-latest \
+            --project "$PROJECT_ID" --region "$REGION" --quiet
+          url=$(gcloud run services describe api --project "$PROJECT_ID" --region "$REGION" --format 'value(status.url)')
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Check it answers
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 3 "$URL/health"
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 3 "$URL/ready"
+          # Unauthenticated writes get the API's JSON 401 (or 401 for App Check).
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' "$URL/v1/teams")
+          [ "$code" = 401 ] || { echo "::error::POST /v1/teams without a token answered $code, expected 401"; exit 1; }
+
+      - name: Tag the release
+        if: inputs.tag
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          IMAGE: ${{ steps.deploy.outputs.image }}
+        run: |
+          tag="api-release-$ENVIRONMENT-$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "API release to $ENVIRONMENT" -m "image: $IMAGE" HEAD
+          git push origin "$tag"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Summary
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          REF: ${{ inputs.ref }}
+          REASON: ${{ inputs.reason }}
+          URL: ${{ steps.deploy.outputs.url }}
+          IMAGE: ${{ steps.deploy.outputs.image }}
+          AUTH: ${{ steps.cfg.outputs.auth }}
+        run: |
+          {
+            echo "### API deployed to \`$ENVIRONMENT\`"
+            echo ""
+            echo "- URL: $URL"
+            echo "- Commit: \`$(git rev-parse --short HEAD)\` ($(git log -1 --format=%s))"
+            echo "- Ref: \`$REF\`"
+            echo "- Image: \`$IMAGE\`"
+            [ -n "${TAG:-}" ] && echo "- Release tag: \`$TAG\`"
+            [ -n "$REASON" ] && echo "- Reason: $REASON"
+            echo "- Signed in with: $AUTH"
+          } >> "$GITHUB_STEP_SUMMARY"

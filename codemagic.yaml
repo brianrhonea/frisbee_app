@@ -1,6 +1,11 @@
 # Codemagic CI: builds the iOS app on a cloud Mac. Setup steps are in
 # docs/ios-release.md.
 #
+# Monorepo: the Flutter app is in apps/mobile. Scripts run there
+# (working_directory); artifact paths stay relative to the repo root.
+# Pushes that only touch apps/api, apps/web, firebase/ or docs skip the build
+# (when: changeset); the first build after this is added always runs.
+#
 #   development branch -> TestFlight, talking to the dev Firebase project
 #                         (frisbee-app-brianrhonea-dev)
 #   main branch        -> App Store, talking to production
@@ -18,6 +23,7 @@ workflows:
     name: iOS TestFlight (dev)
     instance_type: mac_mini_m2
     max_build_duration: 60
+    working_directory: apps/mobile
     integrations:
       # Codemagic > Team settings > Integrations > Developer Portal.
       app_store_connect: Frisbee App Store Connect
@@ -48,6 +54,11 @@ workflows:
           include: true
           source: true
       cancel_previous_builds: true
+    when: &when
+      changeset:
+        includes:
+          - 'apps/mobile/'
+          - 'packages/'
     scripts: &scripts
       - name: Write secrets files
         script: |
@@ -93,7 +104,7 @@ workflows:
             --build-number="$BUILD_NUMBER" \
             --export-options-plist=/Users/builder/export_options.plist
     artifacts: &artifacts
-      - build/ios/ipa/*.ipa
+      - apps/mobile/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:

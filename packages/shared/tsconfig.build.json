@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // No Node types: the package also runs in the browser (apps/web).
+  "compilerOptions": { "rootDir": "src", "outDir": "dist", "types": [] },
+  "include": ["src"]
+}

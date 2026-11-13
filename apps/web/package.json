@@ -1,0 +1,25 @@
+{
+  "name": "@stall10/web",
+  "version": "0.3.1",
+  "private": true,
+  "description": "Stall 10 website (phase 3): Next.js on Vercel, talking only to apps/api. Replaces the Flutter web build in firebase/hosting.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "pnpm --filter @stall10/shared build && next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stall10/shared": "workspace:*",
+    "firebase": "^13.2.0",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.9.0"
+  }
+}

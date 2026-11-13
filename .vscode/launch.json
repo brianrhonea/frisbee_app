@@ -2,32 +2,44 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "frisbee_app",
+      "name": "mobile (dev)",
       "request": "launch",
       "type": "dart",
+      "cwd": "apps/mobile",
       "program": "lib/main.dart",
       "toolArgs": [
         "--dart-define-from-file=secrets.local.json"
       ]
     },
     {
-      "name": "frisbee_app (prod)",
+      "name": "mobile (prod)",
       "request": "launch",
       "type": "dart",
+      "cwd": "apps/mobile",
       "program": "lib/main.dart",
       "toolArgs": [
         "--dart-define-from-file=secrets.prod.local.json"
       ]
     },
     {
-      "name": "frisbee_app (emulators)",
+      "name": "mobile (emulators)",
       "request": "launch",
       "type": "dart",
+      "cwd": "apps/mobile",
       "program": "lib/main.dart",
       "toolArgs": [
         "--dart-define-from-file=secrets.local.json",
         "--dart-define=USE_EMULATORS=true"
       ]
+    },
+    {
+      "name": "api (dev)",
+      "request": "launch",
+      "type": "node",
+      "cwd": "${workspaceFolder}/apps/api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "console": "integratedTerminal"
     }
   ]
 }
