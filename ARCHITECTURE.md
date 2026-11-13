@@ -127,7 +127,7 @@ sequenceDiagram
 | Part | Owns | Doesn't |
 |---|---|---|
 | **apps/mobile** | UI, view models, local state and caches, Firebase Auth sign-in, App Check, push registration | Business rules or validation that matters for security; direct Firestore/Storage writes (being removed feature by feature) |
-| **apps/web** | Public pages (SEO), signed-out browsing, member web app (phase 3); server-rendered reads through the API's `/v1/public/*` | Writes or one-off reads outside the API. The browser uses Firebase for sign-in and, in the member area, the same live listeners as the app (chat, feeds, live stats) |
+| **apps/web** | Public pages (SEO), signed-out browsing, member web app (phase 3); server-rendered reads through the API's `/v1/public/*`; member reads from Firestore in the browser, as the app does (rules guard them), with listeners for live data | Writes outside the API |
 | **apps/api** | Authentication of every request (ID token), App Check, validation (zod), authorization (team roles and permissions), business logic, all Firestore and Storage access for clients, media upload URLs and compression, response caching | Long-running or event-driven work (that stays in functions) |
 | **packages/shared** | Wire types, zod schemas, error codes, pure logic shared by API and web (keywords, team-name rules) | Anything with I/O |
 | **firebase/** | Rules, indexes, Cloud Functions triggers and schedules, hosting of static pages | Client-facing request handling (new endpoints go in the API, not new callables) |
@@ -333,7 +333,7 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 |---|---|---|
 | **1. Monorepo** | Move the app to `apps/mobile`, Firebase to `firebase/`; fix CI (Codemagic, GitHub Actions), site build, docs | **Done** (`monorepo` branch) |
 | **2. API + iOS** | `apps/api` and `packages/shared`; migrate features from direct Firestore/Storage writes to the API one at a time (§10); media pipeline; deploy the API to Cloud Run; iOS releases on the new path | **Started**: API scaffold, team creation migrated |
-| **3. Website** | Build `apps/web` on Next.js against the API; move the domain from Firebase Hosting to Vercel; retire the Flutter web build (`firebase/scripts/build_site.sh`, `apps/mobile/web`, `lib/main_web.dart`, `lib/ui/web`) | **Started**: public site ported (feed, posts, profiles, teams, events, search, About/Help/legal, invite-link fallbacks, sign-in/sign-up); member area next; not deployed to Vercel yet |
+| **3. Website** | Build `apps/web` on Next.js against the API; move the domain from Firebase Hosting to Vercel; retire the Flutter web build (`firebase/scripts/build_site.sh`, `apps/mobile/web`, `lib/main_web.dart`, `lib/ui/web`) | **Started**: public site ported (feed, posts, profiles, teams, events, search, About/Help/legal, invite-link fallbacks, sign-in/sign-up); member area in progress, slice by slice (`docs/product-spec.md` §8.1, W1–W8); dev site on Vercel |
 
 **Transitional pieces** (kept on purpose until their phase):
 - `lib/main_web.dart`, `lib/ui/web`, `lib/ui/browse`,

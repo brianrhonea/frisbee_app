@@ -136,7 +136,59 @@ under Roster or More.
 Each step ships to TestFlight and the dev website from `development`
 before the next one starts.
 
+### 8.1 Website parity
+
+Signed-in members can do everything on the website that they can in the
+app (ARCHITECTURE.md §11 decision 4: the website is the desktop app). It
+runs alongside steps 2–5: each of those adds its website side once parity
+reaches its area.
+
+**Built for the web, not a copy of the app.** No porting of widgets or
+view models: pages are written for a mouse, a keyboard and a wide screen,
+with logic in hooks over `@stall10/shared` types.
+- The URL holds the state: tabs, filters, the open thread or section are
+  linkable and survive a reload.
+- Use the width: lists beside details (messages and rooms beside the
+  thread, the schedule beside the event), tables for rosters, stats and
+  standings, the right column for context.
+- Quick edits in place: inline composers, popovers and dialogs instead of
+  a new page for every form; drag and drop for uploads and the playbook.
+- Hover and focus states, keyboard shortcuts (`n` new post, `/` search,
+  `j`/`k` through lists, `Esc` closes).
+- Phones still work (the bottom tab bar), but desktop comes first.
+
+**Data.** Writes go through the API (ported rules, zod schemas in
+`packages/shared`, fakes and emulator tests: ARCHITECTURE.md §10's
+playbook). The app keeps writing directly and switches to each endpoint
+later behind its `use_api_*` flag, so slices aren't doubled; until then
+the Firestore rules stay as they are. Reads (decided 2026-11-12): the
+browser reads Firestore directly like the app, with listeners for live
+data, since the rules already guard reads; API GETs stay for the
+server-rendered public pages (`/v1/public/*`) and anything the rules
+can't express.
+
+**Slices**, each shipped end to end (API, website, ARCHITECTURE.md §10
+status, versions and changelogs):
+
+| # | Slice | Website | API work |
+|---|---|---|---|
+| W1 | Home and people | Home feed with tabs, compose (text, photos, video), comments, follow and requests, notifications, edit profile, settings | Create/edit/delete posts, comments, follows; first caller of `/v1/uploads` (§6) |
+| W2 | Teams hub | Feed, Schedule, Chat, Roster, More; join, invites, roles, settings; create a team or community | Team posts; membership is already in the API |
+| W3 | Events | My schedule and a calendar, create and edit events, RSVPs, polls | Events, RSVPs, polls |
+| W4 | Messages | DMs and team rooms side by side, reactions, edits, folders, read receipts | Send, edit, react; rooms and folders (reads stay listeners) |
+| W5 | Tournaments and leagues | Find, host, register, divisions, schedules, standings, hat drafts | Move the tournament callables into the API |
+| W6 | Playbook, videos, stats, workouts | Play editor (drag on a field), video library and player, stat entry and tables, workout log | Plays, videos, stats, workouts |
+| W7 | Meetings and voice | Join team meetings and voice rooms (LiveKit web SDK) | LiveKit tokens from the API instead of a callable |
+| W8 | Cut over | Move the domain to Vercel; keep `/join/:code`, `/g/:id`, `/p/:id` working | Fold the `browse` callables; remove the Flutter web code (`main_web.dart`, `lib/ui/web`, `lib/ui/browse`, `web_router.dart`, `build_site.sh`) |
+
+Libraries the website may add (none today): a small data cache for API
+reads and mutations, the Firestore web SDK for listeners, and LiveKit's
+web SDK in W7. Components stay hand-written CSS on the site's tokens.
+
 ## 9. Open questions
+
+- Before W1: if App Check is enforced for Firestore in the console,
+  browser reads need the reCAPTCHA site key (`NEXT_PUBLIC_RECAPTCHA_SITE_KEY`).
 
 - News articles: are official posts enough, or is a longer article format
   wanted for the website? (Start with posts.)
