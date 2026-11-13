@@ -58,16 +58,76 @@ changing them.
 
 ## Vercel
 
-- Root Directory `apps/web`. Vercel detects the pnpm workspace; if
-  `@stall10/shared` isn't built first, set the build command to
-  `pnpm --filter @stall10/shared build && next build`.
-- Environment variables: those in `.env.example`. Previews use the dev
-  Firebase project and dev API; production uses prod.
-- In Firebase Auth (each project), add the Vercel domains to
-  **Authorized domains**, or sign-in fails with "isn't set up for this web
+One Vercel project, `frisbeeapp` (team `brian-honeas-projects`), serves
+both sites:
+
+| | Dev site | Prod site |
+|---|---|---|
+| Branch | `development` (and every other non-`main` branch) | `main` |
+| Vercel environment | Preview | Production |
+| Firebase project | `frisbee-app-brianrhonea-dev` | `frisbee-app-brianrhonea` |
+| API | dev Cloud Run `api` | prod Cloud Run `api` |
+| Address | `frisbeeapp-git-<branch>-brian-honeas-projects.vercel.app`, or a domain assigned to the branch (Settings → Domains → Git Branch) | the production domain |
+
+Until `monorepo` is merged into `development`, the dev site is
+`frisbeeapp-git-monorepo-brian-honeas-projects.vercel.app`.
+
+### Project settings
+
+- **Settings → Build and Deployment:** Framework Preset **Next.js**, Root
+  Directory `apps/web`, "Include files outside the root directory" on, and
+  no overrides for the build, install or output commands. The `build`
+  script compiles `@stall10/shared` first (its `dist/` isn't committed).
+- **Settings → Environments → Production:** branch `main`.
+- **Deployment Protection:** Vercel Authentication is on for previews, so
+  the dev site asks for a Vercel login. Turn it off to test on a phone or
+  share the dev site.
+
+### Environment variables
+
+The variables in `.env.example`, each added twice: dev values with only
+**Preview** ticked, prod values with only **Production** ticked.
+
+| Variable | Dev (Preview) | Prod (Production) | Sensitive |
+|---|---|---|---|
+| `API_BASE_URL`, `NEXT_PUBLIC_API_BASE_URL` | dev API URL | prod API URL | no |
+| `WEB_SERVER_KEY` | `gcloud secrets versions access latest --secret=web-server-key --project frisbee-app-brianrhonea-dev` | same, `--project frisbee-app-brianrhonea` | **yes** |
+| `NEXT_PUBLIC_SITE_URL` | dev site address | prod site address | no |
+| `NEXT_PUBLIC_FIREBASE_*` | the dev web app's config | the prod web app's config | no |
+
+Get a project's web config with `firebase apps:sdkconfig WEB <app id>
+--project <project>` (app ids from `firebase apps:list WEB`). The
+`NEXT_PUBLIC_*` values are built into the site, so redeploy after
+changing them.
+
+### Pitfalls
+
+- **Import shows only `main`.** The import screen browses the default
+  branch, which may not have `apps/web`. Import with root `./`, let the
+  first build fail, then set the root directory and branch in Settings.
+- **Every page is Vercel's `404: NOT_FOUND`.** The Framework Preset isn't
+  Next.js (an import with root `./` picks "Other"). Changing the root
+  directory doesn't change the preset.
+- **No quotes in values.** Vercel stores them literally. A quoted Firebase
+  key (copied from `.env.local`) makes Google sign-in close its popup at
+  once, with `auth/api-key-not-valid` (400) in the console.
+- **`NEXT_PUBLIC_*` can't be Sensitive** ("cannot use `visibility:
+  secret`"). They're public anyway; only `WEB_SERVER_KEY` is a secret.
+  If the team forces Sensitive variables, turn that policy off.
+- **An existing variable can't be added again** for the same
+  environment; edit it instead.
+
+### Firebase and the API
+
+- In Firebase Auth (each project), add the site's domains to
+  **Authorized domains** (no wildcards, so use the branch address, not a
+  per-build one), or sign-in fails with "isn't set up for this web
   address".
-- Add the site's addresses to the API's `CORS_ORIGINS` (Cloud Run), or the
-  member dashboard can't load.
+- Add the site's addresses to the API's `CORS_ORIGINS` (repository
+  variables `API_CORS_ORIGINS_DEV` / `_PROD`, `apps/api/DEPLOY.md`), or
+  the member dashboard can't load. Dev uses
+  `http://localhost:3000,https://frisbee*-brian-honeas-projects.vercel.app`,
+  which covers branch and per-build addresses.
 - Add a firewall rate-limit rule for visitors (the API trusts this server
   through `WEB_SERVER_KEY`).
 - Keep store URLs in step: `lib/site.ts`, `apps/mobile/lib/config/store_links.dart`.
