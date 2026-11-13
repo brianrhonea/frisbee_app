@@ -35,6 +35,11 @@ export class FirestoreDocStore implements DocStore {
     return snap.exists ? (fromFirestore(snap.data()) as Data) : null;
   }
 
+  async list(collection: string, limit: number): Promise<Array<{ id: string; data: Data }>> {
+    const snap = await this.db.collection(collection).limit(limit).get();
+    return snap.docs.map((d) => ({ id: d.id, data: fromFirestore(d.data()) as Data }));
+  }
+
   newId(collection: string): string {
     return this.db.collection(collection).doc().id;
   }

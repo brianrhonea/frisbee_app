@@ -31,6 +31,8 @@ export interface Tx {
 
 export interface DocStore {
   get(path: string): Promise<Data | null>;
+  /** Up to [limit] documents of [collection], in id order. */
+  list(collection: string, limit: number): Promise<Array<{ id: string; data: Data }>>;
   /** A fresh auto id for a document in [collection]. */
   newId(collection: string): string;
   /** Runs [fn] in a transaction, retried on contention. */

@@ -98,3 +98,44 @@ export function useLiveQuery<T = DocumentData>(
   }, [path, key]);
   return state;
 }
+
+/**
+ * Several queries on collection [path], merged by id: for reads the rules
+ * allow only one audience id at a time (chat rooms, a community's events),
+ * as the app's mergeLatest does. Loading until every query has answered.
+ */
+export function useLiveQueries<T = DocumentData>(
+  path: string | null,
+  queries: QueryConstraint[][],
+  key: string,
+): Live<Doc<T>[]> {
+  const [state, setState] = useState<Live<Doc<T>[]>>({ data: undefined, error: null });
+  useEffect(() => {
+    const db = firestoreDb();
+    if (!path || !db) {
+      setState({ data: path ? [] : undefined, error: null });
+      return;
+    }
+    setState({ data: undefined, error: null });
+    const results: Array<Doc<T>[] | undefined> = queries.map(() => undefined);
+    const publish = () => {
+      if (results.some((r) => r === undefined)) return;
+      const byId = new Map<string, Doc<T>>();
+      for (const r of results) for (const d of r!) byId.set(d.id, d);
+      setState({ data: [...byId.values()], error: null });
+    };
+    const stops = queries.map((constraints, i) =>
+      onSnapshot(
+        query(collection(db, path), ...constraints),
+        (snap) => {
+          results[i] = snap.docs.map((d) => ({ ...(plain(d.data()) as T), id: d.id }) as Doc<T>);
+          publish();
+        },
+        (e) => setState({ data: undefined, error: message(e) }),
+      ),
+    );
+    return () => stops.forEach((stop) => stop());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- [key] stands for queries.
+  }, [path, key]);
+  return state;
+}

@@ -87,8 +87,8 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   const path = usePathname() ?? "/";
   const { user } = useAuth();
   const profile = user ? `/players/${encodeURIComponent(user.uid)}` : null;
-  // Home has its own "Coming up" column, for visitors and members alike.
-  const aside = path !== "/" && !fullWidth.some((p) => under(path, p));
+  // Home and team hubs have their own "Coming up" column, for visitors and members alike.
+  const aside = path !== "/" && !/^\/teams\/[^/]+/.test(path) && !fullWidth.some((p) => under(path, p));
   const unread = useUnreadCount();
   useShortcuts(!!user);
   const badge = unread > 0 ? <span className="count-badge">{unread > 99 ? "99+" : unread}</span> : null;

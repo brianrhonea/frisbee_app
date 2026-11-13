@@ -182,6 +182,8 @@ sequenceDiagram
 - Members: `DELETE /v1/teams/:id/members/:uid` (leave/remove); `PUT
   /v1/teams/:id/members/:uid/role`; `PUT .../stat-keeper`; `POST
   /v1/teams/:id/owner`; `PUT /v1/teams/:id/roles`.
+- Roster: `GET /v1/teams/:id/roster` → `TeamRoster` (any signed-in
+  caller; a private group's only to its members).
 - Communities: `PUT|DELETE /v1/teams/:id/community`; `POST
   /v1/teams/:org/link-requests/:team/accept`; `DELETE
   /v1/teams/:org/link-requests/:team`; `PUT|DELETE

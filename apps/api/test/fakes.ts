@@ -77,6 +77,15 @@ export class FakeStore implements DocStore {
     return d ? structuredClone(d) : null;
   }
 
+  async list(collection: string, limit: number) {
+    const prefix = `${collection}/`;
+    return [...this.docs.entries()]
+      .filter(([path]) => path.startsWith(prefix) && !path.slice(prefix.length).includes("/"))
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(0, limit)
+      .map(([path, data]) => ({ id: path.slice(prefix.length), data: structuredClone(data) }));
+  }
+
   newId(collection: string) {
     return `${collection.split("/").pop()}-new${++this.ids}`;
   }

@@ -4,6 +4,34 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.6.0 — 2026-11-12
+
+Website parity, slice W2 (`docs/product-spec.md` §8.1): team pages as a
+hub. Needs API 0.5.0.
+
+**Added**
+- Team and group pages are a hub with tabs in the URL: Feed, Schedule,
+  Roster (Members for a group), and for members Chat and More.
+- **Feed:** members see every post live, marked "Members only" where it
+  isn't public; everyone else sees the public posts. "Coming up" beside it.
+- **Schedule:** events down the left, the open one beside them
+  (`?event=`): when, where (a map link), notes, and for members who's
+  going, maybe or out, reactions and poll results. Members also get past
+  events.
+- **Roster:** anyone signed in sees the roster as a table (number, name,
+  position) and the members with their roles, each linking to their
+  profile, with a filter. Visitors are asked to log in.
+- **Chat** (members): rooms by folder beside the open room (`?room=`),
+  live, with replies, photos and reactions. Read only for now.
+- **More** (members): the playbook drawn on a field, videos (YouTube plays
+  in place), tracked games with the record, and hosted tournaments. A
+  group's More is its tournaments.
+- Join an open group, or ask to join one that approves members, from its
+  page; members see their role there.
+
+**Not yet:** posting to the team, RSVPs, votes and reactions, and sending
+chat messages happen in the app until their API endpoints exist.
+
 ## 0.5.0 — 2026-11-12
 
 Website parity, slice W1 (`docs/product-spec.md` §8.1): posting,

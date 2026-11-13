@@ -7,6 +7,18 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.5.0 — 2026-11-12
+
+Website parity, slice W2 (`docs/product-spec.md` §8.1): team pages.
+
+**Added**
+- `GET /v1/teams/:id/roster`: who's on a team, for anyone signed in, not
+  only its members: the roster's players (name, number, position, and the
+  linked member's public card) and the members (public card, tier and
+  custom role names). Nothing else from the team doc (permissions, stats
+  keepers, paid marks) goes out. A private group (a community or
+  organization that approves joins) shows its members only to members.
+
 ## 0.4.0 — 2026-11-12
 
 Website parity, slice W1 (`docs/product-spec.md` §8.1): what the website

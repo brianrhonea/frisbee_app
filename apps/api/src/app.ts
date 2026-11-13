@@ -25,7 +25,8 @@ import type { DocStore } from "./store.js";
 import { MembershipService } from "./teams/membership.js";
 import { membershipRoutes } from "./teams/membership_routes.js";
 import type { TeamRepository } from "./teams/repository.js";
-import { teamRoutes } from "./teams/routes.js";
+import { RosterService } from "./teams/roster.js";
+import { rosterRoutes, teamRoutes } from "./teams/routes.js";
 import { TeamService } from "./teams/service.js";
 import { apiVersion, versionHeader } from "./version.js";
 
@@ -112,6 +113,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
     profileRoutes(app, new ProfileService(deps.store, deps.users));
+    rosterRoutes(app, new RosterService(deps.store));
     postRoutes(app, new PostService(deps.store, deps.users, deps.now));
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now));
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));

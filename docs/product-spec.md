@@ -69,6 +69,11 @@ Five sections, down from nine today:
 A community uses the same hub. It also lists the teams that belong to it,
 under Roster or More.
 
+Who sees what (decided 2026-11-12): anyone signed in sees a team's
+roster and members, each linking to their profile, and its public posts
+and events; everything else in the hub is for members. A private group
+(one that approves joins) keeps its members, posts and events to itself.
+
 ## 5. Teams and communities
 
 - **Team:** a roster that competes, with a level (club, college, masters,
@@ -173,7 +178,7 @@ status, versions and changelogs):
 | # | Slice | Website | API work |
 |---|---|---|---|
 | W1 | Home and people | Home feed with tabs, compose (text, photos, video), comments, follow and requests, notifications, edit profile, settings | Create/edit/delete posts, comments, follows; first caller of `/v1/uploads` (§6). Built (api 0.4.0, web 0.5.0) except feed tabs, video in posts (waits on the transcode job, ARCHITECTURE.md §10 item 4) and changing your name and photo |
-| W2 | Teams hub | Feed, Schedule, Chat, Roster, More; join, invites, roles, settings; create a team or community | Team posts; membership is already in the API |
+| W2 | Teams hub | Feed, Schedule, Chat, Roster, More; join, invites, roles, settings; create a team or community | Team posts; membership is already in the API. Built (api 0.5.0, web 0.6.0): the hub's five sections read live; the roster for anyone signed in (`GET /v1/teams/:id/roster`); join or ask to join a group. Not yet: team posts, RSVPs and votes, sending chat, invites, roles, settings, creating a team |
 | W3 | Events | My schedule and a calendar, create and edit events, RSVPs, polls | Events, RSVPs, polls |
 | W4 | Messages | DMs and team rooms side by side, reactions, edits, folders, read receipts | Send, edit, react; rooms and folders (reads stay listeners) |
 | W5 | Tournaments and leagues | Find, host, register, divisions, schedules, standings, hat drafts | Move the tournament callables into the API |
