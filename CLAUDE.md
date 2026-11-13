@@ -31,8 +31,7 @@ gitignored local files and must never be committed or pushed to GitHub.
   create or commit a service-account key for it.
 - Native Firebase config files are gitignored local files:
   `apps/mobile/android/app/google-services.json`,
-  `apps/mobile/ios/Runner/GoogleService-Info.plist`,
-  `apps/mobile/macos/Runner/GoogleService-Info.plist`. Get them from the
+  `apps/mobile/ios/Runner/GoogleService-Info.plist`. Get them from the
   Firebase console or `flutterfire configure`.
 - iOS Google Sign-In IDs live in `apps/mobile/ios/Flutter/Secrets.xcconfig`
   (gitignored; template `Secrets.example.xcconfig`), filled from
@@ -77,8 +76,8 @@ The app (always pass the secrets file; run from `apps/mobile`):
 
 ```
 cd apps/mobile
-flutter run -d windows --dart-define-from-file=secrets.local.json
-flutter build windows --dart-define-from-file=secrets.local.json
+flutter run -d <android-emulator-or-device> --dart-define-from-file=secrets.local.json
+flutter build apk --dart-define-from-file=secrets.local.json
 flutter build ipa --dart-define-from-file=secrets.local.json   # Codemagic does this
 ```
 

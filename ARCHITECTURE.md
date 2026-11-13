@@ -336,11 +336,13 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 | **3. Website** | Build `apps/web` on Next.js against the API; move the domain from Firebase Hosting to Vercel; retire the Flutter web build (`firebase/scripts/build_site.sh`, `apps/mobile/web`, `lib/main_web.dart`, `lib/ui/web`) | **Started**: public site ported (feed, posts, profiles, teams, events, search, About/Help/legal, invite-link fallbacks, sign-in/sign-up); member area next; not deployed to Vercel yet |
 
 **Transitional pieces** (kept on purpose until their phase):
-- `apps/mobile/web`, `lib/main_web.dart`, `lib/ui/web`, `lib/ui/browse`: the
-  live website until phase 3.
-- `apps/mobile/windows` (and `macos`): local development target on
-  Windows. Not shipped; remove when development moves to simulators and
-  devices.
+- `lib/main_web.dart`, `lib/ui/web`, `lib/ui/browse`,
+  `firebase/scripts/build_site.sh`: the old Flutter website.
+  `apps/mobile/web` was removed (2026-11-12), so it can't be built any
+  more; Firebase Hosting keeps serving the last deploy until the domain
+  moves to Vercel, and hosting deploys are skipped until then.
+- `apps/mobile/windows` and `macos` were removed (2026-11-12): run the
+  app on an Android emulator or an iOS/Android device.
 - Cloud Functions callables (`account`, `api`, `browse`, `meetings`,
   `discord`, `tournaments`): fold into the API over phase 2.
 

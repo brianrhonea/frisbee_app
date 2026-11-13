@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.15  | 2026-11-12 | `feature/leagues`, `monorepo`           | `e3bac8b` and later |
 | 0.0.14  | 2026-11-06 | `development`                           |                     |
 | 0.0.13  | 2026-11-05 | `hardening/scale-and-abuse`             | `09d17af` and later |
 | 0.0.12  | 2026-11-05 | `development`                           |                     |
@@ -28,6 +29,34 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.15 — Leagues and hat tournaments; monorepo; API paths
+
+**Added**
+- **Leagues and hat tournaments**: a `HostedTournament` with
+  `kind: league`, team or player entry (`entryType`), set weeks, and a
+  balanced (self-rating) or captains' live draft
+  (`/tournaments/:id/live-draft/:divisionId`, callables in
+  `functions/src/tournaments/draft.ts`). Mixed entry: teams reserve spots,
+  free agents are drafted into the rest. **Host an event** picker
+  (League / Tournament / Hat) and a Tournaments & leagues find page.
+- **Official hosts**: `Team.official` (console only) and
+  `HostedTournament.hostOfficial`, shown with a verified badge.
+- Shared event format (`HostedTournament.format`) and points or time
+  scoring.
+- **API paths** for team create, membership and profiles/usernames
+  (`apps/api`), behind `use_api_teams`, `use_api_membership` and
+  `use_api_profiles`. Builds without `API_BASE_URL` keep writing Firestore
+  directly.
+
+**Changed**
+- The repo is a monorepo: the app lives in `apps/mobile` (Codemagic builds
+  from there).
+
+**Removed**
+- The `web/`, `macos/` and `windows/` targets. The app is iOS and Android
+  only; the website is `apps/web` (Next.js). Local runs use an Android
+  emulator or a device.
 
 ## 0.0.14 — Hosted tournaments; USA Ultimate data removed
 

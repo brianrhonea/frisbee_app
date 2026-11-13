@@ -10,7 +10,19 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
-## 0.0.14 (in TestFlight from `development`)
+## 0.0.15 (in TestFlight from `development`)
+
+**Leagues and hat tournaments**
+- Teams, groups and schools/clubs can host a **league** or a **hat
+  tournament** from **Host an event**: set the weeks, and let teams enter
+  or players sign up on their own.
+- Player sign-ups are split into teams by a **balanced draft** (from
+  everyone's self-rating) or a **captains' live draft** you run together
+  on your phones.
+- Find leagues and tournaments in one place, filtered by type.
+- Official events show a verified badge.
+
+## 0.0.14
 
 **Host a tournament**
 - Any team, pickup group or school/club can host a tournament from its

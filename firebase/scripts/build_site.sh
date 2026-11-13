@@ -17,6 +17,13 @@ set -euo pipefail
 firebase_dir="$(cd "$(dirname "$0")/.." && pwd)"
 mobile_dir="$(cd "$firebase_dir/../apps/mobile" && pwd)"
 
+# The Flutter web target was removed; the website moves to apps/web on
+# Vercel. Until hosting is reworked, refuse instead of failing in flutter.
+if [[ ! -d "$mobile_dir/web" ]]; then
+  echo "apps/mobile/web was removed: the Flutter website can't be built. The site is moving to Vercel (apps/web); see ARCHITECTURE.md §9. Hosting stays as last deployed." >&2
+  exit 1
+fi
+
 project="${GCLOUD_PROJECT:-}"
 if [[ "$project" == "frisbee-app-brianrhonea" ]]; then
   secrets="secrets.prod.local.json"

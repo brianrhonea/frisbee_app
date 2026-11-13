@@ -104,6 +104,9 @@ jobs:
           targets="firestore:rules,firestore:indexes,storage"
           if [ ! -f scripts/build_site.sh ]; then
             targets="$targets,hosting"
+          elif [ ! -d "$GITHUB_WORKSPACE/$MOBILE_DIR/web" ]; then
+            # The Flutter web target is gone; the site moves to Vercel (apps/web).
+            echo "::warning::apps/mobile/web was removed; hosting (the website) left as deployed."
           elif [ -z "$WEB_API_KEY" ]; then
             echo "::warning::No FIREBASE_WEB_API_KEY_${PROJECT^^} secret; hosting (the website) left as deployed."
           else

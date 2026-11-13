@@ -95,8 +95,7 @@ API keys are kept out of git (see `CLAUDE.md`). On a fresh clone:
 
 ```
 cd apps/mobile
-flutter run -d windows --dart-define-from-file=secrets.local.json
-flutter run -d <android-device> --dart-define-from-file=secrets.local.json
+flutter run -d <android-emulator-or-device> --dart-define-from-file=secrets.local.json
 ```
 
 The API (Node 22, pnpm): `pnpm install && pnpm dev:api` from the repo root
@@ -110,7 +109,7 @@ Against local emulators (needs Java 21+ for the Firestore emulator):
 
 ```
 cd firebase/functions && npm run serve # auth, firestore, functions emulators
-cd apps/mobile && flutter run -d windows --dart-define-from-file=secrets.local.json --dart-define=USE_EMULATORS=true
+cd apps/mobile && flutter run -d <android-emulator-or-device> --dart-define-from-file=secrets.local.json --dart-define=USE_EMULATORS=true
 ```
 
 ## Tests
