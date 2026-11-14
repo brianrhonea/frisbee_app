@@ -2,6 +2,8 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastif
 import { registerWriteLimits } from "./limits/writes.js";
 import { accountRoutes } from "./account/routes.js";
 import { AccountService } from "./account/service.js";
+import { TeamDeletion, teamDeletionRoutes } from "./teams/deletion.js";
+import { ChatAdmin, chatAdminRoutes } from "./hub/rooms.js";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
@@ -142,12 +144,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
     profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);
     accountRoutes(app, new AccountService(deps.store, deps.users, deps.media), revalidate);
+    teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media));
     if (deps.personal) personalRoutes(app, new PersonalService(deps.store, deps.users, deps.personal, deps.now));
     rosterRoutes(app, new RosterService(deps.store));
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate);
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
     hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
+    chatAdminRoutes(app, new ChatAdmin(deps.store, deps.teams, deps.media), writes);
     conversationRoutes(app, new ConversationService(deps.store, deps.users, deps.media, deps.now), writes);
     if (deps.calendar) {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {

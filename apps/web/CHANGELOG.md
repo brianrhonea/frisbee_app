@@ -4,6 +4,28 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.13.0 — 2026-11-14
+
+Team admin on the website. Needs API 0.12.0.
+
+**Added**
+- Team Settings → **Roles** (owners): custom roles with a name, color,
+  permissions and members, reordered with ↑/↓; and **Keeps stats** per
+  member on teams.
+- **School or club** in a team's Settings: ask a community to list the
+  team, cancel the request, or leave.
+- A community's **Teams** tab for its admins: add a team, accept or
+  decline teams asking to join, pick which community roles join each team,
+  and take teams out.
+- **Manage rooms** in team chat (members who manage chats): new rooms,
+  voice rooms and folders, rename, who can see and post (Everyone, roles,
+  single members), move between folders, reorder and delete.
+- **Delete** a team, group or community (owners, typing its name).
+
+**Fixed**
+- The event editor read a community's roles as a list; they're a map, so
+  it broke for communities with roles.
+
 ## 0.12.0 — 2026-11-14
 
 The website is becoming a full way to use Stall 10 on its own. Needs API

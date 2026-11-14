@@ -166,3 +166,56 @@ export const chatReactionRequestSchema = z.strictObject({
 
 /** The emoji the website offers for chat reactions. */
 export const chatReactionChoices = ["👍", "❤️", "😂", "🔥", "🥏", "👏", "😮", "😢"] as const;
+
+// ---- Chat rooms and folders (teams/{id}/chats, chatFolders) ---------------
+
+/** Rules limits (validChatName, validAccess). */
+export const chatRoomLimits = { name: 60, roles: 60, users: 200, folderId: 40, rooms: 200, folders: 50 } as const;
+
+const audienceId = z.string().min(1).max(64).regex(/^[^/]+$/, "Invalid role.");
+const memberId = z.string().min(1).max(128).regex(/^[^/]+$/, "Invalid member.");
+
+/**
+ * Who reads and who writes a room or folder: "everyone", tiers and custom
+ * role ids, and single members. Writers must also be readers.
+ */
+export const chatAccessSchema = z
+  .strictObject({
+    readRoles: z.array(audienceId).max(chatRoomLimits.roles),
+    writeRoles: z.array(audienceId).max(chatRoomLimits.roles),
+    readUsers: z.array(memberId).max(chatRoomLimits.users).default([]),
+    writeUsers: z.array(memberId).max(chatRoomLimits.users).default([]),
+  })
+  .refine((a) => a.writeRoles.every((r) => a.readRoles.includes(r)) && a.writeUsers.every((u) => a.readUsers.includes(u)), {
+    message: "Anyone who can write must also be able to read.",
+  });
+
+const chatName = z.string().trim().min(1, "Name it.").max(chatRoomLimits.name);
+
+/** `POST /v1/teams/:teamId/chat-rooms` and `PATCH .../chat-rooms/:roomId` (kind is set once). */
+export const saveChatRoomRequestSchema = z.strictObject({
+  name: chatName,
+  kind: z.enum(["text", "voice"]).default("text"),
+  folderId: z.string().min(1).max(chatRoomLimits.folderId).regex(/^[^/]+$/).nullable().default(null),
+  access: chatAccessSchema,
+});
+export type SaveChatRoomRequest = z.input<typeof saveChatRoomRequestSchema>;
+
+/** `POST /v1/teams/:teamId/chat-folders` and `PATCH .../chat-folders/:folderId`. */
+export const saveChatFolderRequestSchema = z.strictObject({ name: chatName, access: chatAccessSchema });
+export type SaveChatFolderRequest = z.input<typeof saveChatFolderRequestSchema>;
+
+/** `PUT /v1/teams/:teamId/chat-layout`: folder and room order, and which folder each room is in. */
+export const chatLayoutRequestSchema = z.strictObject({
+  folders: z.array(z.strictObject({ id: memberId, position: z.number().int().min(0).max(10_000) })).max(chatRoomLimits.folders).default([]),
+  rooms: z
+    .array(
+      z.strictObject({
+        id: memberId,
+        position: z.number().int().min(0).max(10_000),
+        folderId: z.string().min(1).max(chatRoomLimits.folderId).regex(/^[^/]+$/).nullable(),
+      }),
+    )
+    .max(chatRoomLimits.rooms)
+    .default([]),
+});

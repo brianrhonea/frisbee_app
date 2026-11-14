@@ -4,8 +4,30 @@ import { createContext, type ReactNode, useContext } from "react";
 import { type Doc, useLiveDoc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 
+/** One custom role in the team doc's `roles` map (CustomRole in the app). */
+export interface CustomRoleDoc {
+  name: string;
+  color?: number;
+  position?: number;
+  perms?: TeamPermission[];
+}
+
+/** The team's custom roles in the app's order (by position), with their ids. */
+export function rolesInOrder(roles: Record<string, CustomRoleDoc> | undefined): Array<CustomRoleDoc & { id: string }> {
+  return Object.entries(roles ?? {})
+    .filter(([, r]) => r && typeof r === "object" && typeof r.name === "string")
+    .map(([id, r]) => ({ ...r, id }))
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+}
+
 /** The team doc's fields the hub uses (Team.fromMap in the app). */
 export interface TeamDoc {
+  roles?: Record<string, CustomRoleDoc>;
+  /** A community's teams (LinkedTeam): their name, division and the roles that join them. */
+  linkedTeams?: Record<string, { name?: string; division?: string; roles?: string[] }>;
+  orgId?: string | null;
+  orgName?: string;
+  orgLinked?: boolean;
   name?: string;
   kind?: "team" | "community" | "organization";
   ownerId?: string;

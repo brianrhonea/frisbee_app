@@ -37,10 +37,17 @@ export interface MediaStorage {
    * pictures the app shows by URL: profile pictures and header photos.
    */
   downloadUrl(path: string): Promise<string>;
+  /** Deletes every object under [prefix] (a folder ending in "/"). */
+  deletePrefix(prefix: string): Promise<void>;
 }
 
 export class FirebaseMediaStorage implements MediaStorage {
   constructor(private readonly bucket: Bucket) {}
+
+  async deletePrefix(prefix: string) {
+    if (!prefix.endsWith("/") || prefix.includes("..")) throw new Error(`not a folder: ${prefix}`);
+    await this.bucket.deleteFiles({ prefix, force: true });
+  }
 
   async downloadUrl(path: string) {
     const token = randomUUID();

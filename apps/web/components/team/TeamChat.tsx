@@ -2,28 +2,19 @@
 import { MuteButton } from "../MuteButton";
 import { limit, orderBy, where } from "firebase/firestore";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "../Avatar";
 import { LocalTime } from "../LocalTime";
 import { MemberImage } from "../MemberImage";
 import { ChatComposer, MessageActions } from "../ChatComposer";
 import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
+import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
 
-interface Room {
-  name?: string;
-  kind?: "text" | "voice";
-  folderId?: string | null;
-  position?: number;
-  writeRoles?: string[];
-  writeUsers?: string[];
-}
-interface Folder {
-  name?: string;
-  position?: number;
-}
+type Room = ManagedRoom;
+type Folder = ManagedFolder;
 interface Attachment {
   path: string;
   name?: string;
@@ -53,6 +44,7 @@ export function TeamChat() {
   const { teamId, viewer } = useTeamHub();
   const params = useSearchParams();
   const pathname = usePathname();
+  const router = useRouter();
   const member = viewer.state === "member" ? viewer : null;
   const all = member?.can("manageChats") ?? false;
   const queries = !member
@@ -67,6 +59,7 @@ export function TeamChat() {
   if (rooms.error) return <p className="form-error">{rooms.error}</p>;
   if (!rooms.data) return <p className="muted" aria-busy="true">Loading chat…</p>;
 
+  const managing = all && params.get("manage") === "1";
   const sorted = rooms.data.slice().sort(byPosition);
   const openId = params.get("room") ?? sorted.find((r) => r.kind !== "voice")?.id;
   const open = sorted.find((r) => r.id === openId);
@@ -81,6 +74,11 @@ export function TeamChat() {
   return (
     <div className="hub-split chat-split">
       <nav className="hub-list chat-rooms" aria-label="Rooms">
+        {all && (
+          <Link className={`btn btn-small chat-manage-link${managing ? " active" : ""}`} href={managing ? pathname : `${pathname}?manage=1`} scroll={false}>
+            {managing ? "Back to chat" : "Manage rooms"}
+          </Link>
+        )}
         {groups.length === 0 && <p className="empty">No rooms you can read.</p>}
         {groups.map((g) => (
           <div key={g.id || "top"}>
@@ -103,7 +101,9 @@ export function TeamChat() {
         ))}
       </nav>
       <section className="hub-detail chat-thread">
-        {open ? (
+        {managing ? (
+          <ChatManager rooms={sorted} folders={folders.data ?? []} onDone={() => router.replace(pathname, { scroll: false })} />
+        ) : open ? (
           open.kind === "voice" ? (
             <div className="card hub-empty">
               <h2>{open.name}</h2>

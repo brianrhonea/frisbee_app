@@ -12,6 +12,8 @@ import { useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { roleLabel } from "../ProfileDashboard";
 import { useTeamHub } from "./TeamContext";
+import { TeamRoles } from "./TeamRoles";
+import { TeamCommunity } from "./CommunityAdmin";
 import { MembersOnlySection } from "./TeamNav";
 
 /** The team doc's editable details (Team.toEditableMap in the app). */
@@ -43,7 +45,10 @@ export function TeamSettings() {
       {viewer.can("manageMembers") && <InviteLinks />}
       {viewer.can("manageMembers") && kind !== "team" && viewer.team.requiresApproval && <JoinRequests />}
       {viewer.can("manageMembers") && <MemberRoles />}
+      {owner && <TeamRoles />}
+      {kind === "team" && viewer.can("manageTeam") && <TeamCommunity />}
       {owner ? <TransferOwnership /> : <LeaveTeam teamId={teamId} />}
+      {owner && <DeleteTeam />}
     </div>
   );
 }
@@ -255,6 +260,7 @@ function MemberRoles() {
             <tr>
               <th>Member</th>
               <th>Role</th>
+              {owner && kind === "team" && <th>Keeps stats</th>}
               <th />
             </tr>
           </thead>
@@ -286,6 +292,19 @@ function MemberRoles() {
                       </select>
                     )}
                   </td>
+                  {owner && kind === "team" && (
+                    <td>
+                      <input
+                        type="checkbox"
+                        aria-label={`${team.memberNames?.[uid] ?? "Member"} keeps stats`}
+                        checked={tier === "owner" || (team.statKeepers ?? []).includes(uid)}
+                        disabled={busy || tier === "owner"}
+                        onChange={(e) =>
+                          void act(`/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(uid)}/stat-keeper`, "PUT", { on: e.target.checked })
+                        }
+                      />
+                    </td>
+                  )}
                   <td>
                     {!fixed && (
                       <button
@@ -308,7 +327,9 @@ function MemberRoles() {
           </tbody>
         </table>
       </div>
-      <p className="muted small">Custom roles and their permissions are edited in the app for now.</p>
+      <p className="muted small">
+        {owner ? "Give members custom roles and permissions under Roles below." : "The owner sets custom roles and their permissions."}
+      </p>
       <Status error={error} ok={null} />
     </section>
   );
@@ -351,6 +372,44 @@ function TransferOwnership() {
           }}
         >
           Hand over
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** Deletes it for everyone (the owner, typing its name; `DELETE /v1/teams/:id`). */
+function DeleteTeam() {
+  const { teamId, name, kind } = useTeamHub();
+  const router = useRouter();
+  const [typed, setTyped] = useState("");
+  const { act, busy, error } = useAct();
+  const noun = kind === "team" ? "team" : kind === "organization" ? "community" : "group";
+  const matches = typed.trim().toLowerCase() === name.trim().toLowerCase();
+  return (
+    <section className="card settings-form danger-zone">
+      <h2 className="card-title">Delete the {noun}</h2>
+      <p className="muted small">
+        This deletes {name} for everyone: its chat, events, posts, playbook, stats, videos and files. It can&apos;t be undone.
+      </p>
+      <label>
+        Type {name} to confirm
+        <input value={typed} autoComplete="off" onChange={(e) => setTyped(e.target.value)} />
+      </label>
+      <div className="form-actions">
+        <Status error={error} ok={null} />
+        <button
+          type="button"
+          className="btn btn-danger"
+          disabled={busy || !matches}
+          onClick={() => {
+            if (!window.confirm(`Delete ${name} for everyone? This can't be undone.`)) return;
+            void act(`/v1/teams/${encodeURIComponent(teamId)}`, "DELETE", { name: typed.trim() }).then((r) => {
+              if (r !== null) router.push("/teams");
+            });
+          }}
+        >
+          {busy ? "Deleting…" : `Delete ${noun}`}
         </button>
       </div>
     </section>

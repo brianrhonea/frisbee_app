@@ -22,6 +22,7 @@ export const routeWriteLimits: Record<string, Limit[]> = {
   "POST /v1/teams/:teamId/join-requests": [{ max: 10, windowMs: minute }],
   "POST /v1/uploads": [{ max: 30, windowMs: minute }],
   "PUT /v1/me/identity": [{ max: 10, windowMs: minute }],
+  "DELETE /v1/teams/:teamId": [{ max: 3, windowMs: minute }],
   "POST /v1/conversations": [{ max: 10, windowMs: minute }, { max: 100, windowMs: day }],
   "POST /v1/conversations/groups": [{ max: 5, windowMs: minute }, { max: 30, windowMs: day }],
 };

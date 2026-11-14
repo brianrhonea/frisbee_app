@@ -7,6 +7,27 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.12.0 — 2026-11-14
+
+Team admin for the website on its own.
+
+**Added**
+- Chat rooms and folders (`src/hub/rooms.ts`, ports of the `chats` and
+  `chatFolders` rules, manageChats): `POST|PATCH|DELETE
+  /v1/teams/:teamId/chat-rooms[/:roomId]`, `POST|PATCH|DELETE
+  .../chat-folders[/:folderId]` and `PUT .../chat-layout` (order and
+  folders). Access lists are capped as the rules cap them, writers must
+  be readers, and single members must be on the team. A room's kind never
+  changes; General can't be deleted; a deleted room takes its messages
+  and files, and only someone who can read it may delete it. A deleted
+  folder's rooms move out of it.
+- `DELETE /v1/teams/:teamId`: the owner deletes a team, group or
+  community, typing its name (checked here too). As the app's deleteTeam:
+  `deletingAt` first, then every document under the team
+  (`recursiveDelete`), its Storage folder, its directory listing and its
+  tournaments' listings. It also leaves its community's list, and a
+  deleted community's teams are freed.
+
 ## 0.11.0 — 2026-11-14
 
 The member's own account, for the website on its own.

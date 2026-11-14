@@ -193,9 +193,10 @@ everything the app does on the website alone, styled like the website
 
 1. Account: [x] change name, photo and header photo; [x] notification
    settings and muting chats (api 0.11.0, web 0.12.0).
-2. Team admin: [ ] custom roles and permissions (`/teams/:id/roles`);
-   [ ] chat rooms and folders (create, edit, audiences, archive);
-   [ ] adding teams to a community; [ ] deleting a team.
+2. Team admin: [x] custom roles and permissions; [x] chat rooms and
+   folders; [x] adding teams to a community; [x] deleting a team
+   (api 0.12.0, web 0.13.0). Roster players (people without accounts,
+   for stats) come with stats.
 3. Messages: [ ] editing messages (team rooms and DMs); [ ] team rooms
    beside DMs in `/messages`; [ ] typing indicators.
 4. W6: [ ] stats (games, live stat entry, season tables); [ ] playbook

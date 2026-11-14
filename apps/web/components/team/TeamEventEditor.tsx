@@ -4,7 +4,7 @@ import { type FormEvent, useState } from "react";
 import { callApi } from "@/lib/client";
 import { newId } from "@/lib/upload";
 import { useAuth } from "../AuthProvider";
-import { useTeamHub } from "./TeamContext";
+import { rolesInOrder, useTeamHub } from "./TeamContext";
 import type { TeamEventDoc } from "./TeamSchedule";
 
 /** ISO → the value a datetime-local input takes, in the browser's zone. */
@@ -15,12 +15,6 @@ function toLocalInput(iso?: string | null): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
-
-/** A custom role on the team doc (CustomRole in the app). */
-interface Role {
-  id: string;
-  name?: string;
-}
 
 /**
  * Adds or edits a team event (members with manageEvents): what, when,
@@ -38,7 +32,8 @@ export function TeamEventEditor({
   const { teamId, viewer } = useTeamHub();
   const team = viewer.state === "member" ? viewer.team : null;
   const org = team?.kind === "organization";
-  const roles = ((team as { roles?: unknown } | null)?.roles as Role[] | undefined)?.filter((r) => r && typeof r.id === "string") ?? [];
+  // `roles` is a map of id to role on the team doc.
+  const roles = rolesInOrder(team?.roles);
   const [title, setTitle] = useState(event?.title ?? "");
   const [type, setType] = useState<TeamEventType>((event?.type as TeamEventType) ?? "practice");
   const [startsAt, setStartsAt] = useState(toLocalInput(event?.startsAt));

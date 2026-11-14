@@ -40,6 +40,22 @@ export class FakeTeamRepository implements TeamRepository {
   leagues = new Map<string, boolean>();
   listings: Array<NameListing & { keywords: string[] }> = [];
   created: Array<{ id: string; input: CreateTeamInput; owner: Owner }> = [];
+  /** The store deleteTeamTree clears, when a test gives one. */
+  store?: FakeStore;
+  deleted: string[] = [];
+
+  async deleteTree(path: string) {
+    if (!this.store) return;
+    for (const k of [...this.store.docs.keys()]) if (k === path || k.startsWith(`${path}/`)) this.store.docs.delete(k);
+  }
+
+  async deleteTeamTree(teamId: string) {
+    this.deleted.push(teamId);
+    if (!this.store) return;
+    for (const k of [...this.store.docs.keys()]) {
+      if (k === `teams/${teamId}` || k.startsWith(`teams/${teamId}/`) || k === `teamDirectory/${teamId}`) this.store.docs.delete(k);
+    }
+  }
 
   async mutedUntil(uid: string) {
     return this.muted.get(uid) ?? null;
@@ -176,6 +192,9 @@ export class FakeMediaStorage implements MediaStorage {
   }
   async delete(path: string) {
     this.files.delete(path);
+  }
+  async deletePrefix(prefix: string) {
+    for (const k of [...this.files.keys()]) if (k.startsWith(prefix)) this.files.delete(k);
   }
   async downloadUrl(path: string) {
     return `https://dl.test/v0/b/bucket/o/${encodeURIComponent(path)}?alt=media&token=t`;
