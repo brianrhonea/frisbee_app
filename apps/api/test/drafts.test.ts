@@ -420,7 +420,7 @@ describe("playerSignsUp", () => {
 });
 
 describe("playerEdits", () => {
-  const edit = (over: object, before: object = stored, ctx: object = {}) => playerEdits({ ...player, ...ctx }, before, { ...before, ...over, updatedAt: serverTime });
+  const edit = (over: object, before: Record<string, unknown> = stored, ctx: object = {}) => playerEdits({ ...player, ...ctx }, before, { ...before, ...over, updatedAt: serverTime });
   it("passes fixing answers while applied or waitlisted, and coming back", () => {
     expect(edit({ skill: 5 })).toBe(true);
     expect(edit({ skill: 5 }, { ...stored, status: "waitlisted" })).toBe(true);
@@ -437,7 +437,7 @@ describe("playerEdits", () => {
 });
 
 describe("playerWithdraws", () => {
-  const go = (over: object, before: object = stored, ctx: object = {}) => playerWithdraws({ ...player, ...ctx }, before, { ...before, status: "withdrawn", updatedAt: serverTime, ...over });
+  const go = (over: object, before: Record<string, unknown> = stored, ctx: object = {}) => playerWithdraws({ ...player, ...ctx }, before, { ...before, status: "withdrawn", updatedAt: serverTime, ...over });
   it("passes", () => expect(go({})).toBe(true));
   it("uid() == userId", () => expect(go({}, stored, { uid: "other" })).toBe(false));
   it("new status == withdrawn", () => expect(go({ status: "declined" })).toBe(false));
