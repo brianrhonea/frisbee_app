@@ -28,6 +28,9 @@ export interface IdentityResult {
   headerUrl: string | null;
 }
 
+/** `PUT /v1/me/read-receipts`: whether others see when the caller has read their messages. */
+export const readReceiptsRequestSchema = z.strictObject({ on: z.boolean() });
+
 /** Notification kinds (NotificationCategory in the app), in the app's order. */
 export const notificationCategories = [
   "chat",

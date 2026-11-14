@@ -1,6 +1,6 @@
 "use client";
 import { MuteButton } from "./MuteButton";
-import { groupSizeMax, type GroupAddedResult, type OpenConversationResult } from "@stall10/shared";
+import { groupSizeMax, type GroupAddedResult, type OpenConversationResult, typingFreshMs } from "@stall10/shared";
 import { limit, orderBy, where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -330,6 +330,7 @@ function ConversationView({
   const [replyTo, setReplyTo] = useState<Doc<Message> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
+  const typing = useTyping(conv.id, me, conv.names);
   const body = useRef<HTMLDivElement>(null);
   const hiddenBefore = ms(mine?.clearedAt);
   const list = (messages.data ?? [])
@@ -457,6 +458,11 @@ function ConversationView({
           })
         )}
         {info.seen && <p className="muted small conv-seen">Seen</p>}
+        {typing.others.length > 0 && (
+          <p className="muted small conv-typing" aria-live="polite">
+            {typing.others.length === 1 ? `${typing.others[0]} is typing…` : "Several people are typing…"}
+          </p>
+        )}
       </div>
       {info.requestForMe ? (
         <footer className="thread-foot conv-request">
@@ -481,6 +487,7 @@ function ConversationView({
             placeholder={`Message ${info.title}`}
             replyTo={replyTo ? { id: replyTo.id, authorName: replyTo.authorName, text: replyTo.text } : null}
             onClearReply={() => setReplyTo(null)}
+            onTyping={typing.report}
           />
         </>
       )}
@@ -562,4 +569,51 @@ function GroupPeople({
       {note && <p className="muted small">{note}</p>}
     </div>
   );
+}
+
+/**
+ * Who else is typing in [convId] (conversations/{id}/typing, fresh marks
+ * only), and [report] to mark the member's own, sent at most every few
+ * seconds and cleared when they stop.
+ */
+function useTyping(convId: string, me: string, names: Record<string, string> | undefined) {
+  const { user } = useAuth();
+  const marks = useLiveQuery<{ at?: string }>(`conversations/${convId}/typing`, [], convId);
+  const sentAt = useRef(0);
+  const on = useRef(false);
+  const [, tick] = useState(0);
+  // Marks go stale on their own; look again every few seconds.
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 3000);
+    return () => clearInterval(t);
+  }, []);
+  const send = (typing: boolean) => {
+    if (!user) return;
+    void callApi(user, `/v1/conversations/${encodeURIComponent(convId)}/typing`, { method: "PUT", body: { typing } }).catch(() => undefined);
+  };
+  // Clear the mark on leaving the conversation.
+  useEffect(
+    () => () => {
+      if (on.current) send(false);
+      on.current = false;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [convId],
+  );
+  const report = (typing: boolean) => {
+    const now = Date.now();
+    if (typing && (!on.current || now - sentAt.current > typingFreshMs / 2)) {
+      on.current = true;
+      sentAt.current = now;
+      send(true);
+    } else if (!typing && on.current) {
+      on.current = false;
+      send(false);
+    }
+  };
+  const fresh = Date.now() - typingFreshMs;
+  const others = (marks.data ?? [])
+    .filter((d) => d.id !== me && d.at && new Date(d.at).getTime() > fresh)
+    .map((d) => names?.[d.id] || "Someone");
+  return { others, report };
 }

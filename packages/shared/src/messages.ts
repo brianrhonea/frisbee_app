@@ -77,6 +77,12 @@ export const answerRequestSchema = z.strictObject({ accept: z.boolean() });
 /** `PUT /v1/conversations/:id/archive`. */
 export const archiveRequestSchema = z.strictObject({ archived: z.boolean() });
 
+/** `PUT /v1/conversations/:id/typing`: the caller started or stopped typing (conversations/{id}/typing/{uid}). */
+export const typingRequestSchema = z.strictObject({ typing: z.boolean() });
+
+/** How long a typing mark counts, if it's never cleared (the app's typing timeout). */
+export const typingFreshMs = 8_000;
+
 /** The inbox's one-line preview of a message (messagePreview in the app). */
 export function messagePreview(text: string, attachments: number, kind: { image?: boolean; video?: boolean } = {}): string {
   const t = text.trim().replace(/\s+/g, " ");

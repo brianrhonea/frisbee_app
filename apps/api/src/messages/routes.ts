@@ -50,6 +50,10 @@ export function conversationRoutes(app: FastifyInstance, convs: ConversationServ
     await convs.answer(caller(req, "respond"), req.params.id, req.body);
     return done(reply);
   });
+  app.put<Conv>("/v1/conversations/:id/typing", async (req, reply) => {
+    await convs.setTyping(caller(req, "respond"), req.params.id, req.body);
+    return done(reply);
+  });
   app.put<Conv>("/v1/conversations/:id/archive", async (req, reply) => {
     await convs.archive(caller(req, "respond"), req.params.id, req.body);
     return done(reply);

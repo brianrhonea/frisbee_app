@@ -132,6 +132,14 @@ describe("messages", () => {
     expect((await s.call("DELETE", "/v1/conversations/amy_ben/messages/m1", undefined, "ben")).statusCode).toBe(204);
   });
 
+  it("marks and clears typing for participants only", async () => {
+    expect((await s.call("PUT", "/v1/conversations/amy_ben/typing", { typing: true })).statusCode).toBe(204);
+    expect(s.store.doc("conversations/amy_ben/typing/amy")).toEqual({ at: new Date(now) });
+    expect((await s.call("PUT", "/v1/conversations/amy_ben/typing", { typing: true }, "cal")).statusCode).toBe(404);
+    await s.call("PUT", "/v1/conversations/amy_ben/typing", { typing: false });
+    expect(s.store.doc("conversations/amy_ben/typing/amy")).toBeUndefined();
+  });
+
   it("archives and clears for the caller only", async () => {
     await s.call("PUT", "/v1/conversations/amy_ben/archive", { archived: true });
     expect(s.store.doc("users/amy/dmReads/amy_ben")?.archivedAt).toEqual(new Date(now));

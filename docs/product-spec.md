@@ -197,8 +197,9 @@ everything the app does on the website alone, styled like the website
    folders; [x] adding teams to a community; [x] deleting a team
    (api 0.12.0, web 0.13.0). Roster players (people without accounts,
    for stats) come with stats.
-3. Messages: [ ] editing messages (team rooms and DMs); [ ] team rooms
-   beside DMs in `/messages`; [ ] typing indicators.
+3. Messages: [x] typing indicators and read receipts (api 0.13.0, web
+   0.14.0). The app has no message editing and keeps team rooms out of
+   its inbox, so neither is needed.
 4. W6: [ ] stats (games, live stat entry, season tables); [ ] playbook
    (play editor on a field, drag to draw); [ ] videos (library, links,
    uploads, player); [ ] workouts (manual log; GPS recording needs a

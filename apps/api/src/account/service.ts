@@ -5,6 +5,7 @@ import {
   mutedRoomKey,
   notificationCategoryRequestSchema,
   notificationMuteRequestSchema,
+  readReceiptsRequestSchema,
   profileKeywords,
 } from "@stall10/shared";
 import type { z } from "zod";
@@ -118,6 +119,14 @@ export class AccountService {
       req.headerUploadId !== undefined && str(before?.headerUrl) !== header ? str(before?.headerUrl) : null,
     );
     return { name, photoUrl: photo, headerUrl: header };
+  }
+
+  /** users/{uid}.readReceipts (owner-only in the rules); off hides when they've read messages. */
+  async setReadReceipts(caller: Caller, body: unknown): Promise<void> {
+    const { on } = parse(readReceiptsRequestSchema, body);
+    await this.store.transact(async (tx) => {
+      tx.merge(p.user(caller.uid), { readReceipts: on });
+    });
   }
 
   /** Turns a notification kind on or off, for every team or for one. */

@@ -76,6 +76,14 @@ describe("name and pictures", () => {
   });
 });
 
+describe("read receipts", () => {
+  it("turns them off and on for the caller", async () => {
+    expect((await s.call("PUT", "/v1/me/read-receipts", { on: false })).statusCode).toBe(204);
+    expect(s.store.doc("users/amy")?.readReceipts).toBe(false);
+    expect((await s.call("PUT", "/v1/me/read-receipts", { on: "no" })).statusCode).toBe(400);
+  });
+});
+
 describe("notification settings", () => {
   const prefs = () => s.store.doc("users/amy/settings/notifications");
 

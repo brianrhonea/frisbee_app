@@ -4,6 +4,15 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.14.0 — 2026-11-14
+
+Needs API 0.13.0.
+
+**Added**
+- "… is typing" in direct and group conversations, and your own typing
+  shown to others (sent at most every few seconds, cleared when you stop).
+- Settings → Privacy: **Read receipts**.
+
 ## 0.13.0 — 2026-11-14
 
 Team admin on the website. Needs API 0.12.0.

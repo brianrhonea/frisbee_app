@@ -14,6 +14,10 @@ export function accountRoutes(app: FastifyInstance, account: AccountService, rev
     await changed(req, caller.uid);
     return result;
   });
+  app.put("/v1/me/read-receipts", async (req, reply) => {
+    await account.setReadReceipts(requireCaller(req), req.body);
+    return reply.code(204).send();
+  });
   app.put("/v1/me/notification-settings/category", async (req, reply) => {
     await account.setCategory(requireCaller(req), req.body);
     return reply.code(204).send();

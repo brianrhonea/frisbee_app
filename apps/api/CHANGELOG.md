@@ -7,6 +7,13 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.13.0 — 2026-11-14
+
+**Added**
+- `PUT /v1/conversations/:id/typing`: a participant marks or clears their
+  typing (`conversations/{id}/typing/{uid}`, as the typing rule).
+- `PUT /v1/me/read-receipts`: `users/{uid}.readReceipts`.
+
 ## 0.12.0 — 2026-11-14
 
 Team admin for the website on its own.

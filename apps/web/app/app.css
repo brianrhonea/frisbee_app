@@ -1213,3 +1213,4 @@ button.poll-option.on { border-color: var(--accent); }
 .access-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .access-row > span { font-weight: 600; overflow-wrap: anywhere; }
 .settings-form .access-row select { width: auto; min-width: 150px; height: 36px; }
+.conv-typing { margin: 4px 0 0; font-style: italic; }

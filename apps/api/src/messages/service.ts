@@ -3,6 +3,7 @@ import {
   addGroupMembersRequestSchema,
   answerRequestSchema,
   archiveRequestSchema,
+  typingRequestSchema,
   chatReactionChoices,
   chatReactionRequestSchema,
   createGroupRequestSchema,
@@ -347,6 +348,16 @@ export class ConversationService {
       tx.update(p.conv(id), { status: accept ? "accepted" : "declined" });
       // Declining also clears it for them, so nothing lingers.
       if (!accept) tx.merge(p.reads(caller.uid, id), { clearedAt: serverTime });
+    });
+  }
+
+  /** `PUT /v1/conversations/:id/typing`: marks or clears the caller's typing (the typing rule). */
+  async setTyping(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
+    const { typing } = parse(typingRequestSchema, body);
+    const { id } = await this.mine(caller, rawId);
+    await this.store.transact(async (tx) => {
+      if (typing) tx.set(`conversations/${id}/typing/${caller.uid}`, { at: serverTime });
+      else tx.delete(`conversations/${id}/typing/${caller.uid}`);
     });
   }
 

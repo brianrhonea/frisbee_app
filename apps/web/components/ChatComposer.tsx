@@ -19,12 +19,15 @@ export function ChatComposer({
   placeholder,
   replyTo,
   onClearReply,
+  onTyping,
 }: {
   path: string;
   upload: { targetId: string };
   placeholder: string;
   replyTo?: { id: string; authorName?: string; text?: string } | null;
   onClearReply?: () => void;
+  /** Told when the member has words in the box and when they've cleared or sent them. */
+  onTyping?: (typing: boolean) => void;
 }) {
   const { user } = useAuth();
   const [text, setText] = useState("");
@@ -72,6 +75,7 @@ export function ChatComposer({
         },
       });
       setText("");
+      onTyping?.(false);
       setFiles([]);
       setMessageId(newId());
       onClearReply?.();
@@ -120,7 +124,11 @@ export function ChatComposer({
           rows={1}
           value={text}
           maxLength={chatTextMax}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            onTyping?.(e.target.value.trim().length > 0);
+          }}
+          onBlur={() => onTyping?.(false)}
           onPaste={(e) => {
             const pasted = [...e.clipboardData.files];
             if (pasted.length) addFiles(pasted);
