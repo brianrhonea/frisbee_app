@@ -434,30 +434,35 @@ class _Composer extends StatelessWidget {
           Divider(height: 1, color: c.border),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            // Wraps on phones, where the buttons don't fit on one line.
-            child: Wrap(
-              children: [
-                TextButton.icon(
-                  style: compact,
-                  onPressed: post,
-                  icon: const Icon(Icons.image_outlined, size: 18),
-                  label: const Text('Photo'),
-                ),
-                TextButton.icon(
-                  style: compact,
-                  onPressed: onWorkout,
-                  icon: const Icon(Icons.directions_run, size: 18),
-                  label: const Text('Workout'),
-                ),
-                RecordWorkoutButton(style: compact),
-                if (onTeamPost case final teamPost?)
+            // Wraps on phones, where the buttons don't fit on one line. The
+            // card's full width, so every row starts at its left edge (a
+            // centred wrap left the second row out of line).
+            child: SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                children: [
                   TextButton.icon(
                     style: compact,
-                    onPressed: teamPost,
-                    icon: const Icon(Icons.campaign_outlined, size: 18),
-                    label: const Text('Team post'),
+                    onPressed: post,
+                    icon: const Icon(Icons.image_outlined, size: 18),
+                    label: const Text('Photo'),
                   ),
-              ],
+                  TextButton.icon(
+                    style: compact,
+                    onPressed: onWorkout,
+                    icon: const Icon(Icons.directions_run, size: 18),
+                    label: const Text('Workout'),
+                  ),
+                  RecordWorkoutButton(style: compact),
+                  if (onTeamPost case final teamPost?)
+                    TextButton.icon(
+                      style: compact,
+                      onPressed: teamPost,
+                      icon: const Icon(Icons.campaign_outlined, size: 18),
+                      label: const Text('Team post'),
+                    ),
+                ],
+              ),
             ),
           ),
         ],
@@ -846,7 +851,13 @@ class _ComingUpCard extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+              // Compact, so the card's padding below it matches the top
+              // (a full 48 dp tap target left a gap under it).
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: onAdd,
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Add event'),

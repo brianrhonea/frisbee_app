@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import type { ReactNode } from "react";
 import { AppFrame } from "@/components/AppFrame";
 import { AuthProvider } from "@/components/AuthProvider";
 import { PersonalGate } from "@/components/PersonalGate";
 import { SiteFooter } from "@/components/SiteFooter";
+import { themeScript } from "@/lib/theme";
 import "./site.css";
 import "./app.css";
 
@@ -19,15 +21,20 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0e1310" },
-    { media: "(prefers-color-scheme: light)", color: "#f4f4ef" },
+    { media: "(prefers-color-scheme: dark)", color: "#121521" },
+    { media: "(prefers-color-scheme: light)", color: "#f3f5fb" },
   ],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // The theme script sets data-theme before React loads; that's expected.
+    <html lang="en" suppressHydrationWarning>
       <body>
+        {/* Applies a saved light/dark choice before the page paints. */}
+        <Script id="theme" strategy="beforeInteractive">
+          {themeScript}
+        </Script>
         <AuthProvider>
           <AppFrame footer={<SiteFooter />}>
             <PersonalGate>{children}</PersonalGate>

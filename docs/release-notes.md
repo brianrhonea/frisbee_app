@@ -10,6 +10,28 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.22
+
+**A new icon**
+- The app icon is now white with an indigo disc, matching the app's new
+  colours. Same "10" with the flying disc.
+
+## 0.0.21
+
+**A new look, matching the website**
+- The app uses the website's colours: indigo on a cool off-white, and
+  "Midnight" in dark mode. The sidebar and top bar are light (or Midnight),
+  the selected tab is indigo, and calls to action on indigo cards are amber.
+- The sign-in screen's field and disc are in the new colours too.
+
+**Tidier layouts**
+- Photos in posts fill the width of the post (one photo at 4:3, more in
+  two columns), so they no longer overflow narrow screens or leave a gap.
+- Home's post buttons (Photo, Workout, Record, Team post) line up on the
+  left when they wrap onto a second row.
+- Settings → Account shows a long email under its label instead of
+  squeezing the label.
+
 ## 0.0.20
 
 **Fresh Home feed**

@@ -653,7 +653,7 @@ class _InboxTile extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border(
               left: BorderSide(
-                color: selected ? c.ink : Colors.transparent,
+                color: selected ? c.accent : Colors.transparent,
                 width: 3,
               ),
             ),

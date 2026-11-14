@@ -635,7 +635,7 @@ class _PostComposerState extends State<PostComposer> {
                 workoutIcon(a),
                 size: 18,
                 color: _activity == a
-                    ? AppColors.of(context).onHighlight
+                    ? AppColors.of(context).onAccent
                     : null,
               ),
               label: Text(a.label),

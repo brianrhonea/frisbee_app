@@ -178,7 +178,7 @@ class _ResultBlock extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.emoji_events, size: 16, color: c.highlight),
+                  Icon(Icons.emoji_events, size: 16, color: c.accent),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text.rich(

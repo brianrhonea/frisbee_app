@@ -23,13 +23,14 @@ export function HeaderAuth() {
     const name = user.displayName || "Your account";
     return (
       <details className="account-menu" ref={menu}>
-        <summary>
-          <Avatar name={name} url={user.photoURL ?? undefined} size={30} />
+        <summary aria-label="Your account">
+          <Avatar name={name} url={user.photoURL ?? undefined} size={36} />
           <span className="account-name">{name}</span>
         </summary>
         <div className="account-list">
-          <Link href="/">Your dashboard</Link>
-          <Link href={`/players/${encodeURIComponent(user.uid)}`}>Your public profile</Link>
+          <Link href={`/players/${encodeURIComponent(user.uid)}`}>Your profile</Link>
+          <Link href="/notifications">Notifications</Link>
+          <Link href="/settings">Settings</Link>
           <button type="button" onClick={() => void signOut(firebaseAuth()!)}>
             Log out
           </button>

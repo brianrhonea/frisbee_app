@@ -1,64 +1,56 @@
 "use client";
-import { normalizeUsername, usernameProblem } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import { type FormEvent, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
+import { suggestUsername, UsernameField, useUsernameCheck } from "./UsernameField";
 
 /**
  * Picking a username: the step the app shows a new account
- * (/welcome/username). Claimed through the API, which also starts the
- * profile, so the player can be found and followed.
+ * (/welcome/username), started from their name and theirs to change.
+ * Claimed through the API, which also starts the profile, so the player
+ * can be found and followed. A card on Home for older accounts; a step of
+ * sign-up (PersonalGate) for new ones that signed up with Google or Apple.
  */
-export function UsernameStep({ user, onDone }: { user: User; onDone: () => void }) {
-  const [name, setName] = useState("");
+export function UsernameStep({ user, onDone, step = false }: { user: User; onDone: () => void; step?: boolean }) {
+  const [name, setName] = useState(() => suggestUsername(user.displayName));
+  const check = useUsernameCheck(name, user.uid);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const handle = normalizeUsername(name);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const problem = usernameProblem(name);
-    if (problem) return setError(problem);
+    if (check.status !== "available" && check.status !== "failed") return;
     setBusy(true);
     setError("");
     try {
-      await callApi(user, "/v1/me/username", { method: "POST", body: { username: handle } });
+      await callApi(user, "/v1/me/username", { method: "POST", body: { username: check.handle } });
       onDone();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      if (err instanceof ApiError && err.code === "already_exists") check.markTaken();
+      else setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
     } finally {
       setBusy(false);
     }
   }
 
+  const ready = check.status === "available" || check.status === "failed";
   return (
-    <form className="card username-step" onSubmit={submit}>
-      <h2 className="card-title">Pick your username</h2>
-      <p className="muted small">It&apos;s how teammates find you. You can&apos;t change it later.</p>
-      <div className="username-row">
-        <span aria-hidden="true">@</span>
-        <label className="visually-hidden" htmlFor="username">
-          Username
-        </label>
-        <input
-          id="username"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          maxLength={30}
-          placeholder="pat.lee"
-        />
-        <button className="btn btn-primary btn-small" type="submit" disabled={busy || !handle}>
-          Save
-        </button>
-      </div>
+    <form className={step ? "username-step-form" : "card username-step"} onSubmit={(e) => void submit(e)} noValidate>
+      {!step && (
+        <>
+          <h2 className="card-title">Pick your username</h2>
+          <p className="muted small">It&apos;s how teammates find you.</p>
+        </>
+      )}
+      <UsernameField value={name} onChange={setName} check={check} />
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
+      <button className={step ? "btn btn-primary" : "btn btn-primary btn-small"} type="submit" disabled={busy || !ready}>
+        {busy ? "Saving…" : step ? "Continue" : "Save"}
+      </button>
     </form>
   );
 }

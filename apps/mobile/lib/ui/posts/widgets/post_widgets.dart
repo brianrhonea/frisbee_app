@@ -264,18 +264,29 @@ class _PostContent extends StatelessWidget {
         ],
         if (post.images.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final i in post.images)
-                PostImage(
-                  image: i,
-                  loadImage: loadImage,
-                  size: post.images.length == 1 ? 320 : 156,
-                ),
-            ],
-          ),
+          // The full width of the post, as on the website: one photo at
+          // 4:3, more in two columns (never wider than the post, which a
+          // fixed size was on narrow screens).
+          if (post.images.length == 1)
+            PostImage(
+              image: post.images.single,
+              loadImage: loadImage,
+              aspectRatio: 4 / 3,
+            )
+          else
+            LayoutBuilder(
+              builder: (context, box) {
+                final size = (box.maxWidth - 8) / 2;
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final i in post.images)
+                      PostImage(image: i, loadImage: loadImage, size: size),
+                  ],
+                );
+              },
+            ),
         ],
         for (final l in post.links)
           PostLinkRow(
@@ -406,72 +417,82 @@ class _PostFooter extends StatelessWidget {
     final liked = actions.isLiked(post);
     final reposted = actions.isReposted(post);
     final canRepost = actions.canRepost(post) && onRepost != null;
-    // Narrow phones drop the words and keep the counts.
-    final narrow = MediaQuery.sizeOf(context).width < 400;
-    String count(String label, int n) => n > 0 ? '$n' : (narrow ? '' : label);
     final muted = TextButton.styleFrom(
       foregroundColor: scheme.onSurfaceVariant,
     );
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        children: [
-          TextButton.icon(
-            onPressed: () => actions.toggleLike.execute(post),
-            style: TextButton.styleFrom(
-              foregroundColor: liked
-                  ? Colors.red.shade400
-                  : scheme.onSurfaceVariant,
-            ),
-            icon: Icon(
-              liked ? Icons.favorite : Icons.favorite_border,
-              size: 20,
-            ),
-            label: Text(
-              count('Like', target.likeCount),
-              semanticsLabel: liked ? 'Unlike' : 'Like',
-            ),
+    // Where the row is narrow (phones, inside a card), drop the words and
+    // keep the counts. Measured from the row's own width: the screen's
+    // left the words in on 411 dp phones, overflowing the card.
+    return LayoutBuilder(
+      builder: (context, box) {
+        final narrow = box.maxWidth < 380;
+        String count(String label, int n) =>
+            n > 0 ? '$n' : (narrow ? '' : label);
+        return Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            children: [
+              TextButton.icon(
+                onPressed: () => actions.toggleLike.execute(post),
+                style: TextButton.styleFrom(
+                  foregroundColor: liked
+                      ? Colors.red.shade400
+                      : scheme.onSurfaceVariant,
+                ),
+                icon: Icon(
+                  liked ? Icons.favorite : Icons.favorite_border,
+                  size: 20,
+                ),
+                label: Text(
+                  count('Like', target.likeCount),
+                  semanticsLabel: liked ? 'Unlike' : 'Like',
+                ),
+              ),
+              const SizedBox(width: 4),
+              TextButton.icon(
+                // Your own posts show how often they were reposted.
+                onPressed: canRepost ? onRepost : null,
+                style: TextButton.styleFrom(
+                  foregroundColor: reposted
+                      ? scheme.primary
+                      : scheme.onSurfaceVariant,
+                ),
+                icon: Icon(reposted ? Icons.repeat_on : Icons.repeat, size: 20),
+                label: Text(
+                  reposted
+                      ? (target.repostCount > 1
+                            ? '${target.repostCount}'
+                            : 'Reposted')
+                      : count('Repost', target.repostCount),
+                  semanticsLabel: reposted ? 'Undo repost' : 'Repost',
+                ),
+              ),
+              const SizedBox(width: 4),
+              TextButton.icon(
+                onPressed:
+                    onComment ??
+                    () => openPage(
+                      context,
+                      Routes.post(target.id, comment: true),
+                    ),
+                style: muted,
+                icon: const Icon(Icons.chat_bubble_outline, size: 20),
+                label: Text(
+                  count('Comment', target.commentCount),
+                  semanticsLabel: 'Comment',
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Send',
+                onPressed: () => showSendPost(context, target),
+                color: scheme.onSurfaceVariant,
+                icon: const Icon(Icons.send_outlined, size: 20),
+              ),
+            ],
           ),
-          const SizedBox(width: 4),
-          TextButton.icon(
-            // Your own posts show how often they were reposted.
-            onPressed: canRepost ? onRepost : null,
-            style: TextButton.styleFrom(
-              foregroundColor: reposted
-                  ? scheme.primary
-                  : scheme.onSurfaceVariant,
-            ),
-            icon: Icon(reposted ? Icons.repeat_on : Icons.repeat, size: 20),
-            label: Text(
-              reposted
-                  ? (target.repostCount > 1
-                        ? '${target.repostCount}'
-                        : 'Reposted')
-                  : count('Repost', target.repostCount),
-              semanticsLabel: reposted ? 'Undo repost' : 'Repost',
-            ),
-          ),
-          const SizedBox(width: 4),
-          TextButton.icon(
-            onPressed:
-                onComment ??
-                () => openPage(context, Routes.post(target.id, comment: true)),
-            style: muted,
-            icon: const Icon(Icons.chat_bubble_outline, size: 20),
-            label: Text(
-              count('Comment', target.commentCount),
-              semanticsLabel: 'Comment',
-            ),
-          ),
-          const Spacer(),
-          IconButton(
-            tooltip: 'Send',
-            onPressed: () => showSendPost(context, target),
-            color: scheme.onSurfaceVariant,
-            icon: const Icon(Icons.send_outlined, size: 20),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

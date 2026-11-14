@@ -4,6 +4,64 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.10.1 — 2026-11-14
+
+**Changed**
+- New logo and favicon: the app's "10" disc mark with an indigo disc on
+  white instead of lime on green, matching the site's palette. `public/logo.png` and `public/favicon.png` are drawn by
+  `apps/mobile/tool/brand/stall10_logo.py`.
+
+**Deploys**
+- Vercel builds only `main` (production) and `development` (the dev site,
+  and only when `apps/web/` or `packages/` changed). Other branches no
+  longer get preview deployments. See `vercel.json` and
+  `scripts/vercel-ignore.sh`.
+
+## 0.10.0 — 2026-11-14
+
+**Changed**
+- New look: an indigo palette (light) and "Midnight" (dark), with an amber
+  call-to-action colour, squarer buttons and softer cards.
+- The frame has a top bar on every page: the Stall 10 wordmark, a search
+  box (players, teams and events; it opens Explore) and notifications and
+  your account. The sidebar gains Learn, a **Create a post** button
+  (**Join Stall 10** for visitors), your teams, and an About card.
+- Home for members is "Your daily huddle.": the composer, then
+  **Following** and **Community** feed tabs, with a right column for
+  finding pickup, what's coming up on your teams and Learn. Your profile
+  card and stats stay on your profile page.
+- Home for visitors, and the right column on other pages, use the same
+  layout: the community preview with pickup, upcoming events and sign-up
+  cards beside it.
+- Upcoming events show as date badges in a list; empty states and card
+  spacing are consistent across pages.
+- The top bar's search sits centred between the wordmark and your account,
+  with even gaps at every width.
+- Sign-up is two steps, as in the app: **Account details** (first and last
+  name, a username suggested from your name that you can change, with a
+  live "available" check, birthday, email and password), then **About
+  you** (your personal details). With email, under 13 is refused before an
+  account is made. Signing up with Google or Apple (as in the app) asks
+  your username, then About you, whose birthday removes an account under
+  13.
+- Log in and sign up have a new look to match the rest of the site;
+  "Forgot your password?" sits beside the password field.
+- Form fields are the same height across sign-up and settings, and button
+  labels are bold everywhere.
+
+**Added**
+- A light/dark switch (sun/moon) in the top bar, for visitors and members.
+  The choice is kept in that browser; until someone picks, the site follows
+  the system setting.
+- Events has a week strip like the app's Schedule: seven days from today,
+  dots for each day's team events (indigo) and tournaments (amber), and
+  previous/next week. Pick a day to see just its events.
+- Team hubs on desktops show Playbook, Videos, Stats and Tournaments as
+  tabs of their own; narrower screens keep them under More.
+- "Your spaces" in the sidebar labels each one (Team, Community or
+  School/club) with its member count (128, 1.2k), and leaves out teams a
+  community of yours lists, as the Teams page does.
+
 ## 0.9.3 — 2026-11-14
 
 **Fixed**

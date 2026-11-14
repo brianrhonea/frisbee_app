@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { EventItem } from "@/components/EventItem";
 import { HomeGate } from "@/components/HomeGate";
 import { LocalTime } from "@/components/LocalTime";
+import { LearnPromo, PickupCard } from "@/components/HomeCards";
 import { PostCard } from "@/components/PostCard";
 import { getPublic, tags } from "@/lib/api";
 
@@ -37,92 +38,95 @@ export default async function Home() {
 
   return (
     <HomeGate>
-      <div className="page page-wide home">
-        <section className="home-hero">
-          <p className="eyebrow">Built for ultimate frisbee</p>
-          <h1>
-            Your ultimate team, <span className="accent">in one place.</span>
-          </h1>
-          <p className="lead">
-            Schedules, rosters, stats and pickup for club, college and league ultimate. Join free to follow players, keep
-            up with your teams and see everything happening near you.
-          </p>
-          <div className="home-actions">
-            <Link className="btn btn-primary" href="/sign-up">
-              Create your account
-            </Link>
-            <Link className="btn" href="/sign-in">
-              Log in
-            </Link>
-          </div>
-          <p className="web-cta">
-            New to ultimate? <Link href="/learn">Learn the basics →</Link>
-          </p>
-        </section>
-
-        <div className="home-grid">
-          <section>
-            <h2 className="section-title">From the community</h2>
-            {posts.length === 0 ? (
-              <p className="empty">No posts yet.</p>
-            ) : (
-              <div className="stack">
-                {posts.map((p) => (
-                  <PostCard key={p.id} post={p} />
-                ))}
-              </div>
-            )}
-            <div className="cta-card">
-              <p>Sign up to see the whole feed, follow players and post your own.</p>
-              <Link className="btn btn-primary btn-small" href="/sign-up">
-                Sign up free
+      <div className="page huddle home">
+        <div className="huddle-main">
+          <section className="home-hero">
+            <p className="eyebrow">Built for ultimate frisbee</p>
+            <h1>
+              Your ultimate team, <span className="accent">in one place.</span>
+            </h1>
+            <p className="lead">
+              Schedules, rosters, stats and pickup for club, college and league ultimate. Join free to follow players,
+              keep up with your teams and see everything happening near you.
+            </p>
+            <div className="home-actions">
+              <Link className="btn btn-primary" href="/sign-up">
+                Create your account
+              </Link>
+              <Link className="btn btn-quiet" href="/sign-in">
+                Log in
               </Link>
             </div>
           </section>
 
-          <aside className="stack">
-            <h2 className="section-title">Coming up</h2>
-            {events.length === 0 ? (
-              <p className="empty">Nothing public scheduled.</p>
-            ) : (
-              events.map((e) => (
-                <EventItem key={`${e.teamId}/${e.id}`} startsAt={e.startsAt}>
-                  <b>{e.title || "Event"}</b>
-                  <small>
-                    <LocalTime iso={e.startsAt} style="dateTime" />
-                  </small>
-                  <small>
-                    <Link href={`/teams/${encodeURIComponent(e.teamId)}`}>{e.teamName}</Link>
-                  </small>
-                </EventItem>
-              ))
-            )}
-            <Link className="link small" href="/events">
-              All public events →
+          <div className="feed-tabs">
+            <Link className="on" href="/community" aria-current="page">
+              From the community
             </Link>
+          </div>
+          {posts.length === 0 ? (
+            <p className="empty">No posts yet.</p>
+          ) : (
+            <div className="stack">
+              {posts.map((p) => (
+                <PostCard key={p.id} post={p} />
+              ))}
+            </div>
+          )}
+          <div className="cta-card">
+            <p>Sign up to see the whole feed, follow players and post your own.</p>
+            <Link className="btn btn-primary btn-small" href="/sign-up">
+              Sign up free
+            </Link>
+          </div>
+        </div>
 
-            {locked.map(([title, text]) => (
-              <div key={title} className="card locked">
-                <h3>
-                  <span aria-hidden="true">🔒 </span>
-                  {title}
-                </h3>
-                <p className="muted small">{text}</p>
-                <Link className="link small" href="/sign-in">
-                  Log in to see yours
-                </Link>
-              </div>
-            ))}
+        <aside className="huddle-side" aria-label="Coming up">
+          <PickupCard />
 
-            <div className="card learn-card">
-              <h3>Never played?</h3>
-              <p className="muted small">The rules of ultimate in five minutes: the field, the stall count, and spirit.</p>
-              <Link className="btn btn-small" href="/learn">
-                Learn to play
+          <div className="card">
+            <div className="card-head">
+              <h2 className="card-title">Upcoming events</h2>
+              <Link className="see-all" href="/events">
+                View all
               </Link>
             </div>
-          </aside>
-        </div>
+            {events.length === 0 ? (
+              <p className="muted small">Nothing public scheduled.</p>
+            ) : (
+              <div className="date-list">
+                {events.map((e) => (
+                  <EventItem key={`${e.teamId}/${e.id}`} startsAt={e.startsAt} plain>
+                    <b>{e.title || "Event"}</b>
+                    <small>
+                      <LocalTime iso={e.startsAt} style="dateTime" />
+                    </small>
+                    <small>
+                      <Link href={`/teams/${encodeURIComponent(e.teamId)}`}>{e.teamName}</Link>
+                    </small>
+                  </EventItem>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <h2 className="card-title">With a free account</h2>
+            <ul className="locked-list">
+              {locked.map(([title, text]) => (
+                <li key={title}>
+                  <b>{title}</b>
+                  <small>{text}</small>
+                </li>
+              ))}
+            </ul>
+            <Link className="see-all" href="/sign-in">
+              Log in to see yours
+            </Link>
+          </div>
+
+          <LearnPromo label="New to ultimate?" />
+        </aside>
       </div>
     </HomeGate>
   );

@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
 import { postState } from "@/lib/postState";
 import { useAuth } from "./AuthProvider";
+import { NavIcon } from "./NavIcons";
 import { postUrl, ShareButton } from "./ShareButton";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -53,21 +54,28 @@ export function PostActions({ post, onComment }: { post: PublicPost; onComment?:
   if (!target) return null;
   const likeCount = state?.likeCount ?? target.likeCount;
   const repostCount = state?.repostCount ?? target.repostCount;
-  const comments = target.commentCount ? <span>{plural(target.commentCount, "comment", "comments")}</span> : null;
+  const stats = (
+    <div className="post-stats">
+      <span>{plural(likeCount, "like", "likes")}</span>
+      <span>
+        {plural(target.commentCount ?? 0, "comment", "comments")} · {plural(repostCount, "repost", "reposts")}
+      </span>
+    </div>
+  );
 
   if (!user) {
     return (
-      <footer className="post-counts">
-        <span>{plural(likeCount, "like", "likes")}</span>
-        <span>{plural(repostCount, "repost", "reposts")}</span>
-        {comments}
-        <ShareButton url={postUrl(post.id)} />
-        {user === null && (
-          <Link className="post-join" href="/sign-up">
-            Sign up to like and reply
-          </Link>
-        )}
-      </footer>
+      <>
+        {stats}
+        <footer className="post-actions">
+          <ShareButton url={postUrl(post.id)} />
+          {user === null && (
+            <Link className="post-join" href="/sign-up">
+              Sign up to like and reply
+            </Link>
+          )}
+        </footer>
+      </>
     );
   }
 
@@ -112,7 +120,8 @@ export function PostActions({ post, onComment }: { post: PublicPost; onComment?:
   const reposted = state?.reposted ?? false;
   return (
     <>
-      <footer className="post-counts post-actions">
+      {stats}
+      <footer className="post-actions">
         <button
           type="button"
           className={`post-action${liked ? " on" : ""}`}
@@ -120,11 +129,14 @@ export function PostActions({ post, onComment }: { post: PublicPost; onComment?:
           disabled={!state}
           onClick={() => void toggleLike()}
         >
-          <span aria-hidden="true">{liked ? "♥" : "♡"}</span> {plural(likeCount, "like", "likes")}
+          <NavIcon name="heart" size={18} /> {liked ? "Liked" : "Like"}
         </button>
-        {state && !state.canRepost ? (
-          <span>{plural(repostCount, "repost", "reposts")}</span>
-        ) : (
+        {onComment && (
+          <button type="button" className="post-action" onClick={onComment}>
+            <NavIcon name="comment" size={18} /> Comment
+          </button>
+        )}
+        {(!state || state.canRepost) && (
           <button
             type="button"
             className={`post-action${reposted ? " on" : ""}`}
@@ -133,15 +145,8 @@ export function PostActions({ post, onComment }: { post: PublicPost; onComment?:
             disabled={!ready}
             onClick={() => (reposted ? void repost(true) : setComposing((c) => !c))}
           >
-            <span aria-hidden="true">↻</span> {plural(repostCount, "repost", "reposts")}
+            <NavIcon name="repost" size={18} /> {reposted ? "Reposted" : "Repost"}
           </button>
-        )}
-        {onComment ? (
-          <button type="button" className="post-action" onClick={onComment}>
-            <span aria-hidden="true">💬</span> {plural(target.commentCount ?? 0, "comment", "comments")}
-          </button>
-        ) : (
-          comments
         )}
         <ShareButton url={postUrl(post.id)} />
       </footer>

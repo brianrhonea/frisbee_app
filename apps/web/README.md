@@ -65,14 +65,30 @@ both sites:
 
 | | Dev site | Prod site |
 |---|---|---|
-| Branch | `development` (and every other non-`main` branch) | `main` |
+| Branch | `development` | `main` |
 | Vercel environment | Preview | Production |
 | Firebase project | `frisbee-app-brianrhonea-dev` | `frisbee-app-brianrhonea` |
 | API | dev Cloud Run `api` | prod Cloud Run `api` |
-| Address | `https://dev.stall10.app` (Settings → Domains, Git Branch `development`); other branches `frisbeeapp-git-<branch>-brian-honeas-projects.vercel.app` | `https://stall10.app` |
+| Address | `https://dev.stall10.app` (Settings → Domains, Git Branch `development`) | `https://stall10.app` |
 
 Until `monorepo` is merged into `development`, the dev site is
 `frisbeeapp-git-monorepo-brian-honeas-projects.vercel.app`.
+
+### Which pushes deploy
+
+`vercel.json` sets the Ignored Build Step to `scripts/vercel-ignore.sh`:
+
+- `main` always builds (production).
+- `development` builds only when `apps/web/` or `packages/` changed since
+  its last deployment (`VERCEL_GIT_PREVIOUS_SHA`), so app-only or API-only
+  pushes don't redeploy the dev site.
+- Every other branch is skipped (shown as Canceled). To try a branch
+  online, merge it into `development`, or run `vercel` from `apps/web` for
+  a one-off preview.
+
+The file overrides the dashboard's Ignored Build Step setting. Use
+**Redeploy** in the dashboard to force a build (for example after
+changing an environment variable).
 
 ### Project settings
 

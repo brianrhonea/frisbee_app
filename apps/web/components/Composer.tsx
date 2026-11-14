@@ -17,6 +17,7 @@ import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { MemberImage } from "./MemberImage";
+import { NavIcon } from "./NavIcons";
 
 /** A photo on the post: already saved, or chosen now (uploading, then ready). */
 type Photo =
@@ -353,34 +354,34 @@ export function Composer({
               />
               <button
                 type="button"
-                className="icon-btn"
+                className="composer-tool"
                 title="Add photos (or drop or paste them)"
                 disabled={photos.length >= postImagesMax}
                 onClick={() => files.current?.click()}
               >
                 <PhotoIcon />
-                <span className="sr-only">Add photos</span>
+                <span>Photo</span>
               </button>
               <button
                 type="button"
-                className="icon-btn"
+                className="composer-tool"
                 title="Add a link"
                 disabled={links.length >= postLinksMax}
                 onClick={() => setAddingLink(true)}
               >
                 <LinkIcon />
-                <span className="sr-only">Add a link</span>
+                <span>Link</span>
               </button>
               {!editing && (
                 <button
                   type="button"
-                  className={`icon-btn${workout ? " on" : ""}`}
+                  className={`composer-tool${workout ? " on" : ""}`}
                   title={workout ? "Remove the workout" : "Add a workout"}
                   aria-pressed={workout !== null}
                   onClick={() => setWorkout(workout ? null : blankWorkout())}
                 >
                   <WorkoutIcon />
-                  <span className="sr-only">Add a workout</span>
+                  <span>Workout</span>
                 </button>
               )}
             </>
@@ -394,6 +395,7 @@ export function Composer({
           )}
           <button className="btn btn-primary btn-small" type="submit" disabled={!canPost} title="Ctrl+Enter">
             {busy ? (editing ? "Saving…" : "Posting…") : editing ? "Save" : "Post"}
+            {!busy && !editing && <NavIcon name="arrow" size={16} />}
           </button>
         </div>
       </div>

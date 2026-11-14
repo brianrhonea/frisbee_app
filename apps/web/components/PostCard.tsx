@@ -50,30 +50,37 @@ function PostHead({
   menu?: ReactNode;
 }) {
   const author = post.authorName || "A player";
-  const who = (
-    <>
-      <Avatar name={author} url={post.authorPhotoUrl} />
-      <b>{author}</b>
-    </>
-  );
   const time = <LocalTime iso={post.createdAt} style="relative" />;
+  const avatar = <Avatar name={author} url={post.authorPhotoUrl} />;
+  const profile = post.authorId ? `/players/${encodeURIComponent(post.authorId)}` : null;
   return (
     <header className="post-head">
-      {post.authorId ? (
-        <Link href={`/players/${encodeURIComponent(post.authorId)}`} className="post-author">
-          {who}
+      {profile ? (
+        <Link href={profile} className="post-avatar" tabIndex={-1} aria-hidden="true">
+          {avatar}
         </Link>
       ) : (
-        <span className="post-author">{who}</span>
+        avatar
       )}
-      {note && <span className="post-reposted">{note}</span>}
-      {standalone ? (
-        <span className="post-time">{time}</span>
-      ) : (
-        <Link className="post-time" href={`/posts/${encodeURIComponent(post.id)}`}>
-          {time}
-        </Link>
-      )}
+      <span className="post-who">
+        <span className="post-name">
+          {profile ? (
+            <Link href={profile} className="post-author">
+              <b>{author}</b>
+            </Link>
+          ) : (
+            <b className="post-author">{author}</b>
+          )}
+          {note && <span className="post-reposted">{note}</span>}
+        </span>
+        {standalone ? (
+          <span className="post-time">{time}</span>
+        ) : (
+          <Link className="post-time" href={`/posts/${encodeURIComponent(post.id)}`}>
+            {time}
+          </Link>
+        )}
+      </span>
       {menu}
     </header>
   );
