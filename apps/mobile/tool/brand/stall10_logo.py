@@ -1,8 +1,8 @@
 """Draws the Stall 10 logo -- a bold "1" beside a flying disc that forms the
 "0", with a motion trail -- and writes every app icon from it.
 
-The logo is monochrome: white and silver on graphite, so it sits with any
-theme or accent colour (light, dark, or a palette we haven't picked yet).
+The logo is an indigo disc and an ink "1" on white: the website's palette,
+so the icon matches what users see in the app and on the site.
 
 Run from apps/mobile (needs Pillow: `pip install pillow`):
 
@@ -18,14 +18,15 @@ import os
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
-# Neutral graphite and silver: no hue, so nothing clashes with a theme.
-BG_TOP = (44, 45, 50)       # background, top
-BG_BOTTOM = (17, 18, 21)    # background, bottom (and the disc's hole)
-DISC = (232, 233, 237)         # disc top surface, trail
-DISC_SHADE = (190, 192, 199)   # disc shading, outer trails
-DISC_EDGE = (128, 130, 139)    # disc rim underside and flight ring
-DISC_RIM = (255, 255, 255)     # rim highlight
-WHITE = (250, 250, 252)        # the "1"
+# White with an indigo disc: the website's accent (#5348B2 family), so the
+# icon promises the colours users find inside.
+BG_TOP = (255, 255, 255)       # background, top
+BG_BOTTOM = (242, 243, 247)    # background, bottom (and the disc's hole)
+DISC = (99, 86, 204)           # disc top surface, trail
+DISC_SHADE = (84, 73, 173)     # disc shading, outer trails
+DISC_EDGE = (54, 47, 112)      # disc rim underside and flight ring
+DISC_RIM = (193, 188, 235)     # rim highlight
+WHITE = (23, 26, 46)           # the "1" (site ink #171A2E)
 
 S = 4  # supersampling
 

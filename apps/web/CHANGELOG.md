@@ -7,9 +7,8 @@ here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 ## 0.10.1 — 2026-11-14
 
 **Changed**
-- New logo and favicon: the app's "10" disc mark in white and silver on
-  graphite instead of lime on green, so it suits light, dark and any
-  accent colour. `public/logo.png` and `public/favicon.png` are drawn by
+- New logo and favicon: the app's "10" disc mark with an indigo disc on
+  white instead of lime on green, matching the site's palette. `public/logo.png` and `public/favicon.png` are drawn by
   `apps/mobile/tool/brand/stall10_logo.py`.
 
 **Deploys**

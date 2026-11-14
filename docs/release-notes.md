@@ -13,8 +13,8 @@ Firebase project; App Store builds come from `main` and use production.
 ## 0.0.22
 
 **A new icon**
-- The app icon is now white and silver on graphite, so it looks at home
-  with light mode, dark mode and any colour. Same "10" with the flying disc.
+- The app icon is now white with an indigo disc, matching the app's new
+  colours. Same "10" with the flying disc.
 
 ## 0.0.21
 

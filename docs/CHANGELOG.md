@@ -37,13 +37,14 @@ Plain-language notes for testers are in
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
 
-## 0.0.22 — A neutral logo
+## 0.0.22 — An indigo logo
 
 Assets only; no data, rules or API changes.
 
-- `tool/brand/stall10_logo.py` draws the same "10" disc mark in neutral
-  graphite (background), white (the "1") and silver (the disc and trail),
-  with no hue, so the icon suits any theme. It now runs from `apps/mobile`
+- `tool/brand/stall10_logo.py` draws the same "10" disc mark on white
+  with an ink "1" and an indigo disc and trail (the website's accent), in
+  place of lime on green, so the icon promises the palette users find
+  inside. It now runs from `apps/mobile`
   and writes the in-app logo, the Android and iOS launcher icons and the
   website's `logo.png` / `favicon.png` (`apps/web/public`,
   `firebase/hosting`); the macOS and Windows outputs went with those
