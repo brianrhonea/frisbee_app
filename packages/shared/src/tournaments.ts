@@ -221,12 +221,6 @@ export const entryStatusRequestSchema = z.strictObject({
   status: z.enum(["accepted", "waitlisted", "declined", "withdrawn"]),
 });
 
-/** POST /v1/tournaments/:id/reserve: start a team and reserve it a spot (players and teams). */
-export const reserveSpotRequestSchema = z.strictObject({
-  name: z.string().trim().min(1, "Name your team.").max(80),
-  divisionId: z.string().min(1).max(tournamentLimits.divisionId),
-});
-
 /** Scores a captain reports or the host sets. */
 export const scoreRequestSchema = z
   .strictObject({
