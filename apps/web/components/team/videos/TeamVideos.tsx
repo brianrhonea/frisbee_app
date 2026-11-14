@@ -53,7 +53,9 @@ export function TeamVideos() {
   }, [filter, foldersLive.data]);
 
   if (videosLive.error) return <p className="form-error">{videosLive.error}</p>;
-  if (!videosLive.data) return <p className="muted" aria-busy="true">Loading…</p>;
+  // Folders load before the editor opens, so editing never unfiles a video.
+  if (foldersLive.error) return <p className="form-error">{foldersLive.error}</p>;
+  if (!videosLive.data || !foldersLive.data) return <p className="muted" aria-busy="true">Loading…</p>;
 
   const current = filter.kind === "folder" ? folders.find((f) => f.id === filter.id) : undefined;
   const countIn = (f: VideoFilter) => videos.filter((v) => matches(v, f, folders)).length;

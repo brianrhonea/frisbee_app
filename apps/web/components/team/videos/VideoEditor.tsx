@@ -156,7 +156,7 @@ export function VideoEditor({
       ) : (
         <label>
           YouTube link
-          <input type="url" inputMode="url" value={link} placeholder="https://youtu.be/…" autoFocus={!video} onChange={(e) => setLink(e.target.value)} />
+          <input type="text" inputMode="url" value={link} placeholder="https://youtu.be/…" autoFocus={!video} onChange={(e) => setLink(e.target.value)} />
           <LinkStatus check={check} />
         </label>
       )}

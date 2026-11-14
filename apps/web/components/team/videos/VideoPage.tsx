@@ -10,7 +10,7 @@ import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
 import { VideoEditor } from "./VideoEditor";
-import { byName, bytesUsed, type Folder, folderOf, removeMessage, type Video, videosApi, videosHref } from "./model";
+import { byName, bytesUsed, type Folder, removeMessage, type Video, videosApi, videosHref } from "./model";
 import { VideoPlayer } from "./VideoPlayer";
 import "./videos.css";
 
@@ -36,7 +36,8 @@ export function VideoPage({ videoId }: { videoId: string }) {
 
   if (!member) return <MembersOnlySection what="videos" />;
   if (live.error) return <p className="form-error">{live.error}</p>;
-  if (live.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
+  if (foldersLive.error) return <p className="form-error">{foldersLive.error}</p>;
+  if (live.data === undefined || foldersLive.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
   if (live.data === null) return <p className="empty">Video not available. It may have been removed. {back}</p>;
   const video = live.data as Video;
 
@@ -53,10 +54,8 @@ export function VideoPage({ videoId }: { videoId: string }) {
     }
   }
 
-  const folder = folderOf(video, folders);
   const byline = [
     video.authorName ? `Shared by ${video.authorName}` : null,
-    folder?.name ?? null,
     video.file ? formatVideoBytes(video.file.size ?? 0) : null,
   ].filter(Boolean);
 

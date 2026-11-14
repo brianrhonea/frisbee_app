@@ -30,9 +30,9 @@ beforeEach(() => {
   };
   store.put("teams/t1", {
     ownerId: "owner",
-    memberIds: ["owner", "coach", "player", "granted"],
-    members: { owner: "owner", coach: "coach", player: "player", granted: "player", ghost: "coach" },
-    memberPerms: { granted: ["manageTeam"], player: ["manageEvents"] },
+    memberIds: ["owner", "coach", "captain", "player", "granted"],
+    members: { owner: "owner", coach: "coach", captain: "captain", player: "player", granted: "player", ghost: "coach" },
+    memberPerms: { granted: ["manageTeam"], player: ["manageEvents"], formerMember: ["manageTeam"] },
   });
   store.put("teams/t1/videos/v1", youTubeVideo);
   store.put("teams/t1/videos/v2", fileVideo);
@@ -66,6 +66,9 @@ describe("adding a video (create rule)", () => {
 
   it("can(team(), 'manageTeam'): owners, coaches, captains and members granted it", async () => {
     expect((await add({}, "owner")).status).toBe(201);
+    expect((await add({}, "captain")).status).toBe(201);
+    // isMember(team) && perm in permsOf(team): a granted perm needs membership.
+    expect((await add({}, "formerMember")).status).toBe(403);
     expect((await add({}, "granted")).status).toBe(201);
     expect((await add({}, "player")).status).toBe(403);
     expect((await add({}, "stranger")).status).toBe(403);
@@ -168,6 +171,15 @@ describe("editing a video (update rule)", () => {
     expect((await edit("v4", { folderId: "f1" })).status).toBe(400);
   });
 
+  it("validVideo: stored fields must be strings", async () => {
+    store.put("teams/t1/videos/v5", { ...youTubeVideo, youtubeId: 5 });
+    expect((await edit("v5", { title: "x" })).status).toBe(400);
+    store.put("teams/t1/videos/v6", { ...youTubeVideo, folderId: 5 });
+    expect((await edit("v6", { title: "x" })).status).toBe(400);
+    store.put("teams/t1/videos/v7", { ...youTubeVideo, title: 5 });
+    expect((await edit("v7", { description: "x" })).status).toBe(400);
+  });
+
   it("validVideo: a YouTube video keeps a valid id", async () => {
     expect((await edit("v1", { youtubeId: "" })).status).toBe(400);
     expect((await edit("v1", { youtubeId: "bad" })).status).toBe(400);
@@ -192,7 +204,8 @@ describe("editing a video (update rule)", () => {
       expect(await seeded(goodFile("teams/t1/videos/v2/a/game.mp4"))).toBe(400);
       expect(await seeded(goodFile("teams/t1/videos/v2/"))).toBe(400);
     });
-    it("name is 1–200 characters", async () => {
+    it("name is a string of 1–200 characters", async () => {
+      expect(await seeded({ ...goodFile(), name: 5 })).toBe(400);
       expect(await seeded({ ...goodFile(), name: "" })).toBe(400);
       expect(await seeded({ ...goodFile(), name: "n".repeat(201) })).toBe(400);
     });
@@ -257,6 +270,12 @@ describe("folders (videoFolders rules)", () => {
     expect((await call("POST", "/v1/teams/t1/video-folders", { name: " " })).status).toBe(400);
     expect((await call("POST", "/v1/teams/t1/video-folders", { name: "n".repeat(41) })).status).toBe(400);
     expect((await call("PATCH", "/v1/teams/t1/video-folders/f1", { name: "n".repeat(41) })).status).toBe(400);
+  });
+
+  it("signedIn() on every folder write", async () => {
+    expect((await call("PATCH", "/v1/teams/t1/video-folders/f1", { name: "Film" }, null)).status).toBe(401);
+    expect((await call("DELETE", "/v1/teams/t1/video-folders/f1", undefined, null)).status).toBe(401);
+    expect(store.doc("teams/t1/videoFolders/f1")).toBeDefined();
   });
 
   it("update: can(manageTeam), changes only the name", async () => {
