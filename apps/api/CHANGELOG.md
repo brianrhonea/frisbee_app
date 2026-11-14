@@ -7,6 +7,26 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.14.1 — 2026-11-14
+
+**Fixed** (security review of 0.11.0–0.13.0)
+- `DELETE /v1/teams/:teamId` now checks everything the rule checks:
+  `ownerId` must be the caller (a `members` entry of "owner" is no longer
+  enough), the owner must be the only member (412 until the others are
+  removed or it's handed over), and a team that plays in an unfinished
+  league can't be deleted. Stored community and linked-team ids are
+  checked before they're used in paths.
+- Notification settings: at most 200 teams with their own settings (the
+  rules' cap); resetting a team now really removes its settings (it used
+  a merge, which kept the key).
+- `PUT /v1/me/identity` refuses one upload for both pictures, and an
+  unreadable old picture URL no longer fails the request after saving.
+- Visitors' profile views only pass on pictures from Firebase Storage or
+  Google, so a profile can't point visitors' browsers at another server.
+- Chat folder ids refuse `.`, `..` and Firestore's reserved names; failed
+  file clean-ups after deleting a team or room are logged.
+- Test fakes: `merge` now merges nested maps as Firestore does.
+
 ## 0.14.0 — 2026-11-14
 
 **Added**

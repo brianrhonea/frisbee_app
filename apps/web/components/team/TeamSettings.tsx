@@ -380,9 +380,11 @@ function TransferOwnership() {
 
 /** Deletes it for everyone (the owner, typing its name; `DELETE /v1/teams/:id`). */
 function DeleteTeam() {
-  const { teamId, name, kind } = useTeamHub();
+  const { teamId, name, kind, viewer } = useTeamHub();
   const router = useRouter();
   const [typed, setTyped] = useState("");
+  // As the rules ask: the owner removes everyone else, or hands it on, first.
+  const others = Math.max(0, (viewer.state === "member" ? (viewer.team.memberIds?.length ?? 1) : 1) - 1);
   const { act, busy, error } = useAct();
   const noun = kind === "team" ? "team" : kind === "organization" ? "community" : "group";
   const matches = typed.trim().toLowerCase() === name.trim().toLowerCase();
@@ -392,6 +394,12 @@ function DeleteTeam() {
       <p className="muted small">
         This deletes {name} for everyone: its chat, events, posts, playbook, stats, videos and files. It can&apos;t be undone.
       </p>
+      {others > 0 && (
+        <p className="small">
+          {others === 1 ? "1 other person is" : `${others} other people are`} still on it. Remove them from the roster, or hand it over
+          (above), before deleting it.
+        </p>
+      )}
       <label>
         Type {name} to confirm
         <input value={typed} autoComplete="off" onChange={(e) => setTyped(e.target.value)} />
@@ -401,7 +409,7 @@ function DeleteTeam() {
         <button
           type="button"
           className="btn btn-danger"
-          disabled={busy || !matches}
+          disabled={busy || !matches || others > 0}
           onClick={() => {
             if (!window.confirm(`Delete ${name} for everyone? This can't be undone.`)) return;
             void act(`/v1/teams/${encodeURIComponent(teamId)}`, "DELETE", { name: typed.trim() }).then((r) => {

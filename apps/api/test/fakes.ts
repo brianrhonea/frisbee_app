@@ -132,6 +132,18 @@ export class FakeStore implements DocStore {
     return out;
   }
 
+  /** set(..., {merge: true}): nested maps merge key by key, as Firestore does; arrays and other values replace. */
+  private deepMerge(d: Data, data: Data): Data {
+    const out = { ...d };
+    const isMap = (v: unknown): v is Data => !!v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date) && !Buffer.isBuffer(v);
+    for (const [k, v] of Object.entries(data)) {
+      if (v === deleteField) delete out[k];
+      else if (isMap(v) && isMap(out[k])) out[k] = this.deepMerge(out[k] as Data, v);
+      else out[k] = this.stamp(v);
+    }
+    return out;
+  }
+
   async transact<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
     const writes: Array<() => void> = [];
     const tx: Tx = {
@@ -148,7 +160,7 @@ export class FakeStore implements DocStore {
           if (!d) throw new Error(`update of missing ${path}`);
           this.docs.set(path, this.apply(d, data));
         }),
-      merge: (path, data) => writes.push(() => this.docs.set(path, this.apply(this.docs.get(path) ?? {}, data))),
+      merge: (path, data) => writes.push(() => this.docs.set(path, this.deepMerge(this.docs.get(path) ?? {}, data))),
       delete: (path) => writes.push(() => this.docs.delete(path)),
     };
     const result = await fn(tx);

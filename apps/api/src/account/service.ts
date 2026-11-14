@@ -60,7 +60,12 @@ export class AccountService {
   private ownPicturePath(caller: Caller, url: string | null): string | null {
     const m = url?.match(/\/o\/([^?]+)/);
     if (!m) return null;
-    const path = decodeURIComponent(m[1]!);
+    let path: string;
+    try {
+      path = decodeURIComponent(m[1]!);
+    } catch {
+      return null;
+    }
     return path.startsWith(`users/${caller.uid}/profile/`) && !path.includes("..") ? path : null;
   }
 
@@ -83,6 +88,9 @@ export class AccountService {
     if (!this.users.update) throw new ApiError("failed_precondition", "Accounts can't be changed here.");
     if ((req.photoUploadId || req.headerUploadId) && !this.media) {
       throw new ApiError("failed_precondition", "Pictures can't be uploaded here yet.");
+    }
+    if (req.photoUploadId && req.photoUploadId === req.headerUploadId) {
+      throw new ApiError("invalid_argument", "Use a different upload for the header photo.");
     }
     const [photoPath, headerPath] = await Promise.all([
       req.photoUploadId ? this.avatarPath(caller, req.photoUploadId) : null,
@@ -136,6 +144,10 @@ export class AccountService {
       const prefs = (await tx.get(p.prefs(caller.uid))) ?? {};
       if (teamId) {
         const teams = mapOf(prefs.teams);
+        // The rules' cap: Cloud Functions read this map for every notification.
+        if (!Object.hasOwn(teams, teamId) && Object.keys(teams).length >= 200) {
+          throw new ApiError("failed_precondition", "You've set too many teams' notifications. Reset some first.");
+        }
         tx.merge(p.prefs(caller.uid), {
           teams: { ...teams, [teamId]: { ...mapOf(teams[teamId]), [category]: on } },
           updatedAt: serverTime,
@@ -154,7 +166,8 @@ export class AccountService {
       const teams = { ...mapOf(prefs?.teams) };
       if (!(teamId in teams)) return;
       delete teams[teamId];
-      tx.merge(p.prefs(caller.uid), { teams, updatedAt: serverTime });
+      // update, not merge: a merge would keep the removed key inside the map.
+      tx.update(p.prefs(caller.uid), { teams, updatedAt: serverTime });
     });
   }
 

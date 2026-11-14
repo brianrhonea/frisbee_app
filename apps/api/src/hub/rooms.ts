@@ -122,7 +122,8 @@ export class ChatAdmin {
     if (!room) return;
     if (!canReadRoom(team, caller.uid, room)) throw denied();
     await this.teams.deleteTree(p.room(teamId, roomId));
-    await this.media?.deletePrefix(`teams/${teamId}/chats/${roomId}/`).catch(() => undefined);
+    // Left behind, the files are unreadable (storage.rules need the room), so a failure is logged, not fatal.
+    await this.media?.deletePrefix(`teams/${teamId}/chats/${roomId}/`).catch((e: unknown) => console.warn(`room ${teamId}/${roomId}: files not deleted`, e));
   }
 
   async createFolder(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {

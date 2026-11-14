@@ -4,6 +4,14 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.15.1 — 2026-11-14
+
+Needs API 0.14.1.
+
+**Fixed**
+- Deleting a team says when others are still on it and waits until
+  they're removed or it's handed over, as the API now requires.
+
 ## 0.15.0 — 2026-11-14
 
 Needs API 0.14.0.

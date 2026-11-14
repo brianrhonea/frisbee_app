@@ -6,6 +6,16 @@ import type { MediaStorage } from "../media/storage.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import type { TeamRepository } from "./repository.js";
 
+/** A stored id that is safe to put in a path, or null. */
+function safeId(v: unknown): string | null {
+  if (typeof v !== "string" || !v) return null;
+  try {
+    return docIdParam(v);
+  } catch {
+    return null;
+  }
+}
+
 const mapOf = (v: unknown): Data => (v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date) ? (v as Data) : {});
 
 /**
@@ -29,15 +39,27 @@ export class TeamDeletion {
     await this.store.transact(async (tx) => {
       const team = await tx.get(`teams/${teamId}`);
       if (!team) throw new ApiError("not_found", "That team doesn't exist.");
-      if (team.ownerId !== caller.uid && mapOf(team.members)[caller.uid] !== "owner") {
-        throw new ApiError("permission_denied", "Only the owner can delete it.");
+      if (team.ownerId !== caller.uid) throw new ApiError("permission_denied", "Only the owner can delete it.");
+      // soleOwner(): the owner removes everyone else or hands it on first, so no one's team vanishes.
+      const memberIds = Array.isArray(team.memberIds) ? team.memberIds : [];
+      if (memberIds.length !== 1 || memberIds[0] !== caller.uid) {
+        throw new ApiError("failed_precondition", "Remove everyone else or hand it on before deleting it.");
+      }
+      // inActiveLeague(): a league's games and standings refer to its teams until it's final.
+      const leagueId = safeId(team.leagueId);
+      if (team.leagueId != null && !leagueId) throw new ApiError("failed_precondition", "It plays in a league, so it can't be deleted yet.");
+      if (leagueId) {
+        const league = await tx.get(`tournaments/${leagueId}`);
+        if (league && league.status !== "finished") {
+          throw new ApiError("failed_precondition", "It plays in a league that hasn't finished, so it can't be deleted yet.");
+        }
       }
       // The client asks them to type the name; checked here too, so a stray request can't do it.
       if (typed === null || typed.toLowerCase() !== String(team.name ?? "").trim().toLowerCase()) {
         throw new ApiError("invalid_argument", "Type the name exactly to delete it.");
       }
-      const orgId = typeof team.orgId === "string" && team.orgId ? team.orgId : null;
-      const linked = Object.keys(mapOf(team.linkedTeams)).slice(0, 50);
+      const orgId = safeId(team.orgId);
+      const linked = Object.keys(mapOf(team.linkedTeams)).filter((id) => safeId(id) !== null).slice(0, 50);
       const [org, request, ...members] = await Promise.all([
         orgId ? tx.get(`teams/${orgId}`) : Promise.resolve(null),
         orgId ? tx.get(`teams/${orgId}/linkRequests/${teamId}`) : Promise.resolve(null),
@@ -55,7 +77,8 @@ export class TeamDeletion {
       });
     });
     await this.teams.deleteTeamTree(teamId);
-    await this.media?.deletePrefix(`teams/${teamId}/`).catch(() => undefined);
+    // Left behind, the files are unreadable (storage.rules need the team), so a failure is logged, not fatal.
+    await this.media?.deletePrefix(`teams/${teamId}/`).catch((e: unknown) => console.warn(`team ${teamId}: files not deleted`, e));
   }
 }
 

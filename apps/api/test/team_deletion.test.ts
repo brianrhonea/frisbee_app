@@ -20,8 +20,8 @@ beforeEach(() => {
   store.put("teams/t1", {
     name: "Haze",
     ownerId: "owner",
-    memberIds: ["owner", "coach"],
-    members: { owner: "owner", coach: "coach" },
+    memberIds: ["owner"],
+    members: { owner: "owner" },
     orgId: "org",
     orgLinked: true,
   });
@@ -37,10 +37,27 @@ beforeEach(() => {
 describe("deleting a team", () => {
   it("is the owner's, with the name typed", async () => {
     expect(await del("t1", { name: "Haze" }, "coach")).toBe(403);
+    expect(await del("t1", { name: "Haze" }, "stranger")).toBe(403);
     expect(await del("t1", undefined)).toBe(400);
     expect(await del("t1", { name: "Hase" })).toBe(400);
     expect(store.doc("teams/t1")).toBeDefined();
     expect(await del("nope", { name: "x" })).toBe(404);
+  });
+
+  it("waits until the owner is the last one on it (soleOwner)", async () => {
+    store.put("teams/t1", { ...store.doc("teams/t1"), memberIds: ["owner", "coach"] });
+    expect(await del("t1", { name: "Haze" })).toBe(412);
+    // members saying "owner" isn't enough: ownerId decides, as in the rule.
+    store.put("teams/t3", { name: "Odd", ownerId: "someone", memberIds: ["owner"], members: { owner: "owner" } });
+    expect(await del("t3", { name: "Odd" })).toBe(403);
+  });
+
+  it("waits while a league it plays in is going (inActiveLeague)", async () => {
+    store.put("teams/t1", { ...store.doc("teams/t1"), leagueId: "lg" });
+    store.put("tournaments/lg", { status: "inProgress" });
+    expect(await del("t1", { name: "Haze" })).toBe(412);
+    store.put("tournaments/lg", { status: "finished" });
+    expect(await del("t1", { name: "Haze" })).toBe(204);
   });
 
   it("deletes everything under it and its files, and leaves its community's list", async () => {

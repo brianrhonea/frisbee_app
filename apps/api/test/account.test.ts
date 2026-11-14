@@ -66,6 +66,8 @@ describe("name and pictures", () => {
     expect((await s.call("PUT", "/v1/me/identity", {})).statusCode).toBe(400);
     expect((await s.call("PUT", "/v1/me/identity", { name: "" })).statusCode).toBe(400);
     expect((await s.call("PUT", "/v1/me/identity", { name: "Mallory" }, null)).statusCode).toBe(401);
+    avatar("same");
+    expect((await s.call("PUT", "/v1/me/identity", { photoUploadId: "same", headerUploadId: "same" })).statusCode).toBe(400);
   });
 
   it("never deletes files outside the caller's own profile folder", async () => {
@@ -95,6 +97,13 @@ describe("notification settings", () => {
     expect(prefs()).toMatchObject({ categories: { chat: false, social: false }, teams: { t1: { chat: true, posts: false } } });
     await s.call("DELETE", "/v1/me/notification-settings/teams/t1");
     expect(prefs()?.teams).toEqual({});
+  });
+
+  it("caps per-team settings at 200 teams, as the rules do", async () => {
+    const teams = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`t${i}`, { chat: true }]));
+    s.store.put("users/amy/settings/notifications", { teams });
+    expect((await s.call("PUT", "/v1/me/notification-settings/category", { category: "chat", on: false, teamId: "new" })).statusCode).toBe(412);
+    expect((await s.call("PUT", "/v1/me/notification-settings/category", { category: "chat", on: false, teamId: "t5" })).statusCode).toBe(204);
   });
 
   it("only sets per-team kinds per team, and only known kinds", async () => {

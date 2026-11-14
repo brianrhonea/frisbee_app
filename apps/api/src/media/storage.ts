@@ -45,7 +45,7 @@ export class FirebaseMediaStorage implements MediaStorage {
   constructor(private readonly bucket: Bucket) {}
 
   async deletePrefix(prefix: string) {
-    if (!prefix.endsWith("/") || prefix.includes("..")) throw new Error(`not a folder: ${prefix}`);
+    if (!prefix.endsWith("/") || prefix.split("/").includes("..")) throw new Error(`not a folder: ${prefix}`);
     await this.bucket.deleteFiles({ prefix, force: true });
   }
 

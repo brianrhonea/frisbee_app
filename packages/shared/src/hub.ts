@@ -173,6 +173,13 @@ export const chatReactionChoices = ["👍", "❤️", "😂", "🔥", "🥏", "�
 export const chatRoomLimits = { name: 60, roles: 60, users: 200, folderId: 40, rooms: 200, folders: 50 } as const;
 
 const audienceId = z.string().min(1).max(64).regex(/^[^/]+$/, "Invalid role.");
+/** A folder id: one path segment, and not one Firestore reserves. */
+const folderIdSchema = z
+  .string()
+  .min(1)
+  .max(chatRoomLimits.folderId)
+  .regex(/^[^/]+$/)
+  .refine((v) => v !== "." && v !== ".." && !/^__.*__$/.test(v), "Invalid folder.");
 const memberId = z.string().min(1).max(128).regex(/^[^/]+$/, "Invalid member.");
 
 /**
@@ -196,7 +203,7 @@ const chatName = z.string().trim().min(1, "Name it.").max(chatRoomLimits.name);
 export const saveChatRoomRequestSchema = z.strictObject({
   name: chatName,
   kind: z.enum(["text", "voice"]).default("text"),
-  folderId: z.string().min(1).max(chatRoomLimits.folderId).regex(/^[^/]+$/).nullable().default(null),
+  folderId: folderIdSchema.nullable().default(null),
   access: chatAccessSchema,
 });
 export type SaveChatRoomRequest = z.input<typeof saveChatRoomRequestSchema>;
@@ -213,7 +220,7 @@ export const chatLayoutRequestSchema = z.strictObject({
       z.strictObject({
         id: memberId,
         position: z.number().int().min(0).max(10_000),
-        folderId: z.string().min(1).max(chatRoomLimits.folderId).regex(/^[^/]+$/).nullable(),
+        folderId: folderIdSchema.nullable(),
       }),
     )
     .max(chatRoomLimits.rooms)
