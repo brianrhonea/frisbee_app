@@ -12,6 +12,12 @@ here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
   accent colour. `public/logo.png` and `public/favicon.png` are drawn by
   `apps/mobile/tool/brand/stall10_logo.py`.
 
+**Deploys**
+- Vercel builds only `main` (production) and `development` (the dev site,
+  and only when `apps/web/` or `packages/` changed). Other branches no
+  longer get preview deployments. See `vercel.json` and
+  `scripts/vercel-ignore.sh`.
+
 ## 0.10.0 — 2026-11-14
 
 **Changed**
