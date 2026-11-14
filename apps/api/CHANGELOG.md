@@ -7,6 +7,14 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.9.1 — 2026-11-14
+
+**Fixed**
+- `WEB_SERVER_KEY` is trimmed when read, so a secret saved with a trailing
+  newline still matches the website's copy. On dev the site refused every
+  cache refresh (401 "Website revalidate refused") although both sides
+  came from the same key.
+
 ## 0.9.0 — 2026-11-13
 
 Live pages and instant refreshes for the website (fixes from the

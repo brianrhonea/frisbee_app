@@ -4,6 +4,13 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.9.2 — 2026-11-14
+
+**Fixed**
+- `WEB_SERVER_KEY` is trimmed when sent to the API and when checking the
+  API's refresh calls (`/api/revalidate`), so stray whitespace in either
+  copy can't make them differ.
+
 ## 0.9.1 — 2026-11-13
 
 Fixes from the two-person live test, for a more real-time feel. Needs API

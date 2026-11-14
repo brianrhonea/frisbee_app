@@ -10,9 +10,12 @@ const tagPattern = /^(player:[\w-]{1,128}|post:[\w-]{1,256}|posts|feed|search)$/
 const maxTags = 20;
 
 function sameKey(sent: string | null, key: string | undefined): boolean {
-  if (!sent || !key) return false;
-  const a = Buffer.from(sent);
-  const b = Buffer.from(key);
+  // Trimmed on both sides: a stray newline in either copy mustn't lock the API out.
+  const s = sent?.trim();
+  const k = key?.trim();
+  if (!s || !k) return false;
+  const a = Buffer.from(s);
+  const b = Buffer.from(k);
   return a.length === b.length && timingSafeEqual(a, b);
 }
 

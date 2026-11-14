@@ -1,6 +1,6 @@
 {
   "name": "@stall10/web",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "description": "Stall 10 website (phase 3): Next.js on Vercel; writes through apps/api, member reads from Firestore. Replaces the Flutter web build in firebase/hosting.",
   "scripts": {

@@ -36,6 +36,9 @@ const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 1);
 
 let credentialChecked = false;
 
+// Trimmed: a secret saved with a trailing newline must still match the
+// website's copy (which Vercel stores without one).
+const webServerKey = process.env.WEB_SERVER_KEY?.trim() || undefined;
 const imageUrl = storageUrl(process.env.STORAGE_BUCKET || `${projectId}.firebasestorage.app`);
 
 const app = buildApp({
@@ -76,14 +79,14 @@ const app = buildApp({
   publicUrl: process.env.PUBLIC_API_URL || undefined,
   // The website's address: its cached public pages are expired on changes.
   revalidate:
-    process.env.WEB_SITE_URL && process.env.WEB_SERVER_KEY
-      ? webRevalidator(process.env.WEB_SITE_URL, process.env.WEB_SERVER_KEY)
+    process.env.WEB_SITE_URL && webServerKey
+      ? webRevalidator(process.env.WEB_SITE_URL, webServerKey)
       : undefined,
   browse: {
     repo: new FirestoreBrowseRepository(db),
     limiter: new FirestoreRateLimiter(db),
     imageUrl,
-    webServerKey: process.env.WEB_SERVER_KEY || undefined,
+    webServerKey,
   },
   store: new FirestoreDocStore(db),
   // Uploads need the bucket named (STORAGE_BUCKET, e.g. <project>.firebasestorage.app).

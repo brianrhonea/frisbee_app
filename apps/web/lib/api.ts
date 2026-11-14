@@ -8,7 +8,8 @@ import { notFound } from "next/navigation";
 const base = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8787";
 
 /** Shared secret so the API skips its per-visitor limit for this server (Vercel limits visitors). */
-const webKey = process.env.WEB_SERVER_KEY;
+// Trimmed, like the API's copy, so a stray newline can't make them differ.
+const webKey = process.env.WEB_SERVER_KEY?.trim() || undefined;
 
 /**
  * A public answer is reused for at most this long (seconds). The API
