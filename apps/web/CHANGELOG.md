@@ -54,6 +54,8 @@ Website parity (`docs/product-spec.md` §8.1). Needs API 0.10.0.
 - The sign-in `?next=` link only returns to a page on this site: a path
   with a tab or new line (`/%09/other.site`) could send people elsewhere
   after logging in.
+- Learn's guide is a client component (`components/LearnGuide.tsx`), so its
+  words are no longer in the page HTML sent to visitors.
 
 ## 0.10.1 — 2026-11-14
 

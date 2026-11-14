@@ -19,6 +19,8 @@ const firebase = initializeApp({ projectId }, "emulator-test");
 const db = getFirestore(firebase);
 const auth = getAuth(firebase);
 const app = buildApp({
+  // One caller creates many teams here.
+  writeLimits: false,
   verifier: {
     async verifyIdToken(token) {
       const t = await auth.verifyIdToken(token);

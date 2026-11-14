@@ -62,7 +62,9 @@ for the Flutter web site.
 - Every signed-in write is rate limited per caller (120 a minute, in
   memory per instance; `src/limits/writes.ts`), with tighter limits on
   joining by code, invites, join requests, new teams, uploads and new
-  conversations or groups (also a daily cap) (security review S9).
+  conversations or groups (also a best-effort daily cap, reset when an
+  instance restarts) (security review S9). `buildApp({ writeLimits: false })`
+  turns them off for tests.
 
 **Fixed**
 - A school or club community that approves who joins is a private group

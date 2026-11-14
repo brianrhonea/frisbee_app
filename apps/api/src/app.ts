@@ -72,6 +72,8 @@ export interface AppDeps {
   /** true for Fastify's default logger, or pino options (cloudLoggingOptions). */
   logger?: boolean | LoggerOptions;
   now?: () => number;
+  /** Per-caller write limits (registerWriteLimits); off only in tests that make many writes as one caller. */
+  writeLimits?: boolean;
   /** Origins browsers may call from (CORS_ORIGINS); none when omitted. */
   corsOrigins?: string[];
   /** Fastify's trustProxy; on Cloud Run, [trustHops] (server.ts). */
@@ -123,7 +125,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerCors(app, deps.corsOrigins ?? []);
   registerAuth(app, deps.verifier, deps.enforceAppCheck ?? false);
   const writes = new MemoryRateLimiter(deps.now);
-  registerWriteLimits(app, writes);
+  if (deps.writeLimits !== false) registerWriteLimits(app, writes);
 
   // Every answer says which API version gave it, for tracking changes.
   app.addHook("onSend", async (_req, reply) => {
