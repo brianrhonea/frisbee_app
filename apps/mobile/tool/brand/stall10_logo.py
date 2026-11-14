@@ -1,13 +1,16 @@
 """Draws the Stall 10 logo -- a bold "1" beside a flying disc that forms the
-"0", with a motion trail, on the app's deep green -- and writes every app
-icon from it.
+"0", with a motion trail -- and writes every app icon from it.
 
-Run from the repo root (needs Pillow: `pip install pillow`):
+The logo is monochrome: white and silver on graphite, so it sits with any
+theme or accent colour (light, dark, or a palette we haven't picked yet).
+
+Run from apps/mobile (needs Pillow: `pip install pillow`):
 
     python tool/brand/stall10_logo.py
 
-It overwrites assets/brand/stall10_logo.png and the Android, iOS, macOS and
-Windows launcher icons.
+It overwrites assets/brand/stall10_logo.png, the Android and iOS launcher
+icons, and the website's logo and favicon (apps/web/public and
+firebase/hosting).
 """
 import json
 import math
@@ -15,13 +18,14 @@ import os
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
-GREEN_TOP = (38, 76, 54)
-GREEN_BOTTOM = (18, 36, 26)
-LIME = (215, 240, 106)
-LIME_SHADE = (178, 204, 70)
-LIME_EDGE = (120, 146, 40)
-LIME_RIM = (242, 252, 190)
-WHITE = (246, 248, 242)
+# Neutral graphite and silver: no hue, so nothing clashes with a theme.
+BG_TOP = (44, 45, 50)       # background, top
+BG_BOTTOM = (17, 18, 21)    # background, bottom (and the disc's hole)
+DISC = (232, 233, 237)         # disc top surface, trail
+DISC_SHADE = (190, 192, 199)   # disc shading, outer trails
+DISC_EDGE = (128, 130, 139)    # disc rim underside and flight ring
+DISC_RIM = (255, 255, 255)     # rim highlight
+WHITE = (250, 250, 252)        # the "1"
 
 S = 4  # supersampling
 
@@ -62,25 +66,25 @@ def soft_shadow(img, pts_or_mask, W, dx, dy, blur, alpha):
 
 def draw(font_path, size=1024):
     W = size * S
-    img = gradient(W, GREEN_TOP, GREEN_BOTTOM).convert('RGBA')
+    img = gradient(W, BG_TOP, BG_BOTTOM).convert('RGBA')
 
     cx, cy = W * 0.615, W * 0.47
     rx, ry = W * 0.225, W * 0.295
     tilt = -18
 
-    # Soft lime glow behind the disc.
+    # Soft glow behind the disc.
     glow = Image.new('RGBA', (W, W), (0, 0, 0, 0))
     ImageDraw.Draw(glow).polygon(ellipse(cx, cy, rx * 1.15, ry * 1.1, tilt),
-                                 fill=LIME + (55,))
+                                 fill=DISC + (28,))
     img = Image.alpha_composite(
         img, glow.filter(ImageFilter.GaussianBlur(W * 0.08)))
 
     # Motion trail: three tapered swooshes arcing in under the "1".
     trail = Image.new('RGBA', (W, W), (0, 0, 0, 0))
     td = ImageDraw.Draw(trail)
-    for off, width, color in [(-0.075, 0.034, LIME_SHADE),
-                              (0.0, 0.050, LIME),
-                              (0.075, 0.034, LIME_SHADE)]:
+    for off, width, color in [(-0.075, 0.034, DISC_SHADE),
+                              (0.0, 0.050, DISC),
+                              (0.075, 0.034, DISC_SHADE)]:
         top, bot = [], []
         steps = 80
         for k in range(steps + 1):
@@ -114,10 +118,10 @@ def draw(font_path, size=1024):
     d = ImageDraw.Draw(img)
     # the rim's underside, peeking out below/right
     d.polygon(ellipse(cx + W * 0.018, cy + W * 0.026, rx, ry, tilt),
-              fill=LIME_EDGE)
+              fill=DISC_EDGE)
     # top surface, shaded from a light upper-left
     top_mask = mask_of(W, outer)
-    shade = gradient(W, LIME, LIME_SHADE).convert('RGBA')
+    shade = gradient(W, DISC, DISC_SHADE).convert('RGBA')
     img.paste(shade, (0, 0), top_mask)
     d = ImageDraw.Draw(img)
 
@@ -127,13 +131,13 @@ def draw(font_path, size=1024):
             mask_of(W, ellipse(cx, cy, rx * k_in, ry * k_in, tilt)))
 
     # flight ring groove, then the hole that makes it a "0"
-    img.paste(Image.new('RGBA', (W, W), LIME_EDGE + (255,)), (0, 0),
+    img.paste(Image.new('RGBA', (W, W), DISC_EDGE + (255,)), (0, 0),
               ring(0.825, 0.80))
     hole = ellipse(cx, cy, rx * 0.52, ry * 0.60, tilt)
     # the hole shows the rim's inner wall at the top-left
-    d.polygon(hole, fill=LIME_EDGE)
+    d.polygon(hole, fill=DISC_EDGE)
     d.polygon(ellipse(cx + W * 0.012, cy + W * 0.018, rx * 0.52, ry * 0.60,
-                      tilt), fill=GREEN_BOTTOM)
+                      tilt), fill=BG_BOTTOM)
     # re-clip the inner wall to the hole
     hole_mask = mask_of(W, hole)
     inner = img.copy()
@@ -151,7 +155,7 @@ def draw(font_path, size=1024):
                       for i in range(21)], fill=255)
     wedge = wedge.filter(ImageFilter.GaussianBlur(W * 0.03))
     band = ImageChops.multiply(ring(0.955, 0.895), wedge)
-    img.paste(Image.new('RGBA', (W, W), LIME_RIM + (255,)), (0, 0), band)
+    img.paste(Image.new('RGBA', (W, W), DISC_RIM + (255,)), (0, 0), band)
 
     return img.resize((size, size), Image.LANCZOS)
 
@@ -167,19 +171,6 @@ def rounded(img, radius_frac=0.2237):
     out = img.convert('RGBA')
     out.putalpha(m)
     return out
-
-
-def mac_icon(img):
-    """macOS style: a rounded square inset on a transparent 1024 canvas."""
-    inner = rounded(img.resize((824, 824), Image.LANCZOS), 0.2237)
-    canvas = Image.new('RGBA', (1024, 1024), (0, 0, 0, 0))
-    shadow = Image.new('L', (1024, 1024), 0)
-    ImageDraw.Draw(shadow).rounded_rectangle(
-        [100, 112, 924, 936], radius=184, fill=90)
-    shadow = shadow.filter(ImageFilter.GaussianBlur(14))
-    canvas.paste((0, 0, 0, 255), (0, 0), shadow)
-    canvas.alpha_composite(inner, (100, 100))
-    return canvas
 
 
 def main():
@@ -200,23 +191,17 @@ def main():
         square.resize((px, px), Image.LANCZOS).save(
             os.path.join(ios, i['filename']))
 
-    # macOS.
-    mac = mac_icon(master)
-    for px in (16, 32, 64, 128, 256, 512, 1024):
-        mac.resize((px, px), Image.LANCZOS).save(
-            f'macos/Runner/Assets.xcassets/AppIcon.appiconset/'
-            f'app_icon_{px}.png')
-
     # Android launcher icons.
     for folder, px in [('mdpi', 48), ('hdpi', 72), ('xhdpi', 96),
                        ('xxhdpi', 144), ('xxxhdpi', 192)]:
         corners.resize((px, px), Image.LANCZOS).save(
             f'android/app/src/main/res/mipmap-{folder}/ic_launcher.png')
 
-    # Windows.
-    corners.save('windows/runner/resources/app_icon.ico',
-                 sizes=[(s, s) for s in (16, 24, 32, 48, 64, 128, 256)])
-    print('Wrote the logo and every app icon.')
+    # Website: logo (pages round its corners) and favicon.
+    for site in ('../web/public', '../../firebase/hosting'):
+        square.resize((256, 256), Image.LANCZOS).save(f'{site}/logo.png')
+        corners.resize((64, 64), Image.LANCZOS).save(f'{site}/favicon.png')
+    print('Wrote the logo, every app icon and the website icons.')
 
 
 if __name__ == '__main__':

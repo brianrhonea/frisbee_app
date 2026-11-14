@@ -13,7 +13,8 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
-| 0.0.21  | 2026-11-14 | `feature/web-redesign`                  |                     |
+| 0.0.22  | 2026-11-14 | `feature/web-redesign`                  |                     |
+| 0.0.21  | 2026-11-14 | `feature/web-redesign`                  | `848021e`           |
 | 0.0.20  | 2026-11-13 | `feature/core-parity`                   |                     |
 | 0.0.19  | 2026-11-13 | `feature/personal-details`              |                     |
 | 0.0.18  | 2026-11-13 | `development`                           |                     |
@@ -35,6 +36,18 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.22 — A neutral logo
+
+Assets only; no data, rules or API changes.
+
+- `tool/brand/stall10_logo.py` draws the same "10" disc mark in neutral
+  graphite (background), white (the "1") and silver (the disc and trail),
+  with no hue, so the icon suits any theme. It now runs from `apps/mobile`
+  and writes the in-app logo, the Android and iOS launcher icons and the
+  website's `logo.png` / `favicon.png` (`apps/web/public`,
+  `firebase/hosting`); the macOS and Windows outputs went with those
+  platforms.
 
 ## 0.0.21 — The website's palette; layout fixes
 

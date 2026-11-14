@@ -4,6 +4,14 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.10.1 — 2026-11-14
+
+**Changed**
+- New logo and favicon: the app's "10" disc mark in white and silver on
+  graphite instead of lime on green, so it suits light, dark and any
+  accent colour. `public/logo.png` and `public/favicon.png` are drawn by
+  `apps/mobile/tool/brand/stall10_logo.py`.
+
 ## 0.10.0 — 2026-11-14
 
 **Changed**
