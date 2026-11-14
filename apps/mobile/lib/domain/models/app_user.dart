@@ -35,6 +35,11 @@ class AppUser {
   String get label =>
       (displayName?.isNotEmpty ?? false) ? displayName! : (email ?? 'Player');
 
+  /// The name others see on their profile: never the email.
+  String get publicName => (displayName?.trim().isNotEmpty ?? false)
+      ? displayName!.trim()
+      : ((username?.isNotEmpty ?? false) ? username! : 'Player');
+
   @override
   bool operator ==(Object other) =>
       other is AppUser &&

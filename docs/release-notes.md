@@ -10,6 +10,18 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.19
+
+**Your details, kept private**
+- Signing up now asks your date of birth. You need to be 13 or older.
+- New players add their legal name, phone, gender and mailing address
+  (and, under 18, a parent or guardian) to finish signing up, like a USA
+  Ultimate membership.
+- Only you can see these. They're encrypted and never shown on your
+  profile or to teams. Change them in **Settings → Personal details**.
+- Already have an account? You'll see a card on Home asking you to add
+  them; you can skip it for now.
+
 ## 0.0.18 (in TestFlight from `development`)
 
 **A tidier Teams tab**

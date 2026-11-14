@@ -1,3 +1,4 @@
+import type { PersonalCipher, Sealed } from "../src/personal/cipher.js";
 import { readFile, writeFile } from "node:fs/promises";
 import type { CreateTeamInput, NameListing } from "@stall10/shared";
 import type { Caller, TokenVerifier, UserLookup } from "../src/auth.js";
@@ -21,7 +22,7 @@ export class FakeVerifier implements TokenVerifier {
 
 /** Auth user records by uid; unknown users fall back to the token. */
 export class FakeUsers implements UserLookup {
-  records = new Map<string, { name?: string; email?: string; photoUrl?: string }>();
+  records = new Map<string, { name?: string; email?: string; photoUrl?: string; createdAt?: string }>();
 
   async lookup(uid: string) {
     return this.records.get(uid) ?? null;
@@ -169,5 +170,26 @@ export class FakeMediaStorage implements MediaStorage {
   }
   async delete(path: string) {
     this.files.delete(path);
+  }
+}
+
+/**
+ * Reversible stand-in for Cloud KMS: base64 of "context|plaintext", so tests
+ * can see that the context is checked and nothing is stored in the clear.
+ */
+export class FakeCipher implements PersonalCipher {
+  calls = { seal: 0, open: 0 };
+
+  async seal(plaintext: Buffer, context: string): Promise<Sealed> {
+    this.calls.seal++;
+    const scrambled = Buffer.from(`${context}|${plaintext.toString("utf8")}`).map((b) => b ^ 0x5a);
+    return { ciphertext: Buffer.from(scrambled).toString("base64"), key: "fake-key" };
+  }
+
+  async open(sealed: Sealed, context: string): Promise<Buffer> {
+    this.calls.open++;
+    const raw = Buffer.from(Buffer.from(sealed.ciphertext, "base64").map((b) => b ^ 0x5a)).toString("utf8");
+    if (!raw.startsWith(`${context}|`)) throw new Error("wrong context");
+    return Buffer.from(raw.slice(context.length + 1), "utf8");
   }
 }

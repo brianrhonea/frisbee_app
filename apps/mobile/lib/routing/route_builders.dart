@@ -33,6 +33,10 @@ import '../ui/teams/view_models/team_search_viewmodel.dart';
 import '../ui/teams/widgets/team_home_screen.dart';
 import '../ui/teams/widgets/team_section_screen.dart';
 import 'routes.dart';
+import '../ui/personal/view_models/personal_details_viewmodel.dart';
+import '../ui/personal/view_models/personal_prompt_viewmodel.dart';
+import '../ui/personal/widgets/personal_details_screen.dart';
+import '../ui/personal/widgets/personal_prompt_card.dart';
 
 // Pages that both the app's router (router.dart) and the website's
 // (web_router.dart) show, with their view models wired up once.
@@ -43,8 +47,20 @@ Widget signInPage() => ViewModelHost(
 );
 
 Widget signUpPage() => ViewModelHost(
-  create: (c) => SignUpViewModel(authRepository: c.read()),
+  create: (c) =>
+      SignUpViewModel(authRepository: c.read(), personalRepository: c.read()),
   builder: (_, vm) => SignUpScreen(viewModel: vm),
+);
+
+/// Personal details: the last step of signing up, or from Settings.
+Widget personalDetailsPage({bool finishing = false}) => ViewModelHost(
+  key: ValueKey('personal-details-$finishing'),
+  create: (c) => PersonalDetailsViewModel(
+    personalRepository: c.read(),
+    authRepository: c.read(),
+    finishing: finishing,
+  ),
+  builder: (_, vm) => PersonalDetailsScreen(viewModel: vm),
 );
 
 Widget chooseUsernamePage() => ViewModelHost(
@@ -158,7 +174,16 @@ Widget homePage() => ViewModelHost(
     userPostRepository: c.read(),
     filePicker: c.read(),
   ),
-  builder: (_, vm) => HomeScreen(viewModel: vm),
+  builder: (_, vm) => HomeScreen(
+    viewModel: vm,
+    prompt: ViewModelHost(
+      create: (c) => PersonalPromptViewModel(
+        personalRepository: c.read(),
+        authRepository: c.read(),
+      ),
+      builder: (_, p) => PersonalPromptCard(viewModel: p),
+    ),
+  ),
 );
 
 /// A post's page with its comments; `?comment=1` goes to the comment box.

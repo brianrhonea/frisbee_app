@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.19  | 2026-11-13 | `feature/personal-details`              |                     |
 | 0.0.18  | 2026-11-13 | `development`                           |                     |
 | 0.0.17  | 2026-11-12 | `development`                           |                     |
 | 0.0.16  | 2026-11-12 | `development`                           | `9ba6ea0` and later |
@@ -32,6 +33,32 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.19 — Personal details at sign-up
+
+Needs API 0.7.0 (`/v1/me/personal`) and its KMS key. Deploy
+`firestore.rules` (`personalDetails/{uid}` closed to clients) and the
+`account` functions group (account deletion removes the record).
+
+- Sign-up asks the date of birth; under 13 can't make an account.
+- New accounts (made from `personalDetailsRequiredSince`) give their
+  legal name, birthday, phone, gender, mailing address and, under 18, a
+  parent or guardian before anything else (`/welcome/details`, after the
+  username). A birthday under 13 there (Google and Apple sign-ups aren't
+  asked first) deletes the account without sending anything (or, if that
+  needs a fresh sign-in, signs them out). Also on the Flutter web build
+  (`web_router.dart`). Unknown status (no
+  `API_BASE_URL`, offline) holds nobody up.
+- Older accounts get a dismissible **Complete your details** card on Home.
+- **Settings → Personal details** to see and change them.
+- `PersonalDetailsRepository` (API only; no direct Firestore path, since
+  the rules allow none). Model in `domain/models/personal_details.dart`
+  mirrors `packages/shared/src/personal.ts`.
+- Profile writes no longer use the account's email as the public name when
+  there's no display name (`AppUser.publicName`).
+- Account deletion also removes `personalDetails/{uid}` and the profile's
+  subcollections (`private/details`, follow requests), which were left
+  behind before.
 
 ## 0.0.18 — A tidier Teams tab; one team page; communities list their teams
 

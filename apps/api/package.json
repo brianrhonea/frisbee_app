@@ -1,6 +1,6 @@
 {
   "name": "@stall10/api",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Stall 10 API: the one backend apps/mobile and apps/web call. Validates requests and reads/writes Firebase with the Admin SDK.",
   "type": "module",
@@ -17,6 +17,7 @@
     "test:emulator": "firebase --config ../../firebase/firebase.json emulators:exec --only firestore,auth,storage --project demo-stall10 \"vitest run emulator.test --no-file-parallelism\""
   },
   "dependencies": {
+    "@google-cloud/kms": "^6.3.0",
     "@stall10/shared": "workspace:*",
     "fastify": "^5.12.0",
     "firebase-admin": "^14.5.0",

@@ -72,7 +72,7 @@ class ProfileRepositoryFirebase implements ProfileRepository {
   Map<String, dynamic> _base(AppUser user, List<String> tags) => {
     ...UserProfile(
       uid: user.uid,
-      name: user.label,
+      name: user.publicName,
       photoUrl: user.photoUrl,
       username: user.username,
     ).toMap(),

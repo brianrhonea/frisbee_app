@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/auth/auth_repository.dart';
+import '../data/repositories/personal/personal_repository.dart';
 import '../domain/models/model_utils.dart';
 import '../domain/models/team.dart';
 import '../ui/chat/view_models/chat_room_settings_viewmodel.dart';
@@ -85,11 +86,15 @@ const _publicRoutes = {Routes.signIn, Routes.signUp};
 
 final _rootKey = GlobalKey<NavigatorState>();
 
-GoRouter router(AuthRepository auth) => GoRouter(
+GoRouter router(
+  AuthRepository auth,
+  PersonalDetailsRepository personal,
+) => GoRouter(
   navigatorKey: _rootKey,
   initialLocation: Routes.home,
-  refreshListenable: auth,
-  redirect: (context, state) => authRedirect(auth, state.uri),
+  refreshListenable: Listenable.merge([auth, personal]),
+  redirect: (context, state) =>
+      authRedirect(auth, state.uri, personal: personal),
   routes: [
     GoRoute(
       path: splashPath,
@@ -99,6 +104,10 @@ GoRouter router(AuthRepository auth) => GoRouter(
     GoRoute(
       path: Routes.chooseUsername,
       builder: (_, _) => chooseUsernamePage(),
+    ),
+    GoRoute(
+      path: Routes.finishSignUp,
+      builder: (_, _) => personalDetailsPage(finishing: true),
     ),
     GoRoute(path: Routes.signUp, builder: (_, _) => signUpPage()),
     // Invite links (InviteLinks), opened from other apps: join a team by
@@ -195,6 +204,16 @@ GoRouter router(AuthRepository auth) => GoRouter(
               dim: false,
             ),
           ),
+        GoRoute(
+          path: 'personal',
+          pageBuilder: (context, state) => slideOverPage(
+            context,
+            state.pageKey,
+            personalDetailsPage(),
+            panelOnWide: true,
+            dim: false,
+          ),
+        ),
         GoRoute(
           path: 'following',
           pageBuilder: (context, state) => slideOverPage(
@@ -935,10 +954,15 @@ Widget _settings(Widget Function(ProfileViewModel vm) screen) => ViewModelHost(
 );
 
 /// Sends signed-out users to sign-in (remembering where they were headed),
-/// signed-in users without a username to pick one, and everyone else away
+/// signed-in users without a username to pick one, new accounts without
+/// personal details ([personal]) to give them, and everyone else away
 /// from the auth screens: to Community, or back to
 /// the invite link they opened so they can finish joining.
-String? authRedirect(AuthRepository auth, Uri uri) {
+String? authRedirect(
+  AuthRepository auth,
+  Uri uri, {
+  PersonalDetailsRepository? personal,
+}) {
   final path = uri.path;
   final from = uri.queryParameters['from'];
   if (!auth.isReady) {
@@ -972,6 +996,20 @@ String? authRedirect(AuthRepository auth, Uri uri) {
     ).toString();
   }
   if (choosing) return from ?? Routes.home;
+  // A new account without personal details: those next. Only on a definite
+  // "required and missing"; while it's unknown nobody is held up.
+  final finishing = path == Routes.finishSignUp;
+  if (personal?.mustComplete ?? false) {
+    if (finishing) return null;
+    final target = public || path == splashPath ? from : uri.toString();
+    return Uri(
+      path: Routes.finishSignUp,
+      queryParameters: target == null || target == Routes.home
+          ? null
+          : {'from': target},
+    ).toString();
+  }
+  if (finishing) return from ?? Routes.home;
   if (public) return _isInviteLink(from) ? from : Routes.home;
   // Already signed in when the app opened: carry on where it was headed.
   if (path == splashPath) return from ?? Routes.home;

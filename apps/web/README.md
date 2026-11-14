@@ -15,7 +15,9 @@ platform other than iOS and Android uses it.
 | `/events`, `/explore?q=` | Upcoming public events and tournaments; player and team search |
 | `/about`, `/help`, `/terms`, `/privacy`, `/cookies`, `/delete-account` | Static pages ported from `firebase/hosting` (`content/*.html`, served by `app/[slug]`) |
 | `/join/[code]`, `/g/[id]`, `/p/[id]` | Invite and share link fallbacks; `public/.well-known` opens them in the app |
-| `/sign-in`, `/sign-up` | Firebase Auth (email/password, Google) |
+| `/sign-in`, `/sign-up` | Firebase Auth (email/password, Google). Sign-up asks the date of birth first (13 and over) |
+| (every page) | `PersonalGate`: a new account finishes signing up with its personal details (legal name, birthday, phone, gender, address, guardian under 18) before anything else; older ones get a dismissible card. Encrypted by the API (`/v1/me/personal`); only the player sees them |
+| `/settings/personal` | Their personal details |
 | `/home`, `/profile` | Redirect to `/` |
 
 - **Reads:** server components call the API's public routes

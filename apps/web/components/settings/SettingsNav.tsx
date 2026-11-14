@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 const sections = [
   ["/settings/profile", "Profile"],
+  ["/settings/personal", "Personal details"],
   ["/settings/privacy", "Privacy"],
   ["/settings/following", "People you follow"],
   ["/settings/requests", "Follow requests"],

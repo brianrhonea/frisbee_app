@@ -236,6 +236,18 @@ which fails when the current version has no entry.
   and goes through the API. Reads come from a cache (§7) or Firebase:
   chat, feed updates and live stats stay as Firestore listeners straight
   from the app, guarded by the read rules.
+- **Personal details** (decided 2026-11-13; `packages/shared/src/personal.ts`):
+  legal name, date of birth, phone, gender, mailing address and, under 18,
+  a parent or guardian, asked at sign-up on both clients. Only their owner
+  sees them, and only through the API (`/v1/me/personal`, `apps/api/src/personal`).
+  `personalDetails/{uid}` holds one Cloud KMS ciphertext (key
+  `stall10/personal-details`, only `api-runtime` may use it), bound to the
+  document path; `firestore.rules` denies every client read and write.
+  Under 13 can't sign up. Accounts made from `personalDetailsRequiredSince`
+  must give them before using the apps; older ones are prompted. Not
+  end-to-end encrypted: a project owner can grant themselves the key.
+  Sharing any of it (e.g. with event organizers) needs its own consent
+  flow first.
 - **Cloud Storage** holds images and video, always compressed to one
   standard before they're saved (decided 2026-11-11; spec in
   `packages/shared/src/media.ts`):
@@ -368,7 +380,7 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 |---|---|---|---|---|
 | 1 | Teams | create team / group / organization | `POST /v1/teams` | **Migrated** (fallback kept) |
 | 2 | Teams | join (code, link, open group, request/approve), invites, leave, remove, roles, permissions, transfer, edit details, community links, create team in community | Rule functions ported in `apps/api/src/teams/access.ts`, run in transactions (`MembershipService`); `use_api_membership` flag. Still direct: `migrateTiersToRoles` (edits chat rooms, item 10), `deleteTeam`, roster | **Migrated** (fallback kept) |
-| 3 | Users | profile edit, username claim, privacy settings, delete account (callable today) | `apps/api/src/profiles`; `use_api_profiles` flag. Still direct: `publishSummary`, header photo, `users/{uid}` settings (owner-only, unvalidated); delete account stays a callable | **Migrated** details, privacy, visibility, username (fallback kept) |
+| 3 | Users | profile edit, username claim, privacy settings, personal details, delete account (callable today) | `apps/api/src/profiles`; `use_api_profiles` flag. Personal details are API-only from the start (`apps/api/src/personal`, no direct path). Still direct: `publishSummary`, header photo, `users/{uid}` settings (owner-only, unvalidated); delete account stays a callable | **Migrated** details, privacy, visibility, username (fallback kept) |
 | 4 | Media | upload URLs + server-side compression (§6) | `apps/api/src/media`: sniffing, sharp compression, HEIC via ffmpeg (`ffmpegHeicDecoder`), `transcodeJobs/{id}` + `transcode.ts` for the Cloud Run job; needs `STORAGE_BUCKET`. Not yet: the job's entry point and queue, signed URLs verified against real Storage, app callers (posts/chat/avatars still upload directly) | **API built**, app not switched |
 | 5 | Posts | posts, team posts, comments, likes, reposts | `apps/api/src/posts`: likes, reposts, text posts (create/edit/delete, photos from `/v1/uploads`), comments (the website uses them; the app still writes directly). Unit tests with fakes; emulator tests pending. Not yet: team posts, creating workout/event posts, video in posts | **Players' posts and comments in the API**, app not switched |
 | 6 | Follows | follow, requests, accept | `apps/api/src/follows`, with notification read/clear (the website uses them; the app still writes directly). Unit tests with fakes; emulator tests pending | **In the API**, app not switched |

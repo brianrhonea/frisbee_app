@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 
 import 'config/dependencies.dart';
 import 'data/repositories/auth/auth_repository.dart';
+import 'data/repositories/personal/personal_repository.dart';
 import 'data/repositories/theme/theme_repository.dart';
 import 'data/repositories/theme/theme_repository_prefs.dart';
 import 'data/services/shared_preferences_service.dart';
@@ -69,7 +70,10 @@ class StallWebApp extends StatefulWidget {
 }
 
 class _StallWebAppState extends State<StallWebApp> {
-  late final GoRouter _router = webRouter(context.read<AuthRepository>());
+  late final GoRouter _router = webRouter(
+    context.read<AuthRepository>(),
+    personal: context.read<PersonalDetailsRepository>(),
+  );
 
   @override
   void dispose() {

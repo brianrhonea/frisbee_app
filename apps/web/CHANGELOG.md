@@ -4,6 +4,26 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.8.0 — 2026-11-13
+
+Personal details at sign-up. Needs API 0.7.0.
+
+**Added**
+- Sign-up asks the date of birth first; under 13 can't make an account.
+- New accounts finish signing up with their legal name, birthday, phone,
+  gender, mailing address and, under 18, a parent or guardian, before
+  using the site (`PersonalGate`). The legal pages and help stay open.
+  If the API can't say, nobody is held up.
+- Older accounts see a **Complete your details** card they can dismiss.
+- **Settings → Personal details** to see and change them.
+- A birthday under 13 when finishing sign-up (Google sign-ups aren't
+  asked first) removes the new account without sending the details
+  (`account-deleteAccount`, or the login alone if that can't be reached).
+
+**Changed**
+- The sign-up form's name field is now **Name on your profile**, said to
+  be public; the legal name is asked separately and stays private.
+
 ## 0.7.0 — 2026-11-13
 
 Communities and their teams. Needs API 0.6.0.

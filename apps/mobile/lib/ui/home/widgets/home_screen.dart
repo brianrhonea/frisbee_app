@@ -32,9 +32,12 @@ enum _Tab { forYou, teams }
 /// beside them (below the header on narrow screens), and a tab of the
 /// user's teams.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.viewModel});
+  const HomeScreen({super.key, required this.viewModel, this.prompt});
 
   final HomeViewModel viewModel;
+
+  /// A card above the feed (the personal details prompt).
+  final Widget? prompt;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -254,6 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Widget> _main() => switch (_tab) {
     _Tab.forYou => [
+      ?widget.prompt,
       _Composer(
         name: vm.user?.label ?? '',
         photoUrl: vm.user?.photoUrl,

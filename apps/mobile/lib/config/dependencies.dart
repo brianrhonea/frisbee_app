@@ -11,6 +11,8 @@ import '../data/repositories/browse/browse_repository.dart';
 import '../data/repositories/browse/browse_repository_functions.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/auth/auth_repository_firebase.dart';
+import '../data/repositories/personal/personal_repository.dart';
+import '../data/repositories/personal/personal_repository_api.dart';
 import '../data/repositories/chat/chat_repository.dart';
 import '../data/repositories/chat/chat_repository_firebase.dart';
 import '../data/repositories/direct_message/direct_message_repository.dart';
@@ -96,6 +98,12 @@ List<SingleChildWidget> get firebaseProviders => [
       accountService: context.read<AccountService>(),
       api: context.read<ApiClient?>(),
       flags: context.read<FeatureFlags>(),
+    ),
+  ),
+  ChangeNotifierProvider<PersonalDetailsRepository>(
+    create: (context) => PersonalDetailsRepositoryApi(
+      api: context.read<ApiClient?>(),
+      auth: context.read<AuthRepository>(),
     ),
   ),
   Provider(create: (_) => AttachmentStorage()),

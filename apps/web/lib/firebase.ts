@@ -104,3 +104,31 @@ export async function appCheckToken(): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * Deletes the signed-in account and its data through the
+ * `account-deleteAccount` function (as the app does), or, if that can't be
+ * reached (no App Check on this site yet), just the login: a brand-new
+ * account has nothing else yet. Needs a recent sign-in.
+ */
+export async function deleteOwnAccount(): Promise<void> {
+  const a = firebaseAuth();
+  const user = a?.currentUser;
+  if (!a || !user) return;
+  const [{ getFunctions, httpsCallable, connectFunctionsEmulator }, { deleteUser, signOut }] = await Promise.all([
+    import("firebase/functions"),
+    import("firebase/auth"),
+  ]);
+  try {
+    startAppCheck();
+    const functions = getFunctions(firebaseApp(), "us-central1");
+    if (process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR_HOST) {
+      const [host, port] = process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR_HOST.split(":");
+      connectFunctionsEmulator(functions, host!, Number(port));
+    }
+    await httpsCallable(functions, "account-deleteAccount")({});
+  } catch {
+    await deleteUser(user).catch(() => undefined);
+  }
+  await signOut(a).catch(() => undefined);
+}

@@ -112,6 +112,12 @@ class SettingsScreen extends StatelessWidget {
                     title: 'Account',
                     onTap: () => context.push(Routes.settingsAccount),
                   ),
+                  SettingsTile(
+                    icon: Icons.badge_outlined,
+                    title: 'Personal details',
+                    subtitle: 'Only you can see these',
+                    onTap: () => context.push(Routes.settingsPersonal),
+                  ),
                 ],
               ),
               SettingsGroup(

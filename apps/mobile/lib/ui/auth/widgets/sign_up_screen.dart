@@ -27,6 +27,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+  DateTime? _birth;
 
   SignUpViewModel get vm => widget.viewModel;
 
@@ -62,6 +63,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       username: _username.text,
       email: _email.text,
       password: _password.text,
+      birthDate: _birth!,
     ));
   }
 
@@ -124,6 +126,45 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     controller: _username,
                     checker: vm.username,
                     textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 12),
+                  FormField<DateTime>(
+                    validator: (_) => vm.birthDateProblemOn(_birth),
+                    builder: (field) => InkWell(
+                      onTap: busy
+                          ? null
+                          : () async {
+                              final now = DateTime.now();
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _birth ?? DateTime(now.year - 20),
+                                firstDate: DateTime(1900),
+                                lastDate: now,
+                                initialEntryMode: DatePickerEntryMode.input,
+                                helpText: 'Date of birth',
+                              );
+                              if (picked == null) return;
+                              setState(() => _birth = picked);
+                              field.didChange(picked);
+                              field.validate();
+                            },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Date of birth',
+                          helperText: 'Only you will see it.',
+                          errorText: field.errorText,
+                          errorMaxLines: 2,
+                          suffixIcon: const Icon(Icons.calendar_today_outlined),
+                        ),
+                        child: Text(
+                          _birth == null
+                              ? 'Choose'
+                              : MaterialLocalizations.of(
+                                  context,
+                                ).formatMediumDate(_birth!),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(

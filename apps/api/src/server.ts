@@ -18,6 +18,8 @@ import { FirestoreDocStore } from "./firestore_store.js";
 import { ffmpegHeicDecoder } from "./media/image.js";
 import { FirebaseMediaStorage } from "./media/storage.js";
 import { FirestoreTeamRepository } from "./teams/repository.js";
+import { LocalCipher, type PersonalCipher } from "./personal/cipher.js";
+import { KmsCipher } from "./personal/kms.js";
 
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "frisbee-app-brianrhonea-dev";
 const firebase = initializeApp({ projectId });
@@ -60,7 +62,7 @@ const app = buildApp({
     async lookup(uid) {
       try {
         const u = await auth.getUser(uid);
-        return { name: u.displayName, email: u.email, photoUrl: u.photoURL };
+        return { name: u.displayName, email: u.email, photoUrl: u.photoURL, createdAt: u.metadata.creationTime ? new Date(u.metadata.creationTime).toISOString() : undefined };
       } catch {
         return null;
       }
@@ -80,7 +82,23 @@ const app = buildApp({
     ? new FirebaseMediaStorage(getStorage(firebase).bucket(process.env.STORAGE_BUCKET))
     : undefined,
   heic: ffmpegHeicDecoder(),
+  personal: personalCipher(),
 });
+
+/**
+ * Cloud KMS (PERSONAL_DETAILS_KMS_KEY), or with the emulators only a local
+ * key (PERSONAL_DETAILS_LOCAL_KEY). Neither: /v1/me/personal is off.
+ */
+function personalCipher(): PersonalCipher | undefined {
+  const kmsKey = process.env.PERSONAL_DETAILS_KMS_KEY;
+  if (kmsKey) return new KmsCipher(kmsKey);
+  const localKey = process.env.PERSONAL_DETAILS_LOCAL_KEY;
+  if (localKey) {
+    if (!emulated) throw new Error("PERSONAL_DETAILS_LOCAL_KEY is for the emulators only; set PERSONAL_DETAILS_KMS_KEY.");
+    return new LocalCipher(localKey);
+  }
+  return undefined;
+}
 
 /**
  * Storage's REST URL for [path]: it applies storage.rules to an

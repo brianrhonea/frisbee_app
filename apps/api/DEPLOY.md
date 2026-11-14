@@ -191,6 +191,25 @@ gcloud secrets add-iam-policy-binding web-server-key --member="serviceAccount:$R
 gcloud secrets versions access latest --secret=web-server-key   # copy into Vercel
 ```
 
+Personal details (`/v1/me/personal`, `apps/api/src/personal`) are
+encrypted with a Cloud KMS key that only `api-runtime` may use. Create it
+before deploying, or saving details fails. Key rings and keys can't be
+deleted, so check the names first. Dev was set up on 2026-11-13; prod is
+not yet.
+
+```sh
+gcloud services enable cloudkms.googleapis.com
+gcloud kms keyrings create stall10 --location us
+gcloud kms keys create personal-details --keyring stall10 --location us   --purpose encryption --rotation-period 365d --next-rotation-time <a date a year out>
+gcloud kms keys add-iam-policy-binding personal-details --keyring stall10 --location us   --member="serviceAccount:$RUNTIME_SA" --role=roles/cloudkms.cryptoKeyEncrypterDecrypter
+```
+
+`deploy/service.yaml` sets `PERSONAL_DETAILS_KMS_KEY` to this key. To run
+the API locally against dev, grant your own account the same role on the
+dev key (only dev: nobody's account should hold it in prod) and set
+`PERSONAL_DETAILS_KMS_KEY` in `.env`. Old key versions stay enabled after
+rotation so older records still open; don't disable or destroy them.
+
 ### 5. The deployer identity (GitHub Actions)
 
 **Recommended: Workload Identity Federation (no key in GitHub).** GitHub's

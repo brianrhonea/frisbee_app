@@ -132,7 +132,10 @@ void main() {
     (
       'sign-up',
       () => SignUpScreen(
-        viewModel: SignUpViewModel(authRepository: FakeAuthRepository()),
+        viewModel: SignUpViewModel(
+          authRepository: FakeAuthRepository(),
+          personalRepository: FakePersonalDetailsRepository(),
+        ),
       ),
     ),
   ]) {

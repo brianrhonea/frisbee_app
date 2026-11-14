@@ -3940,3 +3940,22 @@ describe("hosted tournaments", () => {
     );
   });
 });
+
+describe("personal details (API only)", () => {
+  const UID = "personal-owner";
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "personalDetails", UID), { ciphertext: "x", key: "k", format: 1 });
+    });
+  });
+
+  it("no client reads, lists or writes them, not even their owner", async () => {
+    await assertFails(getDoc(doc(db(UID), "personalDetails", UID)));
+    await assertFails(getDoc(doc(db("someone-else"), "personalDetails", UID)));
+    await assertFails(getDocs(collection(db(UID), "personalDetails")));
+    await assertFails(setDoc(doc(db(UID), "personalDetails", UID), { ciphertext: "y" }));
+    await assertFails(setDoc(doc(db(UID), "personalDetails", "new-one"), { ciphertext: "y" }));
+    await assertFails(deleteDoc(doc(db(UID), "personalDetails", UID)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "personalDetails", UID)));
+  });
+});

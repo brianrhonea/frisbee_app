@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
+import 'package:frisbee_app/data/repositories/personal/personal_repository.dart';
 import 'package:frisbee_app/data/repositories/browse/browse_repository.dart';
 import 'package:frisbee_app/data/repositories/theme/theme_repository.dart';
 import 'package:frisbee_app/domain/models/browse.dart';
@@ -276,6 +277,9 @@ void main() {
         MultiProvider(
           providers: [
             ChangeNotifierProvider<AuthRepository>.value(value: auth),
+            ChangeNotifierProvider<PersonalDetailsRepository>(
+              create: (_) => FakePersonalDetailsRepository(),
+            ),
             ChangeNotifierProvider<ThemeRepository>.value(
               value: FakeThemeRepository(),
             ),

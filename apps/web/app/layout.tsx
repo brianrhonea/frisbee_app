@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { AppFrame } from "@/components/AppFrame";
 import { AuthProvider } from "@/components/AuthProvider";
+import { PersonalGate } from "@/components/PersonalGate";
 import { SiteFooter } from "@/components/SiteFooter";
 import "./site.css";
 import "./app.css";
@@ -28,7 +29,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <AuthProvider>
-          <AppFrame footer={<SiteFooter />}>{children}</AppFrame>
+          <AppFrame footer={<SiteFooter />}>
+            <PersonalGate>{children}</PersonalGate>
+          </AppFrame>
         </AuthProvider>
       </body>
     </html>

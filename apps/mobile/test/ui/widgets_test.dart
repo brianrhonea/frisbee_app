@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/personal_details.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/auth/view_models/choose_username_viewmodel.dart';
@@ -14,46 +15,73 @@ import 'package:frisbee_app/ui/playbook/widgets/play_canvas.dart';
 import '../testing/fakes.dart';
 
 void main() {
-  testWidgets('sign-up asks for names, a free username and a strong password', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(440, 1400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final auth = FakeAuthRepository()..takenUsernames.add('pat');
-    final vm = SignUpViewModel(authRepository: auth);
-    addTearDown(vm.dispose);
-    await tester.pumpWidget(MaterialApp(home: SignUpScreen(viewModel: vm)));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'sign-up asks for names, a birthday, a free username and a strong password',
+    (tester) async {
+      tester.view.physicalSize = const Size(440, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final auth = FakeAuthRepository()..takenUsernames.add('pat');
+      final personal = FakePersonalDetailsRepository();
+      final vm = SignUpViewModel(
+        authRepository: auth,
+        personalRepository: personal,
+      );
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(MaterialApp(home: SignUpScreen(viewModel: vm)));
+      await tester.pumpAndSettle();
 
-    Finder field(String label) => find.widgetWithText(TextFormField, label);
-    await tester.enterText(field('First name'), 'Pat');
-    await tester.enterText(field('Last name'), 'Lee');
-    await tester.enterText(field('Username'), 'Pat');
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('@pat is taken'), findsOneWidget);
+      Finder field(String label) => find.widgetWithText(TextFormField, label);
+      await tester.enterText(field('First name'), 'Pat');
+      await tester.enterText(field('Last name'), 'Lee');
+      await tester.enterText(field('Username'), 'Pat');
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('@pat is taken'), findsOneWidget);
 
-    await tester.enterText(field('Username'), 'pat.lee');
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('@pat.lee is available'), findsOneWidget);
+      await tester.enterText(field('Username'), 'pat.lee');
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('@pat.lee is available'), findsOneWidget);
 
-    await tester.enterText(field('Email'), 'pat@example.com');
-    await tester.enterText(field('Password'), 'pull1234');
-    await tester.pump();
-    expect(find.text('Fair'), findsOneWidget);
-    await tester.enterText(field('Confirm password'), 'pull12345');
-    await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
-    await tester.pumpAndSettle();
-    expect(find.text("Passwords don't match"), findsOneWidget);
-    expect(auth.currentUser, isNull);
+      await tester.enterText(field('Email'), 'pat@example.com');
+      await tester.enterText(field('Password'), 'pull1234');
+      await tester.pump();
+      expect(find.text('Fair'), findsOneWidget);
+      Future<void> pickBirthday(String mmddyyyy) async {
+        await tester.tap(find.text('Date of birth'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(Dialog),
+            matching: find.byType(TextField),
+          ),
+          mmddyyyy,
+        );
+        await tester.tap(find.text('OK'));
+        await tester.pumpAndSettle();
+      }
 
-    await tester.enterText(field('Confirm password'), 'pull1234');
-    await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
-    await tester.pumpAndSettle();
-    expect(auth.currentUser?.displayName, 'Pat Lee');
-    expect(auth.currentUser?.username, 'pat.lee');
-    expect(auth.needsUsername, isFalse);
-  });
+      // Under 13: no account.
+      await pickBirthday('01/01/${DateTime.now().year - 5}');
+      expect(find.text(tooYoungMessage), findsOneWidget);
+      await tester.enterText(field('Confirm password'), 'pull12345');
+      await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
+      await tester.pumpAndSettle();
+      expect(find.text("Passwords don't match"), findsOneWidget);
+      expect(auth.currentUser, isNull);
+
+      await pickBirthday('04/02/1995');
+      expect(find.text(tooYoungMessage), findsNothing);
+
+      await tester.enterText(field('Confirm password'), 'pull1234');
+      await tester.tap(find.widgetWithText(FilledButton, 'Create account'));
+      await tester.pumpAndSettle();
+      expect(auth.currentUser?.displayName, 'Pat Lee');
+      expect(auth.currentUser?.username, 'pat.lee');
+      expect(auth.needsUsername, isFalse);
+      // Kept for the details step, which comes next.
+      expect(personal.takeSignUpBirthDate(), DateTime(1995, 4, 2));
+    },
+  );
 
   testWidgets('Google and Apple sign-ups pick a username', (tester) async {
     final auth = FakeAuthRepository(

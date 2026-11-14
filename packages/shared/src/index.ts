@@ -10,3 +10,4 @@ export * from "./me.js";
 export * from "./posts.js";
 export * from "./follows.js";
 export * from "./roster.js";
+export * from "./personal.js";

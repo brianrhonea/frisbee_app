@@ -20,6 +20,9 @@ abstract final class Routes {
   /// Picking a username, before anything else (see
   /// AuthRepository.needsUsername).
   static const chooseUsername = '/welcome/username';
+
+  /// The last step of signing up: personal details (new accounts).
+  static const finishSignUp = '/welcome/details';
   static const home = '/home';
   static const teams = '/teams';
   static const createTeam = '/teams/new';
@@ -44,6 +47,7 @@ abstract final class Routes {
   /// returns there). [following] is the same list from the profile.
   static const settingsFollowing = '/settings/following';
   static const settingsAccount = '/settings/account';
+  static const settingsPersonal = '/settings/personal';
 
   /// Another player's profile.
   static String player(String uid) => '/players/$uid';

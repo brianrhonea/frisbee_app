@@ -10,6 +10,8 @@ import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
 import 'package:frisbee_app/data/repositories/profile/profile_repository.dart';
+import 'package:frisbee_app/data/repositories/personal/personal_repository.dart';
+import 'package:frisbee_app/domain/models/personal_details.dart';
 import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository.dart';
 import 'package:frisbee_app/data/repositories/team_post/team_post_repository.dart';
@@ -2493,4 +2495,55 @@ List<ChatMessage> olderThan(
   final i = all.indexWhere((m) => m.id == before.id);
   final older = i < 0 ? const <ChatMessage>[] : all.sublist(0, i);
   return older.skip(older.length > limit ? older.length - limit : 0).toList();
+}
+
+class FakePersonalDetailsRepository extends PersonalDetailsRepository {
+  FakePersonalDetailsRepository({this.status});
+
+  @override
+  PersonalDetailsStatus? status;
+
+  PersonalDetails? details;
+  String? email = 'pat@example.com';
+  final saved = <PersonalDetails>[];
+
+  /// Makes the next save fail as the API does for someone under 13.
+  bool refuseTooYoung = false;
+  DateTime? _birth;
+
+  void setStatus(PersonalDetailsStatus? s) {
+    status = s;
+    notifyListeners();
+  }
+
+  @override
+  Future<void> refreshStatus() async {}
+
+  @override
+  Future<Result<({PersonalDetails? details, String? email})>> load() async =>
+      Result.ok((details: details, email: email));
+
+  @override
+  Future<Result<void>> save(PersonalDetails d) async {
+    if (refuseTooYoung) return const Result.error(TooYoungException());
+    saved.add(d);
+    details = d;
+    setStatus(
+      PersonalDetailsStatus(
+        complete: true,
+        required: status?.required ?? false,
+      ),
+    );
+    return const Result.ok(null);
+  }
+
+  @override
+  DateTime? takeSignUpBirthDate() {
+    final d = _birth;
+    _birth = null;
+    return d;
+  }
+
+  @override
+  set signUpBirthDate(DateTime? value) => _birth = value;
 }

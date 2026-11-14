@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/personal_details.dart';
 import 'package:frisbee_app/routing/router.dart';
 import 'package:frisbee_app/routing/routes.dart';
 
@@ -67,5 +68,56 @@ void main() {
       redirect(auth, '${Routes.chooseUsername}?from=/join/ABC123'),
       '/join/ABC123',
     );
+  });
+
+  group('personal details', () {
+    String? go(FakePersonalDetailsRepository p, String location) =>
+        authRedirect(
+          FakeAuthRepository(user: testUser),
+          Uri.parse(location),
+          personal: p,
+        );
+    const missing = PersonalDetailsStatus(complete: false, required: true);
+
+    test('a new account gives them first, then carries on', () {
+      final p = FakePersonalDetailsRepository(status: missing);
+      expect(go(p, '/teams/t1'), '${Routes.finishSignUp}?from=%2Fteams%2Ft1');
+      expect(go(p, Routes.home), Routes.finishSignUp);
+      expect(go(p, Routes.finishSignUp), isNull);
+      expect(
+        go(p, '/sign-up?from=/join/ABC123'),
+        '${Routes.finishSignUp}?from=%2Fjoin%2FABC123',
+      );
+
+      p.status = const PersonalDetailsStatus(complete: true, required: true);
+      expect(go(p, Routes.finishSignUp), Routes.home);
+      expect(go(p, '${Routes.finishSignUp}?from=/teams/t1'), '/teams/t1');
+      expect(go(p, '/teams/t1'), isNull);
+    });
+
+    test('older accounts and an unknown status are never held up', () {
+      expect(
+        go(
+          FakePersonalDetailsRepository(
+            status: const PersonalDetailsStatus(
+              complete: false,
+              required: false,
+            ),
+          ),
+          '/teams/t1',
+        ),
+        isNull,
+      );
+      expect(go(FakePersonalDetailsRepository(), '/teams/t1'), isNull);
+    });
+
+    test('the username comes first', () {
+      final auth = FakeAuthRepository(user: testUser)..usernameMissing = true;
+      final p = FakePersonalDetailsRepository(status: missing);
+      expect(
+        authRedirect(auth, Uri.parse('/teams/t1'), personal: p),
+        '${Routes.chooseUsername}?from=%2Fteams%2Ft1',
+      );
+    });
   });
 }

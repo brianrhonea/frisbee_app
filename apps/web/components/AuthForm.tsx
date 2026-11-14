@@ -12,7 +12,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 import { authConfigured, firebaseAuth } from "@/lib/firebase";
+import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
+import { localToday, signUpBirthDateProblem } from "./PersonalDetailsForm";
 
 /** Firebase's error codes in words. */
 function message(e: unknown): string {
@@ -57,6 +59,9 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  // Sign-up asks the birthday first, so nobody under 13 gets an account.
+  const [birthDate, setBirthDate] = useState("");
+  const [ageChecked, setAgeChecked] = useState(false);
 
   useEffect(() => {
     if (user) router.replace(next);
@@ -92,6 +97,51 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     });
   }
 
+  if (mode === "sign-up" && !ageChecked) {
+    const checkAge = (e: FormEvent) => {
+      e.preventDefault();
+      const problem = signUpBirthDateProblem(birthDate);
+      if (problem) return setError(problem);
+      signupDraft.setBirthDate(birthDate);
+      setError("");
+      setAgeChecked(true);
+    };
+    return (
+      <div className="auth-card">
+        <h1>Create your account</h1>
+        <form onSubmit={checkAge} noValidate>
+          <label>
+            Date of birth
+            <input
+              type="date"
+              required
+              value={birthDate}
+              max={localToday()}
+              min="1900-01-01"
+              autoComplete="bday"
+              onChange={(e) => {
+                setBirthDate(e.target.value);
+                setError("");
+              }}
+            />
+            <small className="muted">Only you will see it. We ask so we can follow the rules for younger players.</small>
+          </label>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="btn btn-primary" type="submit">
+            Continue
+          </button>
+        </form>
+        <p className="auth-alt">
+          Already have an account? <Link href={`/sign-in?next=${encodeURIComponent(next)}`}>Log in</Link>
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="auth-card">
       <h1>{mode === "sign-in" ? "Log in" : "Create your account"}</h1>
@@ -107,8 +157,9 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       <form onSubmit={submit}>
         {mode === "sign-up" && (
           <label>
-            Name
+            Name on your profile
             <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={60} />
+            <small className="muted">Other players see this. Your legal name comes next and stays private.</small>
           </label>
         )}
         <label>

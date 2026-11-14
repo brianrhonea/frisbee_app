@@ -389,11 +389,11 @@ button.btn:disabled { opacity: 0.6; cursor: default; }
 }
 .segmented button:hover { color: var(--ink); }
 .segmented button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15); }
-.search-input, .settings-form input, .settings-form textarea, .composer-link-row input {
+.search-input, .settings-form input, .settings-form textarea, .settings-form select, .composer-link-row input {
   padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line);
   background: var(--field); color: var(--ink); font: inherit;
 }
-.search-input:focus, .settings-form input:focus, .settings-form textarea:focus, .composer-link-row input:focus {
+.search-input:focus, .settings-form input:focus, .settings-form textarea:focus, .settings-form select:focus, .composer-link-row input:focus {
   outline: 2px solid var(--lime); outline-offset: 1px;
 }
 
@@ -520,6 +520,20 @@ button.btn:disabled { opacity: 0.6; cursor: default; }
 .settings-who p { margin: 2px 0 0; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .form-actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+
+/* Personal details (components/PersonalDetailsForm.tsx, PersonalGate.tsx) */
+.form-grid-3 { grid-template-columns: 2fr 1.2fr 1fr; }
+.settings-form label small { font-weight: 400; }
+.settings-form input:disabled { opacity: 0.7; }
+.settings-form [aria-invalid="true"] { border-color: var(--danger); }
+.personal-private { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--field); }
+.personal-guardian { padding: 14px !important; border: 1px solid var(--line) !important; border-radius: var(--radius); }
+.personal-finish { max-width: 720px; margin: 32px auto 64px; padding: 28px 24px; }
+.personal-finish h1 { margin: 0 0 6px; }
+.personal-finish > p { margin: 0 0 20px; }
+.personal-prompt { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.personal-prompt p { margin: 4px 0 0; }
+.personal-prompt-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .switch-row {
   display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0;
   border-top: 1px solid var(--line); cursor: pointer;
@@ -556,6 +570,7 @@ button.btn:disabled { opacity: 0.6; cursor: default; }
 }
 @media (max-width: 560px) {
   .form-grid { grid-template-columns: 1fr; }
+  .personal-prompt { flex-direction: column; align-items: stretch; }
   .comment.reply, .comment-box.reply { margin-left: 24px; }
 }
 

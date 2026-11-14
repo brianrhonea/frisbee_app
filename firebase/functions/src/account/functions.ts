@@ -84,7 +84,7 @@ export const signInEmail = onCall({ secrets: [webApiKey], enforceAppCheck }, asy
 /**
  * Deletes the caller's account and everything they put in the app: their
  * posts, chat and direct messages (with attachments), event responses,
- * join requests, profile and private data. They leave every team; a team
+ * join requests, profile, personal details and private data. They leave every team; a team
  * they own passes to its next admin, or is deleted if nobody else is on
  * it. Messages other people sent them stay, under "Deleted user".
  *
@@ -120,7 +120,9 @@ async function deleteUserData(db: Firestore, uid: string): Promise<void> {
   // Free their username for someone else.
   const names = await db.collection("usernames").where("uid", "==", uid).get();
   await Promise.all(names.docs.map((d) => d.ref.delete()));
-  await db.doc(`profiles/${uid}`).delete();
+  await db.recursiveDelete(db.doc(`profiles/${uid}`));
+  // Encrypted personal details (apps/api/src/personal).
+  await db.doc(`personalDetails/${uid}`).delete();
 }
 
 const bucket = () => getStorage().bucket();

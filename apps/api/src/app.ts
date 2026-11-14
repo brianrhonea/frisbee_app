@@ -19,6 +19,9 @@ import { FollowService } from "./follows/service.js";
 import { PostEditor } from "./posts/editor.js";
 import { postEditorRoutes, postRoutes } from "./posts/routes.js";
 import { PostService } from "./posts/service.js";
+import type { PersonalCipher } from "./personal/cipher.js";
+import { personalRoutes } from "./personal/routes.js";
+import { PersonalService } from "./personal/service.js";
 import { profileRoutes } from "./profiles/routes.js";
 import { ProfileService } from "./profiles/service.js";
 import type { DocStore } from "./store.js";
@@ -45,6 +48,8 @@ export interface AppDeps {
   };
   /** Transactional document access; enables the membership, profile and post routes. */
   store?: DocStore;
+  /** Encrypts personal details; with [store], enables /v1/me/personal. Off without one: never stored in the clear. */
+  personal?: PersonalCipher;
   /** Cloud Storage; with [store], enables /v1/uploads. */
   media?: MediaStorage;
   heic?: HeicDecoder;
@@ -113,6 +118,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
     profileRoutes(app, new ProfileService(deps.store, deps.users));
+    if (deps.personal) personalRoutes(app, new PersonalService(deps.store, deps.users, deps.personal, deps.now));
     rosterRoutes(app, new RosterService(deps.store));
     postRoutes(app, new PostService(deps.store, deps.users, deps.now));
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now));

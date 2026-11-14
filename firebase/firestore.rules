@@ -2392,6 +2392,15 @@ service cloud.firestore {
       }
     }
 
+    // Personal details (legal name, birthday, phone, gender, address,
+    // guardian): encrypted by the API (apps/api/src/personal) and readable
+    // only through it, by their owner. No client reads or writes them, not
+    // even the owner, so a stolen ID token or a rules mistake elsewhere
+    // can't list them. Deleted with the account (account-deleteAccount).
+    match /personalDetails/{userId} {
+      allow read, write: if false;
+    }
+
     // Unique usernames (Username in lib/domain/models/username.dart): the
     // doc id is the lowercase name, holding who has it. Claimed in the same
     // write that puts it on the claimer's profile, once per account; anyone

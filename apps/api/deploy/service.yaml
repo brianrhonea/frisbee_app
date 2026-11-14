@@ -45,6 +45,10 @@ spec:
               value: "1"
             - name: LOG_LEVEL
               value: info
+            # Encrypts personal details (DEPLOY.md, setup step 4: the key
+            # must exist before /v1/me/personal works).
+            - name: PERSONAL_DETAILS_KMS_KEY
+              value: "projects/${PROJECT_ID}/locations/us/keyRings/stall10/cryptoKeys/personal-details"
             # The website's server key (x-stall10-web-key), so the API doesn't
             # rate-limit the Next.js server as one visitor. Secret Manager
             # secret `web-server-key` (DEPLOY.md, setup step 4).

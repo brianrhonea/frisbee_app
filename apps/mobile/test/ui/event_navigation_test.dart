@@ -12,6 +12,7 @@ import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/data/repositories/notification/notification_repository.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
+import 'package:frisbee_app/data/repositories/personal/personal_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
@@ -101,6 +102,9 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider<AuthRepository>.value(value: auth),
+          ChangeNotifierProvider<PersonalDetailsRepository>(
+            create: (_) => FakePersonalDetailsRepository(),
+          ),
           Provider<TeamRepository>.value(value: teams),
           ChangeNotifierProvider<ThemeRepository>.value(
             value: FakeThemeRepository(),
@@ -139,7 +143,7 @@ void main() {
         ],
         child: MaterialApp.router(
           theme: AppTheme.light,
-          routerConfig: router(auth),
+          routerConfig: router(auth, FakePersonalDetailsRepository()),
         ),
       ),
     );

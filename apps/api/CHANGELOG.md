@@ -7,6 +7,36 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.7.0 — 2026-11-13
+
+Personal details at sign-up: legal name, birthday, phone, gender, mailing
+address and, under 18, a parent or guardian. Only the player reaches them.
+
+**Added**
+- `GET /v1/me/personal/status` (`complete`, `required`: accounts made from
+  `personalDetailsRequiredSince` on must give them first). Reads no
+  ciphertext.
+- `GET` / `PUT /v1/me/personal`: the caller's own details, replaced whole.
+  Validated by `personalDetailsSchema` (`@stall10/shared`); under 13 is
+  refused (`failed_precondition`) and nothing is saved; a guardian is
+  required under 18 and dropped at 18 and over. Ages count on the date in
+  UTC+14, so a birthday today anywhere counts. Responses are
+  `private, no-store`.
+- Stored in `personalDetails/{uid}` as one Cloud KMS ciphertext
+  (`PERSONAL_DETAILS_KMS_KEY`), bound to the document's path; nothing is
+  kept in the clear. Without a key the routes are off. `LocalCipher`
+  (`PERSONAL_DETAILS_LOCAL_KEY`) works with the emulators only.
+- `UserLookup` returns the account's creation time.
+
+**Fixed**
+- A profile write for an account with no display name no longer lists
+  the account's email as its public name; the username (or "Player")
+  stands in.
+
+**Deploy**
+- Create the KMS key and grant `api-runtime` Encrypter/Decrypter first
+  (`DEPLOY.md`, step 4). Done for dev; not yet for prod.
+
 ## 0.6.0 — 2026-11-13
 
 Communities and their teams.

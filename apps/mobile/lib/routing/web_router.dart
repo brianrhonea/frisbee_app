@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/auth/auth_repository.dart';
+import '../data/repositories/personal/personal_repository.dart';
 import '../ui/browse/view_models/browse_search_viewmodel.dart';
 import '../ui/browse/view_models/community_feed_viewmodel.dart';
 import '../ui/browse/view_models/public_profile_viewmodel.dart';
@@ -40,7 +41,11 @@ const _authPages = {Routes.signIn, Routes.signUp};
 /// The website's redirects. Visitors browse everything public; members-only
 /// pages ask them to sign in and come back. Signing in returns to where
 /// they were (`?from=`), else Home.
-String? webRedirect(AuthRepository auth, Uri uri) {
+String? webRedirect(
+  AuthRepository auth,
+  Uri uri, {
+  PersonalDetailsRepository? personal,
+}) {
   final path = uri.path;
   final from = uri.queryParameters['from'];
   if (!auth.isReady) {
@@ -69,7 +74,20 @@ String? webRedirect(AuthRepository auth, Uri uri) {
       queryParameters: target == null ? null : {'from': target},
     ).toString();
   }
-  if (path == Routes.chooseUsername || _authPages.contains(path)) {
+  // A new account without personal details (as the app's authRedirect).
+  if (personal?.mustComplete ?? false) {
+    if (path == Routes.finishSignUp) return null;
+    final target = _authPages.contains(path) || path == Routes.chooseUsername
+        ? from
+        : uri.toString();
+    return Uri(
+      path: Routes.finishSignUp,
+      queryParameters: target == null ? null : {'from': target},
+    ).toString();
+  }
+  if (path == Routes.chooseUsername ||
+      path == Routes.finishSignUp ||
+      _authPages.contains(path)) {
     return from ?? Routes.home;
   }
   return null;
@@ -84,15 +102,19 @@ String? webRedirect(AuthRepository auth, Uri uri) {
 /// anything more. Other app paths show [GetTheAppScreen].
 ///
 /// Paths match the app's (Routes), so links work in both.
-GoRouter webRouter(AuthRepository auth, {String? initialLocation}) {
+GoRouter webRouter(
+  AuthRepository auth, {
+  PersonalDetailsRepository? personal,
+  String? initialLocation,
+}) {
   /// [member] for signed-in users, else [visitor].
   Widget either(Widget Function() member, Widget Function() visitor) =>
       auth.isAuthenticated ? member() : visitor();
 
   return GoRouter(
     initialLocation: initialLocation ?? '/',
-    refreshListenable: auth,
-    redirect: (_, state) => webRedirect(auth, state.uri),
+    refreshListenable: Listenable.merge([auth, ?personal]),
+    redirect: (_, state) => webRedirect(auth, state.uri, personal: personal),
     errorBuilder: (_, state) => _framed(state, const GetTheAppScreen()),
     routes: [
       GoRoute(
@@ -105,6 +127,10 @@ GoRouter webRouter(AuthRepository auth, {String? initialLocation}) {
       GoRoute(
         path: Routes.chooseUsername,
         builder: (_, _) => chooseUsernamePage(),
+      ),
+      GoRoute(
+        path: Routes.finishSignUp,
+        builder: (_, _) => personalDetailsPage(finishing: true),
       ),
       // Group links (InviteLinks): the group's page.
       GoRoute(

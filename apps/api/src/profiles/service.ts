@@ -11,7 +11,7 @@ import {
   usernameTakenMessage,
 } from "@stall10/shared";
 import type { z } from "zod";
-import { type Caller, callerLabel, type UserLookup } from "../auth.js";
+import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { type Data, type DocStore, deleteField, serverTime } from "../store.js";
 
@@ -47,15 +47,17 @@ export class ProfileService {
   /** The caller's name and photo as their Auth record has them. */
   private async who(caller: Caller): Promise<{ name: string; photoUrl: string | null }> {
     const user = await this.users.lookup(caller.uid);
-    const name = clip(callerLabel({ uid: caller.uid, ...(user ?? { name: caller.name, email: caller.email }) }), profileLimits.name);
+    // Never the email: it isn't public (base() falls back to the username).
+    const name = clip(((user ? user.name : caller.name) ?? "").trim(), profileLimits.name);
     return { name, photoUrl: user?.photoUrl ?? null };
   }
 
   /** The directory fields every profile write carries (_base in the app). */
   private static base(who: { name: string; photoUrl: string | null }, username: string | null, tags: string[]): Data {
+    const name = who.name || username || "Player";
     return {
-      name: who.name,
-      keywords: profileKeywords(who.name, username),
+      name,
+      keywords: profileKeywords(name, username),
       photoUrl: who.photoUrl,
       tags,
       updatedAt: serverTime,
