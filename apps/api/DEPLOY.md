@@ -45,8 +45,8 @@ Environment variables on the service:
 | `LOG_LEVEL` | `service.yaml` | `info` |
 
 `CORS_ORIGINS` is comma-separated. A `*` matches one host label or port,
-e.g. `https://stall10.app,https://stall10-*-brianrhonea.vercel.app` for
-Vercel previews, or `http://localhost:*` for any local port. Leaving prod
+e.g. `https://dev.stall10.app,https://frisbee*-brian-honeas-projects.vercel.app` for
+the dev site and Vercel previews (prod: `https://stall10.app`), or `http://localhost:*` for any local port. Leaving prod
 empty means no website can call the API from a browser (the apps don't
 need CORS).
 

@@ -69,7 +69,7 @@ both sites:
 | Vercel environment | Preview | Production |
 | Firebase project | `frisbee-app-brianrhonea-dev` | `frisbee-app-brianrhonea` |
 | API | dev Cloud Run `api` | prod Cloud Run `api` |
-| Address | `frisbeeapp-git-<branch>-brian-honeas-projects.vercel.app`, or a domain assigned to the branch (Settings → Domains → Git Branch) | the production domain |
+| Address | `https://dev.stall10.app` (Settings → Domains, Git Branch `development`); other branches `frisbeeapp-git-<branch>-brian-honeas-projects.vercel.app` | `https://stall10.app` |
 
 Until `monorepo` is merged into `development`, the dev site is
 `frisbeeapp-git-monorepo-brian-honeas-projects.vercel.app`.
@@ -94,7 +94,7 @@ The variables in `.env.example`, each added twice: dev values with only
 |---|---|---|---|
 | `API_BASE_URL`, `NEXT_PUBLIC_API_BASE_URL` | dev API URL | prod API URL | no |
 | `WEB_SERVER_KEY` | `gcloud secrets versions access latest --secret=web-server-key --project frisbee-app-brianrhonea-dev` | same, `--project frisbee-app-brianrhonea` | **yes** |
-| `NEXT_PUBLIC_SITE_URL` | dev site address | prod site address | no |
+| `NEXT_PUBLIC_SITE_URL` | `https://dev.stall10.app` | `https://stall10.app` | no |
 | `NEXT_PUBLIC_FIREBASE_*` | the dev web app's config | the prod web app's config | no |
 
 Get a project's web config with `firebase apps:sdkconfig WEB <app id>
@@ -128,8 +128,9 @@ changing them.
 - Add the site's addresses to the API's `CORS_ORIGINS` (repository
   variables `API_CORS_ORIGINS_DEV` / `_PROD`, `apps/api/DEPLOY.md`), or
   the member dashboard can't load. Dev uses
-  `http://localhost:3000,https://frisbee*-brian-honeas-projects.vercel.app`,
-  which covers branch and per-build addresses.
+  `http://localhost:3000,https://dev.stall10.app,https://frisbee*-brian-honeas-projects.vercel.app`
+  (the dev domain, then branch and per-build addresses); prod uses
+  `https://stall10.app`.
 - Add a firewall rate-limit rule for visitors (the API trusts this server
   through `WEB_SERVER_KEY`).
 - Keep store URLs in step: `lib/site.ts`, `apps/mobile/lib/config/store_links.dart`.

@@ -52,12 +52,15 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
             <!-- Invite and post links (lib/utils/invite_links.dart) open the app.
-                 Verified by hosting/.well-known/assetlinks.json. -->
+                 Verified by .well-known/assetlinks.json on each host
+                 (apps/web/public; the old web.app one in firebase/hosting). -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https"/>
+                <data android:host="stall10.app"/>
+                <data android:host="dev.stall10.app"/>
                 <data android:host="frisbee-app-brianrhonea.web.app"/>
                 <data android:pathPrefix="/join/"/>
                 <data android:pathPrefix="/g/"/>

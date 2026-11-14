@@ -64,6 +64,11 @@ Without `API_BASE_URL`, calendars other than My calendar are hidden.
 - **Add to calendar** (an .ics file through the share sheet) on personal
   and team events (`utils/ics.dart`).
 - `ApiClient` accepts empty `204` answers.
+- Links use the domain: invite, group and post links and the legal
+  pages are on `stall10.app` in prod builds and `dev.stall10.app` in dev
+  builds (`InviteLinks.host`), served by the website. Links on the old
+  `frisbee-app-brianrhonea.web.app` still open the app
+  (`InviteLinks.hosts`; AndroidManifest lists all three).
 
 - Home's feed refreshes on pull-down, and when Home is tapped again (back
   to For you, top of the feed): `HomeFeed.refresh()` re-subscribes every

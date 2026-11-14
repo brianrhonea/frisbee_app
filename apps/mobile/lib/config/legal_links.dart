@@ -1,6 +1,6 @@
 import '../utils/invite_links.dart';
 
-/// The legal pages on the website (`hosting/`), opened from Settings.
+/// The legal pages on the website (`apps/web/content`), opened from Settings.
 abstract final class LegalLinks {
   static Uri _page(String path) => Uri.https(InviteLinks.host, path);
 

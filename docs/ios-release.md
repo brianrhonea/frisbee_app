@@ -85,8 +85,9 @@ build.
 
 ### Invite links (Universal Links)
 
-Invite links (`https://frisbee-app-brianrhonea.web.app/join/<code>`) open
-the app on Android already. On iPhone they open the web page until these
+Invite links (`https://stall10.app/join/<code>`; `dev.stall10.app` in
+dev builds, and the old `frisbee-app-brianrhonea.web.app` for links shared
+before 0.0.20) open the app on Android already. On iPhone they open the web page until these
 are done; the page's **Open in Stall 10** button works meanwhile, through
 the app's `stall10://` scheme.
 
@@ -99,15 +100,16 @@ the app's `stall10://` scheme.
    ```xml
    <key>com.apple.developer.associated-domains</key>
    <array>
-     <string>applinks:frisbee-app-brianrhonea.web.app</string>
+     <string>applinks:stall10.app</string>
+     <string>applinks:dev.stall10.app</string>
    </array>
    ```
 
    Do step 1 first: a build with this entitlement fails to sign until the
    App ID has the capability.
-3. `hosting/.well-known/apple-app-site-association` names Team ID
-   `UR7V8Z48NR` (developer.apple.com > Membership). Deploy it with
-   `firebase deploy --only hosting`.
+3. `apps/web/public/.well-known/apple-app-site-association` names Team ID
+   `UR7V8Z48NR` (developer.apple.com > Membership); the website serves it
+   on both domains.
 
 Android verifies links with `hosting/.well-known/assetlinks.json`, which
 lists the signing key's SHA-256. It holds the debug key's for now (release

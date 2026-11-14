@@ -114,7 +114,7 @@ void main() {
 
       expect(
         vm.link.toString(),
-        'https://frisbee-app-brianrhonea.web.app/g/g1',
+        'https://dev.stall10.app/g/g1',
         reason: "groups have no code; the link opens the group's page",
       );
 
@@ -129,7 +129,7 @@ void main() {
       final dm = people.messages[Conversation.idFor(testUser.uid, 'sam')]!;
       expect(
         dm.single.text,
-        'Join Friends on Stall 10: https://frisbee-app-brianrhonea.web.app/g/g1',
+        'Join Friends on Stall 10: https://dev.stall10.app/g/g1',
       );
 
       await vm.invite.execute(vm.results.last);
@@ -155,7 +155,7 @@ void main() {
       final token = vm.link!.pathSegments.last;
       expect(
         vm.link.toString(),
-        'https://frisbee-app-brianrhonea.web.app/join/$token',
+        'https://dev.stall10.app/join/$token',
       );
       expect(vm.shareText, 'Join Team on Stall 10: ${vm.link}');
       expect(teams.linkExpiries[token], InviteLinkExpiry.week);
