@@ -138,6 +138,25 @@ deploy workflow builds the site from the `FIREBASE_WEB_API_KEY_DEV` /
 `_PROD` repository secrets and skips hosting without them. The web API key
 ends up in public JS (normal for Firebase web), so never commit `build/`.
 
+## Platform parity: web and mobile are the same product
+
+The website (`apps/web`) and the app (`apps/mobile`) must have exactly the
+same features and behaviour; only the design differs. Someone who only
+ever uses one of them must be able to do everything.
+
+- Any feature change on one platform (new feature, changed behaviour,
+  rule, limit, validation, wording of what happens) is made on the other
+  platform in the same piece of work. Don't finish a change on only one.
+- Keep each platform's own design: the app follows its Flutter design
+  decisions, the website its web design (`apps/web/app/app.css` tokens and
+  components). Don't copy one platform's look onto the other.
+- Shared behaviour lives in one place where possible: API endpoints and
+  `packages/shared` schemas and limits both platforms use.
+- Checks cover both: when a feature has tests on one platform, add the
+  matching tests on the other, and keep `docs/product-spec.md` §8.1's
+  parity checklist up to date.
+- Bump both platforms' versions and changelogs when both change.
+
 ## Architecture
 
 - **App:** the official Flutter MVVM architecture guide: `data/services` →
