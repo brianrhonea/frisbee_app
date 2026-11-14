@@ -8,15 +8,8 @@ import { type Doc, useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection, moreTabs } from "./TeamNav";
 import { PlayField } from "./playbook/PlayField";
+import { TeamVideos } from "./videos/TeamVideos";
 
-interface Video {
-  title?: string;
-  description?: string;
-  youtubeId?: string;
-  file?: { path?: string; name?: string };
-  createdAt?: string;
-  authorName?: string;
-}
 interface StatsGame {
   opponent?: string;
   date?: string;
@@ -58,7 +51,7 @@ export function TeamMore() {
         </div>
       )}
       {tab === "playbook" && <Playbook teamId={teamId} editor={viewer.can("manageTeam")} />}
-      {tab === "videos" && <Videos teamId={teamId} />}
+      {tab === "videos" && <TeamVideos />}
       {tab === "stats" && <Stats teamId={teamId} />}
       {tab === "tournaments" && <Tournaments teamId={teamId} manager={viewer.can("manageEvents")} uid={viewer.uid} />}
     </div>
@@ -105,39 +98,6 @@ function Playbook({ teamId, editor }: { teamId: string; editor: boolean }) {
         )}
       </Loading>
     </>
-  );
-}
-
-function Videos({ teamId }: { teamId: string }) {
-  const videos = useLiveQuery<Video>(`teams/${teamId}/videos`, [orderBy("createdAt", "desc")], "videos");
-  return (
-    <Loading live={videos} empty="No videos yet.">
-      {(rows) => (
-        <div className="video-grid">
-          {rows.map((v) => (
-            <article key={v.id} className="card video-card">
-              {v.youtubeId ? (
-                <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.youtubeId)}`}
-                  title={v.title || "Video"}
-                  loading="lazy"
-                  allow="encrypted-media; picture-in-picture; fullscreen"
-                  allowFullScreen
-                />
-              ) : (
-                <div className="video-file muted small">Uploaded video: watch in the app</div>
-              )}
-              <h3>{v.title || "Video"}</h3>
-              <p className="muted small">
-                {v.authorName ? `${v.authorName} · ` : ""}
-                <LocalTime iso={v.createdAt} style="date" />
-              </p>
-              {v.description && <p className="small">{v.description}</p>}
-            </article>
-          ))}
-        </div>
-      )}
-    </Loading>
   );
 }
 
