@@ -42,11 +42,13 @@ describe("webRoute", () => {
     expect(webRoute("/settings/follow-requests")).toBe("/settings/requests");
     expect(webRoute("/posts/p1")).toBe("/posts/p1");
     expect(webRoute("/players/u1")).toBe("/players/u1");
-    expect(webRoute("/messages/c1")).toBe("/messages");
-    expect(webRoute("/teams/t1/chats/r1")).toBe("/teams/t1/chat");
+    expect(webRoute("/messages/c1")).toBe("/messages?c=c1");
+    expect(webRoute("/messages/new")).toBe("/messages");
+    expect(webRoute("/messages")).toBe("/messages");
+    expect(webRoute("/teams/t1/chats/r1")).toBe("/teams/t1/chat?room=r1");
     expect(webRoute("/teams/t1/events")).toBe("/teams/t1/schedule");
     expect(webRoute("/teams/t1/members")).toBe("/teams/t1/roster");
-    expect(webRoute("/team-events/t1/e1")).toBe("/teams/t1/schedule");
+    expect(webRoute("/team-events/t1/e1")).toBe("/teams/t1/schedule?event=e1");
     expect(webRoute("/team-meetings/t1/m1/room")).toBe("/teams/t1");
     expect(webRoute("/my-events/e1")).toBe("/schedule");
     expect(webRoute("/tournaments/t1/live-draft/d1")).toBe("/events");

@@ -42,7 +42,7 @@ function compose(router: ReturnType<typeof useRouter>) {
 }
 
 /** Pages that read best at full width, without the right column. */
-const fullWidth = ["/sign-in", "/sign-up", "/about", "/get-the-app", "/join", "/g", "/p"];
+const fullWidth = ["/sign-in", "/sign-up", "/about", "/get-the-app", "/join", "/g", "/p", "/messages"];
 
 /** Typing in a field, where single-key shortcuts mustn't fire. */
 function typing(target: EventTarget | null) {

@@ -33,6 +33,20 @@ for the Flutter web site.
     the offered emoji, as the caller) and `DELETE .../messages/:id`
     (authors, the owner, and moderators or chat managers who can read the
     room).
+- Direct and group messages (`src/messages`, schemas in
+  `packages/shared/src/messages.ts`), porting the conversations rules:
+  `POST /v1/conversations` (straight to their inbox if they follow you,
+  else a request where their message policy allows one, else refused),
+  `POST /v1/conversations/groups`, `PATCH /v1/conversations/:id` (rename),
+  `POST|DELETE .../members` (only people who follow the adder and take
+  messages, up to 10; leave, or the creator takes someone out),
+  `POST .../messages` (with the inbox preview and the sender's read time;
+  not while a request waits on the sender; attachments from `chat`
+  uploads for this conversation and message), `PUT|DELETE
+  .../messages/:id` (react; authors delete), `POST .../read` (their read
+  time, and the shared receipt unless turned off or a request waits on
+  them), `PUT .../request` (accept or decline), `PUT .../archive` and
+  `POST .../clear`. Outsiders get 404 for every conversation.
 - A per-member, per-instance write limit on those routes
   (`MemoryRateLimiter`: 30 posts/events, 60 messages and 120 answers a
   minute), a first step on security review S9.

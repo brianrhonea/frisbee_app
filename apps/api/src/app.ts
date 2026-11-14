@@ -21,6 +21,8 @@ import { followRoutes } from "./follows/routes.js";
 import { hubRoutes } from "./hub/routes.js";
 import { HubService } from "./hub/service.js";
 import { MemoryRateLimiter } from "./limits/memory.js";
+import { conversationRoutes } from "./messages/routes.js";
+import { ConversationService } from "./messages/service.js";
 import { FollowService } from "./follows/service.js";
 import { PostEditor } from "./posts/editor.js";
 import { postEditorRoutes, postRoutes } from "./posts/routes.js";
@@ -137,7 +139,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate);
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
-    hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), new MemoryRateLimiter(deps.now));
+    const writes = new MemoryRateLimiter(deps.now);
+    hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
+    conversationRoutes(app, new ConversationService(deps.store, deps.users, deps.media, deps.now), writes);
     if (deps.calendar) {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {
         limiter: deps.browse?.limiter,

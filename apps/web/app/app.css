@@ -1124,3 +1124,28 @@ button.poll-option.on { border-color: var(--accent); }
 .message:hover .message-actions, .message:focus-within .message-actions { display: flex; }
 .message-reactions .mine { color: var(--accent); font-weight: 600; }
 @media (hover: none) { .message-actions { display: flex; } }
+
+/* Messages (web 0.11.0). */
+.messages-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.conv-list { margin-top: 10px; }
+.conv-row {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  padding: 8px 10px; border-radius: 12px; color: inherit; text-decoration: none; position: relative;
+}
+.conv-row:hover { background: var(--field); }
+.conv-row.active { background: var(--accent-soft); }
+.conv-main { display: grid; min-width: 0; }
+.conv-main b, .conv-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conv-main small { color: var(--muted); }
+.conv-row.unread .conv-main b, .conv-row.unread .conv-main small { color: var(--ink); font-weight: 700; }
+.conv-time { color: var(--muted); font-size: 0.75rem; }
+.conv-row .notice-dot { position: absolute; right: 8px; bottom: 10px; }
+.conv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.conv-seen { text-align: right; margin: 4px 0 0; }
+.conv-request p { margin: 0 0 8px; }
+.group-people { display: grid; gap: 8px; }
+.group-people .input-row { display: flex; gap: 8px; }
+.group-people .input-row input {
+  flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit;
+}
+.group-people .people-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }

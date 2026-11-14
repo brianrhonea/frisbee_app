@@ -22,6 +22,17 @@ Website parity (`docs/product-spec.md` §8.1). Needs API 0.10.0.
   attach photos, reply to a message, react, and delete your own (or
   any, for moderators). Rooms you can only read say so.
 
+- **Messages** (`/messages`): the inbox, Message requests and Archived
+  beside the open conversation (`?c=`), live. Start a conversation from
+  a person search (it lands as a request when they don't follow you),
+  make a group of up to 10, rename it, add people who follow you, leave
+  or (its creator) remove people. Send with photos, reply, react, delete
+  your own, accept or delete requests, archive, and delete a
+  conversation for yourself. "Seen" shows when they've read your last
+  message. `j`/`k` move through the list, `Esc` closes.
+- Notification links open the conversation, chat room or event itself
+  (`webRoute`), not just its tab.
+
 **Changed**
 - Signed-out visitors see only team and community pages (and the
   community feed and posts). Explore, Events, player profiles, Learn,
