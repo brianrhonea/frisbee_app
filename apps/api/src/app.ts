@@ -5,6 +5,7 @@ import { AccountService } from "./account/service.js";
 import { TeamDeletion, teamDeletionRoutes } from "./teams/deletion.js";
 import { ChatAdmin, chatAdminRoutes } from "./hub/rooms.js";
 import { PlaybookService, playbookRoutes } from "./playbook/service.js";
+import { VideoService, videoRoutes } from "./videos/service.js";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
@@ -154,6 +155,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
     chatAdminRoutes(app, new ChatAdmin(deps.store, deps.teams, deps.media), writes);
     playbookRoutes(app, new PlaybookService(deps.store), writes);
+    videoRoutes(app, new VideoService(deps.store, deps.users, deps.media), writes);
     conversationRoutes(app, new ConversationService(deps.store, deps.users, deps.media, deps.now), writes);
     if (deps.calendar) {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {

@@ -8,6 +8,7 @@ import { type Doc, useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection, moreTabs } from "./TeamNav";
 import { PlayField } from "./playbook/PlayField";
+import { TeamVideos } from "./videos/TeamVideos";
 
 interface Video {
   title?: string;
@@ -58,7 +59,7 @@ export function TeamMore() {
         </div>
       )}
       {tab === "playbook" && <Playbook teamId={teamId} editor={viewer.can("manageTeam")} />}
-      {tab === "videos" && <Videos teamId={teamId} />}
+      {tab === "videos" && <TeamVideos />}
       {tab === "stats" && <Stats teamId={teamId} />}
       {tab === "tournaments" && <Tournaments teamId={teamId} manager={viewer.can("manageEvents")} uid={viewer.uid} />}
     </div>
