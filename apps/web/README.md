@@ -8,11 +8,14 @@ platform other than iOS and Android uses it.
 
 | Path | What |
 |---|---|
-| `/` | Visitors: a preview (a few community posts and public events, locked cards, sign-up prompts). Members: their dashboard (profile card, season stats, teams, upcoming events with RSVPs, their feed) from `GET /v1/me/home` |
-| `/learn` | Beginner's guide to the rules of ultimate (an original summary, not the official text) |
+| `/` | Visitors: a preview (a few community posts, locked cards, sign-up prompts). Members: their dashboard (profile card, season stats, teams, upcoming events with RSVPs, their feed) from `GET /v1/me/home` |
+| `/learn` | Members: beginner's guide to the rules of ultimate (an original summary, not the official text) |
 | `/community`, `/posts/[id]` | The public feed and one post |
-| `/players/[uid]`, `/teams/[id]` | Public profiles (private ones show only their card) and team/group pages |
-| `/events`, `/explore?q=` | Upcoming public events and tournaments; player and team search |
+| `/teams/[id]` | Team and group pages; members get the hub (Feed, Schedule, Chat, Roster, More, Settings) |
+| `/players/[uid]` | Members: profiles (private ones show only their card) |
+| `/teams/new` | Members: create a team, group or school/club community |
+| `/messages` | Members: direct and group conversations |
+| `/events`, `/explore?q=` | Members: upcoming public events and tournaments; player and team search |
 | `/about`, `/help`, `/terms`, `/privacy`, `/cookies`, `/delete-account` | Static pages ported from `firebase/hosting` (`content/*.html`, served by `app/[slug]`) |
 | `/join/[code]`, `/g/[id]`, `/p/[id]` | Invite and share link fallbacks; `public/.well-known` opens them in the app |
 | `/sign-in`, `/sign-up` | Firebase Auth (email/password, Google). Sign-up asks the date of birth first (13 and over) |
