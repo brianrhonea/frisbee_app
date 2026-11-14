@@ -7,6 +7,15 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.14.0 — 2026-11-14
+
+**Added**
+- Team playbooks: `POST /v1/teams/:teamId/plays`, `PUT` and `DELETE
+  /v1/teams/:teamId/plays/:playId` (`apps/api/src/playbook`), the plays
+  rule ported. Members who manage the team save whole plays, checked by
+  `savePlayRequestSchema` (pieces, arrows, steps, their limits, and steps
+  only moving pieces on the field); `updatedBy` is the caller.
+
 ## 0.13.0 — 2026-11-14
 
 **Added**

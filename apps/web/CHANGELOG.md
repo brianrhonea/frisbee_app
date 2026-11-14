@@ -4,6 +4,17 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.15.0 — 2026-11-14
+
+Needs API 0.14.0.
+
+**Added**
+- Playbook editor: admins add and edit plays on a field (players,
+  defenders, disc, cones, cuts and throws), add steps where dragging a
+  piece records its path, add step captions, undo and redo, and play the
+  animation. Members open any play to watch it. Plays in the Playbook tab
+  link to their page, and the tab has a "New play" button for admins.
+
 ## 0.14.0 — 2026-11-14
 
 Needs API 0.13.0.

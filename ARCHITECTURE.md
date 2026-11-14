@@ -400,6 +400,7 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 | 8 | Leagues & tournaments | hosted tournaments, leagues, signups, drafts | Some already callables; move them to the API | |
 | 9 | Search & browse | `api-search`, `browse-*` callables → API GETs with caching | Website (phase 3) depends on these | |
 | 10 | Chat & DMs | send, edit, react; rooms and folders | Writes via the API; reads stay Firestore listeners (§11.2). Team rooms: send, react, delete in `apps/api/src/hub`; DMs and groups (open, groups and members, send, react, delete, read, requests, archive, clear) in `apps/api/src/messages`. The website uses both; the app still writes directly. Rooms and folders (create, edit, access, arrange, delete): `apps/api/src/hub/rooms.ts`, and DM typing marks, for the website | **Team room messages and DMs in the API**, app not switched |
+| 12 | Playbook | save and delete plays | `apps/api/src/playbook` (the website uses it; the app still writes `teams/{id}/plays` directly) | **In the API**, app not switched |
 | 11 | Meetings & voice | LiveKit tokens (callable today) | | |
 | — | Stays on device | theme, workout recording, playbook drawing (until saved) | | n/a |
 

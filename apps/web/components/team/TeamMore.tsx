@@ -1,4 +1,5 @@
 "use client";
+import { type PlayDoc, playCategoryLabels } from "@stall10/shared";
 import { orderBy, where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -6,17 +7,8 @@ import { LocalTime } from "../LocalTime";
 import { type Doc, useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection, moreTabs } from "./TeamNav";
+import { PlayField } from "./playbook/PlayField";
 
-type Point = { x: number; y: number };
-interface Play {
-  name?: string;
-  category?: string;
-  notes?: string;
-  elements?: Array<{ id: string; kind?: string; position?: Point; label?: string }>;
-  arrows?: Array<{ id: string; kind?: string; points?: Point[] }>;
-  steps?: unknown[];
-  updatedAt?: string;
-}
 interface Video {
   title?: string;
   description?: string;
@@ -40,8 +32,6 @@ interface GroupTournament {
   format?: string;
   teams?: unknown[];
 }
-
-const categories: Record<string, string> = { offense: "Offense", defense: "Defense", pull: "Pull", endzone: "Endzone" };
 
 /**
  * The rest of the hub (spec §4, More): a team's playbook, videos, stats and
@@ -67,7 +57,7 @@ export function TeamMore() {
           ))}
         </div>
       )}
-      {tab === "playbook" && <Playbook teamId={teamId} />}
+      {tab === "playbook" && <Playbook teamId={teamId} editor={viewer.can("manageTeam")} />}
       {tab === "videos" && <Videos teamId={teamId} />}
       {tab === "stats" && <Stats teamId={teamId} />}
       {tab === "tournaments" && <Tournaments teamId={teamId} manager={viewer.can("manageEvents")} uid={viewer.uid} />}
@@ -82,75 +72,39 @@ function Loading<T>({ live, empty, children }: { live: { data?: T[]; error: stri
   return <>{children(live.data)}</>;
 }
 
-function Playbook({ teamId }: { teamId: string }) {
-  const plays = useLiveQuery<Play>(`teams/${teamId}/plays`, [], "plays");
+function Playbook({ teamId, editor }: { teamId: string; editor: boolean }) {
+  const plays = useLiveQuery<PlayDoc>(`teams/${teamId}/plays`, [], "plays");
+  const base = `/teams/${encodeURIComponent(teamId)}/plays`;
   return (
-    <Loading live={plays} empty="No plays yet. Draw them in the app.">
-      {(rows) => (
-        <div className="play-grid">
-          {rows
-            .slice()
-            .sort((a, b) => (a.category ?? "").localeCompare(b.category ?? "") || (a.name ?? "").localeCompare(b.name ?? ""))
-            .map((p) => (
-              <article key={p.id} className="card play-card">
-                <FieldDiagram play={p} />
-                <h3>{p.name || "Play"}</h3>
-                <p className="muted small">
-                  {categories[p.category ?? ""] ?? "Play"}
-                  {p.steps?.length ? ` · ${p.steps.length + 1} steps` : ""}
-                </p>
-                {p.notes && <p className="small play-notes">{p.notes}</p>}
-              </article>
-            ))}
+    <>
+      {editor && (
+        <div className="home-actions">
+          <Link href={`${base}/new`} className="btn btn-primary btn-small">
+            New play
+          </Link>
         </div>
       )}
-    </Loading>
-  );
-}
-
-/**
- * A play's starting positions, sideways: the stored field is portrait
- * (x across its 40 yd width, y along its 110 yd length), drawn here with
- * the length running left to right.
- */
-function FieldDiagram({ play }: { play: Play }) {
-  const at = (p?: Point) => ({ x: (p?.y ?? 0) * 110, y: (p?.x ?? 0) * 40 });
-  return (
-    <svg className="field" viewBox="0 0 110 40" role="img" aria-label={`${play.name ?? "Play"} diagram`}>
-      <defs>
-        <marker id="arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-          <path d="M0,0 L6,3 L0,6 z" className="field-arrow-head" />
-        </marker>
-      </defs>
-      <rect x="0" y="0" width="110" height="40" className="field-grass" />
-      <line x1="20" y1="0" x2="20" y2="40" className="field-line" />
-      <line x1="90" y1="0" x2="90" y2="40" className="field-line" />
-      {(play.arrows ?? []).map((a) => (
-        <polyline
-          key={a.id}
-          points={(a.points ?? []).map((p) => `${at(p).x},${at(p).y}`).join(" ")}
-          className={a.kind === "throw_" ? "field-throw" : "field-cut"}
-          markerEnd="url(#arrow)"
-        />
-      ))}
-      {(play.elements ?? []).map((e) => {
-        const p = at(e.position);
-        return (
-          <g key={e.id} className={`field-el ${e.kind ?? "offense"}`}>
-            {e.kind === "cone" ? (
-              <path d={`M${p.x},${p.y - 1.6} L${p.x + 1.4},${p.y + 1.2} L${p.x - 1.4},${p.y + 1.2} z`} />
-            ) : (
-              <circle cx={p.x} cy={p.y} r={e.kind === "disc" ? 1.1 : 2} />
-            )}
-            {e.label && e.kind !== "disc" && e.kind !== "cone" && (
-              <text x={p.x} y={p.y + 0.8} textAnchor="middle">
-                {e.label.slice(0, 2)}
-              </text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
+      <Loading live={plays} empty={editor ? "No plays yet. Draw your first one." : "No plays yet."}>
+        {(rows) => (
+          <div className="play-grid">
+            {rows
+              .slice()
+              .sort((a, b) => (a.category ?? "").localeCompare(b.category ?? "") || (a.name ?? "").localeCompare(b.name ?? ""))
+              .map((p) => (
+                <Link key={p.id} href={`${base}/${encodeURIComponent(p.id)}`} className="card play-card">
+                  <PlayField elements={p.elements ?? []} arrows={p.arrows ?? []} label={`${p.name ?? "Play"} diagram`} />
+                  <h3>{p.name || "Play"}</h3>
+                  <p className="muted small">
+                    {playCategoryLabels[p.category ?? "offense"] ?? "Play"}
+                    {p.steps?.length ? ` · ${p.steps.length + 1} steps` : ""}
+                  </p>
+                  {p.notes && <p className="small play-notes">{p.notes}</p>}
+                </Link>
+              ))}
+          </div>
+        )}
+      </Loading>
+    </>
   );
 }
 
