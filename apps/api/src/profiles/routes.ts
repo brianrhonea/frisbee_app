@@ -13,6 +13,13 @@ export function profileRoutes(app: FastifyInstance, profiles: ProfileService) {
     await profiles.setPrivate(requireCaller(req), req.body);
     return {};
   });
+  app.get("/v1/me/message-policy", async (req, reply) =>
+    reply.header("cache-control", "private, no-store").send(await profiles.messagePolicy(requireCaller(req))),
+  );
+  app.put("/v1/me/message-policy", async (req) => {
+    await profiles.setMessagePolicy(requireCaller(req), req.body);
+    return {};
+  });
   app.put("/v1/me/profile/visibility", async (req) => {
     await profiles.saveVisibility(requireCaller(req), req.body);
     return {};

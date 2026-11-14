@@ -122,19 +122,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 _WeekHeader(viewModel: vm, onPickDay: _pickDay),
                 const Divider(height: 1),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (var i = 0; i < 7; i++)
-                          _DaySection(
-                            key: _dayKeys[i],
-                            day: vm.days[i],
-                            viewModel: vm,
-                            onSwiped: _onSwiped,
-                          ),
-                      ],
+                  // Team and personal events are live; pulling down
+                  // reloads calendars others share.
+                  child: RefreshIndicator(
+                    onRefresh: vm.refreshShared,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0; i < 7; i++)
+                            _DaySection(
+                              key: _dayKeys[i],
+                              day: vm.days[i],
+                              viewModel: vm,
+                              onSwiped: _onSwiped,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -341,7 +347,7 @@ class _SwipeToDelete extends StatelessWidget {
     if (!enabled) return child;
     final scheme = Theme.of(context).colorScheme;
     return Dismissible(
-      key: ValueKey('${entry.team?.id ?? 'me'}/${entry.event.id}'),
+      key: ValueKey(entry.key),
       direction: DismissDirection.startToEnd,
       onDismissed: (_) => onSwiped(entry),
       background: Container(

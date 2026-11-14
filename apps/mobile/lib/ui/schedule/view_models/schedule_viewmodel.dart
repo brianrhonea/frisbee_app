@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/calendar/calendar_share_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
@@ -30,6 +31,7 @@ class ScheduleViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required EventRepository eventRepository,
     MeetingRepository? meetingRepository,
+    CalendarShareRepository? calendarShareRepository,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now,
        _events = eventRepository,
@@ -39,11 +41,13 @@ class ScheduleViewModel extends ChangeNotifier {
       teamRepository: teamRepository,
       eventRepository: eventRepository,
       meetingRepository: meetingRepository,
+      calendarShareRepository: calendarShareRepository,
       uid: _uid,
       clock: _clock,
     )..addListener(notifyListeners);
     _weekStart = today;
     _selectedDay = today;
+    _loadShared();
   }
 
   final DateTime Function() _clock;
@@ -58,14 +62,13 @@ class ScheduleViewModel extends ChangeNotifier {
   /// Swiped-away events waiting out [undoWindow], hidden from the schedule.
   final Map<String, Timer> _pendingDeletes = {};
 
-  static String _keyOf(ScheduleEntry e) =>
-      '${e.team?.id ?? 'me'}/${e.event.id}';
+  static String _keyOf(ScheduleEntry e) => e.key;
 
   /// Personal events are always the user's to delete; team events need an
   /// editing role (owner, coach or captain), as in firestore.rules.
   /// Meetings are deleted from their own page.
   bool canDelete(ScheduleEntry entry) {
-    if (entry.isMeeting) return false;
+    if (entry.isMeeting || entry.isShared) return false;
     final team = entry.team;
     if (team == null) return _uid != null;
     return _uid != null && team.has(_uid, TeamPermission.manageEvents);
@@ -153,8 +156,22 @@ class ScheduleViewModel extends ChangeNotifier {
       _weekStart.day + days,
     );
     _selectedDay = _weekStart;
+    _loadShared();
     notifyListeners();
   }
+
+  /// Calendars shared with the user, around the week shown.
+  void _loadShared() => _feed.loadShared(
+    _weekStart.subtract(MySchedule.lookBack),
+    _weekStart.add(MySchedule.sharedSpan),
+  );
+
+  /// Reloads shared calendars (pull to refresh).
+  Future<void> refreshShared() => _feed.loadShared(
+    _weekStart.subtract(MySchedule.lookBack),
+    _weekStart.add(MySchedule.sharedSpan),
+    force: true,
+  );
 
   ScheduleFilter _filter = ScheduleFilter.all;
   ScheduleFilter get filter => _filter;
@@ -166,7 +183,7 @@ class ScheduleViewModel extends ChangeNotifier {
 
   bool _matches(ScheduleEntry e) => switch (_filter) {
     ScheduleFilter.all => true,
-    ScheduleFilter.team => !e.isPersonal,
+    ScheduleFilter.team => e.team != null,
     ScheduleFilter.personal => e.isPersonal,
   };
 

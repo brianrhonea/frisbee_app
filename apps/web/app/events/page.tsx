@@ -4,6 +4,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { EventItem } from "@/components/EventItem";
 import { LocalTime } from "@/components/LocalTime";
+import { ScheduleLink } from "@/components/ScheduleLink";
 import { getPublic } from "@/lib/api";
 
 export const metadata: Metadata = {
@@ -21,6 +22,7 @@ export default async function Events() {
       <div className="page-head">
         <h1>Events</h1>
         <p>What&apos;s coming up for public teams and groups.</p>
+        <ScheduleLink />
       </div>
       {tournaments.length > 0 && (
         <>

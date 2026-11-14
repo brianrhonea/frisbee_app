@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
 import { postState } from "@/lib/postState";
 import { useAuth } from "./AuthProvider";
+import { postUrl, ShareButton } from "./ShareButton";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
@@ -53,6 +54,7 @@ export function PostActions({ post, onComment }: { post: PublicPost; onComment?:
         <span>{plural(likeCount, "like", "likes")}</span>
         <span>{plural(repostCount, "repost", "reposts")}</span>
         {comments}
+        <ShareButton url={postUrl(post.id)} />
         {user === null && (
           <Link className="post-join" href="/sign-up">
             Sign up to like and reply
@@ -134,6 +136,7 @@ export function PostActions({ post, onComment }: { post: PublicPost; onComment?:
         ) : (
           comments
         )}
+        <ShareButton url={postUrl(post.id)} />
       </footer>
       {composing && !reposted && (
         <form

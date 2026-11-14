@@ -8,6 +8,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { FirestoreBrowseRepository } from "./browse/repository.js";
 import { FirestoreRateLimiter } from "./limits/limiter.js";
+import { FirestoreCalendarRepository } from "./calendar/repository.js";
 import { FirestoreMeRepository } from "./me/repository.js";
 import { buildApp, trustHops } from "./app.js";
 import { parseCorsOrigins } from "./cors.js";
@@ -70,6 +71,7 @@ const app = buildApp({
   },
   teams: new FirestoreTeamRepository(db),
   me: { repo: new FirestoreMeRepository(db), imageUrl },
+  calendar: new FirestoreCalendarRepository(db),
   browse: {
     repo: new FirestoreBrowseRepository(db),
     limiter: new FirestoreRateLimiter(db),

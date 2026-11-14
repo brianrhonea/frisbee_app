@@ -4,6 +4,38 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.9.0 — 2026-11-13
+
+Core features to match the app. Needs API 0.8.0.
+
+**Added**
+- **Settings → Account**: delete your account and its data. Confirms it's
+  you (password, Google or Apple), then runs `account-deleteAccount`.
+- **Share** on every post: the device's share sheet, or copies the link.
+- **Settings → Privacy → Who can message you** (`/v1/me/message-policy`).
+- **Continue with Apple** on sign-in and sign-up. Needs Apple set up in the
+  Firebase console (Services ID, return URL) and the site's domain in
+  Authentication's authorized domains.
+- Sign in with a **username** as well as an email (`account-signInEmail`).
+- **Rankings** (`/rankings`, linked from Explore): teams by division and
+  player ratings, read live like the app's Rankings screen. Members only.
+- **Workout posts**: the composer's workout button adds an activity,
+  minutes, distance (km or mi), effort and exercises. GPS recordings stay
+  in the app. Workouts show their activity's name.
+- **Your schedule** (`/schedule`, from Events): your personal events,
+  live, with add, edit and delete (`/v1/me/events`), and calendars others
+  share with you for the next 30 days, read-only.
+- **Settings → Calendar sharing**: pick people (search by name or
+  username) who see your personal events; notes stay private.
+
+**Changed**
+- Clicking **Home** while on Home scrolls to the top and reloads the feed.
+
+**Fixed**
+- Editing a post showed the old words until a reload; the card now
+  shows the edit at once.
+- Username sign-in errors no longer end in the HTTP status (" [401]").
+
 ## 0.8.0 — 2026-11-13
 
 Personal details at sign-up. Needs API 0.7.0.

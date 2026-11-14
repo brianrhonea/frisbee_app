@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect } from "react";
+import { requestHomeRefresh } from "@/lib/homeRefresh";
 import { useAuth } from "./AuthProvider";
 import { HeaderAuth } from "./HeaderAuth";
 import { NavIcon, type NavIconName } from "./NavIcons";
@@ -14,8 +15,8 @@ type Tab = { href: string; label: string; icon: NavIconName; also?: string[] };
 const tabs: Tab[] = [
   // The community feed and posts are Home's until Home gets its feed tabs.
   { href: "/", label: "Home", icon: "home", also: ["/community", "/posts"] },
-  { href: "/explore", label: "Explore", icon: "explore", also: ["/players"] },
-  { href: "/events", label: "Events", icon: "events" },
+  { href: "/explore", label: "Explore", icon: "explore", also: ["/players", "/rankings"] },
+  { href: "/events", label: "Events", icon: "events", also: ["/schedule"] },
   { href: "/teams", label: "Teams", icon: "teams" },
   { href: "/messages", label: "Messages", icon: "messages" },
 ];
@@ -102,6 +103,9 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
           href={t.href}
           className={active ? `${className} active` : className}
           aria-current={active ? "page" : undefined}
+          onClick={() => {
+            if (t.href === "/" && path === "/") requestHomeRefresh();
+          }}
         >
           <NavIcon name={t.icon} />
           <span>{t.label}</span>

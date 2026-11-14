@@ -3,6 +3,7 @@ import type { MeHome, PublicPost } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { onHomeRefresh } from "@/lib/homeRefresh";
 import { ApiError, callApi } from "@/lib/client";
 import { listingSubtitle } from "@/lib/site";
 import { Composer } from "./Composer";
@@ -38,6 +39,16 @@ export function Dashboard({ user }: { user: User }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Home clicked again: back to the top, with the newest posts.
+  useEffect(
+    () =>
+      onHomeRefresh(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        void load();
+      }),
+    [load],
+  );
 
   async function loadOlder() {
     if (older.next === null) return;

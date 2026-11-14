@@ -157,6 +157,9 @@ class HomeViewModel extends ChangeNotifier {
   bool get loadingMorePosts => feed.loadingMore;
   void loadMorePosts() => feed.loadMore();
 
+  /// Back to the newest posts (Home tapped again, or pulled down).
+  Future<void> refreshFeed() => feed.refresh();
+
   /// Whether the user follows anything yet, for the empty feed's advice.
   bool get followsAnything => feed.follows.isNotEmpty;
 

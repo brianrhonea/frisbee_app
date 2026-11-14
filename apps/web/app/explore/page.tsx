@@ -31,6 +31,25 @@ export default async function Explore({ searchParams }: Props) {
           Search
         </button>
       </form>
+      {!results && (
+        <>
+          <h2 className="section-title">Browse</h2>
+          <div className="stack">
+            <Link className="row-card" href="/rankings">
+              <span>
+                <b>Team rankings</b>
+                <small>Teams by division, from public tournaments</small>
+              </span>
+            </Link>
+            <Link className="row-card" href="/rankings?kind=players">
+              <span>
+                <b>Player ratings</b>
+                <small>From stats logged with the game tracker</small>
+              </span>
+            </Link>
+          </div>
+        </>
+      )}
       {results &&
         (results.players.length === 0 && results.teams.length === 0 ? (
           <p className="empty">Nothing matches &ldquo;{q}&rdquo;.</p>

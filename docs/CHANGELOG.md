@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.20  | 2026-11-13 | `feature/core-parity`                   |                     |
 | 0.0.19  | 2026-11-13 | `feature/personal-details`              |                     |
 | 0.0.18  | 2026-11-13 | `development`                           |                     |
 | 0.0.17  | 2026-11-12 | `development`                           |                     |
@@ -33,6 +34,25 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.20 — Pull to refresh Home; calendar sharing
+
+Needs API 0.8.0 (`/v1/me/calendar/*`). Without `API_BASE_URL`, sharing
+is hidden.
+
+- **Settings → Calendar sharing** (`CalendarSharingScreen`): choose people
+  (people search) who see your personal events; saves at once
+  (`CalendarShareRepository`, API only).
+- Calendars shared with you show on the Schedule tab, read-only:
+  `ScheduleEntry.sharedBy`, gray, tagged with the owner's first name;
+  tapping shows the details in a sheet. Never deletable, not under the
+  Team or Personal filters, not on Home. `MySchedule.loadShared` covers
+  the week shown, from a week before to nine weeks after; pull down
+  to reload.
+
+- Home's feed refreshes on pull-down, and when Home is tapped again (back
+  to For you, top of the feed): `HomeFeed.refresh()` re-subscribes every
+  source. `PageScroll` takes an `onRefresh`.
 
 ## 0.0.19 — Personal details at sign-up
 

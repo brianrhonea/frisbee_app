@@ -10,6 +10,18 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.20
+
+**Fresh Home feed**
+- Pull down on Home, or tap Home again, to load the newest posts.
+
+**Share your calendar**
+- In **Settings → Calendar sharing**, choose friends, a coach or family
+  to see your personal events. They see the title, time and place, never
+  your notes, and you can stop sharing any time.
+- Calendars shared with you show on your Schedule in gray. Pull down to
+  refresh them.
+
 ## 0.0.19
 
 **Your details, kept private**

@@ -121,6 +121,17 @@ class HomeFeed extends ChangeNotifier {
 
   bool get loadingMore => _loadingMore;
 
+  /// Starts over from the newest page of every source (Home tapped again,
+  /// or pulled down): older pages are dropped and the live queries reopen.
+  Future<void> refresh() async {
+    if (_disposed) return;
+    for (final s in _sources.values) {
+      s.dispose();
+    }
+    _sources.clear();
+    _sync();
+  }
+
   /// Shows older posts: fetches the next page from the sources holding the
   /// feed back, until about a page more is shown.
   Future<void> loadMore() async {

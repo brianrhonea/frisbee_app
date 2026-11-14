@@ -9,6 +9,7 @@ import {
   repostId,
   type SavePostResult,
   savePostRequestSchema,
+  type WorkoutPost,
 } from "@stall10/shared";
 import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
@@ -23,6 +24,22 @@ const p = {
   comment: (postId: string, id: string) => `posts/${postId}/comments/${id}`,
   upload: (id: string) => `uploads/${id}`,
 };
+
+/** A workout as the app stores it (Workout.toMap): unset fields left out. */
+function workoutRecord(w: WorkoutPost): Data {
+  return {
+    activity: w.activity,
+    durationMinutes: w.durationMinutes,
+    ...(w.distanceKm !== undefined && { distanceKm: Math.round(w.distanceKm * 100) / 100 }),
+    ...(w.effort !== undefined && { effort: w.effort }),
+    exercises: w.exercises.map((e) => ({
+      name: e.name,
+      ...(e.sets !== undefined && { sets: e.sets }),
+      ...(e.reps !== undefined && { reps: e.reps }),
+      ...(e.weight && { weight: e.weight }),
+    })),
+  };
+}
 
 const noComment = () => new ApiError("not_found", "This comment was deleted.");
 
@@ -53,8 +70,9 @@ function imagesOf(v: unknown): PostImage[] {
  * a post has words or a photo (5,000 characters, 5 links, 4 photos), only
  * the author edits or deletes a post, and only text posts take new photos.
  * Photos come from the caller's finished `post` uploads for this post id,
- * never from paths the client names. Workout and event posts are still
- * made in the app; here their words, links and photos change.
+ * never from paths the client names. A new post may be a workout (typed
+ * in; GPS routes are recorded in the app). Event posts are still made in
+ * the app; here their words, links and photos change, never the workout.
  */
 export class PostEditor {
   constructor(
@@ -88,7 +106,7 @@ export class PostEditor {
     });
   }
 
-  /** `POST /v1/posts`: a new text post by the caller. */
+  /** `POST /v1/posts`: a new text or workout post by the caller. */
   async create(caller: Caller, body: unknown): Promise<SavePostResult> {
     const parsed = savePostRequestSchema.safeParse(body ?? {});
     if (!parsed.success) throw fromZod(parsed.error);
@@ -98,16 +116,19 @@ export class PostEditor {
     await checkNotMuted(this.store, caller.uid, this.now());
     const images = await this.uploadedImages(caller, id, req.uploadIds);
     const words = req.body.trim();
-    if (!words && images.length === 0) throw new ApiError("invalid_argument", "Write something or add a photo.");
+    const workout = req.workout ? workoutRecord(req.workout) : null;
+    if (!workout && !words && images.length === 0) {
+      throw new ApiError("invalid_argument", "Write something or add a photo.");
+    }
     const me = await authorOf(this.store, this.users, caller);
     await this.store.transact(async (tx) => {
       if (await tx.get(p.post(id))) throw new ApiError("already_exists", "That post already exists.");
       tx.create(p.post(id), {
-        kind: "text",
+        kind: workout ? "workout" : "text",
         body: words,
         links: req.links,
         images,
-        workout: null,
+        workout,
         event: null,
         repostOf: null,
         tournamentKey: null,
@@ -128,6 +149,7 @@ export class PostEditor {
     const parsed = savePostRequestSchema.safeParse(body ?? {});
     if (!parsed.success) throw fromZod(parsed.error);
     const req = parsed.data;
+    if (req.workout) throw new ApiError("invalid_argument", "A post's workout can't be changed.");
     const current = await this.store.get(p.post(id));
     if (!current) throw noPost();
     if (current.authorId !== caller.uid) throw new ApiError("permission_denied", "Only its author can edit a post.");

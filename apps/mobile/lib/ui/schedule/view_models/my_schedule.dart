@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
+import '../../../data/repositories/calendar/calendar_share_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
@@ -11,20 +12,25 @@ import '../../../domain/models/meeting.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../domain/models/schedule_entry.dart';
+import '../../../domain/models/shared_calendar.dart';
+import '../../../utils/result.dart';
 
 /// The user's schedule: their personal events plus the events and meetings
-/// of every team they belong to, merged and sorted by start time. Composed
-/// by view models that show it.
+/// of every team they belong to, merged and sorted by start time, and, for
+/// screens that call [loadShared], calendars others share with them
+/// (read-only). Composed by view models that show it.
 class MySchedule extends ChangeNotifier {
   MySchedule({
     required TeamRepository teamRepository,
     required EventRepository eventRepository,
     required String? uid,
     MeetingRepository? meetingRepository,
+    CalendarShareRepository? calendarShareRepository,
     DateTime Function()? clock,
     this.upcomingOnly = false,
   }) : _events = eventRepository,
        _meetings = meetingRepository,
+       _shares = calendarShareRepository,
        _uid = uid,
        _clock = clock ?? DateTime.now {
     if (uid == null) {
@@ -58,6 +64,52 @@ class MySchedule extends ChangeNotifier {
 
   final EventRepository _events;
   final MeetingRepository? _meetings;
+  final CalendarShareRepository? _shares;
+
+  /// How far from its start [loadShared] is asked to look (the API allows
+  /// up to 92 days).
+  static const sharedSpan = Duration(days: 63);
+
+  List<SharedCalendar> _shared = const [];
+  DateTime? _sharedFrom;
+  DateTime? _sharedTo;
+  bool _disposed = false;
+
+  /// Calendars shared with the user, as last loaded.
+  List<SharedCalendar> get sharedCalendars => _shared;
+
+  /// Loads events on calendars shared with the user starting in [from, to),
+  /// unless that range is already loaded. Not live: call again to refresh
+  /// ([force]). Failures keep what's shown.
+  Future<void> loadShared(
+    DateTime from,
+    DateTime to, {
+    bool force = false,
+  }) async {
+    final repo = _shares;
+    if (repo == null || !repo.enabled || _uid == null) return;
+    final loadedFrom = _sharedFrom;
+    final loadedTo = _sharedTo;
+    if (!force &&
+        loadedFrom != null &&
+        loadedTo != null &&
+        !from.isBefore(loadedFrom) &&
+        !to.isAfter(loadedTo)) {
+      return;
+    }
+    final r = await repo.shared(from, to);
+    if (_disposed) return;
+    switch (r) {
+      case Ok(:final value):
+        _shared = value;
+        _sharedFrom = from;
+        _sharedTo = to;
+        notifyListeners();
+      case Error(:final error):
+        _log.warning('Shared calendars failed to load', error);
+    }
+  }
+
   final String? _uid;
   Timer? _retry;
   int _failures = 0;
@@ -195,6 +247,8 @@ class MySchedule extends ChangeNotifier {
         if (teams[id] case final team?)
           for (final m in meetings)
             if (!m.isEnded) ScheduleEntry(team: team, event: m.toEvent()),
+      for (final c in _shared)
+        for (final e in c.events) ScheduleEntry(sharedBy: c.owner, event: e),
     ]..sort((a, b) => a.event.startsAt.compareTo(b.event.startsAt));
   }
 
@@ -203,7 +257,7 @@ class MySchedule extends ChangeNotifier {
   List<ScheduleEntry> upcoming({int? limit, bool personal = true}) {
     final now = _clock();
     final list = entries
-        .where((e) => personal || !e.isPersonal)
+        .where((e) => personal || e.team != null)
         .where((e) => !(e.event.endsAt ?? e.event.startsAt).isBefore(now))
         .toList();
     return limit == null ? list : list.take(limit).toList();
@@ -223,7 +277,7 @@ class MySchedule extends ChangeNotifier {
       return d.year * 10000 + d.month * 100 + d.day;
     }
 
-    int rank(ScheduleEntry e) => e.isPersonal
+    int rank(ScheduleEntry e) => e.team == null
         ? 2
         : priorityTypes.contains(e.event.type)
         ? 0
@@ -241,6 +295,7 @@ class MySchedule extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _teamsSub?.cancel();
     _mineSub?.cancel();
     _retry?.cancel();

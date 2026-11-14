@@ -77,6 +77,58 @@ describe("posts", () => {
     expect((await s.call("POST", "/v1/posts", { body: "hi" }, null)).statusCode).toBe(401);
   });
 
+  it("creates a workout post, stored as the app stores one", async () => {
+    const res = await s.call("POST", "/v1/posts", {
+      body: "",
+      workout: {
+        activity: "gym",
+        durationMinutes: 45,
+        distanceKm: 3.14159,
+        effort: 7,
+        exercises: [{ name: " Squat ", sets: 3, reps: 5, weight: "100 kg" }, { name: "Plank" }],
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(s.store.doc(`posts/${res.json().id}`)).toMatchObject({
+      kind: "workout",
+      body: "",
+      workout: {
+        activity: "gym",
+        durationMinutes: 45,
+        distanceKm: 3.14,
+        effort: 7,
+        exercises: [{ name: "Squat", sets: 3, reps: 5, weight: "100 kg" }, { name: "Plank" }],
+      },
+    });
+  });
+
+  it("checks workouts as validWorkout does, and never changes one on an edit", async () => {
+    const bad = [
+      { activity: "swim", durationMinutes: 30 },
+      { activity: "run", durationMinutes: 0 },
+      { activity: "run", durationMinutes: 1441 },
+      { activity: "run", durationMinutes: 1.5 },
+      { activity: "run", durationMinutes: 30, distanceKm: 0 },
+      { activity: "run", durationMinutes: 30, effort: 11 },
+      { activity: "run", durationMinutes: 30, route: { path: "abc", splitsMi: [], splitsKm: [] } },
+      { activity: "gym", durationMinutes: 30, exercises: [{ name: "" }] },
+      { activity: "gym", durationMinutes: 30, exercises: [{ name: "Squat", sets: 101 }] },
+      { activity: "gym", durationMinutes: 30, exercises: Array.from({ length: 21 }, () => ({ name: "Lunge" })) },
+    ];
+    for (const workout of bad) {
+      expect((await s.call("POST", "/v1/posts", { workout })).statusCode, JSON.stringify(workout)).toBe(400);
+    }
+    const res = await s.call("POST", "/v1/posts", { workout: { activity: "run", durationMinutes: 20 } });
+    const { id } = res.json();
+    const edit = await s.call("PATCH", `/v1/posts/${id}`, {
+      body: "Easy one",
+      workout: { activity: "run", durationMinutes: 90 },
+    });
+    expect(edit.statusCode).toBe(400);
+    expect((await s.call("PATCH", `/v1/posts/${id}`, { body: "Easy one" })).statusCode).toBe(200);
+    expect(s.store.doc(`posts/${id}`)).toMatchObject({ kind: "workout", body: "Easy one", workout: { durationMinutes: 20 } });
+  });
+
   it("adds only the caller's finished uploads for this post", async () => {
     const path = uploaded(s, "u1", "p1");
     const res = await s.call("POST", "/v1/posts", { id: "p1", uploadIds: ["u1"] });

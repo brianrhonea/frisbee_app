@@ -9,6 +9,8 @@ import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/personal/personal_repository.dart';
 import '../domain/models/model_utils.dart';
 import '../domain/models/team.dart';
+import '../ui/calendar/view_models/calendar_sharing_viewmodel.dart';
+import '../ui/calendar/widgets/calendar_sharing_screen.dart';
 import '../ui/chat/view_models/chat_room_settings_viewmodel.dart';
 import '../ui/chat/view_models/chat_room_viewmodel.dart';
 import '../ui/chat/widgets/chat_layout.dart';
@@ -210,6 +212,23 @@ GoRouter router(
             context,
             state.pageKey,
             personalDetailsPage(),
+            panelOnWide: true,
+            dim: false,
+          ),
+        ),
+        GoRoute(
+          path: 'calendar',
+          pageBuilder: (context, state) => slideOverPage(
+            context,
+            state.pageKey,
+            ViewModelHost(
+              create: (c) => CalendarSharingViewModel(
+                calendarShareRepository: c.read(),
+                profileRepository: c.read(),
+                uid: c.read<AuthRepository>().currentUser?.uid,
+              ),
+              builder: (_, vm) => CalendarSharingScreen(viewModel: vm),
+            ),
             panelOnWide: true,
             dim: false,
           ),

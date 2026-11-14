@@ -540,6 +540,9 @@ button.btn:disabled { opacity: 0.6; cursor: default; }
 }
 .card-title + .switch-row { border-top: 0; }
 .switch-row span { display: grid; gap: 2px; }
+.radio-list { border: 0; padding: 0; margin: 0; min-width: 0; }
+.danger-zone { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
+.btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
 .switch-row input[type="checkbox"], .data-table input[type="checkbox"] {
   appearance: none; width: 42px; height: 24px; border-radius: 999px; background: var(--line); position: relative;
   cursor: pointer; flex: none; transition: background 0.15s; margin: 0;
@@ -726,3 +729,61 @@ a.person:hover span { text-decoration: underline; }
 .invite-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .invite-results li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .invite-results .person { min-width: 0; }
+
+/* Rankings */
+.segmented { justify-self: start; }
+.rankings-pick { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.rankings-pick select {
+  padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--field); color: var(--ink); font: inherit;
+}
+.rankings-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.rankings-table th {
+  text-align: left; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line);
+}
+.rankings-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.rankings-table tr:last-child td { border-bottom: 0; }
+.rankings-table th:first-child, .rankings-table td:first-child { width: 2.5em; color: var(--muted); }
+.rankings-table th:nth-child(n + 3), .rankings-table td:nth-child(n + 3) { text-align: right; white-space: nowrap; }
+.rankings-table a { color: var(--ink); font-weight: 600; text-decoration: none; }
+.rankings-table a:hover { text-decoration: underline; }
+.rankings-player { display: inline-flex; align-items: center; gap: 10px; }
+.rankings-player small { font-weight: 400; }
+
+/* Workout posts (Composer) */
+.icon-btn.on { color: var(--lime); }
+.workout-fields { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 12px; margin: 8px 0 0; min-width: 0; }
+.workout-fields legend { font-weight: 700; font-size: 0.9rem; padding: 0 4px; }
+.workout-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.workout-row label { display: grid; gap: 4px; font-size: 0.82rem; color: var(--muted); font-weight: 600; }
+.workout-fields input, .workout-fields select {
+  padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line);
+  background: var(--field); color: var(--ink); font: inherit; min-width: 0; width: 100%; box-sizing: border-box;
+}
+.workout-distance { display: flex; gap: 6px; }
+.workout-distance select { width: auto; }
+.workout-exercises { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.workout-exercises li { display: grid; grid-template-columns: minmax(0, 3fr) repeat(2, minmax(0, 1fr)) minmax(0, 1.4fr) auto; gap: 6px; align-items: center; }
+.exercise-remove { border: 0; background: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; padding: 0 4px; }
+.exercise-remove:hover { color: var(--ink); }
+.workout-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+/* Schedule, calendar sharing, people picker */
+.text-btn { background: none; border: 0; padding: 0; font: inherit; font-size: 0.88rem; color: var(--lime); cursor: pointer; text-decoration: underline; }
+.text-btn:disabled { opacity: 0.5; cursor: default; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.card-head .card-title { margin: 0; }
+.event-actions { display: flex; gap: 14px; margin-top: 4px; }
+.event-editor { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.shared-calendar + .shared-calendar { margin-top: 18px; }
+.shared-calendar-owner { display: flex; align-items: center; gap: 8px; font-size: 1rem; margin: 0 0 8px; }
+.shared-calendar-owner a { color: var(--ink); text-decoration: none; }
+.shared-calendar-owner a:hover { text-decoration: underline; }
+.person-picker { display: grid; gap: 8px; margin-top: 12px; }
+.person-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.person-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px; border-radius: 10px; }
+.person-row > span { flex: 1; min-width: 0; text-align: left; }
+button.person-row { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+button.person-row:hover { background: var(--field); }

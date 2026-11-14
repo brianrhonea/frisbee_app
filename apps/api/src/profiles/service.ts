@@ -1,5 +1,8 @@
 import {
   claimUsernameRequestSchema,
+  type MessagePolicy,
+  messagePolicies,
+  messagePolicyRequestSchema,
   normalizeUsername,
   privateProfileFields,
   profileDetailsRequestSchema,
@@ -19,6 +22,7 @@ const p = {
   profile: (uid: string) => `profiles/${uid}`,
   hidden: (uid: string) => `profiles/${uid}/private/details`,
   username: (name: string) => `usernames/${name}`,
+  user: (uid: string) => `users/${uid}`,
 };
 
 function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
@@ -165,6 +169,20 @@ export class ProfileService {
       const base = ProfileService.base(who, usernameOf(profile), tags);
       if (isPrivate) tx.merge(p.hidden(caller.uid), { ...fields, updatedAt: serverTime });
       else tx.merge(p.profile(caller.uid), { ...base, ...fields });
+    });
+  }
+
+  /** Who may start a conversation with them (users/{uid}.messagePolicy; default everyone). */
+  async messagePolicy(caller: Caller): Promise<{ messagePolicy: MessagePolicy }> {
+    const v = (await this.store.get(p.user(caller.uid)))?.messagePolicy;
+    return { messagePolicy: messagePolicies.includes(v as MessagePolicy) ? (v as MessagePolicy) : "everyone" };
+  }
+
+  /** Sets it on their own users doc, as the app's Settings does (merge). */
+  async setMessagePolicy(caller: Caller, body: unknown): Promise<void> {
+    const { messagePolicy } = parse(messagePolicyRequestSchema, body);
+    await this.store.transact(async (tx) => {
+      tx.merge(p.user(caller.uid), { messagePolicy });
     });
   }
 }

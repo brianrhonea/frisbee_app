@@ -1,5 +1,5 @@
 "use client";
-import type { PublicPost } from "@stall10/shared";
+import { type PublicPost, type WorkoutActivity, workoutActivityLabels } from "@stall10/shared";
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
@@ -13,7 +13,7 @@ import { PostActions } from "./PostActions";
 
 function workoutLine(w: NonNullable<PublicPost["workout"]>): string {
   const parts: string[] = [];
-  if (w.activity) parts.push(w.activity);
+  if (w.activity) parts.push(workoutActivityLabels[w.activity as WorkoutActivity] ?? w.activity);
   const mins = w.durationMinutes ?? (w.durationSeconds ? Math.round(w.durationSeconds / 60) : undefined);
   if (mins) parts.push(`${mins} min`);
   if (w.distanceKm) parts.push(`${w.distanceKm} km`);
@@ -196,8 +196,14 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
       editing={{ id: post.id, body: post.body ?? "", links: post.links ?? [], images: post.images ?? [], kind: kindOf(post) }}
       autoFocus
       onCancel={() => setEditing(false)}
-      onSaved={(r) => {
-        setPost((p) => ({ ...p, images: r.images.map((i) => ({ ...i, url: p.images?.find((x) => x.path === i.path)?.url ?? "" })) }));
+      onSaved={(r, saved) => {
+        // Show the edit at once: its words and links as sent, and the photos kept.
+        setPost((p) => ({
+          ...p,
+          body: saved.body,
+          links: saved.links,
+          images: r.images.map((i) => ({ ...i, url: p.images?.find((x) => x.path === i.path)?.url ?? "" })),
+        }));
         setEditing(false);
       }}
     />

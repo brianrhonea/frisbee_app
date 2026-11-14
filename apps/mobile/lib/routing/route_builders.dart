@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/calendar/calendar_share_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
@@ -218,6 +219,7 @@ Widget eventsPage(GoRouterState state) {
         teamRepository: c.read(),
         eventRepository: c.read(),
         meetingRepository: c.read<MeetingRepository>(),
+        calendarShareRepository: c.read<CalendarShareRepository>(),
       ),
       builder: (context, vm) => ScheduleScreen(
         viewModel: vm,

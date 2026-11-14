@@ -19,6 +19,13 @@ import 'notification_offers.dart';
 /// The app's top-level sections, in the order of the router's shell
 /// branches. The first five are the tabs (docs/product-spec.md §3); the
 /// profile opens from the user's avatar instead.
+/// Home was tapped while open: its feed starts over from the newest posts.
+abstract final class HomeRefresh {
+  static final _requests = ValueNotifier<int>(0);
+  static Listenable get requests => _requests;
+  static void request() => _requests.value++;
+}
+
 enum ShellSection {
   community('Home', 'Home', Icons.home_outlined, Icons.home_rounded),
   explore('Explore', 'Explore', Icons.explore_outlined, Icons.explore),
@@ -75,6 +82,7 @@ class AppShell extends StatelessWidget {
   void _select(ShellSection s) {
     final again = s.index == navigationShell.currentIndex;
     if (again) ScrollToTop.request();
+    if (again && s == ShellSection.community) HomeRefresh.request();
     navigationShell.goBranch(s.index, initialLocation: again);
   }
 

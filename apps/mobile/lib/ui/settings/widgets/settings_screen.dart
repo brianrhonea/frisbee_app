@@ -103,6 +103,12 @@ class SettingsScreen extends StatelessWidget {
               SettingsGroup(
                 children: [
                   SettingsTile(
+                    icon: Icons.event_available_outlined,
+                    title: 'Calendar sharing',
+                    subtitle: 'Who sees your personal events',
+                    onTap: () => context.push(Routes.settingsCalendar),
+                  ),
+                  SettingsTile(
                     icon: Icons.people_outline,
                     title: 'People you follow',
                     onTap: () => context.push(Routes.settingsFollowing),

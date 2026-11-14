@@ -48,6 +48,7 @@ abstract final class Routes {
   static const settingsFollowing = '/settings/following';
   static const settingsAccount = '/settings/account';
   static const settingsPersonal = '/settings/personal';
+  static const settingsCalendar = '/settings/calendar';
 
   /// Another player's profile.
   static String player(String uid) => '/players/$uid';

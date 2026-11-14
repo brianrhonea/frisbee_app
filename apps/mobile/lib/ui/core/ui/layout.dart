@@ -54,10 +54,18 @@ EdgeInsets pagePadding(ScreenSize size) => switch (size) {
 /// Tapping the status bar (iOS), or the page's tab again, scrolls it back
 /// to the top (see [ScrollToTop]).
 class PageScroll extends StatefulWidget {
-  const PageScroll({super.key, required this.children, this.controller});
+  const PageScroll({
+    super.key,
+    required this.children,
+    this.controller,
+    this.onRefresh,
+  });
 
   final List<Widget> children;
   final ScrollController? controller;
+
+  /// Pull down to refresh, when given.
+  final Future<void> Function()? onRefresh;
 
   @override
   State<PageScroll> createState() => _PageScrollState();
@@ -79,21 +87,28 @@ class _PageScrollState extends State<PageScroll> {
   Widget build(BuildContext context) {
     final size = ScreenSize.of(context);
     final controller = _controller;
-    return ScrollToTop(
+    final scroll = SingleChildScrollView(
       controller: controller,
-      child: SingleChildScrollView(
-        controller: controller,
-        padding: pagePadding(size),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: maxPageWidth),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: widget.children,
-            ),
+      physics: widget.onRefresh == null
+          ? null
+          : const AlwaysScrollableScrollPhysics(),
+      padding: pagePadding(size),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: maxPageWidth),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: widget.children,
           ),
         ),
       ),
+    );
+    final onRefresh = widget.onRefresh;
+    return ScrollToTop(
+      controller: controller,
+      child: onRefresh == null
+          ? scroll
+          : RefreshIndicator(onRefresh: onRefresh, child: scroll),
     );
   }
 }

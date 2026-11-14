@@ -3,6 +3,9 @@ import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
 import type { BrowseRepository } from "./browse/repository.js";
+import type { CalendarRepository } from "./calendar/repository.js";
+import { calendarRoutes } from "./calendar/routes.js";
+import { CalendarService } from "./calendar/service.js";
 import { browseRoutes } from "./browse/routes.js";
 import { BrowseService } from "./browse/service.js";
 import type { MeRepository } from "./me/repository.js";
@@ -48,6 +51,8 @@ export interface AppDeps {
   };
   /** Transactional document access; enables the membership, profile and post routes. */
   store?: DocStore;
+  /** Shared calendars' queries; with [store], enables /v1/me/events and /v1/me/calendar/*. */
+  calendar?: CalendarRepository;
   /** Encrypts personal details; with [store], enables /v1/me/personal. Off without one: never stored in the clear. */
   personal?: PersonalCipher;
   /** Cloud Storage; with [store], enables /v1/uploads. */
@@ -123,6 +128,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     postRoutes(app, new PostService(deps.store, deps.users, deps.now));
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now));
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
+    if (deps.calendar) calendarRoutes(app, new CalendarService(deps.store, deps.calendar));
     if (deps.media) {
       const uploads = new UploadService(deps.store, deps.media, { heic: deps.heic, queue: deps.transcodeQueue, now: deps.now });
       uploadRoutes(app, uploads);

@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import 'package:frisbee_app/data/repositories/calendar/calendar_share_repository.dart';
+import 'package:frisbee_app/domain/models/shared_calendar.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
@@ -2546,4 +2548,51 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
 
   @override
   set signUpBirthDate(DateTime? value) => _birth = value;
+}
+
+/// Calendar sharing in memory: [viewerList] is the user's list, [calendars]
+/// what others share with them (filtered by the asked window).
+class FakeCalendarShareRepository implements CalendarShareRepository {
+  FakeCalendarShareRepository({this.enabled = true});
+
+  @override
+  final bool enabled;
+
+  List<CalendarPerson> viewerList = [];
+  List<SharedCalendar> calendars = [];
+  final people = <String, CalendarPerson>{};
+  int sharedLoads = 0;
+  bool fail = false;
+
+  @override
+  Future<Result<List<CalendarPerson>>> viewers() async =>
+      fail ? Result.error(Exception('offline')) : Result.ok(viewerList);
+
+  @override
+  Future<Result<List<CalendarPerson>>> setViewers(List<String> uids) async {
+    if (fail) return Result.error(Exception('offline'));
+    viewerList = [
+      for (final u in uids) people[u] ?? CalendarPerson(uid: u, name: u),
+    ];
+    return Result.ok(viewerList);
+  }
+
+  @override
+  Future<Result<List<SharedCalendar>>> shared(
+    DateTime from,
+    DateTime to,
+  ) async {
+    sharedLoads++;
+    if (fail) return Result.error(Exception('offline'));
+    return Result.ok([
+      for (final c in calendars)
+        SharedCalendar(
+          owner: c.owner,
+          events: [
+            for (final e in c.events)
+              if (!e.startsAt.isBefore(from) && e.startsAt.isBefore(to)) e,
+          ],
+        ),
+    ]);
+  }
 }

@@ -1,6 +1,8 @@
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
+import '../data/repositories/calendar/calendar_share_repository.dart';
+import '../data/repositories/calendar/calendar_share_repository_api.dart';
 import '../data/repositories/discord/discord_import_repository.dart';
 import '../data/repositories/discord/discord_import_repository_firebase.dart';
 import '../data/repositories/voice/voice_repository.dart';
@@ -99,6 +101,10 @@ List<SingleChildWidget> get firebaseProviders => [
       api: context.read<ApiClient?>(),
       flags: context.read<FeatureFlags>(),
     ),
+  ),
+  Provider<CalendarShareRepository>(
+    create: (context) =>
+        CalendarShareRepositoryApi(api: context.read<ApiClient?>()),
   ),
   ChangeNotifierProvider<PersonalDetailsRepository>(
     create: (context) => PersonalDetailsRepositoryApi(

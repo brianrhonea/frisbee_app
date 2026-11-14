@@ -3,6 +3,7 @@ import { FirebaseError } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
+  OAuthProvider,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -11,7 +12,7 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
-import { authConfigured, firebaseAuth } from "@/lib/firebase";
+import { authConfigured, emailForUsername, firebaseAuth } from "@/lib/firebase";
 import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
 import { localToday, signUpBirthDateProblem } from "./PersonalDetailsForm";
@@ -19,6 +20,11 @@ import { localToday, signUpBirthDateProblem } from "./PersonalDetailsForm";
 /** Firebase's error codes in words. */
 function message(e: unknown): string {
   const code = e instanceof FirebaseError ? e.code : "";
+  // Username sign-in (account-signInEmail) words its own failures.
+  // The Functions SDK adds the HTTP status (" [401]"); people don't need it.
+  if (code.startsWith("functions/") && e instanceof FirebaseError && e.message) {
+    return e.message.replace(/\s*\[\d{3}\]$/, "");
+  }
   switch (code) {
     case "auth/invalid-credential":
     case "auth/wrong-password":
@@ -29,7 +35,7 @@ function message(e: unknown): string {
     case "auth/weak-password":
       return "Use a password of at least 6 characters.";
     case "auth/invalid-email":
-      return "That doesn't look like an email address.";
+      return "Enter the email address of your account.";
     case "auth/too-many-requests":
       return "Too many tries. Wait a minute and try again.";
     case "auth/popup-closed-by-user":
@@ -37,6 +43,8 @@ function message(e: unknown): string {
       return "";
     case "auth/unauthorized-domain":
       return "Signing in isn't set up for this web address yet.";
+    case "auth/operation-not-allowed":
+      return "That way of signing in isn't turned on yet.";
     default:
       return "Something went wrong. Try again.";
   }
@@ -89,7 +97,11 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     e.preventDefault();
     void run(async () => {
       if (mode === "sign-in") {
-        await signInWithEmailAndPassword(auth, email.trim(), password);
+        // A username (no @) is swapped for its email by account-signInEmail,
+        // which checks the password first, as in the app.
+        const id = email.trim();
+        const address = id.includes("@") ? id : await emailForUsername(id, password);
+        await signInWithEmailAndPassword(auth, address, password);
       } else {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         if (name.trim()) await updateProfile(cred.user, { displayName: name.trim() });
@@ -153,6 +165,21 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       >
         Continue with Google
       </button>
+      <button
+        className="btn auth-google"
+        type="button"
+        disabled={busy}
+        onClick={() =>
+          run(() => {
+            const apple = new OAuthProvider("apple.com");
+            apple.addScope("email");
+            apple.addScope("name");
+            return signInWithPopup(auth, apple);
+          })
+        }
+      >
+        Continue with Apple
+      </button>
       <p className="auth-or">or</p>
       <form onSubmit={submit}>
         {mode === "sign-up" && (
@@ -163,8 +190,16 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           </label>
         )}
         <label>
-          Email
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+          {mode === "sign-in" ? "Email or username" : "Email"}
+          <input
+            type={mode === "sign-in" ? "text" : "email"}
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete={mode === "sign-in" ? "username" : "email"}
+            autoCapitalize="none"
+            spellCheck={false}
+          />
         </label>
         <label>
           Password
@@ -191,7 +226,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
             disabled={busy}
             onClick={() =>
               run(async () => {
-                if (!email.trim()) throw new FirebaseError("auth/invalid-email", "");
+                if (!email.trim().includes("@")) throw new FirebaseError("auth/invalid-email", "");
                 await sendPasswordResetEmail(auth, email.trim());
                 setNotice("If there's an account with that email, we've sent a link to reset its password.");
               })

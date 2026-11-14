@@ -13,7 +13,7 @@ function setup() {
   const app = buildApp({ verifier: new FakeVerifier(), users, teams: new FakeTeamRepository(), store, now: () => now });
   const call = (method: "POST" | "PUT", url: string, body: object, uid = "u1") =>
     app.inject({ method, url, payload: body, headers: { authorization: `Bearer token:${uid}` } });
-  return { store, users, call };
+  return { store, users, call, app };
 }
 
 let s: ReturnType<typeof setup>;
@@ -154,5 +154,25 @@ describe("privacy", () => {
     await s.call("PUT", "/v1/me/profile/visibility", { visibility: { stats: true, teams: false, games: true }, tags: [] });
     expect(s.store.doc(H)).toMatchObject({ teams: [], visibility: { teams: false } });
     expect(s.store.doc(P)).not.toHaveProperty("visibility");
+  });
+});
+
+describe("message policy (users/{uid}.messagePolicy)", () => {
+  const get = async () => {
+    const res = await s.app.inject({ method: "GET", url: "/v1/me/message-policy", headers: { authorization: "Bearer token:u1" } });
+    return res.json().messagePolicy as string;
+  };
+
+  it("defaults to everyone, and saves on their own users doc", async () => {
+    expect(await get()).toBe("everyone");
+    expect((await s.call("PUT", "/v1/me/message-policy", { messagePolicy: "followers" })).statusCode).toBe(200);
+    expect(s.store.doc("users/u1")).toEqual({ messagePolicy: "followers" });
+    expect(await get()).toBe("followers");
+  });
+
+  it("refuses unknown policies", async () => {
+    const res = await s.call("PUT", "/v1/me/message-policy", { messagePolicy: "friends" });
+    expect(res.statusCode).toBe(400);
+    expect(s.store.doc("users/u1")).toBeUndefined();
   });
 });

@@ -76,8 +76,66 @@ const link = z
   .max(postLinkMax, `Keep links under ${postLinkMax} characters.`)
   .regex(/^https?:\/\/.+/, "Links start with http:// or https://.");
 
+/** Workout activities (WorkoutActivity in the app; validWorkout's list). */
+export const workoutActivities = [
+  "run",
+  "ride",
+  "walk",
+  "hike",
+  "sprints",
+  "throwing",
+  "gym",
+  "agility",
+  "mobility",
+  "other",
+] as const;
+export type WorkoutActivity = (typeof workoutActivities)[number];
+export const workoutActivityLabels: Record<WorkoutActivity, string> = {
+  run: "Run",
+  ride: "Ride",
+  walk: "Walk",
+  hike: "Hike",
+  sprints: "Sprints",
+  throwing: "Throwing",
+  gym: "Gym",
+  agility: "Agility",
+  mobility: "Mobility",
+  other: "Other",
+};
+/** Most exercises on a workout (validExercises). */
+export const workoutExercisesMax = 20;
+
+/** One line of a workout: "Squat 3 × 5 @ 100" (validExercise). */
+export const workoutExerciseSchema = z.strictObject({
+  name: z.string().trim().min(1, "Name each exercise.").max(60, "Keep exercise names under 60 characters."),
+  sets: z.number().int().min(1).max(100).optional(),
+  reps: z.number().int().min(1).max(1000).optional(),
+  weight: z.string().trim().max(20, "Keep weights under 20 characters.").optional(),
+});
+
 /**
- * `POST /v1/posts` (a new text post) and `PATCH /v1/posts/:id` (the author
+ * A workout typed in by hand (validWorkout, without a GPS route: routes are
+ * recorded in the app). Minutes 1–1440, distance up to 1000 km, effort 1–10.
+ */
+export const workoutSchema = z.strictObject({
+  activity: z.enum(workoutActivities),
+  durationMinutes: z
+    .number()
+    .int("Whole minutes only.")
+    .min(1, "A workout lasts at least a minute.")
+    .max(1440, "A workout lasts at most 24 hours."),
+  distanceKm: z.number().positive().max(1000, "Distances go up to 1,000 km.").optional(),
+  effort: z.number().int().min(1).max(10).optional(),
+  exercises: z
+    .array(workoutExerciseSchema)
+    .max(workoutExercisesMax, `Add at most ${workoutExercisesMax} exercises.`)
+    .default([]),
+});
+export type WorkoutInput = z.input<typeof workoutSchema>;
+export type WorkoutPost = z.output<typeof workoutSchema>;
+
+/**
+ * `POST /v1/posts` (a new text post, or a workout post with [workout]) and `PATCH /v1/posts/:id` (the author
  * edits it). [uploadIds] are finished `post` uploads (`/v1/uploads`, with
  * this post's id as itemId) to add; on an edit, [keepImages] lists the
  * paths of the photos to keep (the rest are deleted). A post needs words
@@ -96,6 +154,8 @@ export const savePostRequestSchema = z.strictObject({
     .max(postImagesMax)
     .default([]),
   keepImages: z.array(z.string().max(1024)).max(postImagesMax).optional(),
+  /** New posts only: makes it a workout post. Edits keep the workout as it is. */
+  workout: workoutSchema.optional(),
 });
 export type SavePostRequest = z.input<typeof savePostRequestSchema>;
 

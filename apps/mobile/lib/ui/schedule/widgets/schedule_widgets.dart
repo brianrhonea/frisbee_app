@@ -11,6 +11,7 @@ import 'event_style.dart';
 /// two are easy to tell apart at a glance.
 Color scheduleColor(BuildContext context, ScheduleEntry entry) {
   final c = AppColors.of(context);
+  if (entry.isShared) return c.muted;
   return entry.isPersonal ? c.personal : c.team;
 }
 
@@ -30,11 +31,11 @@ class ScheduleTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = scheduleColor(context, entry);
     final team = entry.team;
-    final label = team == null
-        ? 'PERSONAL'
-        : showTeamName
-        ? team.name.toUpperCase()
-        : 'TEAM';
+    final label = switch ((entry.sharedBy, team)) {
+      (final owner?, _) => owner.name.split(' ').first.toUpperCase(),
+      (_, null) => 'PERSONAL',
+      (_, final t?) => showTeamName ? t.name.toUpperCase() : 'TEAM',
+    };
     return Container(
       constraints: const BoxConstraints(maxWidth: 120),
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -112,7 +113,9 @@ class ScheduleEventRow extends StatelessWidget {
     final tile = large ? 44.0 : 36.0;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: () => context.push(Routes.scheduleEvent(entry)),
+      onTap: () => entry.isShared
+          ? showSharedEventSheet(context, entry)
+          : context.push(Routes.scheduleEvent(entry)),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 6, vertical: large ? 10 : 8),
         child: Row(
@@ -253,4 +256,62 @@ class WeekDayCell extends StatelessWidget {
       ),
     );
   }
+}
+
+/// An event on someone's shared calendar: its details, read-only. It has
+/// no page of its own (the owner's event isn't the user's to open).
+Future<void> showSharedEventSheet(BuildContext context, ScheduleEntry entry) {
+  final e = entry.event;
+  final owner = entry.sharedBy;
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      final c = AppColors.of(context);
+      final when = DateFormat.yMMMEd().add_jm().format(e.startsAt);
+      final until = e.endsAt == null
+          ? ''
+          : ' – ${DateFormat.jm().format(e.endsAt!)}';
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                e.title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${e.type.label} · $when$until',
+                style: TextStyle(color: c.muted),
+              ),
+              if (e.location.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.place_outlined, size: 18, color: c.muted),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text(e.location)),
+                  ],
+                ),
+              ],
+              if (owner != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  "On ${owner.name}'s calendar, shared with you.",
+                  style: TextStyle(fontSize: 13, color: c.muted),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }

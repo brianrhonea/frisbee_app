@@ -7,6 +7,31 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.8.0 — 2026-11-13
+
+Core features on both apps.
+
+**Added**
+- `GET` / `PUT /v1/me/message-policy`: who can start a conversation with
+  the caller (`everyone`, `followers`, `following`, `nobody`;
+  `messagePolicyRequestSchema`). Stored in `users/{uid}.messagePolicy`,
+  as the app already does; unset reads as `everyone`.
+- `POST /v1/posts` takes an optional `workout` (`workoutSchema`: activity,
+  whole minutes, distance, effort, up to 20 exercises; no GPS route),
+  checked as `validWorkout` checks it and stored as `Workout.toMap` does.
+  `PATCH` refuses to change a workout.
+- Personal events: `POST /v1/me/events`, `PATCH` / `DELETE
+  /v1/me/events/:id` (`personalEventSchema`; checks `validMine` and saves
+  as the app does: Timestamps, `poll: null`, `location` and `notes`
+  always set).
+- Calendar sharing (requirements U11, D4): `GET` / `PUT
+  /v1/me/calendar/viewers` (up to 50 people with profiles, not yourself;
+  stored in `users/{uid}.calendarViewers`) and `GET
+  /v1/me/calendar/shared?from=&to=` (up to 92 days): each calendar shared
+  with the caller, events with title, type, times and place, never notes.
+  The owner's list is checked on every read. `FirestoreCalendarRepository`
+  (array-contains and date-range queries; single-field indexes only).
+
 ## 0.7.0 — 2026-11-13
 
 Personal details at sign-up: legal name, birthday, phone, gender, mailing

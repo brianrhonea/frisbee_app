@@ -107,11 +107,12 @@ export async function appCheckToken(): Promise<string | null> {
 
 /**
  * Deletes the signed-in account and its data through the
- * `account-deleteAccount` function (as the app does), or, if that can't be
- * reached (no App Check on this site yet), just the login: a brand-new
- * account has nothing else yet. Needs a recent sign-in.
+ * `account-deleteAccount` function (as the app does). With
+ * [loginOnlyFallback] (a brand-new account, which has nothing else yet), if
+ * that can't be reached, just the login; otherwise its error is thrown.
+ * Needs a recent sign-in.
  */
-export async function deleteOwnAccount(): Promise<void> {
+export async function deleteOwnAccount({ loginOnlyFallback = true } = {}): Promise<void> {
   const a = firebaseAuth();
   const user = a?.currentUser;
   if (!a || !user) return;
@@ -127,8 +128,30 @@ export async function deleteOwnAccount(): Promise<void> {
       connectFunctionsEmulator(functions, host!, Number(port));
     }
     await httpsCallable(functions, "account-deleteAccount")({});
-  } catch {
+  } catch (e) {
+    // An existing account has data the login alone would leave behind.
+    if (!loginOnlyFallback) throw e;
     await deleteUser(user).catch(() => undefined);
   }
   await signOut(a).catch(() => undefined);
+}
+
+/**
+ * The email of the account with [username], from the `account-signInEmail`
+ * function (the app's username sign-in). It checks [password] first, and
+ * an unknown username fails like a wrong password.
+ */
+export async function emailForUsername(username: string, password: string): Promise<string> {
+  const { getFunctions, httpsCallable, connectFunctionsEmulator } = await import("firebase/functions");
+  startAppCheck();
+  const functions = getFunctions(firebaseApp(), "us-central1");
+  if (process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR_HOST) {
+    const [host, port] = process.env.NEXT_PUBLIC_FUNCTIONS_EMULATOR_HOST.split(":");
+    connectFunctionsEmulator(functions, host!, Number(port));
+  }
+  const r = await httpsCallable<{ username: string; password: string }, { email: string }>(
+    functions,
+    "account-signInEmail",
+  )({ username, password });
+  return r.data.email;
 }

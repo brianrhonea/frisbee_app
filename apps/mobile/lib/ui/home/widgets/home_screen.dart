@@ -53,9 +53,15 @@ class _HomeScreenState extends State<HomeScreen> {
     vm.deleteUserPost,
   ];
 
+  void _onHomeAgain() {
+    if (_tab != _Tab.forYou) setState(() => _tab = _Tab.forYou);
+    vm.refreshFeed();
+  }
+
   @override
   void initState() {
     super.initState();
+    HomeRefresh.requests.addListener(_onHomeAgain);
     vm.joinTeam.addListener(_onJoin);
     for (final c in _commands) {
       c.addListener(_onCommand);
@@ -64,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    HomeRefresh.requests.removeListener(_onHomeAgain);
     vm.joinTeam.removeListener(_onJoin);
     for (final c in _commands) {
       c.removeListener(_onCommand);
@@ -220,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, _) {
           // No page header: the composer below is where posts start.
           return PageScroll(
+            onRefresh: vm.refreshFeed,
             children: [
               // On bigger screens the top bar has the same box.
               if (mobile) ...[const SearchField(), const SizedBox(height: 12)],
