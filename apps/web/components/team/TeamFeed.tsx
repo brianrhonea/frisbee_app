@@ -2,11 +2,15 @@
 import type { PublicEvent, PublicTeamPost } from "@stall10/shared";
 import { limit, orderBy } from "firebase/firestore";
 import Link from "next/link";
+import { useState } from "react";
+import { callApi } from "@/lib/client";
+import { useAuth } from "../AuthProvider";
 import { EventItem } from "../EventItem";
 import { LocalTime } from "../LocalTime";
 import { useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "./TeamContext";
 import { type TeamPostView, TeamPostCard } from "./TeamPostCard";
+import { TeamPostComposer } from "./TeamPostComposer";
 import { useTeamEvents } from "./TeamSchedule";
 
 const postLimit = 30;
@@ -28,10 +32,13 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
   const posts: TeamPostView[] = member ? (live.data ?? []) : publicPosts;
   const upcoming = (member ? (events.data ?? []) : publicEvents).slice(0, 4);
   const hidden = !member && privateGroup;
+  const admin = viewer.state === "member" && viewer.can("manageTeam");
+  const [editing, setEditing] = useState<string | null>(null);
 
   return (
     <div className="hub-feed">
       <section className="stack">
+        {admin && <TeamPostComposer teamId={teamId} />}
         {viewer.state === "loading" || (member && !live.data && !live.error) ? (
           <p className="muted" aria-busy="true">Loading posts…</p>
         ) : live.error ? (
@@ -41,9 +48,20 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
         ) : posts.length === 0 ? (
           <p className="empty">{member ? "No posts yet." : "No public posts yet."}</p>
         ) : (
-          posts.map((p) => <TeamPostCard key={p.id} post={p} teamName={name} showAudience={member} />)
+          posts.map((p) =>
+            editing === p.id ? (
+              <TeamPostComposer key={p.id} teamId={teamId} post={p} onDone={() => setEditing(null)} />
+            ) : (
+              <TeamPostCard
+                key={p.id}
+                post={p}
+                teamName={name}
+                showAudience={member}
+                actions={admin ? <PostAdminActions teamId={teamId} postId={p.id} onEdit={() => setEditing(p.id)} /> : undefined}
+              />
+            ),
+          )
         )}
-        {member && <p className="muted small">Posting to the team comes to the website next; post from the app for now.</p>}
       </section>
       <aside className="stack">
         {!hidden && (
@@ -79,5 +97,33 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
         </div>
       </aside>
     </div>
+  );
+}
+
+/** Edit and delete on a team post, for its admins. */
+function PostAdminActions({ teamId, postId, onEdit }: { teamId: string; postId: string; onEdit: () => void }) {
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function remove() {
+    if (!user || !window.confirm("Delete this post? This can't be undone.")) return;
+    setBusy(true);
+    try {
+      await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/posts/${encodeURIComponent(postId)}`, { method: "DELETE" });
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <span className="post-admin">
+      <button type="button" className="text-btn" onClick={onEdit} disabled={busy}>
+        Edit
+      </button>
+      <button type="button" className="text-btn danger" onClick={() => void remove()} disabled={busy}>
+        Delete
+      </button>
+      {error && <span className="form-error">{error}</span>}
+    </span>
   );
 }

@@ -2,11 +2,12 @@
 import { limit, orderBy, where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar } from "../Avatar";
 import { LocalTime } from "../LocalTime";
 import { MemberImage } from "../MemberImage";
-import { useLiveQueries, useLiveQuery } from "@/lib/live";
+import { ChatComposer, MessageActions } from "../ChatComposer";
+import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
 
@@ -15,6 +16,8 @@ interface Room {
   kind?: "text" | "voice";
   folderId?: string | null;
   position?: number;
+  writeRoles?: string[];
+  writeUsers?: string[];
 }
 interface Folder {
   name?: string;
@@ -106,7 +109,18 @@ export function TeamChat() {
               <p className="muted">Voice rooms open in the app for now.</p>
             </div>
           ) : (
-            <Thread teamId={teamId} roomId={open.id} name={open.name ?? "Room"} me={member.uid} />
+            <Thread
+              teamId={teamId}
+              roomId={open.id}
+              name={open.name ?? "Room"}
+              me={member.uid}
+              canWrite={
+                member.tier === "owner" ||
+                member.audience.some((a) => open.writeRoles?.includes(a)) ||
+                (open.writeUsers ?? []).includes(member.uid)
+              }
+              canModerate={member.tier === "owner" || member.can("moderate") || member.can("manageChats")}
+            />
           )
         ) : (
           <p className="empty">Pick a room.</p>
@@ -116,7 +130,23 @@ export function TeamChat() {
   );
 }
 
-function Thread({ teamId, roomId, name, me }: { teamId: string; roomId: string; name: string; me: string }) {
+function Thread({
+  teamId,
+  roomId,
+  name,
+  me,
+  canWrite,
+  canModerate,
+}: {
+  teamId: string;
+  roomId: string;
+  name: string;
+  me: string;
+  canWrite: boolean;
+  canModerate: boolean;
+}) {
+  const [replyTo, setReplyTo] = useState<Doc<Message> | null>(null);
+  const base = `/v1/teams/${encodeURIComponent(teamId)}/chats/${encodeURIComponent(roomId)}/messages`;
   const messages = useLiveQuery<Message>(
     `teams/${teamId}/chats/${roomId}/messages`,
     [orderBy("createdAt", "desc"), limit(messageLimit)],
@@ -176,19 +206,35 @@ function Thread({ teamId, roomId, name, me }: { teamId: string; roomId: string; 
                   {reactions.length > 0 && (
                     <p className="message-reactions">
                       {reactions.map(([e, n]) => (
-                        <span key={e}>
+                        <span key={e} className={m.reactions?.[me] === e ? "mine" : ""}>
                           {e} {n}
                         </span>
                       ))}
                     </p>
                   )}
                 </div>
+                <MessageActions
+                  path={`${base}/${encodeURIComponent(m.id)}`}
+                  mine={m.reactions?.[me] ?? null}
+                  canDelete={m.authorId === me || canModerate}
+                  onReply={canWrite ? () => setReplyTo(m) : undefined}
+                />
               </div>
             );
           })
         )}
       </div>
-      <footer className="thread-foot muted small">Sending from the website comes with the Messages slice; reply in the app for now.</footer>
+      {canWrite ? (
+        <ChatComposer
+          path={base}
+          upload={{ targetId: `teams/${teamId}/chats/${roomId}` }}
+          placeholder={`Message #${name}`}
+          replyTo={replyTo ? { id: replyTo.id, authorName: replyTo.authorName, text: replyTo.text } : null}
+          onClearReply={() => setReplyTo(null)}
+        />
+      ) : (
+        <footer className="thread-foot muted small">You can read this room but not post in it.</footer>
+      )}
     </div>
   );
 }

@@ -8,6 +8,20 @@ here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
 Website parity (`docs/product-spec.md` §8.1). Needs API 0.10.0.
 
+**Added**
+- **Team posts** from the hub's Feed, for the team's admins: a title,
+  words, a place, links, up to four photos (picked, dragged in or
+  pasted) and whether it shows on the public page. Edit and delete in
+  place.
+- **Team events**: members who manage events add, edit and delete them
+  from Schedule (type, when, where, notes, a poll, public or not, and
+  who sees it in a school or club community).
+- **RSVPs, reactions and polls**: Going, Maybe or Can't go on every
+  event, then react and vote while going.
+- **Send in team chat**: Enter sends (Shift+Enter for a new line),
+  attach photos, reply to a message, react, and delete your own (or
+  any, for moderators). Rooms you can only read say so.
+
 **Changed**
 - Signed-out visitors see only team and community pages (and the
   community feed and posts). Explore, Events, player profiles, Learn,

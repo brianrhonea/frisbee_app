@@ -13,6 +13,31 @@ Website parity (`docs/product-spec.md` §8.1) and visitors limited to team
 and community pages. Needs the `browse` functions from the same change
 for the Flutter web site.
 
+**Added**
+- Team hub writes (`src/hub`), each re-checking its Firestore rule in a
+  transaction, with zod schemas in `packages/shared/src/hub.ts`:
+  - Team posts: `POST /v1/teams/:teamId/posts`, `PATCH|DELETE
+    .../posts/:postId` (manageTeam; words or a photo, 5 links, 4 photos
+    from the caller's `teamImage` uploads for this team and post).
+  - Team events: `POST /v1/teams/:teamId/events`, `PATCH|DELETE
+    .../events/:eventId` (manageEvents; validEvent, a community's
+    audience, the `publicEvents` copy kept in step, votes reset when the
+    poll changes; a hosted tournament's event keeps its link).
+  - Answers: `PUT .../events/:eventId/rsvp`, `/reaction`, `/votes`
+    (members who see the event change only their own entries; reactions
+    and votes only while going; votes must be poll options).
+  - Team chat: `POST /v1/teams/:teamId/chats/:roomId/messages` (members who
+    may write in the room, not muted; attachments from the caller's
+    `chat` uploads for this room and message; a reply's quote is copied
+    from the room by the server), `PUT .../messages/:id/reaction` (one of
+    the offered emoji, as the caller) and `DELETE .../messages/:id`
+    (authors, the owner, and moderators or chat managers who can read the
+    room).
+- A per-member, per-instance write limit on those routes
+  (`MemoryRateLimiter`: 30 posts/events, 60 messages and 120 answers a
+  minute), a first step on security review S9.
+- Author names on these writes never fall back to an email (review S2).
+
 **Changed**
 - `GET /v1/public/players/:uid`, `/v1/public/events` and
   `/v1/public/search` need a signed-in caller (401 otherwise, even with

@@ -1,13 +1,18 @@
 "use client";
 import type { PublicEvent } from "@stall10/shared";
 import { orderBy, type QueryConstraint, Timestamp, where } from "firebase/firestore";
+import { eventReactions } from "@stall10/shared";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useAuth } from "../AuthProvider";
 import { EventItem } from "../EventItem";
 import { LocalTime } from "../LocalTime";
 import { downloadIcs } from "@/lib/calendar";
+import { callApi } from "@/lib/client";
 import { type Doc, useLiveQueries } from "@/lib/live";
 import { type TeamViewer, useTeamHub } from "./TeamContext";
+import { TeamEventEditor } from "./TeamEventEditor";
 
 /** A team event as members read it (TeamEvent in the app). */
 export interface TeamEventDoc extends PublicEvent {
@@ -16,6 +21,8 @@ export interface TeamEventDoc extends PublicEvent {
   votes?: Record<string, string[]>;
   reactions?: Record<string, string[]>;
   public?: boolean;
+  audience?: string[];
+  tournamentId?: string;
 }
 
 const typeLabels: Record<string, string> = {
@@ -74,6 +81,9 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   const past = params.get("when") === "past";
   const live = useTeamEvents(teamId, viewer, past);
   const member = viewer.state === "member" ? viewer : null;
+  const router = useRouter();
+  const [editing, setEditing] = useState<string | null>(null);
+  const manager = member?.can("manageEvents") ?? false;
 
   if (viewer.state === "loading") return <p className="muted" aria-busy="true">Loading…</p>;
   if (!member && privateGroup) {
@@ -95,6 +105,13 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   return (
     <div className="hub-split">
       <div className="hub-list">
+        {manager && (
+          <p>
+            <button type="button" className="btn btn-primary btn-small" onClick={() => setEditing("new")}>
+              New event
+            </button>
+          </p>
+        )}
         {member && (
           <div className="segmented" role="tablist" aria-label="Show">
             <Link href={link({ when: null, event: null })} className={past ? "" : "on"} aria-selected={!past} role="tab">
@@ -131,7 +148,19 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
           </p>
         )}
       </div>
-      <div className="hub-detail">{open ? <EventDetail event={open} /> : null}</div>
+      <div className="hub-detail">
+        {editing ? (
+          <TeamEventEditor
+            event={editing === "new" ? undefined : events.find((e) => e.id === editing)}
+            onDone={(id) => {
+              setEditing(null);
+              if (id) router.replace(link({ event: id }), { scroll: false });
+            }}
+          />
+        ) : open ? (
+          <EventDetail event={open} onEdit={manager ? () => setEditing(open.id) : undefined} />
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -147,8 +176,24 @@ function RsvpLine({ event, uid }: { event: TeamEventDoc; uid: string }) {
   );
 }
 
-function EventDetail({ event }: { event: Doc<TeamEventDoc> }) {
+function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () => void }) {
   const { viewer, teamId } = useTeamHub();
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const base = `/v1/teams/${encodeURIComponent(teamId)}/events/${encodeURIComponent(event.id)}`;
+  async function send(path: string, method: "PUT" | "DELETE", body?: unknown) {
+    if (!user) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await callApi(user, `${base}${path}`, { method, body });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   const member = viewer.state === "member" ? viewer : null;
   const names = member?.team.memberNames ?? {};
   const name = (uid: string) => (uid === member?.uid ? "You" : names[uid] || "Member");
@@ -159,9 +204,40 @@ function EventDetail({ event }: { event: Doc<TeamEventDoc> }) {
     .map(([r, emoji]) => [emoji, Object.values(event.reactions ?? {}).filter((s) => s.includes(r)).length] as const)
     .filter(([, n]) => n > 0);
 
+  const mine = member ? event.rsvps?.[member.uid] : undefined;
+  const going = mine === "going";
+  const myReactions = member ? (event.reactions?.[member.uid] ?? []) : [];
+  const myVotes = member ? (event.votes?.[member.uid] ?? []) : [];
+  function vote(id: string) {
+    const picked = myVotes.includes(id);
+    const next = event.poll?.multiple ? (picked ? myVotes.filter((v) => v !== id) : [...myVotes, id]) : picked ? [] : [id];
+    void send("/votes", "PUT", { optionIds: next });
+  }
+
   return (
     <article className="card event-detail">
-      <p className="pill">{typeLabels[event.type ?? ""] ?? "Event"}</p>
+      <div className="event-detail-head">
+        <p className="pill">{typeLabels[event.type ?? ""] ?? "Event"}</p>
+        {onEdit && (
+          <span className="post-admin">
+            {!event.tournamentId && (
+              <button type="button" className="text-btn" onClick={onEdit}>
+                Edit
+              </button>
+            )}
+            <button
+              type="button"
+              className="text-btn danger"
+              disabled={busy}
+              onClick={() => {
+                if (window.confirm("Delete this event for everyone?")) void send("", "DELETE");
+              }}
+            >
+              Delete
+            </button>
+          </span>
+        )}
+      </div>
       <h2>{event.title || "Event"}</h2>
       <p className="muted">
         <LocalTime iso={event.startsAt} style="dateTime" />
@@ -203,6 +279,41 @@ function EventDetail({ event }: { event: Doc<TeamEventDoc> }) {
 
       {member && (
         <>
+          <div className="segmented rsvp-buttons" role="group" aria-label="Your answer">
+            {rsvpLabels.map(([status, label, tLabel]) => (
+              <button
+                key={status}
+                type="button"
+                className={mine === status ? "on" : ""}
+                aria-pressed={mine === status}
+                disabled={busy}
+                onClick={() => void send("/rsvp", "PUT", { status: mine === status ? null : status })}
+              >
+                {tournament ? tLabel : label}
+              </button>
+            ))}
+          </div>
+          {going && (
+            <p className="reaction-picker" role="group" aria-label="React">
+              {eventReactions.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  className={myReactions.includes(r) ? "on" : ""}
+                  aria-pressed={myReactions.includes(r)}
+                  disabled={busy}
+                  onClick={() => void send("/reaction", "PUT", { reaction: r, on: !myReactions.includes(r) })}
+                >
+                  {reactionEmoji[r]}
+                </button>
+              ))}
+            </p>
+          )}
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
           <div className="rsvp-columns">
             {rsvpLabels.map(([status, label, tLabel]) => {
               const who = Object.entries(event.rsvps ?? {}).filter(([, s]) => s === status).map(([u]) => u);
@@ -235,18 +346,30 @@ function EventDetail({ event }: { event: Doc<TeamEventDoc> }) {
               {options.map((o) => {
                 const n = Object.values(event.votes ?? {}).filter((v) => v.includes(o.id)).length;
                 const pct = voters.size ? Math.round((n / voters.size) * 100) : 0;
+                const picked = myVotes.includes(o.id);
                 return (
-                  <div key={o.id} className="poll-option">
+                  <button
+                    key={o.id}
+                    type="button"
+                    className={`poll-option${picked ? " on" : ""}`}
+                    disabled={!going || busy}
+                    aria-pressed={picked}
+                    onClick={() => vote(o.id)}
+                  >
                     <span className="poll-bar" style={{ width: `${pct}%` }} />
-                    <span>{o.text}</span>
+                    <span>
+                      {picked ? "✓ " : ""}
+                      {o.text}
+                    </span>
                     <b>{n}</b>
-                  </div>
+                  </button>
                 );
               })}
-              <p className="muted small">{voters.size} voted</p>
+              <p className="muted small">
+                {voters.size} voted{!going && " · Say you're going to vote"}
+              </p>
             </div>
           )}
-          <p className="muted small">RSVP, react and vote in the app for now; it comes to the website with the Events slice.</p>
         </>
       )}
     </article>
