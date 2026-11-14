@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { LocalTime } from "../LocalTime";
 import { type Doc, useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "./TeamContext";
-import { MembersOnlySection } from "./TeamNav";
+import { MembersOnlySection, moreTabs } from "./TeamNav";
 
 type Point = { x: number; y: number };
 interface Play {
@@ -51,22 +51,15 @@ export function TeamMore() {
   const { teamId, kind, viewer } = useTeamHub();
   const params = useSearchParams();
   const pathname = usePathname();
-  const tabs: Array<[string, string]> =
-    kind === "team"
-      ? [
-          ["playbook", "Playbook"],
-          ["videos", "Videos"],
-          ["stats", "Stats"],
-          ["tournaments", "Tournaments"],
-        ]
-      : [["tournaments", "Tournaments"]];
+  const tabs = kind === "team" ? moreTabs.team : moreTabs.community;
   const tab = tabs.find(([k]) => k === params.get("tab"))?.[0] ?? tabs[0][0];
 
   if (viewer.state !== "member") return <MembersOnlySection what={kind === "team" ? "playbook, videos and stats" : "tournaments"} />;
   return (
     <div className="stack">
       {tabs.length > 1 && (
-        <div className="segmented" role="tablist" aria-label="Section">
+        // Desktops show these as the hub's own tabs (TeamNav).
+        <div className="segmented narrow-only" role="tablist" aria-label="Section">
           {tabs.map(([k, label]) => (
             <Link key={k} href={`${pathname}?tab=${k}`} scroll={false} className={k === tab ? "on" : ""} role="tab" aria-selected={k === tab}>
               {label}

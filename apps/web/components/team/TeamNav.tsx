@@ -1,45 +1,83 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
 import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { roleLabel } from "../ProfileDashboard";
 import { useTeamHub } from "./TeamContext";
 
+/** More's parts (TeamMore's ?tab=), shown as tabs of their own on desktops. */
+export const moreTabs = {
+  team: [
+    ["playbook", "Playbook"],
+    ["videos", "Videos"],
+    ["stats", "Stats"],
+    ["tournaments", "Tournaments"],
+  ],
+  community: [["tournaments", "Tournaments"]],
+} as const satisfies Record<string, ReadonlyArray<readonly [string, string]>>;
+
 /**
  * The hub's sections (spec §4): Feed, Schedule and Roster for everyone
  * signed in; Chat and More once the viewer is a member. A community calls
  * its roster Members, lists its teams under Teams, and keeps no playbook,
- * videos or stats.
+ * videos or stats. Desktops have room for More's parts as tabs of their
+ * own; narrower screens keep them under More.
  */
 export function TeamNav() {
+  return (
+    // useSearchParams needs a Suspense boundary; until it resolves, no tab under More is marked.
+    <Suspense fallback={<Tabs moreTab={null} />}>
+      <TabsWithParams />
+    </Suspense>
+  );
+}
+
+function TabsWithParams() {
+  return <Tabs moreTab={useSearchParams().get("tab")} />;
+}
+
+function Tabs({ moreTab }: { moreTab: string | null }) {
   const { teamId, kind, viewer } = useTeamHub();
   const path = usePathname();
   const base = `/teams/${teamId}`;
   const member = viewer.state === "member";
+  const parts = kind === "team" ? moreTabs.team : moreTabs.community;
+  const onMore = path.startsWith(`${base}/more`);
+  const shownPart = parts.find(([k]) => k === moreTab)?.[0] ?? parts[0][0];
   const sections: Array<[string, string, boolean]> = [
     ["", "Feed", true],
     ["/schedule", "Schedule", true],
     ["/chat", "Chat", member],
     ["/roster", kind === "team" ? "Roster" : "Members", true],
     ["/teams", "Teams", kind !== "team"],
-    ["/more", kind === "team" ? "More" : "Tournaments", member],
   ];
+  const tab = (href: string, label: string, active: boolean, className = "") => (
+    <Link
+      key={href}
+      href={href}
+      className={[className, active ? "active" : ""].filter(Boolean).join(" ") || undefined}
+      aria-current={active ? "page" : undefined}
+    >
+      {label}
+    </Link>
+  );
   return (
     <nav className="team-tabs" aria-label="Team sections">
       {sections
         .filter(([, , shown]) => shown)
         .map(([sub, label]) => {
           const href = base + sub;
-          const active = sub ? path.startsWith(href) : path === base;
-          return (
-            <Link key={sub} href={href} className={active ? "active" : ""} aria-current={active ? "page" : undefined}>
-              {label}
-            </Link>
-          );
+          return tab(href, label, sub ? path.startsWith(href) : path === base);
         })}
+      {member && (
+        <>
+          {parts.map(([k, label]) => tab(`${base}/more?tab=${k}`, label, onMore && shownPart === k, "wide-only"))}
+          {tab(`${base}/more`, kind === "team" ? "More" : "Tournaments", onMore, "narrow-only")}
+        </>
+      )}
     </nav>
   );
 }

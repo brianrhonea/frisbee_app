@@ -6,9 +6,12 @@ import { usePathname } from "next/navigation";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { callApi } from "@/lib/client";
 import { deleteOwnAccount } from "@/lib/firebase";
+import { useLiveDoc } from "@/lib/live";
 import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
 import { PersonalDetailsForm } from "./PersonalDetailsForm";
+import { SignUpSteps } from "./SignUpSteps";
+import { UsernameStep } from "./UsernameStep";
 
 /** Readable without finishing sign-up: the legal pages and help. */
 const open = ["/terms", "/privacy", "/cookies", "/help", "/about", "/delete-account", "/sign-in", "/sign-up"];
@@ -63,8 +66,14 @@ export function PersonalGate({ children }: { children: ReactNode }) {
     if (user) load(user);
   }, [user, load]);
 
+  const openPath = open.some((p) => path === p || path.startsWith(`${p}/`));
+  // A new account finishes sign-up first: its username (Google and Apple
+  // skip the form that asks it), then its details.
+  const newAccount = !!user && status?.required === true;
+  const profile = useLiveDoc<{ username?: string }>(newAccount ? `profiles/${user!.uid}` : null);
+  const needsUsername = newAccount && profile.data !== undefined && !profile.data?.username;
   const missing = !!user && status !== null && !status.complete;
-  const blocked = missing && status.required && !open.some((p) => path === p || path.startsWith(`${p}/`));
+  const blocked = missing && status.required && !openPath;
   const prompt = missing && !status.required && !hidePrompt && path !== "/settings/personal";
 
   return (
@@ -83,6 +92,17 @@ export function PersonalGate({ children }: { children: ReactNode }) {
               Back to Stall 10
             </Link>
           )}
+        </div>
+      ) : needsUsername && !openPath && user ? (
+        <div className="page">
+          <div className="auth-card auth-card-wide">
+            <SignUpSteps at={1} />
+            <header className="auth-head">
+              <h1>Pick your username</h1>
+              <p>It&apos;s how teammates find and mention you. We started one from your name; change it to anything you like.</p>
+            </header>
+            <UsernameStep user={user} step onDone={() => {}} />
+          </div>
         </div>
       ) : blocked && user ? (
         <FinishSignUp
@@ -137,11 +157,11 @@ function FinishSignUp({ user, onDone, onTooYoung }: { user: User; onDone: () => 
   return (
     <div className="page">
       <div className="card personal-finish">
-        <h1>Finish signing up</h1>
-        <p className="muted">
-          Like a USA Ultimate membership, Stall 10 needs a few details about you. Your profile shows only your name and
-          username.
-        </p>
+        <SignUpSteps at={2} />
+        <header className="auth-head">
+          <h1>About you</h1>
+          <p>The last step. Like a club membership, Stall 10 needs a few details about you. Your profile shows only your name and username.</p>
+        </header>
         <PersonalDetailsForm
           user={user}
           email={user.email}

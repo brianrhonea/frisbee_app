@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { getPublicInBrowser } from "@/lib/client";
 import { EventItem } from "./EventItem";
 import { ForVisitors } from "./ForVisitors";
+import { PickupCard } from "./HomeCards";
 import { LocalTime } from "./LocalTime";
+import { NavIcon } from "./NavIcons";
 
 const shown = 4;
 
@@ -36,15 +38,20 @@ export function UpcomingAside() {
   return (
     <>
       <div className="card">
-        <h2 className="card-title">Coming up</h2>
+        <div className="card-head">
+          <h2 className="card-title">Upcoming events</h2>
+          <Link className="see-all" href="/events">
+            View all
+          </Link>
+        </div>
         {page === undefined ? (
           <p className="muted small">Loading…</p>
         ) : items.length === 0 ? (
           <p className="muted small">Nothing coming up yet.</p>
         ) : (
-          <div className="aside-events">
+          <div className="date-list">
             {items.map((i) => (
-              <EventItem key={i.id} startsAt={i.startsAt}>
+              <EventItem key={i.id} startsAt={i.startsAt} plain>
                 <Link href={i.href}>
                   <b>{i.title}</b>
                 </Link>
@@ -55,16 +62,15 @@ export function UpcomingAside() {
             ))}
           </div>
         )}
-        <p className="small">
-          <Link href="/events">All events →</Link>
-        </p>
       </div>
+      <PickupCard />
       <ForVisitors>
-        <div className="card">
-          <h2 className="card-title">New to Stall 10?</h2>
-          <p className="muted small">Follow players, join teams and groups, and keep up with your season.</p>
-          <Link className="btn btn-primary btn-small" href="/sign-up">
-            Sign up free
+        <div className="card promo-card">
+          <small>New to Stall 10?</small>
+          <b>Good people. Great ultimate.</b>
+          <p>Follow players, join teams and groups, and keep up with your season.</p>
+          <Link className="btn btn-amber btn-small" href="/sign-up">
+            Sign up free <NavIcon name="external" size={14} />
           </Link>
         </div>
       </ForVisitors>

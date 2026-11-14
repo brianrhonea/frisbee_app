@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { NavIcon } from "./NavIcons";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -34,7 +35,7 @@ export function ShareButton({ url, title = "A post on Stall 10" }: { url: string
 
   return (
     <button type="button" className="post-action" onClick={() => void share()} title="Share or copy the link">
-      <span aria-hidden="true">↗</span> {copied ? "Link copied" : "Share"}
+      <NavIcon name="share" size={18} /> {copied ? "Link copied" : "Share"}
     </button>
   );
 }
