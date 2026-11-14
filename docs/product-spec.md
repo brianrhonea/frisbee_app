@@ -186,6 +186,34 @@ status, versions and changelogs):
 | W7 | Meetings and voice | Join team meetings and voice rooms (LiveKit web SDK) | LiveKit tokens from the API instead of a callable |
 | W8 | Cut over | Move the domain to Vercel; keep `/join/:code`, `/g/:id`, `/p/:id` working | Fold the `browse` callables; remove the Flutter web code (`main_web.dart`, `lib/ui/web`, `lib/ui/browse`, `web_router.dart`, `build_site.sh`) |
 
+**Website on its own (2026-11-14).** Signed-in members must be able to do
+everything the app does on the website alone, styled like the website
+(not copies of the app's screens). Remaining gaps, built in this order
+(tick each when it ships):
+
+1. Account: [ ] change name, photo and header photo; [ ] notification
+   settings (`notificationPrefs/{uid}`).
+2. Team admin: [ ] custom roles and permissions (`/teams/:id/roles`);
+   [ ] chat rooms and folders (create, edit, audiences, archive);
+   [ ] adding teams to a community; [ ] deleting a team.
+3. Messages: [ ] editing messages (team rooms and DMs); [ ] team rooms
+   beside DMs in `/messages`; [ ] typing indicators.
+4. W6: [ ] stats (games, live stat entry, season tables); [ ] playbook
+   (play editor on a field, drag to draw); [ ] videos (library, links,
+   uploads, player); [ ] workouts (manual log; GPS recording needs a
+   phone, so the website logs them by hand).
+5. W5: [ ] hosted tournaments and leagues (find, host, register,
+   divisions, schedules, scores, standings); [ ] hat tournaments and
+   captains' drafts (the callables' logic ported into API services; the
+   app keeps the callables until it switches).
+6. W7: [ ] team meetings and voice rooms (LiveKit web SDK, tokens from
+   the API; needs the LiveKit secrets on Cloud Run). Recording stays
+   deferred.
+7. Posts: [ ] video in posts (waits on the transcode job); [ ] feed tabs;
+   [ ] Discord import.
+
+Out of scope: payments, meeting recording, USA Ultimate data.
+
 Libraries the website may add (none today): a small data cache for API
 reads and mutations, the Firestore web SDK for listeners, and LiveKit's
 web SDK in W7. Components stay hand-written CSS on the site's tokens.
