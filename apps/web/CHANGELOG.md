@@ -50,6 +50,11 @@ Website parity (`docs/product-spec.md` §8.1). Needs API 0.10.0.
   of their data is in the page sent to visitors; Home's visitor preview
   and the right column no longer show events.
 
+**Fixed**
+- The sign-in `?next=` link only returns to a page on this site: a path
+  with a tab or new line (`/%09/other.site`) could send people elsewhere
+  after logging in.
+
 ## 0.10.1 — 2026-11-14
 
 **Changed**

@@ -244,7 +244,7 @@ describe("public reads", () => {
 
   it("keeps members-only reads out of shared caches", async () => {
     const res = await t.get("/v1/public/events", member);
-    expect(res.headers["cache-control"]).toBe("private, max-age=30");
+    expect(res.headers["cache-control"]).toBe("private, no-store");
   });
 
   it("shows visitors only the feed, posts and team pages", async () => {
@@ -271,15 +271,22 @@ describe("public route access", () => {
     expect((await get("/v1/public/feed", { authorization: "Bearer junk" })).statusCode).toBe(200);
   });
 
-  it("limits visitors by hashed IP and members by uid", async () => {
+  it("limits visitors by hashed IP, and members in memory (never the shared mute)", async () => {
     const { get, limiter } = setup();
     await get("/v1/public/feed", { "x-forwarded-for": "203.0.113.9, 10.0.0.1" });
     await get("/v1/public/feed", { authorization: "Bearer token:u1" });
     await get("/v1/public/events", { authorization: "Bearer token:u2", "x-forwarded-for": "203.0.113.9" });
+    expect(limiter.keys).toHaveLength(1);
     expect(limiter.keys[0]).toMatch(/^ip_[0-9a-f]{32}$/);
     expect(limiter.keys[0]).not.toContain("203");
-    expect(limiter.keys[1]).toBe("u1");
-    expect(limiter.keys[2]).toBe("u2");
+    let last = 0;
+    for (let i = 0; i < 121; i++) last = (await get("/v1/public/events", { authorization: "Bearer token:u3" })).statusCode;
+    expect(last).toBe(429);
+  });
+
+  it("needs App Check for members-only reads when it's enforced", async () => {
+    const { get } = setup({ enforceAppCheck: true });
+    expect((await get("/v1/public/events", { authorization: "Bearer token:u1" })).statusCode).toBe(401);
   });
 
   it("turns away someone over the limit", async () => {

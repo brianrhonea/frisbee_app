@@ -55,14 +55,23 @@ for the Flutter web site.
 **Changed**
 - `GET /v1/public/players/:uid`, `/v1/public/events` and
   `/v1/public/search` need a signed-in caller (401 otherwise, even with
-  the website's server key), are limited per uid, and answer
-  `cache-control: private`. The feed, posts and team pages stay open to
-  visitors.
+  the website's server key) and App Check like other member routes, are
+  limited per uid in memory (so heavy browsing can't trip the shared
+  mute on chat and posts), and answer `cache-control: private, no-store`.
+  The feed, posts and team pages stay open to visitors.
+- Every signed-in write is rate limited per caller (120 a minute, in
+  memory per instance; `src/limits/writes.ts`), with tighter limits on
+  joining by code, invites, join requests, new teams, uploads and new
+  conversations or groups (also a daily cap) (security review S9).
 
 **Fixed**
 - A school or club community that approves who joins is a private group
   on public pages, like a group: its posts and events no longer show to
   visitors (security review S6).
+- Editing a community event without an `audience` keeps its audience
+  instead of opening it to everyone.
+- Deleting a team chat message as a non-member says only that the room
+  isn't found, whether or not the message exists.
 
 ## 0.9.2 — 2026-11-14
 

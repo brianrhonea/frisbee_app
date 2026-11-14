@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { requireCaller } from "../auth.js";
 import { ApiError } from "../errors.js";
 import type { RateLimiter } from "../limits/limiter.js";
+import { MemoryRateLimiter } from "../limits/memory.js";
 import { browseLimit } from "../limits/model.js";
 import { clientIp, visitorKey } from "./model.js";
 import type { BrowseService } from "./service.js";
@@ -22,7 +23,9 @@ export interface BrowseOptions {
 
 /** Short shared caching: a profile turned private drops out within a minute. */
 const cacheControl = "public, max-age=30, s-maxage=60, stale-while-revalidate=60";
-const memberCacheControl = "private, max-age=30";
+// Behind a sign-in: never cached, so a second account in the same browser
+// can't be shown the first one's answer.
+const memberCacheControl = "private, no-store";
 
 function sameSecret(a: string, b: string): boolean {
   const x = Buffer.from(a);
@@ -31,29 +34,33 @@ function sameSecret(a: string, b: string): boolean {
 }
 
 export function browseRoutes(app: FastifyInstance, browse: BrowseService, opts: BrowseOptions) {
+  // Members are counted in memory: the shared limiter's mute
+  // (limits/{uid}.mutedUntil) would also stop their chat and posts.
+  const members = new MemoryRateLimiter();
+  const tooMany = () => new ApiError("resource_exhausted", "Too many requests. Try again in a few minutes.");
+
   async function admit(req: FastifyRequest) {
     const sent = req.headers[webKeyHeader];
     if (opts.webServerKey && typeof sent === "string" && sameSecret(sent, opts.webServerKey)) return;
-    const key = req.caller?.uid ?? visitorKey(clientIp(req.headers["x-forwarded-for"], req.ip));
-    if (!(await opts.limiter.admit(key, browseLimit))) {
+    if (req.caller) {
+      if (!members.admit(req.caller.uid, browseLimit)) throw tooMany();
+      return;
+    }
+    if (!(await opts.limiter.admit(visitorKey(clientIp(req.headers["x-forwarded-for"], req.ip)), browseLimit))) {
       throw new ApiError("resource_exhausted", "Too many requests. Try again in a few minutes.");
     }
   }
 
   /**
-   * Signed-in members only (the website shows visitors nothing but team
+   * Signed-in members only, with App Check as on other member routes (the website shows visitors nothing but team
    * and community pages): player profiles, events and search. Each member
    * is limited by uid, so the website's server key doesn't let anyone in.
    */
   async function admitMember(req: FastifyRequest) {
-    const caller = requireCaller(req);
-    if (!(await opts.limiter.admit(caller.uid, browseLimit))) {
-      throw new ApiError("resource_exhausted", "Too many requests. Try again in a few minutes.");
-    }
+    if (!members.admit(requireCaller(req).uid, browseLimit)) throw tooMany();
   }
 
   const send = (reply: FastifyReply, body: unknown) => reply.header("cache-control", cacheControl).send(body);
-  // Behind a sign-in: never kept in a shared cache.
   const sendPrivate = (reply: FastifyReply, body: unknown) => reply.header("cache-control", memberCacheControl).send(body);
   const config = { public: true };
   type Q = { Querystring: Record<string, string | undefined>; Params: Record<string, string> };
@@ -75,7 +82,7 @@ export function browseRoutes(app: FastifyInstance, browse: BrowseService, opts: 
     return send(reply, await browse.onePost(req.params.id));
   });
 
-  app.get<Q>("/v1/public/players/:uid", { config }, async (req, reply) => {
+  app.get<Q>("/v1/public/players/:uid", async (req, reply) => {
     await admitMember(req);
     return sendPrivate(reply, await browse.profile(req.params.uid));
   });
@@ -85,12 +92,12 @@ export function browseRoutes(app: FastifyInstance, browse: BrowseService, opts: 
     return send(reply, await browse.team(req.params.id));
   });
 
-  app.get<Q>("/v1/public/events", { config }, async (req, reply) => {
+  app.get<Q>("/v1/public/events", async (req, reply) => {
     await admitMember(req);
     return sendPrivate(reply, await browse.events());
   });
 
-  app.get<Q>("/v1/public/search", { config }, async (req, reply) => {
+  app.get<Q>("/v1/public/search", async (req, reply) => {
     await admitMember(req);
     return sendPrivate(reply, await browse.search(req.query.q));
   });

@@ -187,6 +187,9 @@ describe("team events", () => {
       // New community events get an audience.
       const id = (await s.call("POST", "/v1/teams/org/events", event)).json().id;
       expect(s.store.doc(`teams/org/events/${id}`)?.audience).toEqual(["everyone"]);
+      // An edit that doesn't send one keeps it.
+      expect((await s.call("PATCH", "/v1/teams/org/events/staff", event, "coach")).statusCode).toBe(200);
+      expect(s.store.doc("teams/org/events/staff")?.audience).toEqual(["staff"]);
     });
   });
 });
@@ -246,6 +249,10 @@ describe("team chat", () => {
     // A coach is an editor, so can moderate.
     s.store.put("teams/t1/chats/general/messages/m3", { authorId: "player", text: "z" });
     expect((await s.call("DELETE", "/v1/teams/t1/chats/general/messages/m3")).statusCode).toBe(204);
+  });
+
+  it("tells outsiders nothing about which messages exist", async () => {
+    expect((await s.call("DELETE", "/v1/teams/t1/chats/general/messages/none", undefined, "stranger")).statusCode).toBe(404);
   });
 
   it("limits how fast one member sends", async () => {

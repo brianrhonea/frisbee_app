@@ -55,9 +55,16 @@ function message(e: unknown): string {
 
 /** Only same-site paths, so a link can't send people elsewhere after signing in. */
 function safeNext(next: string | null): string {
-  // Not "//host" or "/\host" (browsers treat both as another site), and
-  // no backslashes anywhere.
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/";
+  // Not "//host", "/\host" or "/<tab>/host" (browsers drop tabs and new
+  // lines, so that is "//host" too): only a path that resolves here.
+  if (!next || !next.startsWith("/") || /[\u0000-\u001f\\]/.test(next)) return "/";
+  try {
+    const here = "https://here.invalid"; // also renders on the server
+    const url = new URL(next, here);
+    return url.origin === here ? url.pathname + url.search + url.hash : "/";
+  } catch {
+    return "/";
+  }
 }
 
 

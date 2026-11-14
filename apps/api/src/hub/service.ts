@@ -165,9 +165,11 @@ export class HubService {
   // Team events (teams/{id}/events: manageEvents writes; respond()) -------
 
   /** The event's fields as the app writes them (toEditableMap), and its public copy. */
-  private eventFields(team: Data, body: unknown) {
+  private eventFields(team: Data, body: unknown, editing = false) {
     const req = parse(saveTeamEventRequestSchema, body);
-    const audience = isOrg(team) ? [...new Set(req.audience?.length ? req.audience : ["everyone"])].sort() : null;
+    // An edit without an audience keeps the event's own; a new one is for everyone.
+    const keep = !isOrg(team) || (editing && req.audience === undefined);
+    const audience = keep ? null : [...new Set(req.audience?.length ? req.audience : ["everyone"])].sort();
     const details = {
       title: req.title,
       type: req.type,
@@ -221,7 +223,7 @@ export class HubService {
     const id = docIdParam(rawEvent);
     const team = await this.team(teamId);
     if (!can(team, caller.uid, "manageEvents")) throw denied("You can't edit this team's events.");
-    const { details, poll, isPublic, audience } = this.eventFields(team, body);
+    const { details, poll, isPublic, audience } = this.eventFields(team, body, true);
     await this.store.transact(async (tx) => {
       const [t, event] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.event(teamId, id))]);
       if (!t || !can(t, caller.uid, "manageEvents")) throw denied("You can't edit this team's events.");
@@ -387,9 +389,11 @@ export class HubService {
         tx.get(p.message(teamId, roomId, id)),
       ]);
       if (!team || !room) throw noRoom();
-      if (!message) return null;
       const uid = caller.uid;
       const reads = isMember(team, uid) && canReadRoom(team, uid, room);
+      // Outsiders learn nothing about which messages exist.
+      if (!isMember(team, uid)) throw noRoom();
+      if (!message) return null;
       const allowed =
         message.authorId === uid ||
         isOwner(team, uid) ||
