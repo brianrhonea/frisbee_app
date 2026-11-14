@@ -18,3 +18,4 @@ export * from "./routes.js";
 export * from "./hub.js";
 export * from "./account.js";
 export * from "./playbook.js";
+export * from "./group_tournaments.js";
