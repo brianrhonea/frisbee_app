@@ -375,6 +375,35 @@ describe("advance()", () => {
   });
 });
 
+describe("more conjuncts", () => {
+  it("validGame's place: set on placement games, left out elsewhere", async () => {
+    const body = draft({ settings: { ...draft().settings, format: "poolsPlacement", poolCount: 1, laterDays: [] } });
+    const id = await published(body);
+    const games = await store.list(`teams/g1/groupTournaments/${id}/games`, 50);
+    expect(games.find((g) => g.data.label === "Final")!.data.place).toBe(1);
+    expect(games.filter((g) => g.data.stage === "pool").every((g) => !("place" in g.data))).toBe(true);
+  });
+  it("the listing's endsOn is null without later days", async () => {
+    const id = await created(draft({ settings: { ...draft().settings, laterDays: [] } }));
+    expect(store.doc(`tournamentDirectory/g1_${id}`)!.endsOn).toBeNull();
+  });
+  it("signedIn() on schedules and games", async () => {
+    const id = await published();
+    expect(await unauthenticated("POST", `${base}/${id}/schedule`, draft())).toBe(401);
+    expect(await unauthenticated("POST", `${base}/${id}/games/g001/report`, { scoreA: 11, scoreB: 7 })).toBe(401);
+    expect(await unauthenticated("POST", `${base}/${id}/games/g001/confirm`, { scoreA: 11, scoreB: 7 })).toBe(401);
+    expect(await unauthenticated("PUT", `${base}/${id}/games/g001/score`, { scoreA: 11, scoreB: 7 })).toBe(401);
+    expect(await unauthenticated("POST", `${base}/${id}/advance`)).toBe(401);
+    expect(await unauthenticated("POST", `${base}/${id}/seed-bracket`)).toBe(401);
+  });
+  it("a schedule's players are checked before any game is replaced", async () => {
+    const id = await published();
+    const before = game(id, "g001");
+    expect((await call("POST", `${base}/${id}/schedule`, draft({ teams: [team("t1", ["stranger"]), team("t2", ["b1"])] }))).status).toBe(412);
+    expect(game(id, "g001")).toEqual(before);
+  });
+});
+
 describe("ids", () => {
   it("docIdParam on every path id", async () => {
     expect((await call("PUT", `${base}/__x__`, draft())).status).toBe(400);

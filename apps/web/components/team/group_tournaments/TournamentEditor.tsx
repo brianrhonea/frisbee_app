@@ -157,7 +157,9 @@ function Editor({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dayAgo moves every render.
     [allEvents],
   );
-  const event = allEvents.find((e) => e.id === eventId) ?? null;
+  // The linked event, even if its type changed since (so it isn't in the list).
+  const linkedDoc = useLiveDoc<TeamEventDoc>(eventId ? `teams/${teamId}/events/${eventId}` : null);
+  const event = allEvents.find((e) => e.id === eventId) ?? linkedDoc.data ?? null;
   const nameOf = (uid: string) => group.memberNames?.[uid] ?? "Player";
   const isMemberUid = (uid: string) => Object.hasOwn(group.members ?? {}, uid);
 
@@ -451,7 +453,7 @@ function Editor({
         <p className="muted small">{tournamentDates(s)}</p>
         <div className="gt-days">
           {days.map((d, i) => (
-            <label key={d + i}>
+            <label key={i}>
               {days.length === 1 ? "Start time" : `Day ${i + 1} · ${shortDay(d)}`}
               <input type="time" value={timeInput(d)} onChange={(e) => setDayStart(i, e.target.value)} />
             </label>
@@ -655,20 +657,41 @@ function Editor({
 }
 
 function NumberField({ label, value, min, max, step = 1, onChange }: { label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void }) {
+  // Typed text is held here and only applied on blur or Enter, so clearing
+  // the field mid-edit doesn't drop teams or reset a rule.
+  const [text, setText] = useState<string | null>(null);
+  const commit = () => {
+    if (text === null) return;
+    const v = Number(text);
+    if (text.trim() !== "" && Number.isFinite(v)) onChange(Math.min(Math.max(Math.round(v / step) * step, min), max));
+    setText(null);
+  };
   return (
     <label>
       {label}
-      <input
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          if (Number.isInteger(v)) onChange(Math.min(Math.max(v, min), max));
-        }}
-      />
+      <span className="gt-inline">
+        <button type="button" className="btn btn-small" aria-label={`Fewer: ${label}`} disabled={value - step < min} onClick={() => onChange(value - step)}>
+          −
+        </button>
+        <input
+          type="number"
+          value={text ?? String(value)}
+          min={min}
+          max={max}
+          step={step}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            }
+          }}
+        />
+        <button type="button" className="btn btn-small" aria-label={`More: ${label}`} disabled={value + step > max} onClick={() => onChange(value + step)}>
+          +
+        </button>
+      </span>
     </label>
   );
 }

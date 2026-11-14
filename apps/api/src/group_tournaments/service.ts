@@ -261,7 +261,8 @@ export class GroupTournamentService {
       if (e instanceof GroupScheduleError) throw new ApiError("failed_precondition", e.message);
       throw e;
     }
-    requireOrganizer(await this.store.get(p.team(teamId)), caller.uid, true);
+    // Checked before any game is replaced (the biggest schedules take several transactions).
+    tournamentFields(requireOrganizer(await this.store.get(p.team(teamId)), caller.uid, true), d, "scheduled");
     if (!(await this.store.get(p.tournament(teamId, id)))) throw noTournament();
     const fresh = new Set(plan.games.map((g) => g.id));
     const old = (await this.store.list(p.games(teamId, id), maxGames)).filter((g) => !fresh.has(g.id));
