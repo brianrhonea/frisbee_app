@@ -15,12 +15,18 @@ Firebase project; App Store builds come from `main` and use production.
 **Fresh Home feed**
 - Pull down on Home, or tap Home again, to load the newest posts.
 
-**Share your calendar**
-- In **Settings → Calendar sharing**, choose friends, a coach or family
-  to see your personal events. They see the title, time and place, never
-  your notes, and you can stop sharing any time.
-- Calendars shared with you show on your Schedule in gray. Pull down to
-  refresh them.
+**Calendars, like Outlook or Apple Calendar**
+- In **Settings → Calendars**, make calendars (Training, Family…) with
+  their own color, and invite friends, a coach or family as **Can view**
+  or **Can edit**. They get an invite and see nothing until they accept.
+  Change what someone can do, or remove them, any time.
+- Invites show on your Schedule with **Accept** and **Decline**.
+  Calendars you're on show there in their colors; pull down to refresh.
+- **New event** lets you pick which calendar it goes on.
+- **Add to calendar** on any event puts it in your phone's calendar app.
+- Or subscribe: **Settings → Calendars → Subscribe in Apple Calendar or
+  Outlook** (or Google Calendar) keeps every calendar you're on there,
+  updated about once an hour. Viewers never see notes.
 
 ## 0.0.19
 

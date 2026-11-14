@@ -98,6 +98,9 @@ class ApiClient {
   }
 
   static Map<String, Object?> _decode(http.Response response) {
+    final ok = response.statusCode >= 200 && response.statusCode < 300;
+    // 204 No Content (deletes, invites and the like).
+    if (ok && response.bodyBytes.isEmpty) return const {};
     final Object? json;
     try {
       json = jsonDecode(utf8.decode(response.bodyBytes));
@@ -107,7 +110,6 @@ class ApiClient {
         "Couldn't reach the server (${response.statusCode}).",
       );
     }
-    final ok = response.statusCode >= 200 && response.statusCode < 300;
     if (ok && json is Map<String, Object?>) return json;
     final error = json is Map ? json['error'] : null;
     if (error is Map && error['message'] is String) {

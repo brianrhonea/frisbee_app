@@ -1,35 +1,29 @@
 "use client";
 import {
+  type CalendarEvent,
+  type CalendarEventResult,
+  type CalendarEventsResponse,
+  type CalendarInfo,
+  type CalendarInvite,
+  type CalendarInvitesResponse,
+  type CalendarsResponse,
+  calendarEventTypes,
+  calendarWindowDays,
   type EventType,
   eventTypeLabels,
-  eventTypes,
-  type PersonalEventResult,
-  type SharedCalendarsResponse,
+  shareRoleLabels,
 } from "@stall10/shared";
-import { limit, orderBy, Timestamp, where } from "firebase/firestore";
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { colorOf, downloadIcs, loadHidden, saveHidden } from "@/lib/calendar";
 import { ApiError, callApi } from "@/lib/client";
-import { useLiveQuery } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
-import { Avatar } from "./Avatar";
 import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
 
-/** A personal event as stored (users/{uid}/events; TeamEvent in the app). */
-interface MyEvent {
-  title?: string;
-  type?: EventType;
-  startsAt?: string;
-  endsAt?: string | null;
-  location?: string;
-  notes?: string;
-}
-
 const dayMs = 86_400_000;
-/** How far ahead shared calendars are shown. */
-const sharedDays = 30;
 const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+const canEdit = (c: CalendarInfo | undefined) => c?.role === "owner" || c?.role === "edit";
 
 /** ISO → the value a datetime-local input takes, in the browser's zone. */
 function toLocalInput(iso?: string | null): string {
@@ -46,107 +40,284 @@ function startOfToday(): number {
   return d.getTime();
 }
 
+interface Loaded {
+  calendars: CalendarInfo[];
+  invites: CalendarInvite[];
+  events: CalendarEvent[];
+}
+
 /**
- * The member's own schedule on the website: their personal events (read
- * live; written through the API, as validMine allows) and the calendars
- * others share with them (read-only, through the API). Team events stay on
- * each team's page.
+ * The member's schedule on the website, like Outlook or Apple Calendar:
+ * every calendar they're on (their own and ones they accepted), each in
+ * its color and hidden or shown on this browser, with invites to accept.
+ * Events are added to any calendar they may change. Everything goes through
+ * the API, which checks each calendar's members. Team events stay on each
+ * team's page.
  */
 export function Schedule() {
   const { user } = useAuth();
-  const [since] = useState(() => startOfToday() - dayMs);
-  const { data: mine, error } = useLiveQuery<MyEvent>(
-    user ? `users/${user.uid}/events` : null,
-    [where("startsAt", ">=", Timestamp.fromMillis(since)), orderBy("startsAt"), limit(200)],
-    `mine-${since}`,
-  );
-  const [editing, setEditing] = useState<(MyEvent & { id?: string }) | null>(null);
+  const [data, setData] = useState<Loaded | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [editing, setEditing] = useState<(Partial<CalendarEvent> & { calendarId?: string }) | null>(null);
+
+  useEffect(() => setHidden(loadHidden()), []);
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    const from = startOfToday() - dayMs;
+    const qs = new URLSearchParams({
+      from: new Date(from).toISOString(),
+      to: new Date(from + (calendarWindowDays - 1) * dayMs).toISOString(),
+    });
+    try {
+      const [c, i, e] = await Promise.all([
+        callApi<CalendarsResponse>(user, "/v1/me/calendars"),
+        callApi<CalendarInvitesResponse>(user, "/v1/me/calendar-invites"),
+        callApi<CalendarEventsResponse>(user, `/v1/me/calendar-events?${qs}`),
+      ]);
+      setData({ calendars: c.calendars, invites: i.invites, events: e.events });
+      setError(null);
+    } catch (err) {
+      setError(problem(err));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   if (!user) return null;
-  const upcoming = (mine ?? []).filter((e) => {
-    const end = Date.parse(e.endsAt ?? e.startsAt ?? "");
+  const me = user;
+
+  function toggle(id: string) {
+    const next = hidden.includes(id) ? hidden.filter((h) => h !== id) : [...hidden, id];
+    setHidden(next);
+    saveHidden(next);
+  }
+
+  const byId = new Map((data?.calendars ?? []).map((c) => [c.id, c]));
+  const writable = (data?.calendars ?? []).filter(canEdit);
+  const upcoming = (data?.events ?? []).filter((e) => {
+    if (hidden.includes(e.calendarId)) return false;
+    const end = Date.parse(e.endsAt ?? e.startsAt);
     return Number.isFinite(end) && end >= Date.now() - 60 * 60_000;
   });
 
+  async function remove(e: CalendarEvent) {
+    if (!window.confirm("Delete this event?")) return;
+    try {
+      await callApi(me, `/v1/calendars/${encodeURIComponent(e.calendarId)}/events/${encodeURIComponent(e.id)}`, {
+        method: "DELETE",
+      });
+      await load();
+    } catch (err) {
+      window.alert(problem(err));
+    }
+  }
+
   return (
     <div className="stack">
+      {data && data.invites.length > 0 && <Invites invites={data.invites} onAnswered={load} />}
       <div className="card">
         <div className="card-head">
-          <h2 className="card-title">Your events</h2>
-          {!editing && (
+          <h2 className="card-title">Upcoming</h2>
+          {!editing && writable.length > 0 && (
             <button type="button" className="btn btn-primary btn-small" onClick={() => setEditing({})}>
               Add event
             </button>
           )}
         </div>
-        {editing && <EventEditor key={editing.id ?? "new"} event={editing} onDone={() => setEditing(null)} />}
-        {error && <p className="form-error">{error}</p>}
-        {mine === undefined && !error ? (
+        {editing && data && (
+          <EventEditor
+            key={editing.id ?? "new"}
+            event={editing}
+            calendars={writable}
+            onDone={(saved) => {
+              setEditing(null);
+              if (saved) void load();
+            }}
+          />
+        )}
+        {error && (
+          <p className="form-error">
+            {error}{" "}
+            <button type="button" className="text-btn" onClick={() => void load()}>
+              Retry
+            </button>
+          </p>
+        )}
+        {!data && !error ? (
           <p className="muted">Loading…</p>
-        ) : upcoming.length === 0 ? (
+        ) : data && upcoming.length === 0 ? (
           <p className="muted small">Nothing coming up. Add a workout, a pickup game or anything else you&apos;re doing.</p>
         ) : (
           <div className="stack">
-            {upcoming.map((e) => (
-              <EventItem key={e.id} startsAt={e.startsAt}>
-                <b>{e.title || "Event"}</b>
-                <small>
-                  {eventTypeLabels[e.type ?? "other"] ?? "Event"} · <LocalTime iso={e.startsAt} style="dateTime" />
-                  {e.location ? ` · ${e.location}` : ""}
-                </small>
-                {e.notes && <small className="muted">{e.notes}</small>}
-                <span className="event-actions">
-                  <button type="button" className="text-btn" onClick={() => setEditing(e)}>
-                    Edit
-                  </button>
-                  <DeleteButton id={e.id} />
-                </span>
-              </EventItem>
-            ))}
+            {upcoming.map((e) => {
+              const cal = byId.get(e.calendarId);
+              return (
+                <EventItem key={`${e.calendarId}/${e.id}`} startsAt={e.startsAt}>
+                  <b>
+                    <span className="cal-dot" style={{ background: colorOf(cal?.color) }} aria-hidden />
+                    {e.title}
+                  </b>
+                  <small>
+                    {eventTypeLabels[e.type]} · <LocalTime iso={e.startsAt} style="dateTime" />
+                    {e.location ? ` · ${e.location}` : ""}
+                  </small>
+                  <small className="muted">
+                    {cal ? (cal.role === "owner" ? cal.name : `${cal.name} · ${cal.owner.name}`) : ""}
+                  </small>
+                  {e.notes && <small className="muted">{e.notes}</small>}
+                  <span className="event-actions">
+                    {canEdit(cal) && (
+                      <>
+                        <button type="button" className="text-btn" onClick={() => setEditing(e)}>
+                          Edit
+                        </button>
+                        <button type="button" className="text-btn" onClick={() => void remove(e)}>
+                          Delete
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="text-btn"
+                      onClick={() =>
+                        downloadIcs({
+                          uid: `${e.calendarId}-${e.id}@stall10.app`,
+                          title: e.title,
+                          startsAt: e.startsAt,
+                          endsAt: e.endsAt,
+                          location: e.location,
+                          description: e.notes,
+                        })
+                      }
+                    >
+                      Add to calendar
+                    </button>
+                  </span>
+                </EventItem>
+              );
+            })}
           </div>
         )}
-        <p className="muted small">
-          <Link href="/settings/calendar">Share your calendar</Link> with friends, a coach or family.
-        </p>
       </div>
-      <SharedCalendars />
+      {data && (
+        <div className="card">
+          <div className="card-head">
+            <h2 className="card-title">Calendars</h2>
+            <Link className="btn btn-small" href="/settings/calendar">
+              Manage
+            </Link>
+          </div>
+          <ul className="cal-list">
+            {data.calendars.map((c) => (
+              <li key={c.id}>
+                <label className="cal-toggle">
+                  <input
+                    type="checkbox"
+                    checked={!hidden.includes(c.id)}
+                    onChange={() => toggle(c.id)}
+                    style={{ accentColor: colorOf(c.color) }}
+                  />
+                  <span className="cal-dot" style={{ background: colorOf(c.color) }} aria-hidden />
+                  <span>
+                    {c.name}
+                    {c.role !== "owner" && (
+                      <small className="muted">
+                        {" "}
+                        · {c.owner.name} · {shareRoleLabels[c.role]}
+                      </small>
+                    )}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <p className="muted small">
+            <Link href="/settings/calendar">Share a calendar</Link> with friends, a coach or family, or{" "}
+            <Link href="/settings/calendar#subscribe">see it in Outlook, Apple or Google Calendar</Link>.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
 
-function DeleteButton({ id }: { id: string }) {
+/** Invites waiting for the member: nothing is shared until they accept. */
+export function Invites({ invites, onAnswered }: { invites: CalendarInvite[]; onAnswered: () => void | Promise<void> }) {
   const { user } = useAuth();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   if (!user) return null;
   const me = user;
+
+  async function answer(id: string, how: "accept" | "decline") {
+    setBusy(id);
+    setError(null);
+    try {
+      await callApi(me, `/v1/me/calendar-invites/${encodeURIComponent(id)}/${how}`, { method: "POST" });
+      await onAnswered();
+    } catch (e) {
+      setError(problem(e));
+      await onAnswered();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
-    <button
-      type="button"
-      className="text-btn"
-      disabled={busy}
-      onClick={async () => {
-        if (!window.confirm("Delete this event?")) return;
-        setBusy(true);
-        try {
-          await callApi(me, `/v1/me/events/${encodeURIComponent(id)}`, { method: "DELETE" });
-        } catch (e) {
-          window.alert(problem(e));
-          setBusy(false);
-        }
-      }}
-    >
-      Delete
-    </button>
+    <div className="card cal-invites">
+      <h2 className="card-title">Calendar invites</h2>
+      <ul className="person-list">
+        {invites.map((i) => (
+          <li key={i.calendarId} className="person-row">
+            <span className="cal-dot" style={{ background: colorOf(i.color) }} aria-hidden />
+            <span>
+              <b>{i.from.name}</b> invited you to <b>{i.calendarName}</b>
+              <small className="muted"> · {shareRoleLabels[i.role]}</small>
+            </span>
+            <button
+              type="button"
+              className="btn btn-primary btn-small"
+              disabled={busy !== null}
+              onClick={() => void answer(i.calendarId, "accept")}
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              className="btn btn-small"
+              disabled={busy !== null}
+              onClick={() => void answer(i.calendarId, "decline")}
+            >
+              Decline
+            </button>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="form-error">{error}</p>}
+    </div>
   );
 }
 
 /**
- * Adding or changing a personal event. Its types are the app's for a
- * personal schedule (EventType.editableFor(community: false)): no pickup,
- * which groups run.
+ * Adding or changing an event, on any calendar the member may change. Its
+ * types are the app's for a personal schedule (no pickup, which groups run).
+ * An existing event stays on its calendar.
  */
-function EventEditor({ event, onDone }: { event: MyEvent & { id?: string }; onDone: () => void }) {
+function EventEditor({
+  event,
+  calendars,
+  onDone,
+}: {
+  event: Partial<CalendarEvent> & { calendarId?: string };
+  calendars: CalendarInfo[];
+  onDone: (saved: boolean) => void;
+}) {
   const { user } = useAuth();
+  const [calendarId, setCalendarId] = useState(event.calendarId ?? calendars[0]?.id ?? "");
   const [title, setTitle] = useState(event.title ?? "");
   const [type, setType] = useState<EventType>(event.type ?? "workout");
   const [startsAt, setStartsAt] = useState(toLocalInput(event.startsAt));
@@ -157,6 +328,7 @@ function EventEditor({ event, onDone }: { event: MyEvent & { id?: string }; onDo
   const [error, setError] = useState<string | null>(null);
   if (!user) return null;
   const me = user;
+  const calendar = calendars.find((c) => c.id === calendarId);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -164,24 +336,37 @@ function EventEditor({ event, onDone }: { event: MyEvent & { id?: string }; onDo
     if (!start) return setError("Pick when it starts.");
     const end = fromLocalInput(endsAt);
     if (end && Date.parse(end) < Date.parse(start)) return setError("It can't end before it starts.");
+    if (!calendarId) return setError("Pick a calendar.");
     setBusy(true);
     setError(null);
     const body = { title, type, startsAt: start, endsAt: end, location, notes };
+    const base = `/v1/calendars/${encodeURIComponent(calendarId)}/events`;
     try {
       if (event.id) {
-        await callApi(me, `/v1/me/events/${encodeURIComponent(event.id)}`, { method: "PATCH", body });
+        await callApi(me, `${base}/${encodeURIComponent(event.id)}`, { method: "PATCH", body });
       } else {
-        await callApi<PersonalEventResult>(me, "/v1/me/events", { method: "POST", body });
+        await callApi<CalendarEventResult>(me, base, { method: "POST", body });
       }
-      onDone();
+      onDone(true);
     } catch (err) {
       setError(problem(err));
       setBusy(false);
     }
   }
 
+  const shared = calendar ? calendar.role !== "owner" || (calendar.members?.length ?? 1) > 1 : false;
   return (
     <form className="settings-form event-editor" onSubmit={(e) => void save(e)}>
+      <label>
+        Calendar
+        <select value={calendarId} disabled={Boolean(event.id)} onChange={(e) => setCalendarId(e.target.value)}>
+          {calendars.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.role === "owner" ? c.name : `${c.name} (${c.owner.name})`}
+            </option>
+          ))}
+        </select>
+      </label>
       <label>
         Title
         <input value={title} required maxLength={100} onChange={(e) => setTitle(e.target.value)} />
@@ -189,7 +374,7 @@ function EventEditor({ event, onDone }: { event: MyEvent & { id?: string }; onDo
       <label>
         Type
         <select value={type} onChange={(e) => setType(e.target.value as EventType)}>
-          {eventTypes.filter((t) => t !== "pickup" || t === event.type).map((t) => (
+          {[...calendarEventTypes, ...(event.type === "pickup" ? (["pickup"] as const) : [])].map((t) => (
             <option key={t} value={t}>
               {eventTypeLabels[t]}
             </option>
@@ -211,7 +396,10 @@ function EventEditor({ event, onDone }: { event: MyEvent & { id?: string }; onDo
         <input value={location} maxLength={200} onChange={(e) => setLocation(e.target.value)} />
       </label>
       <label>
-        Notes <small className="muted">(only you see these)</small>
+        Notes{" "}
+        <small className="muted">
+          {shared ? "(people who can edit this calendar see these; viewers don't)" : "(only you see these)"}
+        </small>
         <textarea value={notes} rows={3} maxLength={5000} onChange={(e) => setNotes(e.target.value)} />
       </label>
       <div className="form-actions">
@@ -220,7 +408,7 @@ function EventEditor({ event, onDone }: { event: MyEvent & { id?: string }; onDo
             {error}
           </span>
         )}
-        <button type="button" className="btn" disabled={busy} onClick={onDone}>
+        <button type="button" className="btn" disabled={busy} onClick={() => onDone(false)}>
           Cancel
         </button>
         <button type="submit" className="btn btn-primary" disabled={busy}>
@@ -228,70 +416,5 @@ function EventEditor({ event, onDone }: { event: MyEvent & { id?: string }; onDo
         </button>
       </div>
     </form>
-  );
-}
-
-/** Calendars others share with the member: the next 30 days, read-only. */
-function SharedCalendars() {
-  const { user } = useAuth();
-  const [data, setData] = useState<SharedCalendarsResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!user) return;
-    const from = startOfToday();
-    const qs = new URLSearchParams({
-      from: new Date(from).toISOString(),
-      to: new Date(from + sharedDays * dayMs).toISOString(),
-    });
-    try {
-      setData(await callApi<SharedCalendarsResponse>(user, `/v1/me/calendar/shared?${qs}`));
-      setError(null);
-    } catch (e) {
-      setError(problem(e));
-    }
-  }, [user]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  if (!data && !error) return null;
-  if (data && data.calendars.length === 0) return null;
-  return (
-    <div className="card">
-      <h2 className="card-title">Shared with you</h2>
-      {error && (
-        <p className="form-error">
-          {error}{" "}
-          <button type="button" className="text-btn" onClick={() => void load()}>
-            Retry
-          </button>
-        </p>
-      )}
-      {data?.calendars.map(({ owner, events }) => (
-        <section key={owner.uid} className="shared-calendar">
-          <h3 className="shared-calendar-owner">
-            <Avatar name={owner.name} url={owner.photoUrl ?? undefined} size={28} />
-            <Link href={`/players/${encodeURIComponent(owner.uid)}`}>{owner.name}</Link>
-          </h3>
-          {events.length === 0 ? (
-            <p className="muted small">Nothing in the next {sharedDays} days.</p>
-          ) : (
-            <div className="stack">
-              {events.map((e) => (
-                <EventItem key={e.id} startsAt={e.startsAt}>
-                  <b>{e.title}</b>
-                  <small>
-                    {eventTypeLabels[e.type]} · <LocalTime iso={e.startsAt} style="dateTime" />
-                    {e.location ? ` · ${e.location}` : ""}
-                  </small>
-                </EventItem>
-              ))}
-            </div>
-          )}
-        </section>
-      ))}
-    </div>
   );
 }

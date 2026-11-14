@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
-import '../../../data/repositories/calendar/calendar_share_repository.dart';
+import '../../../data/repositories/calendar/calendar_repository.dart';
+import '../../../domain/models/calendar.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
@@ -31,27 +32,29 @@ class ScheduleViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required EventRepository eventRepository,
     MeetingRepository? meetingRepository,
-    CalendarShareRepository? calendarShareRepository,
+    CalendarRepository? calendarRepository,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now,
        _events = eventRepository,
+       _calendarRepo = calendarRepository,
        _uid = authRepository.currentUser?.uid {
     deleteEvent = Command1<void, ScheduleEntry>(_delete);
     _feed = MySchedule(
       teamRepository: teamRepository,
       eventRepository: eventRepository,
       meetingRepository: meetingRepository,
-      calendarShareRepository: calendarShareRepository,
+      calendarRepository: calendarRepository,
       uid: _uid,
       clock: _clock,
     )..addListener(notifyListeners);
     _weekStart = today;
     _selectedDay = today;
-    _loadShared();
+    _loadCalendars();
   }
 
   final DateTime Function() _clock;
   final EventRepository _events;
+  final CalendarRepository? _calendarRepo;
   final String? _uid;
   late final MySchedule _feed;
   bool _disposed = false;
@@ -65,10 +68,14 @@ class ScheduleViewModel extends ChangeNotifier {
   static String _keyOf(ScheduleEntry e) => e.key;
 
   /// Personal events are always the user's to delete; team events need an
-  /// editing role (owner, coach or captain), as in firestore.rules.
-  /// Meetings are deleted from their own page.
+  /// editing role (owner, coach or captain), as in firestore.rules; events
+  /// on other calendars need Can edit (or to be its owner). Meetings are
+  /// deleted from their own page.
   bool canDelete(ScheduleEntry entry) {
-    if (entry.isMeeting || entry.isShared) return false;
+    if (entry.isMeeting) return false;
+    if (entry.calendar case final cal?) {
+      return cal.canEdit && _calendarRepo != null;
+    }
     final team = entry.team;
     if (team == null) return _uid != null;
     return _uid != null && team.has(_uid, TeamPermission.manageEvents);
@@ -83,9 +90,16 @@ class ScheduleViewModel extends ChangeNotifier {
       return Result.error(Exception("You can't delete this event."));
     }
     final team = entry.team;
-    final result = team == null
-        ? await _events.deleteMyEvent(uid, entry.event.id)
-        : await _events.deleteEvent(team.id, entry.event.id);
+    final cal = entry.calendar;
+    final result = switch ((team, cal)) {
+      (final t?, _) => await _events.deleteEvent(t.id, entry.event.id),
+      (_, final c?) => await _calendarRepo!.deleteEvent(c.id, entry.event.id),
+      _ => await _events.deleteMyEvent(uid, entry.event.id),
+    };
+    if (cal != null && result is Ok && !_disposed) {
+      // Not live: reload so it stays gone after the undo window.
+      await refreshCalendars();
+    }
     if (result is Error && !_disposed) {
       // Show it again so the failed delete isn't silent.
       _pendingDeletes.remove(_keyOf(entry));
@@ -156,22 +170,37 @@ class ScheduleViewModel extends ChangeNotifier {
       _weekStart.day + days,
     );
     _selectedDay = _weekStart;
-    _loadShared();
+    _loadCalendars();
     notifyListeners();
   }
 
-  /// Calendars shared with the user, around the week shown.
-  void _loadShared() => _feed.loadShared(
+  /// The user's other calendars' events, around the week shown.
+  void _loadCalendars() => _feed.loadCalendars(
     _weekStart.subtract(MySchedule.lookBack),
-    _weekStart.add(MySchedule.sharedSpan),
+    _weekStart.add(MySchedule.calendarSpan),
   );
 
-  /// Reloads shared calendars (pull to refresh).
-  Future<void> refreshShared() => _feed.loadShared(
+  /// Reloads calendars, their events and invites (pull to refresh, and
+  /// after an event on one is added, changed or deleted).
+  Future<void> refreshCalendars() => _feed.loadCalendars(
     _weekStart.subtract(MySchedule.lookBack),
-    _weekStart.add(MySchedule.sharedSpan),
+    _weekStart.add(MySchedule.calendarSpan),
     force: true,
   );
+
+  /// Calendar invites waiting for the user.
+  List<CalendarInvite> get invites => _feed.invites;
+
+  /// Accepts or declines an invite, then reloads.
+  Future<Result<void>> answerInvite(CalendarInvite invite, bool accept) async {
+    final repo = _calendarRepo;
+    if (repo == null) return Result.error(Exception('Calendars are off.'));
+    final r = accept
+        ? await repo.accept(invite.calendarId)
+        : await repo.decline(invite.calendarId);
+    if (!_disposed) await refreshCalendars();
+    return r;
+  }
 
   ScheduleFilter _filter = ScheduleFilter.all;
   ScheduleFilter get filter => _filter;
@@ -184,7 +213,7 @@ class ScheduleViewModel extends ChangeNotifier {
   bool _matches(ScheduleEntry e) => switch (_filter) {
     ScheduleFilter.all => true,
     ScheduleFilter.team => e.team != null,
-    ScheduleFilter.personal => e.isPersonal,
+    ScheduleFilter.personal => e.team == null,
   };
 
   /// [day]'s events that pass the filter, earliest first.

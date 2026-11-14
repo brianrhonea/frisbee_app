@@ -25,7 +25,7 @@ Last audited: 2026-11-13, on `feature/core-parity`.
 | U8 | **Private or public profile**, and who can follow and message them | Done: private profile with follow approval; message policy (everyone / followers / nobody) | Done: private profile, follow requests, who can message you (web 0.9.0, API 0.8.0) | |
 | U9 | **Follow teams and communities** | Done | Done (follow from a team or community page) | |
 | U10 | **Delete** their profile and data from Settings | Done: Settings → Delete account (`account-deleteAccount`) | Done: Settings → Account (web 0.9.0) | Deploy the `account` functions group so the personal details record is removed too |
-| U11 | **Personal events**, and share their calendar with other users (not just teams and communities) | Done: personal events; Settings → Calendar sharing; shared calendars on the Schedule tab (0.0.20) | Done: `/schedule` and Settings → Calendar sharing (web 0.9.0) | Shared calendars aren't live: they load with the schedule and on pull-down |
+| U11 | **Personal events**, and share their calendar with other users (not just teams and communities) | Partial: calendars with invites and roles, Settings → Calendars, the Schedule tab, Add to calendar, subscription link (0.0.20) | Partial: `/schedule` and Settings → Calendars (web 0.9.0) | Calendars other than My calendar aren't live (they load with the schedule and on pull-down). Team schedules aren't in the subscription feed. Outlook and Google subscriptions not yet tried against a deployed API |
 | U12 | **Personal details** (legal name, birthday, phone, gender, address, guardian under 18), private to the player and encrypted | Done on this branch | Done on this branch | Deploy API 0.7.0, the KMS key in prod, and the `account` functions group |
 
 ## 2. Teams and communities
@@ -45,7 +45,15 @@ _To come._
 - **D3. Feed (U5), 2026-11-13.** The player's own posts, the people,
   teams and communities they follow, and their teams' posts. Not posts
   from followers they don't follow back.
-- **D4. Calendar sharing (U11), 2026-11-13.** The player picks people to
-  share their personal calendar with. Those people see its events
-  (title, time, place) read-only in their own schedule. Sharing can be
-  stopped at any time.
+- **D4. Calendars (U11), 2026-11-13, revised the same day.** Calendars
+  work like Outlook or Apple Calendar. Everyone has My calendar and may
+  make more (up to 20), each with a name and color. The owner invites
+  people as **Can view** (title, type, time and place; never notes) or
+  **Can edit** (add, change and delete events; sees notes); an invite is
+  pushed, and nothing is shared until it's accepted. The owner changes
+  roles or removes people at any time; anyone can leave. New events go
+  on a calendar picked in the editor (the app also offers team
+  schedules; the website, calendars only for now). For other calendar
+  apps: **Add to calendar** on each event (an .ics file) and a private
+  subscription link (webcal/ICS) of every calendar the player is on,
+  which they can reset or turn off.

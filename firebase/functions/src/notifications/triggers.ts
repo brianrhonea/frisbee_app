@@ -31,6 +31,7 @@ import {
   eventViewers,
   joinRequestNotice,
   teamInviteNotice,
+  calendarInviteNotice,
   meetingCancelledNotice,
   meetingInviteNotice,
   meetingStartedNotice,
@@ -286,6 +287,26 @@ export const teamInvite = onDocumentWrittenWithAuthContext(
     await deliver(getFirestore(), getMessaging(), [userId], teamInviteNotice({ teamId, invite }));
   },
 );
+
+/**
+ * An invitation to a calendar: the person invited, once (changing a pending
+ * invite's role rewrites it without another push).
+ */
+export const calendarInvite = onDocumentCreated("users/{userId}/calendarInvites/{calendarId}", async (event) => {
+  const invite = event.data?.data() as Data | undefined;
+  if (!invite) return;
+  const { userId, calendarId } = event.params;
+  const db = getFirestore();
+  const [calendar, profile] = await Promise.all([
+    db.doc(`calendars/${calendarId}`).get(),
+    typeof invite.fromId === "string" && invite.fromId ? db.doc(`profiles/${invite.fromId}`).get() : null,
+  ]);
+  // Withdrawn (or the calendar deleted) before this ran.
+  const pending = calendar.get("pending") as Record<string, unknown> | undefined;
+  if (!pending?.[userId]) return;
+  const fromName = String(profile?.get("name") ?? "") || (profile?.get("username") ? `@${profile.get("username")}` : "");
+  await deliver(db, getMessaging(), [userId], calendarInviteNotice({ calendarId, invite, fromName }));
+});
 
 /**
  * Followers of [keys] who turned on notifications for them (the bell on a

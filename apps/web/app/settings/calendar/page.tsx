@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { CalendarSharing } from "@/components/settings/CalendarSharing";
+import { CalendarSettings } from "@/components/settings/CalendarSettings";
 
-export const metadata: Metadata = { title: "Calendar sharing" };
+export const metadata: Metadata = { title: "Calendars" };
 
 export default function CalendarSettingsPage() {
-  return <CalendarSharing />;
+  return <CalendarSettings />;
 }

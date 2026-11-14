@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../calendar/widgets/add_to_calendar.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/back_or.dart';
@@ -86,6 +87,11 @@ class _MyEventDetailScreenState extends State<MyEventDetailScreen> {
           leading: backOr(context, Routes.schedule),
           title: Text(e.type.label),
           actions: [
+            AddToCalendarButton(
+              event: e,
+              uid: 'me-${e.id}@stall10.app',
+              asIcon: true,
+            ),
             IconButton(
               tooltip: 'Edit',
               icon: const Icon(Icons.edit_outlined),

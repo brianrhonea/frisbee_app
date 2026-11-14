@@ -9,8 +9,8 @@ import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/personal/personal_repository.dart';
 import '../domain/models/model_utils.dart';
 import '../domain/models/team.dart';
-import '../ui/calendar/view_models/calendar_sharing_viewmodel.dart';
-import '../ui/calendar/widgets/calendar_sharing_screen.dart';
+import '../ui/calendar/view_models/calendars_viewmodel.dart';
+import '../ui/calendar/widgets/calendars_screen.dart';
 import '../ui/chat/view_models/chat_room_settings_viewmodel.dart';
 import '../ui/chat/view_models/chat_room_viewmodel.dart';
 import '../ui/chat/widgets/chat_layout.dart';
@@ -222,12 +222,12 @@ GoRouter router(
             context,
             state.pageKey,
             ViewModelHost(
-              create: (c) => CalendarSharingViewModel(
-                calendarShareRepository: c.read(),
+              create: (c) => CalendarsViewModel(
+                calendarRepository: c.read(),
                 profileRepository: c.read(),
                 uid: c.read<AuthRepository>().currentUser?.uid,
               ),
-              builder: (_, vm) => CalendarSharingScreen(viewModel: vm),
+              builder: (_, vm) => CalendarsScreen(viewModel: vm),
             ),
             panelOnWide: true,
             dim: false,
@@ -531,6 +531,28 @@ GoRouter router(
         ),
       ],
     ),
+    // Editing an event on a calendar other than My calendar (through the
+    // API); those have no page of their own.
+    GoRoute(
+      path: '${Routes.calendarsPath}/:calendarId/events/:eventId/edit',
+      builder: (_, state) {
+        final calendarId = state.pathParameters['calendarId']!;
+        final eventId = state.pathParameters['eventId']!;
+        return ViewModelHost(
+          key: ValueKey('edit-calendar-event-$calendarId-$eventId'),
+          create: (c) => EventEditorViewModel(
+            teamId: null,
+            calendarId: calendarId,
+            eventId: eventId,
+            eventRepository: c.read(),
+            teamRepository: c.read(),
+            authRepository: c.read(),
+            calendarRepository: c.read(),
+          ),
+          builder: (_, vm) => EventEditorScreen(viewModel: vm),
+        );
+      },
+    ),
     // Personal schedule, full screen over the shell.
     GoRoute(
       path: Routes.myEventsPath,
@@ -551,6 +573,7 @@ GoRouter router(
                 teamRepository: c.read(),
                 authRepository: c.read(),
                 postRepository: c.read(),
+                calendarRepository: c.read(),
               ),
               builder: (_, vm) => EventEditorScreen(viewModel: vm),
             );

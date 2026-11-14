@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/themes/theme.dart';
+import '../../../domain/models/calendar.dart';
 import '../../../domain/models/schedule_entry.dart';
+import '../../../routing/routes.dart';
+import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/schedule_viewmodel.dart';
@@ -106,7 +110,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'new-schedule-event',
-        onPressed: () => showEventEditor(context, day: vm.selectedDay),
+        onPressed: () async {
+          final id = await showEventEditor(context, day: vm.selectedDay);
+          // Other calendars aren't live.
+          if (id != null) await vm.refreshCalendars();
+        },
         icon: const Icon(Icons.add),
         label: const Text('New event'),
       ),
@@ -123,15 +131,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 const Divider(height: 1),
                 Expanded(
                   // Team and personal events are live; pulling down
-                  // reloads calendars others share.
+                  // reloads the other calendars and invites.
                   child: RefreshIndicator(
-                    onRefresh: vm.refreshShared,
+                    onRefresh: vm.refreshCalendars,
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          for (final invite in vm.invites)
+                            _InviteCard(invite: invite, viewModel: vm),
                           for (var i = 0; i < 7; i++)
                             _DaySection(
                               key: _dayKeys[i],
@@ -315,6 +325,7 @@ class _DaySection extends StatelessWidget {
                               showTeamName: vm.teams.length > 1,
                               showDay: false,
                               large: true,
+                              onCalendarChanged: vm.refreshCalendars,
                             ),
                           ),
                       ],
@@ -373,6 +384,82 @@ class _SwipeToDelete extends StatelessWidget {
         ),
       ),
       child: child,
+    );
+  }
+}
+
+/// An invite to someone's calendar: nothing is shared until it's accepted.
+class _InviteCard extends StatefulWidget {
+  const _InviteCard({required this.invite, required this.viewModel});
+
+  final CalendarInvite invite;
+  final ScheduleViewModel viewModel;
+
+  @override
+  State<_InviteCard> createState() => _InviteCardState();
+}
+
+class _InviteCardState extends State<_InviteCard> {
+  bool _busy = false;
+
+  Future<void> _answer(bool accept) async {
+    setState(() => _busy = true);
+    final r = await widget.viewModel.answerInvite(widget.invite, accept);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (r is Error) showErrorSnackBar(context, r);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final i = widget.invite;
+    final c = AppColors.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.circle, size: 12, color: i.color.color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${i.from.name} invited you to ${i.calendarName}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              i.role == CalendarRole.edit
+                  ? 'You could see and add events.'
+                  : 'You could see its events.',
+              style: TextStyle(fontSize: 13, color: c.muted),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => context.push(Routes.settingsCalendar),
+                  child: const Text('Calendars'),
+                ),
+                TextButton(
+                  onPressed: _busy ? null : () => _answer(false),
+                  child: const Text('Decline'),
+                ),
+                FilledButton(
+                  onPressed: _busy ? null : () => _answer(true),
+                  child: const Text('Accept'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

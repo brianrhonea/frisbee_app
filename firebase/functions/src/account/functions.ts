@@ -116,6 +116,8 @@ async function deleteUserData(db: Firestore, uid: string): Promise<void> {
   await leaveConversations(db, uid);
   await leaveTeams(db, uid);
   await deleteJoinRequests(db, uid);
+  // Before users/{uid}, whose calendarInvites say which calendars to tidy.
+  await leaveCalendars(db, uid);
   await db.recursiveDelete(db.doc(`users/${uid}`));
   // Free their username for someone else.
   const names = await db.collection("usernames").where("uid", "==", uid).get();
@@ -179,6 +181,38 @@ async function leaveConversations(db: Firestore, uid: string): Promise<void> {
     void writer.update(d.ref, first[0], first[1], ...rest.flat());
   }
   await writer.close();
+}
+
+/**
+ * Calendars (apps/api/src/calendar): theirs are deleted with their events
+ * and outstanding invites ("My calendar"'s events go with users/{uid});
+ * they're taken off everyone else's, invited or not; and their
+ * subscription link stops working.
+ */
+/** Exported for test/server. */
+export async function leaveCalendars(db: Firestore, uid: string): Promise<void> {
+  const owned = await db.collection("calendars").where("ownerId", "==", uid).get();
+  for (const d of owned.docs) {
+    const pending = Object.keys((d.get("pending") ?? {}) as Record<string, unknown>);
+    await Promise.all(pending.map((u) => db.doc(`users/${u}/calendarInvites/${d.id}`).delete()));
+    await db.recursiveDelete(d.ref);
+  }
+  const writer = db.bulkWriter();
+  const shared = await db.collection("calendars").where("memberIds", "array-contains", uid).get();
+  for (const d of shared.docs) {
+    if (d.get("ownerId") === uid) continue;
+    void writer.update(d.ref, new FieldPath("members", uid), FieldValue.delete(), "memberIds", FieldValue.arrayRemove(uid));
+  }
+  const invites = await db.collection(`users/${uid}/calendarInvites`).get();
+  for (const i of invites.docs) {
+    const cal = db.doc(`calendars/${i.id}`);
+    if ((await cal.get()).exists) void writer.update(cal, new FieldPath("pending", uid), FieldValue.delete());
+  }
+  await writer.close();
+  const feed = await db.doc(`calendarFeedOwners/${uid}`).get();
+  const hash = feed.get("hash");
+  if (typeof hash === "string" && hash) await db.doc(`calendarFeeds/${hash}`).delete();
+  await feed.ref.delete();
 }
 
 async function leaveTeams(db: Firestore, uid: string): Promise<void> {

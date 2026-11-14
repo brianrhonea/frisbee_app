@@ -264,6 +264,14 @@ service cloud.firestore {
         allow create, update: if signedIn() && uid() == userId && validMine();
       }
 
+      // Invitations to someone's calendar (CalendarService in the API,
+      // which writes each with the calendar's pending entry). The invitee
+      // reads them; accepting and declining go through the API, which
+      // checks the calendar still has them pending.
+      match /calendarInvites/{calendarId} {
+        allow read: if signedIn() && uid() == userId;
+      }
+
       // Invitations to join a team or group (TeamInvite in
       // lib/domain/models/team.dart). Its owners and organizers send them to
       // people who aren't on it yet; the invitee accepts (see acceptInvite)
@@ -2398,6 +2406,28 @@ service cloud.firestore {
     // even the owner, so a stolen ID token or a rules mistake elsewhere
     // can't list them. Deleted with the account (account-deleteAccount).
     match /personalDetails/{userId} {
+      allow read, write: if false;
+    }
+
+    // ---- Calendars --------------------------------------------------------
+
+    // Calendars as in Outlook or Apple Calendar (CalendarService in the API,
+    // docs/requirements.md D4): ownerId, name, color, members {uid: role},
+    // memberIds and pending invites. People on one read it; nobody else
+    // learns it exists. Every write, and every event on one
+    // (calendars/{id}/events), goes through the API, which checks the
+    // caller's role. "My calendar" (id: its owner's uid) keeps its events
+    // in users/{uid}/events.
+    match /calendars/{calendarId} {
+      allow read: if signedIn() && uid() in resource.data.memberIds;
+    }
+
+    // Subscription links (calendarFeeds/{sha256 of the token} -> uid) and
+    // each owner's current token: the API's only, never a client's.
+    match /calendarFeeds/{hash} {
+      allow read, write: if false;
+    }
+    match /calendarFeedOwners/{userId} {
       allow read, write: if false;
     }
 

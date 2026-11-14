@@ -352,21 +352,49 @@ with a men's team and a women's team. Start one from Teams → **New** →
 
 ### Schedule
 
-Your whole week in one place: personal events plus every team you're on.
+Your whole week in one place: your calendars plus every team you're on.
 
 - Use the arrows to move between weeks, and **Today** to come back.
 - Tap a day in the strip to jump to it.
-- Filter with **All**, **Team** or **Personal**.
-- **New event** adds an event on the selected day. If you're an owner,
-  coach or captain, choose whether it goes on **My schedule** or a team's
-  schedule.
+- Filter with **All**, **Team** or **Personal** (your calendars).
+- **New event** adds an event on the selected day. Under **Add to**, pick
+  **My calendar**, another calendar you own or can edit, or (owners,
+  coaches and captains) a team's schedule.
 - **Swipe an event right to delete it.** Tap **Undo** within 4 seconds to
-  keep it. You can always swipe your personal events; team events only if
-  you're an owner, coach or captain. Others can't be swiped.
+  keep it. You can always swipe your own events; events on someone
+  else's calendar if you **Can edit** it; team events only if you're an
+  owner, coach or captain.
+- Calendar invites show at the top: **Accept** to see that calendar, or
+  **Decline**. Events on other calendars show in that calendar's color;
+  tap one for its details, **Add to calendar**, and **Edit** if you can.
+  Pull down to refresh them.
+- **Add to calendar** (on any event's page too) opens the share sheet to
+  put the event in Apple Calendar, Outlook or Google Calendar.
+
+#### Calendars (Settings → Calendars)
+
+Calendars work like Outlook or Apple Calendar. You start with **My
+calendar** and can make more, each with a name and color.
+
+- Open a calendar to rename it, change its color, or invite people by name
+  or username as **Can view** (title, time and place, never notes) or
+  **Can edit** (they add and change events too, and see notes). Invites
+  are sent as a notification; nothing is shared until they accept.
+- Change someone's role, **Remove** them, or **Cancel** an invite at any
+  time. **Delete calendar** removes it and its events for everyone (My
+  calendar can't be deleted).
+- **Shared with you** lists others' calendars you're on; **Leave** one to
+  stop seeing it.
+- **Outlook, Apple and Google Calendar**: **Get a subscription link**,
+  then **Subscribe in Apple Calendar or Outlook** or **Add to Google
+  Calendar** (or copy the link into Outlook on the web: Add calendar →
+  Subscribe from web). Every calendar you're on shows up there and
+  updates about once an hour. Anyone with the link can see those events,
+  so keep it private; **Reset link** if it gets out, or **Turn off**.
 
 Event types: Practice, Game, Tournament, Scrimmage, Workout, Social, Other
 (in groups: Pickup, Tournament, Social, Other).
-Personal events are private: only you can see them.
+Events on My calendar are private unless you invite people to it.
 
 ### Videos
 

@@ -104,8 +104,8 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   SettingsTile(
                     icon: Icons.event_available_outlined,
-                    title: 'Calendar sharing',
-                    subtitle: 'Who sees your personal events',
+                    title: 'Calendars',
+                    subtitle: 'Share calendars, invites, Outlook and Apple',
                     onTap: () => context.push(Routes.settingsCalendar),
                   ),
                   SettingsTile(

@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/calendar/calendar_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../data/repositories/user_post/user_post_repository.dart';
+import '../../../domain/models/calendar.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
@@ -14,9 +16,11 @@ import '../../../utils/result.dart';
 /// Creates or edits a team or personal event. Form state lives in the
 /// screen; this loads the original and saves the submitted draft.
 ///
-/// A new event can go on the user's personal schedule or on any team
-/// schedule they may edit ([setSchedule]); an existing one stays where it is.
-/// A new one can also be posted for the user's followers ([shareWith]).
+/// A new event can go on My calendar (the user's personal schedule), on
+/// another calendar they own or can edit ([setCalendar], through the API),
+/// or on any team schedule they may edit ([setSchedule]); an existing one
+/// stays where it is. A new one can also be posted for the user's
+/// followers ([shareWith]).
 class EventEditorViewModel extends ChangeNotifier {
   EventEditorViewModel({
     required String? teamId,
@@ -25,8 +29,13 @@ class EventEditorViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required AuthRepository authRepository,
     UserPostRepository? postRepository,
+    CalendarRepository? calendarRepository,
+    String? calendarId,
     DateTime? initialDay,
-  }) : _teamId = teamId,
+  }) : assert(teamId == null || calendarId == null),
+       _teamId = teamId,
+       _calendarId = calendarId,
+       _calendarRepo = calendarRepository,
        _events = eventRepository,
        _teams = teamRepository,
        _auth = authRepository,
@@ -42,6 +51,7 @@ class EventEditorViewModel extends ChangeNotifier {
   final TeamRepository _teams;
   final AuthRepository _auth;
   final UserPostRepository? _posts;
+  final CalendarRepository? _calendarRepo;
   final DateTime? _initialDay;
 
   /// A new event can be posted for followers, unless it's on a private
@@ -77,17 +87,41 @@ class EventEditorViewModel extends ChangeNotifier {
 
   String? _teamId;
 
-  /// Team whose schedule the event is on; null for the personal schedule.
+  /// Team whose schedule the event is on; null for a calendar.
   String? get teamId => _teamId;
 
+  String? _calendarId;
+
+  /// The calendar the event is on when it isn't My calendar or a team's
+  /// (saved through the API).
+  String? get calendarId => _calendarId;
+
+  /// On a calendar (My calendar or another), not a team's schedule.
   bool get isPersonal => _teamId == null;
+
+  /// On My calendar (`users/{uid}/events`).
+  bool get isMyCalendar => _teamId == null && _calendarId == null;
+
+  List<CalendarInfo> _calendars = const [];
+
+  /// The user's calendars other than My calendar that a new event may go
+  /// on: their own, and others' they can edit.
+  List<CalendarInfo> get editableCalendars => [
+    for (final c in _calendars)
+      if (c.canEdit && c.id != _uid) c,
+  ];
+
+  /// The calendar picked, or My calendar's info when known.
+  CalendarInfo? get scheduleCalendar =>
+      _calendars.where((c) => c.id == (_calendarId ?? _uid)).firstOrNull;
 
   List<Team> _editableTeams = const [];
 
   /// Teams whose schedule a new event may go on.
   List<Team> get editableTeams => _editableTeams;
 
-  bool get canChooseSchedule => isNew && _editableTeams.isNotEmpty;
+  bool get canChooseSchedule =>
+      isNew && (_editableTeams.isNotEmpty || editableCalendars.isNotEmpty);
 
   /// The team whose schedule the event is on: one of [editableTeams]
   /// for a new event, or the event's own team when editing.
@@ -122,11 +156,24 @@ class EventEditorViewModel extends ChangeNotifier {
       ? EventType.editableFor(community: false)
       : EventType.editableFor(community: isCommunity && !isOrganization);
 
-  /// Moves a new event to [teamId]'s schedule, or the personal one if null.
+  /// Moves a new event to [teamId]'s schedule, or My calendar if null.
   void setSchedule(String? teamId) {
     if (!isNew) return;
     if (teamId != null && !_editableTeams.any((t) => t.id == teamId)) return;
     _teamId = teamId;
+    _calendarId = null;
+    notifyListeners();
+  }
+
+  /// Moves a new event to [calendarId], or My calendar if null.
+  void setCalendar(String? calendarId) {
+    if (!isNew) return;
+    if (calendarId != null &&
+        !editableCalendars.any((c) => c.id == calendarId)) {
+      return;
+    }
+    _calendarId = calendarId;
+    _teamId = null;
     notifyListeners();
   }
 
@@ -147,6 +194,17 @@ class EventEditorViewModel extends ChangeNotifier {
     final id = eventId;
     if (id == null) return _loadTeams();
     final teamId = _teamId;
+    if (_calendarId case final cal?) {
+      final repo = _calendarRepo;
+      if (repo == null) return Result.error(Exception('Calendars are off.'));
+      final r = await repo.event(cal, id);
+      if (r case Ok(:final value)) {
+        _original = value;
+        notifyListeners();
+        return const Result.ok(null);
+      }
+      return Result.error((r as Error<TeamEvent>).error);
+    }
     try {
       _original =
           await (teamId == null
@@ -171,6 +229,15 @@ class EventEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _loadTeams() async {
+    final repo = _calendarRepo;
+    if (repo != null && repo.enabled) {
+      // Without them the event can still go on My calendar or a team's.
+      if (await repo.calendars() case Ok(:final value)) _calendars = value;
+    }
+    if (_calendarId != null &&
+        !editableCalendars.any((c) => c.id == _calendarId)) {
+      _calendarId = null;
+    }
     try {
       final teams = await _teams.watchMyTeams(_uid).first;
       _editableTeams = [
@@ -192,7 +259,14 @@ class EventEditorViewModel extends ChangeNotifier {
     _shareFailed = false;
     final event = draft.copyWith(id: eventId ?? '');
     final teamId = _teamId;
-    final saved = teamId == null
+    final calendarId = _calendarId;
+    final calendars = _calendarRepo;
+    final saved = calendarId != null && calendars != null
+        ? await calendars.saveEvent(
+            calendarId,
+            event.copyWith(poll: () => null),
+          )
+        : teamId == null
         ? await _events.saveMyEvent(_uid, event.copyWith(poll: () => null))
         : await _events.saveEvent(
             teamId,

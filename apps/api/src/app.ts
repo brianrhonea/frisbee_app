@@ -51,8 +51,10 @@ export interface AppDeps {
   };
   /** Transactional document access; enables the membership, profile and post routes. */
   store?: DocStore;
-  /** Shared calendars' queries; with [store], enables /v1/me/events and /v1/me/calendar/*. */
+  /** Calendars' queries; with [store], enables the calendar routes (the feed also needs [browse]'s limiter). */
   calendar?: CalendarRepository;
+  /** The API's public address, for calendar subscription links (PUBLIC_API_URL). */
+  publicUrl?: string;
   /** Encrypts personal details; with [store], enables /v1/me/personal. Off without one: never stored in the clear. */
   personal?: PersonalCipher;
   /** Cloud Storage; with [store], enables /v1/uploads. */
@@ -128,7 +130,12 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     postRoutes(app, new PostService(deps.store, deps.users, deps.now));
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now));
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
-    if (deps.calendar) calendarRoutes(app, new CalendarService(deps.store, deps.calendar));
+    if (deps.calendar) {
+      calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {
+        limiter: deps.browse?.limiter,
+        publicUrl: deps.publicUrl,
+      });
+    }
     if (deps.media) {
       const uploads = new UploadService(deps.store, deps.media, { heic: deps.heic, queue: deps.transcodeQueue, now: deps.now });
       uploadRoutes(app, uploads);

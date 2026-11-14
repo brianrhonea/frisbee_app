@@ -22,11 +22,18 @@ Core features to match the app. Needs API 0.8.0.
 - **Workout posts**: the composer's workout button adds an activity,
   minutes, distance (km or mi), effort and exercises. GPS recordings stay
   in the app. Workouts show their activity's name.
-- **Your schedule** (`/schedule`, from Events): your personal events,
-  live, with add, edit and delete (`/v1/me/events`), and calendars others
-  share with you for the next 30 days, read-only.
-- **Settings → Calendar sharing**: pick people (search by name or
-  username) who see your personal events; notes stay private.
+- **Your schedule** (`/schedule`, from Events), like Outlook or Apple
+  Calendar: every calendar you're on in its color, shown or hidden on
+  this browser; invites to accept or decline; add, edit and delete events
+  on any calendar you can edit, picking which one. Viewers see title,
+  time and place, never notes. **Add to calendar** on each event
+  downloads an .ics file.
+- **Settings → Calendars**: make calendars (name and color), invite people
+  as Can view or Can edit (they see nothing until they accept), change
+  roles, cancel invites, remove people, leave others' calendars, and a
+  private subscription link for Apple Calendar, Outlook and Google
+  Calendar (reset or turn off).
+- **Add to calendar** on team and group events.
 
 **Changed**
 - Clicking **Home** while on Home scrolls to the top and reloads the feed.

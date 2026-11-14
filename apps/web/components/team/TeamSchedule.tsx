@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { EventItem } from "../EventItem";
 import { LocalTime } from "../LocalTime";
+import { downloadIcs } from "@/lib/calendar";
 import { type Doc, useLiveQueries } from "@/lib/live";
 import { type TeamViewer, useTeamHub } from "./TeamContext";
 
@@ -146,8 +147,8 @@ function RsvpLine({ event, uid }: { event: TeamEventDoc; uid: string }) {
   );
 }
 
-function EventDetail({ event }: { event: TeamEventDoc }) {
-  const { viewer } = useTeamHub();
+function EventDetail({ event }: { event: Doc<TeamEventDoc> }) {
+  const { viewer, teamId } = useTeamHub();
   const member = viewer.state === "member" ? viewer : null;
   const names = member?.team.memberNames ?? {};
   const name = (uid: string) => (uid === member?.uid ? "You" : names[uid] || "Member");
@@ -179,6 +180,26 @@ function EventDetail({ event }: { event: TeamEventDoc }) {
         </p>
       )}
       {event.notes && <p className="post-body">{event.notes}</p>}
+      {event.startsAt && (
+        <p>
+          <button
+            type="button"
+            className="text-btn"
+            onClick={() =>
+              downloadIcs({
+                uid: `team-${teamId}-${event.id}@stall10.app`,
+                title: event.title || typeLabels[event.type ?? ""] || "Event",
+                startsAt: event.startsAt!,
+                endsAt: event.endsAt,
+                location: event.location,
+                description: event.notes,
+              })
+            }
+          >
+            Add to calendar
+          </button>
+        </p>
+      )}
 
       {member && (
         <>

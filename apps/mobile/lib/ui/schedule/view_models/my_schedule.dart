@@ -4,33 +4,34 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
-import '../../../data/repositories/calendar/calendar_share_repository.dart';
+import '../../../data/repositories/calendar/calendar_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../domain/models/calendar.dart';
 import '../../../domain/models/meeting.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../domain/models/schedule_entry.dart';
-import '../../../domain/models/shared_calendar.dart';
 import '../../../utils/result.dart';
 
-/// The user's schedule: their personal events plus the events and meetings
-/// of every team they belong to, merged and sorted by start time, and, for
-/// screens that call [loadShared], calendars others share with them
-/// (read-only). Composed by view models that show it.
+/// The user's schedule: their personal events (My calendar) plus the events
+/// and meetings of every team they belong to, merged and sorted by start
+/// time, and, for screens that call [loadCalendars], their other calendars:
+/// ones they made and ones they accepted invites to. Composed by view
+/// models that show it.
 class MySchedule extends ChangeNotifier {
   MySchedule({
     required TeamRepository teamRepository,
     required EventRepository eventRepository,
     required String? uid,
     MeetingRepository? meetingRepository,
-    CalendarShareRepository? calendarShareRepository,
+    CalendarRepository? calendarRepository,
     DateTime Function()? clock,
     this.upcomingOnly = false,
   }) : _events = eventRepository,
        _meetings = meetingRepository,
-       _shares = calendarShareRepository,
+       _calendarRepo = calendarRepository,
        _uid = uid,
        _clock = clock ?? DateTime.now {
     if (uid == null) {
@@ -64,32 +65,40 @@ class MySchedule extends ChangeNotifier {
 
   final EventRepository _events;
   final MeetingRepository? _meetings;
-  final CalendarShareRepository? _shares;
+  final CalendarRepository? _calendarRepo;
 
-  /// How far from its start [loadShared] is asked to look (the API allows
-  /// up to 92 days).
-  static const sharedSpan = Duration(days: 63);
+  /// How far from its start [loadCalendars] is asked to look (the API
+  /// allows up to 92 days).
+  static const calendarSpan = Duration(days: 63);
 
-  List<SharedCalendar> _shared = const [];
-  DateTime? _sharedFrom;
-  DateTime? _sharedTo;
+  List<CalendarInfo> _calendars = const [];
+  List<CalendarEntry> _calendarEvents = const [];
+  List<CalendarInvite> _invites = const [];
+  DateTime? _calendarsFrom;
+  DateTime? _calendarsTo;
   bool _disposed = false;
 
-  /// Calendars shared with the user, as last loaded.
-  List<SharedCalendar> get sharedCalendars => _shared;
+  /// Every calendar the user is on, as last loaded (My calendar first).
+  List<CalendarInfo> get calendars => _calendars;
 
-  /// Loads events on calendars shared with the user starting in [from, to),
-  /// unless that range is already loaded. Not live: call again to refresh
-  /// ([force]). Failures keep what's shown.
-  Future<void> loadShared(
+  /// Invites waiting for the user, as last loaded.
+  List<CalendarInvite> get invites => _invites;
+
+  bool get calendarsEnabled => _calendarRepo?.enabled ?? false;
+
+  /// Loads the user's calendars, invites, and the events on calendars other
+  /// than My calendar (which is live) starting in [from, to), unless that
+  /// range is already loaded. Not live: call again to refresh ([force]).
+  /// Failures keep what's shown.
+  Future<void> loadCalendars(
     DateTime from,
     DateTime to, {
     bool force = false,
   }) async {
-    final repo = _shares;
+    final repo = _calendarRepo;
     if (repo == null || !repo.enabled || _uid == null) return;
-    final loadedFrom = _sharedFrom;
-    final loadedTo = _sharedTo;
+    final loadedFrom = _calendarsFrom;
+    final loadedTo = _calendarsTo;
     if (!force &&
         loadedFrom != null &&
         loadedTo != null &&
@@ -97,17 +106,23 @@ class MySchedule extends ChangeNotifier {
         !to.isAfter(loadedTo)) {
       return;
     }
-    final r = await repo.shared(from, to);
+    final (cals, events, invites) = await (
+      repo.calendars(),
+      repo.events(from, to),
+      repo.invites(),
+    ).wait;
     if (_disposed) return;
-    switch (r) {
-      case Ok(:final value):
-        _shared = value;
-        _sharedFrom = from;
-        _sharedTo = to;
-        notifyListeners();
-      case Error(:final error):
-        _log.warning('Shared calendars failed to load', error);
+    if (invites case Ok(:final value)) _invites = value;
+    switch ((cals, events)) {
+      case (Ok(value: final c), Ok(value: final e)):
+        _calendars = c;
+        _calendarEvents = e;
+        _calendarsFrom = from;
+        _calendarsTo = to;
+      case (Error(:final error), _) || (_, Error(:final error)):
+        _log.warning('Calendars failed to load', error);
     }
+    notifyListeners();
   }
 
   final String? _uid;
@@ -238,6 +253,7 @@ class MySchedule extends ChangeNotifier {
   /// Personal and team events and meetings, soonest first.
   List<ScheduleEntry> get entries {
     final teams = {for (final t in _teams) t.id: t};
+    final calendarsById = {for (final c in _calendars) c.id: c};
     return [
       for (final e in _mine) ScheduleEntry(event: e),
       for (final MapEntry(key: id, value: events) in _byTeam.entries)
@@ -247,8 +263,11 @@ class MySchedule extends ChangeNotifier {
         if (teams[id] case final team?)
           for (final m in meetings)
             if (!m.isEnded) ScheduleEntry(team: team, event: m.toEvent()),
-      for (final c in _shared)
-        for (final e in c.events) ScheduleEntry(sharedBy: c.owner, event: e),
+      for (final e in _calendarEvents)
+        // My calendar's own events come live from _mine.
+        if (e.calendarId != _uid)
+          if (calendarsById[e.calendarId] case final cal?)
+            ScheduleEntry(calendar: cal, event: e.event),
     ]..sort((a, b) => a.event.startsAt.compareTo(b.event.startsAt));
   }
 

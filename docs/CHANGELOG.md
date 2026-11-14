@@ -35,20 +35,35 @@ Plain-language notes for testers are in
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
 
-## 0.0.20 — Pull to refresh Home; calendar sharing
+## 0.0.20 — Pull to refresh Home; calendars
 
-Needs API 0.8.0 (`/v1/me/calendar/*`). Without `API_BASE_URL`, sharing
-is hidden.
+Needs API 0.8.0 (`/v1/me/calendars`, `/v1/calendars/*`), the
+`calendars` rules and the `notifications-calendarInvite` function.
+Without `API_BASE_URL`, calendars other than My calendar are hidden.
 
-- **Settings → Calendar sharing** (`CalendarSharingScreen`): choose people
-  (people search) who see your personal events; saves at once
-  (`CalendarShareRepository`, API only).
-- Calendars shared with you show on the Schedule tab, read-only:
-  `ScheduleEntry.sharedBy`, gray, tagged with the owner's first name;
-  tapping shows the details in a sheet. Never deletable, not under the
-  Team or Personal filters, not on Home. `MySchedule.loadShared` covers
-  the week shown, from a week before to nine weeks after; pull down
-  to reload.
+- Calendars, as in Outlook or Apple Calendar (`CalendarRepository`, API
+  only; models in `domain/models/calendar.dart`). **Settings → Calendars**
+  (`CalendarsScreen`): your calendars with their color and people, a new
+  calendar, invites to accept, calendars shared with you (leave), and a
+  private subscription link (Apple Calendar or Outlook via `webcal://`,
+  Google Calendar, copy, reset, turn off). Each calendar's page renames,
+  recolors, sets each person's role (Can view or Can edit), cancels
+  invites, invites by people search with a role, and deletes it.
+- Invites push (`notifications-calendarInvite`, opens Calendars) and show
+  on the Schedule tab with Accept and Decline. Nothing is shared until
+  you accept.
+- The Schedule tab shows your other calendars' events in each calendar's
+  color (`ScheduleEntry.calendar`); tapping one opens a sheet with Add to
+  calendar and, if you can edit it, Edit. Editors and owners can swipe
+  to delete. Personal filter includes them. `MySchedule.loadCalendars`
+  covers the week shown, from a week before to nine weeks after; pull
+  down to reload. My calendar's events stay live from Firestore.
+- The event editor's **Add to** picks My calendar, another calendar you
+  own or can edit, or a team; events on other calendars save through the
+  API (`/calendars/:id/events/:eventId/edit` to edit one).
+- **Add to calendar** (an .ics file through the share sheet) on personal
+  and team events (`utils/ics.dart`).
+- `ApiClient` accepts empty `204` answers.
 
 - Home's feed refreshes on pull-down, and when Home is tapped again (back
   to For you, top of the feed): `HomeFeed.refresh()` re-subscribes every

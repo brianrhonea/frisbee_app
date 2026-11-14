@@ -4,14 +4,15 @@ import 'package:intl/intl.dart';
 
 import '../../../domain/models/schedule_entry.dart';
 import '../../../routing/routes.dart';
+import '../../calendar/widgets/add_to_calendar.dart';
 import '../../core/themes/theme.dart';
 import 'event_style.dart';
 
 /// Team events and personal events each get one color on schedules, so the
-/// two are easy to tell apart at a glance.
+/// two are easy to tell apart at a glance; other calendars have their own.
 Color scheduleColor(BuildContext context, ScheduleEntry entry) {
   final c = AppColors.of(context);
-  if (entry.isShared) return c.muted;
+  if (entry.calendar case final cal?) return cal.color.color;
   return entry.isPersonal ? c.personal : c.team;
 }
 
@@ -31,8 +32,8 @@ class ScheduleTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = scheduleColor(context, entry);
     final team = entry.team;
-    final label = switch ((entry.sharedBy, team)) {
-      (final owner?, _) => owner.name.split(' ').first.toUpperCase(),
+    final label = switch ((entry.calendar, team)) {
+      (final cal?, _) => cal.name.toUpperCase(),
       (_, null) => 'PERSONAL',
       (_, final t?) => showTeamName ? t.name.toUpperCase() : 'TEAM',
     };
@@ -94,10 +95,15 @@ class ScheduleEventRow extends StatelessWidget {
     this.showTeamName = false,
     this.showDay = true,
     this.large = false,
+    this.onCalendarChanged,
   });
 
   final ScheduleEntry entry;
   final bool showTeamName;
+
+  /// After an event on another calendar was edited from its sheet (those
+  /// aren't live), e.g. to reload the schedule.
+  final VoidCallback? onCalendarChanged;
 
   /// Prefix the time with the weekday, for lists that span several days.
   final bool showDay;
@@ -113,8 +119,8 @@ class ScheduleEventRow extends StatelessWidget {
     final tile = large ? 44.0 : 36.0;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: () => entry.isShared
-          ? showSharedEventSheet(context, entry)
+      onTap: () => entry.isOnCalendar
+          ? showCalendarEventSheet(context, entry, onChanged: onCalendarChanged)
           : context.push(Routes.scheduleEvent(entry)),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 6, vertical: large ? 10 : 8),
@@ -258,11 +264,17 @@ class WeekDayCell extends StatelessWidget {
   }
 }
 
-/// An event on someone's shared calendar: its details, read-only. It has
-/// no page of its own (the owner's event isn't the user's to open).
-Future<void> showSharedEventSheet(BuildContext context, ScheduleEntry entry) {
+/// An event on one of the user's other calendars: its details, "Add to
+/// calendar", and Edit for people who can edit that calendar. These have
+/// no page of their own. [onChanged] runs after an edit.
+Future<void> showCalendarEventSheet(
+  BuildContext context,
+  ScheduleEntry entry, {
+  VoidCallback? onChanged,
+}) {
   final e = entry.event;
-  final owner = entry.sharedBy;
+  final cal = entry.calendar;
+  final router = GoRouter.maybeOf(context);
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -301,13 +313,51 @@ Future<void> showSharedEventSheet(BuildContext context, ScheduleEntry entry) {
                   ],
                 ),
               ],
-              if (owner != null) ...[
+              if (e.notes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(e.notes),
+              ],
+              if (cal != null) ...[
                 const SizedBox(height: 16),
-                Text(
-                  "On ${owner.name}'s calendar, shared with you.",
-                  style: TextStyle(fontSize: 13, color: c.muted),
+                Row(
+                  children: [
+                    Icon(Icons.circle, size: 10, color: cal.color.color),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        cal.isMine
+                            ? 'On ${cal.name}'
+                            : "On ${cal.owner.name}'s ${cal.name} · "
+                                  '${cal.role.label.toLowerCase()}',
+                        style: TextStyle(fontSize: 13, color: c.muted),
+                      ),
+                    ),
+                  ],
                 ),
               ],
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  AddToCalendarButton(
+                    event: e,
+                    uid: '${cal?.id ?? 'me'}-${e.id}@stall10.app',
+                  ),
+                  if (cal != null && cal.canEdit && router != null)
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        Navigator.of(context).pop();
+                        final saved = await router.push<bool>(
+                          Routes.editCalendarEvent(cal.id, e.id),
+                        );
+                        if (saved == true) onChanged?.call();
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit'),
+                    ),
+                ],
+              ),
             ],
           ),
         ),

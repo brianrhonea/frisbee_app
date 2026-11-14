@@ -474,6 +474,25 @@ export function teamInviteNotice(a: { teamId: string; invite: Data }): Notice {
   };
 }
 
+/**
+ * An invitation to someone's calendar (users/{uid}/calendarInvites/{id},
+ * written by the API's CalendarService). Nothing is shared until they accept.
+ */
+export function calendarInviteNotice(a: { calendarId: string; invite: Data; fromName: string }): Notice {
+  const calendar = String(a.invite.calendarName ?? "") || "a calendar";
+  const from = a.fromName || "Someone";
+  const can = a.invite.role === "edit" ? "see and add events" : "see its events";
+  return {
+    category: "social",
+    route: "/settings/calendar",
+    collapseId: `calendarInvite_${a.calendarId}`,
+    text: () => ({
+      title: `${from} shared a calendar with you`,
+      body: `Accept to ${can} on "${calendar}".`,
+    }),
+  };
+}
+
 /** Team members a reminder goes to: everyone who hasn't said they can't go. */
 export function reminderRecipients(team: TeamDoc, event: Data): string[] {
   const rsvps = (event.rsvps ?? {}) as Record<string, unknown>;

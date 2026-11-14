@@ -12,6 +12,7 @@ import {
   messagePreview,
   joinRequestNotice,
   teamInviteNotice,
+  calendarInviteNotice,
   playNotice,
   reminderNotice,
   reminderRecipients,
@@ -237,6 +238,20 @@ describe("teamInviteNotice", () => {
       body: "Ana invited you to their group. Tap to accept or decline.",
     });
     expect(n.route).toBe("/teams");
+  });
+});
+
+describe("calendarInviteNotice", () => {
+  it("says who shared which calendar, and what they may do", () => {
+    const n = calendarInviteNotice({ calendarId: "c1", invite: { calendarName: "Training", role: "edit" }, fromName: "Ana" });
+    expect(n.text({}, 1)).toEqual({
+      title: "Ana shared a calendar with you",
+      body: 'Accept to see and add events on "Training".',
+    });
+    expect(n.route).toBe("/settings/calendar");
+    expect(n.category).toBe("social");
+    const view = calendarInviteNotice({ calendarId: "c1", invite: { role: "view" }, fromName: "" });
+    expect(view.text({}, 1)).toEqual({ title: "Someone shared a calendar with you", body: 'Accept to see its events on "a calendar".' });
   });
 });
 

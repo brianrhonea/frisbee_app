@@ -9,7 +9,7 @@ export default function SchedulePage() {
     <div className="page">
       <header className="page-head">
         <h1>Your schedule</h1>
-        <p>Your own events, and calendars friends share with you.</p>
+        <p>Your calendars, and ones friends share with you.</p>
       </header>
       <MembersOnly next="/schedule">
         <Schedule />

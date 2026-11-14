@@ -251,6 +251,13 @@ abstract final class Routes {
         : {'date': day.toIso8601String().substring(0, 10)},
   ).toString();
   static String myEvent(String eventId) => '$myEventsPath/$eventId';
+
+  /// Events on calendars other than My calendar, which have no page of
+  /// their own: only an editor.
+  static const calendarsPath = '/calendars';
+  static String editCalendarEvent(String calendarId, String eventId) =>
+      '$calendarsPath/${Uri.encodeComponent(calendarId)}/events/'
+      '${Uri.encodeComponent(eventId)}/edit';
   static String editMyEvent(String eventId) => '$myEventsPath/$eventId/edit';
 
   /// Detail page for a team or personal event.

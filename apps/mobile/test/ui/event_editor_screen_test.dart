@@ -41,7 +41,7 @@ void main() {
     expect(find.text('Add to'), findsOneWidget);
     expect(find.text('Northside Flyers'), findsOneWidget);
     expect(find.text('Add a poll'), findsOneWidget);
-    await tester.tap(find.text('My schedule'));
+    await tester.tap(find.text('My calendar'));
     await tester.pump();
     expect(vm.isPersonal, isTrue);
     expect(find.text('Only you will see this event.'), findsOneWidget);

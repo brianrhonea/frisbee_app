@@ -1211,6 +1211,59 @@ describe("personal events", () => {
   });
 });
 
+describe("calendars", () => {
+  const seed = () =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      const admin = ctx.firestore();
+      await setDoc(doc(admin, "calendars", "cal1"), {
+        ownerId: OWNER,
+        name: "Training",
+        color: "blue",
+        members: { [OWNER]: "owner", [PLAYER]: "view" },
+        memberIds: [OWNER, PLAYER],
+        pending: { [COACH]: "edit" },
+      });
+      await setDoc(doc(admin, "calendars", "cal1", "events", "e1"), { title: "Track", notes: "private" });
+      await setDoc(doc(admin, "users", COACH, "calendarInvites", "cal1"), { calendarId: "cal1", role: "edit", fromId: OWNER });
+      await setDoc(doc(admin, "calendarFeeds", "hash1"), { uid: PLAYER });
+      await setDoc(doc(admin, "calendarFeedOwners", PLAYER), { token: "t", hash: "hash1" });
+    });
+
+  it("lets people on a calendar read it, and nobody write it", async () => {
+    await seed();
+    await assertSucceeds(getDoc(doc(db(OWNER), "calendars", "cal1")));
+    await assertSucceeds(getDoc(doc(db(PLAYER), "calendars", "cal1")));
+    await assertSucceeds(getDocs(query(collection(db(PLAYER), "calendars"), where("memberIds", "array-contains", PLAYER))));
+    // Invited isn't on it yet.
+    await assertFails(getDoc(doc(db(COACH), "calendars", "cal1")));
+    await assertFails(getDoc(doc(db(OUTSIDER), "calendars", "cal1")));
+    await assertFails(getDocs(collection(db(OUTSIDER), "calendars")));
+    await assertFails(updateDoc(doc(db(OWNER), "calendars", "cal1"), { name: "Renamed" }));
+    await assertFails(updateDoc(doc(db(PLAYER), "calendars", "cal1"), { memberIds: arrayUnion(OUTSIDER) }));
+    await assertFails(setDoc(doc(db(OUTSIDER), "calendars", "mine"), { ownerId: OUTSIDER, memberIds: [OUTSIDER] }));
+  });
+
+  it("keeps a calendar's events and the feed records to the API", async () => {
+    await seed();
+    await assertFails(getDoc(doc(db(OWNER), "calendars", "cal1", "events", "e1")));
+    await assertFails(getDoc(doc(db(PLAYER), "calendars", "cal1", "events", "e1")));
+    await assertFails(setDoc(doc(db(OWNER), "calendars", "cal1", "events", "e2"), { title: "x" }));
+    await assertFails(getDoc(doc(db(PLAYER), "calendarFeeds", "hash1")));
+    await assertFails(getDoc(doc(db(PLAYER), "calendarFeedOwners", PLAYER)));
+    await assertFails(setDoc(doc(db(PLAYER), "calendarFeeds", "hash2"), { uid: PLAYER }));
+  });
+
+  it("lets only the invitee read their invites, and nobody write them", async () => {
+    await seed();
+    await assertSucceeds(getDoc(doc(db(COACH), "users", COACH, "calendarInvites", "cal1")));
+    await assertSucceeds(getDocs(collection(db(COACH), "users", COACH, "calendarInvites")));
+    await assertFails(getDoc(doc(db(OWNER), "users", COACH, "calendarInvites", "cal1")));
+    await assertFails(setDoc(doc(db(COACH), "users", COACH, "calendarInvites", "cal2"), { calendarId: "cal2", role: "edit" }));
+    await assertFails(setDoc(doc(db(OWNER), "users", OUTSIDER, "calendarInvites", "cal1"), { calendarId: "cal1" }));
+    await assertFails(deleteDoc(doc(db(COACH), "users", COACH, "calendarInvites", "cal1")));
+  });
+});
+
 describe("public events", () => {
   const details = (extra: Record<string, unknown> = {}) => ({
     title: "Open tryouts",

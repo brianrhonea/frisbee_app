@@ -777,10 +777,25 @@ a.person:hover span { text-decoration: underline; }
 .event-actions { display: flex; gap: 14px; margin-top: 4px; }
 .event-editor { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-.shared-calendar + .shared-calendar { margin-top: 18px; }
-.shared-calendar-owner { display: flex; align-items: center; gap: 8px; font-size: 1rem; margin: 0 0 8px; }
-.shared-calendar-owner a { color: var(--ink); text-decoration: none; }
-.shared-calendar-owner a:hover { text-decoration: underline; }
+/* Calendars (Schedule, Settings → Calendars). */
+.cal-dot { display: inline-block; width: 10px; height: 10px; border-radius: 999px; flex: none; margin-right: 8px; vertical-align: 0.05em; }
+.cal-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.cal-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.cal-toggle .cal-dot { margin-right: 0; }
+.cal-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.cal-swatch { width: 26px; height: 26px; border-radius: 999px; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.cal-swatch.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--card) inset; }
+.cal-swatch:disabled { cursor: default; opacity: 0.6; }
+.cal-subhead { font-size: 0.95rem; margin: 18px 0 4px; }
+.cal-invite { margin-top: 10px; display: grid; gap: 6px; }
+.cal-invite-role { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.cal-invite-role select { width: auto; }
+.cal-subscribe { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.cal-invites { border-color: var(--lime); }
+.input-row { display: flex; gap: 8px; align-items: center; }
+.input-row input { flex: 1; min-width: 0; }
+.person-list .person-row { flex-wrap: wrap; }
+.person-row select { width: auto; }
 .person-picker { display: grid; gap: 8px; margin-top: 12px; }
 .person-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
 .person-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px; border-radius: 10px; }

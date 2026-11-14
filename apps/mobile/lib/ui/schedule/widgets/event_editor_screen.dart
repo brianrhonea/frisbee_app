@@ -15,6 +15,7 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/overlay_panel.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
+import '../../../data/repositories/calendar/calendar_repository.dart';
 import '../../../data/repositories/user_post/user_post_repository.dart';
 import '../view_models/event_editor_viewmodel.dart';
 import 'event_style.dart';
@@ -42,32 +43,42 @@ Future<String?> showEventEditor(
         teamRepository: c.read(),
         authRepository: c.read(),
         postRepository: c.read<UserPostRepository?>(),
+        calendarRepository: c.read<CalendarRepository?>(),
       ),
       builder: (_, vm) =>
           EventEditorScreen(viewModel: vm, inPanel: true, fitContent: fit),
     ),
   );
   if (created == null) return null;
-  final detail = switch (created.teamId) {
-    null => Routes.myEvent(created.id),
-    final t => Routes.event(t, created.id),
+  // Events on other calendars have no page of their own.
+  final detail = switch ((created.teamId, created.calendarId)) {
+    (final t?, _) => Routes.event(t, created.id),
+    (_, null) => Routes.myEvent(created.id),
+    _ => null,
   };
   messenger
     ?..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
         content: Text(_createdMessage(created.shared)),
-        action: SnackBarAction(
-          label: 'View',
-          onPressed: () => router.push(detail),
-        ),
+        action: detail == null
+            ? null
+            : SnackBarAction(
+                label: 'View',
+                onPressed: () => router.push(detail),
+              ),
       ),
     );
   return created.id;
 }
 
 /// What the panel closes with when an event is created.
-typedef _Created = ({String id, String? teamId, bool? shared});
+typedef _Created = ({
+  String id,
+  String? teamId,
+  String? calendarId,
+  bool? shared,
+});
 
 /// [shared]: posted for followers (true), asked to but couldn't (false), or
 /// not asked (null).
@@ -143,6 +154,7 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
         final _Created created = (
           id: value,
           teamId: vm.teamId,
+          calendarId: vm.calendarId,
           shared: vm.shared ? true : (vm.shareFailed ? false : null),
         );
         Navigator.of(context).pop(created);
@@ -157,6 +169,11 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
               : 'Event saved',
         );
         final teamId = vm.teamId;
+        if (vm.calendarId != null) {
+          // No page of its own: back to the schedule.
+          context.canPop() ? context.pop(true) : context.go(Routes.schedule);
+          return;
+        }
         final detail = teamId == null
             ? Routes.myEvent(value)
             : Routes.event(teamId, value);
@@ -739,10 +756,17 @@ class _SchedulePicker extends StatelessWidget {
           children: [
             ChoiceChip(
               avatar: const Icon(Icons.person_outline, size: 18),
-              label: const Text('My schedule'),
-              selected: vm.isPersonal,
+              label: const Text('My calendar'),
+              selected: vm.isMyCalendar,
               onSelected: (_) => vm.setSchedule(null),
             ),
+            for (final c in vm.editableCalendars)
+              ChoiceChip(
+                avatar: Icon(Icons.circle, size: 14, color: c.color.color),
+                label: Text(c.label),
+                selected: vm.calendarId == c.id,
+                onSelected: (_) => vm.setCalendar(c.id),
+              ),
             for (final t in vm.editableTeams)
               ChoiceChip(
                 avatar: const Icon(Icons.groups_outlined, size: 18),
@@ -755,7 +779,10 @@ class _SchedulePicker extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           vm.isPersonal
-              ? 'Only you will see this event.'
+              ? (vm.scheduleCalendar?.isShared ?? false)
+                    ? 'Everyone on ${vm.scheduleCalendar!.name} sees it; '
+                          "people who can only view don't see notes."
+                    : 'Only you will see this event.'
               : vm.isOrganization
               ? 'Choose below who in the community sees it and can RSVP.'
               : vm.isCommunity

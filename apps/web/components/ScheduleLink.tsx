@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useAuth } from "./AuthProvider";
 
-/** On Events, for members: their own schedule and shared calendars. */
+/** On Events, for members: their calendars and ones shared with them. */
 export function ScheduleLink() {
   const { user } = useAuth();
   if (!user) return null;

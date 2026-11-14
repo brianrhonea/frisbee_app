@@ -20,17 +20,38 @@ Core features on both apps.
   whole minutes, distance, effort, up to 20 exercises; no GPS route),
   checked as `validWorkout` checks it and stored as `Workout.toMap` does.
   `PATCH` refuses to change a workout.
-- Personal events: `POST /v1/me/events`, `PATCH` / `DELETE
-  /v1/me/events/:id` (`personalEventSchema`; checks `validMine` and saves
-  as the app does: Timestamps, `poll: null`, `location` and `notes`
-  always set).
-- Calendar sharing (requirements U11, D4): `GET` / `PUT
-  /v1/me/calendar/viewers` (up to 50 people with profiles, not yourself;
-  stored in `users/{uid}.calendarViewers`) and `GET
-  /v1/me/calendar/shared?from=&to=` (up to 92 days): each calendar shared
-  with the caller, events with title, type, times and place, never notes.
-  The owner's list is checked on every read. `FirestoreCalendarRepository`
-  (array-contains and date-range queries; single-field indexes only).
+- Calendars, as in Outlook or Apple Calendar (requirements U11, D4;
+  `calendar/`). `calendars/{id}` holds the owner, name, color, `members`
+  (`{uid: owner|edit|view}`, mirrored in `memberIds`) and `pending`
+  invites. "My calendar" has the owner's uid for id, is made the first
+  time it's needed, and keeps its events in `users/{uid}/events`; others
+  keep theirs in `calendars/{id}/events`.
+  - `GET` / `POST /v1/me/calendars` (up to 20 owned), `PATCH` / `DELETE
+    /v1/calendars/:id` (owner; My calendar can't be deleted; deleting
+    takes its invites and events with it).
+  - Invites: `POST /v1/calendars/:id/invites` (`{uid, role}`; also changes
+    a pending invite's role; up to 50 people; not while muted), `DELETE
+    /v1/calendars/:id/invites/:uid`. The invitee's copy is
+    `users/{uid}/calendarInvites/{id}`; nothing is shared until `POST
+    /v1/me/calendar-invites/:id/accept`, which checks the calendar still
+    has them pending. `GET /v1/me/calendar-invites`, `.../decline`.
+  - Members: `PATCH` / `DELETE /v1/calendars/:id/members/:uid` (Can view or
+    Can edit; the owner removes people, anyone leaves).
+  - Events: `GET /v1/me/calendar-events?from=&to=` (up to 92 days, every
+    calendar the caller is on), `POST /v1/calendars/:id/events`, `GET` /
+    `PATCH` / `DELETE /v1/calendars/:id/events/:eventId` (owner or Can
+    edit; `calendarEventSchema` checks `validMine`, and My calendar's
+    events are saved as the app saves them). Viewers never get notes.
+  - Subscription feed: `GET` / `POST` / `DELETE /v1/me/calendar-feed` (a
+    private link, reset or turned off) and `GET /v1/ical/:token.ics`
+    (public; iCalendar of every calendar the link's owner is on, a month
+    back and a year ahead; membership checked on each fetch; rate-limited
+    per link; logged at warn only, since the path holds the token). Links
+    are stored as a SHA-256 hash (`calendarFeeds`, `calendarFeedOwners`,
+    both closed to clients). `PUBLIC_API_URL` sets the links' address.
+  - `FirestoreCalendarRepository`: `memberIds` array-contains, `ownerId`
+    and date-range queries (single-field indexes only).
+- Empty `204` answers for calendar changes.
 
 ## 0.7.0 — 2026-11-13
 

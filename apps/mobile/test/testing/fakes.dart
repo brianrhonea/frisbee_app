@@ -3,8 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import 'package:frisbee_app/data/repositories/calendar/calendar_share_repository.dart';
-import 'package:frisbee_app/domain/models/shared_calendar.dart';
+import 'package:frisbee_app/data/repositories/calendar/calendar_repository.dart';
+import 'package:frisbee_app/domain/models/calendar.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
@@ -2550,49 +2550,168 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
   set signUpBirthDate(DateTime? value) => _birth = value;
 }
 
-/// Calendar sharing in memory: [viewerList] is the user's list, [calendars]
-/// what others share with them (filtered by the asked window).
-class FakeCalendarShareRepository implements CalendarShareRepository {
-  FakeCalendarShareRepository({this.enabled = true});
+/// Calendars in memory, like the API: [calendarList] the user is on (their
+/// role on each), [eventsBy] calendar id, [inviteList] waiting for them.
+/// Records [saved] and [deleted] events and every [calls] made.
+class FakeCalendarRepository implements CalendarRepository {
+  FakeCalendarRepository({this.enabled = true});
 
   @override
   final bool enabled;
 
-  List<CalendarPerson> viewerList = [];
-  List<SharedCalendar> calendars = [];
-  final people = <String, CalendarPerson>{};
-  int sharedLoads = 0;
+  List<CalendarInfo> calendarList = [];
+  final eventsBy = <String, List<TeamEvent>>{};
+  List<CalendarInvite> inviteList = [];
+  CalendarFeed feedLink = const CalendarFeed();
+  final saved = <(String, TeamEvent)>[];
+  final deleted = <(String, String)>[];
+  final calls = <String>[];
+  int eventLoads = 0;
   bool fail = false;
+  var _ids = 0;
 
-  @override
-  Future<Result<List<CalendarPerson>>> viewers() async =>
-      fail ? Result.error(Exception('offline')) : Result.ok(viewerList);
-
-  @override
-  Future<Result<List<CalendarPerson>>> setViewers(List<String> uids) async {
-    if (fail) return Result.error(Exception('offline'));
-    viewerList = [
-      for (final u in uids) people[u] ?? CalendarPerson(uid: u, name: u),
-    ];
-    return Result.ok(viewerList);
+  Result<T> _ok<T>(String call, T value) {
+    calls.add(call);
+    return fail ? Result.error(Exception('offline')) : Result.ok(value);
   }
 
   @override
-  Future<Result<List<SharedCalendar>>> shared(
-    DateTime from,
-    DateTime to,
-  ) async {
-    sharedLoads++;
-    if (fail) return Result.error(Exception('offline'));
-    return Result.ok([
-      for (final c in calendars)
-        SharedCalendar(
-          owner: c.owner,
-          events: [
-            for (final e in c.events)
-              if (!e.startsAt.isBefore(from) && e.startsAt.isBefore(to)) e,
-          ],
-        ),
+  Future<Result<List<CalendarInfo>>> calendars() async =>
+      _ok('calendars', List.of(calendarList));
+
+  @override
+  Future<Result<CalendarInfo>> create(String name, CalendarColor color) async {
+    final c = CalendarInfo(
+      id: 'cal${++_ids}',
+      name: name,
+      color: color,
+      owner: const CalendarPerson(uid: 'u1', name: 'Me'),
+      role: CalendarRole.owner,
+    );
+    if (!fail) calendarList = [...calendarList, c];
+    return _ok('create $name', c);
+  }
+
+  @override
+  Future<Result<void>> update(
+    String calendarId, {
+    String? name,
+    CalendarColor? color,
+  }) async =>
+      _ok('update $calendarId ${name ?? ''} ${color?.name ?? ''}', null);
+
+  @override
+  Future<Result<void>> delete(String calendarId) async {
+    if (!fail) {
+      calendarList = [
+        for (final c in calendarList)
+          if (c.id != calendarId) c,
+      ];
+    }
+    return _ok('delete $calendarId', null);
+  }
+
+  @override
+  Future<Result<void>> invite(
+    String calendarId,
+    String uid,
+    CalendarRole role,
+  ) async => _ok('invite $calendarId $uid ${role.name}', null);
+
+  @override
+  Future<Result<void>> cancelInvite(String calendarId, String uid) async =>
+      _ok('cancel $calendarId $uid', null);
+
+  @override
+  Future<Result<void>> setRole(
+    String calendarId,
+    String uid,
+    CalendarRole role,
+  ) async => _ok('role $calendarId $uid ${role.name}', null);
+
+  @override
+  Future<Result<void>> removeMember(String calendarId, String uid) async =>
+      _ok('remove $calendarId $uid', null);
+
+  @override
+  Future<Result<List<CalendarInvite>>> invites() async =>
+      _ok('invites', List.of(inviteList));
+
+  @override
+  Future<Result<void>> accept(String calendarId) async {
+    if (!fail) {
+      inviteList = [
+        for (final i in inviteList)
+          if (i.calendarId != calendarId) i,
+      ];
+    }
+    return _ok('accept $calendarId', null);
+  }
+
+  @override
+  Future<Result<void>> decline(String calendarId) async {
+    if (!fail) {
+      inviteList = [
+        for (final i in inviteList)
+          if (i.calendarId != calendarId) i,
+      ];
+    }
+    return _ok('decline $calendarId', null);
+  }
+
+  @override
+  Future<Result<List<CalendarEntry>>> events(DateTime from, DateTime to) async {
+    eventLoads++;
+    return _ok('events', [
+      for (final MapEntry(key: id, value: list) in eventsBy.entries)
+        for (final e in list)
+          if (!e.startsAt.isBefore(from) && e.startsAt.isBefore(to))
+            CalendarEntry(calendarId: id, event: e),
     ]);
+  }
+
+  @override
+  Future<Result<TeamEvent>> event(String calendarId, String eventId) async {
+    final e = eventsBy[calendarId]?.where((e) => e.id == eventId).firstOrNull;
+    calls.add('event $calendarId $eventId');
+    return e == null
+        ? Result.error(Exception('This event was deleted.'))
+        : Result.ok(e);
+  }
+
+  @override
+  Future<Result<String>> saveEvent(String calendarId, TeamEvent event) async {
+    final id = event.id.isEmpty ? 'ev${++_ids}' : event.id;
+    if (!fail) saved.add((calendarId, event.copyWith(id: id)));
+    return _ok('save $calendarId', id);
+  }
+
+  @override
+  Future<Result<void>> deleteEvent(String calendarId, String eventId) async {
+    if (!fail) {
+      deleted.add((calendarId, eventId));
+      eventsBy[calendarId]?.removeWhere((e) => e.id == eventId);
+    }
+    return _ok('deleteEvent $calendarId $eventId', null);
+  }
+
+  @override
+  Future<Result<CalendarFeed>> feed() async => _ok('feed', feedLink);
+
+  @override
+  Future<Result<CalendarFeed>> resetFeed() async {
+    if (!fail) {
+      feedLink = CalendarFeed(
+        url: 'https://api.test/v1/ical/t${++_ids}.ics',
+        webcal: 'webcal://api.test/v1/ical/t$_ids.ics',
+      );
+    }
+    return _ok('resetFeed', feedLink);
+  }
+
+  @override
+  Future<Result<void>> stopFeed() async {
+    if (!fail) feedLink = const CalendarFeed();
+    return _ok('stopFeed', null);
   }
 }

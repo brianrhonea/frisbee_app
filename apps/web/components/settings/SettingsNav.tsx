@@ -6,7 +6,7 @@ const sections = [
   ["/settings/profile", "Profile"],
   ["/settings/personal", "Personal details"],
   ["/settings/privacy", "Privacy"],
-  ["/settings/calendar", "Calendar sharing"],
+  ["/settings/calendar", "Calendars"],
   ["/settings/following", "People you follow"],
   ["/settings/requests", "Follow requests"],
   ["/settings/account", "Account"],

@@ -72,6 +72,7 @@ const app = buildApp({
   teams: new FirestoreTeamRepository(db),
   me: { repo: new FirestoreMeRepository(db), imageUrl },
   calendar: new FirestoreCalendarRepository(db),
+  publicUrl: process.env.PUBLIC_API_URL || undefined,
   browse: {
     repo: new FirestoreBrowseRepository(db),
     limiter: new FirestoreRateLimiter(db),

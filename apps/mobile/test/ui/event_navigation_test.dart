@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frisbee_app/data/repositories/calendar/calendar_share_repository.dart';
+import 'package:frisbee_app/data/repositories/calendar/calendar_repository.dart';
 import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/routing/routes.dart';
 import 'package:frisbee_app/ui/people/widgets/following_screen.dart';
@@ -121,8 +121,8 @@ void main() {
           Provider<FilePickerService>.value(value: FakeFilePickerService()),
           Provider<EventRepository>.value(value: events),
           Provider<MeetingRepository>.value(value: FakeMeetingRepository()),
-          Provider<CalendarShareRepository>.value(
-            value: FakeCalendarShareRepository(),
+          Provider<CalendarRepository>.value(
+            value: FakeCalendarRepository(),
           ),
           Provider<TeamPostRepository>.value(value: FakeTeamPostRepository()),
           Provider<ProfileRepository>.value(value: FakeProfileRepository()),

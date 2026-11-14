@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../calendar/widgets/add_to_calendar.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
@@ -150,6 +151,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   List<Widget> _actions(TeamEvent e) => [
+    AddToCalendarButton(
+      event: e,
+      uid: 'team-${vm.teamId}-${e.id}@stall10.app',
+      asIcon: true,
+    ),
     if (vm.canEdit) ...[
       IconButton(
         tooltip: 'Edit',
