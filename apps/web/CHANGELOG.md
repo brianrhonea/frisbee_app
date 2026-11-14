@@ -4,6 +4,14 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.9.3 — 2026-11-14
+
+**Fixed**
+- Ask to follow a private player: the button says **Requested** as soon as
+  the API answers, and **Ask to follow** again once a request is taken
+  back, instead of waiting for the live listener, which sometimes took
+  15 s or more right after the profile turned private.
+
 ## 0.9.2 — 2026-11-14
 
 **Fixed**

@@ -1,7 +1,7 @@
 "use client";
 import { type FollowResult, type FollowType, followKey } from "@stall10/shared";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
 import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
@@ -34,6 +34,11 @@ export function FollowButton({
   const request = useLiveDoc(user && type === "user" && isPrivate ? `profiles/${targetId}/followRequests/${user.uid}` : null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What the API just told us about the request (asked: true, taken back:
+  // false), shown until the live doc next changes, so the button doesn't
+  // wait on a listener that can lag behind the write.
+  const [asked, setAsked] = useState<boolean | null>(null);
+  useEffect(() => setAsked(null), [request.data]);
 
   if (user === undefined) return null;
   if (!user) {
@@ -55,7 +60,9 @@ export function FollowButton({
     );
   }
   const me = user;
-  const loading = follow.data === undefined || (isPrivate && type === "user" && request.data === undefined);
+  const requested = asked ?? Boolean(request.data);
+  const loading =
+    follow.data === undefined || (isPrivate && type === "user" && asked === null && request.data === undefined);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -102,7 +109,7 @@ export function FollowButton({
         </button>
       </>
     );
-  } else if (request.data) {
+  } else if (requested) {
     button = (
       <button
         type="button"
@@ -110,7 +117,10 @@ export function FollowButton({
         title="Take back your request"
         disabled={busy}
         onClick={() =>
-          void run(() => callApi(me, `/v1/follows/requests/${encodeURIComponent(targetId)}`, { method: "DELETE" }))
+          void run(async () => {
+            await callApi(me, `/v1/follows/requests/${encodeURIComponent(targetId)}`, { method: "DELETE" });
+            setAsked(false);
+          })
         }
       >
         Requested
@@ -123,12 +133,13 @@ export function FollowButton({
         className="btn btn-primary btn-small"
         disabled={busy || loading}
         onClick={() =>
-          void run(() =>
-            callApi<FollowResult>(me, "/v1/follows", {
+          void run(async () => {
+            const r = await callApi<FollowResult>(me, "/v1/follows", {
               method: "PUT",
               body: { type, targetId, ...(groupId && { groupId }) },
-            }),
-          )
+            });
+            if (r.status === "requested") setAsked(true);
+          })
         }
       >
         {isPrivate && type === "user" ? "Ask to follow" : "Follow"}
