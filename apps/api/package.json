@@ -1,6 +1,6 @@
 {
   "name": "@stall10/api",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "Stall 10 API: the one backend apps/mobile and apps/web call. Validates requests and reads/writes Firebase with the Admin SDK.",
   "type": "module",

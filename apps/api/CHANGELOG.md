@@ -7,6 +7,32 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.9.0 — 2026-11-13
+
+Live pages and instant refreshes for the website (fixes from the
+two-person web test).
+
+**Added**
+- `GET /v1/players/:uid` (signed in, never cached): a player's page as the
+  caller may see it. A private profile comes back in full, with its
+  private details and posts, to the player and the people whose follow
+  they accepted; anyone else gets `locked: true` and only the card
+  (`MemberProfilePage` in `@stall10/shared`). Posts by private authors, or
+  reposts of their posts, are left out unless the caller follows them.
+- `GET /v1/posts/:id` (signed in, never cached): one post, if the caller
+  may see it; 404 "This post was deleted." once it's gone.
+- The website's cached public pages are expired the moment they change:
+  after a profile's details, visibility, privacy or username change, and
+  after a post is created, edited, deleted, reposted or a repost undone,
+  the API calls the site's `POST /api/revalidate` with cache tags
+  (`player:<uid>`, `post:<id>`, `posts`, `feed`, `search`;
+  `web/revalidate.ts`). Awaited with a 1.5 s timeout (Cloud Run throttles
+  CPU after the reply) and never fails the write. Needs `WEB_SITE_URL`
+  (repository variable `API_WEB_SITE_URL_DEV/_PROD` on Cloud Run) and
+  `WEB_SERVER_KEY`; without them pages refresh within a minute, as do
+  changes the app still writes straight to Firestore (its stats summary).
+- `MeRepository.profiles(ids)`.
+
 ## 0.8.0 — 2026-11-13
 
 Core features on both apps.

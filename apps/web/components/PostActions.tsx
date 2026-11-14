@@ -43,6 +43,13 @@ export function PostActions({ post, onComment }: { post: PublicPost; onComment?:
     };
   }, [user, post.id, target]);
 
+  // Counts from a live page (someone else liked or reposted) win over ours.
+  const liveLikes = target?.likeCount;
+  const liveReposts = target?.repostCount;
+  useEffect(() => {
+    if (liveLikes === undefined || liveReposts === undefined) return;
+    setState((s) => (s ? { ...s, likeCount: liveLikes, repostCount: liveReposts } : s));
+  }, [liveLikes, liveReposts]);
   if (!target) return null;
   const likeCount = state?.likeCount ?? target.likeCount;
   const repostCount = state?.repostCount ?? target.repostCount;

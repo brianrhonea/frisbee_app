@@ -2,7 +2,19 @@ import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import type { Message, Messaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 
-import { type Notice, type Prefs, type Text, shouldPush, wants } from "./model";
+import {
+  addItem,
+  type Data,
+  hasItem,
+  type ItemKind,
+  itemsWithout,
+  itemText,
+  type Notice,
+  type Prefs,
+  type Text,
+  shouldPush,
+  wants,
+} from "./model";
 
 // FIDs FCM no longer knows; their device docs are deleted.
 const goneCodes = new Set([
@@ -36,14 +48,35 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
 
   const feed = user.collection("notifications");
   const entry = notice.collapseId ? feed.doc(notice.collapseId) : feed.doc();
-  // Repeats fold into the unread entry and count up; a read one starts over.
-  // A repeat soon after the last push only updates the feed (shouldPush).
-  const { text, push } = await db.runTransaction(async (tx) => {
+  const written = await db.runTransaction(async (tx) => {
     const previous = notice.collapseId ? await tx.get(entry) : undefined;
+    // An undo that raced this trigger: the like, comment or request is gone.
+    if (notice.check) {
+      const source = await tx.get(db.doc(notice.check.path));
+      const data = source.data();
+      if (!data || (notice.check.holds && !notice.check.holds(data))) return null;
+    }
     const before = previous?.exists ? previous.data() : undefined;
-    const count = before?.read === false ? Number(before.count ?? 1) + 1 : 1;
-    const push = shouldPush(before, Date.now(), notice.pushId !== undefined);
-    const text: Text = notice.text(prefs, count);
+    const unread = before?.read === false;
+    let count: number;
+    let text: Text;
+    let push: boolean;
+    let items: unknown;
+    if (notice.item && notice.itemKind) {
+      // Folded by distinct item: the same liker or requester again isn't
+      // one more, and doesn't buzz the phone again.
+      const repeat = unread && hasItem(before?.items, notice.item.key);
+      items = addItem(unread ? before?.items : [], notice.item);
+      count = (items as unknown[]).length;
+      text = itemText(notice.itemKind, items as never);
+      push = !repeat && shouldPush(before, Date.now(), notice.pushId !== undefined);
+    } else {
+      // Repeats fold into the unread entry and count up; a read one starts over.
+      // A repeat soon after the last push only updates the feed (shouldPush).
+      count = unread ? Number(before?.count ?? 1) + 1 : 1;
+      push = shouldPush(before, Date.now(), notice.pushId !== undefined);
+      text = notice.text(prefs, count);
+    }
     tx.set(entry, {
       category: notice.category,
       title: text.title,
@@ -54,10 +87,13 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
       read: false,
       count,
       pushedAt: push ? FieldValue.serverTimestamp() : (before?.pushedAt ?? null),
+      ...(notice.itemKind && { itemKind: notice.itemKind, items }),
       ...(notice.extra ?? {}),
     });
     return { text, push };
   });
+  if (!written) return;
+  const { text, push } = written;
   if (!push) return;
 
   const devices = await user.collection("devices").get();
@@ -103,4 +139,53 @@ async function deliverTo(db: Firestore, messaging: Messaging, uid: string, notic
       return undefined;
     }),
   );
+}
+
+/**
+ * Takes [key] back out of [uid]'s folded entry [entryId] (an unlike, a
+ * deleted comment, a request taken back or answered, an undone repost or
+ * follow): re-worded for what's left, or deleted when nothing is. Pushes
+ * already sent stay sent.
+ */
+export async function retract(
+  db: Firestore,
+  uid: string,
+  entryId: string,
+  key: string,
+  /**
+   * Left alone if this doc exists again (and [holds] for it): triggers
+   * aren't ordered, so an ask, take back, ask again must keep the request.
+   */
+  unless?: { path: string; holds?: (d: Data) => boolean },
+): Promise<void> {
+  const entry = db.doc(`users/${uid}/notifications/${entryId}`);
+  try {
+    await db.runTransaction(async (tx) => {
+      if (unless) {
+        const source = (await tx.get(db.doc(unless.path))).data();
+        if (source && (!unless.holds || unless.holds(source))) return;
+      }
+      const snap = await tx.get(entry);
+      const data = snap.data();
+      if (!data || !Array.isArray(data.items)) return;
+      const left = itemsWithout(data.items, key);
+      if (left.length === data.items.length) return;
+      if (left.length === 0) {
+        tx.delete(entry);
+        return;
+      }
+      const text = itemText(data.itemKind as ItemKind, left);
+      tx.update(entry, { items: left, count: left.length, title: text.title, body: text.body });
+    });
+  } catch (e) {
+    logger.error("Retract failed", { uid, entryId, error: String(e) });
+  }
+}
+
+/** Deletes [uid]'s entry [entryId] if there is one (its post is gone). */
+export async function removeEntry(db: Firestore, uid: string, entryId: string): Promise<void> {
+  await db
+    .doc(`users/${uid}/notifications/${entryId}`)
+    .delete()
+    .catch((e) => logger.error("Remove entry failed", { uid, entryId, error: String(e) }));
 }

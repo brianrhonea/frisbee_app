@@ -21,6 +21,7 @@ import { FirebaseMediaStorage } from "./media/storage.js";
 import { FirestoreTeamRepository } from "./teams/repository.js";
 import { LocalCipher, type PersonalCipher } from "./personal/cipher.js";
 import { KmsCipher } from "./personal/kms.js";
+import { webRevalidator } from "./web/revalidate.js";
 
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "frisbee-app-brianrhonea-dev";
 const firebase = initializeApp({ projectId });
@@ -73,6 +74,11 @@ const app = buildApp({
   me: { repo: new FirestoreMeRepository(db), imageUrl },
   calendar: new FirestoreCalendarRepository(db),
   publicUrl: process.env.PUBLIC_API_URL || undefined,
+  // The website's address: its cached public pages are expired on changes.
+  revalidate:
+    process.env.WEB_SITE_URL && process.env.WEB_SERVER_KEY
+      ? webRevalidator(process.env.WEB_SITE_URL, process.env.WEB_SERVER_KEY)
+      : undefined,
   browse: {
     repo: new FirestoreBrowseRepository(db),
     limiter: new FirestoreRateLimiter(db),

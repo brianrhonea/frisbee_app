@@ -121,6 +121,15 @@ export interface ProfilePage extends PostPage {
   profile: PublicProfile;
 }
 
+/**
+ * A player's profile as a signed-in member sees it (`GET /v1/players/:uid`):
+ * a private one in full for the player and the people they let follow
+ * them, else [locked] with only its card.
+ */
+export interface MemberProfilePage extends ProfilePage {
+  locked: boolean;
+}
+
 /** A team, group or school/club's directory listing. */
 export interface PublicListing {
   id: string;

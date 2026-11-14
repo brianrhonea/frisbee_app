@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addItem,
   commentCountChange,
   commentLikeNotice,
   commentNotice,
@@ -11,8 +12,13 @@ import {
   followAcceptedNotice,
   followKeys,
   followRequestNotice,
+  hasItem,
+  itemsWithout,
+  itemText,
   likeNotice,
+  maxItems,
   newLikers,
+  removedLikers,
   repostNotice,
   repostOf,
   postPreview,
@@ -138,7 +144,9 @@ describe("likes, reposts and followers", () => {
     const n = followerNotice({ followerId: "u9", name: "Riley", photoUrl: "https://x/p.png" });
     expect(n.category).toBe("social");
     expect(n.route).toBe("/players/u9");
-    expect(n.collapseId).toBeUndefined();
+    // One entry per follower, so unfollowing and following again isn't two.
+    expect(n.collapseId).toBe("follower_u9");
+    expect(n.item).toEqual({ key: "u9", name: "Riley", body: "" });
     expect(n.text({}, 1).title).toBe("Riley started following you");
     expect(n.extra).toEqual({ followBack: { uid: "u9", name: "Riley", photoUrl: "https://x/p.png" } });
   });
@@ -220,5 +228,91 @@ describe("comments", () => {
     expect(commentCountChange(true, false)).toBe(-1);
     expect(commentCountChange(true, true)).toBe(0);
     expect(commentCountChange(false, false)).toBe(0);
+  });
+});
+
+describe("folding by item", () => {
+  const sam = { key: "sam", name: "Sam", body: "Good throws" };
+  const ann = { key: "ann", name: "Ann", body: "Good throws" };
+
+  it("counts distinct items: the same liker again moves to the end, not one more", () => {
+    let items = addItem(undefined, sam);
+    items = addItem(items, ann);
+    items = addItem(items, sam);
+    expect(items.map((i) => i.key)).toEqual(["ann", "sam"]);
+    expect(hasItem(items, "sam")).toBe(true);
+    expect(hasItem(items, "zed")).toBe(false);
+    expect(itemText("likes", items)).toEqual({ title: "2 new likes on your post", body: "Good throws" });
+  });
+
+  it("re-words what's left when one is taken back, naming the newest", () => {
+    const left = itemsWithout([sam, ann], "ann");
+    expect(left).toEqual([sam]);
+    expect(itemText("likes", left).title).toBe("Sam liked your post");
+    expect(itemsWithout([sam], "sam")).toEqual([]);
+  });
+
+  it("tolerates entries from before items", () => {
+    expect(itemsWithout(undefined, "x")).toEqual([]);
+    expect(itemsWithout([{ nope: 1 }, null, sam], "x")).toEqual([sam]);
+    expect(addItem([{ junk: true }], ann)).toEqual([ann]);
+  });
+
+  it("keeps at most maxItems", () => {
+    let items = addItem(undefined, sam);
+    for (let i = 0; i < maxItems + 5; i++) items = addItem(items, { key: `u${i}`, name: "X", body: "" });
+    expect(items).toHaveLength(maxItems);
+    expect(items.at(-1)?.key).toBe(`u${maxItems + 4}`);
+  });
+
+  it("words every kind for one and for several", () => {
+    const one = [{ key: "c1", name: "Riley", body: "Nice" }];
+    const two = [...one, { key: "c2", name: "Pat", body: "Agreed" }];
+    expect(itemText("comments", one)).toEqual({ title: "Riley commented on your post", body: "Nice" });
+    expect(itemText("comments", two)).toEqual({ title: "2 new comments on your post", body: "Agreed" });
+    expect(itemText("replies", two).title).toBe("2 new replies to your comment");
+    expect(itemText("commentLikes", one).title).toBe("Riley liked your comment");
+    expect(itemText("followRequests", one).title).toBe("Riley wants to follow you");
+    expect(itemText("followRequests", two).title).toBe("2 people want to follow you");
+    expect(itemText("repost", one).title).toBe("Riley reposted your post");
+    expect(itemText("follower", one).title).toBe("Riley started following you");
+  });
+
+  it("finds likes taken back", () => {
+    expect(removedLikers({ likedBy: ["a", "b"] }, { likedBy: ["b"] })).toEqual(["a"]);
+    expect(removedLikers({ likedBy: ["a"] }, { likedBy: ["a", "c"] })).toEqual([]);
+    expect(removedLikers(undefined, { likedBy: ["a"] })).toEqual([]);
+  });
+
+  it("gives social notices their item and a check against undo races", () => {
+    const like = likeNotice({ postId: "p1", post: { body: "Good throws" }, likerName: "Sam", likerId: "sam" });
+    expect(like.itemKind).toBe("likes");
+    expect(like.item).toEqual({ key: "sam", name: "Sam", body: "Good throws" });
+    expect(like.check?.path).toBe("posts/p1");
+    expect(like.check?.holds?.({ likedBy: ["sam"] })).toBe(true);
+    expect(like.check?.holds?.({ likedBy: [] })).toBe(false);
+    // Without the liker's id: the old count-every-event entry.
+    expect(likeNotice({ postId: "p1", post: {}, likerName: "Sam" }).item).toBeUndefined();
+
+    const comment = commentNotice({ postId: "p1", post: {}, comment: { authorName: "Riley", body: "Nice" }, commentId: "c1" });
+    expect(comment.item).toEqual({ key: "c1", name: "Riley", body: "Nice" });
+    expect(comment.check?.path).toBe("posts/p1/comments/c1");
+
+    const reply = replyNotice({ postId: "p1", parentId: "c0", comment: { authorName: "Riley", body: "Yes" }, commentId: "c2" });
+    expect(reply.item?.key).toBe("c2");
+    expect(reply.itemKind).toBe("replies");
+
+    const cl = commentLikeNotice({ postId: "p1", commentId: "c1", comment: { body: "Nice" }, likerName: "Sam", likerId: "sam" });
+    expect(cl.itemKind).toBe("commentLikes");
+    expect(cl.check?.holds?.({ likedBy: ["sam"] })).toBe(true);
+
+    const request = followRequestNotice({ requesterId: "u9", name: "Riley", ownerId: "me" });
+    expect(request.item?.key).toBe("u9");
+    expect(request.check?.path).toBe("profiles/me/followRequests/u9");
+
+    const repost = repostNotice({ repostId: "r_p1_zed", repost: { authorName: "Zed", body: "Look!" } });
+    expect(repost.collapseId).toBe("repost_r_p1_zed");
+    expect(repost.item).toEqual({ key: "r_p1_zed", name: "Zed", body: "Look!" });
+    expect(repost.check?.path).toBe("posts/r_p1_zed");
   });
 });

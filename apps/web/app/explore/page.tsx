@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { ListingCard } from "@/components/ListingCard";
-import { getPublic } from "@/lib/api";
+import { getPublic, tags } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Explore",
@@ -15,7 +15,7 @@ type Props = { searchParams: Promise<{ q?: string | string[] }> };
 export default async function Explore({ searchParams }: Props) {
   const raw = (await searchParams).q;
   const q = (Array.isArray(raw) ? raw[0] : raw)?.trim().slice(0, 100) ?? "";
-  const results = q ? await getPublic<SearchPage>("/v1/public/search", { q }) : null;
+  const results = q ? await getPublic<SearchPage>("/v1/public/search", { q }, { tags: [tags.search] }) : null;
   return (
     <div className="page">
       <div className="page-head">

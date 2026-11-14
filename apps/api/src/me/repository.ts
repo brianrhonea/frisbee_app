@@ -23,6 +23,8 @@ export interface MeRepository {
   postsBy(authors: string[], before: number | null, limit: number): Promise<Doc[]>;
   /** One post (a repost's original); readable by anyone signed in. */
   post(id: string): Promise<Doc | null>;
+  /** Several profiles by uid (missing ones left out). */
+  profiles(ids: string[]): Promise<Map<string, Data>>;
 }
 
 const doc = (d: { id: string; data: () => Data | undefined }): Doc => ({ id: d.id, data: plain(d.data() ?? {}) as Data });
@@ -66,6 +68,13 @@ export class FirestoreMeRepository implements MeRepository {
   async post(id: string): Promise<Doc | null> {
     const snap = await this.db.doc(`posts/${id}`).get();
     return snap.exists ? { id: snap.id, data: plain(snap.data() ?? {}) as Data } : null;
+  }
+
+  async profiles(ids: string[]) {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map<string, Data>();
+    const snaps = await this.db.getAll(...unique.map((id) => this.db.doc(`profiles/${id}`)));
+    return new Map(snaps.filter((s) => s.exists).map((s) => [s.id, plain(s.data()) as Data]));
   }
 
   async postsBy(authors: string[], before: number | null, limit: number) {

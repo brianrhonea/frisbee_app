@@ -4,6 +4,42 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.9.1 — 2026-11-13
+
+Fixes from the two-person live test, for a more real-time feel. Needs API
+0.9.0 and the `notifications` functions from the same change.
+
+**Fixed**
+- **Private profiles for approved followers**: a player page showed "This
+  profile is private" even to people the player had accepted. Members now
+  see each player's page as the API builds it for them
+  (`/v1/players/:uid`, `components/PlayerPage.tsx`), so an accepted
+  follower sees the bio, stats and posts the moment the request is
+  accepted.
+- **Stale pages**: player and post pages were cached for a minute, so a
+  profile turned private or a post edited or deleted still showed. For
+  members, they're now refetched whenever the profile, the player's
+  posts, their own follow, or the post changes (Firestore listeners as
+  change signals, `useChangeSignal` in `lib/live.ts`); likes and reposts
+  by others update the counts too, and a deleted post says "This post was
+  deleted." For visitors, the API expires the cached copy at once through
+  the new `POST /api/revalidate` (shared `WEB_SERVER_KEY`; cache tags in
+  `lib/api.ts`). A private author's post page now asks visitors to log in
+  instead of showing "not found", and members who were approved see it.
+- **Notification links**: the website opened the app's route, so some
+  links were 404s (a follow request opened `/settings/follow-requests`).
+  Each now opens the website's page for it (`webRoute` in
+  `@stall10/shared`, tested against every route the functions send);
+  things only the app has open "Get the app".
+- **Notification counts** (the `notifications` functions): repeats by the
+  same person no longer count up, so asking to follow again, or liking,
+  unliking and liking, stays "Jordan wants to follow you" / "Jordan liked
+  your post". Undoing takes it back out: an unlike, a request taken back,
+  declined or accepted, a deleted comment, an undone repost or an
+  unfollow re-words the notification or removes it.
+- The career table and recent games on a player page follow the player's
+  "Show on my profile" switches, like the stat tiles.
+
 ## 0.9.0 — 2026-11-13
 
 Core features to match the app. Needs API 0.8.0.

@@ -208,6 +208,12 @@ sequenceDiagram
 - Public (no token; the website server): `GET /v1/public/feed`,
   `/players/:uid`, `/posts/:id`, `/teams/:id`, `/events`, `/search`.
   Visitors get one page (`next: null`); paging is for members.
+- Members' views of others (never cached): `GET /v1/players/:uid` → the
+  page as the caller may see it (a private profile in full for people it
+  approved, else `locked`); `GET /v1/posts/:id` → one post if the caller
+  may see it. Posts are readable by anyone signed in (rules), so these
+  keep privacy for the website; it refetches them on Firestore change
+  signals (`useChangeSignal`), so they feel live.
 - `GET /health` → `{ok, version}`; every response carries
   `x-stall10-api-version`.
 
@@ -320,7 +326,13 @@ In order of preference:
    per repository for API reads; images use the platform HTTP cache
    (Storage objects are served with a year-long `Cache-Control`).
 2. **HTTP.** API GETs send `Cache-Control` and `ETag` so clients and Vercel's
-   edge (for the website's public pages) can reuse answers.
+   edge (for the website's public pages) can reuse answers. The website's
+   public reads are tagged (`player:<uid>`, `post:<id>`, `posts`, `feed`,
+   `search`; `apps/web/lib/api.ts`) and kept up to 60 s, but the API
+   expires the tags the moment the data changes (`POST /api/revalidate`
+   on the site with `WEB_SERVER_KEY`, after profile and post writes;
+   `apps/api/src/web/revalidate.ts`, `WEB_SITE_URL`). Members don't see
+   the cache: their pages read the API live.
 3. **In the API.** A small in-memory LRU per instance for hot, public,
    read-mostly data (team pages, directory search), with short TTLs.
 4. **Shared cache** (Memorystore/Redis) only if instance caches stop being

@@ -6,7 +6,7 @@ import { EventItem } from "@/components/EventItem";
 import { HomeGate } from "@/components/HomeGate";
 import { LocalTime } from "@/components/LocalTime";
 import { PostCard } from "@/components/PostCard";
-import { getPublic } from "@/lib/api";
+import { getPublic, tags } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: { absolute: "Stall 10 — your ultimate team, in one place" },
@@ -29,7 +29,7 @@ export default async function Home() {
   // Rendered per request (the build has no API); the reads stay cached 60s.
   await connection();
   const [feed, upcoming] = await Promise.all([
-    getPublic<PostPage>("/v1/public/feed").catch(() => null),
+    getPublic<PostPage>("/v1/public/feed", undefined, { tags: [tags.feed] }).catch(() => null),
     getPublic<EventsPage>("/v1/public/events").catch(() => null),
   ]);
   const posts = feed?.posts.slice(0, previewPosts) ?? [];

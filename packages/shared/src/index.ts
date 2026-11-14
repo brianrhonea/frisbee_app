@@ -14,3 +14,4 @@ export * from "./personal.js";
 export * from "./messages.js";
 export * from "./calendar.js";
 export * from "./ical.js";
+export * from "./routes.js";

@@ -35,6 +35,7 @@ import { RosterService } from "./teams/roster.js";
 import { rosterRoutes, teamRoutes } from "./teams/routes.js";
 import { TeamService } from "./teams/service.js";
 import { apiVersion, versionHeader } from "./version.js";
+import { noRevalidate, type Revalidate } from "./web/revalidate.js";
 
 export interface AppDeps {
   verifier: TokenVerifier;
@@ -73,6 +74,8 @@ export interface AppDeps {
   ready?: () => Promise<void>;
   /** Groups request logs by Cloud Trace (X-Cloud-Trace-Context) when set. */
   traceProjectId?: string;
+  /** Expires the website's cached public pages after a change (WEB_SITE_URL); off when not given. */
+  revalidate?: Revalidate;
 }
 
 /**
@@ -119,16 +122,17 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     reply.header(versionHeader, apiVersion);
   });
   app.get("/health", async () => ({ ok: true, version: apiVersion }));
+  const revalidate = deps.revalidate ?? noRevalidate;
   teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now));
   if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now));
   if (deps.browse) browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now), deps.browse);
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
-    profileRoutes(app, new ProfileService(deps.store, deps.users));
+    profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);
     if (deps.personal) personalRoutes(app, new PersonalService(deps.store, deps.users, deps.personal, deps.now));
     rosterRoutes(app, new RosterService(deps.store));
-    postRoutes(app, new PostService(deps.store, deps.users, deps.now));
-    postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now));
+    postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate);
+    postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
     if (deps.calendar) {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {

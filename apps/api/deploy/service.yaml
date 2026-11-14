@@ -57,6 +57,11 @@ spec:
                 secretKeyRef:
                   name: web-server-key
                   key: latest
+            # The website (repository variable API_WEB_SITE_URL_<ENV>): with
+            # WEB_SERVER_KEY, the API expires its cached public pages the
+            # moment they change. Empty: they refresh within a minute.
+            - name: WEB_SITE_URL
+              value: "${WEB_SITE_URL}"
           resources:
             limits:
               cpu: "1"

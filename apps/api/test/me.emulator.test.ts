@@ -59,3 +59,26 @@ describe("dashboard on the emulator", () => {
     expect(more.next).toBeNull();
   });
 });
+
+describe("GET /v1/players/:uid against Firestore", () => {
+  const player = (uid: string, as: string) =>
+    app.inject({ method: "GET", url: `/v1/players/${uid}`, headers: { authorization: `Bearer token:${as}:Viewer` } });
+
+  it("locks a private profile until its owner accepts a follow, then shows its details and posts", async () => {
+    await db.doc("profiles/privU").set({ name: "Priv", username: "priv", private: true });
+    await db.doc("profiles/privU/private/details").set({ bio: "Hidden bio" });
+    await db.doc("posts/privPost").set({ authorId: "privU", body: "for followers", createdAt: ts(-5_000) });
+
+    let body = (await player("privU", "outsiderU")).json();
+    expect(body.locked).toBe(true);
+    expect(body.profile.bio).toBeUndefined();
+    expect(body.posts).toEqual([]);
+
+    await db.doc("users/outsiderU/follows/user_privU").set({ key: "user_privU", type: "user", targetId: "privU", approved: true });
+    body = (await player("privU", "outsiderU")).json();
+    expect(body.locked).toBe(false);
+    expect(body.profile).toMatchObject({ private: true, bio: "Hidden bio" });
+    expect(body.posts.map((p: { id: string }) => p.id)).toEqual(["privPost"]);
+  });
+});
+

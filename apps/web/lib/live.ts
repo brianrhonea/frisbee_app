@@ -99,6 +99,33 @@ export function useLiveQuery<T = DocumentData>(
   return state;
 }
 
+/** Something to watch for changes: a document, or a query on a collection. */
+export type Signal = { doc: string } | { collection: string; constraints: QueryConstraint[] };
+
+/**
+ * A number that goes up each time any of [signals] changes (once on
+ * subscribing too): a cue to refetch a view the API builds, for pages
+ * whose privacy rules live in the API rather than firestore.rules. [key]
+ * names the set, so it re-subscribes only when that changes. A signal the
+ * rules refuse is just never heard from.
+ */
+export function useChangeSignal(signals: Signal[] | null, key: string): number {
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const db = firestoreDb();
+    if (!signals || !db) return;
+    const bump = () => setVersion((v) => v + 1);
+    const stops = signals.map((s) =>
+      "doc" in s
+        ? onSnapshot(doc(db, s.doc), bump, () => undefined)
+        : onSnapshot(query(collection(db, s.collection), ...s.constraints), bump, () => undefined),
+    );
+    return () => stops.forEach((stop) => stop());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- [key] stands for signals.
+  }, [key]);
+  return version;
+}
+
 /**
  * Several queries on collection [path], merged by id: for reads the rules
  * allow only one audience id at a time (chat rooms, a community's events),

@@ -5,7 +5,7 @@ import { connection } from "next/server";
 import { ForVisitors } from "@/components/ForVisitors";
 import { MoreFeed } from "@/components/MoreFeed";
 import { PostCard } from "@/components/PostCard";
-import { getPublic } from "@/lib/api";
+import { getPublic, tags } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Community",
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default async function Community() {
   // Per request, not at build (no API then); the read stays cached 60s.
   await connection();
-  const page = await getPublic<PostPage>("/v1/public/feed");
+  const page = await getPublic<PostPage>("/v1/public/feed", undefined, { tags: [tags.feed] });
   // Members read on from the last post shown.
   const last = page.posts.at(-1)?.createdAt;
   const before = last ? Date.parse(last) : null;

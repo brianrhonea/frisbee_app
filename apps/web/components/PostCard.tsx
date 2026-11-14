@@ -1,7 +1,7 @@
 "use client";
 import { type PublicPost, type WorkoutActivity, workoutActivityLabels } from "@stall10/shared";
 import Link from "next/link";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
@@ -174,6 +174,12 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
   const [deleted, setDeleted] = useState(false);
   const [showComments, setShowComments] = useState(standalone);
   const [error, setError] = useState<string | null>(null);
+  // A live page passes the post again when it changes (an edit elsewhere,
+  // new counts); keep what's being edited here.
+  useEffect(() => {
+    if (!editing) setPost(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new post from the page.
+  }, [initial]);
 
   if (deleted) return null;
   const mine = !!user && user.uid === post.authorId;

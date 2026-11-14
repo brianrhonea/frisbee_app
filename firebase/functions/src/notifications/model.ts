@@ -242,6 +242,76 @@ export interface Notice {
    * into the last. The feed entry still folds.
    */
   pushId?: string;
+  /**
+   * Fold by distinct item (a liker, a comment, a request) instead of by
+   * event: the entry keeps its items, counts them, and an undo takes one
+   * back out (retract in deliver.ts). Worded by [itemText], not [text].
+   */
+  item?: NoticeItem;
+  itemKind?: ItemKind;
+  /**
+   * Written only if this doc still exists (and [holds] for it) inside the
+   * delivery transaction: an undo that raced the trigger isn't brought back.
+   */
+  check?: { path: string; holds?: (d: Data) => boolean };
+}
+
+/** One thing a folded entry counts: a liker, a comment, a follow request. */
+export interface NoticeItem {
+  key: string;
+  name: string;
+  body: string;
+}
+
+export type ItemKind = "likes" | "comments" | "replies" | "commentLikes" | "followRequests" | "repost" | "follower";
+
+/** Most items one entry keeps (the count stops there too). */
+export const maxItems = 50;
+
+/** How a folded entry reads for its items, oldest first. */
+export function itemText(kind: ItemKind, items: NoticeItem[]): Text {
+  const n = items.length;
+  const last = items[n - 1];
+  const name = last?.name || "Someone";
+  const body = last?.body ?? "";
+  switch (kind) {
+    case "likes":
+      return { title: n > 1 ? `${n} new likes on your post` : `${name} liked your post`, body };
+    case "comments":
+      return { title: n > 1 ? `${n} new comments on your post` : `${name} commented on your post`, body };
+    case "replies":
+      return { title: n > 1 ? `${n} new replies to your comment` : `${name} replied to your comment`, body };
+    case "commentLikes":
+      return { title: n > 1 ? `${n} new likes on your comment` : `${name} liked your comment`, body };
+    case "followRequests":
+      return {
+        title: n > 1 ? `${n} people want to follow you` : `${name} wants to follow you`,
+        body: "Accept or decline in Settings.",
+      };
+    case "repost":
+      return { title: `${name} reposted your post`, body };
+    case "follower":
+      return { title: `${name} started following you`, body: "" };
+  }
+}
+
+function isItem(i: unknown): i is NoticeItem {
+  return !!i && typeof i === "object" && typeof (i as NoticeItem).key === "string";
+}
+
+/** Stored items without [key]; an entry from before items has none. */
+export function itemsWithout(raw: unknown, key: string): NoticeItem[] {
+  return Array.isArray(raw) ? raw.filter((i): i is NoticeItem => isItem(i) && i.key !== key) : [];
+}
+
+/** [item] added to an entry's items (moved to the end if already there), newest last, capped. */
+export function addItem(raw: unknown, item: NoticeItem): NoticeItem[] {
+  return [...itemsWithout(raw, item.key), item].slice(-maxItems);
+}
+
+/** Whether the items already count [key] (a repeat: no new push). */
+export function hasItem(raw: unknown, key: string): boolean {
+  return Array.isArray(raw) && raw.some((i) => isItem(i) && i.key === key);
 }
 
 const eventTypes: Record<string, string> = {
@@ -662,19 +732,35 @@ export function userPostNotice(a: { postId: string; post: Data }): Notice {
 
 /** People who liked [after] since [before], other than its author. */
 export function newLikers(before: Data | undefined, after: Data | undefined): string[] {
-  const list = (d?: Data) => (Array.isArray(d?.likedBy) ? (d.likedBy as unknown[]).map(String) : []);
-  const had = new Set(list(before));
+  const had = new Set(likedBy(before));
   const authorId = String(after?.authorId ?? "");
-  return [...new Set(list(after))].filter((uid) => !had.has(uid) && uid !== authorId);
+  return [...new Set(likedBy(after))].filter((uid) => !had.has(uid) && uid !== authorId);
+}
+
+/** Who a post's or comment's likes come from. */
+export function likedBy(d?: Data): string[] {
+  return Array.isArray(d?.likedBy) ? (d.likedBy as unknown[]).map(String) : [];
+}
+
+/** Likers who took their like back between [before] and [after]. */
+export function removedLikers(before: Data | undefined, after: Data | undefined): string[] {
+  const now = new Set(likedBy(after));
+  return [...new Set(likedBy(before))].filter((uid) => !now.has(uid));
 }
 
 /** Someone liked your post; likes on one post fold into one entry. */
-export function likeNotice(a: { postId: string; post: Data; likerName: string }): Notice {
+export function likeNotice(a: { postId: string; post: Data; likerName: string; likerId?: string }): Notice {
   const name = a.likerName || "Someone";
+  const likerId = a.likerId;
   return {
     category: "social",
     route: `/posts/${a.postId}`,
     collapseId: `likes_${a.postId}`,
+    ...(likerId && {
+      itemKind: "likes" as const,
+      item: { key: likerId, name, body: postPreview(a.post) },
+      check: { path: `posts/${a.postId}`, holds: (d: Data) => likedBy(d).includes(likerId) },
+    }),
     text: (_, count) => ({
       title: count > 1 ? `${count} new likes on your post` : `${name} liked your post`,
       body: postPreview(a.post),
@@ -688,13 +774,18 @@ export function commentCountChange(existedBefore: boolean, existsAfter: boolean)
 }
 
 /** Someone commented on your post; comments on one post fold together. */
-export function commentNotice(a: { postId: string; post: Data; comment: Data }): Notice {
+export function commentNotice(a: { postId: string; post: Data; comment: Data; commentId?: string }): Notice {
   const name = String(a.comment.authorName ?? "") || "Someone";
   const text = String(a.comment.body ?? "").trim().replace(/\s+/g, " ");
   return {
     category: "social",
     route: `/posts/${a.postId}`,
     collapseId: `comments_${a.postId}`,
+    ...(a.commentId && {
+      itemKind: "comments" as const,
+      item: { key: a.commentId, name, body: clip(text, 120) },
+      check: { path: `posts/${a.postId}/comments/${a.commentId}` },
+    }),
     text: (_, count) => ({
       title: count > 1 ? `${count} new comments on your post` : `${name} commented on your post`,
       body: clip(text, 120),
@@ -703,13 +794,18 @@ export function commentNotice(a: { postId: string; post: Data; comment: Data }):
 }
 
 /** Someone replied to your comment; replies to one comment fold together. */
-export function replyNotice(a: { postId: string; parentId: string; comment: Data }): Notice {
+export function replyNotice(a: { postId: string; parentId: string; comment: Data; commentId?: string }): Notice {
   const name = String(a.comment.authorName ?? "") || "Someone";
   const text = String(a.comment.body ?? "").trim().replace(/\s+/g, " ");
   return {
     category: "social",
     route: `/posts/${a.postId}`,
     collapseId: `replies_${a.postId}_${a.parentId}`,
+    ...(a.commentId && {
+      itemKind: "replies" as const,
+      item: { key: a.commentId, name, body: clip(text, 120) },
+      check: { path: `posts/${a.postId}/comments/${a.commentId}` },
+    }),
     text: (_, count) => ({
       title: count > 1 ? `${count} new replies to your comment` : `${name} replied to your comment`,
       body: clip(text, 120),
@@ -718,13 +814,25 @@ export function replyNotice(a: { postId: string; parentId: string; comment: Data
 }
 
 /** Someone liked your comment; likes on one comment fold together. */
-export function commentLikeNotice(a: { postId: string; commentId: string; comment: Data; likerName: string }): Notice {
+export function commentLikeNotice(a: {
+  postId: string;
+  commentId: string;
+  comment: Data;
+  likerName: string;
+  likerId?: string;
+}): Notice {
   const name = a.likerName || "Someone";
   const text = String(a.comment.body ?? "").trim().replace(/\s+/g, " ");
+  const likerId = a.likerId;
   return {
     category: "social",
     route: `/posts/${a.postId}`,
     collapseId: `commentLikes_${a.postId}_${a.commentId}`,
+    ...(likerId && {
+      itemKind: "commentLikes" as const,
+      item: { key: likerId, name, body: clip(text, 120) },
+      check: { path: `posts/${a.postId}/comments/${a.commentId}`, holds: (d: Data) => likedBy(d).includes(likerId) },
+    }),
     text: (_, count) => ({
       title: count > 1 ? `${count} new likes on your comment` : `${name} liked your comment`,
       body: clip(text, 120),
@@ -753,6 +861,11 @@ export function repostNotice(a: { repostId: string; repost: Data; original?: Dat
   return {
     category: "social",
     route: `/posts/${a.repostId}`,
+    // One entry per repost, so undoing it takes the entry back.
+    collapseId: `repost_${a.repostId}`,
+    itemKind: "repost",
+    item: { key: a.repostId, name, body: note ? clip(note, 120) : a.original ? postPreview(a.original) : "" },
+    check: { path: `posts/${a.repostId}` },
     text: () => ({
       title: `${name} reposted your post`,
       body: note ? clip(note, 120) : a.original ? postPreview(a.original) : "",
@@ -761,24 +874,39 @@ export function repostNotice(a: { repostId: string; repost: Data; original?: Dat
 }
 
 /** Someone started following you, with a way to follow them back. */
-export function followerNotice(a: { followerId: string; name: string; photoUrl?: string | null }): Notice {
+export function followerNotice(a: {
+  followerId: string;
+  name: string;
+  photoUrl?: string | null;
+  /** The follow doc; unfollowing before the entry is written means none. */
+  followPath?: string;
+}): Notice {
   const name = a.name || "Someone";
   return {
     category: "social",
     route: `/players/${a.followerId}`,
+    // One entry per follower: following, unfollowing and following again isn't two.
+    collapseId: `follower_${a.followerId}`,
+    itemKind: "follower",
+    item: { key: a.followerId, name, body: "" },
+    ...(a.followPath && { check: { path: a.followPath } }),
     text: () => ({ title: `${name} started following you`, body: "" }),
     extra: { followBack: { uid: a.followerId, name, photoUrl: a.photoUrl ?? null } },
   };
 }
 
 /** Someone asked to follow a private profile: its owner hears. */
-export function followRequestNotice(a: { requesterId: string; name: string }): Notice {
+export function followRequestNotice(a: { requesterId: string; name: string; ownerId?: string }): Notice {
   const name = a.name || "Someone";
   return {
     category: "social",
     route: "/settings/follow-requests",
-    // Several waiting fold into one entry.
+    // Several waiting fold into one entry, counted by person; one taken
+    // back, declined or accepted drops out (retract).
     collapseId: "followRequests",
+    itemKind: "followRequests",
+    item: { key: a.requesterId, name, body: "" },
+    ...(a.ownerId && { check: { path: `profiles/${a.ownerId}/followRequests/${a.requesterId}` } }),
     text: (_, count) =>
       count > 1
         ? { title: `${count} people want to follow you`, body: "Accept or decline in Settings." }

@@ -1,6 +1,7 @@
-import type { MeHome, MyEvent, MyTeam, PublicImage, PublicPost, PublicProfile } from "@stall10/shared";
+import type { MeHome, MemberProfilePage, MyEvent, MyTeam, PublicImage, PublicPost, PublicProfile } from "@stall10/shared";
 import type { Caller } from "../auth.js";
-import { eventView, parseBefore, postView, profileView } from "../browse/model.js";
+import { ApiError } from "../errors.js";
+import { eventView, isPrivateProfile, parseBefore, postAuthors, postView, profileView, validId } from "../browse/model.js";
 import type { Data, Doc } from "../browse/repository.js";
 import { nextCursor, originalsOf, withOriginal } from "../browse/reposts.js";
 import { can, isOrg, kindOf, mapOf, roleIn, strings } from "../teams/access.js";
@@ -118,5 +119,70 @@ export class MeService {
     const originals = await originalsOf(docs, (id) => this.repo.post(id));
     const posts = docs.map((d) => withOriginal(show(d), d, originals, show));
     return { posts, next: nextCursor(docs, feedPageSize) };
+  }
+
+  /**
+   * Whom [viewer] may see the posts and full profile of: themselves,
+   * public profiles, and private ones they follow (a follow of a private
+   * profile needs its owner's OK). Posts are readable by anyone signed in
+   * (firestore.rules), so this is where privacy is kept for members.
+   */
+  private async visibility(viewer: string, authors: string[], known?: Set<string>) {
+    const [followed, profiles] = await Promise.all([
+      known ? [...known] : this.repo.followedUsers(viewer),
+      this.repo.profiles(authors),
+    ]);
+    const follows = new Set(followed);
+    return {
+      follows,
+      profiles,
+      sees: (uid: string) => uid === viewer || follows.has(uid) || !isPrivateProfile(profiles.get(uid)),
+    };
+  }
+
+  /** [docs] the viewer may see (every author, a repost's original's too), with originals. */
+  private async visiblePosts(viewer: string, docs: Doc[], follows?: Set<string>): Promise<PublicPost[]> {
+    const originals = await originalsOf(docs, (id) => this.repo.post(id));
+    const authors = [...docs, ...[...originals.values()].filter((d): d is Doc => d !== null)].flatMap((d) =>
+      postAuthors(d.data),
+    );
+    const { sees } = await this.visibility(viewer, authors, follows);
+    const show = (d: Doc) => {
+      const view = postView(d.data);
+      return { ...view, id: d.id, images: this.images(view.images) } as PublicPost;
+    };
+    return docs
+      .filter((d) => postAuthors(d.data).every(sees))
+      .map((d) => withOriginal(show(d), d, originals, (o) => (postAuthors(o.data).every(sees) ? show(o) : null) as PublicPost));
+  }
+
+  /** A player's page for a signed-in member (`GET /v1/players/:uid`). Never cached. */
+  async player(caller: Caller, uid: unknown, before?: unknown): Promise<MemberProfilePage> {
+    if (!validId(uid)) throw new ApiError("not_found", "No such player.");
+    const { follows, profiles, sees } = await this.visibility(caller.uid, [uid]);
+    const data = profiles.get(uid);
+    if (!data) throw new ApiError("not_found", "No such player.");
+    const isPrivate = data.private === true;
+    if (!sees(uid)) {
+      return { profile: { ...profileView(data), id: uid } as PublicProfile, posts: [], next: null, locked: true };
+    }
+    const hidden = isPrivate ? await this.repo.privateDetails(uid) : null;
+    const view = profileView({ ...data, ...(hidden ?? {}), private: false });
+    const docs = await this.repo.postsBy([uid], parseBefore(before), feedPageSize);
+    return {
+      profile: { ...view, id: uid, private: isPrivate } as PublicProfile,
+      posts: await this.visiblePosts(caller.uid, docs, follows),
+      next: nextCursor(docs, feedPageSize),
+      locked: false,
+    };
+  }
+
+  /** One post for a signed-in member (`GET /v1/posts/:id`), if they may see it. Never cached. */
+  async onePost(caller: Caller, id: unknown): Promise<PublicPost> {
+    if (!validId(id)) throw new ApiError("not_found", "No such post.");
+    const d = await this.repo.post(id);
+    const [shown] = d ? await this.visiblePosts(caller.uid, [d]) : [];
+    if (!shown) throw new ApiError("not_found", d ? "Only people they approve see this post." : "This post was deleted.");
+    return shown;
   }
 }

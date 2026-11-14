@@ -1,4 +1,5 @@
 "use client";
+import { webRoute } from "@stall10/shared";
 import { limit, orderBy, where } from "firebase/firestore";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -48,11 +49,9 @@ function inFilter(n: Notice, f: Filter) {
   }
 }
 
-/** Where a notification goes on the website: the app's route, which the site shares for most pages. */
+/** Where a notification goes on the website: the site's page for the app's route. */
 function href(n: Notice): string | null {
-  const r = n.route;
-  if (!r || !r.startsWith("/")) return null;
-  return r;
+  return webRoute(n.route);
 }
 
 /** The member's unread notifications, for the sidebar badge. */

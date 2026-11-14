@@ -17,6 +17,9 @@
 #   API_CORS_ORIGINS_DEV/_PROD  browser origins allowed to call the API
 #   API_ENFORCE_APP_CHECK_DEV/_PROD   "true" to turn away requests without App Check
 #   API_MAX_INSTANCES_DEV/_PROD       instance cap (3 dev, 10 prod)
+#   API_WEB_SITE_URL_DEV/_PROD  the website's address (https://…), so the API
+#                               expires its cached public pages on changes;
+#                               unset, they refresh within a minute
 #   GCP_WIF_PROVIDER_DEV/_PROD, GCP_DEPLOYER_SA_DEV/_PROD
 
 name: Deploy API (shared)
@@ -76,6 +79,8 @@ jobs:
           APP_CHECK_PROD: ${{ vars.API_ENFORCE_APP_CHECK_PROD }}
           MAX_DEV: ${{ vars.API_MAX_INSTANCES_DEV }}
           MAX_PROD: ${{ vars.API_MAX_INSTANCES_PROD }}
+          SITE_DEV: ${{ vars.API_WEB_SITE_URL_DEV }}
+          SITE_PROD: ${{ vars.API_WEB_SITE_URL_PROD }}
           WIF_DEV: ${{ vars.GCP_WIF_PROVIDER_DEV }}
           WIF_PROD: ${{ vars.GCP_WIF_PROVIDER_PROD }}
           SA_DEV: ${{ vars.GCP_DEPLOYER_SA_DEV }}
@@ -87,15 +92,17 @@ jobs:
           case "$ENVIRONMENT" in
             dev)  project=frisbee-app-brianrhonea-dev; cors="$CORS_DEV"
                   appcheck="${APP_CHECK_DEV:-false}"; max="${MAX_DEV:-3}"
-                  wif="$WIF_DEV"; sa="$SA_DEV" ;;
+                  wif="$WIF_DEV"; sa="$SA_DEV"; site="$SITE_DEV" ;;
             prod) project=frisbee-app-brianrhonea; cors="$CORS_PROD"
                   appcheck="${APP_CHECK_PROD:-false}"; max="${MAX_PROD:-10}"
-                  wif="$WIF_PROD"; sa="$SA_PROD" ;;
+                  wif="$WIF_PROD"; sa="$SA_PROD"; site="$SITE_PROD" ;;
             *) echo "::error::environment must be dev or prod"; exit 1 ;;
           esac
           # An unset variable reads as empty: dev falls back to localhost.
           [ "$ENVIRONMENT" = dev ] && [ -z "$cors" ] && cors=http://localhost:3000
           [ -z "$cors" ] && echo "::warning::API_CORS_ORIGINS_${ENVIRONMENT^^} is empty: no website can call the API from a browser."
+          [ -z "$site" ] && echo "::notice::API_WEB_SITE_URL_${ENVIRONMENT^^} is empty: the website's cached pages refresh within a minute instead of at once."
+          case "$site" in ""|https://*) ;; *) echo "::error::API_WEB_SITE_URL_* must start with https://"; exit 1 ;; esac
           case "$appcheck" in true|false) ;; *) echo "::error::API_ENFORCE_APP_CHECK_* must be true or false"; exit 1 ;; esac
           if [ -n "$wif" ]; then
             [ -n "$sa" ] || { echo "::error::GCP_WIF_PROVIDER_${ENVIRONMENT^^} is set but GCP_DEPLOYER_SA_${ENVIRONMENT^^} isn't."; exit 1; }
@@ -115,6 +122,7 @@ jobs:
             echo "cors=$cors"
             echo "appcheck=$appcheck"
             echo "max=$max"
+            echo "site=$site"
             echo "auth=$auth"
             echo "wif=$wif"
             echo "sa=$sa"
@@ -176,13 +184,14 @@ jobs:
           CORS_ORIGINS: ${{ steps.cfg.outputs.cors }}
           ENFORCE_APP_CHECK: ${{ steps.cfg.outputs.appcheck }}
           MAX_INSTANCES: ${{ steps.cfg.outputs.max }}
+          WEB_SITE_URL: ${{ steps.cfg.outputs.site }}
           IMAGE: ${{ inputs.image || steps.build.outputs.image }}
           REPO: ${{ steps.cfg.outputs.repo }}
         run: |
           case "$IMAGE" in "$REPO@sha256:"*) ;; *)
             echo "::error::Not an image digest from $REPO: '$IMAGE'"; exit 1 ;;
           esac
-          vars='${REGION} ${PROJECT_ID} ${RUNTIME_SA} ${IMAGE} ${CORS_ORIGINS} ${ENFORCE_APP_CHECK} ${MAX_INSTANCES}'
+          vars='${REGION} ${PROJECT_ID} ${RUNTIME_SA} ${IMAGE} ${CORS_ORIGINS} ${ENFORCE_APP_CHECK} ${MAX_INSTANCES} ${WEB_SITE_URL}'
           envsubst "$vars" < apps/api/deploy/service.yaml > "$RUNNER_TEMP/service.yaml"
           cat "$RUNNER_TEMP/service.yaml"
           gcloud run services replace "$RUNNER_TEMP/service.yaml" \

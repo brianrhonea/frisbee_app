@@ -10,7 +10,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 const day = 86_400_000;
 
 class FakeMe implements MeRepository {
-  profiles = new Map<string, Data>();
+  people = new Map<string, Data>();
   hidden = new Map<string, Data>();
   teams: Doc[] = [];
   events = new Map<string, Doc[]>();
@@ -19,7 +19,7 @@ class FakeMe implements MeRepository {
   asked: { authors: string[]; before: number | null }[] = [];
 
   async profile(uid: string) {
-    return this.profiles.get(uid) ?? null;
+    return this.people.get(uid) ?? null;
   }
   async privateDetails(uid: string) {
     return this.hidden.get(uid) ?? null;
@@ -41,6 +41,9 @@ class FakeMe implements MeRepository {
   }
   async post(id: string) {
     return this.posts.find((p) => p.id === id) ?? null;
+  }
+  async profiles(ids: string[]) {
+    return new Map(ids.filter((id) => this.people.has(id)).map((id) => [id, this.people.get(id)!] as const));
   }
 }
 
@@ -87,7 +90,7 @@ describe("GET /v1/me/home", () => {
   });
 
   it("shows their own private profile in full, with the private details", async () => {
-    t.repo.profiles.set("me", { name: "Pat", username: "pat", private: true, keywords: ["pat"] });
+    t.repo.people.set("me", { name: "Pat", username: "pat", private: true, keywords: ["pat"] });
     t.repo.hidden.set("me", { bio: "secret bio", hometown: "Austin" });
     const { profile } = (await t.get("/v1/me/home", "me")).json();
     expect(profile).toMatchObject({ id: "me", name: "Pat", username: "pat", private: true, bio: "secret bio", hometown: "Austin", needsUsername: false });

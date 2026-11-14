@@ -7,6 +7,7 @@ import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 import {
   onDocumentCreated,
+  onDocumentDeleted,
   onDocumentUpdated,
   onDocumentWritten,
   onDocumentWrittenWithAuthContext,
@@ -15,7 +16,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { invitees, type MeetingDoc, meetingChange, type MeetingTeam, startedRecipients } from "../meetings/model";
 import { isLeagueGameEvent } from "../tournaments/model";
-import { deliver } from "./deliver";
+import { deliver, removeEntry, retract } from "./deliver";
 import { draftDeliveries, signupDecisionNotice } from "./league";
 import {
   chatNotice,
@@ -41,7 +42,9 @@ import {
   followAcceptedNotice,
   followRequestNotice,
   likeNotice,
+  likedBy,
   newLikers,
+  removedLikers,
   playNotice,
   postRecipients,
   replyNotice,
@@ -357,14 +360,21 @@ export const postLiked = onDocumentUpdated("posts/{postId}", async (event) => {
   const after = event.data?.after.data();
   if (!after) return;
   const authorId = String(after.authorId ?? "");
+  const { postId } = event.params;
   for (const uid of newLikers(before, after)) {
     const liker = await profileOf(uid);
     await deliver(
       getFirestore(),
       getMessaging(),
       [authorId],
-      likeNotice({ postId: event.params.postId, post: after, likerName: liker.name }),
+      likeNotice({ postId, post: after, likerName: liker.name, likerId: uid }),
     );
+  }
+  for (const uid of removedLikers(before, after)) {
+    await retract(getFirestore(), authorId, `likes_${postId}`, uid, {
+      path: `posts/${postId}`,
+      holds: (d) => likedBy(d).includes(uid),
+    });
   }
 });
 
@@ -383,7 +393,24 @@ export const newFollower = onDocumentCreated("users/{uid}/follows/{key}", async 
     return;
   }
   const follower = await profileOf(followerId);
-  await deliver(getFirestore(), getMessaging(), [target], followerNotice({ followerId, ...follower }));
+  await deliver(
+    getFirestore(),
+    getMessaging(),
+    [target],
+    followerNotice({ followerId, ...follower, followPath: `users/${followerId}/follows/${event.params.key}` }),
+  );
+});
+
+/** An unfollow takes back the "started following you" entry. */
+export const followRemoved = onDocumentDeleted("users/{uid}/follows/{key}", async (event) => {
+  const follow = event.data?.data();
+  if (!follow || follow.type !== "user") return;
+  const target = String(follow.targetId ?? "");
+  const followerId = event.params.uid;
+  if (!target || target === followerId) return;
+  await retract(getFirestore(), target, `follower_${followerId}`, followerId, {
+    path: `users/${followerId}/follows/${event.params.key}`,
+  });
 });
 
 /** Someone asked to follow a private profile. */
@@ -396,10 +423,22 @@ export const followRequest = onDocumentCreated(
       getFirestore(),
       getMessaging(),
       [event.params.uid],
-      followRequestNotice({ requesterId: event.params.requesterId, name: String(request.name ?? "") }),
+      followRequestNotice({
+        requesterId: event.params.requesterId,
+        name: String(request.name ?? ""),
+        ownerId: event.params.uid,
+      }),
     );
   },
 );
+
+/** A request taken back, declined or accepted drops out of the owner's entry. */
+export const followRequestRemoved = onDocumentDeleted("profiles/{uid}/followRequests/{requesterId}", async (event) => {
+  const { uid, requesterId } = event.params;
+  await retract(getFirestore(), uid, "followRequests", requesterId, {
+    path: `profiles/${uid}/followRequests/${requesterId}`,
+  });
+});
 
 /**
  * Someone commented on a post: its author hears, unless it's their own.
@@ -420,10 +459,32 @@ export const postCommented = onDocumentCreated("posts/{postId}/comments/{comment
     commentAuthorId: String(comment.authorId ?? ""),
     parentAuthorId: parent ? String(parent.authorId ?? "") : undefined,
   });
-  if (to.postAuthor) await deliver(db, getMessaging(), [postAuthorId], commentNotice({ postId, post, comment }));
-  if (to.parentAuthor && parent && parentId) {
-    await deliver(db, getMessaging(), [String(parent.authorId)], replyNotice({ postId, parentId, comment }));
+  const { commentId } = event.params;
+  if (to.postAuthor) {
+    await deliver(db, getMessaging(), [postAuthorId], commentNotice({ postId, post, comment, commentId }));
   }
+  if (to.parentAuthor && parent && parentId) {
+    await deliver(db, getMessaging(), [String(parent.authorId)], replyNotice({ postId, parentId, comment, commentId }));
+  }
+});
+
+/**
+ * A deleted comment comes out of the post author's comments entry and the
+ * parent author's replies entry; its own likes entry goes.
+ */
+export const commentRemoved = onDocumentDeleted("posts/{postId}/comments/{commentId}", async (event) => {
+  const comment = event.data?.data();
+  if (!comment) return;
+  const { postId, commentId } = event.params;
+  const db = getFirestore();
+  const post = (await db.doc(`posts/${postId}`).get()).data();
+  if (post?.authorId) await retract(db, String(post.authorId), `comments_${postId}`, commentId);
+  const parentId = typeof comment.parentId === "string" ? comment.parentId : undefined;
+  if (parentId) {
+    const parent = (await db.doc(`posts/${postId}/comments/${parentId}`).get()).data();
+    if (parent?.authorId) await retract(db, String(parent.authorId), `replies_${postId}_${parentId}`, commentId);
+  }
+  if (comment.authorId) await removeEntry(db, String(comment.authorId), `commentLikes_${postId}_${commentId}`);
 });
 
 /** Someone liked a comment: its author hears, likes on one comment folded together. */
@@ -439,9 +500,35 @@ export const commentLiked = onDocumentUpdated("posts/{postId}/comments/{commentI
       getFirestore(),
       getMessaging(),
       [authorId],
-      commentLikeNotice({ postId, commentId, comment: after, likerName: liker.name }),
+      commentLikeNotice({ postId, commentId, comment: after, likerName: liker.name, likerId: uid }),
     );
   }
+  for (const uid of removedLikers(before, after)) {
+    await retract(getFirestore(), authorId, `commentLikes_${postId}_${commentId}`, uid, {
+      path: `posts/${postId}/comments/${commentId}`,
+      holds: (d) => likedBy(d).includes(uid),
+    });
+  }
+});
+
+/**
+ * A deleted post: an undone repost comes out of the original author's
+ * feed; an original's like and comment entries go with it.
+ */
+export const postRemoved = onDocumentDeleted("posts/{postId}", async (event) => {
+  const post = event.data?.data();
+  if (!post) return;
+  const { postId } = event.params;
+  const db = getFirestore();
+  const reposted = repostOf(post);
+  if (reposted?.authorId) {
+    // A repost's id is the same each time (r_<original>_<reposter>).
+    await retract(db, reposted.authorId, `repost_${postId}`, postId, { path: `posts/${postId}` });
+    return;
+  }
+  const authorId = String(post.authorId ?? "");
+  if (!authorId) return;
+  await Promise.all([removeEntry(db, authorId, `likes_${postId}`), removeEntry(db, authorId, `comments_${postId}`)]);
 });
 
 /**
