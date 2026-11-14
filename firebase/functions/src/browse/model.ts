@@ -95,7 +95,7 @@ export function isPrivateProfile(profile: Data | undefined): boolean {
  * follow the player's own visibility settings.
  */
 export function profileView(profile: Data): Data {
-  const card = pick(profile, ["name", "photoUrl", "username"]);
+  const card = pick(profile, ["name", "photoUrl", "headerUrl", "username"]);
   if (profile.private === true) return { ...card, private: true };
   const visibility = (profile.visibility ?? {}) as Data;
   const shows = (k: string) => visibility[k] !== false;

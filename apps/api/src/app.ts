@@ -1,5 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import { registerWriteLimits } from "./limits/writes.js";
+import { accountRoutes } from "./account/routes.js";
+import { AccountService } from "./account/service.js";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
@@ -139,6 +141,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
     profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);
+    accountRoutes(app, new AccountService(deps.store, deps.users, deps.media), revalidate);
     if (deps.personal) personalRoutes(app, new PersonalService(deps.store, deps.users, deps.personal, deps.now));
     rosterRoutes(app, new RosterService(deps.store));
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate);

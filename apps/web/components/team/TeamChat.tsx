@@ -1,4 +1,5 @@
 "use client";
+import { MuteButton } from "../MuteButton";
 import { limit, orderBy, where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -164,6 +165,9 @@ function Thread({
     <div className="card thread">
       <header className="thread-head">
         <h2># {name}</h2>
+        <span className="post-admin">
+          <MuteButton target={{ teamId, roomId }} />
+        </span>
       </header>
       <div className="thread-body" aria-live="polite" ref={body}>
         {messages.error ? (

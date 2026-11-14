@@ -191,8 +191,8 @@ everything the app does on the website alone, styled like the website
 (not copies of the app's screens). Remaining gaps, built in this order
 (tick each when it ships):
 
-1. Account: [ ] change name, photo and header photo; [ ] notification
-   settings (`notificationPrefs/{uid}`).
+1. Account: [x] change name, photo and header photo; [x] notification
+   settings and muting chats (api 0.11.0, web 0.12.0).
 2. Team admin: [ ] custom roles and permissions (`/teams/:id/roles`);
    [ ] chat rooms and folders (create, edit, audiences, archive);
    [ ] adding teams to a community; [ ] deleting a team.

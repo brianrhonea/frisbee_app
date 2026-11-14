@@ -4,6 +4,7 @@
 // that can sign (on Cloud Run: the service account with
 // iam.serviceAccounts.signBlob on itself); the emulator can't sign, so
 // emulator tests put files with the Admin SDK instead.
+import { randomUUID } from "node:crypto";
 import type { Storage } from "firebase-admin/storage";
 
 type Bucket = ReturnType<Storage["bucket"]>;
@@ -31,10 +32,23 @@ export interface MediaStorage {
   downloadTo(path: string, file: string): Promise<void>;
   uploadFrom(file: string, path: string, contentType: string): Promise<void>;
   delete(path: string): Promise<void>;
+  /**
+   * A lasting download URL for [path] (a Firebase download token), for
+   * pictures the app shows by URL: profile pictures and header photos.
+   */
+  downloadUrl(path: string): Promise<string>;
 }
 
 export class FirebaseMediaStorage implements MediaStorage {
   constructor(private readonly bucket: Bucket) {}
+
+  async downloadUrl(path: string) {
+    const token = randomUUID();
+    await this.bucket.file(path).setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
+    const host = process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+    const base = host ? `http://${host}` : "https://firebasestorage.googleapis.com";
+    return `${base}/v0/b/${this.bucket.name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+  }
 
   async signedUploadUrl(
     path: string,

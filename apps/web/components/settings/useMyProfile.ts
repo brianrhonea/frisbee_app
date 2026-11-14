@@ -8,6 +8,7 @@ export interface MyProfile {
   name?: string;
   username?: string;
   photoUrl?: string | null;
+  headerUrl?: string | null;
   private?: boolean;
   bio?: string;
   pronouns?: string;

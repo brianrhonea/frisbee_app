@@ -16,3 +16,4 @@ export * from "./calendar.js";
 export * from "./ical.js";
 export * from "./routes.js";
 export * from "./hub.js";
+export * from "./account.js";

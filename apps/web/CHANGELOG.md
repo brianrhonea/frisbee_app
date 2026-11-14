@@ -4,6 +4,19 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.12.0 — 2026-11-14
+
+The website is becoming a full way to use Stall 10 on its own. Needs API
+0.11.0.
+
+**Added**
+- Settings → Profile: change your **name, profile picture and header
+  photo** (a wide banner on your profile card).
+- Settings → **Notifications**: what to be notified about, for every team
+  and per team, with "Use my defaults".
+- **Mute** in a team chat room or conversation header.
+- Profile cards show the player's header photo.
+
 ## 0.11.0 — 2026-11-14
 
 Website parity (`docs/product-spec.md` §8.1). Needs API 0.10.0.

@@ -7,6 +7,26 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.11.0 — 2026-11-14
+
+The member's own account, for the website on its own.
+
+**Added**
+- `PUT /v1/me/identity`: change your name, profile picture and header
+  photo (`src/account`). The name and picture go on the Auth record (what
+  the app reads), `users/{uid}` and the profile's directory fields with
+  fresh search keywords; the header on the profile. Pictures are the
+  caller's own finished `avatar` uploads, given a lasting download URL
+  (`MediaStorage.downloadUrl`); replaced or removed ones are deleted, and
+  only from the caller's own `users/{uid}/profile/` folder.
+- Notification settings (`users/{uid}/settings/notifications`, as the
+  app's NotificationPreferences): `PUT /v1/me/notification-settings/category`
+  (a kind for every team, or a per-team kind for one team), `DELETE
+  .../teams/:teamId` (back to the defaults), `PUT .../mute` (one team chat
+  room or conversation; at most 500).
+- Player profiles' card includes `headerUrl` (shown even when private, as
+  in the app), here and in the `browse` functions.
+
 ## 0.10.0 — 2026-11-14
 
 Website parity (`docs/product-spec.md` §8.1) and visitors limited to team

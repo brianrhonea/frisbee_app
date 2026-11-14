@@ -72,6 +72,12 @@ const app = buildApp({
         return null;
       }
     },
+    async update(uid, changes) {
+      await auth.updateUser(uid, {
+        ...(changes.name !== undefined && { displayName: changes.name }),
+        ...(changes.photoUrl !== undefined && { photoURL: changes.photoUrl }),
+      });
+    },
   },
   teams: new FirestoreTeamRepository(db),
   me: { repo: new FirestoreMeRepository(db), imageUrl },

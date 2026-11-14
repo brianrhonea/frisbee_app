@@ -70,6 +70,8 @@ export interface PublicProfile {
   name?: string;
   username?: string;
   photoUrl?: string;
+  /** The wide header photo above the profile picture; shown even on a private profile. */
+  headerUrl?: string;
   private?: boolean;
   bio?: string;
   pronouns?: string;

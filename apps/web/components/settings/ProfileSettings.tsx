@@ -1,10 +1,9 @@
 "use client";
 import { profileLimits, throwingHands } from "@stall10/shared";
-import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
-import { Avatar } from "../Avatar";
+import { IdentitySettings } from "./IdentitySettings";
 import { searchTagsFor, useMyProfile } from "./useMyProfile";
 
 const thisYear = new Date().getFullYear();
@@ -80,20 +79,18 @@ export function ProfileSettings() {
     }
   }
 
-  const name = profile.name || me.displayName || "You";
+  const name = profile.name || me.displayName || "";
   return (
+    <div className="settings-stack">
+    <IdentitySettings
+      me={me}
+      name={name}
+      username={profile.username}
+      photoUrl={profile.photoUrl ?? me.photoURL ?? null}
+      headerUrl={profile.headerUrl ?? null}
+    />
     <form className="card settings-form" onSubmit={(e) => void save(e)}>
-      <div className="settings-who">
-        <Avatar name={name} url={profile.photoUrl ?? me.photoURL ?? undefined} size={64} />
-        <div>
-          <b>{name}</b>
-          {profile.username && <p className="muted small">@{profile.username}</p>}
-          <p className="muted small">Your name and photo are changed in the Stall 10 app for now.</p>
-        </div>
-        <Link className="btn btn-small" href={`/players/${encodeURIComponent(me.uid)}`}>
-          View profile
-        </Link>
-      </div>
+      <h2 className="card-title">About you</h2>
 
       <label>
         Bio
@@ -151,5 +148,6 @@ export function ProfileSettings() {
         </button>
       </div>
     </form>
+    </div>
   );
 }

@@ -38,6 +38,8 @@ declare module "fastify" {
  */
 export interface UserLookup {
   lookup(uid: string): Promise<{ name?: string; email?: string; photoUrl?: string; createdAt?: string } | null>;
+  /** Changes the Auth record's name or photo (null removes it); absent where accounts can't be changed. */
+  update?(uid: string, changes: { name?: string; photoUrl?: string | null }): Promise<void>;
 }
 
 /** The name the app shows for [caller] (AppUser.label in the app). */

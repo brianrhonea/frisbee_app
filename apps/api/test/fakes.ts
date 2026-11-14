@@ -27,6 +27,12 @@ export class FakeUsers implements UserLookup {
   async lookup(uid: string) {
     return this.records.get(uid) ?? null;
   }
+  async update(uid: string, changes: { name?: string; photoUrl?: string | null }) {
+    const r = { ...this.records.get(uid) };
+    if (changes.name !== undefined) r.name = changes.name;
+    if (changes.photoUrl !== undefined) r.photoUrl = changes.photoUrl ?? undefined;
+    this.records.set(uid, r);
+  }
 }
 
 export class FakeTeamRepository implements TeamRepository {
@@ -170,6 +176,9 @@ export class FakeMediaStorage implements MediaStorage {
   }
   async delete(path: string) {
     this.files.delete(path);
+  }
+  async downloadUrl(path: string) {
+    return `https://dl.test/v0/b/bucket/o/${encodeURIComponent(path)}?alt=media&token=t`;
   }
 }
 

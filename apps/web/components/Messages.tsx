@@ -1,4 +1,5 @@
 "use client";
+import { MuteButton } from "./MuteButton";
 import { groupSizeMax, type GroupAddedResult, type OpenConversationResult } from "@stall10/shared";
 import { limit, orderBy, where } from "firebase/firestore";
 import Link from "next/link";
@@ -365,6 +366,7 @@ function ConversationView({
       <header className="thread-head conv-head">
         <h2>{info.title}</h2>
         <span className="post-admin">
+          <MuteButton target={{ conversationId: conv.id }} />
           {group && (
             <button type="button" className="text-btn" onClick={() => setManaging(!managing)} aria-expanded={managing}>
               People
