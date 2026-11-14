@@ -76,6 +76,7 @@ function Tabs({ moreTab }: { moreTab: string | null }) {
         <>
           {parts.map(([k, label]) => tab(`${base}/more?tab=${k}`, label, onMore && shownPart === k, "wide-only"))}
           {tab(`${base}/more`, kind === "team" ? "More" : "Tournaments", onMore, "narrow-only")}
+          {tab(`${base}/settings`, "Settings", path.startsWith(`${base}/settings`))}
         </>
       )}
     </nav>

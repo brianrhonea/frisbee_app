@@ -30,6 +30,14 @@ Website parity (`docs/product-spec.md` §8.1). Needs API 0.10.0.
   your own, accept or delete requests, archive, and delete a
   conversation for yourself. "Seen" shows when they've read your last
   message. `j`/`k` move through the list, `Esc` closes.
+- **Create** a team, group or school/club community (`/teams/new`), and
+  **join with a code** from Teams, or straight from an invite link
+  (`/join/<code>`) when signed in.
+- A hub **Settings** tab for members: edit details (name, level, city,
+  and for groups the description and approval), make invite links or a
+  45-second code, approve or decline people asking to join, change
+  members' roles and remove them, hand the team to another member
+  (owners), and leave. Custom roles are still edited in the app.
 - Notification links open the conversation, chat room or event itself
   (`webRoute`), not just its tab.
 
