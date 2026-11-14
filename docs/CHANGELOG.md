@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.23  | 2026-11-14 | `feature/web-parity`                    |                     |
 | 0.0.22  | 2026-11-14 | `feature/web-redesign`                  |                     |
 | 0.0.21  | 2026-11-14 | `feature/web-redesign`                  | `848021e`           |
 | 0.0.20  | 2026-11-13 | `feature/core-parity`                   |                     |
@@ -36,6 +37,19 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.23 — Visitors see only team and community pages
+
+- Flutter web (`web_router.dart`): signed-out visitors keep the community
+  feed and team/community pages; Explore, Events, the Teams tab, player
+  profiles, Schedule, Rankings, Learn, Messages, Notifications and
+  Settings send them to sign in (`?from=` brings them back), as on the
+  Next.js website.
+- `browse` functions: `profile`, `events` and `search` need a signed-in
+  caller (`unauthenticated` otherwise); `feed`, `post` and `team` stay
+  open. School/club communities that approve members are private groups
+  on public pages, like groups (review S6).
+- The native app is unchanged: it already needs a sign-in.
 
 ## 0.0.22 — An indigo logo
 

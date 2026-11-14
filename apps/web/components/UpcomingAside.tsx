@@ -2,7 +2,8 @@
 import type { EventsPage } from "@stall10/shared";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getPublicInBrowser } from "@/lib/client";
+import { callApi } from "@/lib/client";
+import { useAuth } from "./AuthProvider";
 import { EventItem } from "./EventItem";
 import { ForVisitors } from "./ForVisitors";
 import { PickupCard } from "./HomeCards";
@@ -11,12 +12,21 @@ import { NavIcon } from "./NavIcons";
 
 const shown = 4;
 
-/** The right column: what's coming up, and a sign-up prompt for visitors. */
+/** The right column: what's coming up for members, and a sign-up prompt for visitors. */
 export function UpcomingAside() {
+  const { user } = useAuth();
   const [page, setPage] = useState<EventsPage | null | undefined>(undefined);
   useEffect(() => {
-    void getPublicInBrowser<EventsPage>("/v1/public/events").then(setPage);
-  }, []);
+    if (!user) return;
+    let live = true;
+    callApi<EventsPage>(user, "/v1/public/events").then(
+      (p) => live && setPage(p),
+      () => live && setPage(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [user]);
 
   const items = [
     ...(page?.tournaments ?? []).map((t) => ({
@@ -37,6 +47,7 @@ export function UpcomingAside() {
 
   return (
     <>
+      {user && (
       <div className="card">
         <div className="card-head">
           <h2 className="card-title">Upcoming events</h2>
@@ -63,6 +74,7 @@ export function UpcomingAside() {
           </div>
         )}
       </div>
+      )}
       <PickupCard />
       <ForVisitors>
         <div className="card promo-card">

@@ -24,16 +24,29 @@ import 'router.dart' show splashPath;
 import 'routes.dart';
 import 'tournament_routes.dart';
 
-/// Paths only members open; visitors are sent to sign in first.
-/// Tournaments have no public `browse` pages yet.
+/// Paths only members open; visitors are sent to sign in first. Visitors
+/// see only team and community pages and the community feed (as on the
+/// Next.js website); every other tab asks them to sign up or log in.
 const _membersOnly = [
   Routes.home,
   Routes.profile,
   Routes.postsPath,
   Routes.tournaments,
+  Routes.explorePath,
+  Routes.upcomingEvents,
+  Routes.schedule,
+  Routes.rankingsPath,
+  Routes.learn,
+  Routes.messages,
+  Routes.notifications,
+  Routes.settings,
+  '/players',
+  '/people',
 ];
 
 bool _isMembersOnly(String path) =>
+    // The Teams tab itself, but not a team's own page.
+    path == Routes.teams ||
     _membersOnly.any((p) => path == p || path.startsWith('$p/'));
 
 const _authPages = {Routes.signIn, Routes.signUp};
@@ -95,8 +108,8 @@ String? webRedirect(
 
 /// The website's router (lib/main_web.dart), laid out by [WebShell].
 ///
-/// Everyone sees the community feed, Explore, Events, and player and team
-/// pages. Members see the app's own screens for those (with liking,
+/// Everyone sees the community feed and team pages; the other tabs ask
+/// visitors to sign in. Members see the app's own screens for those (with liking,
 /// following, joining…) plus their Home feed and profile; visitors see
 /// read-only pages from the `browse` functions that ask them to join for
 /// anything more. Other app paths show [GetTheAppScreen].

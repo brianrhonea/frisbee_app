@@ -10,6 +10,13 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.23
+
+**The website, signed out**
+- Without an account the website shows team and community pages and the
+  community feed. Other tabs ask you to sign up or log in, then bring
+  you back.
+
 ## 0.0.22
 
 **A new icon**

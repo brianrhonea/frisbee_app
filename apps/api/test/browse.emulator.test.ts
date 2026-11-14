@@ -26,6 +26,8 @@ const app = buildApp({
 
 const ts = (msFromNow: number) => Timestamp.fromMillis(Date.now() + msFromNow);
 const get = (url: string, ip = "198.51.100.7") => app.inject({ method: "GET", url, headers: { "x-forwarded-for": ip } });
+/** Players, events and search are for signed-in members. */
+const memberGet = (url: string) => app.inject({ method: "GET", url, headers: { authorization: "Bearer token:member1" } });
 
 beforeAll(async () => {
   await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${projectId}/databases/(default)/documents`, {
@@ -85,10 +87,10 @@ describe("public reads on the emulator", () => {
   });
 
   it("profiles: a private player is only a card", async () => {
-    const priv = (await get("/v1/public/players/priv")).json();
+    const priv = (await memberGet("/v1/public/players/priv")).json();
     expect(priv.profile).toEqual({ id: "priv", name: "Sam Private", username: "sam", private: true });
     expect(priv.posts).toEqual([]);
-    const pub = (await get("/v1/public/players/pub")).json();
+    const pub = (await memberGet("/v1/public/players/pub")).json();
     expect(pub.posts.map((p: { id: string }) => p.id)).toEqual(["pubPost"]);
   });
 
@@ -103,27 +105,28 @@ describe("public reads on the emulator", () => {
   });
 
   it("events: across teams, without the private group's", async () => {
-    const body = (await get("/v1/public/events")).json();
+    expect((await get("/v1/public/events")).statusCode).toBe(401);
+    const body = (await memberGet("/v1/public/events")).json();
     expect(body.events.map((e: { title: string }) => e.title)).toEqual(["Open practice"]);
   });
 
   it("search: finds teams and players by keyword", async () => {
-    const body = (await get("/v1/public/search?q=Haze")).json();
+    const body = (await memberGet("/v1/public/search?q=Haze")).json();
     expect(body.teams.map((t: { name: string }) => t.name)).toEqual(["Haze"]);
-    const people = (await get("/v1/public/search?q=sam")).json();
+    const people = (await memberGet("/v1/public/search?q=sam")).json();
     expect(people.players).toEqual([{ id: "priv", name: "Sam Private", username: "sam", private: true }]);
   });
 
   it("rate-limits a visitor in limits/ by hashed IP, then mutes them", async () => {
     const ip = "192.0.2.55";
     let last = 0;
-    for (let i = 0; i < 121; i++) last = (await get("/v1/public/events", ip)).statusCode;
+    for (let i = 0; i < 121; i++) last = (await get("/v1/public/feed", ip)).statusCode;
     expect(last).toBe(429);
     const limits = await db.collection("limits").get();
     const mine = limits.docs.find((d) => d.get("mutedUntil"));
     expect(mine?.id).toMatch(/^ip_[0-9a-f]{32}$/);
     expect(JSON.stringify(limits.docs.map((d) => d.data()))).not.toContain(ip);
     // Someone else is unaffected.
-    expect((await get("/v1/public/events", "192.0.2.56")).statusCode).toBe(200);
+    expect((await get("/v1/public/feed", "192.0.2.56")).statusCode).toBe(200);
   }, 60_000);
 });

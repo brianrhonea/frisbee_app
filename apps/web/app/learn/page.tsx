@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ForVisitors } from "@/components/ForVisitors";
+import { MembersOnly } from "@/components/MembersOnly";
 
 export const metadata: Metadata = {
   title: "Learn to play ultimate",
@@ -53,6 +53,7 @@ export default function Learn() {
         </p>
       </div>
 
+      <MembersOnly next="/learn" what="Sign up free or log in for the beginner's guide to the rules.">
       <nav className="card learn-toc" aria-label="On this page">
         <ol>
           {sections.map(([id, label]) => (
@@ -224,14 +225,7 @@ export default function Learn() {
         </section>
       </article>
 
-      <ForVisitors>
-        <div className="cta-card">
-          <p>Ready to play? Join Stall 10 to find pickup and keep up with your team.</p>
-          <Link className="btn btn-primary btn-small" href="/sign-up">
-            Sign up free
-          </Link>
-        </div>
-      </ForVisitors>
+      </MembersOnly>
     </div>
   );
 }

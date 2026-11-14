@@ -1,20 +1,15 @@
-import type { EventsPage } from "@stall10/shared";
 import type { Metadata } from "next";
-import { connection } from "next/server";
-import { EventsBrowser } from "@/components/EventsBrowser";
+import { MemberEvents } from "@/components/MemberEvents";
+import { MembersOnly } from "@/components/MembersOnly";
 import { ScheduleLink } from "@/components/ScheduleLink";
-import { getPublic } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Events",
   description: "Upcoming ultimate frisbee games, practices, pickup and tournaments on Stall 10.",
 };
 
-export default async function Events() {
-  // Render per request, not at build (which has no API). Unlike
-  // `dynamic = "force-dynamic"`, this keeps the fetch's 60-second cache.
-  await connection();
-  const { events, tournaments } = await getPublic<EventsPage>("/v1/public/events");
+/** Members only: read in the browser with their token, so nothing ships to visitors. */
+export default function Events() {
   return (
     <div className="page">
       <div className="page-head">
@@ -22,7 +17,9 @@ export default async function Events() {
         <p>What&apos;s coming up for public teams and groups.</p>
         <ScheduleLink />
       </div>
-      <EventsBrowser events={events} tournaments={tournaments} />
+      <MembersOnly next="/events" what="Sign up free or log in to find games, practices, pickup and tournaments.">
+        <MemberEvents />
+      </MembersOnly>
     </div>
   );
 }

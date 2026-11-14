@@ -22,15 +22,16 @@ const statColumns: Array<[keyof StatTotals, string]> = [
 ];
 
 /**
- * A player's page. Visitors get the cached public page ([initial]); a
+ * A player's page, for members only (visitors are asked to sign up). A
  * member gets it as they may see it (`/v1/players/:uid`: a private profile
  * they follow in full), refetched whenever the profile, the player's
  * posts or the member's follow of them changes, so privacy switches,
  * edits and an accepted request show within a moment.
  */
-export function LivePlayer({ uid, initial }: { uid: string; initial: ProfilePage }) {
+export function LivePlayer({ uid }: { uid: string }) {
   const { user } = useAuth();
   const [member, setMember] = useState<MemberProfilePage | null>(null);
+  const [failed, setFailed] = useState(false);
   const unlocked = member ? !member.locked : false;
   const signals: Signal[] | null = user
     ? [
@@ -52,8 +53,12 @@ export function LivePlayer({ uid, initial }: { uid: string; initial: ProfilePage
     // Several signals fire together (e.g. on subscribing): fetch once.
     const timer = setTimeout(() => {
       callApi<MemberProfilePage>(user, `/v1/players/${encodeURIComponent(uid)}`).then(
-        (page) => live && setMember(page),
-        () => undefined,
+        (page) => {
+          if (!live) return;
+          setMember(page);
+          setFailed(false);
+        },
+        () => live && setFailed(true),
       );
     }, 150);
     return () => {
@@ -62,9 +67,18 @@ export function LivePlayer({ uid, initial }: { uid: string; initial: ProfilePage
     };
   }, [user, uid, version]);
 
-  const page = member ?? initial;
-  const locked = member ? member.locked : initial.profile.private === true;
-  return <PlayerView uid={uid} page={page} locked={locked} />;
+  if (!member) {
+    return failed ? (
+      <div className="page">
+        <p className="empty">This player couldn&apos;t be found.</p>
+      </div>
+    ) : (
+      <div className="page">
+        <p className="muted" aria-busy="true">Loading…</p>
+      </div>
+    );
+  }
+  return <PlayerView uid={uid} page={member} locked={member.locked} />;
 }
 
 function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; locked: boolean }) {

@@ -82,6 +82,8 @@ function setup(opts: { enforceAppCheck?: boolean; webServerKey?: string } = {}) 
   return { app, repo, limiter, get };
 }
 
+const member = { authorization: "Bearer token:m1" };
+
 const post = (id: string, authorId: string, extra: Data = {}): Doc => ({
   id,
   data: {
@@ -175,15 +177,15 @@ describe("public reads", () => {
 
   it("shows a public profile with its posts, and only the card of a private one", async () => {
     t.repo.postsList = [post("p1", "pub"), post("p2", "priv")];
-    const pub = (await t.get("/v1/public/players/pub")).json();
+    const pub = (await t.get("/v1/public/players/pub", member)).json();
     expect(pub.profile).toMatchObject({ id: "pub", name: "Pat", bio: "hi" });
     expect(pub.profile).not.toHaveProperty("keywords");
     expect(pub.profile).not.toHaveProperty("email");
     expect(pub.posts.map((p: { id: string }) => p.id)).toEqual(["p1"]);
 
-    const priv = (await t.get("/v1/public/players/priv")).json();
+    const priv = (await t.get("/v1/public/players/priv", member)).json();
     expect(priv).toEqual({ profile: { id: "priv", name: "Sam", username: "sam", private: true }, posts: [], next: null });
-    expect((await t.get("/v1/public/players/nobody")).statusCode).toBe(404);
+    expect((await t.get("/v1/public/players/nobody", member)).statusCode).toBe(404);
   });
 
   it("hides a private group's posts and events but shows its listing", async () => {
@@ -217,34 +219,48 @@ describe("public reads", () => {
       { id: "t_1", data: { groupId: "t", name: "Cup" } },
       { id: "g_1", data: { groupId: "g", name: "Secret Cup" } },
     ];
-    const body = (await t.get("/v1/public/events")).json();
+    const body = (await t.get("/v1/public/events", member)).json();
     expect(body.events).toEqual([{ id: "e1", teamId: "t", teamName: "Haze", title: "Open game" }]);
     expect(body.tournaments.map((x: { name: string }) => x.name)).toEqual(["Cup"]);
   });
 
   it("searches by the query's longest word, showing private players as cards", async () => {
-    const body = (await t.get("/v1/public/search?q=Pat%20Smithson")).json();
+    const body = (await t.get("/v1/public/search?q=Pat%20Smithson", member)).json();
     expect(t.repo.queries).toEqual(["profiles:smithson", "listings:smithson"]);
     expect(body.players).toContainEqual({ id: "priv", name: "Sam", username: "sam", private: true });
     expect(body.players.find((p: { id: string }) => p.id === "pub")).not.toHaveProperty("bio");
   });
 
   it("answers an empty search without querying", async () => {
-    expect((await t.get("/v1/public/search?q=%20%20")).json()).toEqual({ players: [], teams: [] });
+    expect((await t.get("/v1/public/search?q=%20%20", member)).json()).toEqual({ players: [], teams: [] });
     expect(t.repo.queries).toEqual([]);
   });
 
   it("is cacheable by anyone", async () => {
-    const res = await t.get("/v1/public/events");
+    const res = await t.get("/v1/public/feed");
     expect(res.headers["cache-control"]).toContain("public");
     expect(res.headers["cache-control"]).toContain("s-maxage=60");
+  });
+
+  it("keeps members-only reads out of shared caches", async () => {
+    const res = await t.get("/v1/public/events", member);
+    expect(res.headers["cache-control"]).toBe("private, max-age=30");
+  });
+
+  it("shows visitors only the feed, posts and team pages", async () => {
+    t.repo.listingMap.set("t", { name: "Haze" });
+    for (const url of ["/v1/public/feed", "/v1/public/teams/t"]) expect((await t.get(url)).statusCode).toBe(200);
+    for (const url of ["/v1/public/events", "/v1/public/search?q=pat", "/v1/public/players/pub"]) {
+      expect((await t.get(url)).statusCode).toBe(401);
+      expect((await t.get(url, { authorization: "Bearer junk" })).statusCode).toBe(401);
+    }
   });
 });
 
 describe("public route access", () => {
   it("needs no App Check even when it's enforced", async () => {
     const { get, app } = setup({ enforceAppCheck: true });
-    expect((await get("/v1/public/events")).statusCode).toBe(200);
+    expect((await get("/v1/public/feed")).statusCode).toBe(200);
     // Other routes still need it.
     const res = await app.inject({ method: "POST", url: "/v1/teams", payload: {}, headers: { authorization: "Bearer token:u1" } });
     expect(res.statusCode).toBe(401);
@@ -252,16 +268,18 @@ describe("public route access", () => {
 
   it("treats a bad token as a visitor", async () => {
     const { get } = setup();
-    expect((await get("/v1/public/events", { authorization: "Bearer junk" })).statusCode).toBe(200);
+    expect((await get("/v1/public/feed", { authorization: "Bearer junk" })).statusCode).toBe(200);
   });
 
   it("limits visitors by hashed IP and members by uid", async () => {
     const { get, limiter } = setup();
-    await get("/v1/public/events", { "x-forwarded-for": "203.0.113.9, 10.0.0.1" });
-    await get("/v1/public/events", { authorization: "Bearer token:u1" });
+    await get("/v1/public/feed", { "x-forwarded-for": "203.0.113.9, 10.0.0.1" });
+    await get("/v1/public/feed", { authorization: "Bearer token:u1" });
+    await get("/v1/public/events", { authorization: "Bearer token:u2", "x-forwarded-for": "203.0.113.9" });
     expect(limiter.keys[0]).toMatch(/^ip_[0-9a-f]{32}$/);
     expect(limiter.keys[0]).not.toContain("203");
     expect(limiter.keys[1]).toBe("u1");
+    expect(limiter.keys[2]).toBe("u2");
   });
 
   it("turns away someone over the limit", async () => {
@@ -277,6 +295,8 @@ describe("public route access", () => {
     limiter.allow = false;
     expect((await get("/v1/public/feed", { [webKeyHeader]: "s3cret-key" })).statusCode).toBe(200);
     expect((await get("/v1/public/feed", { [webKeyHeader]: "wrong" })).statusCode).toBe(429);
+    // The key doesn't open members-only reads.
+    expect((await get("/v1/public/events", { [webKeyHeader]: "s3cret-key" })).statusCode).toBe(401);
   });
 
   it("isn't served when the app is built without browse", async () => {

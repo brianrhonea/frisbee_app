@@ -146,23 +146,34 @@ void main() {
       expect(go(auth, '/teams/t1'), '/splash?from=%2Fteams%2Ft1');
     });
 
-    test('visitors browse public pages; members-only ones ask to sign in', () {
+    test('visitors see only the community and team pages', () {
       final auth = FakeAuthRepository();
       expect(go(auth, '/'), Routes.community);
       expect(go(auth, '/splash'), Routes.community);
       for (final open in [
         Routes.community,
-        '/explore?q=a',
-        '/events',
-        '/players/u2',
         '/teams/t1',
+        '/g/t1',
         Routes.signUp,
+        Routes.signIn,
       ]) {
         expect(go(auth, open), isNull, reason: open);
       }
       expect(go(auth, Routes.home), '/sign-in?from=%2Fhome');
       expect(go(auth, '/profile'), '/sign-in?from=%2Fprofile');
       expect(go(auth, '/posts/p1'), '/sign-in?from=%2Fposts%2Fp1');
+      for (final closed in [
+        '/explore?q=a',
+        '/events',
+        '/players/u2',
+        '/teams',
+        '/schedule',
+        '/rankings',
+        '/learn',
+        '/messages',
+      ]) {
+        expect(go(auth, closed), startsWith('/sign-in?from='), reason: closed);
+      }
     });
 
     test('members land on Home, and signing in returns where they were', () {
@@ -324,19 +335,11 @@ void main() {
       expect(location(), '/sign-up?from=%2Fcommunity');
     });
 
-    testWidgets('visitors see public profiles; private ones stay private', (
-      tester,
-    ) async {
+    testWidgets('player profiles ask visitors to sign in', (tester) async {
       auth = FakeAuthRepository();
       await pump(tester, '/players/u2');
-      expect(find.byType(PublicProfileScreen), findsOneWidget);
-      expect(find.text('Hucks all day p1'), findsOneWidget);
-
-      router.go('/players/u3');
-      await tester.pumpAndSettle();
-      expect(find.text('This profile is private'), findsOneWidget);
-      expect(find.text('Hucks all day p2'), findsNothing);
-      expect(find.text('Request to follow'), findsOneWidget);
+      expect(find.byType(PublicProfileScreen), findsNothing);
+      expect(location(), '/sign-in?from=%2Fplayers%2Fu2');
     });
 
     testWidgets('visitors see team pages and what is coming up', (
@@ -355,10 +358,11 @@ void main() {
       await tester.tap(find.text('Not now'));
       await tester.pumpAndSettle();
 
+      // Other tabs ask a visitor to sign up or log in.
       await tester.tap(find.text('Events'));
       await tester.pumpAndSettle();
-      expect(location(), Routes.upcomingEvents);
-      expect(find.text('Winter Hat'), findsOneWidget);
+      expect(location(), '/sign-in?from=%2Fevents');
+      expect(find.text('Winter Hat'), findsNothing);
     });
 
     testWidgets('members-only pages send visitors to sign in', (tester) async {
@@ -383,7 +387,7 @@ void main() {
       expect(find.byType(NavigationBar), findsOneWidget);
       await tester.tap(find.text('Events'));
       await tester.pumpAndSettle();
-      expect(location(), Routes.upcomingEvents);
+      expect(location(), '/sign-in?from=%2Fevents');
     });
   });
 }

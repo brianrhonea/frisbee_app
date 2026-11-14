@@ -7,6 +7,24 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.10.0 — 2026-11-14
+
+Website parity (`docs/product-spec.md` §8.1) and visitors limited to team
+and community pages. Needs the `browse` functions from the same change
+for the Flutter web site.
+
+**Changed**
+- `GET /v1/public/players/:uid`, `/v1/public/events` and
+  `/v1/public/search` need a signed-in caller (401 otherwise, even with
+  the website's server key), are limited per uid, and answer
+  `cache-control: private`. The feed, posts and team pages stay open to
+  visitors.
+
+**Fixed**
+- A school or club community that approves who joins is a private group
+  on public pages, like a group: its posts and events no longer show to
+  visitors (security review S6).
+
 ## 0.9.2 — 2026-11-14
 
 **Fixed**

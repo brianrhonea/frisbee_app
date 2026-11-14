@@ -139,6 +139,8 @@ describe("teams", () => {
     expect(isPrivateGroup({ kind: "community", requiresApproval: true })).toBe(true);
     expect(isPrivateGroup({ kind: "community", requiresApproval: false })).toBe(false);
     expect(isPrivateGroup({ kind: "team", requiresApproval: true })).toBe(false);
+    expect(isPrivateGroup({ kind: "organization", requiresApproval: true })).toBe(true);
+    expect(isPrivateGroup({ kind: "organization", requiresApproval: false })).toBe(false);
   });
 
   it("listings, events and posts show only allowed fields", () => {

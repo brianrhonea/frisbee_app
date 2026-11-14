@@ -132,7 +132,10 @@ export function listingView(listing: Data): Data {
  * (`showsPublic` in firestore.rules).
  */
 export function isPrivateGroup(listing: Data | undefined): boolean {
-  return !listing || (listing.kind === "community" && listing.requiresApproval === true);
+  // Groups and school/club communities that approve who joins (as the rules treat them).
+  return (
+    !listing || ((listing.kind === "community" || listing.kind === "organization") && listing.requiresApproval === true)
+  );
 }
 
 /** A team's public event, as `TeamEvent.toPublicMap` writes it. */

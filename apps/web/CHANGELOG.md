@@ -4,6 +4,19 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.11.0 — 2026-11-14
+
+Website parity (`docs/product-spec.md` §8.1). Needs API 0.10.0.
+
+**Changed**
+- Signed-out visitors see only team and community pages (and the
+  community feed and posts). Explore, Events, player profiles, Learn,
+  Rankings, Schedule, Messages, Notifications, Settings and the Teams
+  tab ask them to sign up or log in (`JoinPrompt`), then return there.
+  These pages now load in the browser with the member's token, so none
+  of their data is in the page sent to visitors; Home's visitor preview
+  and the right column no longer show events.
+
 ## 0.10.1 — 2026-11-14
 
 **Changed**
