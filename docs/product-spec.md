@@ -201,9 +201,10 @@ everything the app does on the website alone, styled like the website
    0.14.0). The app has no message editing and keeps team rooms out of
    its inbox, so neither is needed.
 4. W6: [ ] stats (games, live stat entry, season tables); [x] playbook
-   (play editor on a field, drag to draw; api 0.14.0, web 0.15.0); [ ] videos (library, links,
-   uploads, player); [ ] workouts (manual log; GPS recording needs a
-   phone, so the website logs them by hand).
+   (play editor on a field, drag to draw; api 0.14.0, web 0.15.0); [x] videos (library, links, folders, player;
+   api 0.15.0, web 0.16.0; uploading from the website waits on the
+   transcode job); [x] workouts (both post typed-in workouts; GPS
+   recording needs a phone's location, so it stays in the app).
 5. W5: [ ] hosted tournaments and leagues (find, host, register,
    divisions, schedules, scores, standings); [ ] hat tournaments and
    captains' drafts (the callables' logic ported into API services; the

@@ -7,6 +7,18 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.15.0 — 2026-11-14
+
+**Added**
+- Team videos: `POST/PATCH/DELETE /v1/teams/:teamId/videos[/:videoId]`
+  add YouTube videos, edit them, move them between folders and remove
+  them (an uploaded video's file is deleted too, only from its own
+  folder).
+- Video folders: `POST/PATCH/DELETE /v1/teams/:teamId/video-folders[/:folderId]`;
+  deleting a folder moves its videos to Unsorted first, as the app does.
+- The `videos` and `videoFolders` rules are ported whole (`validVideo`,
+  `validFile` on the resulting document), on the hub write limit.
+
 ## 0.14.1 — 2026-11-14
 
 **Fixed** (security review of 0.11.0–0.13.0)

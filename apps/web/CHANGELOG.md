@@ -4,6 +4,19 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.16.0 — 2026-11-14
+
+Needs API 0.15.0.
+
+**Added**
+- Team videos: admins add YouTube links (checked with YouTube, title
+  filled in), edit, move between folders and remove videos, and create,
+  rename and delete folders.
+- Folder filters (All, each folder, Unsorted) with counts, and the 5 GB
+  upload-space bar for admins.
+- Each video has its own page; uploaded videos now play on the website.
+  Uploading files from the website waits on the video transcode job.
+
 ## 0.15.1 — 2026-11-14
 
 Needs API 0.14.1.
