@@ -45,6 +45,11 @@ spec:
               value: "1"
             - name: LOG_LEVEL
               value: info
+            # Photo uploads (/v1/uploads) are only served when this names the
+            # bucket. Browsers PUT to it directly, so it needs CORS for the
+            # website (storage-cors.<env>.json, DEPLOY.md).
+            - name: STORAGE_BUCKET
+              value: "${PROJECT_ID}.firebasestorage.app"
             # Encrypts personal details (DEPLOY.md, setup step 4: the key
             # must exist before /v1/me/personal works).
             - name: PERSONAL_DETAILS_KMS_KEY

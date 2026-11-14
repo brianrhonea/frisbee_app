@@ -44,6 +44,19 @@ Environment variables on the service:
 | `TRUST_PROXY_HOPS` | `service.yaml` | `1` (Cloud Run's front end; `2` behind a Firebase Hosting rewrite) |
 | `LOG_LEVEL` | `service.yaml` | `info` |
 
+**Photo uploads.** `/v1/uploads` exists only when `STORAGE_BUCKET` is set
+(`service.yaml` sets `<project>.firebasestorage.app`). Browsers PUT photos
+straight to the bucket with the signed URL, so the bucket needs CORS for the
+website, once per project:
+
+```
+gcloud storage buckets update gs://frisbee-app-brianrhonea-dev.firebasestorage.app --cors-file=apps/api/deploy/storage-cors.dev.json
+gcloud storage buckets update gs://frisbee-app-brianrhonea.firebasestorage.app --cors-file=apps/api/deploy/storage-cors.prod.json
+```
+
+The API's service account needs `roles/storage.objectAdmin` on the bucket
+and `roles/iam.serviceAccountTokenCreator` on itself (to sign the URLs).
+
 `CORS_ORIGINS` is comma-separated. A `*` matches one host label or port,
 e.g. `https://dev.stall10.app,https://frisbee*-brian-honeas-projects.vercel.app` for
 the dev site and Vercel previews (prod: `https://stall10.app`), or `http://localhost:*` for any local port. Leaving prod

@@ -7,6 +7,15 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.9.2 — 2026-11-14
+
+**Fixed**
+- Photo uploads on Cloud Run: `service.yaml` never set `STORAGE_BUCKET`,
+  so `/v1/uploads` wasn't registered and the website said "No such
+  endpoint." It's now `<project>.firebasestorage.app`. The bucket also
+  needs CORS for the website (`deploy/storage-cors.dev.json` /
+  `.prod.json`; DEPLOY.md).
+
 ## 0.9.1 — 2026-11-14
 
 **Fixed**
