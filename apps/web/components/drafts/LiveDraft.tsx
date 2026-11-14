@@ -49,11 +49,11 @@ const describe = (skill: number, gender: GenderMatch | null | undefined) => `Ski
 export function LiveDraft({ tournamentId, divisionId }: { tournamentId: string; divisionId: string }) {
   const { user } = useAuth();
   const uid = user?.uid ?? null;
-  const { tournament, divisions, manager } = useTournamentBase(tournamentId, uid);
+  const { tournament, divisions, manager, managerKnown } = useTournamentBase(tournamentId, uid);
   const draft = useLiveDraft(tournamentId, divisionId);
   if (!user) return null;
   const division = divisions.data?.find((d) => d.id === divisionId);
-  if (tournament.data === undefined || divisions.data === undefined || (draft.data === undefined && !draft.error)) {
+  if (!managerKnown || tournament.data === undefined || divisions.data === undefined || (draft.data === undefined && !draft.error)) {
     return <p className="muted" aria-busy="true">Loading…</p>;
   }
   if (!tournament.data || !division) return <div className="empty">Division not found. It may have been removed.</div>;

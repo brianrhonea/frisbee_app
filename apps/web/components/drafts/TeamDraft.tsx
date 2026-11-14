@@ -26,9 +26,9 @@ import { attempt, type DivisionDoc, divisionLabel, draftApi, type TournamentDoc,
 export function TeamDraft({ tournamentId, divisionId }: { tournamentId: string; divisionId: string }) {
   const { user } = useAuth();
   const uid = user?.uid ?? null;
-  const { tournament, divisions, manager } = useTournamentBase(tournamentId, uid);
+  const { tournament, divisions, manager, managerKnown } = useTournamentBase(tournamentId, uid);
   if (!user) return null;
-  if (tournament.data === undefined || divisions.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
+  if (!managerKnown || tournament.data === undefined || divisions.data === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
   const division = divisions.data.find((d) => d.id === divisionId);
   if (!tournament.data || !division) return <div className="empty">Division not found. It may have been removed.</div>;
   if (!manager) return <div className="empty">Only the event&apos;s organizers can draft teams.</div>;

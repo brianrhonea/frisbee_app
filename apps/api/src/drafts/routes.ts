@@ -10,11 +10,14 @@ const minute = 60_000;
 /**
  * Per caller, per instance. Picks and the host's controls get their own
  * bucket, roomier than the global write cap (anyWriteLimit, 120 a minute),
- * so the global cap is what bounds them; signups, saving teams, starting,
- * finishing and creating league teams share a tighter one.
+ * so the global cap is what bounds them. The host's decisions on signups
+ * (accept, waitlist, decline, mark paid: two a player) get room to work
+ * down a long list; signing up, saving teams, starting, finishing and
+ * creating league teams share a tighter bucket.
  */
 export const draftLimits = {
   pick: { max: 240, windowMs: minute },
+  decide: { max: 120, windowMs: minute },
   write: { max: 30, windowMs: minute },
 } satisfies Record<string, Limit>;
 
@@ -48,11 +51,11 @@ export function draftRoutes(app: FastifyInstance, drafts: DraftService, limiter:
 
   app.put<T>(r.mySignup, async (req) => drafts.saveMySignup(caller(req, "write"), req.params.tournamentId, req.body));
   app.put<U>(r.signupStatus, async (req, reply) => {
-    await drafts.setSignupStatus(caller(req, "write"), req.params.tournamentId, req.params.uid, req.body);
+    await drafts.setSignupStatus(caller(req, "decide"), req.params.tournamentId, req.params.uid, req.body);
     return reply.code(204).send();
   });
   app.put<U>(r.signupPayment, async (req, reply) => {
-    await drafts.setSignupPayment(caller(req, "write"), req.params.tournamentId, req.params.uid, req.body);
+    await drafts.setSignupPayment(caller(req, "decide"), req.params.tournamentId, req.params.uid, req.body);
     return reply.code(204).send();
   });
   app.put<D>(r.draftedTeams, async (req, reply) => {

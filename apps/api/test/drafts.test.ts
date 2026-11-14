@@ -203,11 +203,21 @@ describe("captains' draft (draft.server.test.ts)", () => {
 });
 
 describe("pick rate", () => {
-  it("a host auto-picking a big draft in one minute never hits the limits", async () => {
-    seed(112);
-    expect((await start(["p0", "p1"])).status).toBe(201);
-    for (let i = 0; i < 110; i++) expect((await control("autopick")).status).toBe(204);
+  it("the draft's own bucket takes a whole 200-player draft auto-picked in one minute", async () => {
+    // Without the global 120-a-minute cap (limits/writes.ts), which is what still binds a host.
+    const app = buildApp({ verifier: new FakeVerifier(), users: new FakeUsers(), teams: new FakeTeamRepository(), store, media: new FakeMediaStorage(), now: () => now, writeLimits: false });
+    const as = (url: string, body: object) => app.inject({ method: "POST", url, payload: body, headers: { authorization: "Bearer token:director" } });
+    seed(202);
+    expect((await as(`${base}/draft`, { captainIds: ["p0", "p1"] })).statusCode).toBe(201);
+    for (let i = 0; i < 200; i++) expect((await as(`${base}/draft/control`, { action: "autopick" })).statusCode).toBe(204);
     expect(draftOf().status).toBe("done");
+  });
+
+  it("with the global cap, a host's 120th write in a minute is refused (needs the writes.ts exemption)", async () => {
+    seed(202);
+    expect((await start(["p0", "p1"])).status).toBe(201);
+    for (let i = 0; i < 119; i++) expect((await control("autopick")).status).toBe(204);
+    expect((await control("autopick")).status).toBe(429);
   });
 
   it("captains alternating fast are only bounded by the pool", async () => {
@@ -220,6 +230,32 @@ describe("pick rate", () => {
       expect((await pick(clock, left[0])).status).toBe(204);
     }
     expect(draftOf().status).toBe("done");
+  });
+
+  it("a host can decide on 50 players, two writes each, in a minute", async () => {
+    seed(50);
+    for (let i = 0; i < 50; i++) {
+      expect((await call("PUT", `/v1/tournaments/${T}/signups/p${i}/status`, { status: "waitlisted" })).status).toBe(204);
+      expect((await call("PUT", `/v1/tournaments/${T}/signups/p${i}/payment`, { paid: true })).status).toBe(204);
+    }
+  });
+
+  it("every endpoint needs a signed-in caller", async () => {
+    seed();
+    const app = buildApp({ verifier: new FakeVerifier(), users: new FakeUsers(), teams: new FakeTeamRepository(), store, media: new FakeMediaStorage(), now: () => now });
+    for (const [method, url] of [
+      ["PUT", `/v1/tournaments/${T}/signups/me`],
+      ["PUT", `/v1/tournaments/${T}/signups/p0/status`],
+      ["PUT", `/v1/tournaments/${T}/signups/p0/payment`],
+      ["PUT", `${base}/drafted-teams`],
+      ["POST", `${base}/league-teams`],
+      ["POST", `${base}/draft`],
+      ["POST", `${base}/draft/picks`],
+      ["POST", `${base}/draft/control`],
+      ["POST", `${base}/draft/finish`],
+    ] as const) {
+      expect((await app.inject({ method, url, payload: {} })).statusCode).toBe(401);
+    }
   });
 });
 

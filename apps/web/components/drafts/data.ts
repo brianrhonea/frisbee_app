@@ -86,8 +86,10 @@ export function useTournamentBase(tournamentId: string, uid: string | null) {
   // Only members can read a team; anyone else simply isn't a manager.
   const host = useLiveDoc<Record<string, unknown>>(uid && hostId ? `teams/${hostId}` : null);
   const manager = !!uid && canOn(host.data, uid, "manageEvents");
+  /** Whether [manager] is settled: the host doc has answered (or there is none to read). */
+  const managerKnown = tournament.data !== undefined && (!hostId || host.data !== undefined || host.error !== null);
   const list = [...(divisions.data ?? [])].sort((a, b) => a.id.localeCompare(b.id));
-  return { tournament, divisions: { ...divisions, data: divisions.data ? list : undefined }, manager };
+  return { tournament, divisions: { ...divisions, data: divisions.data ? list : undefined }, manager, managerKnown };
 }
 
 /** Everyone's signups (managers), or just the caller's own. */
