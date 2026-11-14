@@ -199,26 +199,26 @@ abstract final class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: c.accentSoft,
-        selectedColor: c.highlight,
+        selectedColor: c.accent,
         side: BorderSide.none,
         shape: const StadiumBorder(),
-        // Selected chips sit on the highlight, so their label switches to
-        // its contrasting ink (the plain ink is pale in dark mode).
+        // Selected chips are filled with the accent, so their label
+        // switches to its contrasting ink.
         labelStyle: TextStyle(
           fontFamily: appFont,
           fontFeatures: tabularFigures,
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: WidgetStateColor.resolveWith(
-            (s) => s.contains(WidgetState.selected) ? c.onHighlight : c.ink,
+            (s) => s.contains(WidgetState.selected) ? c.onAccent : c.ink,
           ),
         ),
-        checkmarkColor: c.onHighlight,
+        checkmarkColor: c.onAccent,
       ),
       tabBarTheme: TabBarThemeData(
-        labelColor: c.ink,
+        labelColor: c.accent,
         unselectedLabelColor: c.muted,
-        indicatorColor: c.ink,
+        indicatorColor: c.accent,
         indicatorSize: TabBarIndicatorSize.label,
         dividerColor: c.border,
         labelStyle: const TextStyle(
@@ -235,8 +235,8 @@ abstract final class AppTheme {
         ),
       ),
       badgeTheme: BadgeThemeData(
-        backgroundColor: c.highlight,
-        textColor: c.onHighlight,
+        backgroundColor: c.accent,
+        textColor: c.onAccent,
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: c.card,
@@ -245,7 +245,7 @@ abstract final class AppTheme {
         height: 64,
         iconTheme: WidgetStateProperty.resolveWith(
           (s) => IconThemeData(
-            color: s.contains(WidgetState.selected) ? c.ink : c.muted,
+            color: s.contains(WidgetState.selected) ? c.accent : c.muted,
           ),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
@@ -256,18 +256,18 @@ abstract final class AppTheme {
             fontWeight: s.contains(WidgetState.selected)
                 ? FontWeight.w700
                 : FontWeight.w500,
-            color: s.contains(WidgetState.selected) ? c.ink : c.muted,
+            color: s.contains(WidgetState.selected) ? c.accent : c.muted,
           ),
         ),
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: c.sidebar,
-        indicatorColor: c.highlight,
-        selectedIconTheme: IconThemeData(color: c.onHighlight),
+        indicatorColor: c.accentSoft,
+        selectedIconTheme: IconThemeData(color: c.accent),
         unselectedIconTheme: IconThemeData(color: c.onSidebarMuted),
       ),
       listTileTheme: ListTileThemeData(
-        selectedColor: c.ink,
+        selectedColor: c.accent,
         selectedTileColor: c.accentSoft,
         iconColor: c.muted,
       ),
@@ -307,9 +307,10 @@ abstract final class AppTheme {
   }
 }
 
-/// Named colors from the app's design: a warm off-white page, white cards,
-/// forest-green ink, sidebar and feature cards, and a lime highlight. Read
-/// with `AppColors.of(context)`.
+/// Named colors from the app's design, shared with the website: a cool
+/// off-white page, white cards and sidebar, indigo accent and feature cards,
+/// and an amber highlight for calls to action on them. Read with
+/// `AppColors.of(context)`.
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   const AppColors({
@@ -354,17 +355,17 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Tinted fill behind accent content, e.g. a date tile or pinned bar.
   final Color accentSoft;
 
-  /// Lime: the selected sidebar item, badges and calls to action on
-  /// feature cards.
+  /// Amber: calls to action and marks on feature cards, and strong tags.
   final Color highlight;
   final Color onHighlight;
 
-  /// The navigation sidebar and rail, and the phone's top bar.
+  /// The navigation sidebar and rail, and the phone's top bar (white, or
+  /// Midnight's card, as on the website).
   final Color sidebar;
   final Color onSidebar;
   final Color onSidebarMuted;
 
-  /// Dark "feature" cards (up next, hero) and their text.
+  /// Indigo "feature" cards (up next, hero) and their text.
   final Color feature;
   final Color onFeature;
   final Color onFeatureMuted;
@@ -376,54 +377,56 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color team;
   final Color personal;
 
+  // The website's palette (apps/web/app/site.css): indigo on a cool
+  // off-white, and "Midnight" in dark mode.
   static const light = AppColors(
-    background: Color(0xFFF4F4EF),
+    background: Color(0xFFF3F5FB),
     card: Color(0xFFFFFFFF),
-    field: Color(0xFFF4F5F0),
-    border: Color(0xFFE3E5DC),
-    ink: Color(0xFF18241D),
-    muted: Color(0xFF6B736A),
-    accent: Color(0xFF1F3B2C),
+    field: Color(0xFFF1F2F8),
+    border: Color(0xFFE3E6F0),
+    ink: Color(0xFF171A2E),
+    muted: Color(0xFF686D86),
+    accent: Color(0xFF5348B2),
     onAccent: Color(0xFFFFFFFF),
-    accentSoft: Color(0xFFE8EDE1),
-    highlight: Color(0xFFD7F06A),
-    onHighlight: Color(0xFF18241D),
-    sidebar: Color(0xFF1F3B2C),
-    onSidebar: Color(0xFFF2F5EE),
-    onSidebarMuted: Color(0xFFA9BAAC),
-    feature: Color(0xFF1F3B2C),
-    onFeature: Color(0xFFF2F5EE),
-    onFeatureMuted: Color(0xFFA9BAAC),
-    featureHighlight: Color(0xFF2D4D3B),
+    accentSoft: Color(0xFFEAE7F9),
+    highlight: Color(0xFFF0D8A8),
+    onHighlight: Color(0xFF3A2A08),
+    sidebar: Color(0xFFFFFFFF),
+    onSidebar: Color(0xFF171A2E),
+    onSidebarMuted: Color(0xFF686D86),
+    feature: Color(0xFF5348B2),
+    onFeature: Color(0xFFFFFFFF),
+    onFeatureMuted: Color(0xFFD9D5F5),
+    featureHighlight: Color(0xFF6A5FC6),
     positive: Color(0xFF2F8F57),
     positiveSoft: Color(0xFFDDEFD9),
-    team: Color(0xFF2F6FD0),
-    personal: Color(0xFF8A4FD1),
+    team: Color(0xFF2C6FB7),
+    personal: Color(0xFFA8407A),
   );
 
   static const dark = AppColors(
-    background: Color(0xFF0E1310),
-    card: Color(0xFF161D18),
-    field: Color(0xFF1C241E),
-    border: Color(0xFF28322B),
-    ink: Color(0xFFE7ECE4),
-    muted: Color(0xFF98A399),
-    accent: Color(0xFFC9E36B),
-    onAccent: Color(0xFF142019),
-    accentSoft: Color(0xFF223026),
-    highlight: Color(0xFFC9E36B),
-    onHighlight: Color(0xFF142019),
-    sidebar: Color(0xFF121A15),
-    onSidebar: Color(0xFFE7ECE4),
-    onSidebarMuted: Color(0xFF8E9C91),
-    feature: Color(0xFF1C2B22),
-    onFeature: Color(0xFFF2F5EE),
-    onFeatureMuted: Color(0xFFA3B3A6),
-    featureHighlight: Color(0xFF2A3D31),
+    background: Color(0xFF121521),
+    card: Color(0xFF1E2230),
+    field: Color(0xFF252A3B),
+    border: Color(0xFF2A3045),
+    ink: Color(0xFFECEEF6),
+    muted: Color(0xFF9398B0),
+    accent: Color(0xFFA599F8),
+    onAccent: Color(0xFF16132F),
+    accentSoft: Color(0xFF2B2846),
+    highlight: Color(0xFFF0D2A2),
+    onHighlight: Color(0xFF2B1E06),
+    sidebar: Color(0xFF171A28),
+    onSidebar: Color(0xFFECEEF6),
+    onSidebarMuted: Color(0xFF9398B0),
+    feature: Color(0xFF4B41A8),
+    onFeature: Color(0xFFFFFFFF),
+    onFeatureMuted: Color(0xFFCFCAF3),
+    featureHighlight: Color(0xFF5D53BA),
     positive: Color(0xFF8FD3A3),
     positiveSoft: Color(0xFF243A2C),
-    team: Color(0xFF6AA6F5),
-    personal: Color(0xFFB794EC),
+    team: Color(0xFF7FB0EE),
+    personal: Color(0xFFE08BB8),
   );
 
   static AppColors of(BuildContext context) =>

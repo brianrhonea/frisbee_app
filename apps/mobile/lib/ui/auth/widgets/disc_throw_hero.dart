@@ -6,15 +6,16 @@ import 'package:flutter/material.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/brand.dart';
 
-/// Brand colours of the logo (assets/brand/stall10_logo.png).
+/// The website's palette: a Midnight sky over an indigo field, and an
+/// amber disc.
 abstract final class _Palette {
-  static const skyTop = Color(0xFF0F1D15);
-  static const field = Color(0xFF1F3B2C);
-  static const fieldDeep = Color(0xFF163023);
-  static const chalk = Color(0xFFF4F6EE);
-  static const disc = Color(0xFFD7F06A);
-  static const discRim = Color(0xFF7E9B32);
-  static const discLine = Color(0xFF93B23C);
+  static const skyTop = Color(0xFF121521);
+  static const field = Color(0xFF3B3290);
+  static const fieldDeep = Color(0xFF2C2570);
+  static const chalk = Color(0xFFF3F5FB);
+  static const disc = Color(0xFFF0D8A8);
+  static const discRim = Color(0xFFB98A3E);
+  static const discLine = Color(0xFFC99D54);
 }
 
 /// The background colour at the bottom of the hero, for whatever sits
@@ -309,8 +310,8 @@ class DiscThrowPainter extends CustomPainter {
     );
   }
 
-  /// An ultimate field in perspective: mowing stripes, sidelines, the goal
-  /// line and a brick mark.
+  /// An ultimate field in perspective: mowing stripes, sidelines and the
+  /// goal line. (No brick mark: it fell right behind the tagline.)
   void _paintField(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
@@ -349,21 +350,8 @@ class DiscThrowPainter extends CustomPainter {
       canvas.drawLine(project(u, 0), project(u, 1), chalk);
     }
     canvas.drawLine(project(0, 1), project(1, 1), chalk);
-    // The goal line, and the brick mark in front of it.
+    // The goal line.
     canvas.drawLine(project(0, 0.55), project(1, 0.55), chalk);
-    final brick = project(0.5, 0.08);
-    const b = 8.0;
-    canvas
-      ..drawLine(
-        brick + Offset(-b, -b * 0.5),
-        brick + Offset(b, b * 0.5),
-        chalk,
-      )
-      ..drawLine(
-        brick + Offset(-b, b * 0.5),
-        brick + Offset(b, -b * 0.5),
-        chalk,
-      );
 
     // Fade the field into the dark at the horizon.
     final fadeRect = Rect.fromLTWH(0, 0, w, project(0, 1).dy + h * 0.08);
@@ -373,7 +361,7 @@ class DiscThrowPainter extends CustomPainter {
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [_Palette.skyTop, Color(0x000F1D15)],
+          colors: [_Palette.skyTop, Color(0x00121521)],
         ).createShader(fadeRect),
     );
   }
@@ -450,7 +438,7 @@ class DiscThrowPainter extends CustomPainter {
             const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFEFFAB8), _Palette.disc, Color(0xFFC3DC55)],
+              colors: [Color(0xFFFBEFD6), _Palette.disc, Color(0xFFDDB878)],
               stops: [0, 0.35, 1],
             ).createShader(
               Rect.fromCenter(

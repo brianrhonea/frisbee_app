@@ -109,18 +109,34 @@ class SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
+    // A long value (an email address) goes under the title instead of
+    // beside it, where it would squeeze the title to a letter a line.
+    final long = (value?.length ?? 0) > 22 && subtitle == null;
+    final side = long ? null : value;
     return ListTile(
       leading: Icon(icon, color: color ?? c.ink),
       title: Text(
         title,
         style: TextStyle(fontWeight: FontWeight.w600, color: color),
       ),
-      subtitle: subtitle == null ? null : Text(subtitle!),
+      subtitle: subtitle != null
+          ? Text(subtitle!)
+          : long
+          ? Text(value!, style: TextStyle(color: c.muted, fontSize: 13))
+          : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (value case final v?)
-            Text(v, style: TextStyle(color: c.muted, fontSize: 13)),
+          if (side case final v?)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                v,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: c.muted, fontSize: 13),
+              ),
+            ),
           if (opensPage && onTap != null) ...[
             const SizedBox(width: 4),
             Icon(Icons.chevron_right, color: c.muted),

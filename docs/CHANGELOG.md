@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.21  | 2026-11-14 | `feature/web-redesign`                  |                     |
 | 0.0.20  | 2026-11-13 | `feature/core-parity`                   |                     |
 | 0.0.19  | 2026-11-13 | `feature/personal-details`              |                     |
 | 0.0.18  | 2026-11-13 | `development`                           |                     |
@@ -34,6 +35,39 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.21 — The website's palette; layout fixes
+
+UI only; no data, rules or API changes.
+
+- `AppColors` (`ui/core/themes/theme.dart`) takes the website's tokens
+  (`apps/web/app/site.css`): indigo accent on `#F3F5FB` (light) and
+  "Midnight" (dark). `sidebar` is now white / Midnight card with ink text,
+  `feature` is the brand indigo, and `highlight` is amber, kept for calls
+  to action and marks on feature cards and strong tags.
+- Selection is indigo tint, as on the website: the sidebar and rail's
+  selected item (`accentSoft` with `accent`), the bottom bar's selected
+  icon and label, `UnderlineTabs` and `TabBar` (accent label and
+  indicator), selected chips (accent fill), badges and selected list tiles.
+- The sign-in hero (`disc_throw_hero.dart`) is a Midnight sky over an
+  indigo field with an amber disc. The logo and launcher icon are
+  unchanged.
+- Post photos (`_PostContent`) fill the post's width: one at 4:3, more in
+  two columns sized from the width. A fixed 320 dp photo overflowed the
+  post page by 10 dp on phones.
+- `SettingsTile` puts a long value (over 22 characters, e.g. an email)
+  under the title, and caps a short one at 180 dp with an ellipsis.
+- Home's composer buttons wrap from the card's left edge.
+- A post's Like / Repost / Comment row drops its words by the row's own
+  width (under 380 dp), not the screen's: on 411 dp phones it overflowed
+  the post card.
+- Schedule marks (`AppColors.team` / `personal`) use the website's tile
+  blue (`#2C6FB7`, dark `#7FB0EE`) and berry (`#A8407A`, dark `#E08BB8`),
+  so personal events no longer look like the new indigo accent.
+- The sign-in hero drops its chalk brick mark, which sat behind the
+  tagline. Home's "Coming up" Add event button is compact (36 dp), so the
+  card's bottom padding matches its top. The selected conversation's left
+  bar is the accent.
 
 ## 0.0.20 — Pull to refresh Home; calendars
 

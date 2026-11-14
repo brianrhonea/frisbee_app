@@ -392,11 +392,11 @@ class _SidebarItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final fg = selected ? c.onHighlight : c.onSidebar;
+    final fg = selected ? c.accent : c.onSidebar;
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
-        color: selected ? c.highlight : Colors.transparent,
+        color: selected ? c.accentSoft : Colors.transparent,
         borderRadius: BorderRadius.circular(controlRadius),
         child: InkWell(
           borderRadius: BorderRadius.circular(controlRadius),
@@ -451,7 +451,7 @@ class _ClubItem extends StatelessWidget {
                   ? Icons.diversity_3_outlined
                   : Icons.landscape_outlined,
               size: 17,
-              color: c.highlight,
+              color: c.accent,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -507,7 +507,7 @@ class _InviteCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.flag_outlined, size: 18, color: c.highlight),
+          Icon(Icons.flag_outlined, size: 18, color: c.accent),
           const SizedBox(height: 8),
           Text(
             'Better together.',
@@ -530,7 +530,7 @@ class _InviteCard extends StatelessWidget {
             child: Text(
               'Invite friends ↗',
               style: TextStyle(
-                color: c.highlight,
+                color: c.accent,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
@@ -577,7 +577,7 @@ class _Rail extends StatelessWidget {
                 child: Tooltip(
                   message: '${s.label}  ·  ${shortcutLabel('${s.index + 1}')}',
                   child: Material(
-                    color: s == selected ? c.highlight : Colors.transparent,
+                    color: s == selected ? c.accentSoft : Colors.transparent,
                     borderRadius: BorderRadius.circular(controlRadius),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(controlRadius),
@@ -596,7 +596,7 @@ class _Rail extends StatelessWidget {
                               s == selected ? s.activeIcon : s.icon,
                               size: 21,
                               color: s == selected
-                                  ? c.onHighlight
+                                  ? c.accent
                                   : c.onSidebarMuted,
                             ),
                           ),

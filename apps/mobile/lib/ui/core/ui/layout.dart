@@ -693,7 +693,7 @@ class UnderlineTabs extends StatelessWidget {
                   decoration: BoxDecoration(
                     border: Border(
                       bottom: BorderSide(
-                        color: i == selected ? c.ink : Colors.transparent,
+                        color: i == selected ? c.accent : Colors.transparent,
                         width: 2,
                       ),
                     ),
@@ -705,7 +705,7 @@ class UnderlineTabs extends StatelessWidget {
                       fontWeight: i == selected
                           ? FontWeight.w700
                           : FontWeight.w500,
-                      color: i == selected ? c.ink : c.muted,
+                      color: i == selected ? c.accent : c.muted,
                     ),
                   ),
                 ),
