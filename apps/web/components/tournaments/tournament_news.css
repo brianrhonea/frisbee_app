@@ -1,0 +1,3 @@
+/* A hosted event's News tab (TournamentNews.tsx). */
+.news-tab .news-start { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.news-tab .news-composer textarea { resize: vertical; }
