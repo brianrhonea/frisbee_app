@@ -10,6 +10,8 @@
 // newest page live; "Older posts" fetches the next page of the sources
 // holding the feed back. Below the newest of the sources' oldest loaded
 // posts a source might be missing posts, so the feed stops there.
+// [teamsOnly] is the "Your teams" tab: only the member's teams' posts (no
+// players' pages, no follows), as the app's HomeFeed(teamsOnly: true).
 import type { PublicPost } from "@stall10/shared";
 import {
   collection,
@@ -73,9 +75,17 @@ export interface UserPages {
   loadMore: () => Promise<void>;
 }
 
-export function useForYou(uid: string | undefined, myTeams: Array<{ id: string; name?: string }> | undefined, users: UserPages) {
+/** No players' posts: the "Your teams" feed. */
+export const noUserPages: UserPages = { posts: [], next: null, loadMore: async () => {} };
+
+export function useForYou(
+  uid: string | undefined,
+  myTeams: Array<{ id: string; name?: string }> | undefined,
+  users: UserPages,
+  { teamsOnly = false }: { teamsOnly?: boolean } = {},
+) {
   // The newest follows (one listener each for teams): bounded like the app's feed sources should be.
-  const follows = useLiveQuery<FollowDoc>(uid ? `users/${uid}/follows` : null, [orderBy("createdAt", "desc"), limit(followsCap)], uid ?? "");
+  const follows = useLiveQuery<FollowDoc>(uid && !teamsOnly ? `users/${uid}/follows` : null, [orderBy("createdAt", "desc"), limit(followsCap)], uid ?? "");
   const mine = useMemo(() => new Map((myTeams ?? []).map((t) => [t.id, t.name ?? "Team"])), [myTeams]);
 
   // The sources wanted now, by key (HomeFeed._sync).
@@ -195,7 +205,7 @@ export function useForYou(uid: string | undefined, myTeams: Array<{ id: string; 
   const [loadingMore, setLoadingMore] = useState(false);
   const hasMore = users.next !== null || sources.some((s) => !exhausted(s));
   // A follows read that failed still lets the feed show (the member's teams and the players' posts).
-  const loaded = (follows.data !== undefined || !!follows.error) && myTeams !== undefined && sources.every((s) => state[s.key]?.live !== undefined);
+  const loaded = (teamsOnly || follows.data !== undefined || !!follows.error) && myTeams !== undefined && sources.every((s) => state[s.key]?.live !== undefined);
 
   /**
    * Fetches the next page of the sources holding the feed back (those whose

@@ -1,21 +1,23 @@
 "use client";
-import type { MeHome, PostPage, PublicPost } from "@stall10/shared";
+import type { MeHome, MyEvent, PostPage, PublicPost } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { newPostBox, onHomeRefresh } from "@/lib/homeRefresh";
 import { callApi, problem } from "@/lib/client";
-import { Composer } from "./Composer";
+import { type Audience, Composer } from "./Composer";
 import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
-import { BrandCard, LearnPromo, PickupCard } from "./HomeCards";
+import { LearnPromo, PickupCard } from "./HomeCards";
 import { PostCard } from "./PostCard";
-import { SideTeams } from "./SideTeams";
 import { UsernameStep } from "./UsernameStep";
-import { ForYouFeed, TeamPostPicker } from "./home/ForYou";
-import { MyTeams } from "./MyTeams";
+import { ForYouFeed, TeamsFeed } from "./home/ForYou";
+import { NeedsYou } from "./home/NeedsYou";
+import { TeamStrip } from "./home/TeamStrip";
+import { FeedPager } from "./home/useInfiniteFeed";
 import { TeamInvites } from "./TeamInvites";
-import { formatDate } from "@/lib/dates";
+import { canOn } from "./tournaments/useTournament";
+import { useMyTeams } from "./useMyTeams";
 
 const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Not going" };
 
@@ -34,16 +36,33 @@ function tabFromUrl(): Tab {
 type Feed = { posts: PublicPost[]; next: number | null; busy: boolean; error: boolean };
 const emptyFeed: Feed = { posts: [], next: null, busy: false, error: false };
 
-/** "Friday, November 14", in the member's time zone once in the browser. */
-function useToday() {
-  const [today, setToday] = useState("");
-  useEffect(() => setToday(formatDate(new Date(), { weekday: "long", month: "long", day: "numeric" })), []);
-  return today;
+/** "Good morning, Sam", by the member's clock once in the browser. */
+function useGreeting(first: string) {
+  const [hello, setHello] = useState("");
+  useEffect(() => {
+    const h = new Date().getHours();
+    setHello(h < 5 ? "Up late" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening");
+  }, []);
+  if (!hello) return first ? `Welcome back, ${first}` : "Welcome back";
+  return first ? `${hello}, ${first}` : hello;
+}
+
+/** The teams the member may post on from Home: those they manage (the app's postableTeams), by name. */
+function useAudiences(uid: string): Audience[] {
+  const teams = useMyTeams(uid);
+  return (teams.data ?? [])
+    .filter((t) => canOn(t, uid, "manageTeam"))
+    .map((t) => ({ id: t.id, name: t.name ?? "Team", privateGroup: (t.kind ?? "team") !== "team" && t.requiresApproval === true }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
- * A signed-in member's home: a composer and their feed (people they follow,
- * or the whole community), with what's coming up on their teams beside it.
+ * A signed-in member's home, like a social feed: a greeting, the composer
+ * (to Everyone or a team they run), their teams in a strip, then the feed
+ * (For you, the whole Community, or their teams' posts), loading as it
+ * scrolls. Beside it: invitations, join requests waiting on them, what's
+ * coming up and one promo; on phones the invitations and next event come
+ * above the feed.
  */
 export function Dashboard({ user }: { user: User }) {
   const [home, setHome] = useState<MeHome | null>(null);
@@ -51,7 +70,8 @@ export function Dashboard({ user }: { user: User }) {
   const [tab, setTab] = useState<Tab>("foryou");
   const [older, setOlder] = useState<Feed>(emptyFeed);
   const [community, setCommunity] = useState<Feed | null>(null);
-  const today = useToday();
+  const audiences = useAudiences(user.uid);
+  const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
 
   const load = useCallback(async () => {
     setError("");
@@ -125,8 +145,19 @@ export function Dashboard({ user }: { user: User }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load.
   }, []);
 
+  /** Arrow keys, Home and End move along the tabs (the ARIA tabs pattern). */
+  function onTabKey(e: KeyboardEvent<HTMLButtonElement>) {
+    const i = tabs.findIndex(([t]) => t === tab);
+    const to = ({ ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 } as Record<string, number>)[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    const [next] = tabs[(to + tabs.length) % tabs.length]!;
+    pickTab(next);
+    tabRefs.current[next]?.focus();
+  }
+
   async function loadOlder() {
-    if (older.next === null) return;
+    if (older.next === null || older.busy) return;
     setOlder((o) => ({ ...o, busy: true, error: false }));
     try {
       const h = await callApi<MeHome>(user, `/v1/me/home?before=${older.next}`);
@@ -153,105 +184,106 @@ export function Dashboard({ user }: { user: User }) {
   const { profile, teams, events } = home;
   const following = [...home.feed.posts, ...older.posts];
   const shown: Feed = community ?? { ...emptyFeed, busy: true };
-  const first = (user.displayName || profile.name || "").trim().split(/\s+/)[0];
+  const first = (user.displayName || profile.name || "").trim().split(/\s+/)[0] ?? "";
 
   return (
     <div className="page huddle">
       <div className="huddle-main">
-        <header className="huddle-head">
-          <div>
-            <h1>Your daily huddle.</h1>
-            <p>{first ? `Welcome back, ${first}. ` : ""}Good throws. Great people. You&apos;re in the right place.</p>
-          </div>
-          {today && <span className="pill pill-date">{today}</span>}
-        </header>
+        <Greeting first={first} />
 
-        {profile.needsUsername && <UsernameStep user={user} onDone={() => void load()} />}
+        {profile.needsUsername && (
+          <div id="username">
+            <UsernameStep user={user} onDone={() => void load()} />
+          </div>
+        )}
 
         <div className="card composer-card">
           <Composer
+            audiences={audiences}
             onSaved={() => {
               void load();
               if (community) void loadCommunity();
             }}
           />
-          <TeamPostPicker uid={user.uid} />
+        </div>
+
+        <TeamStrip uid={user.uid} />
+
+        {/* Phones: what needs an answer or is next, before the feed. */}
+        <div className="huddle-phone">
+          <TeamInvites />
+          {events[0] && <NextEvent event={events[0]} />}
         </div>
 
         <div className="feed-tabs" role="tablist" aria-label="Feed">
           {tabs.map(([t, label]) => (
             <button
               key={t}
+              ref={(el) => {
+                tabRefs.current[t] = el;
+              }}
+              id={`feed-tab-${t}`}
               type="button"
               role="tab"
               aria-selected={tab === t}
+              aria-controls={tab === t ? `feed-panel-${t}` : undefined}
+              tabIndex={tab === t ? 0 : -1}
               className={tab === t ? "on" : undefined}
               onClick={() => pickTab(t)}
+              onKeyDown={onTabKey}
             >
               {label}
             </button>
           ))}
         </div>
 
-        {tab === "foryou" && (
-          <ForYouFeed
-            uid={user.uid}
-            users={{ posts: following, next: older.next, loadMore: loadOlder, busy: older.busy, error: older.error }}
-            onCommunity={() => pickTab("community")}
-          />
-        )}
-        {tab === "teams" && (
-          <div role="tabpanel" aria-label="Your teams">
-            <MyTeams />
-          </div>
-        )}
-        {tab === "community" && (
-        <div role="tabpanel" aria-label="Community">
-          {shown.posts.length === 0 ? (
-            shown.busy ? (
-              <p className="empty" aria-busy="true">
-                Loading posts…
-              </p>
-            ) : shown.error ? (
-              <p className="post-error">Couldn&apos;t load posts. Try again.</p>
-            ) : (
-              <div className="card">
-                <p className="muted small">
-                  No posts yet.
+        <div role="tabpanel" id={`feed-panel-${tab}`} aria-labelledby={`feed-tab-${tab}`} className="feed-panel">
+          {tab === "foryou" && (
+            <ForYouFeed
+              uid={user.uid}
+              users={{ posts: following, next: older.next, loadMore: loadOlder, busy: older.busy, error: older.error }}
+              needsUsername={profile.needsUsername}
+              onCommunity={() => pickTab("community")}
+            />
+          )}
+          {tab === "teams" && <TeamsFeed uid={user.uid} />}
+          {tab === "community" &&
+            (shown.posts.length === 0 ? (
+              shown.busy ? (
+                <p className="empty" aria-busy="true">
+                  Loading posts…
                 </p>
-              </div>
-            )
-          ) : (
-            <div className="stack">
-              {shown.posts.map((p) => (
-                <PostCard key={p.id} post={p} />
-              ))}
-            </div>
-          )}
-          {shown.posts.length > 0 && (
-            <nav className="pager">
-              {shown.next === null ? (
-                <p className="empty">You&apos;re all caught up.</p>
+              ) : shown.error ? (
+                <p className="post-error">Couldn&apos;t load posts. Try again.</p>
               ) : (
-                <button
-                  className="btn"
-                  type="button"
-                  disabled={shown.busy}
-                  onClick={() => void loadCommunity(shown.next ?? undefined)}
-                >
-                  {shown.busy ? "Loading…" : "Older posts"}
-                </button>
-              )}
-              {shown.error && <p className="post-error">Couldn&apos;t load more posts. Try again.</p>}
-            </nav>
-          )}
+                <div className="card">
+                  <p className="muted small">No posts yet.</p>
+                </div>
+              )
+            ) : (
+              <>
+                <div className="stack">
+                  {shown.posts.map((p) => (
+                    <PostCard key={p.id} post={p} />
+                  ))}
+                </div>
+                <FeedPager
+                  hasMore={shown.next !== null}
+                  busy={shown.busy}
+                  error={shown.error}
+                  count={shown.posts.length}
+                  loadMore={() => loadCommunity(shown.next ?? undefined)}
+                />
+              </>
+            ))}
         </div>
-        )}
       </div>
 
-      <aside className="huddle-side" aria-label="Coming up">
-        <TeamInvites />
-        <PickupCard />
+      <aside className="huddle-side" aria-label="For you">
+        <div className="huddle-side-invites">
+          <TeamInvites />
+        </div>
+        <NeedsYou uid={user.uid} />
 
         <div className="card">
           <div className="card-head">
@@ -281,27 +313,30 @@ export function Dashboard({ user }: { user: User }) {
           )}
         </div>
 
-        {teams.length === 0 && (
-          <div className="card">
-            <h2 className="card-title">Your teams</h2>
-            <p className="muted small">
-              Join a team with an invite link, or <Link href="/explore">find one near you</Link>.
-            </p>
-          </div>
-        )}
-
-        <LearnPromo />
-        <p className="side-note">
-          Made for the love of the game.
-          <br />
-          And the people who play it.
-        </p>
+        {/* One promo, last: pickup for someone without a team yet, else Learn. */}
+        {teams.length === 0 ? <PickupCard /> : <LearnPromo />}
       </aside>
-
-      <div className="huddle-foot">
-        <SideTeams inline />
-        <BrandCard />
-      </div>
     </div>
+  );
+}
+
+/** The page's heading: one line, "Good evening, Sam". */
+function Greeting({ first }: { first: string }) {
+  const text = useGreeting(first);
+  return <h1 className="huddle-greeting">{text}</h1>;
+}
+
+/** The next event on the member's teams, for phones above the feed. */
+function NextEvent({ event: e }: { event: MyEvent }) {
+  return (
+    <Link className="card next-event" href={`/teams/${encodeURIComponent(e.teamId)}/schedule?event=${encodeURIComponent(e.id)}`}>
+      <small>Up next · {e.teamName}</small>
+      <b>{e.title || "Event"}</b>
+      <span className="muted small">
+        <LocalTime iso={e.startsAt} style="dateTime" />
+        {e.location ? ` · ${e.location}` : ""}
+        {e.rsvp ? ` · ${rsvpLabels[e.rsvp] ?? e.rsvp}` : ""}
+      </span>
+    </Link>
   );
 }

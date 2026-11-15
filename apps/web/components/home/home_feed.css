@@ -1,7 +1,5 @@
-/* The home page's For you feed and Team post picker (ForYou.tsx). */
+/* The home page's feeds (ForYou.tsx). */
 .feed-team-post { display: grid; gap: 4px; }
 .feed-team-post .feed-team-link { font-size: 12px; font-weight: 600; color: var(--muted, inherit); text-decoration: none; }
 .feed-team-post .feed-team-link:hover,
 .feed-team-post .feed-team-link:focus-visible { text-decoration: underline; }
-.team-post-picker { display: grid; gap: 8px; margin-top: 10px; }
-.team-post-picker select { margin-left: 6px; }
