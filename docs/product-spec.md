@@ -246,6 +246,18 @@ everything the app does on the website alone, styled like the website
     chat; [x] Message on player pages (`/messages?to=<uid>`); [x] unsent
     drafts per conversation and room (kept in the browser; web 0.25.0,
     api 0.23.0).
+11. My schedule: [x] every team's events and meetings beside the
+    member's calendars, merged soonest first, with the app's All / Team /
+    Personal filter, team-name tags when on several teams, and Delete for
+    event managers (live Firestore reads under the team schedule's
+    rules; the merge and the two-hour rule are in `@stall10/shared`
+    `schedule.ts`). The website keeps its upcoming list over the
+    calendars' 92-day window (the app pages a week at a time). Not yet:
+    home's Upcoming events card lists only team events from
+    `/v1/me/home` (the app's home merges personal ones in), and adding a
+    team event from My schedule (the app's editor offers the teams the
+    member manages) stays on the team's page. The subscribe feed
+    (`/v1/ical/:token.ics`) is calendars only on both platforms.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

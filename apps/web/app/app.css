@@ -989,6 +989,7 @@ a.play-card:hover { border-color: var(--accent); }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .card-head .card-title { margin: 0; }
 .event-actions { display: flex; gap: 14px; margin-top: 4px; }
+.schedule-filter { margin-bottom: 12px; }
 .event-editor { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
 /* Calendars (Schedule, Settings → Calendars). */

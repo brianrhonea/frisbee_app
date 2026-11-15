@@ -4,6 +4,18 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.26.0 — 2026-11-15
+
+**Added**
+- My schedule shows every team's upcoming events and meetings beside your
+  calendars, soonest first, with the app's All / Team / Personal filter,
+  team-name tags when you're on several teams, and Delete for event
+  managers.
+
+**Changed**
+- My schedule drops an entry at its end, or once it starts without one,
+  as the app does (calendar entries used to have an hour's grace).
+
 ## 0.25.1 — 2026-11-15
 
 **Fixed** (shared test vectors with the app)
