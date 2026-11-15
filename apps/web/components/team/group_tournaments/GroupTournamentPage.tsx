@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../AuthProvider";
+import { Dialog } from "@/components/Dialog";
 import { FollowButton } from "../../FollowButton";
 import { callApi } from "@/lib/client";
 import { useLiveDoc, useLiveQuery } from "@/lib/live";
@@ -456,8 +457,7 @@ function GameSheet({
   }
 
   return (
-    <div className="gt-overlay" role="presentation" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="card gt-sheet" role="dialog" aria-modal="true" aria-label={`Game ${g.order + 1}`}>
+    <Dialog label={`Game ${g.order + 1}`} onClose={onClose} className="card gt-sheet" dismissOnBackdrop>
         <div className="gt-head">
           <h2 className="card-title">
             Game {g.order + 1} · {g.label}
@@ -544,8 +544,7 @@ function GameSheet({
           </div>
         )}
         {error && <p className="form-error">{error}</p>}
-      </div>
-    </div>
+    </Dialog>
   );
 }
 

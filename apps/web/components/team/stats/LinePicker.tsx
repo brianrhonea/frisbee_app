@@ -1,6 +1,7 @@
 "use client";
 import { lineSize, type StatLine, type StatSide, type StatsPlayer, sideShort } from "@stall10/shared";
 import { useState } from "react";
+import { Dialog } from "../../Dialog";
 import "./stats.css";
 
 /** Toggle up to seven players (PlayerChooser). */
@@ -80,7 +81,7 @@ export function LinePicker({
   // In roster order, as the app keeps them.
   const ordered = () => available.filter((p) => picked.has(p.id)).map((p) => p.id);
   return (
-    <div className="card st-subcard" role="dialog" aria-label={title}>
+    <Dialog label={title} onClose={() => onDone(null)} className="card st-subcard">
       <h3 className="card-title">{title}</h3>
       {saved.length > 0 && !requireName && (
         <div className="st-chips">
@@ -123,6 +124,6 @@ export function LinePicker({
           {picked.size < lineSize ? `Pick ${lineSize - picked.size} more` : requireName ? "Save line" : "Use line"}
         </button>
       </div>
-    </div>
+    </Dialog>
   );
 }
