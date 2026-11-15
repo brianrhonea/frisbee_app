@@ -7,7 +7,9 @@
 //
 // Dates are Date objects. Calendar maths (a league's weekly nights) is in
 // the runtime's local time zone, as the app does on the phone: run it in
-// the browser, not on the server.
+// the browser, not on the server. Group tournaments (group_tournaments.ts)
+// use the same engine with ISO-string dates: everything but scheduling
+// works on any game shape (GameLike), and groupEngine adapts scheduleFor.
 
 export const tournamentFormats = ["roundRobin", "poolsSingleElim", "singleElim", "doubleElim", "poolsPlacement"] as const;
 export type TournamentFormat = (typeof tournamentFormats)[number];
@@ -54,8 +56,8 @@ export interface ScoreReport {
   byTeam: string;
 }
 
-/** One game (GroupGame), keyed as stored. */
-export interface EngineGame {
+/** One game (GroupGame), keyed as stored; [D] is how its start is held. */
+export interface EngineGameOf<D> {
   id: string;
   order: number;
   stage: GameStage;
@@ -63,7 +65,7 @@ export interface EngineGame {
   label: string;
   pool: string | null;
   field: number;
-  startsAt: Date | null;
+  startsAt: D | null;
   teamA: string | null;
   teamB: string | null;
   sourceA: SlotSource | null;
@@ -76,6 +78,12 @@ export interface EngineGame {
   /** Placement games only: the winner's place. */
   place?: number | null;
 }
+
+/** A game with Date starts (hosted tournaments and leagues). */
+export type EngineGame = EngineGameOf<Date>;
+
+/** Any game, whatever its dates are: what the engine reads. */
+export type GameLike = EngineGameOf<unknown>;
 
 /** What a division's games follow (TournamentSettings). */
 export interface EngineSettings {
@@ -105,11 +113,11 @@ export interface EngineSeason {
 export const seasonHasPlayoffs = (s: EngineSeason) => s.playoffTeams > 0 && s.playoffWeeks > 0;
 export const regularWeeks = (s: EngineSeason) => (seasonHasPlayoffs(s) ? s.weeks - s.playoffWeeks : s.weeks);
 
-export const isDone = (g: EngineGame) => g.status === "done";
-export const hasTeams = (g: EngineGame) => g.teamA != null && g.teamB != null;
-export const winnerOf = (g: EngineGame): string | null =>
+export const isDone = (g: GameLike) => g.status === "done";
+export const hasTeams = (g: GameLike) => g.teamA != null && g.teamB != null;
+export const winnerOf = (g: GameLike): string | null =>
   !isDone(g) ? null : (g.scoreA ?? 0) > (g.scoreB ?? 0) ? g.teamA : g.teamB;
-export const loserOf = (g: EngineGame): string | null =>
+export const loserOf = (g: GameLike): string | null =>
   !isDone(g) ? null : (g.scoreA ?? 0) > (g.scoreB ?? 0) ? g.teamB : g.teamA;
 
 export class ScheduleError extends Error {}
@@ -146,7 +154,7 @@ export const pointDiff = (s: Standing) => s.pointsFor - s.pointsAgainst;
 export const poolName = (index: number) => String.fromCharCode(65 + index);
 
 /** Teams of each pool, from its games, pools in name order. */
-export function poolTeams(games: EngineGame[]): Map<string, string[]> {
+export function poolTeams(games: GameLike[]): Map<string, string[]> {
   const pools = new Map<string, Set<string>>();
   for (const g of games) {
     if (g.stage !== "pool" || g.pool == null) continue;
@@ -158,7 +166,7 @@ export function poolTeams(games: EngineGame[]): Map<string, string[]> {
   return new Map([...pools.keys()].sort().map((k) => [k, [...(pools.get(k) ?? [])]]));
 }
 
-export const poolComplete = (poolId: string, games: EngineGame[]) =>
+export const poolComplete = (poolId: string, games: GameLike[]) =>
   games.filter((g) => g.stage === "pool" && g.pool === poolId).every(isDone);
 
 /**
@@ -166,7 +174,7 @@ export const poolComplete = (poolId: string, games: EngineGame[]) =>
  * teams, then point differential, then points scored; remaining ties keep
  * [teamIds] order.
  */
-export function standings(teamIds: string[], games: Iterable<EngineGame>): Standing[] {
+export function standings(teamIds: string[], games: Iterable<GameLike>): Standing[] {
   const ids = new Set(teamIds);
   const done = [...games].filter((g) => isDone(g) && g.teamA != null && g.teamB != null && ids.has(g.teamA) && ids.has(g.teamB));
   const rows = new Map(teamIds.map((id) => [id, { teamId: id, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0 } as Standing]));
@@ -462,7 +470,7 @@ function doubleElim(b: Builder, entrants: Entrant[]) {
   });
 }
 
-function dependencies(games: EngineGame[]): Map<string, Set<string>> {
+function dependencies(games: GameLike[]): Map<string, Set<string>> {
   const byPool = new Map<string, Set<string>>();
   for (const g of games) {
     if (g.stage === "pool") byPool.set(g.pool ?? "", (byPool.get(g.pool ?? "") ?? new Set()).add(g.id));
@@ -477,7 +485,7 @@ export function gamesPerDay(total: number, days: number): number[] {
   return Array.from({ length: days }, (_, d) => Math.floor(total / days) + (d < total % days ? 1 : 0));
 }
 
-const teamsOf = (g: EngineGame) => [g.teamA, g.teamB].filter((t): t is string => t != null);
+const teamsOf = (g: GameLike) => [g.teamA, g.teamB].filter((t): t is string => t != null);
 
 function schedule(games: EngineGame[], s: EngineSettings): SchedulePlan {
   const fields = Math.max(1, s.fields);
@@ -641,7 +649,7 @@ export function seasonFor(teams: string[], s: EngineSettings, season: EngineSeas
 }
 
 /** Teams with no pool game in [week]: the bye. */
-export function byesIn(teams: string[], games: Iterable<EngineGame>, week: number): string[] {
+export function byesIn(teams: string[], games: Iterable<GameLike>, week: number): string[] {
   const playing = new Set<string>();
   for (const g of games) if (g.stage === "pool" && g.round === week) for (const t of teamsOf(g)) playing.add(t);
   return teams.filter((t) => !playing.has(t));
@@ -657,7 +665,7 @@ export interface SlotFill {
 }
 
 /** Teams that move on once [finished] is final. */
-export function fillsAfter(finished: EngineGame, games: EngineGame[], overwrite = false): SlotFill[] {
+export function fillsAfter(finished: GameLike, games: GameLike[], overwrite = false): SlotFill[] {
   const winner = winnerOf(finished);
   const loser = loserOf(finished);
   if (winner == null || loser == null) return [];
@@ -681,16 +689,16 @@ export function fillsAfter(finished: EngineGame, games: EngineGame[], overwrite 
 }
 
 /** Whether a game fed by [game]'s result has been played or reported. */
-export const laterGamesPlayed = (game: EngineGame, games: EngineGame[]) =>
+export const laterGamesPlayed = (game: GameLike, games: GameLike[]) =>
   games.some(
     (g) => g.status !== "scheduled" && [g.sourceA, g.sourceB].some((s) => s != null && s.type !== "pool" && s.game === game.id),
   );
 
 /** Fills that should already have been written for finished games. */
-export const pendingFills = (games: EngineGame[]) => games.filter(isDone).flatMap((g) => fillsAfter(g, games));
+export const pendingFills = (games: GameLike[]) => games.filter(isDone).flatMap((g) => fillsAfter(g, games));
 
 /** Seeds bracket games from pool standings once every pool is complete. */
-export function bracketSeeds(games: EngineGame[]): SlotFill[] {
+export function bracketSeeds(games: GameLike[]): SlotFill[] {
   const map = poolTeams(games);
   if (map.size === 0 || ![...map.keys()].every((p) => poolComplete(p, games))) return [];
   const ranked = new Map(
@@ -706,21 +714,21 @@ export function bracketSeeds(games: EngineGame[]): SlotFill[] {
   return out;
 }
 
-export const awaitingSeeds = (games: EngineGame[]) =>
+export const awaitingSeeds = (games: GameLike[]) =>
   games.some((g) => (g.teamA == null && g.sourceA?.type === "pool") || (g.teamB == null && g.sourceB?.type === "pool"));
 
 /** Games still to be played; the if-needed final drops out once it isn't needed. */
-export function gamesToPlay(games: EngineGame[]): EngineGame[] {
+export function gamesToPlay<G extends GameLike>(games: G[]): G[] {
   const grand = games.find((g) => g.stage === "grandFinal");
   const resetNeeded = grand == null || !isDone(grand) ? true : winnerOf(grand) === grand.teamB;
   return games.filter((g) => !isDone(g) && !(g.ifNeeded && !resetNeeded));
 }
 
-export const skippedGame = (game: EngineGame, games: EngineGame[]) =>
+export const skippedGame = (game: GameLike, games: GameLike[]) =>
   game.ifNeeded && !isDone(game) && !gamesToPlay(games).some((g) => g.id === game.id);
 
 /** The winner once every game that needs playing is done. */
-export function championOf(format: TournamentFormat, games: EngineGame[]): string | null {
+export function championOf(format: TournamentFormat, games: GameLike[]): string | null {
   if (games.length === 0 || gamesToPlay(games).length > 0) return null;
   if (format === "roundRobin") {
     const pool = [...poolTeams(games).values()][0] ?? [];
@@ -739,7 +747,7 @@ export function championOf(format: TournamentFormat, games: EngineGame[]): strin
 }
 
 /** Final places, best first, once every game is played; empty until then. */
-export function placementsOf(format: TournamentFormat, seeds: string[], games: EngineGame[]): string[] {
+export function placementsOf(format: TournamentFormat, seeds: string[], games: GameLike[]): string[] {
   if (games.length === 0 || gamesToPlay(games).length > 0) return [];
   const byPlace = new Map<number, string>();
   for (const g of games) {
