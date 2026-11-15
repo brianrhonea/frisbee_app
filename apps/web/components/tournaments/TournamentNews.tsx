@@ -11,7 +11,7 @@ import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { TeamPostCard, type TeamPostView } from "@/components/team/TeamPostCard";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useLiveQuery } from "@/lib/live";
 import { canOn, type TournamentState } from "./useTournament";
 import "./tournament_news.css";
@@ -81,7 +81,7 @@ function NewsComposer({ hostId, tournamentKey, hostName }: { hostId: string; tou
       setBody("");
       setOpen(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't post that. Try again.");
+      setError(problem(err, "Couldn't post that. Try again."));
     } finally {
       setBusy(false);
     }

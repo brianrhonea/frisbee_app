@@ -17,6 +17,7 @@ import { openConversation } from "./MessageButton";
 import { LoadMore } from "./LoadMore";
 import { loadAtTop, OlderMessages } from "./OlderMessages";
 import { type PickedPerson, PersonPicker } from "./PersonPicker";
+import { isTyping } from "@/lib/text";
 
 /** conversations/{id} (Conversation in the app). */
 interface Conversation {
@@ -163,8 +164,7 @@ export function Messages() {
   keys.current = { shown, openId, go };
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const t = e.target as HTMLElement | null;
-      if (e.ctrlKey || e.metaKey || e.altKey || (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)))) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
       if (e.key !== "j" && e.key !== "k" && e.key !== "Escape") return;
       const { shown, openId, go } = keys.current;
       if (e.key === "Escape") return openId && go({ c: null });

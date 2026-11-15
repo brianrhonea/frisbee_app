@@ -37,11 +37,9 @@ export interface Live<T> {
   denied?: boolean;
 }
 
-const denied = "You can't see this.";
-const failed = "Couldn't load this. Check your connection and refresh.";
-
-function message(e: { code?: string }) {
-  return e.code === "permission-denied" ? denied : failed;
+/** A failed listener in words: refused by the rules, or [failed] for anything else. */
+export function liveError(e: { code?: string }, failed = "Couldn't load this. Check your connection and refresh."): string {
+  return e.code === "permission-denied" ? "You can't see this." : failed;
 }
 
 /**
@@ -64,7 +62,7 @@ export function useLiveDoc<T = DocumentData>(path: string | null): Live<Doc<T> |
           data: snap.exists() ? ({ ...(plain(snap.data()) as T), id: snap.id } as Doc<T>) : null,
           error: null,
         }),
-      (e) => setState({ data: undefined, error: message(e), denied: e.code === "permission-denied" }),
+      (e) => setState({ data: undefined, error: liveError(e), denied: e.code === "permission-denied" }),
     );
   }, [path]);
   return state;
@@ -95,7 +93,7 @@ export function useLiveQuery<T = DocumentData>(
           data: snap.docs.map((d) => ({ ...(plain(d.data()) as T), id: d.id }) as Doc<T>),
           error: null,
         }),
-      (e) => setState({ data: undefined, error: message(e) }),
+      (e) => setState({ data: undefined, error: liveError(e) }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- [key] stands for constraints.
   }, [path, key]);
@@ -196,7 +194,7 @@ export function useLiveQueries<T = DocumentData>(
           results[i] = snap.docs.map((d) => ({ ...(plain(d.data()) as T), id: d.id }) as Doc<T>);
           publish();
         },
-        (e) => setState({ data: undefined, error: message(e) }),
+        (e) => setState({ data: undefined, error: liveError(e) }),
       ),
     );
     return () => stops.forEach((stop) => stop());

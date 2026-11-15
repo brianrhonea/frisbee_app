@@ -18,7 +18,7 @@ import { orderBy, where } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import type { TeamDoc } from "@/components/team/TeamContext";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 
 const editors = ["owner", "coach", "captain"];
@@ -136,7 +136,7 @@ export function useAction() {
     try {
       return { ok: true, value: await callApi<T>(user, path, { method, body }) };
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+      setError(problem(e));
       return { ok: false };
     } finally {
       setBusy(false);

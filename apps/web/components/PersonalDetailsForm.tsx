@@ -15,7 +15,7 @@ import {
 } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import { type FormEvent, useMemo, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { ApiError, callApi, problem } from "@/lib/client";
 
 /** Countries offered first; any other ISO code can be typed under "Other". */
 const countryCodes = [
@@ -176,8 +176,8 @@ export function PersonalDetailsForm({
       for (const i of parsed.error.issues) fields[i.path.join(".") || "_"] ??= i.message;
       return showErrors(fields);
     }
-    const problem = personalDetailsProblem(parsed.data, today);
-    if (problem) return showErrors({ [problem.field]: problem.message });
+    const wrong = personalDetailsProblem(parsed.data, today);
+    if (wrong) return showErrors({ [wrong.field]: wrong.message });
     setBusy(true);
     try {
       await callApi(user, "/v1/me/personal", { method: "PUT", body: body() });
@@ -188,7 +188,7 @@ export function PersonalDetailsForm({
         if (onTooYoung) return onTooYoung();
       }
       if (err instanceof ApiError && err.fields) showErrors(err.fields);
-      else setErrors({ _: err instanceof ApiError ? err.message : "Couldn't save. Try again." });
+      else setErrors({ _: problem(err, "Couldn't save. Try again.") });
     } finally {
       setBusy(false);
     }

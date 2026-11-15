@@ -3,7 +3,7 @@ import { type IdentityResult, profileLimits } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { photoProblem, uploadPhoto } from "@/lib/upload";
 import { Avatar } from "../Avatar";
 
@@ -40,7 +40,7 @@ export function IdentitySettings({ me, name: initialName, username, photoUrl, he
       await me.reload().catch(() => undefined);
       setMessage({ ok: true, text: done });
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof ApiError ? err.message : "Couldn't save. Try again." });
+      setMessage({ ok: false, text: problem(err, "Couldn't save. Try again.") });
     } finally {
       setBusy(null);
     }
@@ -50,15 +50,15 @@ export function IdentitySettings({ me, name: initialName, username, photoUrl, he
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const problem = photoProblem(file, "avatar");
-    if (problem) return setMessage({ ok: false, text: problem });
+    const bad = photoProblem(file, "avatar");
+    if (bad) return setMessage({ ok: false, text: bad });
     setBusy(kind);
     setMessage(null);
     try {
       const up = await uploadPhoto(me, file, { purpose: "avatar" });
       await save(kind, kind === "photo" ? { photoUploadId: up.id } : { headerUploadId: up.id }, kind === "photo" ? "Profile picture updated." : "Header photo updated.");
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof ApiError ? err.message : "Couldn't upload that picture. Try again." });
+      setMessage({ ok: false, text: problem(err, "Couldn't upload that picture. Try again.") });
       setBusy(null);
     }
   }

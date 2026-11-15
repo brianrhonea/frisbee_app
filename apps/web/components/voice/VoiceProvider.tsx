@@ -7,7 +7,7 @@
 import { voiceDecision, type VoiceRoomDoc, type VoiceTeam, type VoiceTokenResult } from "@stall10/shared";
 import { type DocumentReference, type DocumentSnapshot, doc, onSnapshot } from "firebase/firestore";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { firestoreDb } from "@/lib/firebase";
 import { useAuth } from "../AuthProvider";
 import { type CallEnd, CallCancelled, CallSession, type CallState, useCall } from "../team/meetings/call";
@@ -209,7 +209,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         if (mine !== attempt.current || e instanceof CallCancelled) return;
         channelRef.current = null;
         setChannel(null);
-        setError(e instanceof ApiError ? e.message : "Couldn't connect to the channel. Check your connection and try again.");
+        setError(problem(e, "Couldn't connect to the channel. Check your connection and try again."));
       } finally {
         if (mine === attempt.current) setConnecting(false);
       }

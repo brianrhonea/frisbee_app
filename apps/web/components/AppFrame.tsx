@@ -13,6 +13,7 @@ import { SideTeams } from "./SideTeams";
 import { ThemeToggle } from "./ThemeToggle";
 import { UpcomingAside } from "./UpcomingAside";
 import { VoiceBar } from "./voice/VoiceBar";
+import { isTyping } from "@/lib/text";
 
 type Tab = { href: string; label: string; icon: NavIconName; also?: string[] };
 
@@ -46,12 +47,6 @@ function compose(router: ReturnType<typeof useRouter>) {
 /** Pages that read best at full width, without the right column. */
 const fullWidth = ["/sign-in", "/sign-up", "/about", "/get-the-app", "/join", "/g", "/p", "/messages"];
 
-/** Typing in a field, where single-key shortcuts mustn't fire. */
-function typing(target: EventTarget | null) {
-  const el = target as HTMLElement | null;
-  return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
-}
-
 /**
  * Site-wide keys: `n` writes a post (Home's composer), `/` searches
  * (Explore), `g` then a tab's first letter goes there.
@@ -62,7 +57,7 @@ function useShortcuts(signedIn: boolean) {
     let pendingG = 0;
     const go: Record<string, string> = { h: "/", e: "/explore", v: "/events", t: "/teams", m: "/messages", n: "/notifications" };
     function onKey(e: KeyboardEvent) {
-      if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
       if (pendingG && Date.now() - pendingG < 1200 && go[e.key]) {
         pendingG = 0;
         e.preventDefault();

@@ -1,7 +1,7 @@
 "use client";
 import { profileLimits, throwingHands } from "@stall10/shared";
 import { type FormEvent, useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { IdentitySettings } from "./IdentitySettings";
 import { searchTagsFor, useMyProfile } from "./useMyProfile";
@@ -73,7 +73,7 @@ export function ProfileSettings() {
       });
       setMessage({ ok: true, text: "Saved." });
     } catch (err) {
-      setMessage({ ok: false, text: err instanceof ApiError ? err.message : "Couldn't save. Try again." });
+      setMessage({ ok: false, text: problem(err, "Couldn't save. Try again.") });
     } finally {
       setBusy(false);
     }

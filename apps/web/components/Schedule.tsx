@@ -22,7 +22,7 @@ import { where } from "firebase/firestore";
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { colorOf, downloadIcs, loadHidden, saveHidden } from "@/lib/calendar";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { type Meeting, type MeetingData, meetingHref, teamBase, teamMeetingQueries } from "./team/meetings/model";
 import { memberViewer, type TeamDoc } from "./team/TeamContext";
@@ -34,7 +34,6 @@ import { type ShareChoice, ShareEventField, shareEvent } from "./team/ShareEvent
 import { fromLocalInput, startOfToday, toLocalInput } from "@/lib/dates";
 
 const dayMs = 86_400_000;
-const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 const canEdit = (c: CalendarInfo | undefined) => c?.role === "owner" || c?.role === "edit";
 
 

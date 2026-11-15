@@ -2,7 +2,7 @@
 import type { TeamRoster } from "@stall10/shared";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { divisionLabels } from "@/lib/site";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
@@ -28,7 +28,7 @@ export function CommunityTeams() {
     setError("");
     callApi<TeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`)
       .then((r) => setTeams(r.teams))
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Couldn't load the teams. Try again."));
+      .catch((e) => setError(problem(e, "Couldn't load the teams. Try again.")));
   }, [user, teamId]);
 
   if (user === undefined) return null;

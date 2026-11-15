@@ -2,7 +2,7 @@
 import { gameWon, ourScore, ranked, statSheetOfGames, type StatsGame, theirScore } from "@stall10/shared";
 import Link from "next/link";
 import { useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../../AuthProvider";
 import { useTeamHub } from "../TeamContext";
 import {
@@ -59,7 +59,7 @@ export async function confirmAndDelete(
     await callApi(user, path, { method: "DELETE" });
     return true;
   } catch (e) {
-    onError(e instanceof ApiError ? e.message : "Couldn't delete it. Try again.");
+    onError(problem(e, "Couldn't delete it. Try again."));
     return false;
   }
 }

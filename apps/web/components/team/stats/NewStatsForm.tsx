@@ -14,7 +14,7 @@ import {
 } from "@stall10/shared";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../../AuthProvider";
 import { apiUrl, gameUrl, type LinkableEvent, shortDate, tournamentUrl } from "./data";
 import "./stats.css";
@@ -120,7 +120,7 @@ export function NewStatsForm({
         router.push(gameUrl(teamId, id));
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't create it. Try again.");
+      setError(problem(err, "Couldn't create it. Try again."));
       setBusy(false);
     }
   }
@@ -269,7 +269,7 @@ function NewEvent({
       });
       onDone({ id, title: title.trim(), type, startsAt, location: "" });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't add the event. Try again.");
+      setError(problem(err, "Couldn't add the event. Try again."));
       setBusy(false);
     }
   }

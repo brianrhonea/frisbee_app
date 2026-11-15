@@ -3,7 +3,7 @@ import { commentBodyMax, type CommentResult, type LikeResult } from "@stall10/sh
 import { limit, orderBy } from "firebase/firestore";
 import Link from "next/link";
 import { type FormEvent, useRef, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { type Doc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
@@ -25,7 +25,6 @@ interface Comment {
 /** The most comments a post shows (oldest first). */
 const shown = 300;
 
-const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 
 /**
  * A post's comments, live, with replies one level deep under each one.

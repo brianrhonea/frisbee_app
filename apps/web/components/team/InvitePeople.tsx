@@ -1,7 +1,7 @@
 "use client";
 import type { SearchPage } from "@stall10/shared";
 import { useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { ApiError, callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 
@@ -46,7 +46,7 @@ export function InvitePeople({ teamId, teamName, onClose }: { teamId: string; te
       setInvited((m) => ({ ...m, [uid]: "Invited" }));
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setInvited((m) => ({ ...m, [uid]: "Already on it" }));
-      else setError(e instanceof ApiError ? e.message : "Couldn't send the invite. Try again.");
+      else setError(problem(e, "Couldn't send the invite. Try again."));
     } finally {
       setBusy(null);
     }

@@ -2,7 +2,7 @@
 import { orderBy } from "firebase/firestore";
 import Link from "next/link";
 import { useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
@@ -26,19 +26,19 @@ export function FollowRequests() {
     "requests",
   );
   const [busy, setBusy] = useState<string | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   if (!user) return null;
   const me = user;
 
   async function answer(uid: string, accept: boolean) {
     setBusy(uid);
-    setProblem(null);
+    setFailed(null);
     try {
       await callApi(me, `/v1/me/follow-requests/${encodeURIComponent(uid)}${accept ? "/accept" : ""}`, {
         method: accept ? "POST" : "DELETE",
       });
     } catch (e) {
-      setProblem(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+      setFailed(problem(e));
     } finally {
       setBusy(null);
     }
@@ -54,7 +54,7 @@ export function FollowRequests() {
         </p>
       )}
       {error && <p className="form-error">{error}</p>}
-      {problem && <p className="form-error">{problem}</p>}
+      {failed && <p className="form-error">{failed}</p>}
       {data && data.length === 0 && <p className="empty">No requests right now.</p>}
       <ul className="people-list">
         {(data ?? []).map((r) => (

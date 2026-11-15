@@ -13,7 +13,7 @@ import {
 } from "@stall10/shared";
 import { type ClipboardEvent, type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { where } from "firebase/firestore";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useLiveQuery } from "@/lib/live";
 import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
@@ -75,7 +75,6 @@ function workoutOf(d: WorkoutDraft): WorkoutInput | string {
   return out;
 }
 
-const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 
 /** The post being edited, when not writing a new one. */
 interface EditingPost {

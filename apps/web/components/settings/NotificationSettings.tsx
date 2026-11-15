@@ -2,7 +2,7 @@
 import { type NotificationCategory, notificationCategories, notificationCategoryInfo } from "@stall10/shared";
 import { where } from "firebase/firestore";
 import { useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 
@@ -43,7 +43,7 @@ export function NotificationSettings() {
     try {
       await callApi(me, path, { method, ...(body && { body }) });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't save. Try again.");
+      setError(problem(e, "Couldn't save. Try again."));
     } finally {
       setBusy(false);
     }

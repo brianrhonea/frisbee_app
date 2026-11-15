@@ -1,7 +1,7 @@
 "use client";
 import type { User } from "firebase/auth";
 import { type FormEvent, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { ApiError, callApi, problem } from "@/lib/client";
 import { suggestUsername, UsernameField, useUsernameCheck } from "./UsernameField";
 
 /**
@@ -27,7 +27,7 @@ export function UsernameStep({ user, onDone, step = false }: { user: User; onDon
       onDone();
     } catch (err) {
       if (err instanceof ApiError && err.code === "already_exists") check.markTaken();
-      else setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      else setError(problem(err));
     } finally {
       setBusy(false);
     }

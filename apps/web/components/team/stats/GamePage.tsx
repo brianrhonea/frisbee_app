@@ -30,6 +30,7 @@ import { StatSheetTable } from "./StatSheetTable";
 import { confirmAndDelete, deleteGameMessage } from "./StatsHome";
 import { useGameTracker } from "./useTracker";
 import "./stats.css";
+import { isTyping } from "@/lib/text";
 
 type Tab = "track" | "lines" | "points" | "stats";
 type Act = (fn: (t: GameTracker) => void) => void;
@@ -278,8 +279,7 @@ function TrackTab({
   useEffect(() => {
     if (!t.canEdit) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (isTyping(e.target)) return;
       if (overlay) {
         if (e.key === "Escape" && overlay !== "pull") setOverlay(null);
         return;

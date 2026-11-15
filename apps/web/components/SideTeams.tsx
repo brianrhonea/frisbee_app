@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { type Doc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
 import { NavIcon } from "./NavIcons";
+import { initials } from "@/lib/text";
 
 /** Teams listed before "See all". */
 const shown = 5;
@@ -23,13 +24,6 @@ const shortKinds: Record<string, string> = { team: "Team", community: "Community
 /** 128, "1.2k", "12k": short enough to always fit. */
 function compact(n: number) {
   return n < 1000 ? String(n) : `${(n / 1000).toFixed(n < 10_000 ? 1 : 0).replace(/\.0$/, "")}k`;
-}
-
-/** "Seattle Ultimate" → "SU"; one word → its first two letters. */
-function initials(name: string) {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length > 1) return words.slice(0, 3).map((w) => w[0]).join("").toUpperCase();
-  return (words[0] ?? "?").slice(0, 2).toUpperCase();
 }
 
 interface Space {

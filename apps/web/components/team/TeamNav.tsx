@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { roleLabel } from "../ProfileDashboard";
@@ -105,7 +105,7 @@ export function JoinButton() {
     try {
       await callApi(user!, path, { method });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+      setError(problem(e));
     } finally {
       setBusy(false);
     }

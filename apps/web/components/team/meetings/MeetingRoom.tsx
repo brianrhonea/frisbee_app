@@ -3,7 +3,7 @@ import type { MeetingTokenResult } from "@stall10/shared";
 import type { LocalVideoTrack } from "livekit-client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { ApiError, callApi, problem } from "@/lib/client";
 import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../../AuthProvider";
 import { useTeamHub } from "../TeamContext";
@@ -194,7 +194,7 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
       if (joiningRef.current === session) joiningRef.current = null;
       void (session as CallSession | null)?.leave();
       if (mine !== generation.current || e instanceof CallCancelled) return;
-      setError(e instanceof ApiError ? e.message : "Couldn't connect to the call. Check your connection and try again.");
+      setError(problem(e, "Couldn't connect to the call. Check your connection and try again."));
       setStage("lobby");
     }
   }, [user, stage, teamId, meetingId, settings, devices, speaker, stopPreview]);

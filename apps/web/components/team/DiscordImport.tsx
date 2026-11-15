@@ -20,7 +20,7 @@ import {
 import { doc, getDoc } from "firebase/firestore";
 import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { firestoreDb } from "@/lib/firebase";
 import { useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
@@ -86,7 +86,7 @@ export function DiscordImport() {
       setPlan(await callApi<ImportPlan>(user, `/v1/teams/${encodeURIComponent(teamId)}/discord/preview`, { method: "POST", body: { link: link.trim() } }));
     } catch (err) {
       setPlan(null);
-      setError(err instanceof ApiError ? err.message : "Couldn't read that template. Try again.");
+      setError(problem(err, "Couldn't read that template. Try again."));
     } finally {
       setBusy(null);
     }
@@ -108,7 +108,7 @@ export function DiscordImport() {
       const destinations = [...overrides].map(([room, id]) => ({ room, teamId: id }));
       setDone(await callApi<DiscordImportResult>(user, `/v1/teams/${encodeURIComponent(teamId)}/discord/import`, { method: "POST", body: { plan, destinations } }));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't import. Try again.");
+      setError(problem(err, "Couldn't import. Try again."));
     } finally {
       setBusy(null);
     }

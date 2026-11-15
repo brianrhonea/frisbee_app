@@ -4,7 +4,7 @@ import type { User } from "firebase/auth";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { newPostBox, onHomeRefresh } from "@/lib/homeRefresh";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { Composer } from "./Composer";
 import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
@@ -60,7 +60,7 @@ export function Dashboard({ user }: { user: User }) {
       setHome(h);
       setOlder({ ...emptyFeed, next: h.feed.next });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't load your home. Try again.");
+      setError(problem(e, "Couldn't load your home. Try again."));
     }
   }, [user]);
 
