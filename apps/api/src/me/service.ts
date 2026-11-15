@@ -10,10 +10,10 @@ import type { MeRepository } from "./repository.js";
 /** Teams read for the dashboard (the app's home shows them all; few have more). */
 export const teamLimit = 30;
 /**
- * Events shown per team and in all. Each team's read is over-read
- * (eventReadPerTeam) because the audience filter and events that have
- * already ended are applied after it: a community member may see only a
- * few of a team's events.
+ * Events shown per team and in all. Each team's events are over-read
+ * (eventReadPerTeam started recently, and as many upcoming) because the
+ * audience filter and the end check apply after the reads: a community
+ * member may see only a few of a team's events.
  */
 export const eventsPerTeam = 5;
 export const eventReadPerTeam = 25;
@@ -100,8 +100,12 @@ export class MeService {
     const now = this.now();
     const lists = await Promise.all(
       teams.map(async (t) => {
-        const docs = await this.repo.upcomingEvents(t.id, now - eventLookbackMs, eventReadPerTeam);
-        return docs
+        // Two reads, so events that ended recently can't use up the upcoming ones' share.
+        const [started, upcoming] = await Promise.all([
+          this.repo.startedEvents(t.id, now - eventLookbackMs, now, eventReadPerTeam),
+          this.repo.upcomingEvents(t.id, now, eventReadPerTeam),
+        ]);
+        return [...started.reverse(), ...upcoming]
           .filter((e) => notEnded(e.data, now) && seesEvent(t.data, uid, e.data))
           .slice(0, eventsPerTeam)
           .map((e) => {

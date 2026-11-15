@@ -29,6 +29,9 @@ class Repo implements MeRepository {
   async upcomingEvents() {
     return [];
   }
+  async startedEvents() {
+    return [];
+  }
   async followedUsers() {
     return this.follows;
   }

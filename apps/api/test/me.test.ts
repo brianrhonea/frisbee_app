@@ -27,8 +27,15 @@ class FakeMe implements MeRepository {
   async teamsOf(uid: string, limit: number) {
     return this.teams.filter((t) => (t.data.memberIds as string[]).includes(uid)).slice(0, limit);
   }
+  private startOf = (e: Doc) => Date.parse(String(e.data.startsAt));
   async upcomingEvents(teamId: string, at: number, limit: number) {
-    return (this.events.get(teamId) ?? []).filter((e) => Date.parse(String(e.data.startsAt)) >= at).slice(0, limit);
+    return (this.events.get(teamId) ?? []).filter((e) => this.startOf(e) >= at).slice(0, limit);
+  }
+  async startedEvents(teamId: string, since: number, at: number, limit: number) {
+    return (this.events.get(teamId) ?? [])
+      .filter((e) => this.startOf(e) >= since && this.startOf(e) < at)
+      .reverse()
+      .slice(0, limit);
   }
   async followedUsers(uid: string) {
     return this.follows.get(uid) ?? [];
@@ -131,6 +138,14 @@ describe("GET /v1/me/home", () => {
     ]);
     const { events } = (await t.get("/v1/me/home", "me")).json();
     expect(events.map((e: { id: string }) => e.id)).toEqual(["weekend", "next"]);
+  });
+
+  it("many events that just ended don't crowd out the next one", async () => {
+    t.repo.teams = [team("A", { memberIds: ["me"], members: { me: "player" } })];
+    const ended = Array.from({ length: 40 }, (_, i) => event(`old${i}`, -2 + i / 100, { endsAt: iso(now - 60_000) }));
+    t.repo.events.set("A", [...ended, event("next", 1)]);
+    const { events } = (await t.get("/v1/me/home", "me")).json();
+    expect(events.map((e: { id: string }) => e.id)).toEqual(["next"]);
   });
 
   it("a community member still gets their events when earlier ones are for other audiences", async () => {
