@@ -217,7 +217,10 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
                 </button>
               ))}
             </div>
-            {panel === "people" && <PeopleList call={call} people={state.people} volumes={volumes} onVolume={(uid, v) => setVolumes({ ...volumes, [uid]: v })} />}
+            {panel === "people" && <PeopleList call={call} people={state.people} volumes={volumes} onVolume={(uid, v) => {
+              call.setVolume(uid, v);
+              setVolumes({ ...volumes, [uid]: v });
+            }} />}
             {panel === "chat" && <MeetingChat teamId={teamId} meetingId={meetingId} canModerate={admin} />}
             {panel === "watch" && <WatchTogether teamId={teamId} meetingId={meetingId} canControl={admin} stage={false} />}
           </aside>

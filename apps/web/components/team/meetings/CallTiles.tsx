@@ -3,6 +3,7 @@ import type { VideoTrack } from "livekit-client";
 import { useEffect, useRef } from "react";
 import { Avatar } from "../../Avatar";
 import type { CallPerson, CallSession } from "./call";
+import { maxPersonVolume } from "./settings";
 
 /** A camera or screen, attached while shown. [mirror] flips the user's own camera. */
 export function VideoView({ track, mirror = false, contain = false }: { track: VideoTrack; mirror?: boolean; contain?: boolean }) {
@@ -57,36 +58,33 @@ export function CallStage({ people }: { people: CallPerson[] }) {
   );
 }
 
-/** The list of who's in, with a volume for each other person (participantVolumes). */
-export function PeopleList({ call, people, volumes, onVolume }: { call: CallSession; people: CallPerson[]; volumes: Record<string, number>; onVolume: (uid: string, v: number) => void }) {
+/**
+ * The list of who's in, with a volume for each other person
+ * (participantVolumes): 0 to 200%, relative to the call's volume.
+ * [onVolume] applies it to the call and remembers it.
+ */
+export function PeopleList({ people, volumes, onVolume }: { call?: CallSession; people: CallPerson[]; volumes: Record<string, number>; onVolume: (uid: string, v: number) => void }) {
   return (
     <ul className="call-people">
-      {people.map((p) => (
-        <li key={p.uid + (p.isLocal ? ":me" : "")}>
-          <span className={p.speaking ? "speaking" : ""}>
-            {p.name}
-            {p.isLocal ? " (you)" : ""}
-            {!p.micOn ? " · muted" : ""}
-          </span>
-          {!p.isLocal && (
-            <label className="call-volume">
-              <span className="visually-hidden">Volume for {p.name}</span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={volumes[p.uid] ?? 1}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  call.setVolume(p.uid, v);
-                  onVolume(p.uid, v);
-                }}
-              />
-            </label>
-          )}
-        </li>
-      ))}
+      {people.map((p) => {
+        const v = volumes[p.uid] ?? 1;
+        return (
+          <li key={p.uid + (p.isLocal ? ":me" : "")}>
+            <span className={p.speaking ? "speaking" : ""}>
+              {p.name}
+              {p.isLocal ? " (you)" : ""}
+              {!p.micOn ? " · muted" : ""}
+            </span>
+            {!p.isLocal && (
+              <label className="call-volume">
+                <span className="visually-hidden">Volume for {p.name}</span>
+                <input type="range" min={0} max={maxPersonVolume} step={0.05} value={v} onChange={(e) => onVolume(p.uid, Number(e.target.value))} />
+                <small className="muted">{Math.round(v * 100)}%</small>
+              </label>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

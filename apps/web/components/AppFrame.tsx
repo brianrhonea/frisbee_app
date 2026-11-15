@@ -12,6 +12,7 @@ import { useUnreadCount } from "./Notifications";
 import { SideTeams } from "./SideTeams";
 import { ThemeToggle } from "./ThemeToggle";
 import { UpcomingAside } from "./UpcomingAside";
+import { VoiceBar } from "./voice/VoiceBar";
 
 type Tab = { href: string; label: string; icon: NavIconName; also?: string[] };
 
@@ -210,6 +211,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
 
       <div className="frame-main">
         <main>{children}</main>
+        {user && <VoiceBar />}
         {user && <MeetingAlerts />}
         {footer}
       </div>
