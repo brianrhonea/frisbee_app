@@ -45,19 +45,12 @@ import {
   bracketSeeds,
   type TournamentFormat,
 } from "@stall10/shared";
-import type { z } from "zod";
 import type { Caller } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, kindOf, mapOf, strings } from "../teams/access.js";
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 /** A stored id that is safe to put in a path, or null. */
 function safeId(v: unknown): string | null {
@@ -279,7 +272,7 @@ export class TournamentService {
   }
 
   async create(caller: Caller, body: unknown): Promise<{ id: string }> {
-    const r: CreateTournamentInput = parse(createTournamentRequestSchema, body);
+    const r: CreateTournamentInput = parseBody(createTournamentRequestSchema, body);
     const hostId = docIdParam(r.hostId);
     this.checkHosted(r.kind, r.entryType, r);
     const id = this.store.newId("tournaments");
@@ -312,7 +305,7 @@ export class TournamentService {
    */
   async save(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
-    const r = parse(saveTournamentRequestSchema, body);
+    const r = parseBody(saveTournamentRequestSchema, body);
     // Managers only get as far as the lists (checked again below).
     const first = await this.managed(this.store, id, caller.uid);
     const taking = ["status", "divisionId"];
@@ -415,7 +408,7 @@ export class TournamentService {
 
   async setStatus(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
-    const { status } = parse(tournamentStatusRequestSchema, body);
+    const { status } = parseBody(tournamentStatusRequestSchema, body);
     await this.store.transact(async (tx) => {
       await this.managed(tx, id, caller.uid);
       tx.update(p.tournament(id), { status });
@@ -473,7 +466,7 @@ export class TournamentService {
   async saveSeeds(caller: Caller, rawId: unknown, rawDiv: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
-    const { seeds } = parse(seedsRequestSchema, body);
+    const { seeds } = parseBody(seedsRequestSchema, body);
     if ((await this.queries.ids(p.games(id, divId), 1)).length > 0) {
       throw new ApiError("failed_precondition", "Seeds are set: the schedule is published.");
     }
@@ -512,7 +505,7 @@ export class TournamentService {
   async putEntry(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const teamId = docIdParam(rawTeam);
-    const r = parse(entryRequestSchema, body);
+    const r = parseBody(entryRequestSchema, body);
     const divId = docIdParam(r.divisionId);
     // The team's admins only get as far as counting its roster (checked again below).
     await this.visible(this.store, id, caller.uid);
@@ -572,7 +565,7 @@ export class TournamentService {
   async invite(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const teamId = docIdParam(rawTeam);
-    const divId = docIdParam(parse(inviteRequestSchema, body).divisionId);
+    const divId = docIdParam(parseBody(inviteRequestSchema, body).divisionId);
     await this.store.transact(async (tx) => {
       await this.managed(tx, id, caller.uid);
       const team = await tx.get(p.team(teamId));
@@ -596,7 +589,7 @@ export class TournamentService {
   async setEntryStatus(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const teamId = docIdParam(rawTeam);
-    const { status } = parse(entryStatusRequestSchema, body);
+    const { status } = parseBody(entryStatusRequestSchema, body);
     await this.store.transact(async (tx) => {
       const { manager } = await this.visible(tx, id, caller.uid);
       const entry = await tx.get(p.entry(id, teamId));
@@ -649,7 +642,7 @@ export class TournamentService {
   async publish(caller: Caller, rawId: unknown, rawDiv: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
-    const { games } = parse(publishScheduleRequestSchema, body);
+    const { games } = parseBody(publishScheduleRequestSchema, body);
     const check = (tx: Tx) => this.managed(tx, id, caller.uid);
     let format: TournamentFormat = "roundRobin";
     await this.store.transact(async (tx) => {
@@ -756,7 +749,7 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const gameId = docIdParam(rawGame);
-    const s = parse(scoreRequestSchema, body);
+    const s = parseBody(scoreRequestSchema, body);
     await this.store.transact(async (tx) => {
       await this.visible(tx, id, caller.uid);
       const d = await tx.get(p.division(id, divId));
@@ -782,7 +775,7 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const gameId = docIdParam(rawGame);
-    const s = parse(scoreRequestSchema, body);
+    const s = parseBody(scoreRequestSchema, body);
     // Only the other captain gets as far as listing the games (checked again below).
     await this.visible(this.store, id, caller.uid);
     const [division, game] = await Promise.all([this.store.get(p.division(id, divId)), this.store.get(p.game(id, divId, gameId))]);
@@ -807,7 +800,7 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const gameId = docIdParam(rawGame);
-    const s = parse(scoreRequestSchema, body);
+    const s = parseBody(scoreRequestSchema, body);
     await this.managed(this.store, id, caller.uid);
     const ids = await this.gameIds(id, divId);
     await this.store.transact(async (tx) => {

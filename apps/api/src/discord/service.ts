@@ -35,9 +35,8 @@ import {
   teamChatImportIsEmpty,
 } from "@stall10/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import type { z } from "zod";
 import { type Caller, requireCaller } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { accessFields, type ChatAdmin } from "../hub/rooms.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
@@ -76,12 +75,6 @@ const p = {
    */
   mark: (t: string) => `discordImports/${t}`,
 };
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 const ownerOnly = () => new ApiError("permission_denied", "Only the owner can import from Discord.");
 const noTeam = () => new ApiError("not_found", "That team doesn't exist.");
@@ -154,7 +147,7 @@ export class DiscordService {
    */
   async preview(caller: Caller, rawTeam: unknown, body: unknown): Promise<ImportPlan> {
     const teamId = docIdParam(rawTeam);
-    const { link } = parse(discordPreviewRequestSchema, body);
+    const { link } = parseBody(discordPreviewRequestSchema, body);
     const code = templateCode(link);
     if (code === null) throw new ApiError("invalid_argument", "Paste a server template link, like https://discord.new/abc123.");
     const team = await this.store.get(p.team(teamId));
@@ -214,7 +207,7 @@ export class DiscordService {
    */
   async apply(caller: Caller, rawTeam: unknown, body: unknown): Promise<DiscordImportResult> {
     const teamId = docIdParam(rawTeam);
-    const req = parse(discordImportRequestSchema, body);
+    const req = parseBody(discordImportRequestSchema, body);
     const plan = req.plan as ImportPlan;
     const org = await this.store.get(p.team(teamId));
     if (!org) throw noTeam();

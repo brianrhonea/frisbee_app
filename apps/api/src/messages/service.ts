@@ -17,9 +17,8 @@ import {
   type SendChatMessageResult,
   sendChatMessageRequestSchema,
 } from "@stall10/shared";
-import type { z } from "zod";
 import type { Caller, UserLookup } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { deleteFilesUnder, filesOf, uploadedFiles } from "../hub/uploads.js";
 import { docIdParam } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
@@ -40,12 +39,6 @@ const groupId = /^g-[A-Za-z0-9]+$/;
 const isGroupId = (id: string) => groupId.test(id);
 const noConversation = () => new ApiError("not_found", "This conversation doesn't exist.");
 const noMessage = () => new ApiError("not_found", "This message was deleted.");
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 /** A conversation id from the URL: a group's `g-…`, or two different uids joined by "_", sorted. */
 function convIdParam(v: unknown): string {
@@ -106,7 +99,7 @@ export class ConversationService {
 
   /** `POST /v1/conversations`: allowedStart() decides between their inbox, a request, or not at all. */
   async open(caller: Caller, body: unknown): Promise<OpenConversationResult> {
-    const other = docIdParam(parse(openConversationRequestSchema, body).with);
+    const other = docIdParam(parseBody(openConversationRequestSchema, body).with);
     if (other === caller.uid) throw new ApiError("invalid_argument", "You can't message yourself.");
     const id = directConversationId(caller.uid, other);
     const existing = await this.store.get(p.conv(id));
@@ -149,7 +142,7 @@ export class ConversationService {
 
   /** `POST /v1/conversations/groups`: a group that starts with just its creator, then each member in turn. */
   async createGroup(caller: Caller, body: unknown): Promise<GroupAddedResult> {
-    const req = parse(createGroupRequestSchema, body);
+    const req = parseBody(createGroupRequestSchema, body);
     await checkNotMuted(this.store, caller.uid, this.now());
     const id = `g-${randomBytes(15).toString("base64").replace(/[^A-Za-z0-9]/g, "").slice(0, 20) || "x"}`;
     const me = await this.name(caller);
@@ -174,7 +167,7 @@ export class ConversationService {
   async addMembers(caller: Caller, rawId: unknown, body: unknown): Promise<GroupAddedResult> {
     const { id, conv } = await this.mine(caller, rawId);
     if (conv.kind !== "group") throw new ApiError("failed_precondition", "Only group conversations take more people.");
-    return { id, notAdded: await this.addEach(caller, id, parse(addGroupMembersRequestSchema, body).members) };
+    return { id, notAdded: await this.addEach(caller, id, parseBody(addGroupMembersRequestSchema, body).members) };
   }
 
   /** addsMember(): one at a time, at the end, each following the adder and taking messages. */
@@ -225,7 +218,7 @@ export class ConversationService {
 
   /** `PATCH /v1/conversations/:id`: anyone in a group renames it. */
   async rename(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
-    const { name } = parse(renameGroupRequestSchema, body);
+    const { name } = parseBody(renameGroupRequestSchema, body);
     const { id, conv } = await this.mine(caller, rawId);
     if (conv.kind !== "group") throw new ApiError("failed_precondition", "Only group conversations have a name.");
     await this.store.transact(async (tx) => {
@@ -237,7 +230,7 @@ export class ConversationService {
 
   /** `POST /v1/conversations/:id/messages`: the message and the inbox preview, together. */
   async send(caller: Caller, rawId: unknown, body: unknown): Promise<SendChatMessageResult> {
-    const req = parse(sendChatMessageRequestSchema, body);
+    const req = parseBody(sendChatMessageRequestSchema, body);
     const { id, conv } = await this.mine(caller, rawId);
     if (awaiting(conv, caller.uid)) throw new ApiError("failed_precondition", "Accept the request to reply.");
     await checkNotMuted(this.store, caller.uid, this.now());
@@ -294,7 +287,7 @@ export class ConversationService {
 
   /** reactsOnlyAsMe(): anyone in the conversation sets or clears their own emoji. */
   async react(caller: Caller, rawId: unknown, rawMessage: unknown, body: unknown): Promise<void> {
-    const { emoji } = parse(chatReactionRequestSchema, body);
+    const { emoji } = parseBody(chatReactionRequestSchema, body);
     if (emoji !== null && !(chatReactionChoices as readonly string[]).includes(emoji)) {
       throw new ApiError("invalid_argument", "Pick one of the reactions.");
     }
@@ -339,7 +332,7 @@ export class ConversationService {
 
   /** `PUT /v1/conversations/:id/request`: whoever a request waits on accepts or declines it. */
   async answer(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
-    const { accept } = parse(answerRequestSchema, body);
+    const { accept } = parseBody(answerRequestSchema, body);
     const { id } = await this.mine(caller, rawId);
     await this.store.transact(async (tx) => {
       const conv = await tx.get(p.conv(id));
@@ -353,7 +346,7 @@ export class ConversationService {
 
   /** `PUT /v1/conversations/:id/typing`: marks or clears the caller's typing (the typing rule). */
   async setTyping(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
-    const { typing } = parse(typingRequestSchema, body);
+    const { typing } = parseBody(typingRequestSchema, body);
     const { id } = await this.mine(caller, rawId);
     await this.store.transact(async (tx) => {
       if (typing) tx.set(`conversations/${id}/typing/${caller.uid}`, { at: serverTime });
@@ -363,7 +356,7 @@ export class ConversationService {
 
   /** `PUT /v1/conversations/:id/archive`. */
   async archive(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
-    const { archived } = parse(archiveRequestSchema, body);
+    const { archived } = parseBody(archiveRequestSchema, body);
     const { id } = await this.mine(caller, rawId);
     await this.store.transact(async (tx) => {
       tx.merge(p.reads(caller.uid, id), { archivedAt: archived ? serverTime : deleteField });

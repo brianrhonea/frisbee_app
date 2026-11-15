@@ -37,7 +37,7 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
 import { type Caller, requireCaller, type UserLookup } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { chatRole } from "../hub/access.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
@@ -73,12 +73,6 @@ const p = {
   room: (t: string, r: string) => `teams/${t}/chats/${r}`,
   profile: (u: string) => `profiles/${u}`,
 };
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 const noTeam = () => new ApiError("not_found", "That team doesn't exist.");
 const notOnTeam = () => new ApiError("permission_denied", "You're not on this team.");
@@ -145,7 +139,7 @@ export class MeetingService {
   /** allow create: an admin, status scheduled, no answers yet, made by the caller, validMeeting. */
   async create(caller: Caller, rawTeam: unknown, body: unknown): Promise<SaveMeetingResult> {
     const teamId = docIdParam(rawTeam);
-    const req = parse(saveMeetingRequestSchema, body);
+    const req = parseBody(saveMeetingRequestSchema, body);
     const id = this.store.newId(p.meetings(teamId));
     await this.store.transact(async (tx) => {
       const team = await tx.get(p.team(teamId));
@@ -167,7 +161,7 @@ export class MeetingService {
   async edit(caller: Caller, rawTeam: unknown, rawMeeting: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
-    const req = parse(saveMeetingRequestSchema, body);
+    const req = parseBody(saveMeetingRequestSchema, body);
     await this.store.transact(async (tx) => {
       const [team, meeting] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.meeting(teamId, meetingId))]);
       if (!team) throw noTeam();
@@ -196,7 +190,7 @@ export class MeetingService {
   async rsvp(caller: Caller, rawTeam: unknown, rawMeeting: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
-    const { answer } = parse(meetingRsvpRequestSchema, body);
+    const { answer } = parseBody(meetingRsvpRequestSchema, body);
     await this.store.transact(async (tx) => {
       const [team, meeting] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.meeting(teamId, meetingId))]);
       if (!team) throw noTeam();
@@ -274,7 +268,7 @@ export class MeetingService {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
     const userId = docIdParam(rawUser);
-    const { admit } = parse(meetingJoinDecisionRequestSchema, body);
+    const { admit } = parseBody(meetingJoinDecisionRequestSchema, body);
     await this.store.transact(async (tx) => {
       const [team, request] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.request(teamId, meetingId, userId))]);
       if (!team) throw noTeam();
@@ -310,7 +304,7 @@ export class MeetingService {
   async setPlayback(caller: Caller, rawTeam: unknown, rawMeeting: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
-    const req = parse(meetingPlaybackRequestSchema, body);
+    const req = parseBody(meetingPlaybackRequestSchema, body);
     const videoId = docIdParam(req.videoId);
     const presenterName = await this.nameOf(caller);
     await this.store.transact(async (tx) => {
@@ -351,7 +345,7 @@ export class MeetingService {
   async sendMessage(caller: Caller, rawTeam: unknown, rawMeeting: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
-    const { text } = parse(meetingMessageRequestSchema, body);
+    const { text } = parseBody(meetingMessageRequestSchema, body);
     await checkNotMuted(this.store, caller.uid, this.now());
     const authorName = await this.nameOf(caller);
     const id = this.store.newId(p.messages(teamId, meetingId));

@@ -8,9 +8,8 @@ import {
   readReceiptsRequestSchema,
   profileKeywords,
 } from "@stall10/shared";
-import type { z } from "zod";
 import type { Caller, UserLookup } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
 import { type Data, type DocStore, deleteField, serverTime } from "../store.js";
@@ -21,12 +20,6 @@ const p = {
   prefs: (uid: string) => `users/${uid}/settings/notifications`,
   upload: (id: string) => `uploads/${id}`,
 };
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 const str = (v: unknown) => (typeof v === "string" ? v : null);
 const mapOf = (v: unknown): Data => (v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date) ? (v as Data) : {});
@@ -84,7 +77,7 @@ export class AccountService {
    * on the profile. Pictures replaced or removed are deleted.
    */
   async saveIdentity(caller: Caller, body: unknown): Promise<IdentityResult> {
-    const req = parse(identityRequestSchema, body);
+    const req = parseBody(identityRequestSchema, body);
     if (!this.users.update) throw new ApiError("failed_precondition", "Accounts can't be changed here.");
     if ((req.photoUploadId || req.headerUploadId) && !this.media) {
       throw new ApiError("failed_precondition", "Pictures can't be uploaded here yet.");
@@ -131,7 +124,7 @@ export class AccountService {
 
   /** users/{uid}.readReceipts (owner-only in the rules); off hides when they've read messages. */
   async setReadReceipts(caller: Caller, body: unknown): Promise<void> {
-    const { on } = parse(readReceiptsRequestSchema, body);
+    const { on } = parseBody(readReceiptsRequestSchema, body);
     await this.store.transact(async (tx) => {
       tx.merge(p.user(caller.uid), { readReceipts: on });
     });
@@ -139,7 +132,7 @@ export class AccountService {
 
   /** Turns a notification kind on or off, for every team or for one. */
   async setCategory(caller: Caller, body: unknown): Promise<void> {
-    const { category, on, teamId } = parse(notificationCategoryRequestSchema, body);
+    const { category, on, teamId } = parseBody(notificationCategoryRequestSchema, body);
     await this.store.transact(async (tx) => {
       const prefs = (await tx.get(p.prefs(caller.uid))) ?? {};
       if (teamId) {
@@ -173,7 +166,7 @@ export class AccountService {
 
   /** Silences or unsilences one team chat room or conversation. */
   async setMuted(caller: Caller, body: unknown): Promise<void> {
-    const req = parse(notificationMuteRequestSchema, body);
+    const req = parseBody(notificationMuteRequestSchema, body);
     const key = req.conversationId ? mutedConversationKey(req.conversationId) : mutedRoomKey(req.teamId!, req.roomId!);
     await this.store.transact(async (tx) => {
       const prefs = await tx.get(p.prefs(caller.uid));

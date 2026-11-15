@@ -20,7 +20,7 @@ import {
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { z } from "zod";
 import { type Caller, requireCaller } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
 import type { MemoryRateLimiter } from "../limits/memory.js";
@@ -28,12 +28,6 @@ import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, isGroup, mapOf, own, strings } from "../teams/access.js";
 import type { TeamRepository } from "../teams/repository.js";
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 const p = {
   team: (t: string) => `teams/${t}`,
@@ -251,7 +245,7 @@ export class GroupTournamentService {
 
   async create(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
-    const d = parse(saveGroupTournamentRequestSchema, body);
+    const d = parseBody(saveGroupTournamentRequestSchema, body);
     requireOrganizer(await this.store.get(p.team(teamId)), caller.uid, true);
     const id = this.store.newId(p.tournaments(teamId));
     await this.store.transact(async (tx) => {
@@ -268,7 +262,7 @@ export class GroupTournamentService {
   async save(caller: Caller, rawTeam: unknown, rawId: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
-    const d = parse(saveGroupTournamentRequestSchema, body);
+    const d = parseBody(saveGroupTournamentRequestSchema, body);
     await this.store.transact(async (tx) => {
       const [t, existing, listing] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.tournament(teamId, id)), tx.get(p.listing(teamId, id))]);
       const team = requireOrganizer(t, caller.uid, true);
@@ -289,7 +283,7 @@ export class GroupTournamentService {
   async publish(caller: Caller, rawTeam: unknown, rawId: unknown, body: unknown): Promise<{ games: number }> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
-    const d = parse(saveGroupTournamentRequestSchema, body);
+    const d = parseBody(saveGroupTournamentRequestSchema, body);
     // Checked before the schedule is worked out or any game is replaced
     // (the biggest schedules take several transactions).
     const [team, tour, listing] = await Promise.all([this.store.get(p.team(teamId)), this.store.get(p.tournament(teamId, id)), this.store.get(p.listing(teamId, id))]);
@@ -355,7 +349,7 @@ export class GroupTournamentService {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
     const gameId = docIdParam(rawGame);
-    const s = parse(groupGameScoreRequestSchema, body);
+    const s = parseBody(groupGameScoreRequestSchema, body);
     await this.store.transact(async (tx) => {
       const [t, gd] = await Promise.all([tx.get(p.tournament(teamId, id)), tx.get(p.game(teamId, id, gameId))]);
       if (!t) throw noTournament();
@@ -380,7 +374,7 @@ export class GroupTournamentService {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
     const gameId = docIdParam(rawGame);
-    const s = parse(groupGameScoreRequestSchema, body);
+    const s = parseBody(groupGameScoreRequestSchema, body);
     // Only the other captain gets as far as listing the games.
     const [tour, game] = await Promise.all([this.store.get(p.tournament(teamId, id)), this.store.get(p.game(teamId, id, gameId))]);
     if (!tour) throw noTournament();
@@ -407,7 +401,7 @@ export class GroupTournamentService {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
     const gameId = docIdParam(rawGame);
-    const s = parse(groupGameScoreRequestSchema, body);
+    const s = parseBody(groupGameScoreRequestSchema, body);
     requireOrganizer(await this.store.get(p.team(teamId)), caller.uid, false);
     if (!(await this.store.get(p.tournament(teamId, id)))) throw noTournament();
     const listed = await this.games(teamId, id);
