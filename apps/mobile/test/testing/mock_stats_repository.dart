@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 
-import '../../../domain/models/roster_player.dart';
-import '../../../domain/models/stats.dart';
-import '../../../utils/result.dart';
-import '../team/team_repository.dart';
-import 'stats_repository.dart';
+import 'package:frisbee_app/domain/models/roster_player.dart';
+import 'package:frisbee_app/domain/models/stats.dart';
+import 'package:frisbee_app/utils/result.dart';
+import 'package:frisbee_app/data/repositories/team/team_repository.dart';
+import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 
 /// In-memory stats for tests and demos. Nothing is saved; each team is
 /// seeded with a sample tournament and games the first time it's opened.

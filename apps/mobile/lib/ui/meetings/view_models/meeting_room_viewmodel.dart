@@ -278,13 +278,7 @@ class MeetingRoomViewModel extends ChangeNotifier {
       if (d.kind == kind) d,
   ];
 
-  bool get canPickSpeaker => _media.canPickSpeaker;
   bool get canShareScreen => _media.canShareScreen;
-  bool get picksScreenSource => _media.picksScreenSource;
-
-  /// Desktop: which screen or window to share; null if cancelled.
-  Future<String?> pickScreenSource(BuildContext context) =>
-      _media.pickScreenSource(context);
 
   /// The device in use for [kind]: the saved one if it's still plugged in,
   /// otherwise the system default (null).

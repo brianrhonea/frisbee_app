@@ -435,8 +435,6 @@ class FakeMeetingMediaService implements MeetingMediaService {
   bool micAllowed = true;
   bool cameraAllowed = true;
   bool screenShare = true;
-  bool picker = false;
-  String? pickedSource = 'screen:1';
   final previews = <FakeCameraPreview>[];
   final calls = <FakeMeetingCall>[];
   final _deviceChanges = StreamController<void>.broadcast();
@@ -462,15 +460,6 @@ class FakeMeetingMediaService implements MeetingMediaService {
 
   @override
   bool get canShareScreen => screenShare;
-
-  @override
-  bool get picksScreenSource => picker;
-
-  @override
-  Future<String?> pickScreenSource(BuildContext context) async => pickedSource;
-
-  @override
-  bool get canPickSpeaker => true;
 
   @override
   MeetingCall createCall() {

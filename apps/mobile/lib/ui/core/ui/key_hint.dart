@@ -14,14 +14,12 @@ String shortcutLabel(String key) => usesCommandKey ? '⌘$key' : 'Ctrl $key';
 
 /// Whether this device likely has a keyboard worth hinting at: desktops
 /// and wide screens, not phones.
-bool showsKeyHints(BuildContext context) =>
-    switch (defaultTargetPlatform) {
-      TargetPlatform.windows ||
-      TargetPlatform.macOS ||
-      TargetPlatform.linux => true,
-      _ => false,
-    } ||
-    kIsWeb;
+bool showsKeyHints(BuildContext context) => switch (defaultTargetPlatform) {
+  TargetPlatform.windows ||
+  TargetPlatform.macOS ||
+  TargetPlatform.linux => true,
+  _ => false,
+};
 
 /// A keyboard shortcut drawn as a key cap, e.g. next to the search box.
 class KeyHint extends StatelessWidget {

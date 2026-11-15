@@ -3,21 +3,15 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../domain/models/app_user.dart';
 import '../../utils/platform_support.dart';
-import 'google_desktop_oauth.dart';
 
 /// Thin wrapper around Firebase Auth that hides per-platform sign-in flows.
 class AuthService {
-  AuthService({
-    FirebaseAuth? auth,
-    GoogleSignIn? googleSignIn,
-    GoogleDesktopOAuth? googleDesktopOAuth,
-  }) : _auth = auth ?? FirebaseAuth.instance,
-       _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
-       _googleDesktopOAuth = googleDesktopOAuth ?? GoogleDesktopOAuth();
+  AuthService({FirebaseAuth? auth, GoogleSignIn? googleSignIn})
+    : _auth = auth ?? FirebaseAuth.instance,
+      _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
 
   final FirebaseAuth _auth;
   final GoogleSignIn _googleSignIn;
-  final GoogleDesktopOAuth _googleDesktopOAuth;
   bool _googleInitialized = false;
 
   Stream<User?> userChanges() => _auth.userChanges();
@@ -46,10 +40,6 @@ class AuthService {
       _auth.sendPasswordResetEmail(email: email);
 
   Future<void> signInWithGoogle() async {
-    if (PlatformSupport.webGoogleSignIn) {
-      await _auth.signInWithPopup(GoogleAuthProvider());
-      return;
-    }
     await _auth.signInWithCredential(await _googleCredential());
   }
 
@@ -83,8 +73,6 @@ class AuthService {
             password: password ?? '',
           ),
         );
-      case SignInMethod.google when PlatformSupport.webGoogleSignIn:
-        await user.reauthenticateWithPopup(GoogleAuthProvider());
       case SignInMethod.google:
         await user.reauthenticateWithCredential(await _googleCredential());
       case SignInMethod.apple:
@@ -109,14 +97,7 @@ class AuthService {
   }
 
   Future<OAuthCredential> _googleCredential() async {
-    if (PlatformSupport.desktopGoogleSignIn) {
-      final tokens = await _googleDesktopOAuth.signIn();
-      return GoogleAuthProvider.credential(
-        idToken: tokens.idToken,
-        accessToken: tokens.accessToken,
-      );
-    }
-    if (!PlatformSupport.nativeGoogleSignIn) {
+    if (!PlatformSupport.googleSignIn) {
       throw Exception('Google sign-in is not supported on this platform.');
     }
     if (!_googleInitialized) {

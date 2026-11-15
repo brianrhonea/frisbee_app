@@ -109,34 +109,28 @@ see `docs/ios-release.md`. Pushes that don't touch `apps/mobile/` or
 
 ## Website
 
-Today: Firebase Hosting serves `firebase/build/site` (gitignored), built by
-`firebase/scripts/build_site.sh` (firebase.json predeploy): the Flutter web
-app (`apps/mobile/lib/main_web.dart`, `lib/routing/web_router.dart`,
-`lib/ui/web/`, `lib/ui/browse/`) at `/`, and the static pages in
-`firebase/hosting/` (`/about`, `/help`, `/terms`, `/privacy`, `/cookies`,
-invite fallbacks) beside it. Signed-out visitors browse the community
-feed, search, public profiles, team pages and events through the `browse`
-Cloud Functions (allow-listed public fields, rate-limited per hashed IP;
-Firestore rules stay sign-in-only), and liking, following or joining asks
-them to sign up. Members get their home feed and the app's screens; other
-paths show "get the app". The legal pages are drafts: fill in the
-[bracketed] details and get them reviewed before launch.
+The website is `apps/web` (Next.js on Vercel; see `apps/web/README.md`).
+Signed-out visitors read the public pages through the API's
+`/v1/public/*`; members use the member area. Its env lives in the
+gitignored `apps/web/.env.local` (template `.env.example`). The old
+Flutter web site (`lib/main_web.dart`, `lib/ui/web`, `lib/ui/browse`) was
+removed from the app.
+
+Firebase Hosting now serves only static pages: `firebase/build/site`
+(gitignored), copied from `firebase/hosting/` by
+`firebase/scripts/build_site.sh` (firebase.json predeploy): `/about`,
+`/help`, `/terms`, `/privacy`, `/cookies`, `/delete-account`, the invite
+fallbacks (`/join/…`, `/g/…`, `/p/…`) and `.well-known/`. Nothing is
+compiled, so hosting deploys need no API key. The legal pages are drafts:
+fill in the [bracketed] details and get them reviewed before launch.
 
 ```
-cd apps/mobile && flutter run -d chrome -t lib/main_web.dart --dart-define-from-file=secrets.local.json
 bash firebase/scripts/build_site.sh && cd firebase && firebase emulators:start --only hosting
 ```
 
-Phase 3 replaces it with `apps/web` (Next.js on Vercel; see
-`apps/web/README.md`): the public pages are ported and read through the
-API's `/v1/public/*`; the member area is next. Its env lives in the
-gitignored `apps/web/.env.local` (template `.env.example`). Store URLs are
-placeholders in `apps/mobile/lib/config/store_links.dart`,
-`apps/web/lib/site.ts` and `firebase/hosting/about.html` / `join.html`
-(and `apps/web/content/about.html`); keep them in step. The
-deploy workflow builds the site from the `FIREBASE_WEB_API_KEY_DEV` /
-`_PROD` repository secrets and skips hosting without them. The web API key
-ends up in public JS (normal for Firebase web), so never commit `build/`.
+Store URLs are placeholders in `apps/web/lib/site.ts` and
+`firebase/hosting/about.html` / `join.html` (and
+`apps/web/content/about.html`); keep them in step. Never commit `build/`.
 
 ## Platform parity: web and mobile are the same product
 

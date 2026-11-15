@@ -9,8 +9,6 @@ import '../data/repositories/voice/voice_repository.dart';
 import '../data/repositories/voice/voice_repository_livekit.dart';
 import '../data/services/device_permissions.dart';
 import '../data/services/callable_client.dart';
-import '../data/repositories/browse/browse_repository.dart';
-import '../data/repositories/browse/browse_repository_functions.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/auth/auth_repository_firebase.dart';
 import '../data/repositories/personal/personal_repository.dart';
@@ -112,13 +110,6 @@ List<SingleChildWidget> get firebaseProviders => [
     ),
   ),
   Provider(create: (_) => AttachmentStorage()),
-  // Public pages for the website's signed-out visitors (functions/src/browse).
-  Provider<BrowseRepository>(
-    create: (context) => BrowseRepositoryFunctions(
-      functions: context.read<CallableClient>(),
-      attachments: context.read<AttachmentStorage>(),
-    ),
-  ),
   Provider<TeamRepository>(
     create: (context) => TeamRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),

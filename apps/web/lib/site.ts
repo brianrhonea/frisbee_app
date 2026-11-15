@@ -1,5 +1,5 @@
 // Site-wide constants. Store URLs are placeholders, as in
-// apps/mobile/lib/config/store_links.dart; keep the two in step.
+// firebase/hosting/about.html and join.html; keep them in step.
 
 export const storeLinks = {
   appStore: "https://apps.apple.com/",

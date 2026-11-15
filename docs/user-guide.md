@@ -8,8 +8,7 @@ version 0.0.12. What changed in each version is in
 ## Getting started
 
 1. **Sign up** with your first and last name, a **username**, your email
-   and a password (twice), or with Google or Apple. (Google and Apple
-   aren't available on Windows.)
+   and a password (twice), or with Google or Apple.
    - Your **username** is how people find and message you, as @name. It's
      3–20 lowercase letters, numbers, `_` or `.`, and only one person can
      have each; the form tells you as you type if it's taken. Signing up
@@ -160,8 +159,8 @@ open, new ones also pop up as a small bubble at the top.
 Notifications):
 
 - **This device**: tap **Turn on** to get push notifications on your phone,
-  tablet or Mac, even when Stall 10 is closed. Windows has no push, but
-  everything still shows under the 🔔.
+  or tablet, even when Stall 10 is closed. Everything also shows under
+  the 🔔.
 - **Notify me about**: turn each kind on or off for all your teams. Your
   choices apply on every device you use.
 - **Teams**: change any kind for one team, for example reminders only for
@@ -454,7 +453,7 @@ but only to the people invited.
   in the lobby and in the call, and tap **Admit** or **Deny**.
 - **In the call** you'll see everyone's camera, or their photo when it's
   off; a green border shows who's talking. The buttons along the bottom:
-  mic, camera, mute all sound, share screen (Windows, Mac and Android),
+  mic, camera, mute all sound, share screen (Android),
   chat, settings and **Leave**. Admins can also **End for everyone**.
 - **Chat** lets you type instead of unmuting. Only people in the call can
   read it.

@@ -184,7 +184,7 @@ status, versions and changelogs):
 | W5 | Tournaments and leagues | Find, host, register, divisions, schedules, standings, hat drafts | Move the tournament callables into the API. Built: player signups and captains' drafts (api 0.16.0, web 0.17.0), communities' own tournaments (api 0.18.0, web 0.19.0), hosted tournaments and leagues (api 0.19.0, web 0.20.0). Not yet: payments from the website |
 | W6 | Playbook, videos, stats, workouts | Play editor (drag on a field), video library and player, stat entry and tables, workout log | Plays, videos, stats, workouts |
 | W7 | Meetings and voice | Join team meetings and voice rooms (LiveKit web SDK) | LiveKit tokens from the API instead of a callable |
-| W8 | Cut over | Move the domain to Vercel; keep `/join/:code`, `/g/:id`, `/p/:id` working | Fold the `browse` callables; remove the Flutter web code (`main_web.dart`, `lib/ui/web`, `lib/ui/browse`, `web_router.dart`, `build_site.sh`) |
+| W8 | Cut over | Move the domain to Vercel; keep `/join/:code`, `/g/:id`, `/p/:id` working | Fold the `browse` callables (removable after the next hosting deploy); the Flutter web code (`main_web.dart`, `lib/ui/web`, `lib/ui/browse`, `web_router.dart`) is removed and `build_site.sh` only copies the static pages |
 
 **Website on its own (2026-11-14).** Signed-in members must be able to do
 everything the app does on the website alone, styled like the website

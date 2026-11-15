@@ -22,19 +22,18 @@ tells them "You're going too fast".
 
 1. **Register the apps** in Firebase console → App Check:
    - Android: Play Integrity (add the app's SHA-256 signing fingerprint).
-   - iOS/macOS: App Attest (DeviceCheck fallback). Add the App Attest
+   - iOS: App Attest (DeviceCheck fallback). Add the App Attest
      capability in Xcode (Codemagic signs it).
-2. **Debug token for Windows and debug builds**: App Check → Apps →
-   Manage debug tokens → Add. Put the token in `APP_CHECK_DEBUG_TOKEN` in
-   `secrets.local.json` (never commit it). Without one, Windows runs
-   without App Check.
+2. **Debug token for debug builds**: App Check → Apps → Manage debug
+   tokens → Add. Put the token in `APP_CHECK_DEBUG_TOKEN` in
+   `secrets.local.json` (never commit it).
 3. **Watch** App Check → APIs → Firestore / Storage / Functions metrics for
    a week. "Verified" should cover nearly all requests from current builds.
 4. **Enforce** in the console (Firestore, Storage) once older builds without
-   App Check are gone. **The website (`lib/main_web.dart`) has no App Check
-   provider yet**: before enforcing, register a reCAPTCHA Enterprise key for
-   the web app and add `providerWeb` in `AppCheck.activate`, or the website
-   stops working. For callables, add `ENFORCE_APP_CHECK=true` to
+   App Check are gone. **The website (`apps/web`) uses reCAPTCHA
+   Enterprise only when `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` is set**
+   (`apps/web/lib/firebase.ts`): register the key and set it before
+   enforcing, or the website stops working. For callables, add `ENFORCE_APP_CHECK=true` to
    `functions/.env.dev` (or `.env.prod`) and redeploy the functions.
 5. Undo any step by un-enforcing in the console, or removing the env line
    and redeploying.
