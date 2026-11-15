@@ -298,6 +298,14 @@ describe("roster spots", () => {
       expect((await link("taken", "player", "admin")).status).toBe(204);
       expect((await link("taken", "stranger", "admin")).status).toBe(403);
     });
+    it("says why a link is refused", async () => {
+      const why = async (id: string, userId: string | null, uid: string) => (await link(id, userId, uid)).json().error.message;
+      expect(await why("free", "keeper", "player")).toBe("You can only claim a spot for yourself.");
+      expect(await why("taken", null, "player")).toBe("This spot is linked to someone else.");
+      expect(await why("free", "stranger", "admin")).toBe("Only one of the team's members can be linked to a spot.");
+      await link("free", "player", "player");
+      expect(await why("free", "keeper", "player")).toBe("You can only unlink yourself from your spot.");
+    });
     it("only userId changes, and the spot must exist", async () => {
       expect((await call("PUT", `${url}/free/link`, { userId: "player", name: "X" }, "player")).status).toBe(400);
       expect((await link("ghost", "player", "player")).status).toBe(404);
