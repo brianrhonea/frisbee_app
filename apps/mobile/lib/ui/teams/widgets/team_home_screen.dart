@@ -2078,6 +2078,7 @@ class _DeleteTeamDialogState extends State<_DeleteTeamDialog> {
     final team = widget.team;
     final scheme = Theme.of(context).colorScheme;
     return AlertDialog(
+      scrollable: true,
       title: Text('Delete ${team.name}?'),
       content: Column(
         mainAxisSize: MainAxisSize.min,

@@ -819,8 +819,15 @@ class TeamRepositoryFirebase implements TeamRepository {
     // unfinished league), checks the typed name, and deletes everything
     // under the team, its files and its community links in one go.
     if (_membersApi case final api?) {
-      onProgress?.call((done: 0, total: 1, step: 'Deleting'));
-      await api.delete('/v1/teams/${team.id}', {'name': name.trim()});
+      // One request with no steps to report: total 0 shows it as going.
+      onProgress?.call((done: 0, total: 0, step: 'Deleting everything'));
+      await api.delete(
+        '/v1/teams/${team.id}',
+        {'name': name.trim()},
+        // A big team takes a while; a 20 s timeout would say it failed
+        // while the server carried on deleting it.
+        const Duration(minutes: 3),
+      );
       onProgress?.call((done: 1, total: 1, step: 'Deleted'));
       return;
     }
