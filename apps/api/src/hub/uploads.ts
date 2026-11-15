@@ -47,6 +47,7 @@ export async function uploadedFiles(
     if (!u || u.uid !== caller.uid || u.purpose !== want.purpose || u.targetId !== want.targetId || u.itemId !== want.itemId) {
       throw new ApiError("invalid_argument", "That file wasn't uploaded for this.");
     }
+    if (u.status === "removed") throw new ApiError("invalid_argument", "A file was removed. Attach it again.");
     if (u.status !== "ready" || typeof u.path !== "string") {
       throw new ApiError("failed_precondition", "A file is still being processed. Try again in a moment.");
     }

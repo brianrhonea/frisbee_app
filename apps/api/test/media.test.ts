@@ -231,6 +231,7 @@ describe("uploads API", () => {
       memberRoles: { p1: ["chatter"] },
     });
     store.put("teams/t1/chats/c1", { writeRoles: ["chatter"], writeUsers: [] });
+    store.put("conversations/u1_u2", { participants: ["u1", "u2"], status: "accepted" });
   });
 
   async function upload(body: object, data: Buffer | null, uid = "u1") {
@@ -422,6 +423,121 @@ describe("uploads API", () => {
     it("leaves other purposes' videos to the transcoder", async () => {
       const { done } = await upload({ purpose: "post", itemId: "i1", contentType: "video/mp4", size: 1000 }, samples["video/mp4"]);
       expect(done!.json().status).toBe("processing");
+    });
+  });
+
+  describe("chat files: conversation, daily quota, generations, removing", () => {
+    const MB = 1024 * 1024;
+    const dm = { purpose: "chat", targetId: "conversations/u1_u2", itemId: "m1" };
+    const pdf = Buffer.from("%PDF-1.7 a small document");
+    const del = (id: string | undefined, uid = "u1") => app.inject({ method: "DELETE", url: `/v1/uploads/${id}`, headers: { authorization: `Bearer token:${uid}` } });
+    const today = new Date(now).toISOString().slice(0, 10);
+
+    it("needs a direct conversation that exists and has the caller", async () => {
+      const body = { ...dm, targetId: "conversations/u1_u9", contentType: "application/pdf", size: 10 };
+      expect((await call("/v1/uploads", body)).statusCode).toBe(403);
+      store.put("conversations/u1_u9", { participants: ["u9"] });
+      expect((await call("/v1/uploads", body)).statusCode).toBe(403);
+      store.put("conversations/u1_u9", { participants: ["u1", "u9"] });
+      expect((await call("/v1/uploads", body)).statusCode).toBe(201);
+    });
+
+    it("counts files asked for each day, and stops at the quota", async () => {
+      const body = { ...dm, contentType: "application/pdf", size: 10 };
+      expect((await call("/v1/uploads", body)).statusCode).toBe(201);
+      expect(store.doc("uploadQuotas/u1")).toMatchObject({ day: today, files: 1, bytes: 0 });
+      store.put("uploadQuotas/u1", { day: today, files: 200, bytes: 0 });
+      const over = await call("/v1/uploads", body);
+      expect(over.statusCode).toBe(429);
+      expect(over.json().error.message).toContain("200 files or 2 GB a day");
+      // Yesterday's count doesn't carry over, and other purposes don't count.
+      store.put("uploadQuotas/u1", { day: "2026-11-10", files: 200, bytes: 2048 * MB });
+      expect((await call("/v1/uploads", body)).statusCode).toBe(201);
+      expect(store.doc("uploadQuotas/u1")).toMatchObject({ day: today, files: 1, bytes: 0 });
+      store.put("uploadQuotas/u1", { day: today, files: 200, bytes: 0 });
+      expect((await call("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "image/jpeg", size: 10 })).statusCode).toBe(201);
+    });
+
+    it("counts the bytes received, refusing a file past the day's 2 GB", async () => {
+      store.put("uploadQuotas/u1", { day: today, files: 3, bytes: 2048 * MB - 100 });
+      // Declared too big for what's left.
+      expect((await call("/v1/uploads", { ...dm, contentType: "application/pdf", size: 101 })).statusCode).toBe(429);
+      // Declared small, sent bigger.
+      const sent = Buffer.concat([pdf, Buffer.alloc(200)]);
+      const { id, done } = await upload({ ...dm, contentType: "application/pdf", size: 10 }, sent);
+      expect(done!.statusCode).toBe(429);
+      expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "failed" });
+      expect(storage.files.has(`uploads/raw/u1/${id}`)).toBe(false);
+      expect(store.doc("uploadQuotas/u1")).toMatchObject({ files: 4, bytes: 2048 * MB - 100 });
+      const fits = await upload({ ...dm, contentType: "application/pdf", size: pdf.length }, pdf);
+      expect(fits.done!.statusCode).toBe(200);
+      expect(store.doc("uploadQuotas/u1")).toMatchObject({ files: 5, bytes: 2048 * MB - 100 + pdf.length });
+    });
+
+    it("copies only the generation it checked (a second PUT can't swap the bytes)", async () => {
+      const res = await call("/v1/uploads", { ...dm, contentType: "application/pdf", name: "a.pdf", size: pdf.length });
+      const { id } = res.json();
+      const raw = `uploads/raw/u1/${id}`;
+      storage.files.set(raw, { data: pdf });
+      storage.beforeCopy = () => storage.files.set(raw, { data: Buffer.from("<html>swapped</html>") });
+      const done = await call(`/v1/uploads/${id}/complete`);
+      expect(done.statusCode).toBe(412);
+      expect(storage.files.has(`conversations/u1_u2/u1/m1/${id}-a.pdf`)).toBe(false);
+      expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "failed" });
+    });
+
+    it("refuses a copy that isn't the size it checked", async () => {
+      storage.copy = async (_from, to, contentType) => void storage.files.set(to, { data: Buffer.from("x"), contentType });
+      const { id, done } = await upload({ ...dm, contentType: "application/pdf", name: "a.pdf", size: pdf.length }, pdf);
+      expect(done!.statusCode).toBe(412);
+      expect(storage.files.has(`conversations/u1_u2/u1/m1/${id}-a.pdf`)).toBe(false);
+    });
+
+    it("removes an unsent file for its owner, deleting what was stored", async () => {
+      const { id, done } = await upload({ ...dm, contentType: "application/pdf", name: "a.pdf", size: pdf.length }, pdf);
+      const path = done!.json().path as string;
+      expect(storage.files.has(path)).toBe(true);
+      expect((await del(id, "u2")).statusCode).toBe(404);
+      expect((await del(id)).statusCode).toBe(204);
+      expect(storage.files.has(path)).toBe(false);
+      expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "removed" });
+      expect((await del(id)).statusCode).toBe(204);
+      // It can't be sent after that.
+      const send = await call("/v1/conversations/u1_u2/messages", { id: "m1", text: "", uploadIds: [id] });
+      expect(send.statusCode).toBe(400);
+      expect(send.json().error.message).toBe("A file was removed. Attach it again.");
+    });
+
+    it("removes a compressed photo and its thumbnail", async () => {
+      const data = await jpeg();
+      const { id, done } = await upload({ ...dm, contentType: "image/jpeg", name: "p.jpg", size: data.length }, data);
+      const { path, thumbPath } = done!.json();
+      expect((await del(id)).statusCode).toBe(204);
+      expect(storage.files.has(path)).toBe(false);
+      expect(storage.files.has(thumbPath)).toBe(false);
+    });
+
+    it("leaves a sent file, and anything that isn't a chat file", async () => {
+      const { id, done } = await upload({ ...dm, contentType: "application/pdf", name: "a.pdf", size: pdf.length }, pdf);
+      store.put("conversations/u1_u2/messages/m1", { authorId: "u1", attachments: [{ path: done!.json().path }] });
+      expect((await del(id)).statusCode).toBe(412);
+      expect(storage.files.has(done!.json().path)).toBe(true);
+      const post = await upload({ purpose: "post", itemId: "i1", contentType: "image/jpeg", size: 10 }, await jpeg());
+      expect((await del(post.id)).statusCode).toBe(412);
+    });
+
+    it("takes an MP4 or MOV with an unlisted brand as a video in chat, as the app does by its name", async () => {
+      const xavc = Buffer.concat([ftyp("XAVC", "XAVC", "mp42"), Buffer.alloc(11 * MB)]);
+      const byType = await upload({ ...dm, contentType: "video/mp4", name: "clip.mp4", size: 1000 }, xavc);
+      expect(byType.done!.json()).toMatchObject({ status: "ready", contentType: "video/mp4" });
+      const byName = await upload({ ...dm, contentType: "application/octet-stream", name: "clip.MOV", size: 1000 }, xavc);
+      expect(byName.done!.json()).toMatchObject({ status: "ready", contentType: "video/quicktime" });
+      // Not named or declared as a video: a file, so 10 MB at most.
+      const neither = await upload({ ...dm, contentType: "application/octet-stream", name: "clip.bin", size: 1000 }, xavc);
+      expect(neither.done!.statusCode).toBe(400);
+      // Posts stay strict: no transcode of an unknown container.
+      const post = await upload({ purpose: "post", itemId: "i1", contentType: "video/mp4", size: 1000 }, ftyp("XAVC", "XAVC"));
+      expect(post.done!.json().error.message).toBe("That file isn't a photo or video we can use.");
     });
   });
 

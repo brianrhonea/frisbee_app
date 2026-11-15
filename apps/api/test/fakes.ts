@@ -185,19 +185,32 @@ export class FakeMediaStorage implements MediaStorage {
     this.signed.push({ path, contentType, maxBytes, expiresAt });
     return { url: `signed:${path}`, headers: { "content-type": contentType, "x-goog-content-length-range": `0,${maxBytes}` } };
   }
-  async size(path: string) {
-    return this.files.get(path)?.data.length ?? null;
+  /** Each stored entry is one generation: setting a path again makes a new one. */
+  private generations = new WeakMap<object, string>();
+  private nextGeneration = 1;
+  /** Runs just before a copy (a test re-PUTs the raw file here). */
+  beforeCopy?: () => void;
+
+  private generationOf(entry: object) {
+    let g = this.generations.get(entry);
+    if (!g) this.generations.set(entry, (g = String(this.nextGeneration++)));
+    return g;
   }
-  async read(path: string, bytes?: number) {
+  async stat(path: string) {
     const f = this.files.get(path);
-    if (!f) throw new Error(`no ${path}`);
+    return f ? { size: f.data.length, generation: this.generationOf(f) } : null;
+  }
+  async read(path: string, bytes?: number, generation?: string) {
+    const f = this.files.get(path);
+    if (!f || (generation && this.generationOf(f) !== generation)) throw Object.assign(new Error(`no ${path}`), { code: 404 });
     return bytes ? f.data.subarray(0, bytes) : f.data;
   }
   async write(path: string, data: Buffer, contentType: string) {
     this.files.set(path, { data, contentType });
   }
-  async copy(from: string, to: string, contentType: string) {
-    this.files.set(to, { data: await this.read(from), contentType });
+  async copy(from: string, to: string, contentType: string, generation?: string) {
+    this.beforeCopy?.();
+    this.files.set(to, { data: await this.read(from, undefined, generation), contentType });
   }
   async downloadTo(path: string, file: string) {
     await writeFile(file, await this.read(path));

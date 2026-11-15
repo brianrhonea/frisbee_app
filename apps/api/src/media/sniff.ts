@@ -49,3 +49,22 @@ export function sniffMediaType(head: Uint8Array): AcceptedMediaType | null {
   if (/^(iso\d|isom|mp4\d|avc\d|dash|mmp4|f4v)$/.test(major)) return "video/mp4";
   return null;
 }
+
+/** ISO base media video types, and the extensions the app sends them with. */
+const ftypVideo: Record<string, AcceptedMediaType> = { mp4: "video/mp4", mov: "video/quicktime", m4v: "video/x-m4v", "3gp": "video/3gpp" };
+const ftypVideoTypes = new Set<string>(Object.values(ftypVideo));
+
+/**
+ * A chat file's type: [sniffMediaType], except that an ISO base media
+ * (ftyp) file with a brand we don't list is a video if it was declared as
+ * one ([declared]) or is named like one ([name]), as the app accepts chat
+ * videos by their extension. Other purposes stay strict, so a post never
+ * queues an unknown container for transcoding.
+ */
+export function sniffChatMediaType(head: Uint8Array, declared: string, name: string | undefined): AcceptedMediaType | null {
+  const known = sniffMediaType(head);
+  if (known || !ftypBrands(head)) return known;
+  if (ftypVideoTypes.has(declared)) return declared as AcceptedMediaType;
+  const dot = (name ?? "").lastIndexOf(".");
+  return dot < 0 ? null : (ftypVideo[name!.slice(dot + 1).toLowerCase()] ?? null);
+}

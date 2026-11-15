@@ -196,6 +196,13 @@ export function chatAttachmentMax(fileName: string, videoType: boolean): number 
   return videoType && chatVideoName.test(fileName) ? chatVideoMax : chatFileMax;
 }
 
+/**
+ * What one member may upload to chats in a UTC day through the API: files
+ * asked for, and bytes received. Kept in uploadQuotas/{uid}; a file removed
+ * from the composer still counts, so removing and re-adding doesn't reset it.
+ */
+export const chatUploadQuota = { files: 200, bytes: 2 * 1024 * MB } as const;
+
 /** Longest file name kept on a chat file. */
 export const chatFileNameMax = 120;
 
@@ -308,9 +315,11 @@ export function uploadMax(purpose: UploadPurpose, contentType: string, name?: st
  * An upload's life (uploads/{id}.status): `pending` until the client says
  * it's uploaded, then `ready` (images, compressed in the request) or
  * `processing` (videos, until the transcode job ends in `ready` or
- * `failed`). A file that isn't what it claims is `failed`.
+ * `failed`). A file that isn't what it claims is `failed`. A chat file
+ * taken out of the composer before it's sent (`DELETE /v1/uploads/{id}`)
+ * is `removed`, and its stored files are deleted.
  */
-export const uploadStatuses = ["pending", "processing", "ready", "failed"] as const;
+export const uploadStatuses = ["pending", "processing", "ready", "failed", "removed"] as const;
 export type UploadStatus = (typeof uploadStatuses)[number];
 
 /** Answer to `POST /v1/uploads`: PUT the file to [uploadUrl] with [headers]. */

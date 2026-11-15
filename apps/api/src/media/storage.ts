@@ -24,13 +24,23 @@ export interface MediaStorage {
     maxBytes: number,
     expiresAt: Date,
   ): Promise<{ url: string; headers: Record<string, string> }>;
-  /** The object's size in bytes, or null if there's none. */
-  size(path: string): Promise<number | null>;
-  /** The first [bytes] bytes, or the whole object without a limit. */
-  read(path: string, bytes?: number): Promise<Buffer>;
+  /**
+   * The object's size in bytes and its generation (which changes whenever
+   * it's written again), or null if there's none.
+   */
+  stat(path: string): Promise<{ size: number; generation: string } | null>;
+  /**
+   * The first [bytes] bytes, or the whole object without a limit. With
+   * [generation], only that version: it fails if the object was replaced.
+   */
+  read(path: string, bytes?: number, generation?: string): Promise<Buffer>;
   write(path: string, data: Buffer, contentType: string): Promise<void>;
-  /** Copies [from] to [to] in the bucket (no download), saved as [contentType]. */
-  copy(from: string, to: string, contentType: string): Promise<void>;
+  /**
+   * Copies [from] to [to] in the bucket (no download), saved as
+   * [contentType]. With [generation], copies only that version of [from]
+   * and fails if it was replaced, so what was checked is what's copied.
+   */
+  copy(from: string, to: string, contentType: string, generation?: string): Promise<void>;
   downloadTo(path: string, file: string): Promise<void>;
   uploadFrom(file: string, path: string, contentType: string): Promise<void>;
   delete(path: string): Promise<void>;
@@ -76,15 +86,19 @@ export class FirebaseMediaStorage implements MediaStorage {
     return { url, headers: { "content-type": contentType, ...headers } };
   }
 
-  async size(path: string) {
+  async stat(path: string) {
     const [exists] = await this.bucket.file(path).exists();
     if (!exists) return null;
     const [meta] = await this.bucket.file(path).getMetadata();
-    return Number(meta.size ?? 0);
+    return { size: Number(meta.size ?? 0), generation: String(meta.generation ?? "") };
   }
 
-  async read(path: string, bytes?: number) {
-    const [data] = await this.bucket.file(path).download(bytes ? { start: 0, end: bytes - 1 } : {});
+  private file(path: string, generation?: string) {
+    return this.bucket.file(path, generation ? { generation } : {});
+  }
+
+  async read(path: string, bytes?: number, generation?: string) {
+    const [data] = await this.file(path, generation).download(bytes ? { start: 0, end: bytes - 1 } : {});
     return data;
   }
 
@@ -92,8 +106,9 @@ export class FirebaseMediaStorage implements MediaStorage {
     await this.bucket.file(path).save(data, { contentType, resumable: false, metadata: { cacheControl: mediaCacheControl } });
   }
 
-  async copy(from: string, to: string, contentType: string) {
-    await this.bucket.file(from).copy(this.bucket.file(to), { contentType, cacheControl: mediaCacheControl });
+  async copy(from: string, to: string, contentType: string, generation?: string) {
+    // A File with a generation copies with sourceGeneration: that version or nothing.
+    await this.file(from, generation).copy(this.bucket.file(to), { contentType, cacheControl: mediaCacheControl });
   }
 
   async downloadTo(path: string, file: string) {

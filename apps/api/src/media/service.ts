@@ -2,6 +2,7 @@ import {
   type AcceptedImageType,
   chatDocumentTypes,
   chatFileMax,
+  chatUploadQuota,
   type CompleteUploadResponse,
   type CreateUploadResponse,
   createUploadRequestSchema,
@@ -20,7 +21,7 @@ import { docIdParam } from "../ids.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { can, isMember, mapOf, roleIn, strings } from "../teams/access.js";
 import { compressImage, type HeicDecoder, UnreadableImage } from "./image.js";
-import { sniffBytes, sniffMediaType } from "./sniff.js";
+import { sniffBytes, sniffChatMediaType, sniffMediaType } from "./sniff.js";
 import type { MediaStorage } from "./storage.js";
 import { nextStatus, videoOutputs } from "./transcode.js";
 
@@ -130,14 +131,32 @@ export class UploadService {
     if (!ok) throw denied("You can't post in this chat.");
   }
 
-  /** inConversation() in storage.rules. */
+  /**
+   * inConversation() in storage.rules, and more: the conversation must
+   * exist and list the caller, direct ones too (the rules go by the id
+   * alone), so nobody stores files against a conversation never started.
+   */
   private async checkConversation(uid: string, convId: string) {
-    if (/^g-[A-Za-z0-9]+$/.test(convId)) {
-      const conv = await this.store.get(`conversations/${convId}`);
-      if (!conv || !strings(conv.participants).includes(uid)) throw denied("You're not in this conversation.");
-    } else if (!convId.split("_").includes(uid)) {
-      throw denied("You're not in this conversation.");
-    }
+    const direct = !/^g-[A-Za-z0-9]+$/.test(convId);
+    if (direct && !convId.split("_").includes(uid)) throw denied("You're not in this conversation.");
+    const conv = await this.store.get(`conversations/${docIdParam(convId)}`);
+    if (!conv || !strings(conv.participants).includes(uid)) throw denied("You're not in this conversation.");
+  }
+
+  /** Today (UTC), the day uploadQuotas/{uid} counts. */
+  private quotaDay() {
+    return new Date(this.now()).toISOString().slice(0, 10);
+  }
+
+  /** Adds [bytes] received to today's chat quota; false (nothing added) if it would pass it. */
+  private async chargeBytes(uid: string, bytes: number): Promise<boolean> {
+    const day = this.quotaDay();
+    return this.store.transact(async (tx) => {
+      const used = usage(await tx.get(quotaPath(uid)), day);
+      if (used.bytes + bytes > chatUploadQuota.bytes) return false;
+      tx.set(quotaPath(uid), { day, files: used.files, bytes: used.bytes + bytes, updatedAt: serverTime });
+      return true;
+    });
   }
 
   /** `POST /v1/uploads`. */
@@ -153,7 +172,14 @@ export class UploadService {
     const rawPath = `uploads/raw/${caller.uid}/${id}`;
     const expiresAt = new Date(this.now() + urlLifetimeMs);
     const signed = await this.storage.signedUploadUrl(rawPath, contentType, maxBytes, expiresAt);
+    const day = this.quotaDay();
     await this.store.transact(async (tx) => {
+      // Chat files are stored as soon as they're complete, sent or not: a daily quota bounds them.
+      if (purpose === "chat") {
+        const used = usage(await tx.get(quotaPath(caller.uid)), day);
+        if (used.files >= chatUploadQuota.files || used.bytes + size > chatUploadQuota.bytes) throw overQuota();
+        tx.set(quotaPath(caller.uid), { day, files: used.files + 1, bytes: used.bytes, updatedAt: serverTime });
+      }
       tx.create(`uploads/${id}`, {
         uid: caller.uid,
         purpose,
@@ -182,10 +208,22 @@ export class UploadService {
     const purpose = upload.purpose as UploadPurpose;
     const folder = String(upload.folder);
 
-    const size = await this.storage.size(rawPath);
-    if (size == null) throw new ApiError("failed_precondition", "The file hasn't finished uploading.");
-    const type = sniffMediaType(await this.storage.read(rawPath, sniffBytes));
-    if (purpose === "chat" && (type == null || isVideoType(type))) return this.keepAsSent(id, upload, type, size);
+    // Everything from here reads and copies this generation of the raw
+    // file: a second PUT to the signed URL makes a new one, which fails.
+    const stat = await this.storage.stat(rawPath);
+    if (stat == null) throw new ApiError("failed_precondition", "The file hasn't finished uploading.");
+    const { size, generation } = stat;
+    if (purpose === "chat" && !(await this.chargeBytes(caller.uid, size))) {
+      const e = overQuota();
+      await this.reject(id, rawPath, e.message);
+      throw e;
+    }
+    const head = await this.storage.read(rawPath, sniffBytes, generation);
+    const type =
+      purpose === "chat"
+        ? sniffChatMediaType(head, String(upload.contentType ?? ""), typeof upload.name === "string" ? upload.name : undefined)
+        : sniffMediaType(head);
+    if (purpose === "chat" && (type == null || isVideoType(type))) return this.keepAsSent(id, upload, type, size, generation);
     const limits = uploadLimits[purpose];
     const max = type == null ? null : isImageType(type) ? limits.image : limits.video;
     let problem: string | null = null;
@@ -221,7 +259,7 @@ export class UploadService {
 
     let compressed: Awaited<ReturnType<typeof compressImage>>;
     try {
-      compressed = await compressImage(await this.storage.read(rawPath), type as AcceptedImageType, { heic: this.opts.heic });
+      compressed = await compressImage(await this.storage.read(rawPath, undefined, generation), type as AcceptedImageType, { heic: this.opts.heic });
     } catch (e) {
       if (!(e instanceof UnreadableImage)) throw e;
       const message = "That photo couldn't be read. Try a JPEG or PNG.";
@@ -257,7 +295,13 @@ export class UploadService {
    * stored as a photo, video or page it isn't. The limit is storage.rules'
    * attachmentSizeOk: 10 MB, or 100 MB for a video named like one.
    */
-  private async keepAsSent(id: string, upload: Data, type: ReturnType<typeof sniffMediaType>, size: number): Promise<CompleteUploadResponse> {
+  private async keepAsSent(
+    id: string,
+    upload: Data,
+    type: ReturnType<typeof sniffMediaType>,
+    size: number,
+    generation: string,
+  ): Promise<CompleteUploadResponse> {
     const rawPath = String(upload.rawPath);
     const declared = String(upload.contentType ?? "");
     const video = type != null && isVideoType(type);
@@ -270,7 +314,21 @@ export class UploadService {
       throw new ApiError("invalid_argument", problem);
     }
     const path = `${String(upload.folder)}/${id}-${safeFileName(name)}`;
-    await this.storage.copy(rawPath, path, contentType);
+    // Only the generation checked above is copied, and the copy must be the size checked.
+    const problem = "The file changed while it was being saved. Try sending it again.";
+    try {
+      await this.storage.copy(rawPath, path, contentType, generation);
+    } catch (e) {
+      // 404: that generation is gone; 412: it no longer matches.
+      if (![404, 412].includes(Number((e as { code?: unknown }).code))) throw e;
+      await this.reject(id, rawPath, problem);
+      throw new ApiError("failed_precondition", problem);
+    }
+    if ((await this.storage.stat(path))?.size !== size) {
+      await this.storage.delete(path).catch(() => undefined);
+      await this.reject(id, rawPath, problem);
+      throw new ApiError("failed_precondition", problem);
+    }
     const done: Data = {
       status: nextStatus("pending", "file_saved"),
       sniffedType: type,
@@ -284,6 +342,30 @@ export class UploadService {
     return answer(id, done);
   }
 
+  /**
+   * `DELETE /v1/uploads/{id}`: a chat file taken out of the composer before
+   * sending. Only its owner may, and only while no message holds it (the
+   * message the file was uploaded for doesn't exist yet); its raw and
+   * stored files are deleted. A file already sent goes with its message.
+   */
+  async remove(caller: Caller, id: string): Promise<void> {
+    const upload = await this.store.get(`uploads/${id}`);
+    if (!upload || upload.uid !== caller.uid) throw new ApiError("not_found", "No such upload.");
+    if (upload.purpose !== "chat") throw new ApiError("failed_precondition", "Only a file in an unsent message can be removed.");
+    // targetId and itemId were checked when the upload was made (checkTarget, the schema).
+    const message = `${String(upload.targetId)}/messages/${docIdParam(upload.itemId)}`;
+    const removed = await this.store.transact(async (tx) => {
+      const [now, sent] = await Promise.all([tx.get(`uploads/${id}`), tx.get(message)]);
+      if (!now || now.status === "removed") return null;
+      if (sent) throw new ApiError("failed_precondition", "That file was sent. Delete the message to remove it.");
+      tx.update(`uploads/${id}`, { status: nextStatus(now.status as UploadStatus, "removed"), updatedAt: serverTime });
+      return now;
+    });
+    if (!removed) return;
+    const paths = [removed.rawPath, removed.path, removed.thumbPath].filter((p): p is string => typeof p === "string");
+    await Promise.all(paths.map((p) => this.storage.delete(p).catch(() => undefined)));
+  }
+
   private async reject(id: string, rawPath: string, error: string) {
     await this.store.transact(async (tx) =>
       tx.update(`uploads/${id}`, { status: nextStatus("pending", "rejected"), error, updatedAt: serverTime }),
@@ -291,6 +373,20 @@ export class UploadService {
     await this.storage.delete(rawPath).catch(() => undefined);
   }
 }
+
+const quotaPath = (uid: string) => `uploadQuotas/${uid}`;
+
+/** What uploadQuotas/{uid} says was used on [day] (nothing if it's another day's). */
+function usage(q: Data | null, day: string): { files: number; bytes: number } {
+  if (!q || q.day !== day) return { files: 0, bytes: 0 };
+  return { files: typeof q.files === "number" ? q.files : 0, bytes: typeof q.bytes === "number" ? q.bytes : 0 };
+}
+
+const overQuota = () =>
+  new ApiError(
+    "resource_exhausted",
+    `You've sent a lot of files today (the most is ${chatUploadQuota.files} files or ${chatUploadQuota.bytes / (1024 * MB)} GB a day). Try again tomorrow.`,
+  );
 
 function answer(id: string, u: Data): CompleteUploadResponse {
   const out: CompleteUploadResponse = { id, status: u.status as UploadStatus };
