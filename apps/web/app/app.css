@@ -1023,11 +1023,6 @@ button.person-row:hover { background: var(--field); }
   max-width: 1180px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start;
 }
 .huddle-main { display: grid; gap: 16px; min-width: 0; max-width: 760px; width: 100%; justify-self: center; }
-.huddle-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.huddle-head h1 { margin: 0 0 4px; font-size: clamp(1.6rem, 3vw, 2rem); }
-.huddle-head p { margin: 0; color: var(--muted); }
-.pill-date { margin: 6px 0 0; white-space: nowrap; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px; }
-.pill-date::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .huddle-side { display: grid; gap: 16px; position: sticky; top: 88px; }
 .huddle-side .card { padding: 16px 18px; }
 .feed-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-top: 4px; }
@@ -1062,7 +1057,6 @@ button.person-row:hover { background: var(--field); }
 .promo-card small { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; }
 .promo-card b { font-size: 1.35rem; line-height: 1.2; letter-spacing: -0.02em; }
 .side-note { margin: 0; text-align: center; color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
-.huddle-foot { display: none; }
 .promo-card p { margin: 0 0 4px; font-size: 0.9rem; opacity: 0.85; }
 .card-head .card-title { margin: 0; }
 
@@ -1070,19 +1064,9 @@ button.person-row:hover { background: var(--field); }
   .page.huddle { grid-template-columns: minmax(0, 1fr) 250px; gap: 18px; }
   .huddle-main { max-width: none; }
 }
-@media (max-width: 1000px) {
-  .huddle-foot { display: grid; gap: 16px; grid-column: 1 / -1; }
-  .huddle-foot .side-team-list { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
-  .huddle-foot .brand-card { display: none; }
-}
 @media (max-width: 760px) {
   .page.huddle { grid-template-columns: minmax(0, 1fr); }
   .huddle-side { position: static; }
-  .huddle-foot .brand-card { display: grid; }
-}
-@media (max-width: 560px) {
-  .huddle-head { flex-direction: column; gap: 8px; }
-  .pill-date { margin: 0; }
 }
 
 /* Events: the week strip (EventsBrowser), like the app's Schedule. */
@@ -1259,3 +1243,114 @@ button.poll-option.on { border-color: var(--accent); }
 .access-row > span { font-weight: 600; overflow-wrap: anywhere; }
 .settings-form .access-row select { width: auto; min-width: 150px; height: 36px; }
 .conv-typing { margin: 4px 0 0; font-style: italic; }
+
+/* ==== Home: social feed (w2/home-ui) =====================================
+   Dashboard.tsx, Composer.tsx's audience chip, components/home/*, the
+   floating Post button (AppFrame.tsx) and SideTeams' "+". Home only: the
+   team pages' rules live elsewhere. */
+.huddle-greeting { margin: 0; font-size: clamp(1.25rem, 2.4vw, 1.5rem); letter-spacing: -0.02em; }
+
+/* Composer: "To: Everyone / a team", and a team post's own fields. */
+.audience-chip {
+  display: inline-flex; align-items: center; gap: 6px; width: fit-content; margin-bottom: 6px;
+  padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent);
+  font-size: 0.8rem; font-weight: 700;
+}
+.audience-chip select {
+  border: 0; background: transparent; color: inherit; font: inherit; padding: 3px 4px; border-radius: 999px; cursor: pointer;
+  max-width: 220px;
+}
+.audience-chip select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.composer-title, .composer-place {
+  display: block; width: 100%; box-sizing: border-box; margin: 0 0 6px; padding: 8px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit;
+}
+.composer-title { font-weight: 700; }
+.composer-place { margin: 6px 0 0; font-size: 0.9rem; }
+.composer-public { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 600; cursor: pointer; }
+
+/* The team strip under the composer. */
+.team-strip { margin: -4px 0 0; min-width: 0; }
+.team-strip ul {
+  list-style: none; margin: 0; padding: 2px 2px 6px; display: flex; gap: 8px;
+  overflow-x: auto; scrollbar-width: thin; scroll-snap-type: x proximity;
+}
+.team-strip li { flex: none; scroll-snap-align: start; }
+.team-strip-item {
+  display: grid; justify-items: center; gap: 6px; width: 84px; padding: 10px 4px 8px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none;
+  font: inherit; cursor: pointer; box-shadow: var(--shadow);
+}
+.team-strip-item:hover { border-color: var(--accent); }
+.team-strip-item .team-tile { width: 42px; height: 42px; border-radius: 12px; font-size: 13px; }
+.team-strip-name {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; font-weight: 700; text-align: center;
+}
+.team-strip-add { border-style: dashed; box-shadow: none; background: none; }
+.team-strip-add .team-tile { background: var(--accent-soft); color: var(--accent); }
+
+/* Create or join (the strip, the "+" by Your spaces, the checklist). */
+.side-add { border: 0; background: none; cursor: pointer; padding: 0; font: inherit; }
+.start-join { display: grid; gap: 12px; max-height: calc(100vh - 64px); overflow: auto; }
+.start-join .card-head { display: flex; align-items: center; justify-content: space-between; }
+.start-join .card-head .card-title { margin: 0; }
+.start-join > .settings-form { padding: 0; border: 0; box-shadow: none; }
+.start-join > p { margin: 0; }
+.start-join-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.start-join-list a { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; color: var(--ink); text-decoration: none; }
+.start-join-list a:hover { background: var(--field); }
+.start-join-list small { color: var(--muted); font-size: 0.8rem; }
+
+/* Feed end: the infinite-scroll sentinel and its fallbacks. */
+.feed-panel { display: grid; gap: 14px; min-width: 0; }
+.feed-pager { flex-direction: column; align-items: center; gap: 8px; margin-top: 10px; }
+.feed-pager > p:empty { display: none; }
+.feed-sentinel { display: block; width: 100%; height: 1px; }
+.feed-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+
+/* The new-member checklist and the no-team card. */
+.get-started .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.get-started > p { margin: 0 0 10px; }
+.get-started-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.get-started-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+.get-started-list li + li { border-top: 1px solid var(--line); }
+.get-started-check {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; box-sizing: border-box;
+  border: 2px solid var(--line); color: var(--on-accent); font-size: 13px; font-weight: 800;
+}
+.get-started-list li.done .get-started-check { background: var(--accent); border-color: var(--accent); }
+.get-started-label { flex: 1; min-width: 0; font-weight: 600; }
+.get-started-list li.done .get-started-label { color: var(--muted); text-decoration: line-through; font-weight: 500; }
+.join-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.join-card .btn:not(.btn-amber) { background: transparent; color: var(--on-brand); border-color: currentColor; }
+
+/* Right rail: Needs you. */
+.needs-you-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.needs-you-list a { display: grid; gap: 2px; padding: 8px 10px; margin: 0 -10px; border-radius: 10px; color: var(--ink); text-decoration: none; }
+.needs-you-list a:hover { background: var(--field); }
+.needs-you-list small { color: var(--accent); font-weight: 700; font-size: 0.8rem; }
+
+/* Phones: invitations and the next event above the feed (and not again beside it). */
+.huddle-phone { display: none; }
+.next-event { display: grid; gap: 2px; text-decoration: none; color: var(--ink); background: var(--accent-soft); border-color: transparent; }
+.next-event small { color: var(--accent); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+@media (max-width: 760px) {
+  .huddle-phone { display: grid; gap: 12px; }
+  .huddle-phone:empty { display: none; }
+  .huddle-side-invites { display: none; }
+}
+
+/* The floating Post button, where the side nav is hidden. */
+.fab-post { display: none; }
+@media (max-width: 640px) {
+  .fab-post {
+    position: fixed; z-index: 30; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    display: inline-flex; align-items: center; gap: 6px; padding: 12px 18px; border: 0; border-radius: 999px;
+    background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 800; cursor: pointer;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.22);
+  }
+  .fab-post:hover { filter: brightness(1.05); }
+  .frame-main { padding-bottom: 72px; }
+}
+/* ==== end Home: social feed ============================================ */
