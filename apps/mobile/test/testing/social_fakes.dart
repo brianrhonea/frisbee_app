@@ -243,6 +243,36 @@ class FakeUserPostRepository implements UserPostRepository {
   UserPost? _find(String id) => posts.where((p) => p.id == id).firstOrNull;
 
   @override
+  bool hasCommunityFeed = true;
+
+  /// What [fetchCommunityPage] returns, by its `before` cursor (null for
+  /// the first page); missing cursors give an empty last page.
+  final communityPages = <int?, CommunityFeedPage>{};
+
+  /// Fails [fetchCommunityPage] while set.
+  Exception? communityError;
+
+  /// The cursors [fetchCommunityPage] was called with.
+  final communityRequests = <int?>[];
+
+  @override
+  Future<Result<CommunityFeedPage>> fetchCommunityPage({int? before}) async {
+    communityRequests.add(before);
+    if (communityError case final e?) return Result.error(e);
+    return Result.ok(communityPages[before] ?? (ids: const [], next: null));
+  }
+
+  /// Holds watchPostsByIds' first snapshot until completed, as Firestore
+  /// takes a moment.
+  Completer<void>? idsGate;
+
+  @override
+  Stream<List<UserPost>> watchPostsByIds(List<String> ids) async* {
+    await idsGate?.future;
+    yield* _watch((p) => ids.contains(p.id), ids.length);
+  }
+
+  @override
   Stream<UserPost?> watchPost(String id) async* {
     yield _find(id);
     yield* _changes.stream.map((_) => _find(id));

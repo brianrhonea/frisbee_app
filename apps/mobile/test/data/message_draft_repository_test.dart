@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +19,17 @@ class _MemoryPrefs implements SharedPreferencesService {
 
   @override
   Future<void> remove(String key) async => values.remove(key);
+}
+
+/// Prefs whose reads wait for [gate].
+class _SlowPrefs extends _MemoryPrefs {
+  final gate = Completer<void>();
+
+  @override
+  Future<String?> getString(String key) async {
+    await gate.future;
+    return super.getString(key);
+  }
 }
 
 const _other = AppUser(uid: 'u2', email: 'b@c.com', displayName: 'Blair');
@@ -121,5 +133,36 @@ void main() {
     auth.setUser(_other);
     await _settle();
     expect(drafts.draft('dm_a'), '');
+  });
+
+  test('a save before the stored drafts load keeps them', () async {
+    final slow = _SlowPrefs()
+      ..values['messageDrafts_u1'] = jsonEncode({
+        'dm_a': 'stored',
+        'dm_b': 'cleared later',
+      });
+    final drafts = MessageDraftRepositoryPrefs(
+      slow,
+      auth: auth,
+      writeDelay: Duration.zero,
+    );
+    drafts.save('dm_c', 'typed first');
+    drafts.save('dm_b', '');
+    await _settle();
+    // Not written over while the load is still going.
+    expect(jsonDecode(slow.values['messageDrafts_u1']!), {
+      'dm_a': 'stored',
+      'dm_b': 'cleared later',
+    });
+
+    slow.gate.complete();
+    await _settle();
+    expect(drafts.draft('dm_a'), 'stored');
+    expect(drafts.draft('dm_b'), '');
+    expect(drafts.draft('dm_c'), 'typed first');
+    expect(jsonDecode(slow.values['messageDrafts_u1']!), {
+      'dm_a': 'stored',
+      'dm_c': 'typed first',
+    });
   });
 }

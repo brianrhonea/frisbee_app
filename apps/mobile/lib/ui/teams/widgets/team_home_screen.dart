@@ -290,20 +290,14 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           );
         }
       case _MenuAction.delete:
-        if (await confirmDialog(
-          context,
-          title: 'Delete ${team.name}?',
-          message: team.isCommunity
-              ? 'This permanently deletes the group, its events, '
-                    'tournaments, chat and posts.'
-              : 'This permanently deletes the team, its roster, events, '
-                    'posts and playbook.',
-          confirmLabel: 'Delete',
-          destructive: true,
-        )) {
-          if (!mounted) return;
+        // As on the website: they type the name to confirm.
+        final typed = await showDialog<String>(
+          context: context,
+          builder: (_) => _DeleteTeamDialog(team: team),
+        );
+        if (typed != null && mounted) {
           _showDeleting(team.name);
-          vm.deleteTeam.execute();
+          vm.deleteTeam.execute(typed);
         }
     }
   }
@@ -2051,4 +2045,83 @@ class _DeletingDialog extends StatelessWidget {
       );
     },
   );
+}
+
+/// Asks the owner to type [team]'s name before deleting it; pops with what
+/// they typed once it matches.
+class _DeleteTeamDialog extends StatefulWidget {
+  const _DeleteTeamDialog({required this.team});
+
+  final Team team;
+
+  @override
+  State<_DeleteTeamDialog> createState() => _DeleteTeamDialogState();
+}
+
+class _DeleteTeamDialogState extends State<_DeleteTeamDialog> {
+  final _name = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  bool get _matches => deleteNameMatches(widget.team.name, _name.text);
+
+  void _confirm() {
+    if (_matches) Navigator.pop(context, _name.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final team = widget.team;
+    final scheme = Theme.of(context).colorScheme;
+    return AlertDialog(
+      scrollable: true,
+      title: Text('Delete ${team.name}?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            team.isCommunity
+                ? 'This permanently deletes the ${team.kind.noun}, its '
+                      'events, tournaments, chat and posts, for everyone. '
+                      "It can't be undone."
+                : 'This permanently deletes the team, its roster, events, '
+                      "posts and playbook, for everyone. It can't be undone.",
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _name,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              labelText: 'Type ${team.name} to confirm',
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _confirm(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.error,
+            foregroundColor: scheme.onError,
+          ),
+          onPressed: _matches ? _confirm : null,
+          child: const Text('Delete'),
+        ),
+      ],
+    );
+  }
 }

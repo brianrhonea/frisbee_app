@@ -19,6 +19,8 @@ import '../../../domain/models/team_post.dart';
 import '../../../utils/command.dart';
 import '../../../utils/pending_removals.dart';
 import '../../../utils/result.dart';
+import '../../../domain/models/user_post.dart';
+import '../../posts/view_models/community_feed.dart';
 import '../../posts/view_models/home_feed.dart';
 import '../../posts/view_models/post_actions.dart';
 import '../../schedule/view_models/my_schedule.dart';
@@ -65,6 +67,8 @@ class HomeViewModel extends ChangeNotifier {
       teamPostRepository: teamPostRepository,
       userPostRepository: userPostRepository,
     )..addListener(_onPosts);
+    community = CommunityFeed(userPostRepository: userPostRepository)
+      ..addListener(_onPosts);
     _feed = MySchedule(
       teamRepository: teamRepository,
       eventRepository: eventRepository,
@@ -157,8 +161,28 @@ class HomeViewModel extends ChangeNotifier {
   bool get loadingMorePosts => feed.loadingMore;
   void loadMorePosts() => feed.loadMore();
 
-  /// Back to the newest posts (Home tapped again, or pulled down).
-  Future<void> refreshFeed() => feed.refresh();
+  /// Back to the newest posts (Home tapped again, or pulled down), in the
+  /// community feed too once it's been opened.
+  Future<void> refreshFeed() async {
+    await Future.wait([feed.refresh(), community.refresh()]);
+  }
+
+  // Community --------------------------------------------------------------
+
+  /// Every public profile's posts, as the website's Community tab shows.
+  late final CommunityFeed community;
+
+  /// Whether Home has a Community tab (builds with the API).
+  bool get hasCommunity => community.available;
+
+  /// Opens the Community tab: its first page loads the first time.
+  void openCommunity() => community.start();
+
+  /// The community's posts, less any being deleted.
+  List<UserPost> get communityPosts => [
+    for (final p in community.posts)
+      if (!removals.isPending(UserPostItem(p))) p,
+  ];
 
   /// Whether the user follows anything yet, for the empty feed's advice.
   bool get followsAnything => feed.follows.isNotEmpty;
@@ -220,6 +244,7 @@ class HomeViewModel extends ChangeNotifier {
     actions.track([
       for (final item in feed.items)
         if (item case UserPostItem(:final post)) post,
+      ...community.posts,
     ]);
     notifyListeners();
   }
@@ -236,6 +261,9 @@ class HomeViewModel extends ChangeNotifier {
       ..removeListener(_onFeed)
       ..dispose();
     feed
+      ..removeListener(_onPosts)
+      ..dispose();
+    community
       ..removeListener(_onPosts)
       ..dispose();
     joinTeam.dispose();

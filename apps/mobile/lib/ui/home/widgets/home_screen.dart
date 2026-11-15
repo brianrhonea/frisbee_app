@@ -6,6 +6,7 @@ import '../../../domain/models/feed_item.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_post.dart';
+import '../../../domain/models/user_post.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
@@ -25,12 +26,20 @@ import '../../posts/widgets/post_composer.dart';
 import '../../workouts/widgets/record_button.dart';
 import '../../core/ui/skeleton.dart';
 
-enum _Tab { forYou, teams }
+enum _Tab {
+  forYou('For you'),
+  community('Community'),
+  teams('Your teams');
 
-/// The community feed: the user's posts, their teams' and those of what
-/// they follow, with what's up next
-/// beside them (below the header on narrow screens), and a tab of the
-/// user's teams.
+  const _Tab(this.label);
+
+  final String label;
+}
+
+/// The home feed: the user's posts, their teams' and those of what they
+/// follow, with what's up next beside them (below the header on narrow
+/// screens); a Community tab of every public profile's posts (as on the
+/// website); and a tab of the user's teams.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.viewModel, this.prompt});
 
@@ -232,8 +241,16 @@ class _HomeScreenState extends State<HomeScreen> {
               // On bigger screens the top bar has the same box.
               if (mobile) ...[const SearchField(), const SizedBox(height: 12)],
               _TabRow(
+                tabs: [
+                  _Tab.forYou,
+                  if (vm.hasCommunity) _Tab.community,
+                  _Tab.teams,
+                ],
                 selected: _tab,
-                onSelect: (t) => setState(() => _tab = t),
+                onSelect: (t) {
+                  setState(() => _tab = t);
+                  if (t == _Tab.community) vm.openCommunity();
+                },
               ),
               const SizedBox(height: 14),
               if (vm.savePost.running)
@@ -290,20 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       for (final item in vm.posts)
         switch (item) {
-          UserPostItem(:final post) => UserPostCard(
-            key: ValueKey(item.id),
-            post: post,
-            loadImage: vm.imageData,
-            onOpen: () => context.push(Routes.post(post.id)),
-            onEdit: post.authorId == vm.user?.uid
-                ? () => showPostComposer(context, postId: post.id)
-                : null,
-            onDelete: post.authorId == vm.user?.uid
-                ? () => _remove(item)
-                : null,
-            actions: vm.actions,
-            onRepost: () => repostOrUndo(context, vm.actions, post),
-          ),
+          UserPostItem(:final post) => _userPostCard(post),
           final TeamPostItem p => TeamPostCard(
             key: ValueKey(item.id),
             post: p.post,
@@ -334,6 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
       else if (vm.postsLoaded)
         _CaughtUp(empty: vm.posts.isEmpty, followsAnything: vm.followsAnything),
     ],
+    _Tab.community => _community(),
     _Tab.teams => [
       for (final t in vm.teams)
         _TeamRow(
@@ -351,6 +356,63 @@ class _HomeScreenState extends State<HomeScreen> {
     ],
   };
 
+  Widget _userPostCard(UserPost post) {
+    final mine = post.authorId == vm.user?.uid;
+    final item = UserPostItem(post);
+    return UserPostCard(
+      key: ValueKey(item.id),
+      post: post,
+      loadImage: vm.imageData,
+      onOpen: () => context.push(Routes.post(post.id)),
+      onEdit: mine ? () => showPostComposer(context, postId: post.id) : null,
+      onDelete: mine ? () => _remove(item) : null,
+      actions: vm.actions,
+      onRepost: () => repostOrUndo(context, vm.actions, post),
+    );
+  }
+
+  /// Every public profile's posts, newest first, a page at a time.
+  List<Widget> _community() {
+    final feed = vm.community;
+    final posts = vm.communityPosts;
+    return [
+      if (!feed.loaded)
+        const Skeleton(
+          child: Column(
+            children: [SkeletonPost(), SizedBox(height: 14), SkeletonPost()],
+          ),
+        ),
+      for (final post in posts) _userPostCard(post),
+      if (feed.loaded)
+        if (feed.loading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          )
+        else if (feed.error)
+          _FeedNote(
+            text: "Couldn't load posts.",
+            action: ('Try again', feed.loadMore),
+          )
+        else if (feed.hasMore)
+          Center(
+            child: TextButton(
+              onPressed: feed.loadMore,
+              child: const Text('Show older posts'),
+            ),
+          )
+        else
+          _FeedNote(
+            text: posts.isEmpty ? 'No posts yet.' : "You're all caught up.",
+          ),
+    ];
+  }
+
   List<Widget> _side() => [
     if (vm.nextTeamEvent case final next?) _UpNextCard(entry: next),
     _ComingUpCard(events: vm.upcomingEvents, onAdd: _newEvent),
@@ -361,16 +423,21 @@ class _HomeScreenState extends State<HomeScreen> {
 // Tabs -----------------------------------------------------------------------
 
 class _TabRow extends StatelessWidget {
-  const _TabRow({required this.selected, required this.onSelect});
+  const _TabRow({
+    required this.tabs,
+    required this.selected,
+    required this.onSelect,
+  });
 
+  final List<_Tab> tabs;
   final _Tab selected;
   final ValueChanged<_Tab> onSelect;
 
   @override
   Widget build(BuildContext context) => UnderlineTabs(
-    labels: const ['For you', 'Your teams'],
-    selected: selected.index,
-    onSelect: (i) => onSelect(_Tab.values[i]),
+    labels: [for (final t in tabs) t.label],
+    selected: tabs.indexOf(selected),
+    onSelect: (i) => onSelect(tabs[i]),
   );
 }
 
@@ -465,6 +532,41 @@ class _Composer extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A line under a feed: where it ends, or that a page failed, with
+/// [action] (a label and what it does) beside it.
+class _FeedNote extends StatelessWidget {
+  const _FeedNote({required this.text, this.action});
+
+  final String text;
+  final (String, VoidCallback)? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            action == null ? Icons.check_circle_outline : Icons.error_outline,
+            size: 15,
+            color: c.muted,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(text, style: TextStyle(fontSize: 12, color: c.muted)),
+          ),
+          if (action case (final label, final onTap)) ...[
+            const SizedBox(width: 6),
+            TextButton(onPressed: onTap, child: Text(label)),
+          ],
         ],
       ),
     );

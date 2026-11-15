@@ -1,5 +1,5 @@
 {
-  "about": "PlayerSignup.compareByName (signupOrder): the order players are listed and drafted in.",
+  "about": "PlayerSignup.compareByName (signupOrder): the order players are listed and drafted in; equal names go by uid.",
   "cases": [
     {
       "signups": [
@@ -60,6 +60,37 @@
         "u5",
         "u4",
         "u3"
+      ]
+    },
+    {
+      "signups": [
+        {
+          "uid": "u9",
+          "name": "Sam"
+        },
+        {
+          "uid": "u2",
+          "name": "sam"
+        },
+        {
+          "uid": "u5",
+          "name": "Sam"
+        },
+        {
+          "uid": "u1",
+          "name": "Alex"
+        },
+        {
+          "uid": "u10",
+          "name": "SAM"
+        }
+      ],
+      "expected": [
+        "u1",
+        "u10",
+        "u2",
+        "u5",
+        "u9"
       ]
     }
   ]

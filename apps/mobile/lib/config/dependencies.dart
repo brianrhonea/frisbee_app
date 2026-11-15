@@ -145,6 +145,7 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<UserPostRepository>(
     create: (context) => UserPostRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
+      api: context.read<ApiClient?>(),
     ),
   ),
   Provider<PostCommentRepository>(

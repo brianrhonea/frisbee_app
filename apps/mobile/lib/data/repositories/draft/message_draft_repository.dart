@@ -38,6 +38,14 @@ class MessageDraftRepositoryPrefs implements MessageDraftRepository {
   String? _uid;
   Timer? _write;
 
+  /// The signed-in user's stored drafts loading; writes wait for it, so a
+  /// save made first doesn't overwrite what's stored.
+  Future<void>? _loading;
+  var _loaded = false;
+
+  /// Keys saved (or cleared) since sign-in; the load doesn't bring them back.
+  final _touched = <String>{};
+
   /// Where [uid]'s drafts are kept (messageDraftsKey in packages/shared).
   static String keyFor(String uid) => 'messageDrafts_$uid';
 
@@ -56,10 +64,13 @@ class MessageDraftRepositoryPrefs implements MessageDraftRepository {
     _write?.cancel();
     _write = null;
     _drafts.clear();
+    _touched.clear();
+    _loaded = false;
+    _loading = null;
     if (previous != null) {
       unawaited(_prefs.remove(keyFor(previous)).catchError((Object _) {}));
     }
-    if (uid != null) unawaited(_load(uid));
+    if (uid != null) _loading = _load(uid);
   }
 
   Future<void> _load(String uid) async {
@@ -71,12 +82,29 @@ class MessageDraftRepositoryPrefs implements MessageDraftRepository {
       if (raw == null || _uid != uid) return;
       final map = jsonDecode(raw);
       if (map is! Map) return;
-      for (final e in map.entries) {
-        // Anything typed since sign-in wins over what was stored.
-        if (e.value is String) _drafts.putIfAbsent('${e.key}', () => e.value);
-      }
+      final stored = <String, String>{
+        for (final e in map.entries)
+          // Anything typed or cleared since sign-in wins over what was stored.
+          if (e.value is String && !_touched.contains('${e.key}'))
+            '${e.key}': e.value as String,
+      };
+      // Stored drafts are older than anything typed since, so go first.
+      final typed = Map.of(_drafts);
+      _drafts
+        ..clear()
+        ..addAll(stored)
+        ..addAll(typed);
+      _trim();
     } on Object {
       // A bad entry just means no drafts.
+    } finally {
+      if (_uid == uid) _loaded = true;
+    }
+  }
+
+  void _trim() {
+    while (_drafts.length > maxDrafts) {
+      _drafts.remove(_drafts.keys.first);
     }
   }
 
@@ -87,25 +115,26 @@ class MessageDraftRepositoryPrefs implements MessageDraftRepository {
   void save(String key, String text) {
     final uid = _uid;
     if (uid == null) return;
+    _touched.add(key);
     if (text.trim().isEmpty) {
-      if (_drafts.remove(key) == null) return;
+      // Before the load, a stored draft for [key] may still need clearing.
+      if (_drafts.remove(key) == null && _loaded) return;
     } else {
       // Re-inserted at the end, so the map runs oldest to newest.
       _drafts
         ..remove(key)
         ..[key] = text;
-      while (_drafts.length > maxDrafts) {
-        _drafts.remove(_drafts.keys.first);
-      }
+      _trim();
     }
-    // Typing saves a lot; write once it settles.
+    // Typing saves a lot; write once it settles, and after the load.
+    final loading = _loading;
     _write?.cancel();
-    _write = Timer(_writeDelay, () {
-      unawaited(
-        _prefs
-            .setString(keyFor(uid), jsonEncode(_drafts))
-            .catchError((Object _) {}),
-      );
+    _write = Timer(_writeDelay, () async {
+      await loading;
+      if (_uid != uid) return;
+      await _prefs
+          .setString(keyFor(uid), jsonEncode(_drafts))
+          .catchError((Object _) {});
     });
   }
 

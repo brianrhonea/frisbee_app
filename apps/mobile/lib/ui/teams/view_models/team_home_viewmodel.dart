@@ -20,6 +20,11 @@ import '../../../domain/models/follow.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
 
+/// Whether [typed] confirms deleting a team called [name]: the same name,
+/// ignoring case and spaces at the ends, as the API checks.
+bool deleteNameMatches(String name, String typed) =>
+    typed.trim().toLowerCase() == name.trim().toLowerCase();
+
 /// Backs the team home page. Members get the team summary, upcoming
 /// events and every post; anyone else who finds the team gets its public
 /// page: directory listing, public events and public posts.
@@ -49,7 +54,7 @@ class TeamHomeViewModel extends ChangeNotifier {
     );
     updateTeam = Command1<void, Team>(_teams.updateTeam);
     leaveTeam = Command0<void>(() => _teams.removeMember(teamId, uid));
-    deleteTeam = Command0<void>(_deleteTeam);
+    deleteTeam = Command1<void, String>(_deleteTeam);
     savePost = Command1<void, PostDraft>(_savePost);
     deletePost = Command1<void, String>((id) => _posts.deletePost(teamId, id));
     joinTeam = Command1<String, String>(_joinTeam);
@@ -301,7 +306,9 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   late final Command1<void, Team> updateTeam;
   late final Command0<void> leaveTeam;
-  late final Command0<void> deleteTeam;
+
+  /// Deletes the team; the argument is the name the owner typed.
+  late final Command1<void, String> deleteTeam;
 
   /// Creates or edits a post, uploading its new photos.
   late final Command1<void, PostDraft> savePost;
@@ -328,19 +335,23 @@ class TeamHomeViewModel extends ChangeNotifier {
     return result;
   }
 
-  Future<Result<void>> _deleteTeam() async {
+  Future<Result<void>> _deleteTeam(String typedName) async {
     final t = _team;
     if (t == null) return Result.error(Exception('Team not loaded'));
-    // The screen asks first; rules refuse it too.
+    // The screen asks first; the API (or rules) refuse it too.
     if (t.members.length > 1) {
       return Result.error(
         Exception('Remove the other members or transfer ownership first.'),
       );
     }
+    if (!deleteNameMatches(t.name, typedName)) {
+      return Result.error(Exception('Type the name exactly to delete it.'));
+    }
     _deleteProgress = (done: 0, total: 1, step: 'Getting ready');
     notifyListeners();
     final result = await _teams.deleteTeam(
       t,
+      name: typedName,
       onProgress: (p) {
         _deleteProgress = p;
         notifyListeners();

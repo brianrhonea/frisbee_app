@@ -231,20 +231,30 @@ void main() {
       for (final (i, n) in names.indexed)
         PlayerSignup(uid: 'u$i', name: n, divisionId: 'open'),
     ];
+    // Equal names (any case) go by uid; listed out of uid order.
+    final sameNames = [
+      for (final (uid, n) in [
+        ('u9', 'Sam'),
+        ('u2', 'sam'),
+        ('u5', 'Sam'),
+        ('u1', 'Alex'),
+        ('u10', 'SAM'),
+      ])
+        PlayerSignup(uid: uid, name: n, divisionId: 'open'),
+    ];
     checkFixture(
       'drafts/signup_order.json',
       'PlayerSignup.compareByName (signupOrder): the order players are '
-          'listed and drafted in.',
+          'listed and drafted in; equal names go by uid.',
       [
-        {
-          'signups': [
-            for (final s in signups) {'uid': s.uid, 'name': s.name},
-          ],
-          'expected': [
-            for (final s in [...signups]..sort(PlayerSignup.compareByName))
-              s.uid,
-          ],
-        },
+        for (final list in [signups, sameNames])
+          {
+            'signups': [for (final s in list) {'uid': s.uid, 'name': s.name}],
+            'expected': [
+              for (final s in [...list]..sort(PlayerSignup.compareByName))
+                s.uid,
+            ],
+          },
       ],
     );
   });
