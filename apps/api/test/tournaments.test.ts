@@ -64,7 +64,7 @@ beforeEach(() => {
   const list = listDocQueries(store);
   const queries: DocQueries = {
     ids: (c, limit, where) => (queried.push(c), list.ids(c, limit, where)),
-    fields: (c, f, limit) => (queried.push(c), list.fields(c, f, limit)),
+    fields: (c, f, limit, where) => (queried.push(c), list.fields(c, f, limit, where)),
   };
   const app = buildApp({
     verifier: new FakeVerifier(),
@@ -283,6 +283,34 @@ describe("editing (update: manages, hostId/createdBy/createdAt kept, validHosted
     await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "scheduled" });
     expect((await call("PATCH", `/v1/tournaments/${t.id}`, details({ format: { settings, level: "club", maxTeams: 16, minRoster: null } }))).status).toBe(204);
     expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.maxTeams).toBe(8);
+  });
+});
+
+describe("closing a division with many games", () => {
+  it("deletes every game, a page at a time, then the division", async () => {
+    const t = await host({ divisions: ["mixed", "women"] });
+    const women = (store.doc(`tournaments/${t.id}`)?.divisions as Array<{ id: string; division: string }>).find((d) => d.division === "women")!.id;
+    for (let i = 0; i < 1000; i++) store.put(`tournaments/${t.id}/divisions/${women}/games/g${String(i).padStart(4, "0")}`, { order: i });
+    let biggest = 0;
+    const transact = store.transact.bind(store);
+    store.transact = (fn) =>
+      transact((tx) => {
+        let writes = 0;
+        const count = <A extends unknown[]>(f: (...a: A) => void) => (...a: A) => (writes++, (biggest = Math.max(biggest, writes)), f(...a));
+        return fn({ ...tx, create: count(tx.create), set: count(tx.set), update: count(tx.update), merge: count(tx.merge), delete: count(tx.delete) });
+      });
+    expect((await call("PATCH", `/v1/tournaments/${t.id}`, details({ divisions: ["mixed"] }))).status).toBe(204);
+    expect([...store.docs.keys()].filter((k) => k.includes(`/divisions/${women}`))).toEqual([]);
+    expect(biggest).toBeLessThanOrEqual(500);
+  });
+
+  it("deletes nothing when the request is refused", async () => {
+    const t = await host({ divisions: ["mixed", "women"] });
+    const women = (store.doc(`tournaments/${t.id}`)?.divisions as Array<{ id: string; division: string }>).find((d) => d.division === "women")!.id;
+    store.put(`tournaments/${t.id}/divisions/${women}/games/g1`, { order: 1 });
+    const bad = details({ divisions: ["mixed"], season: { weeks: 4, playoffTeams: 0, playoffWeeks: 0 } });
+    expect((await call("PATCH", `/v1/tournaments/${t.id}`, bad)).status).toBe(400);
+    expect(store.doc(`tournaments/${t.id}/divisions/${women}/games/g1`)).toBeDefined();
   });
 });
 
@@ -605,6 +633,33 @@ describe("the host's view keeps things in step (reconcile)", () => {
     expect((await call("POST", url)).json().changed).toEqual(["live", "placements", "finished"]);
     expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.placements).toEqual(["red", "blue"]);
     expect(store.doc(`tournaments/${t.id}`)?.status).toBe("finished");
+  });
+
+  it("reads only what it may change: no transaction when nothing changes; a fill re-reads just its games", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"], ["green", "gcap"]]);
+    await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games: plan(["red", "blue", "green"], "singleElim") });
+    const games = `tournaments/${t.id}/divisions/${t.div}/games`;
+    // A game the fill doesn't touch, and another division's entry.
+    store.put(`${games}/x900`, { order: 900, stage: "consolation", teamA: "red", teamB: "green", status: "scheduled" });
+    store.put(`tournaments/${t.id}/entries/elsewhere`, { status: "accepted", divisionId: "other", captainIds: ["z"] });
+    const reads: string[] = [];
+    let txs = 0;
+    const transact = store.transact.bind(store);
+    store.transact = (fn) =>
+      transact((tx) => {
+        txs++;
+        return fn({ ...tx, get: (path: string) => (reads.push(path), tx.get(path)) });
+      });
+    const url = `/v1/tournaments/${t.id}/divisions/${t.div}/reconcile`;
+    expect((await call("POST", url)).json().changed).toEqual([]);
+    expect(txs).toBe(0);
+    // g001's result landed but g002 wasn't filled (blue v green, the winner meets red).
+    store.put(`${games}/g001`, { ...(store.doc(`${games}/g001`) as object), status: "done", scoreA: 15, scoreB: 7 });
+    expect((await call("POST", url)).json().changed).toEqual(["fills", "live"]);
+    expect(store.doc(`${games}/g002`)).toMatchObject({ teamA: "red", teamB: "blue" });
+    expect(txs).toBe(1);
+    expect(reads.filter((r) => r.startsWith(games)).sort()).toEqual([`${games}/g001`, `${games}/g002`]);
+    expect(reads).not.toContain(`tournaments/${t.id}/entries/elsewhere`);
   });
 
   it("drops withdrawn teams from unpublished seeds and copies captains from entries", async () => {
