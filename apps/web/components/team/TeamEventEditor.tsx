@@ -2,6 +2,7 @@
 import { type SaveTeamEventRequest, type TeamEventType, teamEventTypeLabels, teamEventTypes } from "@stall10/shared";
 import { type FormEvent, useState } from "react";
 import { callApi } from "@/lib/client";
+import { type ShareChoice, ShareEventField, shareEvent } from "./ShareEvent";
 import { newId } from "@/lib/upload";
 import { useAuth } from "../AuthProvider";
 import { rolesInOrder, useTeamHub } from "./TeamContext";
@@ -29,7 +30,10 @@ export function TeamEventEditor({
   onDone: (id: string | null) => void;
 }) {
   const { user } = useAuth();
-  const { teamId, viewer } = useTeamHub();
+  const { teamId, viewer, privateGroup } = useTeamHub();
+  // A new event may be shared on the member's profile, except in a private group (canShare).
+  const canShare = !event && !privateGroup;
+  const [share, setShare] = useState<ShareChoice>({ on: false, message: "" });
   const team = viewer.state === "member" ? viewer.team : null;
   const org = team?.kind === "organization";
   // `roles` is a map of id to role on the team doc.
@@ -80,6 +84,9 @@ export function TeamEventEditor({
       const res = event
         ? await callApi<{ id: string }>(user, `${base}/${encodeURIComponent(event.id)}`, { method: "PATCH", body })
         : await callApi<{ id: string }>(user, base, { method: "POST", body });
+      if (canShare && share.on && !(await shareEvent(user, teamId, res.id, share.message))) {
+        window.alert("Event created, but it couldn't be shared. Try posting it.");
+      }
       onDone(res.id);
     } catch (err) {
       setError((err as Error).message);
@@ -197,6 +204,7 @@ export function TeamEventEditor({
           </button>
         </p>
       )}
+      {canShare && <ShareEventField value={share} onChange={setShare} />}
       <div className="form-actions">
         {error && (
           <span className="form-error" role="alert">
