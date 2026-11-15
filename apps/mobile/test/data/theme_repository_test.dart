@@ -11,6 +11,9 @@ class _MemoryPrefs implements SharedPreferencesService {
 
   @override
   Future<void> setString(String key, String value) async => values[key] = value;
+
+  @override
+  Future<void> remove(String key) async => values.remove(key);
 }
 
 void main() {

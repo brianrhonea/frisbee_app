@@ -103,8 +103,7 @@ List<SingleChildWidget> get firebaseProviders => [
     ),
   ),
   Provider<CalendarRepository>(
-    create: (context) =>
-        CalendarRepositoryApi(api: context.read<ApiClient?>()),
+    create: (context) => CalendarRepositoryApi(api: context.read<ApiClient?>()),
   ),
   ChangeNotifierProvider<PersonalDetailsRepository>(
     create: (context) => PersonalDetailsRepositoryApi(
@@ -151,8 +150,15 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<PostCommentRepository>(
     create: (_) => PostCommentRepositoryFirebase(),
   ),
+  // Drafts belong to whoever is signed in, and go when they sign out.
   Provider<MessageDraftRepository>(
-    create: (_) => MessageDraftRepositoryPrefs(SharedPreferencesService()),
+    create: (context) => MessageDraftRepositoryPrefs(
+      SharedPreferencesService(),
+      auth: context.read<AuthRepository>(),
+    ),
+    dispose: (_, drafts) {
+      if (drafts is MessageDraftRepositoryPrefs) drafts.dispose();
+    },
   ),
   ChangeNotifierProvider<PeopleRepository>(
     create: (_) => PeopleRepositoryFirebase(),
