@@ -4,7 +4,7 @@ import { CallSession } from "./call";
 import { canPickSpeaker, type MeetingSettings, present } from "./settings";
 
 export type DeviceKind = "audioinput" | "videoinput" | "audiooutput";
-export type DeviceLists = Record<DeviceKind, MediaDeviceInfo[]>;
+type DeviceLists = Record<DeviceKind, MediaDeviceInfo[]>;
 const none: DeviceLists = { audioinput: [], videoinput: [], audiooutput: [] };
 
 const idKey = { audioinput: "audioInputId", videoinput: "videoInputId", audiooutput: "audioOutputId" } as const;

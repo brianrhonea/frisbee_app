@@ -19,7 +19,6 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { callApi } from "@/lib/client";
 import { useAuth } from "../../AuthProvider";
 import { useTeamHub } from "../TeamContext";
 import { apiUrl, dateTime, tournamentUrl } from "./data";
@@ -31,6 +30,8 @@ import { StatSheetTable } from "./StatSheetTable";
 import { confirmAndDelete, deleteGameMessage } from "./StatsHome";
 import { useGameTracker } from "./useTracker";
 import "./stats.css";
+import { isTyping } from "@/lib/text";
+import { Dialog } from "../../Dialog";
 
 type Tab = "track" | "lines" | "points" | "stats";
 type Act = (fn: (t: GameTracker) => void) => void;
@@ -54,7 +55,7 @@ function Game({ gameId }: { gameId: string }) {
   const [panel, setPanel] = useState<"gameTo" | "timeouts" | null>(null);
   const [deleteError, setDeleteError] = useState("");
 
-  if (!loaded) return <p className="muted" aria-busy="true">Loading…</p>;
+  if (!loaded && !error) return <p className="muted" aria-busy="true">Loading…</p>;
   if (!t) {
     return (
       <div className="stack">
@@ -279,8 +280,7 @@ function TrackTab({
   useEffect(() => {
     if (!t.canEdit) return;
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (isTyping(e.target)) return;
       if (overlay) {
         if (e.key === "Escape" && overlay !== "pull") setOverlay(null);
         return;
@@ -367,7 +367,14 @@ function TrackTab({
         />
       )}
       {overlay === "sub" && (
-        <div className="card st-subcard" role="dialog" aria-label="Substitution">
+        <Dialog
+          label="Substitution"
+          onClose={() => {
+            setSubOut(null);
+            setOverlay(null);
+          }}
+          className="card st-subcard"
+        >
           <h3 className="card-title">{subOut ? `Who's going in for ${t.nameOf(subOut)}?` : "Who's coming off?"}</h3>
           <div className="st-chips">
             {(subOut ? t.bench.map((p) => p.id) : t.onField).map((id) => (
@@ -400,7 +407,7 @@ function TrackTab({
           >
             {subOut ? "Back" : "Cancel"}
           </button>
-        </div>
+        </Dialog>
       )}
 
       {(tracking || pickingLine || (t.over && t.canUndo)) && (

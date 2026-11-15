@@ -28,7 +28,7 @@ export const levelLabels: Record<string, string> = {
   pickup: "Pickup",
 };
 
-export const kindLabels: Record<string, string> = {
+const kindLabels: Record<string, string> = {
   team: "Team",
   community: "Community group",
   organization: "School or club",

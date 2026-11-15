@@ -6,14 +6,14 @@ const L = fieldYards.length;
 const W = fieldYards.width;
 
 /** A stored point (x across the width, y along the length) on the sideways field. */
-export const toSvg = (p: FieldPoint) => ({ x: p.y * L, y: p.x * W });
+const toSvg = (p: FieldPoint) => ({ x: p.y * L, y: p.x * W });
 const clamp = (v: number) => Math.min(1, Math.max(0, v));
 const toField = (x: number, y: number): FieldPoint => ({ x: clamp(y / W), y: clamp(x / L) });
 
 /** What the pointer touched: a piece, an arrow, or the grass at a point. */
 export type FieldHit = { kind: "element" | "arrow"; id: string; at: FieldPoint } | { kind: "field"; at: FieldPoint };
 
-export interface FieldHandlers {
+interface FieldHandlers {
   onDown?: (hit: FieldHit) => void;
   onMove?: (at: FieldPoint) => void;
   onUp?: (at: FieldPoint) => void;

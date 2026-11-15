@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LocalTime } from "../../LocalTime";
 import { useAuth } from "../../AuthProvider";
 import { callApi } from "@/lib/client";
+import { limit } from "firebase/firestore";
 import { useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "../TeamContext";
 import { VideoEditor } from "./VideoEditor";
@@ -24,6 +25,9 @@ import {
 } from "./model";
 import "./videos.css";
 
+const videosCap = 1000;
+const foldersCap = 200;
+
 const same = (a: VideoFilter, b: VideoFilter) => a.kind === b.kind && (a.kind !== "folder" || (b.kind === "folder" && a.id === b.id));
 
 /**
@@ -35,8 +39,9 @@ export function TeamVideos() {
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const editor = viewer.state === "member" && viewer.can("manageTeam");
-  const videosLive = useLiveQuery<Video>(`teams/${teamId}/videos`, [], "videos");
-  const foldersLive = useLiveQuery<Folder>(`teams/${teamId}/videoFolders`, [], "videoFolders");
+  // Bounded well past a real team's library: the counts and storage used add up every video read.
+  const videosLive = useLiveQuery<Video>(`teams/${teamId}/videos`, [limit(videosCap)], "videos");
+  const foldersLive = useLiveQuery<Folder>(`teams/${teamId}/videoFolders`, [limit(foldersCap)], "videoFolders");
   const videos = useMemo(() => (videosLive.data ?? []).slice().sort(newestFirst), [videosLive.data]);
   const folders = useMemo(() => (foldersLive.data ?? []).slice().sort(byName), [foldersLive.data]);
   const [filter, setFilter] = useState<VideoFilter>({ kind: "all" });

@@ -14,7 +14,7 @@ import {
   groupTournamentLimits,
   tournamentFollowKey,
 } from "@stall10/shared";
-import { where } from "firebase/firestore";
+import { limit, where } from "firebase/firestore";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -26,6 +26,7 @@ import { MembersOnlySection } from "../TeamNav";
 import type { TeamEventDoc } from "../TeamSchedule";
 import { gameTime, shortDay, slotLabel, tournamentDates, tournamentView, tournamentWhen } from "./format";
 import "./group_tournaments.css";
+import { formatDate, toLocalInput } from "@/lib/dates";
 
 /**
  * Sets a tournament up (/teams/:id/tournaments/new, or .../:id/edit):
@@ -37,7 +38,8 @@ export function TournamentEditorPage({ tournamentId, eventId }: { tournamentId: 
   const member = viewer.state === "member" ? viewer : null;
   const organizer = member?.can("manageEvents") ?? false;
   const doc = useLiveDoc<GroupTournamentDoc>(organizer && tournamentId ? `teams/${teamId}/groupTournaments/${tournamentId}` : null);
-  const events = useLiveQuery<TeamEventDoc>(organizer ? `teams/${teamId}/events` : null, [where("type", "==", "tournament")], "tournamentEvents");
+  // Bounded (ordering them would need an index): the events a tournament can be linked to.
+  const events = useLiveQuery<TeamEventDoc>(organizer ? `teams/${teamId}/events` : null, [where("type", "==", "tournament"), limit(300)], "tournamentEvents");
   const back = (
     <Link href={`/teams/${encodeURIComponent(teamId)}/more?tab=tournaments`} className="text-btn">
       ← Tournaments
@@ -95,7 +97,6 @@ const timeInput = (iso: string) => {
   const d = new Date(iso);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
-const localInput = (iso: string | null) => (iso ? `${dateInput(iso)}T${timeInput(iso)}` : "");
 const fromDateInput = (v: string) => {
   const [y, m, d] = v.split("-").map(Number);
   return y && m && d ? new Date(y, m - 1, d) : null;
@@ -465,7 +466,7 @@ function Editor({
           <span className="gt-inline">
             <input
               type="datetime-local"
-              value={localInput(s.idealEndsAt)}
+              value={toLocalInput(s.idealEndsAt)}
               onChange={(e) => {
                 const t = e.target.value ? new Date(e.target.value) : null;
                 updateSettings({ ...s, idealEndsAt: t && !Number.isNaN(t.getTime()) ? t.toISOString() : null });
@@ -766,7 +767,7 @@ function Announcement({
   onDone: () => void;
 }) {
   const { user } = useAuth();
-  const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  const day = (iso: string) => formatDate(iso, { weekday: "long", month: "short", day: "numeric" });
   const last = s.laterDays.at(-1);
   const suggested = `${name}: sign up to play!`;
   const [title, setTitle] = useState(suggested.length <= 100 ? suggested : name);

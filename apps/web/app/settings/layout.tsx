@@ -12,7 +12,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
       <header className="page-head">
         <h1>Settings</h1>
       </header>
-      <MembersOnly next="/settings">
+      <MembersOnly>
         <div className="settings">
           <SettingsNav />
           <section className="settings-main">{children}</section>

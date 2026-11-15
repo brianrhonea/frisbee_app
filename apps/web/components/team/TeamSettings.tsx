@@ -16,6 +16,7 @@ import { TeamRoles } from "./TeamRoles";
 import { DiscordImport } from "./DiscordImport";
 import { TeamCommunity } from "./CommunityAdmin";
 import { MembersOnlySection } from "./TeamNav";
+import { formatDateTime } from "@/lib/dates";
 
 /** The team doc's editable details (Team.toEditableMap in the app). */
 interface Details {
@@ -201,7 +202,7 @@ function InviteLinks() {
           )}
           <small className="muted">
             {" "}
-            Expires {new Date(invite.expiresAt).toLocaleString()}
+            Expires {formatDateTime(invite.expiresAt, { dateStyle: "medium", timeStyle: "short" })}
           </small>
         </p>
       )}

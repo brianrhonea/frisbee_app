@@ -37,6 +37,9 @@ import {
 
 type Fee = NonNullable<TournamentDoc["bidFee"]>;
 
+/** How to pay: the host's instructions, as paying on Stall 10 isn't here yet. */
+const howToPay = (fee: Fee) => fee.instructions?.trim() || "Paying on Stall 10 is coming soon: the host will tell you how to pay.";
+
 const overdue = (fee: Fee | null | undefined, paid: boolean) =>
   !!fee && fee.amountCents > 0 && !!fee.dueAt && Date.now() > Date.parse(fee.dueAt) && !paid;
 
@@ -171,8 +174,8 @@ function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User
           {paid
             ? "Entry fee paid."
             : overdue(fee, paid)
-              ? `Entry fee overdue: ${feeLabel(fee)}. ${fee.instructions ?? ""}`
-              : `Entry fee ${feeLabel(fee)} to pay. ${fee.instructions ?? ""}${fee.dueAt ? ` Due ${dateLabel(fee.dueAt)}.` : ""}`}
+              ? `Entry fee overdue: ${feeLabel(fee)}. ${howToPay(fee)}`
+              : `Entry fee ${feeLabel(fee)} to pay. ${howToPay(fee)}${fee.dueAt ? ` Due ${dateLabel(fee.dueAt)}.` : ""}`}
         </p>
       )}
       {error && <p className="form-error">{error}</p>}
@@ -219,7 +222,7 @@ function SignupForm(props: {
     <form className="settings-form" onSubmit={submit}>
       {fee && (
         <p className="muted">
-          Entry fee: {feeLabel(fee)}. {fee.instructions} {fee.dueAt && `Due ${dateLabel(fee.dueAt)}.`}
+          Entry fee: {feeLabel(fee)}. {howToPay(fee)} {fee.dueAt && `Due ${dateLabel(fee.dueAt)}.`}
         </p>
       )}
       {divisions.length > 1 && (

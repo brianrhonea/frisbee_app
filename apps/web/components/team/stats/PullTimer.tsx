@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { Dialog } from "../../Dialog";
 import "./stats.css";
 
 /**
@@ -34,8 +35,8 @@ export function PullTimer({
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDone(null);
-      else if (e.key === " " || e.key === "Enter") {
+      // Esc is the dialog's (its onClose).
+      if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
         if (startedAt === null) {
           if (puller) setStartedAt(performance.now());
@@ -50,7 +51,7 @@ export function PullTimer({
 
   const seconds = startedAt === null ? 0 : (performance.now() - startedAt) / 1000;
   return (
-    <div className="card st-subcard st-pull" role="dialog" aria-label="Pull">
+    <Dialog label="Pull" onClose={() => onDone(null)} className="card st-subcard st-pull">
       <h3 className="card-title">Pull</h3>
       <p className="muted small">Who&apos;s pulling?</p>
       <div className="st-chips">
@@ -88,6 +89,6 @@ export function PullTimer({
       <button type="button" className="text-btn" onClick={() => onDone(null)}>
         Cancel
       </button>
-    </div>
+    </Dialog>
   );
 }

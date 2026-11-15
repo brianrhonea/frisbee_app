@@ -14,12 +14,13 @@ import {
   type GameDoc,
   type TournamentDoc,
 } from "@stall10/shared";
-import { orderBy, where } from "firebase/firestore";
+import { orderBy } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import type { TeamDoc } from "@/components/team/TeamContext";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
+import { useMyTeams } from "../useMyTeams";
 
 const editors = ["owner", "coach", "captain"];
 
@@ -41,11 +42,7 @@ export function useTournament(id: string) {
   const host = useLiveDoc<TeamDoc>(user && t?.hostId ? `teams/${t.hostId}` : null);
   const divRows = useLiveQuery<DivisionDoc>(user && t ? `tournaments/${id}/divisions` : null, [], id);
   const entryRows = useLiveQuery<EntryDoc>(user && t ? `tournaments/${id}/entries` : null, [], id);
-  const mine = useLiveQuery<TeamDoc & { division?: string; level?: string }>(
-    uid ? "teams" : null,
-    uid ? [where("memberIds", "array-contains", uid)] : [],
-    uid ?? "",
-  );
+  const mine = useMyTeams<TeamDoc & { division?: string; level?: string }>(uid);
   const manager = canOn(host.data, uid, "manageEvents");
 
   // In the tournament's order.
@@ -136,7 +133,7 @@ export function useAction() {
     try {
       return { ok: true, value: await callApi<T>(user, path, { method, body }) };
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+      setError(problem(e));
       return { ok: false };
     } finally {
       setBusy(false);

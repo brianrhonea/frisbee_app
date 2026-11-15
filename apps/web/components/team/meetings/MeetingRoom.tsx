@@ -3,7 +3,7 @@ import type { MeetingTokenResult } from "@stall10/shared";
 import type { LocalVideoTrack } from "livekit-client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { ApiError, callApi, problem } from "@/lib/client";
 import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../../AuthProvider";
 import { useTeamHub } from "../TeamContext";
@@ -140,6 +140,22 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   useEffect(() => {
     if (state.ended && stage === "inCall") void hangUp(endNotices[state.ended]);
   }, [state.ended, stage, hangUp]);
+  // Signed out (here or in another tab), removed from the team, or no
+  // longer invited: leave the call, so the mic and camera stop (as voice
+  // channels do). The page can't show the call without the team doc
+  // either, so a team doc that stopped loading leaves it too, as a lost
+  // connection.
+  const lostAccess = !member || meeting.denied === true || (!!m && !canSee(m, member));
+  const lostNotice = viewer.state === "error" ? endNotices.connectionLost : "You no longer have access to this meeting.";
+  useEffect(() => {
+    if ((stage === "inCall" || stage === "joining") && lostAccess) void hangUp(lostNotice);
+  }, [lostAccess, lostNotice, stage, hangUp]);
+  // Another account signing in (in another tab) leaves the call too.
+  const joinedAs = useRef(uid);
+  useEffect(() => {
+    if (stage === "lobby" || stage === "left") joinedAs.current = uid;
+    else if (joinedAs.current !== uid) void hangUp(null);
+  }, [uid, stage, hangUp]);
 
   const join = useCallback(async () => {
     if (!user || stage !== "lobby") return;
@@ -181,7 +197,7 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
       if (joiningRef.current === session) joiningRef.current = null;
       void (session as CallSession | null)?.leave();
       if (mine !== generation.current || e instanceof CallCancelled) return;
-      setError(e instanceof ApiError ? e.message : "Couldn't connect to the call. Check your connection and try again.");
+      setError(problem(e, "Couldn't connect to the call. Check your connection and try again."));
       setStage("lobby");
     }
   }, [user, stage, teamId, meetingId, settings, devices, speaker, stopPreview]);

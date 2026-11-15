@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 
@@ -19,7 +19,7 @@ export function ReadReceiptsSetting() {
     try {
       await callApi(me, "/v1/me/read-receipts", { method: "PUT", body: { on: next } });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't save. Try again.");
+      setError(problem(e, "Couldn't save. Try again."));
     } finally {
       setBusy(false);
     }

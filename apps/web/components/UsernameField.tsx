@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { firestoreDb } from "@/lib/firebase";
 
 /** Where a typed username stands (the app's UsernameStatus). */
-export type UsernameStatus = "empty" | "invalid" | "checking" | "available" | "taken" | "failed";
+type UsernameStatus = "empty" | "invalid" | "checking" | "available" | "taken" | "failed";
 
 /**
  * Whether [handle] is free: usernames/{name} doesn't exist. Signed out,

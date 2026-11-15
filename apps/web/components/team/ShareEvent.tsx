@@ -8,7 +8,7 @@ import { callApi } from "@/lib/client";
 import "./share_event.css";
 
 /** The app's message box caps at 1,000 characters. */
-export const shareMessageMax = 1000;
+const shareMessageMax = 1000;
 
 export interface ShareChoice {
   on: boolean;

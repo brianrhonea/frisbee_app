@@ -15,13 +15,12 @@ import {
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { colorOf } from "@/lib/calendar";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { PersonPicker } from "../PersonPicker";
 import { Invites } from "../Schedule";
 
-const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 const colorName = (c: CalendarColor) => c[0]!.toUpperCase() + c.slice(1);
 
 type Call = (path: string, init?: { method?: string; body?: unknown }) => Promise<void>;

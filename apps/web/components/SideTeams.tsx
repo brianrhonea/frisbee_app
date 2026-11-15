@@ -1,10 +1,11 @@
 "use client";
-import { where } from "firebase/firestore";
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { type Doc, useLiveQuery } from "@/lib/live";
+import { type Doc } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
 import { NavIcon } from "./NavIcons";
+import { initials } from "@/lib/text";
+import { useMyTeams } from "./useMyTeams";
 
 /** Teams listed before "See all". */
 const shown = 5;
@@ -25,13 +26,6 @@ function compact(n: number) {
   return n < 1000 ? String(n) : `${(n / 1000).toFixed(n < 10_000 ? 1 : 0).replace(/\.0$/, "")}k`;
 }
 
-/** "Seattle Ultimate" → "SU"; one word → its first two letters. */
-function initials(name: string) {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length > 1) return words.slice(0, 3).map((w) => w[0]).join("").toUpperCase();
-  return (words[0] ?? "?").slice(0, 2).toUpperCase();
-}
-
 interface Space {
   name?: string;
   kind?: string;
@@ -50,11 +44,7 @@ interface Space {
  */
 export function SideTeams({ inline = false }: { inline?: boolean }) {
   const { user } = useAuth();
-  const live = useLiveQuery<Space>(
-    user ? "teams" : null,
-    user ? [where("memberIds", "array-contains", user.uid)] : [],
-    user?.uid ?? "",
-  );
+  const live = useMyTeams<Space>(user?.uid);
   if (!user || !live.data?.length) return null;
   const communities = live.data.filter((t) => t.kind && t.kind !== "team");
   const viaCommunity = (t: Doc<Space>) =>

@@ -18,7 +18,7 @@ import { ApiError, callApi } from "./client";
 const MB = 1024 * 1024;
 
 /** The file's media type: the browser's, or one from its name (HEIC often has none). */
-export function fileType(file: File): string | null {
+function fileType(file: File): string | null {
   if (file.type && file.type !== "application/octet-stream") return file.type;
   return mediaTypeFor(file.name);
 }
@@ -37,7 +37,7 @@ export function photoProblem(file: File, purpose: UploadPurpose = "post"): strin
  * else the app's type for its name if it's a document type, else
  * application/octet-stream. Any file goes, as in the app.
  */
-export function chatFileType(file: File): string {
+function chatFileType(file: File): string {
   const media = fileType(file);
   if (media && (isImageType(media) || isVideoType(media))) return media;
   const byName = chatContentTypeFor(file.name);

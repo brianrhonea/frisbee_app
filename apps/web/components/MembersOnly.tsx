@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useAuth } from "./AuthProvider";
 
@@ -8,17 +9,18 @@ import { useAuth } from "./AuthProvider";
  * visitors, who see only team and community pages. Children never render
  * for visitors, so gated pages must fetch their data here, in the browser,
  * with the member's token (not on the server, where it would ship in the
- * page to everyone).
+ * page to everyone). Signing in comes back to [next], or this page.
  */
-export function MembersOnly({ children, next, what }: { children: ReactNode; next: string; what?: string }) {
+export function MembersOnly({ children, next, what }: { children: ReactNode; next?: string; what?: string }) {
   const { user } = useAuth();
+  const path = usePathname();
   if (user === undefined) return <p className="muted" aria-busy="true">Loading…</p>;
-  if (!user) return <JoinPrompt next={next} what={what} />;
+  if (!user) return <JoinPrompt next={next ?? path} what={what} />;
   return <>{children}</>;
 }
 
 /** Asks a visitor to sign up or log in, then come back to [next]. */
-export function JoinPrompt({ next, what }: { next: string; what?: string }) {
+function JoinPrompt({ next, what }: { next: string; what?: string }) {
   const q = `?next=${encodeURIComponent(next)}`;
   return (
     <div className="card join-prompt">

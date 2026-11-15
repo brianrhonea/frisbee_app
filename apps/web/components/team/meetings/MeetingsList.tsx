@@ -5,12 +5,7 @@ import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
 import { audienceLine, type Meeting, meetingHref, meetingsHref, roomHref, useTeamMeetings, whenLine } from "./model";
 import "./meetings.css";
-
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
+import { startOfToday } from "@/lib/dates";
 
 /**
  * The team's video meetings (/teams/:id/meetings): live ones first, then
@@ -28,7 +23,7 @@ export function MeetingsList() {
   if (!meetings.data) return <p className="muted" aria-busy="true">Loading meetings…</p>;
 
   const admin = viewer.can("manageEvents");
-  const today = startOfToday();
+  const today = startOfToday().getTime();
   const isPast = (m: Meeting) => m.status === "ended" || (m.status !== "live" && Date.parse(m.startsAt ?? "") < today);
   const live = meetings.data.filter((m) => m.status === "live");
   const upcoming = meetings.data.filter((m) => m.status !== "live" && !isPast(m));

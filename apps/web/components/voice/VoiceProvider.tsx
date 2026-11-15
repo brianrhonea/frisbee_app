@@ -7,14 +7,14 @@
 import { voiceDecision, type VoiceRoomDoc, type VoiceTeam, type VoiceTokenResult } from "@stall10/shared";
 import { type DocumentReference, type DocumentSnapshot, doc, onSnapshot } from "firebase/firestore";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { firestoreDb } from "@/lib/firebase";
 import { useAuth } from "../AuthProvider";
 import { type CallEnd, CallCancelled, CallSession, type CallState, useCall } from "../team/meetings/call";
 import { canPickSpeaker, loadSettings, present, updateSettings, withPersonVolume } from "../team/meetings/settings";
 
 /** The voice channel the user is in (VoiceChannel). */
-export interface VoiceChannel {
+interface VoiceChannel {
   teamId: string;
   roomId: string;
   name: string;
@@ -27,7 +27,7 @@ const dropNotices: Record<CallEnd, string> = {
   connectionLost: "Lost the connection to voice.",
   meetingEnded: "The voice channel closed.",
 };
-export const lostAccessNotice = "You no longer have access to this channel.";
+const lostAccessNotice = "You no longer have access to this channel.";
 
 const denied = (e: unknown) => (e as { code?: string })?.code === "permission-denied";
 
@@ -209,7 +209,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         if (mine !== attempt.current || e instanceof CallCancelled) return;
         channelRef.current = null;
         setChannel(null);
-        setError(e instanceof ApiError ? e.message : "Couldn't connect to the channel. Check your connection and try again.");
+        setError(problem(e, "Couldn't connect to the channel. Check your connection and try again."));
       } finally {
         if (mine === attempt.current) setConnecting(false);
       }

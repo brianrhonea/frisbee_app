@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { firestoreDb } from "./firebase";
-import { type Doc, plain } from "./live";
+import { type Doc, liveError, plain } from "./live";
 
 // A chat thread's messages as the app's MessageThreadViewModel keeps them:
 // the newest page live, and older pages loaded on request with a query
@@ -34,7 +34,7 @@ function rows<T>(docs: QueryDocumentSnapshot[]): Row<T>[] {
  * pushed-out message is older than everything still in a full page; a
  * deleted one isn't, or the page wasn't full.
  */
-export function pushedOut<T extends { createdAt?: string | null }>(
+function pushedOut<T extends { createdAt?: string | null }>(
   before: Doc<T>[] | null,
   after: Doc<T>[],
   pageLimit: number,
@@ -113,7 +113,7 @@ export function usePagedMessages<T extends { createdAt?: string | null }>(
         setError(null);
       },
       (e) => {
-        setError(e.code === "permission-denied" ? "You can't see this." : "Couldn't load messages. Check your connection and refresh.");
+        setError(liveError(e, "Couldn't load messages. Check your connection and refresh."));
         setLive((l) => l ?? []);
       },
     );

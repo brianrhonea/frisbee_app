@@ -1,10 +1,10 @@
 "use client";
 import { type NotificationCategory, notificationCategories, notificationCategoryInfo } from "@stall10/shared";
-import { where } from "firebase/firestore";
 import { useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
-import { useLiveDoc, useLiveQuery } from "@/lib/live";
+import { callApi, problem } from "@/lib/client";
+import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
+import { useMyTeams } from "../useMyTeams";
 
 /** users/{uid}/settings/notifications (NotificationPreferences in the app). */
 interface Prefs {
@@ -23,7 +23,7 @@ const perTeam = notificationCategories.filter((c) => notificationCategoryInfo[c]
 export function NotificationSettings() {
   const { user } = useAuth();
   const prefs = useLiveDoc<Prefs>(user ? `users/${user.uid}/settings/notifications` : null);
-  const teams = useLiveQuery<{ name?: string }>(user ? "teams" : null, user ? [where("memberIds", "array-contains", user.uid)] : [], user?.uid ?? "");
+  const teams = useMyTeams<{ name?: string }>(user?.uid);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export function NotificationSettings() {
     try {
       await callApi(me, path, { method, ...(body && { body }) });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't save. Try again.");
+      setError(problem(e, "Couldn't save. Try again."));
     } finally {
       setBusy(false);
     }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { appScheme } from "@/lib/site";
 import { StoreBadges } from "./StoreBadges";
 
-export type LinkKind = "join" | "g" | "p";
+type LinkKind = "join" | "g" | "p";
 
 const valid = /^[A-Za-z0-9_-]{1,200}$/;
 

@@ -44,6 +44,7 @@ import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { tournamentHref } from "./TournamentLists";
 import { canOn, tournamentPath, useAction } from "./useTournament";
 import "./tournaments.css";
+import { formatDate } from "@/lib/dates";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const dayValue = (d: Date | null) => (d ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : "");
@@ -357,7 +358,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
                 if (d) set({ startsOn: d, endsOn: seasonEnd(d, f.season) });
               }}
             />
-            {f.endsOn && <small className="muted">Last night {f.endsOn.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</small>}
+            {f.endsOn && <small className="muted">Last night {formatDate(f.endsOn, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</small>}
           </label>
         ) : (
           <div className="form-grid">
@@ -423,7 +424,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
                   aria-label={`Don't skip ${d.toDateString()}`}
                   onClick={() => setSeason({ ...f.season, skipDates: f.season.skipDates.filter((x) => x.getTime() !== d.getTime()) })}
                 >
-                  {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ✕
+                  {formatDate(d, { month: "short", day: "numeric" })} ✕
                 </button>
               ))}
               {f.season.skipDates.length < tournamentLimits.maxSkipDates && (

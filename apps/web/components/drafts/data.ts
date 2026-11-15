@@ -15,6 +15,7 @@ import type { User } from "firebase/auth";
 import { limit } from "firebase/firestore";
 import { callApi } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
+import { formatDate } from "@/lib/dates";
 
 // What the signups and draft views read and write. Reads are Firestore
 // listeners, as the app's (the rules decide who sees signups, drafts and
@@ -43,7 +44,7 @@ export interface DivisionDoc {
   teams?: unknown[];
 }
 
-export interface PaymentDoc {
+interface PaymentDoc {
   paid?: boolean;
   paidAt?: string | null;
   note?: string;
@@ -64,7 +65,7 @@ export function feeLabel(fee: NonNullable<TournamentDoc["bidFee"]>): string {
   const symbol = fee.currency === "USD" ? "$" : `${fee.currency} `;
   return cents === 0 ? `${symbol}${whole}` : `${symbol}${whole}.${String(cents).padStart(2, "0")}`;
 }
-export const dateLabel = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+export const dateLabel = (iso: string) => formatDate(iso, { year: "numeric", month: "short", day: "numeric" });
 
 /** can(team, perm) in the rules, from the host team doc (null when the caller can't read it). */
 function canOn(team: Record<string, unknown> | null | undefined, uid: string, perm: TeamPermission): boolean {
@@ -92,13 +93,16 @@ export function useTournamentBase(tournamentId: string, uid: string | null) {
   return { tournament, divisions: { ...divisions, data: divisions.data ? list : undefined }, manager, managerKnown };
 }
 
+// Bounded well past any real event: drafts and the signup list need every signup read.
+const signupsCap = 2000;
+
 /** Everyone's signups (managers), or just the caller's own. */
 export function useSignups(tournamentId: string, manager: boolean) {
-  return useLiveQuery<PlayerSignupDoc>(manager ? `${t(tournamentId)}/signups` : null, [], `signups:${tournamentId}`);
+  return useLiveQuery<PlayerSignupDoc>(manager ? `${t(tournamentId)}/signups` : null, [limit(signupsCap)], `signups:${tournamentId}`);
 }
 export const useMySignup = (tournamentId: string, uid: string | null) => useLiveDoc<PlayerSignupDoc>(uid ? `${t(tournamentId)}/signups/${uid}` : null);
 export function usePayments(tournamentId: string, manager: boolean) {
-  return useLiveQuery<PaymentDoc>(manager ? `${t(tournamentId)}/payments` : null, [], `payments:${tournamentId}`);
+  return useLiveQuery<PaymentDoc>(manager ? `${t(tournamentId)}/payments` : null, [limit(signupsCap)], `payments:${tournamentId}`);
 }
 export const useMyPayment = (tournamentId: string, uid: string | null) => useLiveDoc<PaymentDoc>(uid ? `${t(tournamentId)}/payments/${uid}` : null);
 
@@ -155,10 +159,8 @@ export async function attempt(setBusy: (b: boolean) => void, setError: (e: strin
   }
 }
 
-/** Where each view lives until the hosted tournament page mounts them. */
+/** The captains' draft board and the team editor: pages of their own beside the tournament page. */
 export const draftHrefs = {
-  signups: (tournamentId: string, divisionId?: string) =>
-    `/tournaments/${encodeURIComponent(tournamentId)}/signups${divisionId ? `?division=${encodeURIComponent(divisionId)}` : ""}`,
   liveDraft: (tournamentId: string, divisionId: string) => `/tournaments/${encodeURIComponent(tournamentId)}/live-draft/${encodeURIComponent(divisionId)}`,
   teamDraft: (tournamentId: string, divisionId: string) => `/tournaments/${encodeURIComponent(tournamentId)}/draft/${encodeURIComponent(divisionId)}`,
 };

@@ -10,12 +10,7 @@ import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
 import { inviteTier, isEditorTier, type MeetingData, meetingApi, meetingHref, meetingsApi, meetingsHref } from "./model";
 import "./meetings.css";
-
-function toLocalInput(d: Date | null): string {
-  if (!d || Number.isNaN(d.getTime())) return "";
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
-const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
+import { fromLocalInput, toLocalInput } from "@/lib/dates";
 
 /** 7 PM today, after practice (MeetingEditorViewModel._defaultStart). */
 function defaultStart() {

@@ -1,45 +1,33 @@
 "use client";
-import type { EventsPage } from "@stall10/shared";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { callApi } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { EventItem } from "./EventItem";
 import { ForVisitors } from "./ForVisitors";
 import { PickupCard } from "./HomeCards";
 import { LocalTime } from "./LocalTime";
 import { NavIcon } from "./NavIcons";
+import { usePublicEvents } from "./usePublicEvents";
 
 const shown = 4;
 
 /** The right column: what's coming up for members, and a sign-up prompt for visitors. */
 export function UpcomingAside() {
   const { user } = useAuth();
-  const [page, setPage] = useState<EventsPage | null | undefined>(undefined);
-  useEffect(() => {
-    if (!user) return;
-    let live = true;
-    callApi<EventsPage>(user, "/v1/public/events").then(
-      (p) => live && setPage(p),
-      () => live && setPage(null),
-    );
-    return () => {
-      live = false;
-    };
-  }, [user]);
+  const page = usePublicEvents();
 
   const items = [
     ...(page?.tournaments ?? []).map((t) => ({
       id: `t-${t.id}`,
       startsAt: t.startsAt,
       title: t.name || "Tournament",
-      href: "/events",
+      // A group's tournament has its own page; anything else is on Events.
+      href: t.groupId && t.tournamentId ? `/teams/${encodeURIComponent(t.groupId)}/tournaments/${encodeURIComponent(t.tournamentId)}` : "/events",
     })),
     ...(page?.events ?? []).map((e) => ({
       id: `e-${e.id}`,
       startsAt: e.startsAt,
       title: e.title || "Event",
-      href: `/teams/${encodeURIComponent(e.teamId)}`,
+      href: `/teams/${encodeURIComponent(e.teamId)}/schedule?event=${encodeURIComponent(e.id)}`,
     })),
   ]
     .sort((a, b) => (a.startsAt ?? "").localeCompare(b.startsAt ?? ""))

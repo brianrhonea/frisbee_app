@@ -14,7 +14,7 @@ import {
 } from "@stall10/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../../AuthProvider";
 import { useTeamHub } from "../TeamContext";
 import { apiUrl, gameUrl, nameMap, statsAccess, useStatsGames, useStatsPlayers, useStatsTournaments } from "./data";
@@ -24,6 +24,7 @@ import { BackToStats, StatsGate } from "./SeasonStatsPage";
 import { StatSheetTable } from "./StatSheetTable";
 import { confirmAndDelete, deleteGameMessage, GameRow } from "./StatsHome";
 import "./stats.css";
+import { formatDate } from "@/lib/dates";
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`);
 
@@ -59,7 +60,7 @@ function Tournament({ tournamentId }: { tournamentId: string }) {
           if (!userRef.current) throw new Error("Signed out");
           await callApi(userRef.current, apiUrl(teamId, `/stats-tournaments/${encodeURIComponent(t.id)}`), { method: "PUT", body: statsTournamentBody(t) });
         },
-        (e) => setError(e === null ? "" : e instanceof ApiError ? e.message : "Couldn't save the tournament. It will retry."),
+        (e) => setError(e === null ? "" : problem(e, "Couldn't save the tournament. It will retry.")),
       ),
     [teamId],
   );
@@ -101,7 +102,7 @@ function Tournament({ tournamentId }: { tournamentId: string }) {
       <div className="st-game-head">
         <div>
           <h2 className="card-title">{t.name}</h2>
-          <p className="muted small">{[new Date(t.startDate).toLocaleDateString(), ...(t.location ? [t.location] : []), `${wins}–${losses}`].join(" · ")}</p>
+          <p className="muted small">{[formatDate(t.startDate, { month: "short", day: "numeric", year: "numeric" }), ...(t.location ? [t.location] : []), `${wins}–${losses}`].join(" · ")}</p>
         </div>
         <div className="home-actions">
           {access.keepStats && (
@@ -352,7 +353,7 @@ function AddGame({ teamId, tournament, onClose }: { teamId: string; tournament: 
           const { id } = await callApi<CreatedId>(user, apiUrl(teamId, "/stats-games"), { method: "POST", body });
           router.push(gameUrl(teamId, id));
         } catch (err) {
-          setError(err instanceof ApiError ? err.message : "Couldn't add the game. Try again.");
+          setError(problem(err, "Couldn't add the game. Try again."));
           setBusy(false);
         }
       }}

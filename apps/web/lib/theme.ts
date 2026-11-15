@@ -7,19 +7,12 @@
 export type Theme = "light" | "dark";
 export type ThemeChoice = Theme | "system";
 
-export const themeKey = "stall10.theme";
+const themeKey = "stall10.theme";
 
 export const themeChoiceLabels: Record<ThemeChoice, string> = { system: "System", light: "Light", dark: "Dark" };
 
 /** Runs in <head> before the page paints, so a saved choice never flashes. */
 export const themeScript = `try{var t=localStorage.getItem("${themeKey}");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
-
-/** The theme showing now: the saved choice, else the system's. */
-export function currentTheme(): Theme {
-  const set = document.documentElement.dataset.theme;
-  if (set === "light" || set === "dark") return set;
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-}
 
 /** What the visitor chose: light, dark, or the system's (nothing set). */
 export function currentChoice(): ThemeChoice {

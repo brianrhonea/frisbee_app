@@ -42,16 +42,18 @@ export interface TeamDoc {
 
 /**
  * Who the viewer is on this team: still loading, a signed-out visitor,
- * signed in but not a member (the rules refuse the team doc), or a member
- * with the team doc live.
+ * signed in but not a member (the rules refuse the team doc), a team doc
+ * that couldn't be read for another reason (not treated as an outsider, so
+ * a member isn't offered "Join"), or a member with the team doc live.
  */
 export type TeamViewer =
   | { state: "loading" }
   | { state: "visitor" }
   | { state: "outsider"; uid: string }
+  | { state: "error"; uid: string; message: string }
   | { state: "member"; uid: string; team: Doc<TeamDoc>; tier: string; can: (p: TeamPermission) => boolean; audience: string[] };
 
-export interface TeamHubInfo {
+interface TeamHubInfo {
   teamId: string;
   name: string;
   kind: "team" | "community" | "organization";
@@ -98,7 +100,8 @@ export function TeamProvider({
   let viewer: TeamViewer;
   if (user === undefined) viewer = { state: "loading" };
   else if (!user) viewer = { state: "visitor" };
-  else if (live.error) viewer = { state: "outsider", uid: user.uid };
+  else if (live.error && live.denied) viewer = { state: "outsider", uid: user.uid };
+  else if (live.error) viewer = { state: "error", uid: user.uid, message: live.error };
   else if (live.data === undefined) viewer = { state: "loading" };
   else if (!live.data || !live.data.memberIds?.includes(user.uid)) viewer = { state: "outsider", uid: user.uid };
   else viewer = memberViewer(live.data, user.uid);

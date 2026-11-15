@@ -17,14 +17,12 @@ export class ApiError extends Error {
   }
 }
 
-/** GETs a public API route (`/v1/public/...`) from the browser; null if it fails. */
-export async function getPublicInBrowser<T>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(new URL(path, base));
-    return res.ok ? ((await res.json()) as T) : null;
-  } catch {
-    return null;
-  }
+/**
+ * The text to show for a failed call: the API's own message, or [fallback]
+ * for anything else (a thrown bug, a Firestore error).
+ */
+export function problem(e: unknown, fallback = "Something went wrong. Try again."): string {
+  return e instanceof ApiError ? e.message : fallback;
 }
 
 /**

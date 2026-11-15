@@ -13,12 +13,12 @@ import {
 } from "@stall10/shared";
 import { type ClipboardEvent, type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { where } from "firebase/firestore";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useLiveQuery } from "@/lib/live";
 import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
-import { MemberImage } from "./MemberImage";
+import { ComposerPhotos } from "./ComposerPhotos";
 import { NavIcon } from "./NavIcons";
 import "./composer_tag.css";
 
@@ -75,10 +75,9 @@ function workoutOf(d: WorkoutDraft): WorkoutInput | string {
   return out;
 }
 
-const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 
 /** The post being edited, when not writing a new one. */
-export interface EditingPost {
+interface EditingPost {
   id: string;
   body: string;
   links: string[];
@@ -150,12 +149,11 @@ export function Composer({
     if (autoFocus) text.current?.focus();
   }, [autoFocus]);
 
-  // Previews are object URLs; free them when they go.
-  useEffect(
-    () => () => photos.forEach((p) => p.kind === "new" && URL.revokeObjectURL(p.preview)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on unmount
-    [],
-  );
+  // Previews are object URLs; free them when they go (the ref sees the
+  // photos at unmount, not the first render's).
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
+  useEffect(() => () => photosRef.current.forEach((p) => p.kind === "new" && URL.revokeObjectURL(p.preview)), []);
 
   if (!user) return null;
   const me = user;
@@ -271,6 +269,8 @@ export function Composer({
   return (
     <form
       className={`composer${dragging ? " dragging" : ""}`}
+      // The new-post composer (not a post being edited): what `n` and #compose focus.
+      data-compose={editing ? undefined : "new"}
       onSubmit={(e) => void submit(e)}
       onDragOver={(e) => {
         if (repost) return;
@@ -301,24 +301,14 @@ export function Composer({
 
         {workout && <WorkoutFields draft={workout} onChange={setWorkout} onRemove={() => setWorkout(null)} />}
 
-        {photos.length > 0 && (
-          <ul className={`composer-photos n${photos.length}`}>
-            {photos.map((p, i) => (
-              <li key={p.kind === "saved" ? p.image.path : p.key} className={p.kind === "new" && p.error ? "failed" : ""}>
-                {p.kind === "saved" ? (
-                  <MemberImage path={p.image.path} url={p.image.url} alt="" />
-                ) : (
-                  <img src={p.preview} alt="" />
-                )}
-                {p.kind === "new" && !p.uploadId && !p.error && <span className="photo-status">Uploading…</span>}
-                {p.kind === "new" && p.error && <span className="photo-status">{p.error}</span>}
-                <button type="button" className="photo-remove" aria-label="Remove photo" onClick={() => removePhoto(i)}>
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ComposerPhotos
+          photos={photos.map((p) =>
+            p.kind === "saved"
+              ? { kind: "saved", key: p.image.path, path: p.image.path, url: p.image.url, alt: "" }
+              : { kind: "new", key: p.key, preview: p.preview, uploading: !p.uploadId && !p.error, error: p.error },
+          )}
+          onRemove={removePhoto}
+        />
 
         {links.length > 0 && (
           <ul className="composer-links">

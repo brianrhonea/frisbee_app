@@ -18,12 +18,11 @@ import {
   shareRoleLabels,
   upcomingSchedule,
 } from "@stall10/shared";
-import { where } from "firebase/firestore";
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { colorOf, downloadIcs, loadHidden, saveHidden } from "@/lib/calendar";
-import { ApiError, callApi } from "@/lib/client";
-import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
+import { callApi, problem } from "@/lib/client";
+import { type Doc, useLiveQueries } from "@/lib/live";
 import { type Meeting, type MeetingData, meetingHref, teamBase, teamMeetingQueries } from "./team/meetings/model";
 import { memberViewer, type TeamDoc } from "./team/TeamContext";
 import { scheduleMeetings, type TeamEventDoc, teamEventQueries } from "./team/TeamSchedule";
@@ -31,25 +30,12 @@ import { useAuth } from "./AuthProvider";
 import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
 import { type ShareChoice, ShareEventField, shareEvent } from "./team/ShareEvent";
+import { fromLocalInput, startOfToday, toLocalInput } from "@/lib/dates";
+import { useMyTeams } from "./useMyTeams";
 
 const dayMs = 86_400_000;
-const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 const canEdit = (c: CalendarInfo | undefined) => c?.role === "owner" || c?.role === "edit";
 
-/** ISO → the value a datetime-local input takes, in the browser's zone. */
-function toLocalInput(iso?: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
-const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
-
-function startOfToday(): number {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
 
 interface Loaded {
   calendars: CalendarInfo[];
@@ -125,11 +111,7 @@ export function Schedule() {
   const [editing, setEditing] = useState<(Partial<CalendarEvent> & { calendarId?: string }) | null>(null);
   const [filter, setFilter] = useState<ScheduleFilter>("all");
   // Every team the member is on (watchMyTeams), each listened to by a TeamFeed.
-  const teamsLive = useLiveQuery<TeamDoc>(
-    user ? "teams" : null,
-    user ? [where("memberIds", "array-contains", user.uid)] : [],
-    user?.uid ?? "",
-  );
+  const teamsLive = useMyTeams<TeamDoc>(user?.uid);
   const [feeds, setFeeds] = useState<Record<string, TeamFeedData>>({});
   const onFeed = useCallback((teamId: string, d: TeamFeedData | null) => {
     setFeeds((f) => {
@@ -144,7 +126,7 @@ export function Schedule() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    const from = startOfToday() - dayMs;
+    const from = startOfToday().getTime() - dayMs;
     const qs = new URLSearchParams({
       from: new Date(from).toISOString(),
       to: new Date(from + (calendarWindowDays - 1) * dayMs).toISOString(),
@@ -208,7 +190,7 @@ export function Schedule() {
     ]),
   ];
   // Team entries stop where the calendars' window does, so the list has one horizon.
-  const windowEnd = startOfToday() - dayMs + (calendarWindowDays - 1) * dayMs;
+  const windowEnd = startOfToday().getTime() - dayMs + (calendarWindowDays - 1) * dayMs;
   const upcoming = upcomingSchedule(rows, { now: Date.now(), until: windowEnd, filter, hiddenCalendars: hidden });
 
   /** Team events can be deleted from here by the team's event managers, as the app's swipe does. */

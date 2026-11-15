@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { Suspense, useEffect, useState } from "react";
+import { callApi, problem } from "@/lib/client";
 import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { roleLabel } from "../ProfileDashboard";
@@ -105,7 +105,7 @@ export function JoinButton() {
     try {
       await callApi(user!, path, { method });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+      setError(problem(e));
     } finally {
       setBusy(false);
     }
@@ -152,13 +152,28 @@ export function JoinButton() {
 
 /** Shown in a members-only section to anyone who isn't one. */
 export function MembersOnlySection({ what }: { what: string }) {
-  const { teamId, viewer } = useTeamHub();
+  const { viewer } = useTeamHub();
+  // Back to this section (and its ?tab=) after logging in.
+  const path = usePathname();
+  // Read after mounting (useSearchParams would need a Suspense boundary here).
+  const [query, setQuery] = useState("");
+  useEffect(() => setQuery(window.location.search), [path]);
   if (viewer.state === "loading") return <p className="muted" aria-busy="true">Loading…</p>;
+  if (viewer.state === "error") {
+    return (
+      <div className="card hub-empty">
+        <p className="form-error">{viewer.message}</p>
+        <button type="button" className="btn btn-small" onClick={() => window.location.reload()}>
+          Try again
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="card hub-empty">
       <p>Only members see this team&apos;s {what}.</p>
       {viewer.state === "visitor" && (
-        <Link className="btn btn-primary btn-small" href={`/sign-in?next=${encodeURIComponent(`/teams/${teamId}`)}`}>
+        <Link className="btn btn-primary btn-small" href={`/sign-in?next=${encodeURIComponent(path + query)}`}>
           Log in
         </Link>
       )}

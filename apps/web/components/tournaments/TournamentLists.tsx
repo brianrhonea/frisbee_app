@@ -25,11 +25,13 @@ import type { TeamDoc } from "@/components/team/TeamContext";
 import { type Doc, useLiveQuery } from "@/lib/live";
 import { canOn } from "./useTournament";
 import "./tournaments.css";
+import { formatDate, startOfToday } from "@/lib/dates";
+import { useMyTeams } from "../useMyTeams";
 
 export const tournamentHref = (id: string) => `/tournaments/${encodeURIComponent(id)}`;
 
 const dayFmt = (iso: string | null | undefined, opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" }) =>
-  iso ? new Date(iso).toLocaleDateString("en-US", opts) : "";
+  iso ? formatDate(iso, opts) : "";
 
 /** "Jun 6 – 7, 2026" or "Jun 6, 2026" (hostedDates). */
 export function datesLabel(startsOn: string | null | undefined, endsOn: string | null | undefined): string {
@@ -107,10 +109,6 @@ function useFiltered(list: Array<Doc<TournamentDoc>>) {
   return { query, setQuery, type, setType, typeCounts, status, setStatus, statusCounts, shown };
 }
 
-const midnight = () => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-};
 const openStatuses: HostedStatus[] = ["registration", "seeding", "scheduled", "live"];
 
 /**
@@ -120,7 +118,7 @@ const openStatuses: HostedStatus[] = ["registration", "seeding", "scheduled", "l
  */
 export function useUpcomingTournaments(max = 50) {
   const { user } = useAuth();
-  const [since] = useState(midnight);
+  const [since] = useState(startOfToday);
   const weekAgo = new Date(since.getFullYear(), since.getMonth(), since.getDate() - 7);
   const starting = useLiveQuery<TournamentDoc>(
     user ? "tournaments" : null,
@@ -247,7 +245,7 @@ const sections = [
 export function HostEvent() {
   const { user } = useAuth();
   const [type, setType] = useState<HostedType>("league");
-  const mine = useLiveQuery<TeamDoc & { official?: boolean }>(user ? "teams" : null, user ? [where("memberIds", "array-contains", user.uid)] : [], user?.uid ?? "");
+  const mine = useMyTeams<TeamDoc & { official?: boolean }>(user?.uid);
   if (mine.error) return <p className="form-error">{mine.error}</p>;
   if (!mine.data) return <p className="muted" aria-busy="true">Loading…</p>;
   const hosts = mine.data.filter((t) => canOn(t, user?.uid, "manageEvents")).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));

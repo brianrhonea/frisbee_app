@@ -30,10 +30,6 @@ button.gt-game:hover { border-color: var(--accent); }
 .gt-bracket { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
 .gt-column { flex: 0 0 240px; display: grid; gap: 8px; align-content: start; }
 
-.gt-overlay {
-  position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 0.45);
-  display: grid; place-items: center; padding: 16px;
-}
 .gt-sheet { width: min(100%, 480px); max-height: calc(100vh - 32px); overflow-y: auto; display: grid; gap: 10px; }
 
 .gt-editor .settings-form { gap: 14px; }

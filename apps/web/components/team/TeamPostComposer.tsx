@@ -4,7 +4,7 @@ import { type ClipboardEvent, type DragEvent, type FormEvent, useEffect, useRef,
 import { callApi } from "@/lib/client";
 import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "../AuthProvider";
-import { MemberImage } from "../MemberImage";
+import { ComposerPhotos } from "../ComposerPhotos";
 import type { TeamPostView } from "./TeamPostCard";
 
 type Photo =
@@ -155,20 +155,14 @@ export function TeamPostComposer({
           }}
         />
         <input aria-label="Where" placeholder="Where (optional)" value={location} maxLength={200} onChange={(e) => setLocation(e.target.value)} />
-        {photos.length > 0 && (
-          <ul className={`composer-photos n${photos.length}`}>
-            {photos.map((p, i) => (
-              <li key={p.kind === "saved" ? p.path : p.key} className={p.kind === "new" && p.error ? "failed" : ""}>
-                {p.kind === "saved" ? <MemberImage path={p.path} url="" alt={p.name ?? ""} /> : <img src={p.preview} alt="" />}
-                {p.kind === "new" && !p.uploadId && !p.error && <span className="photo-status">Uploading…</span>}
-                {p.kind === "new" && p.error && <span className="photo-status">{p.error}</span>}
-                <button type="button" className="photo-remove" aria-label="Remove photo" onClick={() => setPhotos(photos.filter((_, j) => j !== i))}>
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ComposerPhotos
+          photos={photos.map((p) =>
+            p.kind === "saved"
+              ? { kind: "saved", key: p.path, path: p.path, url: "", alt: p.name ?? "" }
+              : { kind: "new", key: p.key, preview: p.preview, uploading: !p.uploadId && !p.error, error: p.error },
+          )}
+          onRemove={(i) => setPhotos(photos.filter((_, j) => j !== i))}
+        />
         {links.length > 0 && (
           <ul className="composer-links">
             {links.map((l) => (

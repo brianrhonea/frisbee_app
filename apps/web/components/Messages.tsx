@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
-import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
+import { type Doc, useLiveDoc, useLivePaged, useLiveQuery } from "@/lib/live";
 import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
@@ -14,8 +14,10 @@ import { ChatAttachment, type ChatFile } from "./ChatAttachment";
 import { ChatComposer, MessageActions } from "./ChatComposer";
 import { LocalTime } from "./LocalTime";
 import { openConversation } from "./MessageButton";
+import { LoadMore } from "./LoadMore";
 import { loadAtTop, OlderMessages } from "./OlderMessages";
 import { type PickedPerson, PersonPicker } from "./PersonPicker";
+import { isTyping, validId } from "@/lib/text";
 
 /** conversations/{id} (Conversation in the app). */
 interface Conversation {
@@ -47,7 +49,10 @@ interface Message {
   reactions?: Record<string, string>;
 }
 
-type View = "inbox" | "requests" | "archived";
+const views = ["inbox", "requests", "archived"] as const;
+type View = (typeof views)[number];
+/** Conversations per page (no index orders them by last message, so "More conversations" reads the next page). */
+const conversationPage = 200;
 const ms = (iso?: string | null) => (iso ? Date.parse(iso) : Number.NaN);
 const isGroup = (c: Doc<Conversation>) => c.kind === "group" || c.id.startsWith("g-");
 
@@ -90,11 +95,19 @@ export function Messages() {
   const pathname = usePathname();
   const router = useRouter();
   const me = user?.uid ?? "";
-  const convs = useLiveQuery<Conversation>(user ? "conversations" : null, [where("participants", "array-contains", me)], me);
-  const reads = useLiveQuery<Mine>(user ? `users/${me}/dmReads` : null, [], me);
+  // A page at a time, and each conversation's read state with it.
+  const convs = useLivePaged<Conversation>(user ? "conversations" : null, [where("participants", "array-contains", me)], me, conversationPage);
+  const reads = useLivePaged<Mine>(user ? `users/${me}/dmReads` : null, [], me, conversationPage * 2);
+  const loadMore = () => {
+    convs.loadMore();
+    reads.loadMore();
+  };
   const [composing, setComposing] = useState<"direct" | "group" | null>(null);
-  const view = (params.get("view") as View) || "inbox";
-  const openId = params.get("c");
+  // Search by name, as the app's inbox does (InboxViewModel.setQuery).
+  const [search, setSearch] = useState("");
+  const rawView = params.get("view");
+  const view: View = views.find((v) => v === rawView) ?? "inbox";
+  const openId = validId(params.get("c"));
   const to = params.get("to");
 
   const mineById = useMemo(() => new Map((reads.data ?? []).map((r) => [r.id, r] as const)), [reads.data]);
@@ -105,7 +118,10 @@ export function Messages() {
         .sort((a, b) => (ms(b.c.lastMessageAt) || 0) - (ms(a.c.lastMessageAt) || 0)),
     [convs.data, mineById, me],
   );
-  const shown = all.filter(({ d }) => (view === "requests" ? d.inRequests : view === "archived" ? d.inArchive : d.inInbox));
+  const q = search.trim().toLowerCase();
+  const shown = all.filter(
+    ({ d }) => (view === "requests" ? d.inRequests : view === "archived" ? d.inArchive : d.inInbox) && (!q || d.title.toLowerCase().includes(q)),
+  );
   const requests = all.filter(({ d }) => d.inRequests).length;
   const open = all.find(({ c }) => c.id === openId);
 
@@ -123,7 +139,11 @@ export function Messages() {
   // conversation for anyone.
   const toUid = to && to !== me && /^[A-Za-z0-9_-]{1,128}$/.test(to) ? to : null;
   const toId = toUid ? directConversationId(me, toUid) : null;
-  const toExists = !!toId && all.some(({ c }) => c.id === toId);
+  // It may be past the pages loaded: ask for it by id too (the rules refuse a missing one).
+  const toListed = !!toId && all.some(({ c }) => c.id === toId);
+  const toDoc = useLiveDoc<Conversation>(toId && convs.data && !toListed ? `conversations/${toId}` : null);
+  const toExists = toListed || !!toDoc.data;
+  const toKnown = !toId || toExists || toDoc.data === null || !!toDoc.error;
   const showConversation = (id: string) => {
     const next = new URLSearchParams(params);
     next.delete("to");
@@ -136,12 +156,15 @@ export function Messages() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once it's known to exist.
   }, [toId, toExists]);
 
-  // j / k move through the list; Esc closes the conversation.
+  // j / k move through the list; Esc closes the conversation. One
+  // listener, reading the latest list through a ref.
+  const keys = useRef({ shown, openId, go });
+  keys.current = { shown, openId, go };
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const t = e.target as HTMLElement | null;
-      if (e.ctrlKey || e.metaKey || e.altKey || (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)))) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
       if (e.key !== "j" && e.key !== "k" && e.key !== "Escape") return;
+      const { shown, openId, go } = keys.current;
       if (e.key === "Escape") return openId && go({ c: null });
       const i = shown.findIndex(({ c }) => c.id === openId);
       const next = shown[e.key === "j" ? Math.min(shown.length - 1, i + 1) : Math.max(0, i - 1)];
@@ -149,7 +172,7 @@ export function Messages() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, []);
 
   if (!user) return null;
   if (convs.error) return <p className="form-error">{convs.error}</p>;
@@ -179,13 +202,27 @@ export function Messages() {
             </Link>
           ))}
         </div>
+        <input
+          className="search-input"
+          type="search"
+          placeholder="Search messages"
+          aria-label="Search conversations by name"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
         {!convs.data ? (
           <p className="muted" aria-busy="true">
             Loading…
           </p>
         ) : shown.length === 0 ? (
           <p className="empty">
-            {view === "requests" ? "No message requests." : view === "archived" ? "Nothing archived." : "No conversations yet."}
+            {q
+              ? "No conversations match your search."
+              : view === "requests"
+                ? "No message requests."
+                : view === "archived"
+                  ? "Nothing archived."
+                  : "No conversations yet."}
           </p>
         ) : (
           <ul className="hub-items conv-list">
@@ -214,6 +251,7 @@ export function Messages() {
             ))}
           </ul>
         )}
+        {convs.data && <LoadMore paged={{ ...convs, loadMore }} label="More conversations" />}
       </nav>
       <section className="hub-detail chat-thread">
         {composing ? (
@@ -227,8 +265,8 @@ export function Messages() {
         ) : open ? (
           <ConversationView key={open.c.id} conv={open.c} info={open.d} mine={mineById.get(open.c.id)} me={me} onClose={() => go({ c: null })} />
         ) : openId && convs.data ? (
-          <OpenById id={openId} />
-        ) : toUid && convs.data && !toExists ? (
+          <OpenById key={openId} id={openId} me={me} onClose={() => go({ c: null })} />
+        ) : toUid && convs.data && toKnown && !toExists ? (
           <StartConversation key={toUid} uid={toUid} onStarted={showConversation} onCancel={() => go({ to: null })} />
         ) : (
           <div className="card hub-empty">
@@ -290,11 +328,14 @@ function StartConversation({ uid, onStarted, onCancel }: { uid: string; onStarte
   );
 }
 
-/** A conversation not in the list yet (just made, or opened from a link). */
-function OpenById({ id }: { id: string }) {
+/** A conversation not in the pages loaded (just made, older, or opened from a link), read by its id. */
+function OpenById({ id, me, onClose }: { id: string; me: string; onClose: () => void }) {
   const live = useLiveDoc<Conversation>(`conversations/${id}`);
+  const mine = useLiveDoc<Mine>(`users/${me}/dmReads/${id}`);
   if (live.data === undefined && !live.error) return <p className="muted">Loading…</p>;
-  return <p className="empty">This conversation isn&apos;t available.</p>;
+  if (!live.data) return <p className="empty">This conversation isn&apos;t available.</p>;
+  const m = mine.data ?? undefined;
+  return <ConversationView conv={live.data} info={describe(live.data, m, me)} mine={m} me={me} onClose={onClose} />;
 }
 
 function NewConversation({ group, onDone }: { group: boolean; onDone: (id: string | null) => void }) {

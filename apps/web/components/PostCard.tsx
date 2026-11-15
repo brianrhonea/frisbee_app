@@ -2,7 +2,7 @@
 import { type PublicPost, type WorkoutActivity, workoutActivityLabels } from "@stall10/shared";
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { Comments } from "./Comments";
@@ -199,7 +199,7 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
       await callApi(user, `/v1/posts/${encodeURIComponent(post.id)}`, { method: "DELETE" });
       setDeleted(true);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't delete it. Try again.");
+      setError(problem(e, "Couldn't delete it. Try again."));
     }
   }
 

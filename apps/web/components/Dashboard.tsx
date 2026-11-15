@@ -3,8 +3,8 @@ import type { MeHome, PostPage, PublicPost } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { onHomeRefresh } from "@/lib/homeRefresh";
-import { ApiError, callApi } from "@/lib/client";
+import { newPostBox, onHomeRefresh } from "@/lib/homeRefresh";
+import { callApi, problem } from "@/lib/client";
 import { Composer } from "./Composer";
 import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
@@ -15,6 +15,7 @@ import { UsernameStep } from "./UsernameStep";
 import { ForYouFeed, TeamPostPicker } from "./home/ForYou";
 import { MyTeams } from "./MyTeams";
 import { TeamInvites } from "./TeamInvites";
+import { formatDate } from "@/lib/dates";
 
 const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Not going" };
 
@@ -36,7 +37,7 @@ const emptyFeed: Feed = { posts: [], next: null, busy: false, error: false };
 /** "Friday, November 14", in the member's time zone once in the browser. */
 function useToday() {
   const [today, setToday] = useState("");
-  useEffect(() => setToday(new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })), []);
+  useEffect(() => setToday(formatDate(new Date(), { weekday: "long", month: "long", day: "numeric" })), []);
   return today;
 }
 
@@ -59,7 +60,7 @@ export function Dashboard({ user }: { user: User }) {
       setHome(h);
       setOlder({ ...emptyFeed, next: h.feed.next });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't load your home. Try again.");
+      setError(problem(e, "Couldn't load your home. Try again."));
     }
   }, [user]);
 
@@ -100,10 +101,10 @@ export function Dashboard({ user }: { user: User }) {
   // "Create a post" from another page lands here with #compose.
   useEffect(() => {
     if (!home || window.location.hash !== "#compose") return;
-    const box = document.querySelector<HTMLTextAreaElement>(".composer textarea");
+    const box = document.querySelector<HTMLTextAreaElement>(newPostBox);
     box?.scrollIntoView({ block: "center" });
     box?.focus({ preventScroll: true });
-    history.replaceState(null, "", "/");
+    history.replaceState(null, "", window.location.pathname + window.location.search); // Drops #compose, keeps ?tab=.
   }, [home]);
 
   function pickTab(t: Tab, push = true) {

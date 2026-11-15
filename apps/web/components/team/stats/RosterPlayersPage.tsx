@@ -1,7 +1,7 @@
 "use client";
 import type { SaveRosterPlayerRequest, StatsPlayer } from "@stall10/shared";
 import { useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../../AuthProvider";
 import { useTeamHub } from "../TeamContext";
 import { apiUrl, statsAccess, useStatsPlayers } from "./data";
@@ -70,7 +70,7 @@ function RosterPlayers() {
       await fn();
       return true;
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't save that. Try again.");
+      setError(problem(e, "Couldn't save that. Try again."));
       return false;
     } finally {
       setBusy(false);

@@ -85,7 +85,7 @@ export function StatSheetTable({ sheet, nameOf }: { sheet: StatSheet; nameOf: (i
 }
 
 /** What each column means and how the score and ratings are worked out (stats_glossary.dart, in short). */
-export function StatsGlossary() {
+function StatsGlossary() {
   return (
     <div className="card">
       <dl className="glossary">

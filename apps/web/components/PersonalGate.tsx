@@ -3,7 +3,7 @@ import { minimumAge, type PersonalDetailsStatus } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
 import { deleteOwnAccount } from "@/lib/firebase";
 import { useLiveDoc } from "@/lib/live";
@@ -48,13 +48,19 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   // Under 13: the account is removed and signed out, and this stays up.
   const [tooYoung, setTooYoung] = useState<"removing" | "removed" | null>(null);
 
+  // Only the latest request answers: a slow one for the last account (or
+  // an earlier refresh) never overwrites a newer status.
+  const latest = useRef(0);
   const load = useCallback((u: User) => {
-    callApi<PersonalDetailsStatus>(u, "/v1/me/personal/status")
-      .then(setStatus)
-      .catch(() => setStatus(null));
+    const mine = ++latest.current;
+    callApi<PersonalDetailsStatus>(u, "/v1/me/personal/status").then(
+      (s) => mine === latest.current && setStatus(s),
+      () => mine === latest.current && setStatus(null),
+    );
   }, []);
 
   useEffect(() => {
+    latest.current += 1;
     setStatus(null);
     if (user) {
       setHidePrompt(dismissed(user.uid));

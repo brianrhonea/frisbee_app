@@ -1,20 +1,22 @@
 "use client";
 import type { PublicEvent } from "@stall10/shared";
-import { orderBy, type QueryConstraint, Timestamp, where } from "firebase/firestore";
+import { limit, orderBy, type QueryConstraint, Timestamp, where } from "firebase/firestore";
 import { eventReactions, scheduleEntryOver } from "@stall10/shared";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "../AuthProvider";
 import { EventItem } from "../EventItem";
 import { LocalTime } from "../LocalTime";
 import { downloadIcs } from "@/lib/calendar";
 import { callApi } from "@/lib/client";
-import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
+import { type Doc, useLiveDoc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { type Meeting, meetingHref, meetingsHref, useTeamMeetings } from "./meetings/model";
 import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { TeamEventEditor } from "./TeamEventEditor";
 import "./team_schedule_meetings.css";
+import { startOfToday } from "@/lib/dates";
+import { validId } from "@/lib/text";
 
 /** A team event as members read it (TeamEvent in the app). */
 export interface TeamEventDoc extends PublicEvent {
@@ -44,11 +46,6 @@ const rsvpLabels: Array<[string, string, string]> = [
 ];
 const reactionEmoji: Record<string, string> = { thumbsUp: "👍", fire: "🔥", disc: "🥏", clap: "🙌", laugh: "😂", grimace: "😬" };
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return Timestamp.fromDate(d);
-}
 
 /**
  * The Firestore reads for a member's events: upcoming ones from today
@@ -58,41 +55,57 @@ function startOfToday() {
  * [lookBackDays] starts upcoming reads that many days before today, so
  * multi-day events under way stay in (MySchedule.lookBack). [key] names
  * the set for useLiveQueries. Shared with My schedule.
+ *
+ * Every read is bounded: the first [upcomingEventCap] upcoming events, and
+ * the past a page at a time ([pages]): the newest [pastEventCap] per page,
+ * or, for an organization's audiences (whose index is ascending only, so a
+ * limit would keep the oldest), [pastWindowDays] more days per page.
  */
-export function teamEventQueries(member: Extract<TeamViewer, { state: "member" }>, past = false, lookBackDays = 0) {
-  const today = startOfToday();
+export function teamEventQueries(member: Extract<TeamViewer, { state: "member" }>, past = false, lookBackDays = 0, pages = 1) {
+  const today = Timestamp.fromDate(startOfToday());
   const since = lookBackDays > 0 ? Timestamp.fromMillis(today.toMillis() - lookBackDays * day) : today;
   const scoped = member.team.kind === "organization" && !member.can("manageEvents");
-  // The audience + startsAt index is ascending only (firestore.indexes.json),
-  // so an organization's past events come oldest first and are sorted here.
-  const range: QueryConstraint[] = past
-    ? [where("startsAt", "<", Timestamp.fromMillis(today.toMillis() + day)), orderBy("startsAt", scoped ? "asc" : "desc")]
-    : [where("startsAt", ">=", since), orderBy("startsAt")];
+  const tomorrow = Timestamp.fromMillis(today.toMillis() + day);
+  const range: QueryConstraint[] = !past
+    ? [where("startsAt", ">=", since), orderBy("startsAt"), limit(upcomingEventCap)]
+    : scoped
+      ? [where("startsAt", ">=", Timestamp.fromMillis(today.toMillis() - pages * pastWindowDays * day)), where("startsAt", "<", tomorrow), orderBy("startsAt")]
+      : [where("startsAt", "<", tomorrow), orderBy("startsAt", "desc"), limit(pages * pastEventCap)];
   const queries = scoped ? member.audience.map((id) => [where("audience", "array-contains", id), ...range]) : [range];
-  const key = `${past}|${scoped ? member.audience.join(",") : "all"}|${since.seconds}`;
-  return { queries, key };
+  const key = `${past}|${scoped ? member.audience.join(",") : "all"}|${since.seconds}|${past ? pages : 0}`;
+  return { queries, key, scoped };
 }
 
-/** How many upcoming events a team's schedule lists (and past ones). */
+/** How many upcoming events a team's schedule reads; past ones come a page at a time. */
 const upcomingEventCap = 200;
 const pastEventCap = 50;
+const pastWindowDays = 90;
+/** An organization's past goes back at most this many windows (about five years). */
+const pastWindowsMax = 20;
 
 /**
  * A member's events that haven't finished (or have, newest first, for
  * [past]), live: as the app's upcomingEvents, an event is over at its end,
  * or two hours after it starts without one (scheduleEntryOver). Null for
- * non-members.
+ * non-members. The past comes [pages] pages at a time; [more] when there
+ * may be earlier ones, and the last pages stay while the next loads.
  */
-export function useTeamEvents(teamId: string, viewer: TeamViewer, past = false) {
+export function useTeamEvents(teamId: string, viewer: TeamViewer, past = false, pages = 1) {
   const member = viewer.state === "member" ? viewer : null;
-  const { queries, key } = member ? teamEventQueries(member, past) : { queries: [], key: "" };
-  const live = useLiveQueries<TeamEventDoc>(member ? `teams/${teamId}/events` : null, queries, key);
+  const { queries, key, scoped } = member ? teamEventQueries(member, past, 0, pages) : { queries: [], key: "", scoped: false };
+  const path = member ? `teams/${teamId}/events` : null;
+  const live = useLiveQueries<TeamEventDoc>(path, queries, key);
+  // Keep what's showing while a bigger page of the past loads.
+  const base = `${path}|${past}`;
+  const last = useRef<{ base: string; data: Array<Doc<TeamEventDoc>> } | null>(null);
+  if (live.data !== undefined) last.current = { base, data: live.data };
+  const data = live.data ?? (last.current?.base === base ? last.current.data : undefined);
   const now = Date.now();
-  const sorted = live.data
+  const sorted = data
     ?.filter((e) => scheduleEntryOver(e.startsAt, e.endsAt, now) === past)
-    .sort((a, b) => (a.startsAt ?? "").localeCompare(b.startsAt ?? "") * (past ? -1 : 1))
-    .slice(0, past ? pastEventCap : upcomingEventCap);
-  return { ...live, data: sorted };
+    .sort((a, b) => (a.startsAt ?? "").localeCompare(b.startsAt ?? "") * (past ? -1 : 1));
+  const more = past && data !== undefined && (scoped ? pages < pastWindowsMax : data.length >= pages * pastEventCap);
+  return { ...live, data: sorted, more, loadingMore: live.data === undefined && data !== undefined && !live.error };
 }
 
 /**
@@ -119,12 +132,19 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   const params = useSearchParams();
   const pathname = usePathname();
   const past = params.get("when") === "past";
-  const live = useTeamEvents(teamId, viewer, past);
+  // Pages of the past shown; back to one on switching tabs.
+  const [pastPages, setPastPages] = useState({ past, n: 1 });
+  const pages = pastPages.past === past ? pastPages.n : 1;
+  const live = useTeamEvents(teamId, viewer, past, pages);
   const meetings = useTeamMeetings(teamId, viewer);
   const member = viewer.state === "member" ? viewer : null;
   const router = useRouter();
   const [editing, setEditing] = useState<string | null>(null);
   const manager = member?.can("manageEvents") ?? false;
+  // ?event= for an event that isn't in the list showing (a past one, say): read it by id.
+  const wanted = validId(params.get("event"));
+  const listed = !!wanted && (member ? (live.data ?? []) : publicEvents).some((e) => e.id === wanted);
+  const linked = useLiveDoc<TeamEventDoc>(member && wanted && live.data && !listed ? `teams/${teamId}/events/${wanted}` : null);
 
   if (viewer.state === "loading") return <p className="muted" aria-busy="true">Loading…</p>;
   if (!member && privateGroup) {
@@ -138,8 +158,8 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
     ...events.map((event) => ({ kind: "event" as const, event })),
     ...(member ? scheduleMeetings(meetings.data, past).map((meeting) => ({ kind: "meeting" as const, meeting })) : []),
   ].sort((a, b) => entryStart(a).localeCompare(entryStart(b)) * (past ? -1 : 1));
-  const openId = params.get("event") ?? events[0]?.id;
-  const open = events.find((e) => e.id === openId);
+  const openId = wanted ?? events[0]?.id;
+  const open = events.find((e) => e.id === openId) ?? (linked.data && linked.data.id === wanted ? linked.data : undefined);
   const link = (q: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
     for (const [k, v] of Object.entries(q)) v === null ? next.delete(k) : next.set(k, v);
@@ -195,6 +215,13 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
             })}
           </ul>
         )}
+        {live.more && (
+          <div className="pager">
+            <button type="button" className="btn btn-small" disabled={live.loadingMore} onClick={() => setPastPages({ past, n: pages + 1 })}>
+              {live.loadingMore ? "Loading…" : "Earlier events"}
+            </button>
+          </div>
+        )}
         {!member && (
           <p className="muted small">
             {viewer.state === "visitor" ? "Members see the full schedule." : `Only ${kind === "team" ? "the team's" : "the group's"} public events show here.`}
@@ -204,7 +231,7 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
       <div className="hub-detail">
         {editing ? (
           <TeamEventEditor
-            event={editing === "new" ? undefined : events.find((e) => e.id === editing)}
+            event={editing === "new" ? undefined : (events.find((e) => e.id === editing) ?? (open?.id === editing ? open : undefined))}
             onDone={(id) => {
               setEditing(null);
               if (id) router.replace(link({ event: id }), { scroll: false });

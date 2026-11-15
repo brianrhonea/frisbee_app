@@ -11,8 +11,9 @@ import {
   readGroupSettings,
   readGroupTeams,
 } from "@stall10/shared";
+import { formatDateTime } from "@/lib/dates";
 
-const fmt = (iso: string, o: Intl.DateTimeFormatOptions) => new Date(iso).toLocaleString("en-US", o);
+const fmt = (iso: string, o: Intl.DateTimeFormatOptions) => formatDateTime(iso, o);
 
 /** "Sat, Nov 7 · 9:00 AM". */
 export const tournamentWhen = (iso: string) =>

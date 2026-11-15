@@ -3,12 +3,13 @@ import {
   collection,
   doc,
   type DocumentData,
+  limit,
   onSnapshot,
   query,
   type QueryConstraint,
   Timestamp,
 } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { firestoreDb } from "./firebase";
 
 // Live reads from Firestore for the member area, as the app reads them: the
@@ -32,13 +33,24 @@ export type Doc<T> = T & { id: string };
 export interface Live<T> {
   data: T | undefined;
   error: string | null;
+  /** The rules refused the read (rather than it failing). */
+  denied?: boolean;
 }
 
-const denied = "You can't see this.";
-const failed = "Couldn't load this. Check your connection and refresh.";
+/**
+ * Whether [path] names a document ("doc") or a collection: non-empty
+ * segments, none "." or "..", and an even or odd count. Ids from the
+ * address bar can hold a decoded "/" (and Firestore throws on a bad
+ * path), so a path that isn't is read as nothing there.
+ */
+function wellFormed(path: string, kind: "doc" | "collection"): boolean {
+  const parts = path.split("/");
+  return parts.every((p) => p !== "" && p !== "." && p !== "..") && parts.length % 2 === (kind === "doc" ? 0 : 1);
+}
 
-function message(e: { code?: string }) {
-  return e.code === "permission-denied" ? denied : failed;
+/** A failed listener in words: refused by the rules, or [failed] for anything else. */
+export function liveError(e: { code?: string }, failed = "Couldn't load this. Check your connection and refresh."): string {
+  return e.code === "permission-denied" ? "You can't see this." : failed;
 }
 
 /**
@@ -49,7 +61,7 @@ export function useLiveDoc<T = DocumentData>(path: string | null): Live<Doc<T> |
   const [state, setState] = useState<Live<Doc<T> | null>>({ data: undefined, error: null });
   useEffect(() => {
     const db = firestoreDb();
-    if (!path || !db) {
+    if (!path || !db || !wellFormed(path, "doc")) {
       setState({ data: path ? null : undefined, error: null });
       return;
     }
@@ -61,7 +73,7 @@ export function useLiveDoc<T = DocumentData>(path: string | null): Live<Doc<T> |
           data: snap.exists() ? ({ ...(plain(snap.data()) as T), id: snap.id } as Doc<T>) : null,
           error: null,
         }),
-      (e) => setState({ data: undefined, error: message(e) }),
+      (e) => setState({ data: undefined, error: liveError(e), denied: e.code === "permission-denied" }),
     );
   }, [path]);
   return state;
@@ -80,7 +92,7 @@ export function useLiveQuery<T = DocumentData>(
   const [state, setState] = useState<Live<Doc<T>[]>>({ data: undefined, error: null });
   useEffect(() => {
     const db = firestoreDb();
-    if (!path || !db) {
+    if (!path || !db || !wellFormed(path, "collection")) {
       setState({ data: path ? [] : undefined, error: null });
       return;
     }
@@ -92,11 +104,46 @@ export function useLiveQuery<T = DocumentData>(
           data: snap.docs.map((d) => ({ ...(plain(d.data()) as T), id: d.id }) as Doc<T>),
           error: null,
         }),
-      (e) => setState({ data: undefined, error: message(e) }),
+      (e) => setState({ data: undefined, error: liveError(e) }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- [key] stands for constraints.
   }, [path, key]);
   return state;
+}
+
+/** A live query read a page at a time: [more] when a full page came back. */
+export interface LivePaged<T> extends Live<Doc<T>[]> {
+  more: boolean;
+  /** The bigger page is on its way (the last one still showing). */
+  loadingMore: boolean;
+  loadMore: () => void;
+}
+
+/**
+ * useLiveQuery with a limit: the first [pageSize] documents of the query,
+ * and [pageSize] more on each loadMore. What's showing stays while the
+ * bigger page loads. Back to one page when [path] or [key] changes.
+ */
+export function useLivePaged<T = DocumentData>(
+  path: string | null,
+  constraints: QueryConstraint[],
+  key: string,
+  pageSize: number,
+): LivePaged<T> {
+  const base = `${path ?? ""}|${key}`;
+  const [page, setPage] = useState({ base, n: pageSize });
+  const n = page.base === base ? page.n : pageSize;
+  const live = useLiveQuery<T>(path, [...constraints, limit(n)], `${key}|${n}`);
+  const last = useRef<{ base: string; data: Doc<T>[] } | null>(null);
+  if (live.data !== undefined) last.current = { base, data: live.data };
+  const data = live.data ?? (last.current?.base === base ? last.current.data : undefined);
+  return {
+    data,
+    error: live.error,
+    loadingMore: live.data === undefined && data !== undefined && !live.error,
+    more: live.data === undefined ? data !== undefined && !live.error : live.data.length >= n,
+    loadMore: () => setPage({ base, n: n + pageSize }),
+  };
 }
 
 /** Something to watch for changes: a document, or a query on a collection. */
@@ -115,7 +162,8 @@ export function useChangeSignal(signals: Signal[] | null, key: string): number {
     const db = firestoreDb();
     if (!signals || !db) return;
     const bump = () => setVersion((v) => v + 1);
-    const stops = signals.map((s) =>
+    const sound = signals.filter((s) => ("doc" in s ? wellFormed(s.doc, "doc") : wellFormed(s.collection, "collection")));
+    const stops = sound.map((s) =>
       "doc" in s
         ? onSnapshot(doc(db, s.doc), bump, () => undefined)
         : onSnapshot(query(collection(db, s.collection), ...s.constraints), bump, () => undefined),
@@ -139,7 +187,7 @@ export function useLiveQueries<T = DocumentData>(
   const [state, setState] = useState<Live<Doc<T>[]>>({ data: undefined, error: null });
   useEffect(() => {
     const db = firestoreDb();
-    if (!path || !db) {
+    if (!path || !db || !wellFormed(path, "collection")) {
       setState({ data: path ? [] : undefined, error: null });
       return;
     }
@@ -158,7 +206,7 @@ export function useLiveQueries<T = DocumentData>(
           results[i] = snap.docs.map((d) => ({ ...(plain(d.data()) as T), id: d.id }) as Doc<T>);
           publish();
         },
-        (e) => setState({ data: undefined, error: message(e) }),
+        (e) => setState({ data: undefined, error: liveError(e) }),
       ),
     );
     return () => stops.forEach((stop) => stop());

@@ -28,9 +28,9 @@ import type { TeamPostView } from "@/components/team/TeamPostCard";
 import { firestoreDb } from "@/lib/firebase";
 import { type Doc, plain, useLiveQuery } from "@/lib/live";
 
-export const feedPageSize = 20;
+const feedPageSize = 20;
 
-export type FeedItem =
+type FeedItem =
   | { kind: "user"; id: string; createdAt: string | undefined; post: PublicPost }
   | { kind: "team"; id: string; createdAt: string | undefined; teamId: string; teamName: string; member: boolean; post: Doc<TeamPostView> };
 
@@ -62,6 +62,9 @@ interface SourceState {
 /** Newest first; unsaved timestamps (pending writes) count as now. */
 const at = (iso: string | undefined) => (iso ? Date.parse(iso) : Number.POSITIVE_INFINITY);
 
+/** The newest follows the feed reads (each followed team is a listener). */
+const followsCap = 500;
+
 /** The players' posts page source: what /v1/me/home returned so far. */
 export interface UserPages {
   posts: PublicPost[];
@@ -71,7 +74,8 @@ export interface UserPages {
 }
 
 export function useForYou(uid: string | undefined, myTeams: Array<{ id: string; name?: string }> | undefined, users: UserPages) {
-  const follows = useLiveQuery<FollowDoc>(uid ? `users/${uid}/follows` : null, [], uid ?? "");
+  // The newest follows (one listener each for teams): bounded like the app's feed sources should be.
+  const follows = useLiveQuery<FollowDoc>(uid ? `users/${uid}/follows` : null, [orderBy("createdAt", "desc"), limit(followsCap)], uid ?? "");
   const mine = useMemo(() => new Map((myTeams ?? []).map((t) => [t.id, t.name ?? "Team"])), [myTeams]);
 
   // The sources wanted now, by key (HomeFeed._sync).
@@ -190,7 +194,8 @@ export function useForYou(uid: string | undefined, myTeams: Array<{ id: string; 
 
   const [loadingMore, setLoadingMore] = useState(false);
   const hasMore = users.next !== null || sources.some((s) => !exhausted(s));
-  const loaded = follows.data !== undefined && myTeams !== undefined && sources.every((s) => state[s.key]?.live !== undefined);
+  // A follows read that failed still lets the feed show (the member's teams and the players' posts).
+  const loaded = (follows.data !== undefined || !!follows.error) && myTeams !== undefined && sources.every((s) => state[s.key]?.live !== undefined);
 
   /**
    * Fetches the next page of the sources holding the feed back (those whose
