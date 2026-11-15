@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.25.1 — 2026-11-15
+
+**Fixed** (shared test vectors with the app)
+- The balanced draft deals players in the app's order with the app's
+  seeded shuffle, so the same seed gives the same teams on both.
+- "Add to calendar" downloads the same file as the app (no calendar
+  name, so it adds to an existing calendar).
+- The stats roster is ordered like the app's; play animation positions
+  match the app exactly.
+
 ## 0.25.0 — 2026-11-15
 
 Needs API 0.23.0 (chat uploads send the file's `name`).

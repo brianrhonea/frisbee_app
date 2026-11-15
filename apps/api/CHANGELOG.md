@@ -7,6 +7,16 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.23.1 — 2026-11-15
+
+**Fixed** (shared test vectors with the app)
+- Discord import into a community's teams orders community roles tied on
+  position by name as the app does (which new role id goes to which role).
+- The roster's players are ordered as the app orders them: by number (none
+  counts as 1000), then name compared exactly.
+- Tests read the shared Discord template (`packages/shared/fixtures`) and
+  check the whole parsed plan.
+
 ## 0.23.0 — 2026-11-15
 
 **Changed**

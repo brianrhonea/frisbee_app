@@ -115,7 +115,9 @@ export function pathIn(play: Pick<PlayDoc, "elements" | "steps">, index: number,
 export function pointAlong(path: FieldPoint[], f: number): FieldPoint {
   if (path.length === 1 || f <= 0) return path[0]!;
   if (f >= 1) return path[path.length - 1]!;
-  const dist = (a: FieldPoint, b: FieldPoint) => Math.hypot(a.x - b.x, a.y - b.y);
+  // As the app measures it (sqrt of the squares, not Math.hypot), so the
+  // points come out bit for bit the same.
+  const dist = (a: FieldPoint, b: FieldPoint) => Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
   let total = 0;
   for (let i = 1; i < path.length; i++) total += dist(path[i - 1]!, path[i]!);
   if (total === 0) return path[path.length - 1]!;

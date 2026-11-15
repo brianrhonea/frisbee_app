@@ -429,11 +429,18 @@ export function teamChatImportIsEmpty(t: TeamChatImport, team: ImportTeam): bool
   return importIsEmpty(t.import) && Object.entries(t.orgRoles).every(([k, v]) => before[k] === v);
 }
 
-/** [org]'s roles by position, then name (Team.sortedRoles). */
+/** Compares by UTF-16 code units, as Dart's String.compareTo does. */
+const byCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * [org]'s roles by position, then lowercased name (Team.sortedRoles). Names
+ * compare by code units like the app, not localeCompare, so roles tied on
+ * position come in the same order (and get the same new ids) on both.
+ */
 function sortedRoles(org: ImportTeam) {
   return Object.entries(rolesOf(org))
     .map(([id, r]) => ({ id, ...r }))
-    .sort((a, b) => (a.position !== b.position ? a.position - b.position : a.name.toLowerCase().localeCompare(b.name.toLowerCase())));
+    .sort((a, b) => (a.position !== b.position ? a.position - b.position : byCodeUnits(a.name.toLowerCase(), b.name.toLowerCase())));
 }
 
 /**

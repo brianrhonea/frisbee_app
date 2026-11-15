@@ -1,0 +1,1840 @@
+{
+  "about": "balancedDraft(players, teams, seed, mixed): the teams it deals.",
+  "cases": [
+    {
+      "name": "8 players, 2 teams",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u06",
+          "name": "Player 6",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u07",
+          "name": "Player 7",
+          "skill": 3,
+          "gender": null
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 1,
+      "mixed": false,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u03",
+          "playerIds": [
+            "u03",
+            "u02",
+            "u07",
+            "u06"
+          ],
+          "playerNames": {
+            "u03": "Player 3",
+            "u02": "Player 2",
+            "u07": "Player 7",
+            "u06": "Player 6"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u05",
+            "u04",
+            "u01"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u05": "Player 5",
+            "u04": "Player 4",
+            "u01": "Player 1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 players, 3 teams",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u06",
+          "name": "Player 6",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u07",
+          "name": "Player 7",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u08",
+          "name": "Player 8",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u09",
+          "name": "Player 9",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u10",
+          "name": "Player 10",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u11",
+          "name": "Player 11",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u12",
+          "name": "Player 12",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u13",
+          "name": "Player 13",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u14",
+          "name": "Player 14",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u15",
+          "name": "Player 15",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u16",
+          "name": "Player 16",
+          "skill": 1,
+          "gender": null
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 7,
+      "mixed": false,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u15",
+            "u00",
+            "u09",
+            "u01",
+            "u06"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u15": "Player 15",
+            "u00": "Player 0",
+            "u09": "Player 9",
+            "u01": "Player 1",
+            "u06": "Player 6"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u13",
+          "playerIds": [
+            "u13",
+            "u10",
+            "u12",
+            "u02",
+            "u11",
+            "u16"
+          ],
+          "playerNames": {
+            "u13": "Player 13",
+            "u10": "Player 10",
+            "u12": "Player 12",
+            "u02": "Player 2",
+            "u11": "Player 11",
+            "u16": "Player 16"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u03",
+          "playerIds": [
+            "u03",
+            "u05",
+            "u07",
+            "u04",
+            "u14"
+          ],
+          "playerNames": {
+            "u03": "Player 3",
+            "u05": "Player 5",
+            "u07": "Player 7",
+            "u04": "Player 4",
+            "u14": "Player 14"
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 players, 3 teams, another seed",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u06",
+          "name": "Player 6",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u07",
+          "name": "Player 7",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u08",
+          "name": "Player 8",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u09",
+          "name": "Player 9",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u10",
+          "name": "Player 10",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u11",
+          "name": "Player 11",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u12",
+          "name": "Player 12",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u13",
+          "name": "Player 13",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u14",
+          "name": "Player 14",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u15",
+          "name": "Player 15",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u16",
+          "name": "Player 16",
+          "skill": 1,
+          "gender": null
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 8,
+      "mixed": false,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u15",
+            "u10",
+            "u09",
+            "u01",
+            "u11"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u15": "Player 15",
+            "u10": "Player 10",
+            "u09": "Player 9",
+            "u01": "Player 1",
+            "u11": "Player 11"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u03",
+          "playerIds": [
+            "u03",
+            "u00",
+            "u12",
+            "u02",
+            "u06",
+            "u16"
+          ],
+          "playerNames": {
+            "u03": "Player 3",
+            "u00": "Player 0",
+            "u12": "Player 12",
+            "u02": "Player 2",
+            "u06": "Player 6",
+            "u16": "Player 16"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u13",
+          "playerIds": [
+            "u13",
+            "u05",
+            "u07",
+            "u14",
+            "u04"
+          ],
+          "playerNames": {
+            "u13": "Player 13",
+            "u05": "Player 5",
+            "u07": "Player 7",
+            "u14": "Player 14",
+            "u04": "Player 4"
+          }
+        }
+      ]
+    },
+    {
+      "name": "23 players, 4 teams",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u06",
+          "name": "Player 6",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u07",
+          "name": "Player 7",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u08",
+          "name": "Player 8",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u09",
+          "name": "Player 9",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u10",
+          "name": "Player 10",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u11",
+          "name": "Player 11",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u12",
+          "name": "Player 12",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u13",
+          "name": "Player 13",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u14",
+          "name": "Player 14",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u15",
+          "name": "Player 15",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u16",
+          "name": "Player 16",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u17",
+          "name": "Player 17",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u18",
+          "name": "Player 18",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u19",
+          "name": "Player 19",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u20",
+          "name": "Player 20",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u21",
+          "name": "Player 21",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u22",
+          "name": "Player 22",
+          "skill": 3,
+          "gender": null
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team4",
+          "name": "Team 4",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 40000,
+      "mixed": false,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u03",
+          "playerIds": [
+            "u03",
+            "u05",
+            "u20",
+            "u09",
+            "u04"
+          ],
+          "playerNames": {
+            "u03": "Player 3",
+            "u05": "Player 5",
+            "u20": "Player 20",
+            "u09": "Player 9",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u18",
+          "playerIds": [
+            "u18",
+            "u10",
+            "u07",
+            "u22",
+            "u01",
+            "u21"
+          ],
+          "playerNames": {
+            "u18": "Player 18",
+            "u10": "Player 10",
+            "u07": "Player 7",
+            "u22": "Player 22",
+            "u01": "Player 1",
+            "u21": "Player 21"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u13",
+          "playerIds": [
+            "u13",
+            "u15",
+            "u12",
+            "u17",
+            "u16",
+            "u06"
+          ],
+          "playerNames": {
+            "u13": "Player 13",
+            "u15": "Player 15",
+            "u12": "Player 12",
+            "u17": "Player 17",
+            "u16": "Player 16",
+            "u06": "Player 6"
+          }
+        },
+        {
+          "id": "team4",
+          "name": "Team 4",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u00",
+            "u02",
+            "u19",
+            "u14",
+            "u11"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u00": "Player 0",
+            "u02": "Player 2",
+            "u19": "Player 19",
+            "u14": "Player 14",
+            "u11": "Player 11"
+          }
+        }
+      ]
+    },
+    {
+      "name": "mixed, 20 players, 4 teams",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3",
+          "skill": 5,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4",
+          "skill": 2,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5",
+          "skill": 4,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u06",
+          "name": "Player 6",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u07",
+          "name": "Player 7",
+          "skill": 3,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u08",
+          "name": "Player 8",
+          "skill": 5,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u09",
+          "name": "Player 9",
+          "skill": 2,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u10",
+          "name": "Player 10",
+          "skill": 4,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u11",
+          "name": "Player 11",
+          "skill": 1,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u12",
+          "name": "Player 12",
+          "skill": 3,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u13",
+          "name": "Player 13",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u14",
+          "name": "Player 14",
+          "skill": 2,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u15",
+          "name": "Player 15",
+          "skill": 4,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u16",
+          "name": "Player 16",
+          "skill": 1,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u17",
+          "name": "Player 17",
+          "skill": 3,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u18",
+          "name": "Player 18",
+          "skill": 5,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u19",
+          "name": "Player 19",
+          "skill": 2,
+          "gender": "mmp"
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team4",
+          "name": "Team 4",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 5,
+      "mixed": true,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u19",
+            "u16",
+            "u03",
+            "u06"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u19": "Player 19",
+            "u16": "Player 16",
+            "u03": "Player 3",
+            "u06": "Player 6"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u05",
+          "playerIds": [
+            "u05",
+            "u02",
+            "u01",
+            "u15",
+            "u12"
+          ],
+          "playerNames": {
+            "u05": "Player 5",
+            "u02": "Player 2",
+            "u01": "Player 1",
+            "u15": "Player 15",
+            "u12": "Player 12"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u10",
+          "playerIds": [
+            "u10",
+            "u04",
+            "u14",
+            "u00",
+            "u09"
+          ],
+          "playerNames": {
+            "u10": "Player 10",
+            "u04": "Player 4",
+            "u14": "Player 14",
+            "u00": "Player 0",
+            "u09": "Player 9"
+          }
+        },
+        {
+          "id": "team4",
+          "name": "Team 4",
+          "captainId": "u18",
+          "playerIds": [
+            "u17",
+            "u07",
+            "u11",
+            "u18",
+            "u13"
+          ],
+          "playerNames": {
+            "u17": "Player 17",
+            "u07": "Player 7",
+            "u11": "Player 11",
+            "u18": "Player 18",
+            "u13": "Player 13"
+          }
+        }
+      ]
+    },
+    {
+      "name": "mixed, 31 players, 3 teams",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3",
+          "skill": 5,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4",
+          "skill": 2,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5",
+          "skill": 4,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u06",
+          "name": "Player 6",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u07",
+          "name": "Player 7",
+          "skill": 3,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u08",
+          "name": "Player 8",
+          "skill": 5,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u09",
+          "name": "Player 9",
+          "skill": 2,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u10",
+          "name": "Player 10",
+          "skill": 4,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u11",
+          "name": "Player 11",
+          "skill": 1,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u12",
+          "name": "Player 12",
+          "skill": 3,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u13",
+          "name": "Player 13",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u14",
+          "name": "Player 14",
+          "skill": 2,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u15",
+          "name": "Player 15",
+          "skill": 4,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u16",
+          "name": "Player 16",
+          "skill": 1,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u17",
+          "name": "Player 17",
+          "skill": 3,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u18",
+          "name": "Player 18",
+          "skill": 5,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u19",
+          "name": "Player 19",
+          "skill": 2,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u20",
+          "name": "Player 20",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u21",
+          "name": "Player 21",
+          "skill": 1,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u22",
+          "name": "Player 22",
+          "skill": 3,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u23",
+          "name": "Player 23",
+          "skill": 5,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u24",
+          "name": "Player 24",
+          "skill": 2,
+          "gender": "wmp"
+        },
+        {
+          "uid": "u25",
+          "name": "Player 25",
+          "skill": 4,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u26",
+          "name": "Player 26",
+          "skill": 1,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u27",
+          "name": "Player 27",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u28",
+          "name": "Player 28",
+          "skill": 5,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u29",
+          "name": "Player 29",
+          "skill": 2,
+          "gender": "mmp"
+        },
+        {
+          "uid": "u30",
+          "name": "Player 30",
+          "skill": 4,
+          "gender": "wmp"
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 65535,
+      "mixed": true,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u28",
+          "playerIds": [
+            "u28",
+            "u10",
+            "u22",
+            "u17",
+            "u16",
+            "u26",
+            "u03",
+            "u30",
+            "u21",
+            "u13"
+          ],
+          "playerNames": {
+            "u28": "Player 28",
+            "u10": "Player 10",
+            "u22": "Player 22",
+            "u17": "Player 17",
+            "u16": "Player 16",
+            "u26": "Player 26",
+            "u03": "Player 3",
+            "u30": "Player 30",
+            "u21": "Player 21",
+            "u13": "Player 13"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u25",
+            "u02",
+            "u04",
+            "u19",
+            "u01",
+            "u18",
+            "u12",
+            "u09",
+            "u20"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u25": "Player 25",
+            "u02": "Player 2",
+            "u04": "Player 4",
+            "u19": "Player 19",
+            "u01": "Player 1",
+            "u18": "Player 18",
+            "u12": "Player 12",
+            "u09": "Player 9",
+            "u20": "Player 20"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u23",
+          "playerIds": [
+            "u23",
+            "u05",
+            "u07",
+            "u14",
+            "u29",
+            "u11",
+            "u00",
+            "u15",
+            "u24",
+            "u27",
+            "u06"
+          ],
+          "playerNames": {
+            "u23": "Player 23",
+            "u05": "Player 5",
+            "u07": "Player 7",
+            "u14": "Player 14",
+            "u29": "Player 29",
+            "u11": "Player 11",
+            "u00": "Player 0",
+            "u15": "Player 15",
+            "u24": "Player 24",
+            "u27": "Player 27",
+            "u06": "Player 6"
+          }
+        }
+      ]
+    },
+    {
+      "name": "mixed flag with no genders",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u06",
+          "name": "Player 6",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u07",
+          "name": "Player 7",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u08",
+          "name": "Player 8",
+          "skill": 5,
+          "gender": null
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 3,
+      "mixed": true,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u05",
+            "u02",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u05": "Player 5",
+            "u02": "Player 2",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u03",
+          "playerIds": [
+            "u03",
+            "u00",
+            "u07",
+            "u01",
+            "u06"
+          ],
+          "playerNames": {
+            "u03": "Player 3",
+            "u00": "Player 0",
+            "u07": "Player 7",
+            "u01": "Player 1",
+            "u06": "Player 6"
+          }
+        }
+      ]
+    },
+    {
+      "name": "named teams keep their names; rosters are replaced",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u06",
+          "name": "Player 6",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u07",
+          "name": "Player 7",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u08",
+          "name": "Player 8",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u09",
+          "name": "Player 9",
+          "skill": 2,
+          "gender": null
+        }
+      ],
+      "teams": [
+        {
+          "id": "red",
+          "name": "Red",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "blue",
+          "name": "Blue",
+          "captainId": "old",
+          "playerIds": [
+            "old"
+          ],
+          "playerNames": {
+            "old": "Old Player"
+          }
+        },
+        {
+          "id": "green",
+          "name": "Green",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 12,
+      "mixed": false,
+      "expected": [
+        {
+          "id": "red",
+          "name": "Red",
+          "captainId": "u03",
+          "playerIds": [
+            "u03",
+            "u07",
+            "u09"
+          ],
+          "playerNames": {
+            "u03": "Player 3",
+            "u07": "Player 7",
+            "u09": "Player 9"
+          }
+        },
+        {
+          "id": "blue",
+          "name": "Blue",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u02",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u02": "Player 2",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "green",
+          "name": "Green",
+          "captainId": "u05",
+          "playerIds": [
+            "u05",
+            "u00",
+            "u01",
+            "u06"
+          ],
+          "playerNames": {
+            "u05": "Player 5",
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u06": "Player 6"
+          }
+        }
+      ]
+    },
+    {
+      "name": "more teams than players",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": null
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team4",
+          "name": "Team 4",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team5",
+          "name": "Team 5",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 9,
+      "mixed": false,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00"
+          ],
+          "playerNames": {
+            "u00": "Player 0"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u02",
+          "playerIds": [
+            "u02"
+          ],
+          "playerNames": {
+            "u02": "Player 2"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u01",
+          "playerIds": [
+            "u01"
+          ],
+          "playerNames": {
+            "u01": "Player 1"
+          }
+        },
+        {
+          "id": "team4",
+          "name": "Team 4",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team5",
+          "name": "Team 5",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ]
+    },
+    {
+      "name": "no players",
+      "players": [],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 1,
+      "mixed": false,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ]
+    },
+    {
+      "name": "no teams",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3",
+          "skill": 5,
+          "gender": null
+        }
+      ],
+      "teams": [],
+      "seed": 1,
+      "mixed": false,
+      "expected": []
+    },
+    {
+      "name": "a player listed twice counts once",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1",
+          "skill": 1,
+          "gender": null
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4",
+          "skill": 2,
+          "gender": null
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5",
+          "skill": 4,
+          "gender": null
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2",
+          "skill": 3,
+          "gender": null
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 2,
+      "mixed": false,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u03",
+          "playerIds": [
+            "u03",
+            "u02",
+            "u04"
+          ],
+          "playerNames": {
+            "u03": "Player 3",
+            "u02": "Player 2",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u05",
+            "u01"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u05": "Player 5",
+            "u01": "Player 1"
+          }
+        }
+      ]
+    }
+  ]
+}

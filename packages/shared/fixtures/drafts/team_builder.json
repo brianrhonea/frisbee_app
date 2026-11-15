@@ -1,0 +1,1104 @@
+{
+  "about": "dealPlayers with SeededRandom(seed); blankTeams(count, existing); movePlayer(teams, player, teamId).",
+  "cases": [
+    {
+      "kind": "dealPlayers",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0"
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1"
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2"
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3"
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4"
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5"
+        },
+        {
+          "uid": "u06",
+          "name": "Player 6"
+        },
+        {
+          "uid": "u07",
+          "name": "Player 7"
+        },
+        {
+          "uid": "u08",
+          "name": "Player 8"
+        },
+        {
+          "uid": "u09",
+          "name": "Player 9"
+        },
+        {
+          "uid": "u10",
+          "name": "Player 10"
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 21,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "dealPlayers",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0"
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1"
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2"
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3"
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team4",
+          "name": "Team 4",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 99,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00"
+          ],
+          "playerNames": {
+            "u00": "Player 0"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u03",
+          "playerIds": [
+            "u03"
+          ],
+          "playerNames": {
+            "u03": "Player 3"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u02",
+          "playerIds": [
+            "u02"
+          ],
+          "playerNames": {
+            "u02": "Player 2"
+          }
+        },
+        {
+          "id": "team4",
+          "name": "Team 4",
+          "captainId": "u01",
+          "playerIds": [
+            "u01"
+          ],
+          "playerNames": {
+            "u01": "Player 1"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "dealPlayers",
+      "players": [
+        {
+          "uid": "u00",
+          "name": "Player 0"
+        },
+        {
+          "uid": "u01",
+          "name": "Player 1"
+        },
+        {
+          "uid": "u02",
+          "name": "Player 2"
+        },
+        {
+          "uid": "u03",
+          "name": "Player 3"
+        },
+        {
+          "uid": "u04",
+          "name": "Player 4"
+        },
+        {
+          "uid": "u05",
+          "name": "Player 5"
+        },
+        {
+          "uid": "u06",
+          "name": "Player 6"
+        },
+        {
+          "uid": "u07",
+          "name": "Player 7"
+        },
+        {
+          "uid": "u08",
+          "name": "Player 8"
+        },
+        {
+          "uid": "u09",
+          "name": "Player 9"
+        },
+        {
+          "uid": "u10",
+          "name": "Player 10"
+        }
+      ],
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "seed": 0,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u09",
+          "playerIds": [
+            "u09",
+            "u07",
+            "u05",
+            "u03",
+            "u10",
+            "u02"
+          ],
+          "playerNames": {
+            "u09": "Player 9",
+            "u07": "Player 7",
+            "u05": "Player 5",
+            "u03": "Player 3",
+            "u10": "Player 10",
+            "u02": "Player 2"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u04",
+          "playerIds": [
+            "u04",
+            "u08",
+            "u06",
+            "u01",
+            "u00"
+          ],
+          "playerNames": {
+            "u04": "Player 4",
+            "u08": "Player 8",
+            "u06": "Player 6",
+            "u01": "Player 1",
+            "u00": "Player 0"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "blankTeams",
+      "count": 3,
+      "existing": [],
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ]
+    },
+    {
+      "kind": "blankTeams",
+      "count": 2,
+      "existing": [
+        {
+          "id": "red",
+          "name": "Red",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "blue",
+          "name": "Blue",
+          "captainId": "old",
+          "playerIds": [
+            "old"
+          ],
+          "playerNames": {
+            "old": "Old Player"
+          }
+        },
+        {
+          "id": "green",
+          "name": "Green",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "expected": [
+        {
+          "id": "team4",
+          "name": "Team 4",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team5",
+          "name": "Team 5",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ]
+    },
+    {
+      "kind": "blankTeams",
+      "count": 2,
+      "existing": [
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team4",
+          "name": "Team 4",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ],
+      "expected": [
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        },
+        {
+          "id": "team5",
+          "name": "Team 5",
+          "captainId": null,
+          "playerIds": [],
+          "playerNames": {}
+        }
+      ]
+    },
+    {
+      "kind": "movePlayer",
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ],
+      "player": {
+        "uid": "u00",
+        "name": "Player 0"
+      },
+      "teamId": "team2",
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u01",
+          "playerIds": [
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04",
+            "u00"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4",
+            "u00": "Player 0"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "movePlayer",
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ],
+      "player": {
+        "uid": "u01",
+        "name": "Player 1"
+      },
+      "teamId": "team1",
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "movePlayer",
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ],
+      "player": {
+        "uid": "u00",
+        "name": "Player 0"
+      },
+      "teamId": null,
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u01",
+          "playerIds": [
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "movePlayer",
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ],
+      "player": {
+        "uid": "u03",
+        "name": "Player 3"
+      },
+      "teamId": "team3",
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02",
+            "u03"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2",
+            "u03": "Player 3"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "movePlayer",
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ],
+      "player": {
+        "uid": "new",
+        "name": "New Player"
+      },
+      "teamId": "team1",
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10",
+            "new"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10",
+            "new": "New Player"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "movePlayer",
+      "teams": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05",
+            "u02"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5",
+            "u02": "Player 2"
+          }
+        }
+      ],
+      "player": {
+        "uid": "u02",
+        "name": "Player 2"
+      },
+      "teamId": "nowhere",
+      "expected": [
+        {
+          "id": "team1",
+          "name": "Team 1",
+          "captainId": "u00",
+          "playerIds": [
+            "u00",
+            "u01",
+            "u07",
+            "u10"
+          ],
+          "playerNames": {
+            "u00": "Player 0",
+            "u01": "Player 1",
+            "u07": "Player 7",
+            "u10": "Player 10"
+          }
+        },
+        {
+          "id": "team2",
+          "name": "Team 2",
+          "captainId": "u08",
+          "playerIds": [
+            "u08",
+            "u09",
+            "u03",
+            "u04"
+          ],
+          "playerNames": {
+            "u08": "Player 8",
+            "u09": "Player 9",
+            "u03": "Player 3",
+            "u04": "Player 4"
+          }
+        },
+        {
+          "id": "team3",
+          "name": "Team 3",
+          "captainId": "u06",
+          "playerIds": [
+            "u06",
+            "u05"
+          ],
+          "playerNames": {
+            "u06": "Player 6",
+            "u05": "Player 5"
+          }
+        }
+      ]
+    }
+  ]
+}

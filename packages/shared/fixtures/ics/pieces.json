@@ -1,0 +1,95 @@
+{
+  "about": "Ics.text, Ics.date, Ics.fold and Ics.fileName.",
+  "cases": [
+    {
+      "kind": "text",
+      "input": "a\\b;c,d",
+      "output": "a\\\\b\\;c\\,d"
+    },
+    {
+      "kind": "text",
+      "input": "line\nbreak\r\nand\rreturn",
+      "output": "line\\nbreak\\nand\\nreturn"
+    },
+    {
+      "kind": "text",
+      "input": "plain",
+      "output": "plain"
+    },
+    {
+      "kind": "text",
+      "input": "",
+      "output": ""
+    },
+    {
+      "kind": "date",
+      "input": "2026-11-15T11:00:00.000-06:00",
+      "output": "20261115T170000Z"
+    },
+    {
+      "kind": "date",
+      "input": "2026-01-01T00:00:00.000Z",
+      "output": "20260101T000000Z"
+    },
+    {
+      "kind": "date",
+      "input": "2026-12-31T23:59:59.000Z",
+      "output": "20261231T235959Z"
+    },
+    {
+      "kind": "fold",
+      "input": "SHORT:x",
+      "output": "SHORT:x"
+    },
+    {
+      "kind": "fold",
+      "input": "X:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "output": "X:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "kind": "fold",
+      "input": "X:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "output": "X:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n a"
+    },
+    {
+      "kind": "fold",
+      "input": "SUMMARY:éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "output": "SUMMARY:ééééééééééééééééééééééééééééééééé\r\n ééééééééééééééééééééééééééé"
+    },
+    {
+      "kind": "fold",
+      "input": "SUMMARY:🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏",
+      "output": "SUMMARY:🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏\r\n 🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏🥏"
+    },
+    {
+      "kind": "fold",
+      "input": "D:abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab",
+      "output": "D:ababababababababababababababababababababababababababababababababababababa\r\n bababababababababababababababababababababababababababababababababababababa\r\n babababababababababababababababababababababababababab"
+    },
+    {
+      "kind": "fileName",
+      "input": "Track session",
+      "output": "Track session.ics"
+    },
+    {
+      "kind": "fileName",
+      "input": "  Hat: finals!! (day 2) ",
+      "output": "Hat finals day 2.ics"
+    },
+    {
+      "kind": "fileName",
+      "input": "???",
+      "output": "event.ics"
+    },
+    {
+      "kind": "fileName",
+      "input": "Ünïcödé names_and-dashes",
+      "output": "ncd names_and-dashes.ics"
+    },
+    {
+      "kind": "fileName",
+      "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "output": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.ics"
+    }
+  ]
+}

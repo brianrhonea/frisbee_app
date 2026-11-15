@@ -1,0 +1,2241 @@
+{
+  "about": "DiscordImport.of(plan, team, folders, rooms) with new ids n1, n2, ... (planImport in discord.ts). Teams are as ImportTeam takes them.",
+  "cases": [
+    {
+      "name": "a team with nothing yet",
+      "plan": {
+        "serverName": "Rockets Ultimate",
+        "roles": [
+          {
+            "key": "4",
+            "name": "Admin",
+            "color": 4293348412,
+            "position": 0,
+            "perms": [
+              "manageTeam",
+              "manageMembers",
+              "manageChats",
+              "manageEvents",
+              "moderate"
+            ]
+          },
+          {
+            "key": "3",
+            "name": "Captains",
+            "color": 4281637083,
+            "position": 1,
+            "perms": [
+              "manageMembers",
+              "manageChats",
+              "manageEvents"
+            ]
+          },
+          {
+            "key": "2",
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 2,
+            "perms": [
+              "moderate"
+            ]
+          },
+          {
+            "key": "1",
+            "name": "Handlers",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        ],
+        "folders": [
+          {
+            "key": "10",
+            "name": "Info",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "key": "20",
+            "name": "Team",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "announcements",
+            "folderKey": "10",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "name": "general",
+            "folderKey": "20",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "rules",
+            "folderKey": "10",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4"
+            ]
+          },
+          {
+            "name": "handlers-only",
+            "folderKey": "20",
+            "position": 1,
+            "readRoles": [
+              "4",
+              "1"
+            ],
+            "writeRoles": [
+              "4",
+              "1"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderKey": "20",
+            "position": 2,
+            "readRoles": [
+              "4",
+              "3"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "name": "off-topic",
+            "folderKey": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "drills",
+            "folderKey": "20",
+            "position": 3,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Practice voice",
+            "reason": "Voice channel"
+          }
+        ],
+        "skippedRoles": []
+      },
+      "team": {},
+      "folders": [],
+      "rooms": [],
+      "expected": {
+        "roleIdsByKey": {
+          "4": "n1",
+          "3": "n2",
+          "2": "n3",
+          "1": "n4"
+        },
+        "roles": {
+          "n1": {
+            "name": "Admin",
+            "color": 4293348412,
+            "position": 0,
+            "perms": [
+              "manageTeam",
+              "manageMembers",
+              "manageChats",
+              "manageEvents",
+              "moderate"
+            ]
+          },
+          "n2": {
+            "name": "Captains",
+            "color": 4281637083,
+            "position": 1,
+            "perms": [
+              "manageMembers",
+              "manageChats",
+              "manageEvents"
+            ]
+          },
+          "n3": {
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 2,
+            "perms": [
+              "moderate"
+            ]
+          },
+          "n4": {
+            "name": "Handlers",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        },
+        "newRoles": [
+          "Admin",
+          "Captains",
+          "Moderator",
+          "Handlers"
+        ],
+        "folders": [
+          {
+            "id": "n5",
+            "name": "Info",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "n1",
+              "n2"
+            ]
+          },
+          {
+            "id": "n6",
+            "name": "Team",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "announcements",
+            "folderId": "n5",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "n1",
+              "n2"
+            ]
+          },
+          {
+            "name": "general",
+            "folderId": "n6",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "rules",
+            "folderId": "n5",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "n1"
+            ]
+          },
+          {
+            "name": "handlers-only",
+            "folderId": "n6",
+            "position": 1,
+            "readRoles": [
+              "n1",
+              "n4"
+            ],
+            "writeRoles": [
+              "n1",
+              "n4"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderId": "n6",
+            "position": 2,
+            "readRoles": [
+              "n1",
+              "n2"
+            ],
+            "writeRoles": [
+              "n1",
+              "n2"
+            ]
+          },
+          {
+            "name": "off-topic",
+            "folderId": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "drills",
+            "folderId": "n6",
+            "position": 3,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "alreadyHere": [],
+        "tooManyRoles": [],
+        "isEmpty": false
+      }
+    },
+    {
+      "name": "the same template again adds nothing",
+      "plan": {
+        "serverName": "Rockets Ultimate",
+        "roles": [
+          {
+            "key": "4",
+            "name": "Admin",
+            "color": 4293348412,
+            "position": 0,
+            "perms": [
+              "manageTeam",
+              "manageMembers",
+              "manageChats",
+              "manageEvents",
+              "moderate"
+            ]
+          },
+          {
+            "key": "3",
+            "name": "Captains",
+            "color": 4281637083,
+            "position": 1,
+            "perms": [
+              "manageMembers",
+              "manageChats",
+              "manageEvents"
+            ]
+          },
+          {
+            "key": "2",
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 2,
+            "perms": [
+              "moderate"
+            ]
+          },
+          {
+            "key": "1",
+            "name": "Handlers",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        ],
+        "folders": [
+          {
+            "key": "10",
+            "name": "Info",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "key": "20",
+            "name": "Team",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "announcements",
+            "folderKey": "10",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "name": "general",
+            "folderKey": "20",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "rules",
+            "folderKey": "10",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4"
+            ]
+          },
+          {
+            "name": "handlers-only",
+            "folderKey": "20",
+            "position": 1,
+            "readRoles": [
+              "4",
+              "1"
+            ],
+            "writeRoles": [
+              "4",
+              "1"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderKey": "20",
+            "position": 2,
+            "readRoles": [
+              "4",
+              "3"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "name": "off-topic",
+            "folderKey": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "drills",
+            "folderKey": "20",
+            "position": 3,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Practice voice",
+            "reason": "Voice channel"
+          }
+        ],
+        "skippedRoles": []
+      },
+      "team": {
+        "roles": {
+          "n1": {
+            "name": "Admin",
+            "color": 4293348412,
+            "position": 0,
+            "perms": [
+              "manageTeam",
+              "manageMembers",
+              "manageChats",
+              "manageEvents",
+              "moderate"
+            ]
+          },
+          "n2": {
+            "name": "Captains",
+            "color": 4281637083,
+            "position": 1,
+            "perms": [
+              "manageMembers",
+              "manageChats",
+              "manageEvents"
+            ]
+          },
+          "n3": {
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 2,
+            "perms": [
+              "moderate"
+            ]
+          },
+          "n4": {
+            "name": "Handlers",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        }
+      },
+      "folders": [
+        {
+          "id": "n5",
+          "name": "Info",
+          "position": 0
+        },
+        {
+          "id": "n6",
+          "name": "Team",
+          "position": 1
+        }
+      ],
+      "rooms": [
+        {
+          "id": "room0",
+          "name": "announcements",
+          "folderId": "n5",
+          "position": 0
+        },
+        {
+          "id": "room1",
+          "name": "general",
+          "folderId": "n6",
+          "position": 0
+        },
+        {
+          "id": "room2",
+          "name": "rules",
+          "folderId": "n5",
+          "position": 1
+        },
+        {
+          "id": "room3",
+          "name": "handlers-only",
+          "folderId": "n6",
+          "position": 1
+        },
+        {
+          "id": "room4",
+          "name": "captains",
+          "folderId": "n6",
+          "position": 2
+        },
+        {
+          "id": "room5",
+          "name": "off-topic",
+          "folderId": null,
+          "position": 0
+        },
+        {
+          "id": "room6",
+          "name": "drills",
+          "folderId": "n6",
+          "position": 3
+        }
+      ],
+      "expected": {
+        "roleIdsByKey": {
+          "4": "n1",
+          "3": "n2",
+          "2": "n3",
+          "1": "n4"
+        },
+        "roles": {
+          "n1": {
+            "name": "Admin",
+            "color": 4293348412,
+            "position": 0,
+            "perms": [
+              "manageTeam",
+              "manageMembers",
+              "manageChats",
+              "manageEvents",
+              "moderate"
+            ]
+          },
+          "n2": {
+            "name": "Captains",
+            "color": 4281637083,
+            "position": 1,
+            "perms": [
+              "manageMembers",
+              "manageChats",
+              "manageEvents"
+            ]
+          },
+          "n3": {
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 2,
+            "perms": [
+              "moderate"
+            ]
+          },
+          "n4": {
+            "name": "Handlers",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        },
+        "newRoles": [],
+        "folders": [],
+        "rooms": [],
+        "alreadyHere": [
+          "announcements",
+          "general",
+          "rules",
+          "handlers-only",
+          "captains",
+          "off-topic",
+          "drills"
+        ],
+        "tooManyRoles": [],
+        "isEmpty": true
+      }
+    },
+    {
+      "name": "roles and folders reused by name, rooms added after the ones there",
+      "plan": {
+        "serverName": "Rockets Ultimate",
+        "roles": [
+          {
+            "key": "4",
+            "name": "Admin",
+            "color": 4293348412,
+            "position": 0,
+            "perms": [
+              "manageTeam",
+              "manageMembers",
+              "manageChats",
+              "manageEvents",
+              "moderate"
+            ]
+          },
+          {
+            "key": "3",
+            "name": "Captains",
+            "color": 4281637083,
+            "position": 1,
+            "perms": [
+              "manageMembers",
+              "manageChats",
+              "manageEvents"
+            ]
+          },
+          {
+            "key": "2",
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 2,
+            "perms": [
+              "moderate"
+            ]
+          },
+          {
+            "key": "1",
+            "name": "Handlers",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        ],
+        "folders": [
+          {
+            "key": "10",
+            "name": "Info",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "key": "20",
+            "name": "Team",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "announcements",
+            "folderKey": "10",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "name": "general",
+            "folderKey": "20",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "rules",
+            "folderKey": "10",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4"
+            ]
+          },
+          {
+            "name": "handlers-only",
+            "folderKey": "20",
+            "position": 1,
+            "readRoles": [
+              "4",
+              "1"
+            ],
+            "writeRoles": [
+              "4",
+              "1"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderKey": "20",
+            "position": 2,
+            "readRoles": [
+              "4",
+              "3"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "name": "off-topic",
+            "folderKey": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "drills",
+            "folderKey": "20",
+            "position": 3,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Practice voice",
+            "reason": "Voice channel"
+          }
+        ],
+        "skippedRoles": []
+      },
+      "team": {
+        "roles": {
+          "mine": {
+            "name": "ADMIN",
+            "color": 0,
+            "position": 4,
+            "perms": [
+              "moderate"
+            ]
+          },
+          "x": {
+            "name": "Coaches",
+            "color": 0,
+            "position": 9,
+            "perms": []
+          }
+        }
+      },
+      "folders": [
+        {
+          "id": "fInfo",
+          "name": " info ",
+          "position": 3
+        },
+        {
+          "id": "fOther",
+          "name": "Other",
+          "position": 7
+        }
+      ],
+      "rooms": [
+        {
+          "id": "r1",
+          "name": "Announcements",
+          "folderId": "fInfo",
+          "position": 2
+        },
+        {
+          "id": "r2",
+          "name": "random",
+          "folderId": null,
+          "position": 4
+        },
+        {
+          "id": "r3",
+          "name": "off-topic",
+          "folderId": "fOther",
+          "position": 0
+        }
+      ],
+      "expected": {
+        "roleIdsByKey": {
+          "4": "mine",
+          "3": "n1",
+          "2": "n2",
+          "1": "n3"
+        },
+        "roles": {
+          "mine": {
+            "name": "ADMIN",
+            "color": 0,
+            "position": 4,
+            "perms": [
+              "moderate"
+            ]
+          },
+          "x": {
+            "name": "Coaches",
+            "color": 0,
+            "position": 9,
+            "perms": []
+          },
+          "n1": {
+            "name": "Captains",
+            "color": 4281637083,
+            "position": 10,
+            "perms": [
+              "manageMembers",
+              "manageChats",
+              "manageEvents"
+            ]
+          },
+          "n2": {
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 11,
+            "perms": [
+              "moderate"
+            ]
+          },
+          "n3": {
+            "name": "Handlers",
+            "color": 0,
+            "position": 12,
+            "perms": []
+          }
+        },
+        "newRoles": [
+          "Captains",
+          "Moderator",
+          "Handlers"
+        ],
+        "folders": [
+          {
+            "id": "n4",
+            "name": "Team",
+            "position": 8,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "general",
+            "folderId": "n4",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "rules",
+            "folderId": "fInfo",
+            "position": 3,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "mine"
+            ]
+          },
+          {
+            "name": "handlers-only",
+            "folderId": "n4",
+            "position": 1,
+            "readRoles": [
+              "mine",
+              "n3"
+            ],
+            "writeRoles": [
+              "mine",
+              "n3"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderId": "n4",
+            "position": 2,
+            "readRoles": [
+              "mine",
+              "n1"
+            ],
+            "writeRoles": [
+              "mine",
+              "n1"
+            ]
+          },
+          {
+            "name": "off-topic",
+            "folderId": null,
+            "position": 5,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "drills",
+            "folderId": "n4",
+            "position": 3,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "alreadyHere": [
+          "announcements"
+        ],
+        "tooManyRoles": [],
+        "isEmpty": false
+      }
+    },
+    {
+      "name": "the role limit leaves roles out",
+      "plan": {
+        "serverName": "Rockets Ultimate",
+        "roles": [
+          {
+            "key": "4",
+            "name": "Admin",
+            "color": 4293348412,
+            "position": 0,
+            "perms": [
+              "manageTeam",
+              "manageMembers",
+              "manageChats",
+              "manageEvents",
+              "moderate"
+            ]
+          },
+          {
+            "key": "3",
+            "name": "Captains",
+            "color": 4281637083,
+            "position": 1,
+            "perms": [
+              "manageMembers",
+              "manageChats",
+              "manageEvents"
+            ]
+          },
+          {
+            "key": "2",
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 2,
+            "perms": [
+              "moderate"
+            ]
+          },
+          {
+            "key": "1",
+            "name": "Handlers",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        ],
+        "folders": [
+          {
+            "key": "10",
+            "name": "Info",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "key": "20",
+            "name": "Team",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "announcements",
+            "folderKey": "10",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "name": "general",
+            "folderKey": "20",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "rules",
+            "folderKey": "10",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4"
+            ]
+          },
+          {
+            "name": "handlers-only",
+            "folderKey": "20",
+            "position": 1,
+            "readRoles": [
+              "4",
+              "1"
+            ],
+            "writeRoles": [
+              "4",
+              "1"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderKey": "20",
+            "position": 2,
+            "readRoles": [
+              "4",
+              "3"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "name": "off-topic",
+            "folderKey": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "drills",
+            "folderKey": "20",
+            "position": 3,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Practice voice",
+            "reason": "Voice channel"
+          }
+        ],
+        "skippedRoles": []
+      },
+      "team": {
+        "roles": {
+          "old0": {
+            "name": "Old 0",
+            "color": 0,
+            "position": 0,
+            "perms": []
+          },
+          "old1": {
+            "name": "Old 1",
+            "color": 0,
+            "position": 1,
+            "perms": []
+          },
+          "old2": {
+            "name": "Old 2",
+            "color": 0,
+            "position": 2,
+            "perms": []
+          },
+          "old3": {
+            "name": "Old 3",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          },
+          "old4": {
+            "name": "Old 4",
+            "color": 0,
+            "position": 4,
+            "perms": []
+          },
+          "old5": {
+            "name": "  CAPTAINS ",
+            "color": 0,
+            "position": 5,
+            "perms": []
+          },
+          "old6": {
+            "name": "Old 6",
+            "color": 0,
+            "position": 6,
+            "perms": []
+          },
+          "old7": {
+            "name": "Old 7",
+            "color": 0,
+            "position": 7,
+            "perms": []
+          },
+          "old8": {
+            "name": "Old 8",
+            "color": 0,
+            "position": 8,
+            "perms": []
+          },
+          "old9": {
+            "name": "Old 9",
+            "color": 0,
+            "position": 9,
+            "perms": []
+          },
+          "old10": {
+            "name": "Old 10",
+            "color": 0,
+            "position": 10,
+            "perms": []
+          },
+          "old11": {
+            "name": "Old 11",
+            "color": 0,
+            "position": 11,
+            "perms": []
+          },
+          "old12": {
+            "name": "Old 12",
+            "color": 0,
+            "position": 12,
+            "perms": []
+          },
+          "old13": {
+            "name": "Old 13",
+            "color": 0,
+            "position": 13,
+            "perms": []
+          },
+          "old14": {
+            "name": "Old 14",
+            "color": 0,
+            "position": 14,
+            "perms": []
+          },
+          "old15": {
+            "name": "Old 15",
+            "color": 0,
+            "position": 15,
+            "perms": []
+          },
+          "old16": {
+            "name": "Old 16",
+            "color": 0,
+            "position": 16,
+            "perms": []
+          },
+          "old17": {
+            "name": "Old 17",
+            "color": 0,
+            "position": 17,
+            "perms": []
+          },
+          "old18": {
+            "name": "Old 18",
+            "color": 0,
+            "position": 18,
+            "perms": []
+          },
+          "old19": {
+            "name": "Old 19",
+            "color": 0,
+            "position": 19,
+            "perms": []
+          },
+          "old20": {
+            "name": "Old 20",
+            "color": 0,
+            "position": 20,
+            "perms": []
+          },
+          "old21": {
+            "name": "Old 21",
+            "color": 0,
+            "position": 21,
+            "perms": []
+          },
+          "old22": {
+            "name": "Old 22",
+            "color": 0,
+            "position": 22,
+            "perms": []
+          },
+          "old23": {
+            "name": "Old 23",
+            "color": 0,
+            "position": 23,
+            "perms": []
+          },
+          "old24": {
+            "name": "Old 24",
+            "color": 0,
+            "position": 24,
+            "perms": []
+          },
+          "old25": {
+            "name": "Old 25",
+            "color": 0,
+            "position": 25,
+            "perms": []
+          },
+          "old26": {
+            "name": "Old 26",
+            "color": 0,
+            "position": 26,
+            "perms": []
+          },
+          "old27": {
+            "name": "Old 27",
+            "color": 0,
+            "position": 27,
+            "perms": []
+          },
+          "old28": {
+            "name": "Old 28",
+            "color": 0,
+            "position": 28,
+            "perms": []
+          },
+          "old29": {
+            "name": "Old 29",
+            "color": 0,
+            "position": 29,
+            "perms": []
+          },
+          "old30": {
+            "name": "Old 30",
+            "color": 0,
+            "position": 30,
+            "perms": []
+          },
+          "old31": {
+            "name": "Old 31",
+            "color": 0,
+            "position": 31,
+            "perms": []
+          },
+          "old32": {
+            "name": "Old 32",
+            "color": 0,
+            "position": 32,
+            "perms": []
+          },
+          "old33": {
+            "name": "Old 33",
+            "color": 0,
+            "position": 33,
+            "perms": []
+          },
+          "old34": {
+            "name": "Old 34",
+            "color": 0,
+            "position": 34,
+            "perms": []
+          },
+          "old35": {
+            "name": "Old 35",
+            "color": 0,
+            "position": 35,
+            "perms": []
+          },
+          "old36": {
+            "name": "Old 36",
+            "color": 0,
+            "position": 36,
+            "perms": []
+          },
+          "old37": {
+            "name": "Old 37",
+            "color": 0,
+            "position": 37,
+            "perms": []
+          },
+          "old38": {
+            "name": "Old 38",
+            "color": 0,
+            "position": 38,
+            "perms": []
+          },
+          "old39": {
+            "name": "Old 39",
+            "color": 0,
+            "position": 39,
+            "perms": []
+          },
+          "old40": {
+            "name": "Old 40",
+            "color": 0,
+            "position": 40,
+            "perms": []
+          },
+          "old41": {
+            "name": "Old 41",
+            "color": 0,
+            "position": 41,
+            "perms": []
+          },
+          "old42": {
+            "name": "Old 42",
+            "color": 0,
+            "position": 42,
+            "perms": []
+          },
+          "old43": {
+            "name": "Old 43",
+            "color": 0,
+            "position": 43,
+            "perms": []
+          },
+          "old44": {
+            "name": "Old 44",
+            "color": 0,
+            "position": 44,
+            "perms": []
+          },
+          "old45": {
+            "name": "Old 45",
+            "color": 0,
+            "position": 45,
+            "perms": []
+          },
+          "old46": {
+            "name": "Old 46",
+            "color": 0,
+            "position": 46,
+            "perms": []
+          },
+          "old47": {
+            "name": "Old 47",
+            "color": 0,
+            "position": 47,
+            "perms": []
+          }
+        }
+      },
+      "folders": [],
+      "rooms": [],
+      "expected": {
+        "roleIdsByKey": {
+          "4": "n1",
+          "3": "old5",
+          "2": "n2"
+        },
+        "roles": {
+          "old0": {
+            "name": "Old 0",
+            "color": 0,
+            "position": 0,
+            "perms": []
+          },
+          "old1": {
+            "name": "Old 1",
+            "color": 0,
+            "position": 1,
+            "perms": []
+          },
+          "old2": {
+            "name": "Old 2",
+            "color": 0,
+            "position": 2,
+            "perms": []
+          },
+          "old3": {
+            "name": "Old 3",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          },
+          "old4": {
+            "name": "Old 4",
+            "color": 0,
+            "position": 4,
+            "perms": []
+          },
+          "old5": {
+            "name": "CAPTAINS",
+            "color": 0,
+            "position": 5,
+            "perms": []
+          },
+          "old6": {
+            "name": "Old 6",
+            "color": 0,
+            "position": 6,
+            "perms": []
+          },
+          "old7": {
+            "name": "Old 7",
+            "color": 0,
+            "position": 7,
+            "perms": []
+          },
+          "old8": {
+            "name": "Old 8",
+            "color": 0,
+            "position": 8,
+            "perms": []
+          },
+          "old9": {
+            "name": "Old 9",
+            "color": 0,
+            "position": 9,
+            "perms": []
+          },
+          "old10": {
+            "name": "Old 10",
+            "color": 0,
+            "position": 10,
+            "perms": []
+          },
+          "old11": {
+            "name": "Old 11",
+            "color": 0,
+            "position": 11,
+            "perms": []
+          },
+          "old12": {
+            "name": "Old 12",
+            "color": 0,
+            "position": 12,
+            "perms": []
+          },
+          "old13": {
+            "name": "Old 13",
+            "color": 0,
+            "position": 13,
+            "perms": []
+          },
+          "old14": {
+            "name": "Old 14",
+            "color": 0,
+            "position": 14,
+            "perms": []
+          },
+          "old15": {
+            "name": "Old 15",
+            "color": 0,
+            "position": 15,
+            "perms": []
+          },
+          "old16": {
+            "name": "Old 16",
+            "color": 0,
+            "position": 16,
+            "perms": []
+          },
+          "old17": {
+            "name": "Old 17",
+            "color": 0,
+            "position": 17,
+            "perms": []
+          },
+          "old18": {
+            "name": "Old 18",
+            "color": 0,
+            "position": 18,
+            "perms": []
+          },
+          "old19": {
+            "name": "Old 19",
+            "color": 0,
+            "position": 19,
+            "perms": []
+          },
+          "old20": {
+            "name": "Old 20",
+            "color": 0,
+            "position": 20,
+            "perms": []
+          },
+          "old21": {
+            "name": "Old 21",
+            "color": 0,
+            "position": 21,
+            "perms": []
+          },
+          "old22": {
+            "name": "Old 22",
+            "color": 0,
+            "position": 22,
+            "perms": []
+          },
+          "old23": {
+            "name": "Old 23",
+            "color": 0,
+            "position": 23,
+            "perms": []
+          },
+          "old24": {
+            "name": "Old 24",
+            "color": 0,
+            "position": 24,
+            "perms": []
+          },
+          "old25": {
+            "name": "Old 25",
+            "color": 0,
+            "position": 25,
+            "perms": []
+          },
+          "old26": {
+            "name": "Old 26",
+            "color": 0,
+            "position": 26,
+            "perms": []
+          },
+          "old27": {
+            "name": "Old 27",
+            "color": 0,
+            "position": 27,
+            "perms": []
+          },
+          "old28": {
+            "name": "Old 28",
+            "color": 0,
+            "position": 28,
+            "perms": []
+          },
+          "old29": {
+            "name": "Old 29",
+            "color": 0,
+            "position": 29,
+            "perms": []
+          },
+          "old30": {
+            "name": "Old 30",
+            "color": 0,
+            "position": 30,
+            "perms": []
+          },
+          "old31": {
+            "name": "Old 31",
+            "color": 0,
+            "position": 31,
+            "perms": []
+          },
+          "old32": {
+            "name": "Old 32",
+            "color": 0,
+            "position": 32,
+            "perms": []
+          },
+          "old33": {
+            "name": "Old 33",
+            "color": 0,
+            "position": 33,
+            "perms": []
+          },
+          "old34": {
+            "name": "Old 34",
+            "color": 0,
+            "position": 34,
+            "perms": []
+          },
+          "old35": {
+            "name": "Old 35",
+            "color": 0,
+            "position": 35,
+            "perms": []
+          },
+          "old36": {
+            "name": "Old 36",
+            "color": 0,
+            "position": 36,
+            "perms": []
+          },
+          "old37": {
+            "name": "Old 37",
+            "color": 0,
+            "position": 37,
+            "perms": []
+          },
+          "old38": {
+            "name": "Old 38",
+            "color": 0,
+            "position": 38,
+            "perms": []
+          },
+          "old39": {
+            "name": "Old 39",
+            "color": 0,
+            "position": 39,
+            "perms": []
+          },
+          "old40": {
+            "name": "Old 40",
+            "color": 0,
+            "position": 40,
+            "perms": []
+          },
+          "old41": {
+            "name": "Old 41",
+            "color": 0,
+            "position": 41,
+            "perms": []
+          },
+          "old42": {
+            "name": "Old 42",
+            "color": 0,
+            "position": 42,
+            "perms": []
+          },
+          "old43": {
+            "name": "Old 43",
+            "color": 0,
+            "position": 43,
+            "perms": []
+          },
+          "old44": {
+            "name": "Old 44",
+            "color": 0,
+            "position": 44,
+            "perms": []
+          },
+          "old45": {
+            "name": "Old 45",
+            "color": 0,
+            "position": 45,
+            "perms": []
+          },
+          "old46": {
+            "name": "Old 46",
+            "color": 0,
+            "position": 46,
+            "perms": []
+          },
+          "old47": {
+            "name": "Old 47",
+            "color": 0,
+            "position": 47,
+            "perms": []
+          },
+          "n1": {
+            "name": "Admin",
+            "color": 4293348412,
+            "position": 48,
+            "perms": [
+              "manageTeam",
+              "manageMembers",
+              "manageChats",
+              "manageEvents",
+              "moderate"
+            ]
+          },
+          "n2": {
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 49,
+            "perms": [
+              "moderate"
+            ]
+          }
+        },
+        "newRoles": [
+          "Admin",
+          "Moderator"
+        ],
+        "folders": [
+          {
+            "id": "n3",
+            "name": "Info",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "n1",
+              "old5"
+            ]
+          },
+          {
+            "id": "n4",
+            "name": "Team",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "announcements",
+            "folderId": "n3",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "n1",
+              "old5"
+            ]
+          },
+          {
+            "name": "general",
+            "folderId": "n4",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "rules",
+            "folderId": "n3",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "n1"
+            ]
+          },
+          {
+            "name": "handlers-only",
+            "folderId": "n4",
+            "position": 1,
+            "readRoles": [
+              "n1"
+            ],
+            "writeRoles": [
+              "n1"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderId": "n4",
+            "position": 2,
+            "readRoles": [
+              "n1",
+              "old5"
+            ],
+            "writeRoles": [
+              "n1",
+              "old5"
+            ]
+          },
+          {
+            "name": "off-topic",
+            "folderId": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "drills",
+            "folderId": "n4",
+            "position": 3,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "alreadyHere": [],
+        "tooManyRoles": [
+          "Handlers"
+        ],
+        "isEmpty": false
+      }
+    },
+    {
+      "name": "a plan that already skipped roles",
+      "plan": {
+        "serverName": "Rockets Ultimate",
+        "roles": [
+          {
+            "key": "4",
+            "name": "Admin",
+            "color": 4293348412,
+            "position": 0,
+            "perms": [
+              "manageTeam",
+              "manageMembers",
+              "manageChats",
+              "manageEvents",
+              "moderate"
+            ]
+          },
+          {
+            "key": "3",
+            "name": "Captains",
+            "color": 4281637083,
+            "position": 1,
+            "perms": [
+              "manageMembers",
+              "manageChats",
+              "manageEvents"
+            ]
+          },
+          {
+            "key": "2",
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 2,
+            "perms": [
+              "moderate"
+            ]
+          },
+          {
+            "key": "1",
+            "name": "Handlers",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        ],
+        "folders": [
+          {
+            "key": "10",
+            "name": "Info",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "key": "20",
+            "name": "Team",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "announcements",
+            "folderKey": "10",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "name": "general",
+            "folderKey": "20",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "rules",
+            "folderKey": "10",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "4"
+            ]
+          },
+          {
+            "name": "handlers-only",
+            "folderKey": "20",
+            "position": 1,
+            "readRoles": [
+              "4",
+              "1"
+            ],
+            "writeRoles": [
+              "4",
+              "1"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderKey": "20",
+            "position": 2,
+            "readRoles": [
+              "4",
+              "3"
+            ],
+            "writeRoles": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "name": "off-topic",
+            "folderKey": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "drills",
+            "folderKey": "20",
+            "position": 3,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Practice voice",
+            "reason": "Voice channel"
+          }
+        ],
+        "skippedRoles": [
+          "Bots",
+          "Muted"
+        ]
+      },
+      "team": {},
+      "folders": [],
+      "rooms": [],
+      "expected": {
+        "roleIdsByKey": {
+          "4": "n1",
+          "3": "n2",
+          "2": "n3",
+          "1": "n4"
+        },
+        "roles": {
+          "n1": {
+            "name": "Admin",
+            "color": 4293348412,
+            "position": 0,
+            "perms": [
+              "manageTeam",
+              "manageMembers",
+              "manageChats",
+              "manageEvents",
+              "moderate"
+            ]
+          },
+          "n2": {
+            "name": "Captains",
+            "color": 4281637083,
+            "position": 1,
+            "perms": [
+              "manageMembers",
+              "manageChats",
+              "manageEvents"
+            ]
+          },
+          "n3": {
+            "name": "Moderator",
+            "color": 4288371126,
+            "position": 2,
+            "perms": [
+              "moderate"
+            ]
+          },
+          "n4": {
+            "name": "Handlers",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        },
+        "newRoles": [
+          "Admin",
+          "Captains",
+          "Moderator",
+          "Handlers"
+        ],
+        "folders": [
+          {
+            "id": "n5",
+            "name": "Info",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "n1",
+              "n2"
+            ]
+          },
+          {
+            "id": "n6",
+            "name": "Team",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "announcements",
+            "folderId": "n5",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "n1",
+              "n2"
+            ]
+          },
+          {
+            "name": "general",
+            "folderId": "n6",
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "rules",
+            "folderId": "n5",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "n1"
+            ]
+          },
+          {
+            "name": "handlers-only",
+            "folderId": "n6",
+            "position": 1,
+            "readRoles": [
+              "n1",
+              "n4"
+            ],
+            "writeRoles": [
+              "n1",
+              "n4"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderId": "n6",
+            "position": 2,
+            "readRoles": [
+              "n1",
+              "n2"
+            ],
+            "writeRoles": [
+              "n1",
+              "n2"
+            ]
+          },
+          {
+            "name": "off-topic",
+            "folderId": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "drills",
+            "folderId": "n6",
+            "position": 3,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "alreadyHere": [],
+        "tooManyRoles": [
+          "Bots",
+          "Muted"
+        ],
+        "isEmpty": false
+      }
+    }
+  ]
+}

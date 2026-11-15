@@ -1,0 +1,42 @@
+{
+  "about": "The ScheduleException message for each case.",
+  "cases": [
+    {
+      "name": "one team",
+      "kind": "tournament",
+      "teams": [
+        "t1"
+      ],
+      "error": "A tournament needs at least two teams."
+    },
+    {
+      "name": "league with one team",
+      "kind": "season",
+      "teams": [
+        "t1"
+      ],
+      "season": {
+        "weeks": 4,
+        "playoffWeeks": 1,
+        "playoffTeams": 2
+      },
+      "error": "A league needs at least two teams."
+    },
+    {
+      "name": "league with only playoff weeks",
+      "kind": "season",
+      "teams": [
+        "t1",
+        "t2",
+        "t3",
+        "t4"
+      ],
+      "season": {
+        "weeks": 2,
+        "playoffWeeks": 2,
+        "playoffTeams": 2
+      },
+      "error": "Leave at least one week for the regular season."
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 // Small helpers the schedule and calendar settings share.
-import { type CalendarColor, calendarColorHex, icsCalendar } from "@stall10/shared";
+import { type CalendarColor, calendarColorHex, icsEvent, icsFileName } from "@stall10/shared";
 
 export const colorOf = (c: CalendarColor | undefined) => calendarColorHex[c ?? "green"] ?? calendarColorHex.green;
 
-/** "Add to calendar": one event as an .ics file, which Outlook, Apple and Google Calendar open. */
+/** "Add to calendar": one event as an .ics file, which Outlook, Apple and Google Calendar open (the same file as the app's). */
 export function downloadIcs(e: {
   uid: string;
   title: string;
@@ -12,11 +12,11 @@ export function downloadIcs(e: {
   location?: string;
   description?: string;
 }) {
-  const ics = icsCalendar({ name: e.title, events: [e] });
+  const ics = icsEvent(e);
   const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${e.title.replace(/[^\w -]+/g, "").trim().slice(0, 60) || "event"}.ics`;
+  a.download = icsFileName(e.title);
   document.body.appendChild(a);
   a.click();
   a.remove();

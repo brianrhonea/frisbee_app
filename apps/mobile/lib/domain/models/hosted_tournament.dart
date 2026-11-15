@@ -1029,6 +1029,12 @@ class PlayerSignup {
   static const minSkill = 1;
   static const maxSkill = 5;
 
+  /// Signups by name, ignoring case: the order players are listed and
+  /// drafted in. The website sorts the same way (signupOrder in
+  /// packages/shared/src/drafts.ts), so a seed deals the same teams.
+  static int compareByName(PlayerSignup a, PlayerSignup b) =>
+      a.name.toLowerCase().compareTo(b.name.toLowerCase());
+
   final String uid;
   final String name;
   final String divisionId;

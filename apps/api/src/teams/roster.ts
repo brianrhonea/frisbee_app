@@ -70,7 +70,8 @@ export class RosterService {
       kind,
       players: players
         .map(({ id, data }) => player(id, data, cards))
-        .sort((a, b) => (a.number ?? 1e9) - (b.number ?? 1e9) || a.name.localeCompare(b.name)),
+        // RosterPlayer.compareRoster: by number (none counts as 1000), then name by code units.
+        .sort((a, b) => (a.number ?? 1000) - (b.number ?? 1000) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
       members,
       teams: kind === "team" ? [] : linkedTeams(team.linkedTeams),
     };

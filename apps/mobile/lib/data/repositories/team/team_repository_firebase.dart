@@ -963,10 +963,7 @@ class TeamRepositoryFirebase implements TeamRepository {
   }
 
   static List<RosterPlayer> _sorted(List<RosterPlayer> players) =>
-      players..sort((a, b) {
-        final byNumber = (a.number ?? 1000).compareTo(b.number ?? 1000);
-        return byNumber != 0 ? byNumber : a.name.compareTo(b.name);
-      });
+      players..sort(RosterPlayer.compareRoster);
 
   static Map<String, dynamic>? _legacyStatus(Map<String, dynamic> data) =>
       _legacyStatusKeys.any(data.containsKey)

@@ -8,9 +8,9 @@ import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
 
-/// What `discord-previewTemplate` returns for
-/// functions/test/fixtures/discord_template_synthetic.json (see
-/// functions/test/discord/template.test.ts).
+/// A trimmed copy of what the preview returns for the shared made-up
+/// template (packages/shared/fixtures/discord/template_plan.json, which
+/// test/shared_fixtures/discord_fixtures_test.dart uses in full).
 final planMap = <String, dynamic>{
   'serverName': 'Rockets Ultimate',
   'roles': [

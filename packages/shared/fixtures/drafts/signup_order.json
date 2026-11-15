@@ -1,0 +1,66 @@
+{
+  "about": "PlayerSignup.compareByName (signupOrder): the order players are listed and drafted in.",
+  "cases": [
+    {
+      "signups": [
+        {
+          "uid": "u0",
+          "name": "bob"
+        },
+        {
+          "uid": "u1",
+          "name": "Alice"
+        },
+        {
+          "uid": "u2",
+          "name": "alice b"
+        },
+        {
+          "uid": "u3",
+          "name": "Émile"
+        },
+        {
+          "uid": "u4",
+          "name": "Zoe"
+        },
+        {
+          "uid": "u5",
+          "name": "zed"
+        },
+        {
+          "uid": "u6",
+          "name": "_x"
+        },
+        {
+          "uid": "u7",
+          "name": "Aaron-Lee"
+        },
+        {
+          "uid": "u8",
+          "name": "aaron lee"
+        },
+        {
+          "uid": "u9",
+          "name": "9 Lives"
+        },
+        {
+          "uid": "u10",
+          "name": ""
+        }
+      ],
+      "expected": [
+        "u10",
+        "u9",
+        "u6",
+        "u8",
+        "u7",
+        "u1",
+        "u2",
+        "u0",
+        "u5",
+        "u4",
+        "u3"
+      ]
+    }
+  ]
+}

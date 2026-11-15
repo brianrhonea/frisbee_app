@@ -228,9 +228,12 @@ export function statsPlayerFrom(id: string, raw: unknown, status?: unknown): Sta
   };
 }
 
-/** Roster order: by number, then name (TeamRepositoryFirebase._sorted). */
+/**
+ * Roster order: by number (no number last), then name, comparing code
+ * units as the app does (RosterPlayer.compareRoster), not localeCompare.
+ */
 export function sortPlayers(players: StatsPlayer[]): StatsPlayer[] {
-  return [...players].sort((a, b) => (a.number ?? 1e9) - (b.number ?? 1e9) || a.name.localeCompare(b.name));
+  return [...players].sort((a, b) => (a.number ?? 1000) - (b.number ?? 1000) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
 // ---- Request schemas ------------------------------------------------------------------

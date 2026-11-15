@@ -52,6 +52,14 @@ Plain-language notes for testers are in
 - The native app is unchanged: it already needs a sign-in.
 - Discord import: moving rooms to linked teams never moves the
   community's General room (as on the website).
+- Balanced draft: a seeded mulberry32 shuffle (`SeededRandom`,
+  `shuffleWith`), the website's, so the same seed deals the same teams on
+  both. Existing seeds deal differently than before; teams aren't
+  redealt unless the host deals again.
+- Tests: shared test vectors (`packages/shared/fixtures`, written by
+  `test/shared_fixtures`) check the tournament engine, stats, play
+  animation, drafts, Discord import and calendar files against the
+  website's code.
 
 ## 0.0.22 — An indigo logo
 

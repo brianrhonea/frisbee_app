@@ -207,3 +207,11 @@ cd firebase/functions && npm run test:server   # callables against the emulator
 After changing what a new team starts with or the team-name rules, refresh
 the shared fixtures (`flutter test test/data/shared_fixtures_test.dart
 --dart-define=UPDATE_FIXTURES=true` in `apps/mobile`) and rerun `pnpm test`.
+
+The app also writes cross-language test vectors to
+`packages/shared/fixtures/<area>/` (tournament engine, stats, playbook,
+drafts, Discord, calendar files), which the TypeScript ports are tested
+against. After changing any of that logic on either side, refresh them
+(`flutter test test/shared_fixtures --dart-define=UPDATE_FIXTURES=true` in
+`apps/mobile`), review the diff, and rerun `pnpm test` and the functions
+tests.

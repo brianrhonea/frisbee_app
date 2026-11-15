@@ -1,0 +1,1046 @@
+{
+  "about": "TeamChatImport.of(planFor(team), org, team, roleIds, folders, rooms) with new ids n1, n2, ... (teamChatImport in discord.ts), on the split.json plan as suggested.",
+  "cases": [
+    {
+      "name": "a new team",
+      "plan": {
+        "serverName": "Tech Ultimate",
+        "roles": [
+          {
+            "key": "r1",
+            "name": "Admin",
+            "color": 0,
+            "position": 0,
+            "perms": []
+          },
+          {
+            "key": "r2",
+            "name": "Woof Captain",
+            "color": 0,
+            "position": 1,
+            "perms": []
+          },
+          {
+            "key": "r3",
+            "name": "Woof Player",
+            "color": 0,
+            "position": 2,
+            "perms": []
+          },
+          {
+            "key": "r4",
+            "name": "Whiplash Coach",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        ],
+        "folders": [
+          {
+            "key": "f1",
+            "name": "Woof",
+            "position": 0,
+            "readRoles": [
+              "r1",
+              "r2",
+              "r3"
+            ],
+            "writeRoles": []
+          },
+          {
+            "key": "f2",
+            "name": "Empty",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "general",
+            "folderKey": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "woof-chat",
+            "folderKey": "f1",
+            "position": 1,
+            "readRoles": [
+              "r1",
+              "r2",
+              "r3"
+            ],
+            "writeRoles": [
+              "r2",
+              "r3"
+            ]
+          },
+          {
+            "name": "woof-captains",
+            "folderKey": "f1",
+            "position": 2,
+            "readRoles": [
+              "r1",
+              "r2"
+            ],
+            "writeRoles": [
+              "r2"
+            ]
+          },
+          {
+            "name": "admin",
+            "folderKey": null,
+            "position": 3,
+            "readRoles": [
+              "r1"
+            ],
+            "writeRoles": [
+              "r1"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderKey": null,
+            "position": 4,
+            "readRoles": [
+              "r2",
+              "r4"
+            ],
+            "writeRoles": [
+              "r2",
+              "r4"
+            ]
+          },
+          {
+            "name": "whip",
+            "folderKey": null,
+            "position": 5,
+            "readRoles": [
+              "r4"
+            ],
+            "writeRoles": []
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Voice",
+            "reason": "Voice channel"
+          }
+        ],
+        "skippedRoles": [
+          "Bots"
+        ]
+      },
+      "org": {
+        "roles": {
+          "admin": {
+            "name": "Admin",
+            "color": 0,
+            "position": 0,
+            "perms": [
+              "manageTeam"
+            ]
+          },
+          "woofCap": {
+            "name": "Woof Captain",
+            "color": 0,
+            "position": 1,
+            "perms": [
+              "manageEvents"
+            ]
+          },
+          "woofP": {
+            "name": "Woof Player",
+            "color": 0,
+            "position": 2,
+            "perms": []
+          },
+          "whipC": {
+            "name": "Whiplash Coach",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        },
+        "linkedTeams": {
+          "woof": {
+            "name": "Woof",
+            "roles": [
+              "woofCap",
+              "woofP"
+            ]
+          },
+          "whip": {
+            "name": "Whiplash",
+            "roles": [
+              "whipC"
+            ]
+          }
+        }
+      },
+      "teamId": "woof",
+      "team": {},
+      "roleIds": {
+        "r1": "admin",
+        "r2": "woofCap",
+        "r3": "woofP",
+        "r4": "whipC"
+      },
+      "folders": [],
+      "rooms": [],
+      "expected": {
+        "import": {
+          "roleIdsByKey": {
+            "woofCap": "n1",
+            "woofP": "n2"
+          },
+          "roles": {
+            "n1": {
+              "name": "Woof Captain",
+              "color": 0,
+              "position": 0,
+              "perms": [
+                "manageEvents"
+              ]
+            },
+            "n2": {
+              "name": "Woof Player",
+              "color": 0,
+              "position": 1,
+              "perms": []
+            }
+          },
+          "newRoles": [
+            "Woof Captain",
+            "Woof Player"
+          ],
+          "folders": [
+            {
+              "id": "n3",
+              "name": "Woof",
+              "position": 0,
+              "readRoles": [
+                "everyone"
+              ],
+              "writeRoles": []
+            }
+          ],
+          "rooms": [
+            {
+              "name": "woof-chat",
+              "folderId": "n3",
+              "position": 0,
+              "readRoles": [
+                "everyone"
+              ],
+              "writeRoles": [
+                "everyone"
+              ]
+            },
+            {
+              "name": "woof-captains",
+              "folderId": "n3",
+              "position": 1,
+              "readRoles": [
+                "n1"
+              ],
+              "writeRoles": [
+                "n1"
+              ]
+            }
+          ],
+          "alreadyHere": [],
+          "tooManyRoles": [],
+          "isEmpty": false
+        },
+        "orgRoles": {
+          "n1": "woofCap",
+          "n2": "woofP"
+        },
+        "isEmpty": false
+      }
+    },
+    {
+      "name": "a team whose copy of a community role was renamed",
+      "plan": {
+        "serverName": "Tech Ultimate",
+        "roles": [
+          {
+            "key": "r1",
+            "name": "Admin",
+            "color": 0,
+            "position": 0,
+            "perms": []
+          },
+          {
+            "key": "r2",
+            "name": "Woof Captain",
+            "color": 0,
+            "position": 1,
+            "perms": []
+          },
+          {
+            "key": "r3",
+            "name": "Woof Player",
+            "color": 0,
+            "position": 2,
+            "perms": []
+          },
+          {
+            "key": "r4",
+            "name": "Whiplash Coach",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        ],
+        "folders": [
+          {
+            "key": "f1",
+            "name": "Woof",
+            "position": 0,
+            "readRoles": [
+              "r1",
+              "r2",
+              "r3"
+            ],
+            "writeRoles": []
+          },
+          {
+            "key": "f2",
+            "name": "Empty",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "general",
+            "folderKey": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "woof-chat",
+            "folderKey": "f1",
+            "position": 1,
+            "readRoles": [
+              "r1",
+              "r2",
+              "r3"
+            ],
+            "writeRoles": [
+              "r2",
+              "r3"
+            ]
+          },
+          {
+            "name": "woof-captains",
+            "folderKey": "f1",
+            "position": 2,
+            "readRoles": [
+              "r1",
+              "r2"
+            ],
+            "writeRoles": [
+              "r2"
+            ]
+          },
+          {
+            "name": "admin",
+            "folderKey": null,
+            "position": 3,
+            "readRoles": [
+              "r1"
+            ],
+            "writeRoles": [
+              "r1"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderKey": null,
+            "position": 4,
+            "readRoles": [
+              "r2",
+              "r4"
+            ],
+            "writeRoles": [
+              "r2",
+              "r4"
+            ]
+          },
+          {
+            "name": "whip",
+            "folderKey": null,
+            "position": 5,
+            "readRoles": [
+              "r4"
+            ],
+            "writeRoles": []
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Voice",
+            "reason": "Voice channel"
+          }
+        ],
+        "skippedRoles": [
+          "Bots"
+        ]
+      },
+      "org": {
+        "roles": {
+          "admin": {
+            "name": "Admin",
+            "color": 0,
+            "position": 0,
+            "perms": [
+              "manageTeam"
+            ]
+          },
+          "woofCap": {
+            "name": "Woof Captain",
+            "color": 0,
+            "position": 1,
+            "perms": [
+              "manageEvents"
+            ]
+          },
+          "woofP": {
+            "name": "Woof Player",
+            "color": 0,
+            "position": 2,
+            "perms": []
+          },
+          "whipC": {
+            "name": "Whiplash Coach",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        },
+        "linkedTeams": {
+          "woof": {
+            "name": "Woof",
+            "roles": [
+              "woofCap",
+              "woofP"
+            ]
+          },
+          "whip": {
+            "name": "Whiplash",
+            "roles": [
+              "whipC"
+            ]
+          }
+        }
+      },
+      "teamId": "woof",
+      "team": {
+        "roles": {
+          "mine": {
+            "name": "Captains",
+            "color": 0,
+            "position": 0,
+            "perms": []
+          }
+        },
+        "orgRoles": {
+          "mine": "woofCap"
+        }
+      },
+      "roleIds": {
+        "r1": "admin",
+        "r2": "woofCap",
+        "r3": "woofP",
+        "r4": "whipC"
+      },
+      "folders": [
+        {
+          "id": "fw",
+          "name": "woof",
+          "position": 0
+        }
+      ],
+      "rooms": [
+        {
+          "id": "rw",
+          "name": "woof-chat",
+          "folderId": "fw",
+          "position": 0
+        }
+      ],
+      "expected": {
+        "import": {
+          "roleIdsByKey": {
+            "woofCap": "mine",
+            "woofP": "n1"
+          },
+          "roles": {
+            "mine": {
+              "name": "Captains",
+              "color": 0,
+              "position": 0,
+              "perms": []
+            },
+            "n1": {
+              "name": "Woof Player",
+              "color": 0,
+              "position": 1,
+              "perms": []
+            }
+          },
+          "newRoles": [
+            "Woof Player"
+          ],
+          "folders": [],
+          "rooms": [
+            {
+              "name": "woof-captains",
+              "folderId": "fw",
+              "position": 1,
+              "readRoles": [
+                "mine"
+              ],
+              "writeRoles": [
+                "mine"
+              ]
+            }
+          ],
+          "alreadyHere": [
+            "woof-chat"
+          ],
+          "tooManyRoles": [],
+          "isEmpty": false
+        },
+        "orgRoles": {
+          "mine": "woofCap",
+          "n1": "woofP"
+        },
+        "isEmpty": false
+      }
+    },
+    {
+      "name": "Whiplash: one room only its coach reads, so the whole team",
+      "plan": {
+        "serverName": "Tech Ultimate",
+        "roles": [
+          {
+            "key": "r1",
+            "name": "Admin",
+            "color": 0,
+            "position": 0,
+            "perms": []
+          },
+          {
+            "key": "r2",
+            "name": "Woof Captain",
+            "color": 0,
+            "position": 1,
+            "perms": []
+          },
+          {
+            "key": "r3",
+            "name": "Woof Player",
+            "color": 0,
+            "position": 2,
+            "perms": []
+          },
+          {
+            "key": "r4",
+            "name": "Whiplash Coach",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        ],
+        "folders": [
+          {
+            "key": "f1",
+            "name": "Woof",
+            "position": 0,
+            "readRoles": [
+              "r1",
+              "r2",
+              "r3"
+            ],
+            "writeRoles": []
+          },
+          {
+            "key": "f2",
+            "name": "Empty",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "general",
+            "folderKey": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "woof-chat",
+            "folderKey": "f1",
+            "position": 1,
+            "readRoles": [
+              "r1",
+              "r2",
+              "r3"
+            ],
+            "writeRoles": [
+              "r2",
+              "r3"
+            ]
+          },
+          {
+            "name": "woof-captains",
+            "folderKey": "f1",
+            "position": 2,
+            "readRoles": [
+              "r1",
+              "r2"
+            ],
+            "writeRoles": [
+              "r2"
+            ]
+          },
+          {
+            "name": "admin",
+            "folderKey": null,
+            "position": 3,
+            "readRoles": [
+              "r1"
+            ],
+            "writeRoles": [
+              "r1"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderKey": null,
+            "position": 4,
+            "readRoles": [
+              "r2",
+              "r4"
+            ],
+            "writeRoles": [
+              "r2",
+              "r4"
+            ]
+          },
+          {
+            "name": "whip",
+            "folderKey": null,
+            "position": 5,
+            "readRoles": [
+              "r4"
+            ],
+            "writeRoles": []
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Voice",
+            "reason": "Voice channel"
+          }
+        ],
+        "skippedRoles": [
+          "Bots"
+        ]
+      },
+      "org": {
+        "roles": {
+          "admin": {
+            "name": "Admin",
+            "color": 0,
+            "position": 0,
+            "perms": [
+              "manageTeam"
+            ]
+          },
+          "woofCap": {
+            "name": "Woof Captain",
+            "color": 0,
+            "position": 1,
+            "perms": [
+              "manageEvents"
+            ]
+          },
+          "woofP": {
+            "name": "Woof Player",
+            "color": 0,
+            "position": 2,
+            "perms": []
+          },
+          "whipC": {
+            "name": "Whiplash Coach",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        },
+        "linkedTeams": {
+          "woof": {
+            "name": "Woof",
+            "roles": [
+              "woofCap",
+              "woofP"
+            ]
+          },
+          "whip": {
+            "name": "Whiplash",
+            "roles": [
+              "whipC"
+            ]
+          }
+        }
+      },
+      "teamId": "whip",
+      "team": {},
+      "roleIds": {
+        "r1": "admin",
+        "r2": "woofCap",
+        "r3": "woofP",
+        "r4": "whipC"
+      },
+      "folders": [],
+      "rooms": [],
+      "expected": {
+        "import": {
+          "roleIdsByKey": {
+            "whipC": "n1"
+          },
+          "roles": {
+            "n1": {
+              "name": "Whiplash Coach",
+              "color": 0,
+              "position": 0,
+              "perms": []
+            }
+          },
+          "newRoles": [
+            "Whiplash Coach"
+          ],
+          "folders": [],
+          "rooms": [
+            {
+              "name": "whip",
+              "folderId": null,
+              "position": 0,
+              "readRoles": [
+                "everyone"
+              ],
+              "writeRoles": []
+            }
+          ],
+          "alreadyHere": [],
+          "tooManyRoles": [],
+          "isEmpty": false
+        },
+        "orgRoles": {
+          "n1": "whipC"
+        },
+        "isEmpty": false
+      }
+    },
+    {
+      "name": "community roles tied on position",
+      "plan": {
+        "serverName": "Tech Ultimate",
+        "roles": [
+          {
+            "key": "r1",
+            "name": "Admin",
+            "color": 0,
+            "position": 0,
+            "perms": []
+          },
+          {
+            "key": "r2",
+            "name": "Woof Captain",
+            "color": 0,
+            "position": 1,
+            "perms": []
+          },
+          {
+            "key": "r3",
+            "name": "Woof Player",
+            "color": 0,
+            "position": 2,
+            "perms": []
+          },
+          {
+            "key": "r4",
+            "name": "Whiplash Coach",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        ],
+        "folders": [
+          {
+            "key": "f1",
+            "name": "Woof",
+            "position": 0,
+            "readRoles": [
+              "r1",
+              "r2",
+              "r3"
+            ],
+            "writeRoles": []
+          },
+          {
+            "key": "f2",
+            "name": "Empty",
+            "position": 1,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "name": "general",
+            "folderKey": null,
+            "position": 0,
+            "readRoles": [
+              "everyone"
+            ],
+            "writeRoles": [
+              "everyone"
+            ]
+          },
+          {
+            "name": "woof-chat",
+            "folderKey": "f1",
+            "position": 1,
+            "readRoles": [
+              "r1",
+              "r2",
+              "r3"
+            ],
+            "writeRoles": [
+              "r2",
+              "r3"
+            ]
+          },
+          {
+            "name": "woof-captains",
+            "folderKey": "f1",
+            "position": 2,
+            "readRoles": [
+              "r1",
+              "r2"
+            ],
+            "writeRoles": [
+              "r2"
+            ]
+          },
+          {
+            "name": "admin",
+            "folderKey": null,
+            "position": 3,
+            "readRoles": [
+              "r1"
+            ],
+            "writeRoles": [
+              "r1"
+            ]
+          },
+          {
+            "name": "captains",
+            "folderKey": null,
+            "position": 4,
+            "readRoles": [
+              "r2",
+              "r4"
+            ],
+            "writeRoles": [
+              "r2",
+              "r4"
+            ]
+          },
+          {
+            "name": "whip",
+            "folderKey": null,
+            "position": 5,
+            "readRoles": [
+              "r4"
+            ],
+            "writeRoles": []
+          }
+        ],
+        "skipped": [
+          {
+            "name": "Voice",
+            "reason": "Voice channel"
+          }
+        ],
+        "skippedRoles": [
+          "Bots"
+        ]
+      },
+      "org": {
+        "roles": {
+          "admin": {
+            "name": "Admin",
+            "color": 0,
+            "position": 0,
+            "perms": [
+              "manageTeam"
+            ]
+          },
+          "woofCap": {
+            "name": "Fast",
+            "color": 0,
+            "position": 1,
+            "perms": []
+          },
+          "woofP": {
+            "name": "Élite",
+            "color": 0,
+            "position": 1,
+            "perms": []
+          },
+          "whipC": {
+            "name": "Whiplash Coach",
+            "color": 0,
+            "position": 3,
+            "perms": []
+          }
+        },
+        "linkedTeams": {
+          "woof": {
+            "name": "Woof",
+            "roles": [
+              "woofCap",
+              "woofP"
+            ]
+          },
+          "whip": {
+            "name": "Whiplash",
+            "roles": [
+              "whipC"
+            ]
+          }
+        }
+      },
+      "teamId": "woof",
+      "team": {},
+      "roleIds": {
+        "r1": "admin",
+        "r2": "woofCap",
+        "r3": "woofP",
+        "r4": "whipC"
+      },
+      "folders": [],
+      "rooms": [],
+      "expected": {
+        "import": {
+          "roleIdsByKey": {
+            "woofCap": "n1",
+            "woofP": "n2"
+          },
+          "roles": {
+            "n1": {
+              "name": "Fast",
+              "color": 0,
+              "position": 0,
+              "perms": []
+            },
+            "n2": {
+              "name": "Élite",
+              "color": 0,
+              "position": 1,
+              "perms": []
+            }
+          },
+          "newRoles": [
+            "Fast",
+            "Élite"
+          ],
+          "folders": [
+            {
+              "id": "n3",
+              "name": "Woof",
+              "position": 0,
+              "readRoles": [
+                "everyone"
+              ],
+              "writeRoles": []
+            }
+          ],
+          "rooms": [
+            {
+              "name": "woof-chat",
+              "folderId": "n3",
+              "position": 0,
+              "readRoles": [
+                "everyone"
+              ],
+              "writeRoles": [
+                "everyone"
+              ]
+            },
+            {
+              "name": "woof-captains",
+              "folderId": "n3",
+              "position": 1,
+              "readRoles": [
+                "n1"
+              ],
+              "writeRoles": [
+                "n1"
+              ]
+            }
+          ],
+          "alreadyHere": [],
+          "tooManyRoles": [],
+          "isEmpty": false
+        },
+        "orgRoles": {
+          "n1": "woofCap",
+          "n2": "woofP"
+        },
+        "isEmpty": false
+      }
+    }
+  ]
+}

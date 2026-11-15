@@ -11,7 +11,7 @@ import { discordFetchTimeoutMs, discordTemplateBytesMax } from "../src/discord/s
 import { FakeMediaStorage, FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.UTC(2026, 10, 14, 12);
-const fixture = readFileSync(join(import.meta.dirname, "fixtures/discord_template_synthetic.json"), "utf8");
+const fixture = readFileSync(join(import.meta.dirname, "../../../packages/shared/fixtures/discord/template_synthetic.json"), "utf8");
 let store: FakeStore;
 let call: (url: string, body: object, uid?: string) => Promise<{ status: number; json: () => any }>;
 let fetchMock: ReturnType<typeof vi.fn>;

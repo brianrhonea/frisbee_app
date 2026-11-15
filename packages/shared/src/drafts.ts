@@ -27,6 +27,17 @@ export const genderMatches = ["mmp", "wmp"] as const;
 export type GenderMatch = (typeof genderMatches)[number];
 export const genderMatchLabels: Record<GenderMatch, string> = { mmp: "MMP", wmp: "WMP" };
 
+/**
+ * Signups by name, ignoring case, comparing code units as the app does
+ * (PlayerSignup.compareByName): the order players are drafted in, so a
+ * seed deals the same teams on the app and the website.
+ */
+export function signupOrder(a: { name: string }, b: { name: string }): number {
+  const x = a.name.toLowerCase();
+  const y = b.name.toLowerCase();
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 /** What the rules and the app allow (validSignup, PlayerSignup). */
 export const signupLimits = { name: 100, divisionId: 100, minSkill: 1, maxSkill: 5, paymentNote: 200 } as const;
 
