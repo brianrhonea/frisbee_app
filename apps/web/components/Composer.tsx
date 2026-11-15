@@ -5,6 +5,9 @@ import {
   postLinksMax,
   type PublicImage,
   type SavePostResult,
+  type SaveTeamPostRequest,
+  teamPostImagesMax,
+  teamPostLinksMax,
   type WorkoutActivity,
   type WorkoutInput,
   workoutActivities,
@@ -13,6 +16,7 @@ import {
 } from "@stall10/shared";
 import { type ClipboardEvent, type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { where } from "firebase/firestore";
+import Link from "next/link";
 import { callApi, problem } from "@/lib/client";
 import { useLiveQuery } from "@/lib/live";
 import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
@@ -22,10 +26,22 @@ import { ComposerPhotos } from "./ComposerPhotos";
 import { NavIcon } from "./NavIcons";
 import "./composer_tag.css";
 
-/** A photo on the post: already saved, or chosen now (uploading, then ready). */
+/**
+ * A photo on the post: already saved, or chosen now (uploading, then
+ * ready). [target] is who it was uploaded for ("" for the member's own
+ * post, else the team's id): changing the audience uploads it again.
+ */
 type Photo =
   | { kind: "saved"; image: PublicImage }
-  | { kind: "new"; key: string; preview: string; uploadId?: string; error?: string };
+  | { kind: "new"; key: string; file: File; target: string; preview: string; uploadId?: string; error?: string };
+
+/** A team or group the member can post on from Home (manageTeam). */
+export interface Audience {
+  id: string;
+  name: string;
+  /** A group that approves who joins: its posts stay inside (no Public). */
+  privateGroup: boolean;
+}
 
 /** A workout as typed: numbers stay strings until it's posted. */
 interface WorkoutDraft {
@@ -93,14 +109,25 @@ interface EditingPost {
  * paste them; they upload while you type) and up to 5 links. A new post
  * can be a workout, typed in (GPS recordings are made in the app).
  * Ctrl+Enter (⌘+Enter) posts.
+ *
+ * With [audiences] (Home), a "To" chip posts to Everyone (the member's own
+ * post) or to one of those teams: a team post as the team page's composer
+ * (and the app's Team post) writes it, with a title, a place and whether
+ * outsiders see it, on the team's feed.
  */
 export function Composer({
   editing,
   onSaved,
+  onTeamPosted,
   onCancel,
   autoFocus = false,
+  audiences = [],
 }: {
   editing?: EditingPost;
+  /** A team post was saved, on [teamId]. */
+  onTeamPosted?: (teamId: string) => void;
+  /** Teams the member may post to from here; none, just their own posts. */
+  audiences?: Audience[];
   /** With what was saved: the words and links as sent. */
   onSaved?: (result: SavePostResult, saved: { body: string; links: string[]; tournament?: { key: string; name: string } | null }) => void;
   onCancel?: () => void;
@@ -119,6 +146,13 @@ export function Composer({
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The team posted to (null: Everyone), and a team post's own fields.
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const team = editing ? undefined : audiences.find((a) => a.id === teamId);
+  const [title, setTitle] = useState("");
+  const [place, setPlace] = useState("");
+  const [isPublic, setPublic] = useState(false);
+  const [posted, setPosted] = useState<Audience | null>(null);
   const text = useRef<HTMLTextAreaElement>(null);
   const files = useRef<HTMLInputElement>(null);
   const repost = editing?.kind === "repost";
@@ -157,25 +191,51 @@ export function Composer({
 
   if (!user) return null;
   const me = user;
+  const imagesMax = team ? teamPostImagesMax : postImagesMax;
+  const linksMax = team ? teamPostLinksMax : postLinksMax;
+
+  /** Uploads [file] for a post to [target] ("" for Everyone); a result for an older target is dropped. */
+  function upload(key: string, file: File, target: string) {
+    const opts = target ? { purpose: "teamImage" as const, targetId: target, itemId: postId } : { itemId: postId };
+    const settle = (patch: { uploadId?: string; error?: string }) =>
+      setPhotos((ps) => ps.map((p) => (p.kind === "new" && p.key === key && p.target === target ? { ...p, ...patch } : p)));
+    uploadPhoto(me, file, opts).then(
+      (done) => settle({ uploadId: done.id }),
+      (e) => settle({ error: problem(e) }),
+    );
+  }
 
   function addFiles(list: FileList | File[]) {
     setError(null);
-    const room = postImagesMax - photos.length;
+    const room = imagesMax - photos.length;
     const chosen = Array.from(list).slice(0, Math.max(room, 0));
-    if (list.length > room) setError(`Add at most ${postImagesMax} photos.`);
+    if (list.length > room) setError(`Add at most ${imagesMax} photos.`);
+    const target = team?.id ?? "";
     for (const file of chosen) {
-      const bad = photoProblem(file);
+      const bad = photoProblem(file, target ? "teamImage" : "post");
       if (bad) {
         setError(bad);
         continue;
       }
       const key = newId();
-      setPhotos((ps) => [...ps, { kind: "new", key, preview: URL.createObjectURL(file) }]);
-      uploadPhoto(me, file, { itemId: postId }).then(
-        (done) => setPhotos((ps) => ps.map((p) => (p.kind === "new" && p.key === key ? { ...p, uploadId: done.id } : p))),
-        (e) => setPhotos((ps) => ps.map((p) => (p.kind === "new" && p.key === key ? { ...p, error: problem(e) } : p))),
-      );
+      setPhotos((ps) => [...ps, { kind: "new", key, file, target, preview: URL.createObjectURL(file) }]);
+      upload(key, file, target);
     }
+  }
+
+  /** Changes who the post is for: a team post has no workout or tournament tag, and photos upload again for it. */
+  function pickAudience(id: string | null) {
+    if (id === teamId) return;
+    setTeamId(id);
+    setError(null);
+    setPosted(null);
+    const target = id ?? "";
+    if (id) {
+      setWorkout(null);
+      setTag(null);
+    }
+    for (const p of photos) if (p.kind === "new") upload(p.key, p.file, target);
+    setPhotos((ps) => ps.map((p) => (p.kind === "new" ? { ...p, target, uploadId: undefined, error: undefined } : p)));
   }
 
   function removePhoto(i: number) {
@@ -195,7 +255,7 @@ export function Composer({
     } catch {
       return setError("That doesn't look like a link.");
     }
-    if (links.length >= postLinksMax) return setError(`Add at most ${postLinksMax} links.`);
+    if (links.length >= linksMax) return setError(`Add at most ${linksMax} links.`);
     if (!links.includes(url)) setLinks([...links, url]);
     setLinkText("");
     setAddingLink(false);
@@ -210,9 +270,47 @@ export function Composer({
   const mayBeEmpty = (!!editing?.kind && editing.kind !== "text") || workout !== null;
   const canPost = !busy && !uploading && !failedPhoto && !tooLong && (mayBeEmpty || !empty);
 
+  function reset() {
+    photos.forEach((p) => p.kind === "new" && URL.revokeObjectURL(p.preview));
+    setBody("");
+    setLinks([]);
+    setPhotos([]);
+    setWorkout(null);
+    setTag(null);
+    setTitle("");
+    setPlace("");
+    setPublic(false);
+    setPostId(newId());
+  }
+
+  /** A team post, as TeamPostComposer saves it (POST /v1/teams/{id}/posts). */
+  async function submitTeam(to: Audience) {
+    setBusy(true);
+    setError(null);
+    const req: SaveTeamPostRequest = {
+      title: title.trim(),
+      body,
+      location: place.trim(),
+      links,
+      public: !to.privateGroup && isPublic,
+      uploadIds: photos.flatMap((p) => (p.kind === "new" && p.uploadId ? [p.uploadId] : [])),
+    };
+    try {
+      await callApi(me, `/v1/teams/${encodeURIComponent(to.id)}/posts`, { method: "POST", body: { ...req, id: postId } });
+      reset();
+      setPosted(to);
+      onTeamPosted?.(to.id);
+    } catch (err) {
+      setError(problem(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit(e?: FormEvent) {
     e?.preventDefault();
     if (!canPost) return;
+    if (team) return submitTeam(team);
     const w = workout ? workoutOf(workout) : undefined;
     if (typeof w === "string") return setError(w);
     setBusy(true);
@@ -236,13 +334,8 @@ export function Composer({
             body: { ...payload, id: postId, ...(w && { workout: w }) },
           });
       if (!editing) {
-        photos.forEach((p) => p.kind === "new" && URL.revokeObjectURL(p.preview));
-        setBody("");
-        setLinks([]);
-        setPhotos([]);
-        setWorkout(null);
-        setTag(null);
-        setPostId(newId());
+        reset();
+        setPosted(null);
       }
       onSaved?.(result, { body: body.trim(), links: payload.links, ...(!repost && { tournament: tag }) });
     } catch (e) {
@@ -282,22 +375,59 @@ export function Composer({
     >
       {!editing && <Avatar name={me.displayName ?? "You"} url={me.photoURL ?? undefined} />}
       <div className="composer-main">
+        {!editing && audiences.length > 0 && (
+          <label className="audience-chip">
+            <span>To</span>
+            <select value={teamId ?? ""} onChange={(e) => pickAudience(e.target.value || null)} disabled={busy}>
+              <option value="">Everyone</option>
+              {audiences.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {team && (
+          <input
+            className="composer-title"
+            aria-label="Title"
+            placeholder="Title (optional)"
+            value={title}
+            maxLength={100}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        )}
         <label className="sr-only" htmlFor={`composer-${postId}`}>
-          {repost ? "Your note" : "Write a post"}
+          {repost ? "Your note" : team ? `Post to ${team.name}` : "Write a post"}
         </label>
         <textarea
           id={`composer-${postId}`}
           ref={text}
           value={body}
           rows={editing ? 3 : 2}
-          placeholder={repost ? "Add a note" : workout ? "How did it go? (optional)" : "What's happening on the field?"}
-          onChange={(e) => setBody(e.target.value)}
+          placeholder={repost ? "Add a note" : team ? `What's the news for ${team.name}?` : workout ? "How did it go? (optional)" : "What's happening on the field?"}
+          onChange={(e) => {
+            setBody(e.target.value);
+            if (posted) setPosted(null);
+          }}
           onPaste={onPaste}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) void submit();
             if (e.key === "Escape" && onCancel) onCancel();
           }}
         />
+
+        {team && (
+          <input
+            className="composer-place"
+            aria-label="Where"
+            placeholder="Where (optional)"
+            value={place}
+            maxLength={200}
+            onChange={(e) => setPlace(e.target.value)}
+          />
+        )}
 
         {workout && <WorkoutFields draft={workout} onChange={setWorkout} onRemove={() => setWorkout(null)} />}
 
@@ -344,7 +474,7 @@ export function Composer({
           </div>
         )}
 
-        {!repost && tagOptions.length > 0 && (
+        {!repost && !team && tagOptions.length > 0 && (
           <label className="composer-tag small">
             At a tournament
             <select
@@ -366,6 +496,11 @@ export function Composer({
             {error}
           </p>
         )}
+        {posted && (
+          <p className="form-ok" role="status">
+            Posted to <Link href={`/teams/${encodeURIComponent(posted.id)}`}>{posted.name}</Link>.
+          </p>
+        )}
 
         <div className="composer-bar">
           {!repost && (
@@ -385,7 +520,7 @@ export function Composer({
                 type="button"
                 className="composer-tool"
                 title="Add photos (or drop or paste them)"
-                disabled={photos.length >= postImagesMax}
+                disabled={photos.length >= imagesMax}
                 onClick={() => files.current?.click()}
               >
                 <PhotoIcon />
@@ -395,13 +530,13 @@ export function Composer({
                 type="button"
                 className="composer-tool"
                 title="Add a link"
-                disabled={links.length >= postLinksMax}
+                disabled={links.length >= linksMax}
                 onClick={() => setAddingLink(true)}
               >
                 <LinkIcon />
                 <span>Link</span>
               </button>
-              {!editing && (
+              {!editing && !team && (
                 <button
                   type="button"
                   className={`composer-tool${workout ? " on" : ""}`}
@@ -414,6 +549,11 @@ export function Composer({
                 </button>
               )}
             </>
+          )}
+          {team && !team.privateGroup && (
+            <label className="composer-public small" title="Public posts show on the team page to everyone">
+              <input type="checkbox" checked={isPublic} onChange={(e) => setPublic(e.target.checked)} /> Public
+            </label>
           )}
           <span className="composer-spacer" />
           {left < 300 && <span className={`composer-count${left < 0 ? " over" : ""}`}>{left}</span>}

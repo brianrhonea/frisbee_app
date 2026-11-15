@@ -17,7 +17,9 @@ import { isTyping } from "@/lib/text";
 
 type Tab = { href: string; label: string; icon: NavIconName; also?: string[] };
 
-/** The five tabs, as in the app (docs/product-spec.md §3). */
+/**
+ * Six tabs: the app's five (docs/product-spec.md §3) and Learn.
+ */
 const tabs: Tab[] = [
   // The community feed and posts are Home's (its Community tab).
   { href: "/", label: "Home", icon: "home", also: ["/community", "/posts"] },
@@ -43,6 +45,10 @@ function compose(router: ReturnType<typeof useRouter>) {
     composer.focus({ preventScroll: true });
   } else router.push("/#compose");
 }
+
+/** Pages with a composer of their own at the foot, where a floating Post button would cover it. */
+const ownComposer = ["/messages", "/posts"];
+const isChat = (path: string) => /^\/teams\/[^/]+\/(chat|meetings)/.test(path);
 
 /** Pages that read best at full width, without the right column. */
 const fullWidth = ["/sign-in", "/sign-up", "/about", "/get-the-app", "/join", "/g", "/p", "/messages"];
@@ -103,6 +109,8 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   const search = !under(path, "/explore");
   const unread = useUnreadCount();
   useShortcuts(!!user);
+  // Phones' floating Post button, on pages without a composer of their own at the foot.
+  const fab = !!user && !ownComposer.some((p) => under(path, p)) && !isChat(path);
   const badge = unread > 0 ? <span className="count-badge">{unread > 99 ? "99+" : unread}</span> : null;
 
   function onSearch(e: FormEvent<HTMLFormElement>) {
@@ -131,7 +139,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
     });
 
   return (
-    <div className={aside ? "frame with-aside" : "frame"}>
+    <div className={`frame${aside ? " with-aside" : ""}${fab ? " has-fab" : ""}`}>
       <header className="top-bar">
         <div className="top-brand">
           <Link className="brand wordmark" href="/" aria-label="Stall 10 home">
@@ -204,6 +212,14 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
           <small className="side-copy">© {new Date().getFullYear()} Stall 10</small>
         </div>
       </aside>
+
+      {/* Phones, where the side nav (and its Create a post) is hidden. */}
+      {fab && (
+        <button type="button" className="fab-post" onClick={() => compose(router)}>
+          <NavIcon name="plus" size={20} />
+          <span>Post</span>
+        </button>
+      )}
 
       <div className="frame-main">
         <main>{children}</main>

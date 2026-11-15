@@ -22,6 +22,7 @@ import '../../shell/widgets/app_shell.dart';
 import '../../teams/widgets/join_team_dialog.dart';
 import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/home_viewmodel.dart';
+import 'home_cards.dart';
 import '../../posts/widgets/post_composer.dart';
 import '../../workouts/widgets/record_button.dart';
 import '../../core/ui/skeleton.dart';
@@ -39,7 +40,9 @@ enum _Tab {
 /// The home feed: the user's posts, their teams' and those of what they
 /// follow, with what's up next beside them (below the header on narrow
 /// screens); a Community tab of every public profile's posts (as on the
-/// website); and a tab of the user's teams.
+/// website); and a Your teams tab of their teams' posts. Under the
+/// composer, a strip of their teams; on an empty feed, a "Get started"
+/// checklist (both as on the website).
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.viewModel, this.prompt});
 
@@ -250,6 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onSelect: (t) {
                   setState(() => _tab = t);
                   if (t == _Tab.community) vm.openCommunity();
+                  if (t == _Tab.teams) vm.openTeams();
                 },
               ),
               const SizedBox(height: 14),
@@ -263,6 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 side: _side(),
                 narrow: [
                   if (_tab == _Tab.forYou) ...[
+                    if (vm.needsYou.isNotEmpty) _needsYou(),
                     if (vm.nextTeamEvent case final next?)
                       _NextEventStrip(entry: next),
                     _ComingUpCard(
@@ -292,7 +297,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ? null
             : _compose,
       ),
-      if (vm.teamsLoaded && vm.teams.isEmpty)
+      if (vm.teamsLoaded)
+        TeamStrip(
+          teams: vm.stripTeams,
+          onOpen: (t) => context.go(Routes.team(t.id)),
+          onNewOrJoin: _newOrJoin,
+        ),
+      // An empty feed has the checklist, which covers joining.
+      if (vm.teamsLoaded && vm.teams.isEmpty && !vm.showOnboarding)
         _JoinCard(
           joining: vm.joinTeam.running,
           onJoin: _join,
@@ -308,17 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
       for (final item in vm.posts)
         switch (item) {
           UserPostItem(:final post) => _userPostCard(post),
-          final TeamPostItem p => TeamPostCard(
-            key: ValueKey(item.id),
-            post: p.post,
-            teamName: p.teamName,
-            now: vm.now,
-            loadImage: vm.imageData,
-            showVisibility: vm.teamOf(p) != null,
-            onOpenTeam: () => context.go(Routes.team(p.teamId)),
-            onEdit: vm.canEditPost(p) ? () => _edit(p) : null,
-            onDelete: vm.canEditPost(p) ? () => _remove(p) : null,
-          ),
+          final TeamPostItem p => _teamPostCard(p),
         },
       if (vm.hasMorePosts)
         Center(
@@ -335,26 +337,126 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: const Text('Show older posts'),
                 ),
         )
+      else if (vm.showOnboarding)
+        GetStartedCard(steps: vm.onboarding, onStep: _onboardingStep)
       else if (vm.postsLoaded)
         _CaughtUp(empty: vm.posts.isEmpty, followsAnything: vm.followsAnything),
     ],
     _Tab.community => _community(),
-    _Tab.teams => [
-      for (final t in vm.teams)
-        _TeamRow(
-          team: t,
-          next: vm.nextEventFor(t),
-          onTap: () => context.go(Routes.team(t.id)),
-        ),
-      _JoinCard(
-        joining: vm.joinTeam.running,
-        onJoin: _join,
-        onCreate: () => context.go(Routes.createTeam),
-        onFind: () => context.go(Routes.explore(only: ExploreFilter.groups)),
-        hasTeams: vm.teams.isNotEmpty,
-      ),
-    ],
+    _Tab.teams => _teamPosts(),
   };
+
+  Widget _teamPostCard(TeamPostItem p) => TeamPostCard(
+    key: ValueKey(p.id),
+    post: p.post,
+    teamName: p.teamName,
+    now: vm.now,
+    loadImage: vm.imageData,
+    showVisibility: vm.teamOf(p) != null,
+    onOpenTeam: () => context.go(Routes.team(p.teamId)),
+    onEdit: vm.canEditPost(p) ? () => _edit(p) : null,
+    onDelete: vm.canEditPost(p) ? () => _remove(p) : null,
+  );
+
+  /// Every post of the user's teams and groups, newest first; no team yet,
+  /// the join card.
+  List<Widget> _teamPosts() {
+    final feed = vm.teamFeed;
+    final posts = vm.teamPosts;
+    if (vm.teamsLoaded && vm.teams.isEmpty) {
+      return [
+        _JoinCard(
+          joining: vm.joinTeam.running,
+          onJoin: _join,
+          onCreate: () => context.go(Routes.createTeam),
+          onFind: () => context.go(Routes.explore(only: ExploreFilter.groups)),
+        ),
+      ];
+    }
+    return [
+      if (!vm.teamPostsLoaded)
+        const Skeleton(
+          child: Column(
+            children: [SkeletonPost(), SizedBox(height: 14), SkeletonPost()],
+          ),
+        ),
+      for (final item in posts)
+        if (item case final TeamPostItem p) _teamPostCard(p),
+      if (vm.teamPostsLoaded && feed != null)
+        if (feed.loadingMore)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          )
+        else if (feed.hasMore)
+          Center(
+            child: TextButton(
+              onPressed: feed.loadMore,
+              child: const Text('Show older posts'),
+            ),
+          )
+        else
+          _FeedNote(
+            text: posts.isEmpty
+                ? 'No team posts yet. News your teams and groups post shows '
+                      'up here.'
+                : "You're all caught up.",
+          ),
+    ];
+  }
+
+  /// Create a team, or join one with a code (the strip's New / Join).
+  Future<void> _newOrJoin() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Create or join'),
+        children: [
+          for (final (value, icon, label) in [
+            ('join', Icons.group_add_outlined, 'Join with a code'),
+            ('create', Icons.add, 'Create a team or group'),
+            ('find', Icons.search, 'Find a group'),
+          ])
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, value),
+              child: Row(
+                children: [Icon(icon), const SizedBox(width: 12), Text(label)],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'join':
+        await _join();
+      case 'create':
+        context.go(Routes.createTeam);
+      case 'find':
+        context.go(Routes.explore(only: ExploreFilter.groups));
+    }
+  }
+
+  void _onboardingStep(OnboardingStep step) => switch (step) {
+    OnboardingStep.username => context.go(Routes.chooseUsername),
+    OnboardingStep.join => _join(),
+    OnboardingStep.find => context.go(
+      Routes.explore(only: ExploreFilter.teams),
+    ),
+    OnboardingStep.follow => context.go(
+      Routes.explore(only: ExploreFilter.players),
+    ),
+  };
+
+  Widget _needsYou() => NeedsYouCard(
+    items: vm.needsYou,
+    onOpen: (t) => context.go(Routes.teamMembers(t.id)),
+  );
 
   Widget _userPostCard(UserPost post) {
     final mine = post.authorId == vm.user?.uid;
@@ -414,6 +516,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Widget> _side() => [
+    if (vm.needsYou.isNotEmpty) _needsYou(),
     if (vm.nextTeamEvent case final next?) _UpNextCard(entry: next),
     _ComingUpCard(events: vm.upcomingEvents, onAdd: _newEvent),
     const _Footer(),
@@ -610,14 +713,12 @@ class _JoinCard extends StatelessWidget {
     required this.onJoin,
     required this.onCreate,
     required this.onFind,
-    this.hasTeams = false,
   });
 
   final bool joining;
   final VoidCallback onJoin;
   final VoidCallback onCreate;
   final VoidCallback onFind;
-  final bool hasTeams;
 
   @override
   Widget build(BuildContext context) {
@@ -626,13 +727,10 @@ class _JoinCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Eyebrow(
-            hasTeams ? 'Another team?' : 'No team yet',
-            color: c.onFeatureMuted,
-          ),
+          Eyebrow('No team yet', color: c.onFeatureMuted),
           const SizedBox(height: 8),
           Text(
-            hasTeams ? 'Join or start one.' : 'Join your team.',
+            'Join your team.',
             style: TextStyle(
               color: c.onFeature,
               fontSize: 22,
@@ -677,66 +775,6 @@ class _JoinCard extends StatelessWidget {
                 ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TeamRow extends StatelessWidget {
-  const _TeamRow({required this.team, required this.next, required this.onTap});
-
-  final Team team;
-  final ScheduleEntry? next;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final count = team.members.length;
-    final e = next?.event;
-    return SectionCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          TeamBadge(size: 46, community: team.isCommunity),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  team.name,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: c.ink,
-                  ),
-                ),
-                Text(
-                  '${TeamListing.of(team).subtitle} · $count '
-                  '${count == 1 ? 'member' : 'members'}',
-                  style: TextStyle(fontSize: 12, color: c.muted),
-                ),
-                if (e != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Next: ${e.title} · '
-                    '${DateFormat.MMMEd().format(e.startsAt)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: c.ink,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right, color: c.muted),
         ],
       ),
     );

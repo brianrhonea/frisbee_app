@@ -21,6 +21,10 @@ import '../../../utils/result.dart';
 /// keeps its newest page live; "Show older posts" fetches the next page
 /// once (a cursor read) instead of re-reading every source with a bigger
 /// limit.
+///
+/// [teamsOnly] is Home's "Your teams" tab: just the posts of the user's
+/// teams and groups (no people's posts, nothing followed), as the
+/// website's Your teams tab shows.
 class HomeFeed extends ChangeNotifier {
   HomeFeed({
     required this.uid,
@@ -28,25 +32,30 @@ class HomeFeed extends ChangeNotifier {
     required TeamRepository teamRepository,
     required TeamPostRepository teamPostRepository,
     required UserPostRepository userPostRepository,
+    this.teamsOnly = false,
   }) : _teamPosts = teamPostRepository,
        _userPosts = userPostRepository {
     if (uid.isEmpty) {
       _followsLoaded = _teamsLoaded = true;
       return;
     }
-    _followsSub = followRepository
-        .watchFollows(uid)
-        .listen(
-          (f) {
-            _follows = f;
-            _followsLoaded = true;
-            _sync();
-          },
-          onError: (Object _) {
-            _followsLoaded = true;
-            _sync();
-          },
-        );
+    if (teamsOnly) {
+      _followsLoaded = true;
+    } else {
+      _followsSub = followRepository
+          .watchFollows(uid)
+          .listen(
+            (f) {
+              _follows = f;
+              _followsLoaded = true;
+              _sync();
+            },
+            onError: (Object _) {
+              _followsLoaded = true;
+              _sync();
+            },
+          );
+    }
     _teamsSub = teamRepository
         .watchMyTeams(uid)
         .listen(
@@ -68,6 +77,9 @@ class HomeFeed extends ChangeNotifier {
   static const _maxRounds = 5;
 
   final String uid;
+
+  /// Only the user's teams' posts.
+  final bool teamsOnly;
   final TeamPostRepository _teamPosts;
   final UserPostRepository _userPosts;
 
@@ -204,6 +216,13 @@ class HomeFeed extends ChangeNotifier {
   void _sync() {
     final myTeams = {for (final t in _teams) t.id: t};
     final wanted = <String, _FeedSource Function()>{};
+    if (teamsOnly) {
+      for (final t in _teams) {
+        wanted['team:${t.id}'] = () => _teamSource(t);
+      }
+      _replaceSources(wanted);
+      return;
+    }
 
     final authors = [
       uid,
@@ -249,10 +268,7 @@ class HomeFeed extends ChangeNotifier {
     }
 
     for (final t in _teams) {
-      wanted['team:${t.id}'] = () => _source(
-        _teamItems(t.id, t.name, _teamPosts.watchPosts(t.id, limit: pageSize)),
-        _teamPages(t.id, t.name),
-      );
+      wanted['team:${t.id}'] = () => _teamSource(t);
     }
     for (final f in _follows) {
       final target = f.target;
@@ -282,6 +298,17 @@ class HomeFeed extends ChangeNotifier {
       }
     }
 
+    _replaceSources(wanted);
+  }
+
+  /// Every post of [t], a team the user is on.
+  _FeedSource _teamSource(Team t) => _source(
+    _teamItems(t.id, t.name, _teamPosts.watchPosts(t.id, limit: pageSize)),
+    _teamPages(t.id, t.name),
+  );
+
+  /// Keeps the sources still [wanted], opens new ones and drops the rest.
+  void _replaceSources(Map<String, _FeedSource Function()> wanted) {
     for (final key in _sources.keys.toList()) {
       if (!wanted.containsKey(key)) _sources.remove(key)?.dispose();
     }

@@ -467,6 +467,97 @@ void main() {
       });
     });
 
+    test(
+      'the Your teams feed has only my teams\' posts, once opened',
+      () async {
+        final vm = await load();
+        userPosts.posts.add(
+          userPost('mine', testUser.uid, DateTime(2026, 10, 28)),
+        );
+        await follows.follow(
+          testUser.uid,
+          const FollowTarget.team('t7', 'Followed Club'),
+        );
+        posts.posts['t7'] = [
+          TeamPost(
+            id: 'q1',
+            body: 'Open tryouts',
+            isPublic: true,
+            createdAt: now,
+          ),
+        ];
+        await pumpEventQueue();
+        expect(vm.teamFeed, isNull, reason: 'not opened yet');
+        expect(vm.posts.map((i) => i.id), contains('team/t7/q1'));
+
+        vm.openTeams();
+        await pumpEventQueue();
+        expect(vm.teamPostsLoaded, isTrue);
+        expect(vm.teamPosts.map((i) => i.id), ['team/t1/p1']);
+      },
+    );
+
+    test(
+      'Needs you lists groups I approve with people asking to join',
+      () async {
+        final vm = await load();
+        teams.teams['g1'] = Team(
+          id: 'g1',
+          name: 'Lake Pickup',
+          division: Division.mixed,
+          level: CompetitionLevel.club,
+          ownerId: testUser.uid,
+          members: {testUser.uid: TeamRole.owner},
+          kind: TeamKind.community,
+          requiresApproval: true,
+        );
+        teams.joinRequests['g1'] = [
+          const GroupJoinRequest(uid: 'u2', name: 'Kai'),
+          const GroupJoinRequest(uid: 'u3', name: 'Rae'),
+        ];
+        // A plain team never has requests to approve.
+        teams.joinRequests['t1'] = [
+          const GroupJoinRequest(uid: 'u4', name: 'X'),
+        ];
+        teams.changed();
+        await pumpEventQueue();
+        expect(
+          [for (final r in vm.needsYou) (r.team.id, r.count)],
+          [('g1', 2)],
+        );
+
+        teams.joinRequests['g1'] = [];
+        teams.changed();
+        await pumpEventQueue();
+        expect(vm.needsYou, isEmpty);
+      },
+    );
+
+    test(
+      'the Get started checklist shows on an empty feed until done',
+      () async {
+        final vm = await load(withTeam: false);
+        expect(vm.showOnboarding, isTrue);
+        expect(
+          [
+            for (final (s, done) in vm.onboarding)
+              if (done) s,
+          ],
+          [OnboardingStep.username],
+        );
+
+        await follows.follow(
+          testUser.uid,
+          const FollowTarget.user('sam', 'Sam'),
+        );
+        teams.teams['t9'] = team('t9', 'Other', owner: 'u9');
+        teams.changed();
+        await pumpEventQueue();
+        expect(vm.onboarding.every((s) => s.$2), isTrue);
+        expect(vm.showOnboarding, isFalse);
+      },
+    );
+
     test('joins a team by invite code', () async {
       final vm = await load(withTeam: false);
       teams.teams['t9'] = team('t9', 'Other', owner: 'u9');
@@ -510,15 +601,18 @@ void main() {
       expect(find.text('Theo Brooks'), findsOneWidget);
       expect(find.textContaining('Northside Flyers ·'), findsOneWidget);
 
+      // The team strip under the composer.
+      expect(find.text('Northside Flyers'), findsOneWidget);
+      expect(find.text('New / Join'), findsOneWidget);
+
       await tester.ensureVisible(find.text('Your teams'));
       await tester.pump();
       await tester.tap(find.text('Your teams'));
       await tester.pump();
-      expect(find.text('Northside Flyers'), findsOneWidget);
-      expect(
-        find.text('Next: Thursday practice · Thu, Oct 29'),
-        findsOneWidget,
-      );
+      await tester.pump();
+      // The Your teams tab is the teams' posts, not a list of them.
+      expect(find.text('Next stop: the postseason'), findsOneWidget);
+      expect(find.text('New / Join'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -618,12 +712,23 @@ void main() {
     );
     await tester.pump();
 
-    await tester.ensureVisible(find.text('Join with code'));
+    // An empty feed: the checklist, which covers joining.
+    await tester.ensureVisible(find.text('Get started'));
     await tester.pumpAndSettle();
-    expect(find.text('Join your team.'), findsOneWidget);
-    await tester.tap(find.text('Join with code'));
+    expect(find.text('1 of 4 done'), findsOneWidget);
+    expect(find.text('Join your team.'), findsNothing);
+    await tester.tap(find.text('Enter code'));
     await tester.pumpAndSettle();
     expect(find.text('Invite code'), findsOneWidget);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+
+    // The Your teams tab, with no team yet: the join card.
+    await tester.ensureVisible(find.text('Your teams'));
+    await tester.tap(find.text('Your teams'));
+    await tester.pumpAndSettle();
+    expect(find.text('Join your team.'), findsOneWidget);
+    expect(find.text('Join with code'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
