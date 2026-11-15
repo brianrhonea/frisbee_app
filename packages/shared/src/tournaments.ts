@@ -112,7 +112,7 @@ export const tournamentLimits = {
 } as const;
 
 /** Ids of the real teams a league makes from its drafted ones start with this. */
-export const leagueTeamPrefix = "league_";
+export const createdLeagueTeamPrefix = "league_";
 
 export const currencies = ["USD", "CAD", "EUR", "GBP", "AUD", "MXN"] as const;
 

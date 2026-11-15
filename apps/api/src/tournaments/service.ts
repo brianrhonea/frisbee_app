@@ -30,7 +30,7 @@ import {
   isDone,
   laterGamesPlayed,
   leagueFitProblem,
-  leagueTeamPrefix,
+  createdLeagueTeamPrefix,
   pendingFills,
   placementsOf,
   publishScheduleRequestSchema,
@@ -616,7 +616,7 @@ export class TournamentService {
       const seeds = strings(d.seeds);
       const drafted = Array.isArray(d.teams) ? d.teams.map((x) => String(mapOf(x).id ?? "")) : [];
       // needsTeamsCreated: a league that takes players makes its real teams first.
-      const teamsCreated = drafted.length > 0 && drafted.every((x) => x.startsWith(leagueTeamPrefix));
+      const teamsCreated = drafted.length > 0 && drafted.every((x) => x.startsWith(createdLeagueTeamPrefix));
       const mixed = t.entryType === "players" && t.teamEntry === true;
       if (t.kind === "league" && t.entryType === "players" && !teamsCreated && (drafted.length > 0 || !mixed)) {
         throw new ApiError("failed_precondition", "Create the league's teams first: draft teams, then Create teams.");

@@ -4,6 +4,7 @@ import { orderBy, where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { LocalTime } from "../LocalTime";
+import { HostedTournamentsSection } from "../tournaments/TournamentLists";
 import { type Doc, useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection, moreTabs } from "./TeamNav";
@@ -60,6 +61,7 @@ export function TeamMore() {
       {tab === "playbook" && <Playbook teamId={teamId} editor={viewer.can("manageTeam")} />}
       {tab === "videos" && <Videos teamId={teamId} />}
       {tab === "stats" && <Stats teamId={teamId} />}
+      {tab === "tournaments" && <HostedTournamentsSection teamId={teamId} kind={kind} manager={viewer.can("manageEvents")} member />}
       {tab === "tournaments" && <Tournaments teamId={teamId} manager={viewer.can("manageEvents")} uid={viewer.uid} />}
     </div>
   );
