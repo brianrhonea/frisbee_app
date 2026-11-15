@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frisbee_app/data/services/api_client.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
@@ -383,7 +384,7 @@ void main() {
       expect(teams.teams, contains('t1'), reason: 'not deleted');
 
       // The view model refuses too, whatever the screen does.
-      await vm.deleteTeam.execute();
+      await vm.deleteTeam.execute('Team');
       await tester.pump();
       expect(
         find.textContaining('transfer ownership first'),
@@ -406,6 +407,17 @@ void main() {
       expect(find.text('Delete Team?'), findsOneWidget);
       expect(find.textContaining("Can't delete"), findsNothing);
 
+      // As on the website, the name has to be typed first.
+      FilledButton deleteButton() =>
+          tester.widget(find.widgetWithText(FilledButton, 'Delete'));
+      expect(deleteButton().onPressed, isNull);
+      await tester.enterText(find.byType(TextField), 'Tea');
+      await tester.pump();
+      expect(deleteButton().onPressed, isNull);
+      await tester.enterText(find.byType(TextField), ' team ');
+      await tester.pump();
+      expect(deleteButton().onPressed, isNotNull, reason: 'any case');
+
       // While it deletes, a dialog nobody can dismiss shows how far it is.
       teams.deleteGate = Completer<void>();
       await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
@@ -418,6 +430,46 @@ void main() {
       await tester.pump();
       expect(find.text('Deleting Team'), findsOneWidget, reason: 'stays up');
       expect(teams.teams, contains('t1'), reason: 'still going');
+      expect(teams.deletedWithName, 'team');
+    });
+
+    testWidgets("the API's refusal is shown and the team stays", (
+      tester,
+    ) async {
+      addTeam({testUser.uid: TeamRole.owner});
+      teams.deleteError = const ApiException(
+        'failed_precondition',
+        "It plays in a league that hasn't finished, so it can't be deleted "
+            'yet.',
+      );
+      await pump(tester, homeVm());
+
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete team'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Team');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(
+        find.textContaining("league that hasn't finished"),
+        findsOneWidget,
+      );
+      expect(find.text('Deleting Team'), findsNothing);
+      expect(teams.teams, contains('t1'));
+    });
+
+    test('the view model refuses a name that does not match', () async {
+      addTeam({testUser.uid: TeamRole.owner});
+      final vm = homeVm();
+      await pumpEventQueue();
+      await vm.deleteTeam.execute('Other');
+      expect(vm.deleteTeam.error, isTrue);
+      expect(teams.deletedWithName, isNull);
+      expect(teams.teams, contains('t1'));
     });
 
     testWidgets('others get the public page and can join', (tester) async {

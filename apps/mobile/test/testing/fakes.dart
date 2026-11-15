@@ -844,8 +844,11 @@ class FakeTeamRepository implements TeamRepository {
   @override
   Future<Result<void>> deleteTeam(
     Team team, {
+    required String name,
     void Function(DeleteProgress progress)? onProgress,
   }) async {
+    deletedWithName = name;
+    if (deleteError case final e?) return Result.error(e);
     for (var i = 0; i < 3; i++) {
       onProgress?.call((done: i, total: 3, step: 'Deleting step $i'));
       await deleteGate?.future;
@@ -858,6 +861,12 @@ class FakeTeamRepository implements TeamRepository {
   /// Holds deleteTeam at each step until completed, for tests that watch
   /// its progress.
   Completer<void>? deleteGate;
+
+  /// What deleteTeam was last called with as the typed name.
+  String? deletedWithName;
+
+  /// deleteTeam fails with this (as the API refuses it) when set.
+  Exception? deleteError;
 
   final _rosterChanges = StreamController<void>.broadcast();
 

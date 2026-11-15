@@ -58,8 +58,12 @@ class ApiClient {
   Future<Map<String, Object?>> patch(String path, Map<String, Object?> body) =>
       send('PATCH', path, body);
 
-  /// DELETEs [path] (no body); returns the decoded answer.
-  Future<Map<String, Object?>> delete(String path) => send('DELETE', path);
+  /// DELETEs [path], with [body] as JSON when given (most have none);
+  /// returns the decoded answer.
+  Future<Map<String, Object?>> delete(
+    String path, [
+    Map<String, Object?>? body,
+  ]) => send('DELETE', path, body);
 
   /// Sends [method] to [path], with [body] as JSON when given, and returns
   /// the decoded JSON answer or throws [ApiException].

@@ -812,8 +812,19 @@ class TeamRepositoryFirebase implements TeamRepository {
   @override
   Future<Result<void>> deleteTeam(
     Team team, {
+    required String name,
     void Function(DeleteProgress progress)? onProgress,
   }) => guard(() async {
+    // The API (`DELETE /v1/teams/:id`) re-checks the rules (sole owner, no
+    // unfinished league), checks the typed name, and deletes everything
+    // under the team, its files and its community links in one go.
+    if (_membersApi case final api?) {
+      onProgress?.call((done: 0, total: 1, step: 'Deleting'));
+      await api.delete('/v1/teams/${team.id}', {'name': name.trim()});
+      onProgress?.call((done: 1, total: 1, step: 'Deleted'));
+      return;
+    }
+    // Flag off (or no API in this build): the direct cascade.
     final ref = _teams.doc(team.id);
     const subs = [
       'roster',
