@@ -9,6 +9,9 @@ import { competitionLevels, divisions, groupLocationSchema, teamLimits } from ".
 export const teamTiers = ["owner", "coach", "captain", "stats", "player"] as const;
 export type TeamTier = (typeof teamTiers)[number];
 
+/** The tier rooms, events and meetings go by: a legacy "stats" member counts as a player (chatRole). */
+export const audienceTier = <R extends string | undefined>(role: R): R | "player" => (role === "stats" ? "player" : role);
+
 /** What a custom role can grant (TeamPermission), in the app's order. */
 export const teamPermissions = [
   "manageTeam",

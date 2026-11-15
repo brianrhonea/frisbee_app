@@ -19,8 +19,9 @@ import type { Caller } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
+import { canWriteRoom } from "../hub/access.js";
 import { filesOf } from "../hub/uploads.js";
-import { can, isMember, mapOf, roleIn, strings } from "../teams/access.js";
+import { can, isMember, strings } from "../teams/access.js";
 import { compressImage, type HeicDecoder, UnreadableImage } from "./image.js";
 import { sniffBytes, sniffChatMediaType, sniffMediaType } from "./sniff.js";
 import type { MediaStorage } from "./storage.js";
@@ -119,17 +120,7 @@ export class UploadService {
       this.store.get(`teams/${teamId}/chats/${roomId}`),
     ]);
     if (!team || !room) throw new ApiError("not_found", "That chat doesn't exist anymore.");
-    const role = roleIn(team, uid) === "stats" ? "player" : roleIn(team, uid);
-    const ids = strings(room.writeRoles);
-    const mine = strings(mapOf(team.memberRoles)[uid]);
-    const ok =
-      isMember(team, uid) &&
-      (role === "owner" ||
-        ids.includes("everyone") ||
-        ids.includes(role) ||
-        mine.slice(0, 10).some((r) => ids.includes(r)) ||
-        strings(room.writeUsers).includes(uid));
-    if (!ok) throw denied("You can't post in this chat.");
+    if (!isMember(team, uid) || !canWriteRoom(team, uid, room)) throw denied("You can't post in this chat.");
   }
 
   /**

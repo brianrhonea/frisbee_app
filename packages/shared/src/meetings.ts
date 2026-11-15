@@ -6,6 +6,7 @@
 // in step, and in step with the meetings rules in firestore.rules.
 import { z } from "zod";
 import { isoDateTime } from "./dates.js";
+import { audienceTier } from "./membership.js";
 
 // ---- Who may see and join (model.ts) -------------------------------------
 
@@ -48,7 +49,7 @@ const own = (m: Record<string, unknown> | undefined, key: string): unknown =>
 export function meetingRoleOf(team: MeetingTeam, uid: string): string | undefined {
   const role = own(team.members, uid);
   if (typeof role !== "string") return undefined;
-  return role === "stats" ? "player" : role;
+  return audienceTier(role);
 }
 
 /**

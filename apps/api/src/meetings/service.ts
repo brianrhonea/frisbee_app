@@ -10,6 +10,7 @@
 // and its direct writes; the closeRoom trigger still closes the call when
 // a meeting ends or is deleted, whoever wrote it.
 import {
+  audienceTier,
   meetingDisplayName,
   type JoinRequestDoc,
   meetingInviteRoles,
@@ -37,13 +38,14 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
 import { type Caller, requireCaller, type UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
+import { chatRole } from "../hub/access.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
 import type { MemoryRateLimiter } from "../limits/memory.js";
 import type { Limit } from "../limits/model.js";
 import { authorOf, checkNotMuted } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
-import { can, clip, isMember, mapOf, roleIn, strings } from "../teams/access.js";
+import { can, clip, isMember, mapOf, strings } from "../teams/access.js";
 import type { TeamRepository } from "../teams/repository.js";
 import type { LiveKitSigner } from "./signer.js";
 
@@ -87,9 +89,6 @@ const notSetUp = () => new ApiError("failed_precondition", "Meetings aren't set 
 
 // ---- The rules' helpers (match /meetings/{meetingId}) ----------------------
 
-/** chatRole(team()): a legacy "stats" member counts as a player. */
-const chatRole = (team: Data, uid: string) => (roleIn(team, uid) === "stats" ? "player" : roleIn(team, uid));
-
 /** canManage: can(team(), 'manageEvents'). */
 const manages = (team: Data, uid: string) => can(team, uid, "manageEvents");
 
@@ -115,7 +114,7 @@ function editableFields(team: Data, m: z.output<typeof saveMeetingRequestSchema>
   const users = [...new Set(m.inviteUsers)].filter((uid) => {
     const raw = Object.hasOwn(members, uid) ? members[uid] : undefined;
     if (typeof raw !== "string") return false;
-    const role = raw === "stats" ? "player" : raw;
+    const role = audienceTier(raw);
     return !["owner", "coach", "captain"].includes(role) && !roles.includes(role as (typeof roles)[number]);
   });
   return {
