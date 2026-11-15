@@ -77,7 +77,6 @@ export const savePlayRequestSchema = z
       }
     }
   });
-export type SavePlayRequest = z.input<typeof savePlayRequestSchema>;
 export type SavePlayInput = z.output<typeof savePlayRequestSchema>;
 
 /** A stored play. */

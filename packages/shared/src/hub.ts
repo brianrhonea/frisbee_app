@@ -80,14 +80,6 @@ export type RsvpStatus = (typeof rsvpStatuses)[number];
 /** Reaction in the app: who's going reacts with these. */
 export const eventReactions = ["thumbsUp", "fire", "disc", "clap", "laugh", "grimace"] as const;
 export type EventReaction = (typeof eventReactions)[number];
-export const eventReactionEmoji: Record<EventReaction, string> = {
-  thumbsUp: "👍",
-  fire: "🔥",
-  disc: "🥏",
-  clap: "🙌",
-  laugh: "😂",
-  grimace: "😬",
-};
 
 const isoDate = isoDateTime("Give a date and time.");
 
@@ -105,7 +97,6 @@ export const eventPollSchema = z.strictObject({
     .max(10, "Give at most 10 options."),
   multiple: z.boolean().default(false),
 });
-export type EventPollInput = z.input<typeof eventPollSchema>;
 
 /**
  * `POST /v1/teams/:teamId/events` and `PATCH .../events/:eventId`
@@ -165,7 +156,6 @@ export const sendChatMessageRequestSchema = z.strictObject({
   uploadIds: z.array(z.string().min(1).max(128)).max(chatAttachmentsMax).default([]),
   replyTo: z.string().min(1).max(128).optional(),
 });
-export type SendChatMessageRequest = z.input<typeof sendChatMessageRequestSchema>;
 
 export interface SendChatMessageResult {
   id: string;
@@ -222,7 +212,6 @@ export type SaveChatRoomRequest = z.input<typeof saveChatRoomRequestSchema>;
 
 /** `POST /v1/teams/:teamId/chat-folders` and `PATCH .../chat-folders/:folderId`. */
 export const saveChatFolderRequestSchema = z.strictObject({ name: chatName, access: chatAccessSchema });
-export type SaveChatFolderRequest = z.input<typeof saveChatFolderRequestSchema>;
 
 /** `PUT /v1/teams/:teamId/chat-layout`: folder and room order, and which folder each room is in. */
 export const chatLayoutRequestSchema = z.strictObject({

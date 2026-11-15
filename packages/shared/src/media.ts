@@ -281,7 +281,6 @@ export const createUploadRequestSchema = z
       });
     }
   });
-export type CreateUploadRequest = z.input<typeof createUploadRequestSchema>;
 
 /** A name for a chat video sent without one, so its limit still follows its type. */
 const videoExtensions: Record<string, string> = {

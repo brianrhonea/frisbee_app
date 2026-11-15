@@ -181,7 +181,6 @@ export const saveDraftedTeamsRequestSchema = z.strictObject({
     )
     .max(32),
 });
-export type SaveDraftedTeamsInput = z.output<typeof saveDraftedTeamsRequestSchema>;
 
 /**
  * Why the host can't save [teams] now, or null: the checks the app's team

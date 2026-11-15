@@ -6,7 +6,6 @@ import {
   canSeeMeeting,
   type MeetingDoc,
   meetingDisplayName,
-  meetingInvitees,
   meetingJoinDecision,
   meetingRoomName,
   type MeetingTeam,
@@ -52,9 +51,6 @@ describe("canSeeMeeting", () => {
     expect(canSeeMeeting(team, everyone, "constructor")).toBe(false);
   });
 
-  it("lists invitees", () => {
-    expect(meetingInvitees(team, adminsOnly).sort()).toEqual(["c", "k", "o", "p1"]);
-  });
 });
 
 describe("meetingJoinDecision", () => {

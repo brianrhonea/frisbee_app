@@ -301,7 +301,6 @@ export const groupGameScoreRequestSchema = z
     scoreB: z.number().int().min(0, "Scores go from 0 to 99.").max(99, "Scores go from 0 to 99."),
   })
   .refine((s) => s.scoreA !== s.scoreB, { message: "Games can't end in a tie.", path: ["scoreB"] });
-export type GroupGameScoreRequest = z.input<typeof groupGameScoreRequestSchema>;
 
 // ---- Engine (tournament_engine.ts) ---------------------------------------
 //

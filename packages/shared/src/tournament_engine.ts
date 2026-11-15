@@ -22,22 +22,11 @@ export const tournamentFormatLabels: Record<TournamentFormat, { label: string; s
   poolsPlacement: { label: "Pool play + placement bracket", summary: "Pools, then brackets where every team plays for a final place" },
 };
 
-export const hasPools = (f: TournamentFormat) => f === "roundRobin" || f === "poolsSingleElim" || f === "poolsPlacement";
-
 export const scoringModes = ["points", "time"] as const;
 export type ScoringMode = (typeof scoringModes)[number];
 
 export const gameStages = ["pool", "winners", "losers", "grandFinal", "reset", "crossover", "placement"] as const;
 export type GameStage = (typeof gameStages)[number];
-export const gameStageLabels: Record<GameStage, string> = {
-  pool: "Pool",
-  winners: "Bracket",
-  losers: "Losers' bracket",
-  grandFinal: "Final",
-  reset: "Final (if needed)",
-  crossover: "Crossover",
-  placement: "Placement",
-};
 export const isBracketStage = (s: GameStage) => s !== "pool";
 
 export const gameStatuses = ["scheduled", "reported", "done"] as const;
@@ -133,8 +122,6 @@ export interface SchedulePlan {
   games: EngineGame[];
   days: ScheduleDay[];
 }
-
-export const planEndsAt = (p: SchedulePlan) => p.days[p.days.length - 1]?.endsAt ?? null;
 
 const minutes = (n: number) => n * 60_000;
 const at = (d: Date, ms: number) => new Date(d.getTime() + ms);

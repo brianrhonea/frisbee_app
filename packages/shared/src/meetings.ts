@@ -71,11 +71,6 @@ export function canSeeMeeting(team: MeetingTeam, meeting: MeetingDoc, uid: strin
   return isMeetingAdmin(team, uid) || (meeting.inviteRoles ?? []).includes(role) || (meeting.inviteUsers ?? []).includes(uid);
 }
 
-/** Team members who can see [meeting] (invitees). */
-export function meetingInvitees(team: MeetingTeam, meeting: MeetingDoc): string[] {
-  return Object.keys(team.members ?? {}).filter((uid) => canSeeMeeting(team, meeting, uid));
-}
-
 export type MeetingJoinDecision = "ok" | "notMember" | "notInvited" | "missing" | "notStarted" | "ended" | "needsApproval";
 
 /** Whether [uid] may get a token for the meeting's call right now (joinDecision). */
