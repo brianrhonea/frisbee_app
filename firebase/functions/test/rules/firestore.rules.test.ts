@@ -202,6 +202,8 @@ describe("a league's team", () => {
     await assertSucceeds(getDoc(doc(db(MATE), "teams", LEAGUE)));
     await assertFails(updateDoc(doc(db(MATE), "teams", LEAGUE), { name: "Mine" }));
     await assertFails(updateDoc(ref, { leagueId: "other" }));
+    // leagueHostId is the server's mark (createLeagueTeams checks it): never a client's.
+    await assertFails(updateDoc(ref, { leagueHostId: "other" }));
     await assertFails(updateDoc(ref, { ownerId: MATE }));
   });
 

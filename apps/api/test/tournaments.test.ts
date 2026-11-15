@@ -353,6 +353,16 @@ describe("authorized before anything is listed", () => {
     }
   });
 
+  it("a schedule body past the 64 KB default reaches the checks (its own bodyLimit)", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    const [g] = plan(["red", "blue"]);
+    const games = Array.from({ length: 300 }, (_, i) => ({ ...g, id: `g${String(i + 1).padStart(3, "0")}`, order: i, teamA: "x".repeat(128) }));
+    expect(JSON.stringify({ games }).length).toBeGreaterThan(64 * 1024);
+    const res = await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games });
+    expect(res.status).toBe(400);
+    expect(res.json().error.message).toMatch(/doesn't match the division's teams/);
+  });
+
   it("delete pages through subcollections bigger than one list", async () => {
     const t = await host();
     for (let i = 0; i < 2300; i++) store.put(`tournaments/${t.id}/entries/team${String(i).padStart(4, "0")}`, { status: "applied" });
