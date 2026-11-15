@@ -4,10 +4,12 @@ import { useState } from "react";
 import { callApi } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { PostCard } from "./PostCard";
+import { FeedPager } from "./home/useInfiniteFeed";
 
 /**
  * Older community posts for members (`GET /v1/feed`), after the page the
- * server rendered; [before] is that page's last post time (ms).
+ * server rendered; [before] is that page's last post time (ms). They load
+ * as the end of the list nears the screen.
  */
 export function MoreFeed({ before }: { before: number | null }) {
   const { user } = useAuth();
@@ -19,7 +21,7 @@ export function MoreFeed({ before }: { before: number | null }) {
   if (!user) return null;
 
   async function load() {
-    if (!user || next === null) return;
+    if (!user || next === null || busy) return;
     setBusy(true);
     setError(false);
     try {
@@ -42,16 +44,7 @@ export function MoreFeed({ before }: { before: number | null }) {
           ))}
         </div>
       )}
-      <div className="pager">
-        {next === null ? (
-          <p className="empty">You&apos;re all caught up.</p>
-        ) : (
-          <button className="btn" type="button" disabled={busy} onClick={() => void load()}>
-            {busy ? "Loading…" : "Older posts"}
-          </button>
-        )}
-        {error && <p className="post-error">Couldn&apos;t load more posts. Try again.</p>}
-      </div>
+      <FeedPager hasMore={next !== null} busy={busy} error={error} count={posts.length} loadMore={load} />
     </>
   );
 }
