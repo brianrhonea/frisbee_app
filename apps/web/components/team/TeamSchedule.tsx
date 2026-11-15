@@ -55,18 +55,21 @@ function startOfToday() {
  * (or, for [past], ones before tomorrow). An organization's events say who
  * sees them, so a member without manageEvents asks once per audience id,
  * as the app does; teams and groups show every event to every member.
- * [key] names the set for useLiveQueries. Shared with My schedule.
+ * [lookBackDays] starts upcoming reads that many days before today, so
+ * multi-day events under way stay in (MySchedule.lookBack). [key] names
+ * the set for useLiveQueries. Shared with My schedule.
  */
-export function teamEventQueries(member: Extract<TeamViewer, { state: "member" }>, past = false) {
+export function teamEventQueries(member: Extract<TeamViewer, { state: "member" }>, past = false, lookBackDays = 0) {
   const today = startOfToday();
+  const since = lookBackDays > 0 ? Timestamp.fromMillis(today.toMillis() - lookBackDays * day) : today;
   const scoped = member.team.kind === "organization" && !member.can("manageEvents");
   // The audience + startsAt index is ascending only (firestore.indexes.json),
   // so an organization's past events come oldest first and are sorted here.
   const range: QueryConstraint[] = past
     ? [where("startsAt", "<", Timestamp.fromMillis(today.toMillis() + day)), orderBy("startsAt", scoped ? "asc" : "desc")]
-    : [where("startsAt", ">=", today), orderBy("startsAt")];
+    : [where("startsAt", ">=", since), orderBy("startsAt")];
   const queries = scoped ? member.audience.map((id) => [where("audience", "array-contains", id), ...range]) : [range];
-  const key = `${past}|${scoped ? member.audience.join(",") : "all"}|${today.seconds}`;
+  const key = `${past}|${scoped ? member.audience.join(",") : "all"}|${since.seconds}`;
   return { queries, key };
 }
 

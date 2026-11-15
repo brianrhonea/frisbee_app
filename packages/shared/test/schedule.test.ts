@@ -1,8 +1,9 @@
-// The website's My schedule merge, mirroring the app's MySchedule /
-// ScheduleViewModel cases (apps/mobile/test/ui/home_test.dart: personal
-// events show without a team, team events feature first; calendars_test:
-// other calendars' events join the schedule) and TeamDetailViewModel's
-// two-hour rule for events without an end.
+// The website's My schedule merge, mirroring the app's MySchedule
+// (apps/mobile/lib/ui/schedule/view_models/my_schedule.dart: personal,
+// calendar and team entries merged soonest first; meetings until ended),
+// ScheduleViewModel's All / Team / Personal filter and
+// TeamDetailViewModel.upcomingEvents' two-hour rule for events without an
+// end.
 import { describe, expect, it } from "vitest";
 import {
   scheduleEntryOver,

@@ -72,6 +72,9 @@ type Row = ScheduleItem &
   );
 
 /** Team entries share one color, as in the app; calendars have their own. */
+
+/** How far back team events are read, so multi-day ones under way stay in (MySchedule.lookBack). */
+const lookBackDays = 7;
 const teamColor = "var(--accent)";
 
 /**
@@ -90,7 +93,7 @@ function TeamFeed({
   onData: (teamId: string, data: TeamFeedData | null) => void;
 }) {
   const member = memberViewer(team, uid);
-  const ev = teamEventQueries(member);
+  const ev = teamEventQueries(member, false, lookBackDays);
   const events = useLiveQueries<TeamEventDoc>(`teams/${team.id}/events`, ev.queries, ev.key);
   const mq = teamMeetingQueries(member);
   const meetings = useLiveQueries<MeetingData>(`teams/${team.id}/meetings`, mq.queries, mq.key);
@@ -287,7 +290,7 @@ export function Schedule() {
           <p className="muted small">
             {filter !== "team"
               ? "Nothing coming up. Add a workout, a pickup game or anything else you're doing."
-              : teams.length === 0
+              : teamsLive.data !== undefined && teams.length === 0
                 ? "You're not on a team yet."
                 : "Nothing coming up on your teams."}
           </p>
@@ -310,7 +313,7 @@ export function Schedule() {
                     <small className="muted">{scheduleTeamLabel(x.team.name, teams.length)}</small>
                     {memberViewer(x.team, me.uid).can("manageEvents") && (
                       <span className="event-actions">
-                        <button type="button" className="text-btn" onClick={() => void removeTeamEvent(x.team, e)}>
+                        <button type="button" className="text-btn danger" onClick={() => void removeTeamEvent(x.team, e)}>
                           Delete
                         </button>
                       </span>
