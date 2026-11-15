@@ -140,8 +140,34 @@ class TeamHomeViewModel extends ChangeNotifier {
     _watchListings();
     _watchContent();
     _watchRequest();
+    _watchJoinRequests();
     _publishListing();
     notifyListeners();
+  }
+
+  StreamSubscription<List<GroupJoinRequest>>? _joinRequestsSub;
+  int _joinRequestCount = 0;
+
+  /// How many people are asking to join, for the Invite button's badge:
+  /// a group that approves members, to members who manage members.
+  int get joinRequestCount => _joinRequestCount;
+
+  void _watchJoinRequests() {
+    final team = _team;
+    final want =
+        team != null &&
+        team.isCommunity &&
+        team.requiresApproval &&
+        canManageMembers;
+    if (want == (_joinRequestsSub != null)) return;
+    _joinRequestsSub?.cancel();
+    _joinRequestsSub = null;
+    _joinRequestCount = 0;
+    if (!want) return;
+    _joinRequestsSub = _teams.watchJoinRequests(teamId).listen((r) {
+      _joinRequestCount = r.length;
+      notifyListeners();
+    }, onError: (Object _) {});
   }
 
   void _watchListings() {
@@ -401,6 +427,7 @@ class TeamHomeViewModel extends ChangeNotifier {
     _listingSub.cancel();
     _listingsSub?.cancel();
     _requestSub?.cancel();
+    _joinRequestsSub?.cancel();
     _teamSub?.cancel();
     _eventsSub?.cancel();
     _postsSub?.cancel();

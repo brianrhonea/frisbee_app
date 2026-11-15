@@ -13,10 +13,11 @@ import '../../../utils/command.dart';
 import '../../../utils/invite_links.dart';
 import '../../../utils/result.dart';
 
-/// An invite link to share anywhere, and people search: each person
-/// invited gets an in-app invite plus the link as a direct message.
-/// A team's link expires after [expiry] (each one minted when first copied,
-/// shared or sent); a group's link just opens its page. Owners and
+/// An invite link to share anywhere, people search (each person invited
+/// gets an in-app invite plus the link as a direct message), and a group's
+/// join requests. A team's link expires after [expiry]; [start] (the dialog
+/// opening) mints it, so it's ready to copy or share, as on the website.
+/// A group's link just opens its page. Owners and
 /// organizers only (the rules check), or, without [withLink], a community's
 /// admins inviting to one of its teams: they can't make the team's links,
 /// so the message just says where to accept.
@@ -33,6 +34,18 @@ class InviteMembersViewModel extends ChangeNotifier {
        _auth = authRepository {
     invite = Command1<void, UserProfile>(_invite);
     createLink = Command0<Uri>(_createLink);
+    approveJoinRequest = Command1<void, GroupJoinRequest>(
+      (r) => _teams.approveJoinRequest(team.id, r),
+    );
+    declineJoinRequest = Command1<void, String>(
+      (uid) => _teams.declineJoinRequest(team.id, uid),
+    );
+    if (hasJoinRequests) {
+      _requestSub = _teams.watchJoinRequests(team.id).listen((r) {
+        _joinRequests = r;
+        notifyListeners();
+      }, onError: (Object _) {});
+    }
     // Groups have no code; the link opens their page.
     if (team.isCommunity) _link = InviteLinks.group(team.id);
   }
@@ -56,14 +69,44 @@ class InviteMembersViewModel extends ChangeNotifier {
   InviteLinkExpiry get expiry => _expiry;
 
   /// Picks how long the link works; a link already made keeps its own
-  /// expiry, and the next copy or share makes a new one.
+  /// expiry. Once [start]ed a new one is made at once, else on the next
+  /// copy or share.
   void setExpiry(InviteLinkExpiry value) {
     if (value == _expiry || !linkExpires) return;
     _expiry = value;
     _link = null;
     _linkExpiresAt = null;
     notifyListeners();
+    if (_started) createLink.execute();
   }
+
+  bool _started = false;
+
+  /// The dialog opened: make the team's link now, so Invite then Copy (or
+  /// Share) is all it takes.
+  void start() {
+    if (_started) return;
+    _started = true;
+    if (withLink && linkExpires) createLink.execute();
+  }
+
+  StreamSubscription<List<GroupJoinRequest>>? _requestSub;
+  List<GroupJoinRequest> _joinRequests = const [];
+
+  /// Whether join requests are shown: a group that approves members, to
+  /// its member managers (the rules let only them read requests).
+  bool get hasJoinRequests =>
+      withLink &&
+      team.isCommunity &&
+      team.requiresApproval &&
+      (_auth.currentUser != null &&
+          team.has(_auth.currentUser!.uid, TeamPermission.manageMembers));
+
+  /// People asking to join, oldest first.
+  List<GroupJoinRequest> get joinRequests => _joinRequests;
+
+  late final Command1<void, GroupJoinRequest> approveJoinRequest;
+  late final Command1<void, String> declineJoinRequest;
 
   /// Makes the team's link if there isn't one yet; returns the link.
   late final Command0<Uri> createLink;
@@ -123,6 +166,12 @@ class InviteMembersViewModel extends ChangeNotifier {
   Object? get error => _error;
 
   final Set<String> _invited = {};
+  final List<UserProfile> _invitedPeople = [];
+
+  /// Who was invited while this dialog was open, newest first. A team's
+  /// pending invites live under each invitee, so there's no list to read
+  /// back; this is the session's.
+  List<UserProfile> get invitedPeople => List.unmodifiable(_invitedPeople);
 
   String get query => _query;
 
@@ -177,6 +226,9 @@ class InviteMembersViewModel extends ChangeNotifier {
     final result = await _teams.inviteToTeam(team, person.uid, user);
     if (result is! Ok) return result;
     _invited.add(person.uid);
+    _invitedPeople
+      ..removeWhere((p) => p.uid == person.uid)
+      ..insert(0, person);
     notifyListeners();
     final String text;
     if (withLink) {
@@ -199,8 +251,11 @@ class InviteMembersViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    _requestSub?.cancel();
     invite.dispose();
     createLink.dispose();
+    approveJoinRequest.dispose();
+    declineJoinRequest.dispose();
     super.dispose();
   }
 }

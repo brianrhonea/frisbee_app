@@ -12,6 +12,7 @@ import 'package:frisbee_app/ui/teams/view_models/join_link_viewmodel.dart';
 import 'package:frisbee_app/ui/teams/view_models/team_home_viewmodel.dart';
 import 'package:frisbee_app/ui/teams/view_models/teams_viewmodel.dart';
 import 'package:frisbee_app/ui/teams/widgets/invite_code_card.dart';
+import 'package:frisbee_app/ui/teams/widgets/invite_members_dialog.dart';
 import 'package:frisbee_app/ui/teams/widgets/join_link_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -153,10 +154,7 @@ void main() {
 
       await vm.createLink.execute();
       final token = vm.link!.pathSegments.last;
-      expect(
-        vm.link.toString(),
-        'https://dev.stall10.app/join/$token',
-      );
+      expect(vm.link.toString(), 'https://dev.stall10.app/join/$token');
       expect(vm.shareText, 'Join Team on Stall 10: ${vm.link}');
       expect(teams.linkExpiries[token], InviteLinkExpiry.week);
       expect(
@@ -203,6 +201,192 @@ void main() {
       await vm.createLink.execute();
       expect(vm.createLink.error, isTrue);
       expect(vm.link, isNull);
+      vm.dispose();
+    });
+
+    test("opening the dialog makes a team's link at once, as on the "
+        'website', () async {
+      final t = teamWith({testUser.uid: TeamRole.owner});
+      teams.teams['t1'] = t;
+      final vm = InviteMembersViewModel(
+        team: t,
+        teamRepository: teams,
+        directMessageRepository: FakeDirectMessageRepository(),
+        authRepository: auth,
+      );
+      vm.start();
+      await pumpEventQueue();
+      final token = vm.link!.pathSegments.last;
+      expect(teams.linkExpiries[token], InviteLinkExpiry.week);
+      // Opening again (or copying) reuses it.
+      vm.start();
+      await vm.createLink.execute();
+      expect(teams.inviteCodes, hasLength(1));
+      // Another duration makes its link straight away.
+      vm.setExpiry(InviteLinkExpiry.day);
+      await pumpEventQueue();
+      final dayToken = vm.link!.pathSegments.last;
+      expect(dayToken, isNot(token));
+      expect(teams.linkExpiries[dayToken], InviteLinkExpiry.day);
+      vm.dispose();
+    });
+
+    test("a group's link is its page: opening mints nothing", () async {
+      final g = makeGroup(members: {testUser.uid: TeamRole.owner});
+      teams.teams['g1'] = g;
+      final vm = InviteMembersViewModel(
+        team: g,
+        teamRepository: teams,
+        directMessageRepository: FakeDirectMessageRepository(),
+        authRepository: auth,
+      )..start();
+      await pumpEventQueue();
+      expect(vm.link.toString(), 'https://dev.stall10.app/g/g1');
+      expect(teams.inviteCodes, isEmpty);
+      vm.dispose();
+    });
+
+    test('the dialog lists join requests to approve or decline', () async {
+      final g = makeGroup(
+        members: {'owner': TeamRole.owner, testUser.uid: TeamRole.captain},
+      );
+      teams.teams['g1'] = g;
+      teams.joinRequests['g1'] = [
+        const GroupJoinRequest(uid: 'ann', name: 'Ann'),
+        const GroupJoinRequest(uid: 'bo', name: 'Bo'),
+      ];
+      final vm = InviteMembersViewModel(
+        team: g,
+        teamRepository: teams,
+        directMessageRepository: FakeDirectMessageRepository(),
+        authRepository: auth,
+      );
+      await pumpEventQueue();
+      expect(vm.hasJoinRequests, isTrue);
+      expect(vm.joinRequests.map((r) => r.uid), ['ann', 'bo']);
+
+      await vm.approveJoinRequest.execute(vm.joinRequests.first);
+      await pumpEventQueue();
+      expect(teams.teams['g1']!.roleOf('ann'), TeamRole.player);
+      await vm.declineJoinRequest.execute('bo');
+      await pumpEventQueue();
+      expect(vm.joinRequests, isEmpty);
+      expect(teams.teams['g1']!.roleOf('bo'), isNull);
+      vm.dispose();
+    });
+
+    test('an open group or a team has no requests to show', () async {
+      final open = makeGroup(
+        members: {testUser.uid: TeamRole.owner},
+        requiresApproval: false,
+      );
+      final vm = InviteMembersViewModel(
+        team: open,
+        teamRepository: teams,
+        directMessageRepository: FakeDirectMessageRepository(),
+        authRepository: auth,
+      );
+      expect(vm.hasJoinRequests, isFalse);
+      vm.dispose();
+    });
+
+    test('who was invited is listed while the dialog is open', () async {
+      final g = makeGroup(members: {testUser.uid: TeamRole.owner});
+      teams.teams['g1'] = g;
+      final people = FakeDirectMessageRepository()
+        ..profiles.addAll(const [
+          UserProfile(uid: 'sam', name: 'Sam Lee'),
+          UserProfile(uid: 'sal', name: 'Sal Ray'),
+        ]);
+      final vm = InviteMembersViewModel(
+        team: g,
+        teamRepository: teams,
+        directMessageRepository: people,
+        authRepository: auth,
+        debounce: Duration.zero,
+      );
+      vm.search('sa');
+      await pumpEventQueue();
+      await vm.invite.execute(vm.results.first);
+      await vm.invite.execute(vm.results.last);
+      expect(vm.invitedPeople.map((p) => p.uid), ['sal', 'sam']);
+      vm.dispose();
+    });
+
+    testWidgets('the dialog shows the link made on opening and the requests', (
+      tester,
+    ) async {
+      final g = makeGroup(members: {testUser.uid: TeamRole.owner});
+      teams.teams['g1'] = g;
+      teams.joinRequests['g1'] = [
+        const GroupJoinRequest(uid: 'ann', name: 'Ann'),
+      ];
+      final vm = InviteMembersViewModel(
+        team: g,
+        teamRepository: teams,
+        directMessageRepository: FakeDirectMessageRepository(),
+        authRepository: auth,
+      );
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(body: InviteMembersDialog(viewModel: vm)),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('https://dev.stall10.app/g/g1'), findsOneWidget);
+      expect(find.text('Requests (1)'), findsOneWidget);
+      await tester.tap(find.text('Approve'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Requests (1)'), findsNothing);
+      expect(teams.teams['g1']!.roleOf('ann'), TeamRole.player);
+    });
+
+    test('the team page counts join requests for its Invite badge', () async {
+      final g = makeGroup(
+        members: {'owner': TeamRole.owner, testUser.uid: TeamRole.captain},
+      );
+      teams.teams['g1'] = g;
+      teams.joinRequests['g1'] = [
+        const GroupJoinRequest(uid: 'ann', name: 'Ann'),
+      ];
+      final vm = TeamHomeViewModel(
+        teamId: 'g1',
+        teamRepository: teams,
+        eventRepository: FakeEventRepository(),
+        teamPostRepository: FakeTeamPostRepository(),
+        authRepository: auth,
+        filePicker: FakeFilePickerService(),
+      );
+      await pumpEventQueue();
+      expect(vm.canManageMembers, isTrue);
+      expect(vm.joinRequestCount, 1);
+      await teams.declineJoinRequest('g1', 'ann');
+      await pumpEventQueue();
+      expect(vm.joinRequestCount, 0);
+      vm.dispose();
+    });
+
+    test('players see no join-request count', () async {
+      final g = makeGroup(
+        members: {'owner': TeamRole.owner, testUser.uid: TeamRole.player},
+      );
+      teams.teams['g1'] = g;
+      teams.joinRequests['g1'] = [
+        const GroupJoinRequest(uid: 'ann', name: 'Ann'),
+      ];
+      final vm = TeamHomeViewModel(
+        teamId: 'g1',
+        teamRepository: teams,
+        eventRepository: FakeEventRepository(),
+        teamPostRepository: FakeTeamPostRepository(),
+        authRepository: auth,
+        filePicker: FakeFilePickerService(),
+      );
+      await pumpEventQueue();
+      expect(vm.joinRequestCount, 0);
       vm.dispose();
     });
 

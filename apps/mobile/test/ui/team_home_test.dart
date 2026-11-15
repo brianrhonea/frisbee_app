@@ -495,6 +495,37 @@ void main() {
       );
     });
 
+    testWidgets('a team says outsiders need an invite code', (tester) async {
+      addTeam({'owner': TeamRole.owner});
+      await pump(tester, homeVm());
+      expect(find.textContaining('invite code to join'), findsOneWidget);
+    });
+
+    testWidgets("Invite counts a group's join requests", (tester) async {
+      final group = Team(
+        id: 't1',
+        name: 'Friends',
+        division: Division.mixed,
+        level: CompetitionLevel.pickup,
+        ownerId: testUser.uid,
+        members: {testUser.uid: TeamRole.owner},
+        kind: TeamKind.community,
+        requiresApproval: true,
+      );
+      teams.teams['t1'] = group;
+      teams.listings['t1'] = TeamListing.of(group);
+      teams.joinRequests['t1'] = [
+        const GroupJoinRequest(uid: 'ann', name: 'Ann'),
+        const GroupJoinRequest(uid: 'bo', name: 'Bo'),
+      ];
+      await pump(tester, homeVm());
+      expect(find.text('Invite members'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(Badge), matching: find.text('2')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('posts show their place, links and photos', (tester) async {
       addTeam({'owner': TeamRole.owner});
       posts.posts['t1'] = [

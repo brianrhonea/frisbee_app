@@ -35,8 +35,9 @@ Future<void> showInviteMembers(
   ),
 );
 
-/// The team's invite link to copy or share to any app, and people search:
-/// each person invited gets an in-app invite and the link in a message.
+/// The team's invite link (made on opening) to copy or share to any app,
+/// a group's join requests, and people search: each person invited gets
+/// an in-app invite and the link in a message.
 class InviteMembersDialog extends StatefulWidget {
   const InviteMembersDialog({super.key, required this.viewModel});
 
@@ -53,11 +54,16 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
   void initState() {
     super.initState();
     vm.invite.addListener(_onInvite);
+    vm.approveJoinRequest.addListener(_onRequest);
+    vm.declineJoinRequest.addListener(_onRequest);
+    vm.start();
   }
 
   @override
   void dispose() {
     vm.invite.removeListener(_onInvite);
+    vm.approveJoinRequest.removeListener(_onRequest);
+    vm.declineJoinRequest.removeListener(_onRequest);
     super.dispose();
   }
 
@@ -65,6 +71,15 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
     if (vm.invite.result case Error(:final error)) {
       showErrorSnackBar(context, error);
       vm.invite.clearResult();
+    }
+  }
+
+  void _onRequest() {
+    for (final c in [vm.approveJoinRequest, vm.declineJoinRequest]) {
+      if (c.result case Error(:final error)) {
+        showErrorSnackBar(context, error);
+        c.clearResult();
+      }
     }
   }
 
@@ -89,6 +104,7 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
           children: [
             if (vm.withLink) ...[
               _LinkCard(viewModel: vm),
+              _JoinRequestsCard(viewModel: vm),
               const SizedBox(height: 16),
               Text(
                 'Or invite someone on Stall 10',
@@ -109,6 +125,33 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
                     return Center(child: Text(errorMessage(vm.error)));
                   }
                   String? note;
+                  final invited = vm.invitedPeople;
+                  if (vm.query.length < InviteMembersViewModel.minQueryLength &&
+                      invited.isNotEmpty) {
+                    // Who was invited while this was open, until the next
+                    // search.
+                    return ListView(
+                      children: [
+                        Text(
+                          'Invited just now',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        for (final p in invited)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: PersonAvatar(
+                              name: p.name,
+                              photoUrl: p.photoUrl,
+                            ),
+                            title: Text(p.name),
+                            trailing: Text(
+                              'Pending',
+                              style: TextStyle(color: c.muted),
+                            ),
+                          ),
+                      ],
+                    );
+                  }
                   if (vm.query.length < InviteMembersViewModel.minQueryLength) {
                     note = vm.withLink
                         ? 'Find people by name. They get an invite to accept '
@@ -271,8 +314,18 @@ class _LinkCard extends StatelessWidget {
                   Expanded(
                     child: link == null
                         ? Text(
-                            'Copy or share to make a link.',
-                            style: TextStyle(fontSize: 12.5, color: c.muted),
+                            busy
+                                ? 'Making a link…'
+                                : viewModel.createLink.error
+                                ? "Couldn't make a link. Copy or share to "
+                                      'try again.'
+                                : 'Copy or share to make a link.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: viewModel.createLink.error
+                                  ? Theme.of(context).colorScheme.error
+                                  : c.muted,
+                            ),
                           )
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,6 +358,81 @@ class _LinkCard extends StatelessWidget {
                     label: const Text('Share'),
                   ),
                 ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// People asking to join a group that approves members, to approve or
+/// decline right from the invite dialog (also on the Members tab).
+class _JoinRequestsCard extends StatelessWidget {
+  const _JoinRequestsCard({required this.viewModel});
+
+  final InviteMembersViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        vm,
+        vm.approveJoinRequest,
+        vm.declineJoinRequest,
+      ]),
+      builder: (context, _) {
+        final requests = vm.joinRequests;
+        if (!vm.hasJoinRequests || requests.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final busy =
+            vm.approveJoinRequest.running || vm.declineJoinRequest.running;
+        return Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Requests (${requests.length})',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 132),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final r in requests)
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: PersonAvatar(
+                          name: r.name.isEmpty ? '?' : r.name,
+                        ),
+                        title: Text(r.name.isEmpty ? 'Someone' : r.name),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Decline',
+                              icon: const Icon(Icons.close),
+                              onPressed: busy
+                                  ? null
+                                  : () => vm.declineJoinRequest.execute(r.uid),
+                            ),
+                            FilledButton.tonal(
+                              onPressed: busy
+                                  ? null
+                                  : () => vm.approveJoinRequest.execute(r),
+                              child: const Text('Approve'),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),

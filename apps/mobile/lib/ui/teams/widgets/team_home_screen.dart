@@ -1197,7 +1197,7 @@ FollowControl? _followOf(TeamHomeViewModel vm) => switch (vm.follow) {
 };
 
 /// The buttons under the team's name: its community, [follow], Message and
-/// Invite.
+/// Invite (with a badge counting join requests).
 List<Widget> _teamActions(
   BuildContext context,
   TeamHomeViewModel vm,
@@ -1219,10 +1219,18 @@ List<Widget> _teamActions(
       label: const Text('Message'),
     ),
   if (vm.team case final team? when vm.canManageMembers)
-    FilledButton.icon(
-      onPressed: () => showInviteMembers(context, team),
-      icon: const Icon(Icons.person_add_alt, size: 18),
-      label: Text(summary.isCommunity ? 'Invite members' : 'Invite players'),
+    // The badge counts people asking to join; they're in the dialog too.
+    Badge(
+      isLabelVisible: vm.joinRequestCount > 0,
+      label: Text(
+        vm.joinRequestCount > 99 ? '99+' : '${vm.joinRequestCount}',
+        semanticsLabel: '${vm.joinRequestCount} asking to join',
+      ),
+      child: FilledButton.icon(
+        onPressed: () => showInviteMembers(context, team),
+        icon: const Icon(Icons.person_add_alt, size: 18),
+        label: Text(summary.isCommunity ? 'Invite members' : 'Invite players'),
+      ),
     ),
 ];
 
