@@ -217,10 +217,20 @@ everything the app does on the website alone, styled like the website
    the API; api 0.20.0, web 0.21.0; needs the LiveKit secrets on Cloud
    Run). Recording stays deferred. Not yet on the website: device
    pickers and camera preview, output volume, older call chat, a voice
-   call that stays up across pages, and meetings on the schedule (they
-   have their own tab).
+   call that stays up across pages. [x] Meetings on the team schedule
+   beside events, with New meeting (the website keeps its Meetings tab
+   too; the app has none).
 7. Posts: [ ] video in posts (waits on the transcode job); [x] feed tabs;
-   [x] Discord import (api 0.21.0, web 0.22.0).
+   [x] Discord import (api 0.21.0, web 0.22.0); [x] sharing My calendar
+   and shared-calendar events with followers (as the app's editor does;
+   the API checks the caller can edit that calendar).
+8. Small gaps: [x] notifications open the matching website page for
+   every app route (tournaments, signups, drafts, plays, videos, stats
+   games, group tournaments, meetings); [x] one draft URL scheme
+   (`draft/:div` is the host's balanced draft, `live-draft/:div` the
+   captains', as in the app); [x] change password, with the app's
+   password policy (`@stall10/shared`, on sign-up too); [x] a System
+   theme choice beside Light and Dark.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

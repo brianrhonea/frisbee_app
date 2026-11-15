@@ -178,8 +178,9 @@ export const savePostRequestSchema = z.strictObject({
   /**
    * New posts only: shares an event (the app's "post it on my profile" when
    * saving one) from a team's schedule ([teamId], whose events the caller
-   * manages) or from the caller's own (null). The API copies its details
-   * from the stored event.
+   * manages), from a calendar the caller can edit ([calendarId]; their own
+   * uid is My calendar), or from the caller's own (both null). The API
+   * copies its details from the stored event.
    */
   shareEvent: z
     .strictObject({
@@ -188,7 +189,13 @@ export const savePostRequestSchema = z.strictObject({
         .string()
         .regex(/^[A-Za-z0-9_-]{1,128}$/)
         .nullable(),
+      calendarId: z
+        .string()
+        .regex(/^[A-Za-z0-9_-]{1,128}$/)
+        .nullable()
+        .optional(),
     })
+    .refine((e) => !(e.teamId && e.calendarId), { message: "Share a team's event or a calendar's, not both." })
     .optional(),
 });
 export type SavePostRequest = z.input<typeof savePostRequestSchema>;

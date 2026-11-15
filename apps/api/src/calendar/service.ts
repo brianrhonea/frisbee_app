@@ -93,6 +93,23 @@ const isDefault = (c: Cal) => c.id === c.ownerId;
 const eventsOf = (c: Cal) => (isDefault(c) ? `users/${c.ownerId}/events` : `calendars/${c.id}/events`);
 const canEdit = (role: CalendarRole | undefined) => role === "owner" || role === "edit";
 
+/**
+ * Where calendar [rawId]'s events are kept, for [uid] who can edit it
+ * (owner or Can edit), as addEvent checks: not_found when they aren't on
+ * it (an invite they haven't accepted included), permission_denied for
+ * Can view. Their own uid is My calendar, which may not exist yet.
+ */
+export async function editableEventsPath(store: DocStore, uid: string, rawId: unknown): Promise<string> {
+  const id = docIdParam(rawId);
+  if (id === uid) return `users/${uid}/events`;
+  const d = await store.get(p.calendar(id));
+  const cal = d && parse(id, d);
+  const role = cal ? cal.members[uid] : undefined;
+  if (!cal || !role) throw noCalendar();
+  if (!canEdit(role)) throw new ApiError("permission_denied", "You can view this calendar but not change it.");
+  return eventsOf(cal);
+}
+
 /** The hash a feed token is stored under; the token itself is only on its owner's record. */
 export const feedHash = (token: string) => createHash("sha256").update(token).digest("hex");
 const tokenPattern = /^[A-Za-z0-9_-]{24,64}$/;

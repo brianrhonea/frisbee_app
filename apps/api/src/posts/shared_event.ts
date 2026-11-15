@@ -3,9 +3,14 @@
 // event's details, so followers who can't open the event see them. The
 // posts rule's validSharedEvent and sharesOwnTeamEvent, ported: the copy
 // is made here from the stored event (never from the client), and a team's
-// event is shared only by someone who manages its schedule.
+// event is shared only by someone who manages its schedule. A shared
+// calendar's event (the app shares those from its editor too, with no
+// teamId) is read only for someone who can edit that calendar, as the
+// calendar API checks: the rules never let clients read its events, so the
+// copy mustn't show them to anyone else.
 import { teamEventTypes } from "@stall10/shared";
 import type { Caller } from "../auth.js";
+import { editableEventsPath } from "../calendar/service.js";
 import { ApiError } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { Data, DocStore } from "../store.js";
@@ -19,7 +24,11 @@ const asDate = (v: unknown): Date | null => {
 };
 
 /** The event field of an event post (SharedEvent.toMap). */
-export async function sharedEvent(store: DocStore, caller: Caller, ref: { eventId: string; teamId: string | null }): Promise<Data> {
+export async function sharedEvent(
+  store: DocStore,
+  caller: Caller,
+  ref: { eventId: string; teamId: string | null; calendarId?: string | null },
+): Promise<Data> {
   const eventId = docIdParam(ref.eventId);
   const teamId = ref.teamId === null ? null : docIdParam(ref.teamId);
   let teamName: string | null = null;
@@ -32,6 +41,8 @@ export async function sharedEvent(store: DocStore, caller: Caller, ref: { eventI
     }
     teamName = clip(team.name, 100) || null;
     event = await store.get(`teams/${teamId}/events/${eventId}`);
+  } else if (ref.calendarId) {
+    event = await store.get(`${await editableEventsPath(store, caller.uid, ref.calendarId)}/${eventId}`);
   } else {
     event = await store.get(`users/${caller.uid}/events/${eventId}`);
   }

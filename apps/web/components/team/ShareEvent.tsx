@@ -15,7 +15,8 @@ export interface ShareChoice {
   message: string;
 }
 
-export function ShareEventField({ value, onChange }: { value: ShareChoice; onChange: (v: ShareChoice) => void }) {
+/** [personal]: an event on one of the member's calendars, which has no team members to reach. */
+export function ShareEventField({ value, onChange, personal = false }: { value: ShareChoice; onChange: (v: ShareChoice) => void; personal?: boolean }) {
   return (
     <fieldset className="share-event">
       <label className="check-row">
@@ -23,7 +24,9 @@ export function ShareEventField({ value, onChange }: { value: ShareChoice; onCha
         Share with my followers
       </label>
       <small className="muted">
-        Posts it on your profile, so the people who follow you and the team&apos;s members see it in their feed. RSVPs and notes stay here.
+        {personal
+          ? "Posts it on your profile, so the people who follow you see it in their feed. RSVPs and notes stay here."
+          : "Posts it on your profile, so the people who follow you and the team's members see it in their feed. RSVPs and notes stay here."}
       </small>
       {value.on && (
         <label>
@@ -41,10 +44,14 @@ export function ShareEventField({ value, onChange }: { value: ShareChoice; onCha
   );
 }
 
-/** Posts the saved event; false when it couldn't (the event is saved either way). */
-export async function shareEvent(user: User, teamId: string | null, eventId: string, message: string): Promise<boolean> {
+/**
+ * Posts the saved event, from team [teamId]'s schedule or (teamId null)
+ * calendar [calendarId]'s; false when it couldn't (the event is saved
+ * either way).
+ */
+export async function shareEvent(user: User, teamId: string | null, eventId: string, message: string, calendarId: string | null = null): Promise<boolean> {
   try {
-    await callApi(user, "/v1/posts", { method: "POST", body: { body: message.trim(), shareEvent: { eventId, teamId } } });
+    await callApi(user, "/v1/posts", { method: "POST", body: { body: message.trim(), shareEvent: { eventId, teamId, ...(calendarId && { calendarId }) } } });
     return true;
   } catch {
     return false;
