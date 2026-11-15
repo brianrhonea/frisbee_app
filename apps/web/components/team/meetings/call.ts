@@ -147,8 +147,12 @@ export class CallSession {
     call.listen();
     a.onSession?.(call);
     const cancelled = () => {
-      if (call.left) throw new CallCancelled();
+      if (!call.left) return;
+      // leave() may have run before connect started; make sure the room is closed.
+      void room.disconnect(true).catch(() => undefined);
+      throw new CallCancelled();
     };
+    cancelled();
     try {
       await room.connect(a.url, a.token);
     } catch (e) {

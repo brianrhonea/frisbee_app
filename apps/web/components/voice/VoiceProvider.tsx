@@ -44,8 +44,10 @@ function watchDoc(ref: DocumentReference, onData: (snap: DocumentSnapshot) => vo
   const start = () => {
     timer = null;
     if (closed) return;
+    // Metadata changes too, so a cached doc still reports once the server confirms it.
     stop = onSnapshot(
       ref,
+      { includeMetadataChanges: true },
       (snap) => {
         failures = 0;
         onData(snap);
