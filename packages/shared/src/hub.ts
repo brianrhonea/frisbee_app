@@ -3,6 +3,7 @@
 // and team chat messages. Ports of the teams/{id}/posts, events, chats and
 // messages rules in firestore.rules; the app still writes these directly.
 import { z } from "zod";
+import { isoDateTime } from "./dates.js";
 
 // Team posts ---------------------------------------------------------------
 
@@ -88,7 +89,7 @@ export const eventReactionEmoji: Record<EventReaction, string> = {
   grimace: "😬",
 };
 
-const isoDate = z.string().refine((s) => !Number.isNaN(Date.parse(s)), "Give a date and time.");
+const isoDate = isoDateTime("Give a date and time.");
 
 /** validPoll: a question and 2–10 options, each with an id. */
 export const eventPollSchema = z.strictObject({

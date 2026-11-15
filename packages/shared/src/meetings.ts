@@ -5,6 +5,7 @@
 // meetings-voiceToken callables), which the app still calls; keep the two
 // in step, and in step with the meetings rules in firestore.rules.
 import { z } from "zod";
+import { isoDateTime } from "./dates.js";
 
 // ---- Who may see and join (model.ts) -------------------------------------
 
@@ -186,7 +187,7 @@ export const meetingRsvps = ["attending", "notAttending"] as const;
 export type MeetingRsvp = (typeof meetingRsvps)[number];
 export const meetingRsvpLabels: Record<MeetingRsvp, string> = { attending: "Attending", notAttending: "Not attending" };
 
-const isoDate = z.string().refine((s) => !Number.isNaN(Date.parse(s)), "Give a date and time.");
+const isoDate = isoDateTime("Give a date and time.");
 
 /**
  * `POST /v1/teams/:teamId/meetings` and `PATCH .../meetings/:meetingId`
