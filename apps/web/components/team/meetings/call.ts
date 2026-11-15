@@ -79,6 +79,19 @@ function photoOf(metadata: string | undefined): string | null {
 
 type LK = typeof import("livekit-client");
 
+/** Thrown by [CallSession.connect] when the session was left before it finished. */
+export class CallCancelled extends Error {
+  constructor() {
+    super("The call was cancelled.");
+    this.name = "CallCancelled";
+  }
+}
+
+/** Whether calls can mix sound through Web Audio (webAudioMix), which lets a person go past 100%. */
+function hasWebAudio(): boolean {
+  return typeof window !== "undefined" && (typeof AudioContext !== "undefined" || "webkitAudioContext" in window);
+}
+
 /** How loud the call plays: everyone, and each person relative to that (0–2). */
 export interface CallVolumes {
   output: number;
@@ -101,6 +114,12 @@ export class CallSession {
    * Connects with [token], then turns on the mic and camera asked for.
    * The browser asks for them here, on joining, never before; a refusal
    * leaves that device off with a note, not a failed join.
+   *
+   * [onSession] gets the session before it connects, so the caller can
+   * keep it and [leave] at any point: cancelling while connecting, or
+   * while the browser asks for the mic or camera, still disconnects and
+   * stops any device opened meanwhile. A session left before it finished
+   * rejects with [CallCancelled].
    */
   static async connect(a: {
     url: string;
@@ -111,6 +130,7 @@ export class CallSession {
     audioOutputId?: string | null;
     videoInputId?: string | null;
     volumes?: CallVolumes;
+    onSession?: (call: CallSession) => void;
   }) {
     const lk = await import("livekit-client");
     const room = new lk.Room({
@@ -125,10 +145,22 @@ export class CallSession {
     const call = new CallSession(lk, room);
     if (a.volumes) call.volumes = { output: a.volumes.output, people: { ...a.volumes.people } };
     call.listen();
-    await room.connect(a.url, a.token);
+    a.onSession?.(call);
+    const cancelled = () => {
+      if (call.left) throw new CallCancelled();
+    };
+    try {
+      await room.connect(a.url, a.token);
+    } catch (e) {
+      cancelled();
+      throw e;
+    }
+    cancelled();
     call.refresh();
     if (a.micOn) await call.setMic(true);
+    cancelled();
     if (a.cameraOn) await call.setCamera(true);
+    cancelled();
     return call;
   }
 
@@ -230,13 +262,21 @@ export class CallSession {
   snapshot = () => this.state;
 
   private async device(kind: "microphone" | "camera" | "screen", fn: () => Promise<unknown>) {
+    if (this.left) return;
     try {
       await fn();
+      if (this.left) return this.stopLocalTracks();
       this.set({ ...this.state, notice: null });
     } catch (e) {
+      if (this.left) return this.stopLocalTracks();
       this.set({ ...this.state, notice: deviceProblem(e, kind) });
     }
     this.refresh();
+  }
+
+  /** Left while the browser was opening a device: release whatever it opened. */
+  private stopLocalTracks() {
+    for (const pub of this.room.localParticipant.trackPublications.values()) pub.track?.stop();
   }
 
   setMic(on: boolean) {
@@ -250,8 +290,20 @@ export class CallSession {
   }
 
   private applyVolume(uid: string) {
-    const v = this.state.audioMuted ? 0 : this.volumes.output * (this.volumes.people[uid] ?? 1);
-    this.room.remoteParticipants.get(uid)?.setVolume(v);
+    const p = this.room.remoteParticipants.get(uid);
+    if (!p) return;
+    const { Track } = this.lk;
+    // Above 100% needs Web Audio gain; a media element's volume throws past 1.
+    const max = hasWebAudio() ? 2 : 1;
+    const v = this.state.audioMuted ? 0 : Math.min(max, this.volumes.output * (this.volumes.people[uid] ?? 1));
+    // Their mic and the sound of a screen they share.
+    for (const source of [Track.Source.Microphone, Track.Source.ScreenShareAudio] as const) {
+      try {
+        p.setVolume(v, source);
+      } catch {
+        p.setVolume(Math.min(1, v), source);
+      }
+    }
   }
   private applyVolumes() {
     for (const uid of this.room.remoteParticipants.keys()) this.applyVolume(uid);

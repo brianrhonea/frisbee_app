@@ -72,6 +72,8 @@ function SearchCard({
   const [query, setQuery] = useState(initialQuery.trim());
   const [only, setOnly] = useState<ExploreFilter | null>(initialFilter);
   const [found, setFound] = useState<{ q: string; page: SearchPage | null } | null>(null);
+  // Bumped to rerun a failed search for the same text.
+  const [retry, setRetry] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // What this card last put in the address, so its own updates don't rewrite the box.
@@ -99,10 +101,15 @@ function SearchCard({
     return () => {
       live = false;
     };
-  }, [user, query, ready]);
+  }, [user, query, ready, retry]);
 
   function search(next: string, filter = only) {
     if (timer.current) clearTimeout(timer.current);
+    // The same text after "Couldn't search": try it again.
+    if (next.trim() === query && found?.q === query && found.page === null) {
+      setFound(null);
+      setRetry((n) => n + 1);
+    }
     setQuery(next.trim());
     pushed.current = next.trim();
     router.replace(exploreHref(next, filter), { scroll: false });

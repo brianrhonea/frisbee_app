@@ -3,15 +3,15 @@
 // one channel at a time, kept up across pages until they disconnect. It
 // lives in the root layout, so moving around the site doesn't drop it.
 // Leaving the team, losing access to the room, the room being deleted or
-// signing out disconnects.
-import type { VoiceTokenResult } from "@stall10/shared";
-import { doc, getDocFromServer, onSnapshot } from "firebase/firestore";
+// signing out disconnects; losing the right to talk there mutes the mic.
+import { voiceDecision, type VoiceRoomDoc, type VoiceTeam, type VoiceTokenResult } from "@stall10/shared";
+import { type DocumentReference, type DocumentSnapshot, doc, onSnapshot } from "firebase/firestore";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
 import { firestoreDb } from "@/lib/firebase";
 import { useAuth } from "../AuthProvider";
-import { type CallEnd, CallSession, type CallState, useCall } from "../team/meetings/call";
-import { canPickSpeaker, loadSettings, saveSettings } from "../team/meetings/settings";
+import { type CallEnd, CallCancelled, CallSession, type CallState, useCall } from "../team/meetings/call";
+import { canPickSpeaker, loadSettings, present, updateSettings, withPersonVolume } from "../team/meetings/settings";
 
 /** The voice channel the user is in (VoiceChannel). */
 export interface VoiceChannel {
@@ -28,6 +28,46 @@ const dropNotices: Record<CallEnd, string> = {
   meetingEnded: "The voice channel closed.",
 };
 export const lostAccessNotice = "You no longer have access to this channel.";
+
+const denied = (e: unknown) => (e as { code?: string })?.code === "permission-denied";
+
+/**
+ * onSnapshot that keeps watching: permission-denied goes to [onDenied];
+ * any other error (offline, a backend hiccup) resubscribes after a
+ * backoff of 1 s doubling to 30 s, reset by the next snapshot.
+ */
+function watchDoc(ref: DocumentReference, onData: (snap: DocumentSnapshot) => void, onDenied: () => void): () => void {
+  let stop: (() => void) | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let failures = 0;
+  let closed = false;
+  const start = () => {
+    timer = null;
+    if (closed) return;
+    stop = onSnapshot(
+      ref,
+      (snap) => {
+        failures = 0;
+        onData(snap);
+      },
+      (e) => {
+        stop = null;
+        if (closed) return;
+        if (denied(e)) {
+          onDenied();
+          return;
+        }
+        timer = setTimeout(start, Math.min(30_000, 1000 * 2 ** failures++));
+      },
+    );
+  };
+  start();
+  return () => {
+    closed = true;
+    if (timer) clearTimeout(timer);
+    stop?.();
+  };
+}
 
 export interface Voice {
   /** The channel joined or being joined; null when disconnected. */
@@ -63,25 +103,34 @@ export function useVoice(): Voice {
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const uid = user?.uid ?? null;
   const [channel, setChannel] = useState<VoiceChannel | null>(null);
   const [call, setCall] = useState<CallSession | null>(null);
   const state = useCall(call);
   const [connecting, setConnecting] = useState(false);
-  const [canSpeak, setCanSpeak] = useState(false);
+  // What the token allows (fixed for the call), and what the team and room allow now.
+  const [tokenCanSpeak, setTokenCanSpeak] = useState(false);
+  const [allowedToSpeak, setAllowedToSpeak] = useState(true);
+  const allowedRef = useRef(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [volumes, setVolumes] = useState<Record<string, number>>({});
   const callRef = useRef<CallSession | null>(null);
+  // The call being joined, from the moment it exists, so dropping mid-join
+  // (or while the browser asks for the mic) still disconnects it.
+  const joiningRef = useRef<CallSession | null>(null);
   const channelRef = useRef<VoiceChannel | null>(null);
   // Bumped on every join and leave, so a slow join that's been replaced hangs up instead of taking over.
   const attempt = useRef(0);
 
   const hangUp = useCallback(async () => {
     const c = callRef.current;
+    const joining = joiningRef.current;
     callRef.current = null;
+    joiningRef.current = null;
     setCall(null);
-    setCanSpeak(false);
-    await c?.leave();
+    setTokenCanSpeak(false);
+    await Promise.all([c?.leave(), joining?.leave()]);
   }, []);
 
   const drop = useCallback(
@@ -110,6 +159,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       setConnecting(true);
       setNotice(null);
       setError(null);
+      allowedRef.current = true;
+      setAllowedToSpeak(true);
+      let session: CallSession | null = null;
       try {
         const access = await callApi<VoiceTokenResult>(
           user,
@@ -117,27 +169,42 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           { method: "POST" },
         );
         if (mine !== attempt.current) return;
-        const settings = loadSettings();
+        const settings = loadSettings(user.uid);
         setVolumes(settings.participantVolumes);
+        // Saved devices only while they're still plugged in; otherwise the system default.
+        const speakerOk = canPickSpeaker();
+        const [mics, speakers] = await Promise.all([
+          CallSession.devices("audioinput"),
+          speakerOk ? CallSession.devices("audiooutput") : Promise.resolve([] as MediaDeviceInfo[]),
+        ]);
+        if (mine !== attempt.current) return;
         // Listeners join muted and are never asked for the mic.
         const c = await CallSession.connect({
           url: access.url,
           token: access.token,
-          micOn: access.canSpeak,
+          micOn: access.canSpeak && allowedRef.current,
           cameraOn: false,
-          audioInputId: settings.audioInputId,
-          audioOutputId: canPickSpeaker() ? settings.audioOutputId : null,
+          audioInputId: present(settings.audioInputId, mics),
+          audioOutputId: speakerOk ? present(settings.audioOutputId, speakers) : null,
           volumes: { output: settings.outputVolume, people: settings.participantVolumes },
+          onSession: (s) => {
+            session = s;
+            if (mine === attempt.current) joiningRef.current = s;
+            else void s.leave();
+          },
         });
+        if (joiningRef.current === c) joiningRef.current = null;
         if (mine !== attempt.current) {
           await c.leave();
           return;
         }
         callRef.current = c;
         setCall(c);
-        setCanSpeak(access.canSpeak);
+        setTokenCanSpeak(access.canSpeak);
       } catch (e) {
-        if (mine !== attempt.current) return;
+        if (joiningRef.current === session) joiningRef.current = null;
+        void (session as CallSession | null)?.leave();
+        if (mine !== attempt.current || e instanceof CallCancelled) return;
         channelRef.current = null;
         setChannel(null);
         setError(e instanceof ApiError ? e.message : "Couldn't connect to the channel. Check your connection and try again.");
@@ -156,61 +223,53 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   }, [state.ended, drop]);
 
   // Signing out, or another account signing in, disconnects.
-  const uid = user?.uid ?? null;
   const lastUid = useRef(uid);
   useEffect(() => {
     if (lastUid.current !== uid && channelRef.current) void drop(null);
     lastUid.current = uid;
   }, [uid, drop]);
 
-  // While in a channel, watch its room and its team. Whether the room can
-  // be read depends on the team (membership, roles), so: leaving the team
-  // or the team going drops the call, and any other change to the team
-  // re-checks the room with the server. A deleted room closes the channel.
-  // A passing network error doesn't disconnect; LiveKit reconnects.
+  // While in a channel, watch its room and its team, and decide as the API
+  // does when it hands out the token (voiceDecision): leaving the team, the
+  // team going or losing read access drops the call; a deleted room closes
+  // it; losing write access mutes the mic and keeps the user listening.
+  // Cached snapshots don't count. A passing network error doesn't
+  // disconnect (LiveKit reconnects) and the watch resubscribes.
   const teamId = channel?.teamId;
   const roomId = channel?.roomId;
   useEffect(() => {
     const db = firestoreDb();
     if (!db || !teamId || !roomId || !uid) return;
-    const roomRef = doc(db, `teams/${teamId}/chats/${roomId}`);
-    const denied = (e: unknown) => (e as { code?: string })?.code === "permission-denied";
-    const stopRoom = onSnapshot(
-      roomRef,
+    let team: VoiceTeam | null | undefined;
+    let room: VoiceRoomDoc | null | undefined;
+    const check = () => {
+      if (team === undefined || room === undefined) return;
+      const d = voiceDecision(team ?? undefined, room ?? undefined, uid);
+      if (!d.ok) {
+        void drop(d.code === "not-found" ? dropNotices.meetingEnded : lostAccessNotice);
+        return;
+      }
+      allowedRef.current = d.canSpeak;
+      setAllowedToSpeak(d.canSpeak);
+    };
+    const lost = () => void drop(lostAccessNotice);
+    const stopRoom = watchDoc(
+      doc(db, `teams/${teamId}/chats/${roomId}`),
       (snap) => {
-        if (!snap.exists() && !snap.metadata.fromCache) void drop(dropNotices.meetingEnded);
+        if (snap.metadata.fromCache) return;
+        room = snap.exists() ? (snap.data() as VoiceRoomDoc) : null;
+        check();
       },
-      (e) => {
-        if (denied(e)) void drop(lostAccessNotice);
-      },
+      lost,
     );
-    let first = true;
-    const stopTeam = onSnapshot(
+    const stopTeam = watchDoc(
       doc(db, `teams/${teamId}`),
       (snap) => {
         if (snap.metadata.fromCache) return;
-        const memberIds = (snap.data()?.memberIds as string[] | undefined) ?? [];
-        if (!snap.exists() || !memberIds.includes(uid)) {
-          void drop(lostAccessNotice);
-          return;
-        }
-        if (first) {
-          first = false;
-          return;
-        }
-        // Roles or room access may have changed.
-        getDocFromServer(roomRef).then(
-          (r) => {
-            if (!r.exists()) void drop(dropNotices.meetingEnded);
-          },
-          (e) => {
-            if (denied(e)) void drop(lostAccessNotice);
-          },
-        );
+        team = snap.exists() ? (snap.data() as VoiceTeam) : null;
+        check();
       },
-      (e) => {
-        if (denied(e)) void drop(lostAccessNotice);
-      },
+      lost,
     );
     return () => {
       stopRoom();
@@ -218,11 +277,19 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     };
   }, [teamId, roomId, uid, drop]);
 
+  // A listener token can't be upgraded mid-call, so talking needs both.
+  const canSpeak = !!call && tokenCanSpeak && allowedToSpeak;
+  // Lost the right to talk mid-call (or before the mic came on): stop sending it.
+  useEffect(() => {
+    if (call && !canSpeak && state.micOn) void call.setMic(false);
+  }, [call, canSpeak, state.micOn]);
+
   // Closing the tab hangs up.
   useEffect(
     () => () => {
       attempt.current += 1;
       void callRef.current?.leave();
+      void joiningRef.current?.leave();
     },
     [],
   );
@@ -236,16 +303,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   );
 
   const setVolume = useCallback(
-    (uid: string, v: number) => {
-      call?.setVolume(uid, v);
-      setVolumes((cur) => {
-        const next = { ...cur, [uid]: v };
-        const s = loadSettings();
-        saveSettings({ ...s, participantVolumes: { ...s.participantVolumes, [uid]: v } });
-        return next;
-      });
+    (who: string, v: number) => {
+      call?.setVolume(who, v);
+      // Read-merge-write on the saved copy, outside a state updater (which may run twice).
+      setVolumes(updateSettings(uid, (s) => withPersonVolume(s, who, v)).participantVolumes);
     },
-    [call],
+    [call, uid],
   );
 
   const value = useMemo<Voice>(
