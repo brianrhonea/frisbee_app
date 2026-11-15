@@ -7,6 +7,18 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.22.0 — 2026-11-15
+
+**Added**
+- `POST /v1/posts` `shareEvent` takes an optional `calendarId`, so My
+  calendar and shared-calendar events can be shared with followers, as
+  in the app. Only the calendar's owner and editors share; viewers get
+  403, non-members and pending invitees 404; it can't be sent with
+  `teamId`. The stored copy keeps `validSharedEvent`'s keys.
+- `@stall10/shared`: the app's password policy (`password.ts`) and app
+  routes for tournaments, drafts, plays, videos, stats and meetings in
+  `webRoute`.
+
 ## 0.21.1 — 2026-11-15
 
 **Fixed** (security review of the meetings and posts slices)

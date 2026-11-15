@@ -9,6 +9,7 @@ import {
   signInWithPopup,
   updateProfile,
 } from "firebase/auth";
+import { passwordMaxLength, passwordMinLength, passwordProblem } from "@stall10/shared";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
@@ -16,6 +17,7 @@ import { authConfigured, emailForUsername, firebaseAuth } from "@/lib/firebase";
 import { ApiError, callApi } from "@/lib/client";
 import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
+import { PasswordHints } from "./PasswordHints";
 import { localToday, signUpBirthDateProblem } from "./PersonalDetailsForm";
 import { SignUpSteps } from "./SignUpSteps";
 import { suggestUsername, UsernameField, useUsernameCheck } from "./UsernameField";
@@ -36,7 +38,7 @@ function message(e: unknown): string {
     case "auth/email-already-in-use":
       return "There's already an account with that email. Log in instead.";
     case "auth/weak-password":
-      return "Use a password of at least 6 characters.";
+      return "That password is too weak. Use 8+ characters with a letter and a number.";
     case "auth/invalid-email":
       return "Enter the email address of your account.";
     case "auth/too-many-requests":
@@ -143,7 +145,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     const ageProblem = signUpBirthDateProblem(birthDate);
     if (ageProblem) return fail(ageProblem, "su-birth");
     if (!email.trim().includes("@")) return fail("Enter your email address.", "su-email");
-    if (password.length < 6) return fail("Use a password of at least 6 characters.", "su-password");
+    const passwordIssue = passwordProblem(password);
+    if (passwordIssue) return fail(passwordIssue, "su-password");
     signupDraft.setBirthDate(birthDate);
     void run(async () => {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
@@ -330,12 +333,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           <input
             id="su-password"
             type="password"
-            minLength={6}
+            minLength={passwordMinLength}
+            maxLength={passwordMaxLength}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
           />
-          <small className="muted">At least 6 characters.</small>
+          <PasswordHints password={password} />
         </label>
         {alerts}
         <button className="btn btn-primary" type="submit" disabled={busy}>

@@ -4,6 +4,26 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.23.0 — 2026-11-15
+
+Needs API 0.22.0 (sharing calendar events sends `calendarId`).
+
+**Added**
+- Notifications open the matching page for tournaments, signups, drafts,
+  plays, videos, stats games, group tournaments and meetings.
+- Change password in Settings → Account (email accounts), with the app's
+  password rules, checklist and strength meter.
+- The theme toggle has a System choice beside Light and Dark.
+- The team schedule lists meetings beside events, with "New meeting".
+- "Share with my followers" on new events in My schedule.
+
+**Changed**
+- Draft URLs match the app: `draft/:div` is the host's balanced draft and
+  `live-draft/:div` the captains' draft; old `team-draft/` links redirect.
+- `/tournaments/:id?host=` falls back to that group's tournament.
+- Sign-up needs 8+ characters with a letter and a number, as in the app
+  (it was 6+).
+
 ## 0.22.0 — 2026-11-14
 
 Needs API 0.21.0.

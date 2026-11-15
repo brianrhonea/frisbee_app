@@ -34,9 +34,9 @@ export function SignupsSlot({ tournamentId, tournament, divisions, divisionId, m
         <ul className="hosted-slot-links">
           {divisions.map((d) => (
             <li key={d.id}>
-              {captains && <Link href={`${base}/draft/${encodeURIComponent(d.id)}`}>{divisionLabel(d)}: captains&apos; draft</Link>}
+              {captains && <Link href={`${base}/live-draft/${encodeURIComponent(d.id)}`}>{divisionLabel(d)}: captains&apos; draft</Link>}
               {captains && " · "}
-              <Link href={`${base}/team-draft/${encodeURIComponent(d.id)}`}>{divisionLabel(d)}: teams</Link>
+              <Link href={`${base}/draft/${encodeURIComponent(d.id)}`}>{divisionLabel(d)}: teams</Link>
             </li>
           ))}
         </ul>

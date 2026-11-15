@@ -11,8 +11,10 @@ import { LocalTime } from "../LocalTime";
 import { downloadIcs } from "@/lib/calendar";
 import { callApi } from "@/lib/client";
 import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
+import { type Meeting, meetingHref, meetingsHref, useTeamMeetings } from "./meetings/model";
 import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { TeamEventEditor } from "./TeamEventEditor";
+import "./team_schedule_meetings.css";
 
 /** A team event as members read it (TeamEvent in the app). */
 export interface TeamEventDoc extends PublicEvent {
@@ -73,13 +75,30 @@ export function useTeamEvents(teamId: string, viewer: TeamViewer, past = false) 
   return { ...live, data: sorted };
 }
 
-/** The schedule: events down the left, the open one (?event=) beside them. */
+/**
+ * The member's meetings for the schedule, as the app's team schedule lists
+ * them beside events: not ended ones only, live or from today on for
+ * upcoming, before today (newest first) for [past].
+ */
+function scheduleMeetings(all: Meeting[] | undefined, past: boolean): Meeting[] {
+  const today = startOfToday().toMillis();
+  return (all ?? [])
+    .filter((m) => m.status !== "ended" && !!m.startsAt)
+    .filter((m) => (past ? m.status !== "live" && Date.parse(m.startsAt!) < today : m.status === "live" || Date.parse(m.startsAt!) >= today))
+    .sort((a, b) => a.startsAt!.localeCompare(b.startsAt!) * (past ? -1 : 1));
+}
+
+type Entry = { kind: "event"; event: Doc<TeamEventDoc> } | { kind: "meeting"; meeting: Meeting };
+const entryStart = (x: Entry) => (x.kind === "event" ? x.event.startsAt : x.meeting.startsAt) ?? "";
+
+/** The schedule: events and meetings down the left, the open event (?event=) beside them; a meeting opens its own page. */
 export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) {
   const { teamId, kind, privateGroup, viewer } = useTeamHub();
   const params = useSearchParams();
   const pathname = usePathname();
   const past = params.get("when") === "past";
   const live = useTeamEvents(teamId, viewer, past);
+  const meetings = useTeamMeetings(teamId, viewer);
   const member = viewer.state === "member" ? viewer : null;
   const router = useRouter();
   const [editing, setEditing] = useState<string | null>(null);
@@ -93,6 +112,10 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   const events: Array<Doc<TeamEventDoc>> = member ? (live.data ?? []) : publicEvents;
   if (member && !live.data) return <p className="muted" aria-busy="true">Loading the schedule…</p>;
 
+  const entries: Entry[] = [
+    ...events.map((event) => ({ kind: "event" as const, event })),
+    ...(member ? scheduleMeetings(meetings.data, past).map((meeting) => ({ kind: "meeting" as const, meeting })) : []),
+  ].sort((a, b) => entryStart(a).localeCompare(entryStart(b)) * (past ? -1 : 1));
   const openId = params.get("event") ?? events[0]?.id;
   const open = events.find((e) => e.id === openId);
   const link = (q: Record<string, string | null>) => {
@@ -106,10 +129,14 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
     <div className="hub-split">
       <div className="hub-list">
         {manager && (
-          <p>
+          <p className="schedule-new">
             <button type="button" className="btn btn-primary btn-small" onClick={() => setEditing("new")}>
               New event
             </button>
+            {/* The app's New → Meeting; the API lets the same admins schedule meetings. */}
+            <Link className="btn btn-small" href={`${meetingsHref(teamId)}/new`}>
+              New meeting
+            </Link>
           </p>
         )}
         {member && (
@@ -122,11 +149,14 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
             </Link>
           </div>
         )}
-        {events.length === 0 ? (
+        {entries.length === 0 ? (
           <p className="empty">{past ? "No past events." : "Nothing scheduled."}</p>
         ) : (
           <ul className="hub-items">
-            {events.map((e) => (
+            {entries.map((x) => {
+              if (x.kind === "meeting") return <MeetingItem key={`m-${x.meeting.id}`} teamId={teamId} meeting={x.meeting} />;
+              const e = x.event;
+              return (
               <li key={e.id}>
                 <Link href={link({ event: e.id })} scroll={false} className={e.id === open?.id ? "active" : ""} aria-current={e.id === open?.id ? "true" : undefined}>
                   <EventItem startsAt={e.startsAt}>
@@ -139,7 +169,8 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
                   </EventItem>
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
         {!member && (
@@ -162,6 +193,25 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** A meeting in the schedule (TeamMeeting.toEvent): "Live now" or "Video meeting", opening the meeting's page. */
+function MeetingItem({ teamId, meeting }: { teamId: string; meeting: Meeting }) {
+  const live = meeting.status === "live";
+  return (
+    <li className="schedule-meeting">
+      <Link href={meetingHref(teamId, meeting.id)}>
+        <EventItem startsAt={meeting.startsAt}>
+          <b>{meeting.title || "Meeting"}</b>
+          <small>
+            <LocalTime iso={meeting.startsAt} style="dateTime" />
+            {" · "}
+            <span className={live ? "schedule-meeting-live" : ""}>{live ? "Live now" : "Video meeting"}</span>
+          </small>
+        </EventItem>
+      </Link>
+    </li>
   );
 }
 

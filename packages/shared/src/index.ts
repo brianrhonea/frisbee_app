@@ -17,6 +17,7 @@ export * from "./ical.js";
 export * from "./routes.js";
 export * from "./hub.js";
 export * from "./account.js";
+export * from "./password.js";
 export * from "./playbook.js";
 export * from "./videos.js";
 export * from "./drafts.js";

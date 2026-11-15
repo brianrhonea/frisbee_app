@@ -122,3 +122,96 @@ describe("event posts (validSharedEvent, sharesOwnTeamEvent)", () => {
     expect((await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "m1", teamId: null } })).status).toBe(429);
   });
 });
+
+// Calendar events (the app shares them from its editor with no teamId):
+// validSharedEvent's shape, plus the calendar API's own access check, since
+// clients can never read calendars/{id}/events and the copy mustn't leak them.
+describe("calendar event posts (validSharedEvent, the calendar's editors)", () => {
+  const share = (eventId: string, calendarId: string | null, uid = "me", teamId: string | null = null) =>
+    call("POST", "/v1/posts", { body: "", shareEvent: { eventId, teamId, calendarId } }, uid);
+
+  beforeEach(() => {
+    store.put("calendars/c1", {
+      ownerId: "own",
+      name: "Club",
+      members: { own: "owner", me: "edit", vw: "view" },
+      memberIds: ["own", "me", "vw"],
+      pending: { inv: "edit" },
+    });
+    store.put("calendars/c1/events/ce1", { title: "Board meeting", type: "other", startsAt: new Date(now + 7_200_000), location: "Clubhouse", notes: "private" });
+    store.put("calendars/own", { ownerId: "own", name: "My calendar", members: { own: "owner", me: "edit", vw: "view" }, memberIds: ["own", "me", "vw"] });
+    store.put("users/own/events/oe1", { title: "Own's practice", type: "practice", startsAt: new Date(now + 3_600_000) });
+  });
+
+  it("copies an editor's calendar event from the stored event, without notes or a team (validSharedEvent's keys)", async () => {
+    const res = await share("ce1", "c1");
+    expect(res.status).toBe(201);
+    const post = store.doc(`posts/${res.json().id}`)!;
+    expect(post.kind).toBe("event");
+    expect(post.event).toEqual({ eventId: "ce1", title: "Board meeting", type: "other", startsAt: new Date(now + 7_200_000), location: "Clubhouse" });
+  });
+
+  it("the owner shares too", async () => {
+    expect((await share("ce1", "c1", "own")).status).toBe(201);
+  });
+
+  it("refuses someone who can only view the calendar (canEdit(role))", async () => {
+    expect((await share("ce1", "c1", "vw")).status).toBe(403);
+  });
+
+  it("refuses someone not on it, as not found (members[uid])", async () => {
+    expect((await share("ce1", "c1", "pl")).status).toBe(404);
+  });
+
+  it("refuses an invitee who hasn't accepted (pending isn't members)", async () => {
+    expect((await share("ce1", "c1", "inv")).status).toBe(404);
+  });
+
+  it("refuses a calendar that doesn't exist", async () => {
+    expect((await share("ce1", "nope")).status).toBe(404);
+  });
+
+  it("needs the event on that calendar", async () => {
+    expect((await share("gone", "c1")).status).toBe(404);
+    // Another calendar's event isn't found through this one.
+    expect((await share("m1", "c1")).status).toBe(404);
+  });
+
+  it("reads the caller's own uid as My calendar (users/{uid}/events)", async () => {
+    const res = await share("m1", "me");
+    expect(res.status).toBe(201);
+    expect(store.doc(`posts/${res.json().id}`)!.event).toEqual({ eventId: "m1", title: "Track", type: "workout", startsAt: new Date(now + 3_600_000) });
+  });
+
+  it("reads someone else's My calendar, shared with the caller to edit, from their users/{uid}/events", async () => {
+    const res = await share("oe1", "own");
+    expect(res.status).toBe(201);
+    expect((store.doc(`posts/${res.json().id}`)!.event as Record<string, unknown>).title).toBe("Own's practice");
+    expect((await share("oe1", "own", "vw")).status).toBe(403);
+    expect((await share("oe1", "own", "pl")).status).toBe(404);
+  });
+
+  it("takes a team or a calendar, not both", async () => {
+    expect((await share("e1", "c1", "me", "t1")).status).toBe(400);
+  });
+
+  it("needs a title and a start (validSharedEvent's title and startsAt)", async () => {
+    store.put("calendars/c1/events/notitle", { title: " ", startsAt: new Date(now) });
+    store.put("calendars/c1/events/nostart", { title: "When?" });
+    expect((await share("notitle", "c1")).status).toBe(412);
+    expect((await share("nostart", "c1")).status).toBe(412);
+  });
+
+  it("files an unknown type as other and clips the location (e.type in [...], validString(location, 200))", async () => {
+    store.put("calendars/c1/events/odd", { title: "Odd", type: "party", startsAt: new Date(now), location: "L".repeat(250) });
+    const res = await share("odd", "c1");
+    const ev = store.doc(`posts/${res.json().id}`)!.event as Record<string, string>;
+    expect(ev.type).toBe("other");
+    expect(ev.location).toHaveLength(200);
+  });
+
+  it("isn't allowed while muted (notMuted)", async () => {
+    store.put("limits/me", { mutedUntil: new Date(now + 60_000) });
+    expect((await share("ce1", "c1")).status).toBe(429);
+  });
+});

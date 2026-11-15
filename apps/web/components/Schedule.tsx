@@ -20,6 +20,7 @@ import { ApiError, callApi } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
+import { type ShareChoice, ShareEventField, shareEvent } from "./team/ShareEvent";
 
 const dayMs = 86_400_000;
 const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
@@ -326,6 +327,11 @@ function EventEditor({
   const [notes, setNotes] = useState(event.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A new event may be posted for followers, as the app's editor offers on
+  // My calendar and shared calendars (canShare); the list only offers
+  // calendars the member can edit.
+  const canShare = !event.id;
+  const [share, setShare] = useState<ShareChoice>({ on: false, message: "" });
   if (!user) return null;
   const me = user;
   const calendar = calendars.find((c) => c.id === calendarId);
@@ -345,7 +351,11 @@ function EventEditor({
       if (event.id) {
         await callApi(me, `${base}/${encodeURIComponent(event.id)}`, { method: "PATCH", body });
       } else {
-        await callApi<CalendarEventResult>(me, base, { method: "POST", body });
+        const res = await callApi<CalendarEventResult>(me, base, { method: "POST", body });
+        // The event is saved either way, as in the app and TeamEventEditor.
+        if (canShare && share.on && !(await shareEvent(me, null, res.id, share.message, calendarId))) {
+          window.alert("Event created, but it couldn't be shared. Try posting it.");
+        }
       }
       onDone(true);
     } catch (err) {
@@ -402,6 +412,7 @@ function EventEditor({
         </small>
         <textarea value={notes} rows={3} maxLength={5000} onChange={(e) => setNotes(e.target.value)} />
       </label>
+      {canShare && <ShareEventField value={share} onChange={setShare} personal />}
       <div className="form-actions">
         {error && (
           <span className="form-error" role="alert">
