@@ -13,6 +13,7 @@ import { useAuth } from "../AuthProvider";
 import { roleLabel } from "../ProfileDashboard";
 import { useTeamHub } from "./TeamContext";
 import { TeamRoles } from "./TeamRoles";
+import { DiscordImport } from "./DiscordImport";
 import { TeamCommunity } from "./CommunityAdmin";
 import { MembersOnlySection } from "./TeamNav";
 
@@ -46,6 +47,7 @@ export function TeamSettings() {
       {viewer.can("manageMembers") && kind !== "team" && viewer.team.requiresApproval && <JoinRequests />}
       {viewer.can("manageMembers") && <MemberRoles />}
       {owner && <TeamRoles />}
+      {owner && <DiscordImport />}
       {kind === "team" && viewer.can("manageTeam") && <TeamCommunity />}
       {owner ? <TransferOwnership /> : <LeaveTeam teamId={teamId} />}
       {owner && <DeleteTeam />}

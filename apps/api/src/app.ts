@@ -4,6 +4,7 @@ import { accountRoutes } from "./account/routes.js";
 import { AccountService } from "./account/service.js";
 import { TeamDeletion, teamDeletionRoutes } from "./teams/deletion.js";
 import { ChatAdmin, chatAdminRoutes } from "./hub/rooms.js";
+import { DiscordService, discordRoutes } from "./discord/service.js";
 import { PlaybookService, playbookRoutes } from "./playbook/service.js";
 import { VideoService, videoRoutes } from "./videos/service.js";
 import { type DraftQueries, listDraftQueries } from "./drafts/repository.js";
@@ -164,6 +165,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
     hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
     chatAdminRoutes(app, new ChatAdmin(deps.store, deps.teams, deps.media), writes);
+    discordRoutes(app, new DiscordService(deps.store, new ChatAdmin(deps.store, deps.teams, deps.media)), writes);
     playbookRoutes(app, new PlaybookService(deps.store), writes);
     videoRoutes(app, new VideoService(deps.store, deps.users, deps.media), writes);
     draftRoutes(app, new DraftService(deps.store, deps.draftQueries ?? listDraftQueries(deps.store)), writes);

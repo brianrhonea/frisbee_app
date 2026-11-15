@@ -1,0 +1,17 @@
+/* Import from Discord (DiscordImport.tsx), in team Settings. */
+.discord-import .discord-link { display: flex; gap: 8px; margin: 12px 0; }
+.discord-import .discord-link input { flex: 1; min-width: 0; }
+.discord-import .discord-preview h3 { margin: 16px 0 4px; }
+.discord-import .discord-preview h4 { margin: 14px 0 6px; font-size: 14px; }
+.discord-import .discord-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.discord-import .discord-list li { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.discord-import .discord-split ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.discord-import .discord-split li { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.discord-import .discord-split select { max-width: 50%; }
+.discord-import .discord-done { margin-top: 12px; }
+.discord-import .btn-primary { margin-top: 14px; }
+@media (max-width: 560px) {
+  .discord-import .discord-link { flex-direction: column; }
+  .discord-import .discord-split li { flex-direction: column; align-items: stretch; }
+  .discord-import .discord-split select { max-width: none; }
+}
