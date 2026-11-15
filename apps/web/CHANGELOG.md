@@ -4,6 +4,19 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.25.0 — 2026-11-15
+
+Needs API 0.23.0 (chat uploads send the file's `name`).
+
+**Added**
+- Accept or decline team invites on Teams and the home page.
+- Send any file in team chat and messages; videos play and files
+  download with their name and size.
+- Load older messages in conversations, team rooms and call chat.
+- A Message button on player pages, and `/messages?to=` links.
+- Unsent messages are kept as drafts per conversation and room (in this
+  browser).
+
 ## 0.24.1 — 2026-11-15
 
 **Fixed**

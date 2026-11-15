@@ -1,17 +1,20 @@
 "use client";
 import { MuteButton } from "./MuteButton";
-import { groupSizeMax, type GroupAddedResult, type OpenConversationResult, typingFreshMs } from "@stall10/shared";
-import { limit, orderBy, where } from "firebase/firestore";
+import { groupSizeMax, type GroupAddedResult, typingFreshMs } from "@stall10/shared";
+import { where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
+import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
+import { ChatAttachment, type ChatFile } from "./ChatAttachment";
 import { ChatComposer, MessageActions } from "./ChatComposer";
 import { LocalTime } from "./LocalTime";
-import { MemberImage } from "./MemberImage";
+import { openConversation } from "./MessageButton";
+import { loadAtTop, OlderMessages } from "./OlderMessages";
 import { type PickedPerson, PersonPicker } from "./PersonPicker";
 
 /** conversations/{id} (Conversation in the app). */
@@ -38,7 +41,7 @@ interface Message {
   authorId?: string;
   authorName?: string;
   text?: string;
-  attachments?: Array<{ path: string; name?: string; contentType?: string }>;
+  attachments?: ChatFile[];
   createdAt?: string;
   replyTo?: { authorName?: string; text?: string };
   reactions?: Record<string, string>;
@@ -92,6 +95,9 @@ export function Messages() {
   const [composing, setComposing] = useState<"direct" | "group" | null>(null);
   const view = (params.get("view") as View) || "inbox";
   const openId = params.get("c");
+  const to = params.get("to");
+  const [toError, setToError] = useState<string | null>(null);
+  const opening = useRef<string | null>(null);
 
   const mineById = useMemo(() => new Map((reads.data ?? []).map((r) => [r.id, r] as const)), [reads.data]);
   const all = useMemo(
@@ -111,6 +117,24 @@ export function Messages() {
     const s = next.toString();
     router.push(s ? `${pathname}?${s}` : pathname, { scroll: false });
   };
+
+  // /messages?to=<uid> (a player's Message button, a shared link): open
+  // or start the conversation with them, then show it as ?c=.
+  useEffect(() => {
+    if (!user || !to || opening.current === to) return;
+    opening.current = to;
+    setToError(null);
+    openConversation(user, to).then(
+      (res) => {
+        const next = new URLSearchParams(params);
+        next.delete("to");
+        next.delete("view");
+        next.set("c", res.id);
+        router.replace(`${pathname}?${next}`, { scroll: false });
+      },
+      (e: Error) => setToError(e.message),
+    );
+  }, [user, to, params, pathname, router]);
 
   // j / k move through the list; Esc closes the conversation.
   useEffect(() => {
@@ -192,6 +216,11 @@ export function Messages() {
         )}
       </nav>
       <section className="hub-detail chat-thread">
+        {toError && (
+          <p className="form-error" role="alert">
+            {toError}
+          </p>
+        )}
         {composing ? (
           <NewConversation
             group={composing === "group"}
@@ -234,7 +263,7 @@ function NewConversation({ group, onDone }: { group: boolean; onDone: (id: strin
     setBusy(true);
     setError(null);
     try {
-      const res = await callApi<OpenConversationResult>(user, "/v1/conversations", { method: "POST", body: { with: person.uid } });
+      const res = await openConversation(user, person.uid);
       onDone(res.id);
     } catch (e) {
       setError((e as Error).message);
@@ -309,7 +338,8 @@ function NewConversation({ group, onDone }: { group: boolean; onDone: (id: strin
   );
 }
 
-const messageLimit = 60;
+/** Messages per page, live and older (MessageThreadViewModel.pageSize). */
+const pageSize = 50;
 
 function ConversationView({
   conv,
@@ -326,21 +356,15 @@ function ConversationView({
 }) {
   const { user } = useAuth();
   const base = `/v1/conversations/${encodeURIComponent(conv.id)}`;
-  const messages = useLiveQuery<Message>(`conversations/${conv.id}/messages`, [orderBy("createdAt", "desc"), limit(messageLimit)], conv.id);
+  const hiddenBefore = ms(mine?.clearedAt);
+  const messages = usePagedMessages<Message>(`conversations/${conv.id}/messages`, pageSize, hiddenBefore);
   const [replyTo, setReplyTo] = useState<Doc<Message> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
   const typing = useTyping(conv.id, me, conv.names);
   const body = useRef<HTMLDivElement>(null);
-  const hiddenBefore = ms(mine?.clearedAt);
-  const list = (messages.data ?? [])
-    .filter((m) => Number.isNaN(hiddenBefore) || ms(m.createdAt) > hiddenBefore)
-    .slice()
-    .reverse();
-  const count = list.length;
-  useEffect(() => {
-    if (body.current) body.current.scrollTop = body.current.scrollHeight;
-  }, [count]);
+  const list = (messages.list ?? []).filter((m) => Number.isNaN(hiddenBefore) || ms(m.createdAt) > hiddenBefore);
+  useThreadScroll(body, list[0]?.id, list[list.length - 1]?.id);
 
   // Opening it, and each new message while open, marks it read.
   const unread = info.unread || info.requestForMe;
@@ -395,10 +419,11 @@ function ConversationView({
       </header>
       {managing && group && <GroupPeople conv={conv} me={me} act={act} onLeft={onClose} />}
       {error && <p className="form-error thread-foot">{error}</p>}
-      <div className="thread-body" aria-live="polite" ref={body}>
+      <div className="thread-body" aria-live="polite" ref={body} onScroll={loadAtTop(messages)}>
+        <OlderMessages paged={messages} />
         {messages.error ? (
           <p className="form-error">{messages.error}</p>
-        ) : !messages.data ? (
+        ) : !messages.list ? (
           <p className="muted" aria-busy="true">
             Loading messages…
           </p>
@@ -426,17 +451,9 @@ function ConversationView({
                     </p>
                   )}
                   {m.text && <p className="message-text">{m.text}</p>}
-                  {(m.attachments ?? []).map((a) =>
-                    a.contentType?.startsWith("image/") ? (
-                      <span key={a.path} className="message-image">
-                        <MemberImage path={a.path} url="" alt={a.name ?? ""} />
-                      </span>
-                    ) : (
-                      <p key={a.path} className="muted small">
-                        📎 {a.name ?? "Attachment"}
-                      </p>
-                    ),
-                  )}
+                  {(m.attachments ?? []).map((a) => (
+                    <ChatAttachment key={a.path} file={a} />
+                  ))}
                   {reactions.length > 0 && (
                     <p className="message-reactions">
                       {reactions.map(([e, n]) => (
@@ -452,6 +469,7 @@ function ConversationView({
                   mine={m.reactions?.[me] ?? null}
                   canDelete={m.authorId === me}
                   onReply={info.requestForMe ? undefined : () => setReplyTo(m)}
+                  onDeleted={() => messages.removed(m.id)}
                 />
               </div>
             );
@@ -488,6 +506,7 @@ function ConversationView({
             replyTo={replyTo ? { id: replyTo.id, authorName: replyTo.authorName, text: replyTo.text } : null}
             onClearReply={() => setReplyTo(null)}
             onTyping={typing.report}
+            draftKey={`dm_${conv.id}`}
           />
         </>
       )}

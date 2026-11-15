@@ -1,11 +1,11 @@
 "use client";
 import { meetingLimits } from "@stall10/shared";
-import { limit, orderBy } from "firebase/firestore";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
-import { useLiveQuery } from "@/lib/live";
+import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { useAuth } from "../../AuthProvider";
 import { LocalTime } from "../../LocalTime";
+import { loadAtTop, OlderMessages } from "../../OlderMessages";
 import { meetingApi } from "./model";
 
 interface Message {
@@ -15,7 +15,8 @@ interface Message {
   createdAt?: string;
 }
 
-const shown = 100;
+/** Messages per page, live and older (MessageThreadViewModel.pageSize). */
+const pageSize = 50;
 
 /**
  * The chat inside the call (MeetingChatViewModel): text only, for people in
@@ -23,15 +24,13 @@ const shown = 100;
  */
 export function MeetingChat({ teamId, meetingId, canModerate }: { teamId: string; meetingId: string; canModerate: boolean }) {
   const { user } = useAuth();
-  const messages = useLiveQuery<Message>(`teams/${teamId}/meetings/${meetingId}/messages`, [orderBy("createdAt", "desc"), limit(shown)], meetingId);
+  const messages = usePagedMessages<Message>(`teams/${teamId}/meetings/${meetingId}/messages`, pageSize);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const body = useRef<HTMLDivElement>(null);
-  const list = (messages.data ?? []).slice().reverse();
-  useEffect(() => {
-    if (body.current) body.current.scrollTop = body.current.scrollHeight;
-  }, [list.length]);
+  const list = messages.list ?? [];
+  useThreadScroll(body, list[0]?.id, list[list.length - 1]?.id);
 
   async function send(e: FormEvent) {
     e.preventDefault();
@@ -50,10 +49,11 @@ export function MeetingChat({ teamId, meetingId, canModerate }: { teamId: string
 
   return (
     <div className="call-chat">
-      <div className="call-chat-body" ref={body} aria-live="polite">
+      <div className="call-chat-body" ref={body} aria-live="polite" onScroll={loadAtTop(messages)}>
+        <OlderMessages paged={messages} />
         {messages.error ? (
           <p className="form-error">{messages.error}</p>
-        ) : !messages.data ? (
+        ) : !messages.list ? (
           <p className="muted small">Loading…</p>
         ) : list.length === 0 ? (
           <p className="muted small">No messages yet. Only people in the call see this chat.</p>
@@ -68,7 +68,10 @@ export function MeetingChat({ teamId, meetingId, canModerate }: { teamId: string
                     className="text-btn"
                     onClick={() => {
                       if (user && window.confirm("Delete this message?")) {
-                        void callApi(user, `${meetingApi(teamId, meetingId)}/messages/${encodeURIComponent(m.id)}`, { method: "DELETE" }).catch((err: Error) => setError(err.message));
+                        void callApi(user, `${meetingApi(teamId, meetingId)}/messages/${encodeURIComponent(m.id)}`, { method: "DELETE" }).then(
+                          () => messages.removed(m.id),
+                          (err: Error) => setError(err.message),
+                        );
                       }
                     }}
                   >

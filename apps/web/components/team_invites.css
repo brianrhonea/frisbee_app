@@ -1,0 +1,7 @@
+/* Invitations to teams and groups (TeamInvites), above the member's teams. */
+.team-invite-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.team-invite-list li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.team-invite-main { display: grid; min-width: 0; flex: 1 1 180px; }
+.team-invite-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-invite-main small { color: var(--muted); font-size: 0.8rem; }
+.team-invite-actions { display: flex; gap: 6px; margin-left: auto; }

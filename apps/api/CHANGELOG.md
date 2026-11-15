@@ -7,6 +7,19 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.23.0 — 2026-11-15
+
+**Changed**
+- Chat uploads (`/v1/uploads`, team rooms and DMs) take any file, as the
+  app does: the app's document types or `application/octet-stream`
+  (never HTML, SVG or script), with the file's `name` kept. Chat videos
+  and files are stored as sent at the app's paths
+  (`{folder}/{uploadId}-{safeName}`, so storage.rules still apply),
+  within its limits (10 MB, or 100 MB for a video), and no longer wait on
+  the transcode job. Chat photos are still compressed. Anything whose
+  bytes don't confirm a photo or video is stored as
+  `application/octet-stream`.
+
 ## 0.22.1 — 2026-11-15
 
 **Fixed** (security review of the small-fixes batch)

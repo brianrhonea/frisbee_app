@@ -54,9 +54,12 @@ export async function uploadedFiles(
     if (want.imagesOnly && !contentType.startsWith("image/")) {
       throw new ApiError("invalid_argument", "Only photos can be added here.");
     }
+    // A file kept as sent (chat videos and documents) keeps the name it was
+    // sent with, as the app's do; a compressed photo is named as it's saved.
+    const sentName = !contentType.startsWith("image/") && typeof u.name === "string" && u.name ? u.name : null;
     return {
       path: u.path,
-      name: u.path.split("/").pop() ?? unique[i]!,
+      name: sentName ?? u.path.split("/").pop() ?? unique[i]!,
       contentType,
       size: typeof u.actualSize === "number" ? u.actualSize : 0,
     };

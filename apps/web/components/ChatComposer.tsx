@@ -1,17 +1,19 @@
 "use client";
-import { chatAttachmentsMax, chatReactionChoices, chatTextMax } from "@stall10/shared";
-import { type FormEvent, useRef, useState } from "react";
+import { chatAttachmentsMax, chatReactionChoices, chatTextMax, formatFileSize } from "@stall10/shared";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
-import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
+import { loadDraft, saveDraft } from "@/lib/messages";
+import { chatFileProblem, newId, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
 
-type Pending = { key: string; name: string; uploadId?: string; error?: string };
+type Pending = { key: string; name: string; size: number; uploadId?: string; error?: string };
 
 /**
  * The box under a chat thread: Enter sends, Shift+Enter starts a new line,
- * photos upload as they're picked (`chat` uploads for [upload.targetId],
+ * files (any kind, as in the app: photos, videos, documents) upload as they're picked (`chat` uploads for [upload.targetId],
  * with the new message's id as itemId). [path] is the room's or
- * conversation's messages endpoint.
+ * conversation's messages endpoint. With a [draftKey], unsent text is kept
+ * in this browser until it's sent, as the app keeps drafts per thread.
  */
 export function ChatComposer({
   path,
@@ -20,6 +22,7 @@ export function ChatComposer({
   replyTo,
   onClearReply,
   onTyping,
+  draftKey,
 }: {
   path: string;
   upload: { targetId: string };
@@ -28,6 +31,8 @@ export function ChatComposer({
   onClearReply?: () => void;
   /** Told when the member has words in the box and when they've cleared or sent them. */
   onTyping?: (typing: boolean) => void;
+  /** Where this thread's unsent text is kept (`dm_<id>`, `chat_<team>_<room>`). */
+  draftKey?: string;
 }) {
   const { user } = useAuth();
   const [text, setText] = useState("");
@@ -37,17 +42,27 @@ export function ChatComposer({
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
+  // What was left unsent here last time (read after mounting: it's in this browser only).
+  useEffect(() => {
+    if (draftKey) setText(loadDraft(draftKey));
+  }, [draftKey]);
+
+  function edit(value: string) {
+    setText(value);
+    if (draftKey) saveDraft(draftKey, value);
+  }
+
   function addFiles(list: File[]) {
     if (!user) return;
     const room = chatAttachmentsMax - files.length;
     for (const file of list.slice(0, Math.max(0, room))) {
-      const problem = photoProblem(file, "chat");
+      const problem = chatFileProblem(file);
       if (problem) {
         setError(problem);
         continue;
       }
       const key = newId();
-      setFiles((fs) => [...fs, { key, name: file.name }]);
+      setFiles((fs) => [...fs, { key, name: file.name, size: file.size }]);
       uploadPhoto(user, file, { purpose: "chat", targetId: upload.targetId, itemId: messageId }).then(
         (done) => setFiles((fs) => fs.map((f) => (f.key === key ? { ...f, uploadId: done.id } : f))),
         (e: Error) => setFiles((fs) => fs.map((f) => (f.key === key ? { ...f, error: e.message } : f))),
@@ -74,7 +89,7 @@ export function ChatComposer({
           ...(replyTo && { replyTo: replyTo.id }),
         },
       });
-      setText("");
+      edit("");
       onTyping?.(false);
       setFiles([]);
       setMessageId(newId());
@@ -100,7 +115,7 @@ export function ChatComposer({
         <ul className="chat-files">
           {files.map((f) => (
             <li key={f.key} className={f.error ? "failed" : ""}>
-              📎 {f.name} {f.error ? `— ${f.error}` : f.uploadId ? "" : "(uploading…)"}{" "}
+              📎 {f.name} <small className="muted">{formatFileSize(f.size)}</small> {f.error ? `— ${f.error}` : f.uploadId ? "" : "(uploading…)"}{" "}
               <button type="button" className="text-btn" onClick={() => setFiles(files.filter((x) => x.key !== f.key))}>
                 Remove
               </button>
@@ -114,8 +129,17 @@ export function ChatComposer({
         </p>
       )}
       <div className="chat-input-row">
-        <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles([...(e.target.files ?? [])])} />
-        <button type="button" className="icon-btn" aria-label="Attach a photo" onClick={() => input.current?.click()}>
+        <input
+          ref={input}
+          type="file"
+          multiple
+          hidden
+          onChange={(e) => {
+            addFiles([...(e.target.files ?? [])]);
+            e.target.value = "";
+          }}
+        />
+        <button type="button" className="icon-btn" aria-label="Attach files" title="Attach photos, videos or files" onClick={() => input.current?.click()}>
           📎
         </button>
         <textarea
@@ -125,7 +149,7 @@ export function ChatComposer({
           value={text}
           maxLength={chatTextMax}
           onChange={(e) => {
-            setText(e.target.value);
+            edit(e.target.value);
             onTyping?.(e.target.value.trim().length > 0);
           }}
           onBlur={() => onTyping?.(false)}
@@ -155,11 +179,14 @@ export function MessageActions({
   mine,
   canDelete,
   onReply,
+  onDeleted,
 }: {
   path: string;
   mine: string | null;
   canDelete: boolean;
   onReply?: () => void;
+  /** Told once the message is deleted (older pages aren't live). */
+  onDeleted?: () => void;
 }) {
   const { user } = useAuth();
   const [picking, setPicking] = useState(false);
@@ -170,6 +197,7 @@ export function MessageActions({
     setError(null);
     try {
       await callApi(user, url, { method, body });
+      if (method === "DELETE") onDeleted?.();
     } catch (e) {
       setError((e as Error).message);
     }

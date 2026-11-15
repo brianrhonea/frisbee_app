@@ -196,6 +196,9 @@ export class FakeMediaStorage implements MediaStorage {
   async write(path: string, data: Buffer, contentType: string) {
     this.files.set(path, { data, contentType });
   }
+  async copy(from: string, to: string, contentType: string) {
+    this.files.set(to, { data: await this.read(from), contentType });
+  }
   async downloadTo(path: string, file: string) {
     await writeFile(file, await this.read(path));
   }

@@ -335,6 +335,96 @@ describe("uploads API", () => {
     expect(queued).toEqual([id]);
   });
 
+  describe("chat files and videos, stored as sent like the app's (storage.rules attachmentSizeOk)", () => {
+    const MB = 1024 * 1024;
+    const dm = { purpose: "chat", targetId: "conversations/u1_u2", itemId: "m1" };
+    const pdf = Buffer.from("%PDF-1.7 a small document");
+
+    it("keeps any file in the message's folder, with its name and declared document type", async () => {
+      const { res, id, done } = await upload({ ...dm, contentType: "application/pdf", name: "Line calls.pdf", size: pdf.length }, pdf);
+      expect(res.statusCode).toBe(201);
+      expect(storage.signed.at(-1)!.maxBytes).toBe(10 * MB);
+      expect(done!.json()).toEqual({ id, status: "ready", path: `conversations/u1_u2/u1/m1/${id}-Line calls.pdf`, contentType: "application/pdf" });
+      expect(storage.files.get(`conversations/u1_u2/u1/m1/${id}-Line calls.pdf`)).toMatchObject({ data: pdf, contentType: "application/pdf" });
+      expect(storage.files.has(`uploads/raw/u1/${id}`)).toBe(false);
+      expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "ready", name: "Line calls.pdf", actualSize: pdf.length });
+      expect(queued).toEqual([]);
+    });
+
+    it("never lets a name add a path segment", async () => {
+      const { id, done } = await upload({ ...dm, contentType: "application/octet-stream", name: "../../users/u2/x.bin", size: 4 }, Buffer.from("data"));
+      expect(done!.json().path).toBe(`conversations/u1_u2/u1/m1/${id}-.._.._users_u2_x.bin`);
+    });
+
+    it("refuses types that could run in a browser, and documents outside chat", async () => {
+      for (const contentType of ["text/html", "image/svg+xml", "application/javascript"]) {
+        expect((await call("/v1/uploads", { ...dm, contentType, size: 10 })).statusCode).toBe(400);
+      }
+      expect((await call("/v1/uploads", { purpose: "avatar", contentType: "application/pdf", size: 1000 })).statusCode).toBe(400);
+      expect((await call("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "application/pdf", size: 1000 })).statusCode).toBe(400);
+      expect((await call("/v1/uploads", { purpose: "teamImage", targetId: "t1", itemId: "i1", contentType: "application/zip", size: 1000 }, "owner")).statusCode).toBe(400);
+    });
+
+    it("stores what isn't a confirmed photo or video as application/octet-stream", async () => {
+      const { done } = await upload({ ...dm, contentType: "image/jpeg", name: "fake.jpg", size: 9 }, Buffer.from("not a jpg"));
+      expect(done!.json()).toMatchObject({ status: "ready", contentType: "application/octet-stream" });
+      const video = await upload({ ...dm, contentType: "video/mp4", name: "fake.mp4", size: 9 }, Buffer.from("not a mp4"));
+      expect(video.done!.json()).toMatchObject({ status: "ready", contentType: "application/octet-stream" });
+    });
+
+    it("still compresses photos", async () => {
+      const data = await jpeg();
+      const { id, done } = await upload({ ...dm, contentType: "image/jpeg", name: "photo.jpg", size: data.length }, data);
+      expect(done!.json()).toMatchObject({ status: "ready", path: `conversations/u1_u2/u1/m1/${id}.jpg`, width: 1920 });
+    });
+
+    it("stores a video as sent, typed by its bytes, without transcoding", async () => {
+      const { id, done } = await upload({ ...dm, contentType: "video/quicktime", name: "huck.mov", size: 1000 }, samples["video/quicktime"]);
+      expect(storage.signed.at(-1)!.maxBytes).toBe(100 * MB);
+      expect(done!.json()).toEqual({ id, status: "ready", path: `conversations/u1_u2/u1/m1/${id}-huck.mov`, contentType: "video/quicktime" });
+      expect(store.doc(`transcodeJobs/${id}`)).toBeUndefined();
+      expect(queued).toEqual([]);
+      const room = await upload({ purpose: "chat", targetId: "teams/t1/chats/c1", itemId: "m2", contentType: "video/webm", size: 1000 }, samples["video/webm"], "p1");
+      expect(room.done!.json()).toMatchObject({ status: "ready", path: `teams/t1/chats/c1/p1/m2/${room.id}-${room.id}.webm`, contentType: "video/webm" });
+    });
+
+    // attachmentSizeOk: size <= 10 MB || (size <= 100 MB && a video's name && a video/* or unknown type).
+    it("takes 10 MB of anything", async () => {
+      expect((await call("/v1/uploads", { ...dm, contentType: "application/zip", name: "a.zip", size: 10 * MB })).statusCode).toBe(201);
+      expect((await call("/v1/uploads", { ...dm, contentType: "application/zip", name: "a.zip", size: 10 * MB + 1 })).statusCode).toBe(400);
+      const big = Buffer.concat([pdf, Buffer.alloc(10 * MB)]);
+      const tooBig = await upload({ ...dm, contentType: "application/pdf", name: "a.pdf", size: 1000 }, big);
+      expect(tooBig.done!.json().error.message).toBe("That file is too big. The most is 10 MB.");
+      expect(storage.files.has(`uploads/raw/u1/${tooBig.id}`)).toBe(false);
+    });
+
+    it("takes up to 100 MB only of a video named like one", async () => {
+      const ok = { ...dm, contentType: "video/mp4", name: "game.mp4", size: 100 * MB };
+      expect((await call("/v1/uploads", ok)).statusCode).toBe(201);
+      expect((await call("/v1/uploads", { ...ok, size: 100 * MB + 1 })).statusCode).toBe(400);
+      // Not named like a video.
+      expect((await call("/v1/uploads", { ...ok, contentType: "video/x-matroska", name: "game.mkv" })).statusCode).toBe(400);
+      expect((await call("/v1/uploads", { ...ok, name: "game.bin" })).statusCode).toBe(400);
+      // Not a video type (an unknown one may be).
+      expect((await call("/v1/uploads", { ...ok, contentType: "application/zip" })).statusCode).toBe(400);
+      expect((await call("/v1/uploads", { ...ok, contentType: "application/octet-stream" })).statusCode).toBe(201);
+      // Unknown bytes over 10 MB aren't a video, whatever the name says.
+      const big = Buffer.concat([pdf, Buffer.alloc(10 * MB)]);
+      const fake = await upload({ ...dm, contentType: "application/octet-stream", name: "game.mp4", size: 1000 }, big);
+      expect(fake.done!.json().error.message).toBe("That file is too big. The most is 10 MB.");
+      const mkv = await upload(
+        { ...dm, contentType: "video/x-matroska", name: "game.mkv", size: 1000 },
+        Buffer.concat([samples["video/x-matroska"], Buffer.alloc(10 * MB)]),
+      );
+      expect(mkv.done!.json().error.message).toBe("That file is too big. The most is 10 MB.");
+    });
+
+    it("leaves other purposes' videos to the transcoder", async () => {
+      const { done } = await upload({ purpose: "post", itemId: "i1", contentType: "video/mp4", size: 1000 }, samples["video/mp4"]);
+      expect(done!.json().status).toBe("processing");
+    });
+  });
+
   it("refuses ids that aren't one document id", async () => {
     const body = { purpose: "teamImage", itemId: "i1", contentType: "image/jpeg", size: 10, targetId: "t1/chats/c1" };
     expect((await call("/v1/uploads", body, "owner")).statusCode).toBe(400);

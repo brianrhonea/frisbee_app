@@ -218,8 +218,8 @@ everything the app does on the website alone, styled like the website
    Run). Recording stays deferred. [x] device pickers (speaker where
    the browser can switch output), lobby camera preview, meeting
    volume, mute audio, per-person volume to 200%; [x] a voice call that
-   stays up across pages, with a voice bar (web 0.24.0). Not yet on the
-   website: older call chat. [x] Meetings on the team schedule
+   stays up across pages, with a voice bar (web 0.24.0); [x] older call
+   chat (web 0.25.0). [x] Meetings on the team schedule
    beside events, with New meeting (the website keeps its Meetings tab
    too; the app has none).
 7. Posts: [ ] video in posts (waits on the transcode job); [x] feed tabs;
@@ -239,6 +239,13 @@ everything the app does on the website alone, styled like the website
    and the Jump in shortcuts (web 0.24.0). Not yet: player rows show
    only @username (the app adds team, school and hometown; the public
    search returns neither).
+10. Messaging: [x] accepting and declining team invites (Teams page and
+    home); [x] any file in team chat and DMs (videos and files stored as
+    sent, as the app stores them; videos play, files download with their
+    name and size); [x] older messages in DMs, team rooms and the call
+    chat; [x] Message on player pages (`/messages?to=<uid>`); [x] unsent
+    drafts per conversation and room (kept in the browser; web 0.25.0,
+    api 0.23.0).
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

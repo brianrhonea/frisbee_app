@@ -14,6 +14,7 @@ import { SideTeams } from "./SideTeams";
 import { UsernameStep } from "./UsernameStep";
 import { ForYouFeed, TeamPostPicker } from "./home/ForYou";
 import { MyTeams } from "./MyTeams";
+import { TeamInvites } from "./TeamInvites";
 
 const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Not going" };
 
@@ -248,6 +249,7 @@ export function Dashboard({ user }: { user: User }) {
       </div>
 
       <aside className="huddle-side" aria-label="Coming up">
+        <TeamInvites />
         <PickupCard />
 
         <div className="card">
