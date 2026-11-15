@@ -56,7 +56,15 @@ export function ForYouFeed({
   const teams = useMyTeams(uid);
   const feed = useForYou(uid, teams.data ?? (teams.error ? [] : undefined), users);
 
-  if (feed.items.length > 0) return <FeedList feed={feed} busy={users.busy} error={users.error} />;
+  if (feed.items.length > 0) {
+    return (
+      <>
+        {/* No team yet (as the app's For you): the checklist covers it on an empty feed. */}
+        {teams.data?.length === 0 && <JoinCard />}
+        <FeedList feed={feed} busy={users.busy} error={users.error} />
+      </>
+    );
+  }
   if (!feed.loaded || users.busy) return loading;
   if (users.error) return <p className="post-error">Couldn&apos;t load posts. Try again.</p>;
   const steps = onboardingSteps({ needsUsername, onTeam: (teams.data ?? []).length > 0, followsAnything: feed.followsAnything });
