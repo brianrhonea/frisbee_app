@@ -13,6 +13,11 @@ export const teamPostLocationMax = 200;
 /** Most links and photos on a team post (TeamPost.maxLinks / maxImages). */
 export const teamPostLinksMax = 5;
 export const teamPostImagesMax = 4;
+/** Longest tournament key on a team post (validString(p.tournamentKey, 300)). */
+export const teamPostTournamentKeyMax = 300;
+
+/** A hosted or group tournament's follow key (FollowTarget.tournamentKey in the app). */
+export const tournamentFollowKey = (hostId: string, tournamentId: string) => `tournament_${hostId}_${tournamentId}`;
 
 const webLink = z
   .string()
@@ -38,6 +43,12 @@ export const saveTeamPostRequestSchema = z.strictObject({
   public: z.boolean().default(false),
   uploadIds: z.array(z.string().min(1).max(128)).max(teamPostImagesMax, `Add at most ${teamPostImagesMax} photos.`).default([]),
   keepImages: z.array(z.string().max(1024)).max(teamPostImagesMax).optional(),
+  /**
+   * Ties the post to one of this team's tournaments or leagues (its follow
+   * key, `tournament_{teamId}_{tournamentId}`), so the event's News tab and
+   * followers show it (validPost). Left as it is on an edit when absent.
+   */
+  tournamentKey: z.string().max(teamPostTournamentKeyMax, "That tournament key is too long.").optional(),
 });
 export type SaveTeamPostRequest = z.input<typeof saveTeamPostRequestSchema>;
 

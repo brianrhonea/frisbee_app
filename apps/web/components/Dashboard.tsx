@@ -12,10 +12,23 @@ import { BrandCard, LearnPromo, PickupCard } from "./HomeCards";
 import { PostCard } from "./PostCard";
 import { SideTeams } from "./SideTeams";
 import { UsernameStep } from "./UsernameStep";
+import { ForYouFeed, TeamPostPicker } from "./home/ForYou";
+import { MyTeams } from "./MyTeams";
 
 const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Not going" };
 
-type Tab = "following" | "community";
+type Tab = "foryou" | "community" | "teams";
+const tabs: Array<[Tab, string]> = [
+  ["foryou", "For you"],
+  ["community", "Community"],
+  ["teams", "Your teams"],
+];
+/** The tab in the URL (?tab=), so it's linkable and survives a reload. */
+function tabFromUrl(): Tab {
+  if (typeof window === "undefined") return "foryou";
+  const t = new URLSearchParams(window.location.search).get("tab");
+  return t === "community" || t === "teams" ? t : "foryou";
+}
 type Feed = { posts: PublicPost[]; next: number | null; busy: boolean; error: boolean };
 const emptyFeed: Feed = { posts: [], next: null, busy: false, error: false };
 
@@ -33,7 +46,7 @@ function useToday() {
 export function Dashboard({ user }: { user: User }) {
   const [home, setHome] = useState<MeHome | null>(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<Tab>("following");
+  const [tab, setTab] = useState<Tab>("foryou");
   const [older, setOlder] = useState<Feed>(emptyFeed);
   const [community, setCommunity] = useState<Feed | null>(null);
   const today = useToday();
@@ -92,10 +105,23 @@ export function Dashboard({ user }: { user: User }) {
     history.replaceState(null, "", "/");
   }, [home]);
 
-  function pickTab(t: Tab) {
+  function pickTab(t: Tab, push = true) {
     setTab(t);
     if (t === "community" && !community) void loadCommunity();
+    if (push) {
+      const url = new URL(window.location.href);
+      if (t === "foryou") url.searchParams.delete("tab");
+      else url.searchParams.set("tab", t);
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
   }
+
+  // Open the tab the URL names.
+  useEffect(() => {
+    const t = tabFromUrl();
+    if (t !== "foryou") pickTab(t, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load.
+  }, []);
 
   async function loadOlder() {
     if (older.next === null) return;
@@ -124,8 +150,7 @@ export function Dashboard({ user }: { user: User }) {
 
   const { profile, teams, events } = home;
   const following = [...home.feed.posts, ...older.posts];
-  const shown: Feed =
-    tab === "following" ? { ...older, posts: following } : (community ?? { ...emptyFeed, busy: true });
+  const shown: Feed = community ?? { ...emptyFeed, busy: true };
   const first = (user.displayName || profile.name || "").trim().split(/\s+/)[0];
 
   return (
@@ -148,15 +173,11 @@ export function Dashboard({ user }: { user: User }) {
               if (community) void loadCommunity();
             }}
           />
+          <TeamPostPicker uid={user.uid} />
         </div>
 
         <div className="feed-tabs" role="tablist" aria-label="Feed">
-          {(
-            [
-              ["following", "Following"],
-              ["community", "Community"],
-            ] as const
-          ).map(([t, label]) => (
+          {tabs.map(([t, label]) => (
             <button
               key={t}
               type="button"
@@ -170,7 +191,20 @@ export function Dashboard({ user }: { user: User }) {
           ))}
         </div>
 
-        <div role="tabpanel" aria-label={tab === "following" ? "Following" : "Community"}>
+        {tab === "foryou" && (
+          <ForYouFeed
+            uid={user.uid}
+            users={{ posts: following, next: older.next, loadMore: loadOlder, busy: older.busy, error: older.error }}
+            onCommunity={() => pickTab("community")}
+          />
+        )}
+        {tab === "teams" && (
+          <div role="tabpanel" aria-label="Your teams">
+            <MyTeams />
+          </div>
+        )}
+        {tab === "community" && (
+        <div role="tabpanel" aria-label="Community">
           {shown.posts.length === 0 ? (
             shown.busy ? (
               <p className="empty" aria-busy="true">
@@ -181,17 +215,7 @@ export function Dashboard({ user }: { user: User }) {
             ) : (
               <div className="card">
                 <p className="muted small">
-                  {tab === "following" ? (
-                    <>
-                      Posts from you and the people you follow show up here.{" "}
-                      <button type="button" className="link-button" onClick={() => pickTab("community")}>
-                        See the community
-                      </button>{" "}
-                      or <Link href="/explore">find players to follow</Link>.
-                    </>
-                  ) : (
-                    "No posts yet."
-                  )}
+                  No posts yet.
                 </p>
               </div>
             )
@@ -211,7 +235,7 @@ export function Dashboard({ user }: { user: User }) {
                   className="btn"
                   type="button"
                   disabled={shown.busy}
-                  onClick={() => void (tab === "following" ? loadOlder() : loadCommunity(shown.next ?? undefined))}
+                  onClick={() => void loadCommunity(shown.next ?? undefined)}
                 >
                   {shown.busy ? "Loading…" : "Older posts"}
                 </button>
@@ -220,6 +244,7 @@ export function Dashboard({ user }: { user: User }) {
             </nav>
           )}
         </div>
+        )}
       </div>
 
       <aside className="huddle-side" aria-label="Coming up">

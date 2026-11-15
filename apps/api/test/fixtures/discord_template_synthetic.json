@@ -1,0 +1,55 @@
+{
+  "code": "synth3t1c",
+  "name": "Ultimate club",
+  "description": "Synthetic template shaped like Discord's documented guild template object; not from a real server.",
+  "usage_count": 0,
+  "creator_id": "1",
+  "source_guild_id": "2",
+  "serialized_source_guild": {
+    "name": "Rockets Ultimate",
+    "description": null,
+    "region": "us-west",
+    "verification_level": 0,
+    "default_message_notifications": 1,
+    "explicit_content_filter": 0,
+    "preferred_locale": "en-US",
+    "afk_timeout": 300,
+    "roles": [
+      { "id": 0, "name": "@everyone", "permissions": "104324673", "color": 0, "hoist": false, "mentionable": false },
+      { "id": 1, "name": "Handlers", "permissions": "0", "color": 0, "hoist": false, "mentionable": true },
+      { "id": 2, "name": "Moderator", "permissions": "8192", "color": 10181046, "hoist": false, "mentionable": false },
+      { "id": 3, "name": "Captains", "permissions": "8598454290", "color": 3447003, "hoist": true, "mentionable": true },
+      { "id": 4, "name": "Admin", "permissions": "8", "color": 15158332, "hoist": true, "mentionable": false }
+    ],
+    "channels": [
+      { "id": 10, "type": 4, "name": "Info", "position": 0, "parent_id": null, "permission_overwrites": [
+        { "id": 0, "type": 0, "allow": "0", "deny": "2048" },
+        { "id": 3, "type": 0, "allow": "2048", "deny": "0" }
+      ] },
+      { "id": 11, "type": 5, "name": "announcements", "position": 0, "parent_id": 10, "permission_overwrites": [
+        { "id": 0, "type": 0, "allow": "0", "deny": "2048" },
+        { "id": 3, "type": 0, "allow": "2048", "deny": "0" }
+      ] },
+      { "id": 12, "type": 0, "name": "rules", "position": 1, "parent_id": 10, "permission_overwrites": [
+        { "id": 0, "type": 0, "allow": "0", "deny": "2048" }
+      ] },
+      { "id": 20, "type": 4, "name": "Team", "position": 1, "parent_id": null, "permission_overwrites": [] },
+      { "id": 21, "type": 0, "name": "general", "position": 0, "parent_id": 20, "permission_overwrites": [] },
+      { "id": 22, "type": 0, "name": "handlers-only", "position": 1, "parent_id": 20, "permission_overwrites": [
+        { "id": 0, "type": 0, "allow": "0", "deny": "1024" },
+        { "id": 1, "type": 0, "allow": "1024", "deny": "0" }
+      ] },
+      { "id": 23, "type": 0, "name": "captains", "position": 2, "parent_id": 20, "permission_overwrites": [
+        { "id": 0, "type": 0, "allow": "0", "deny": "1024" },
+        { "id": 3, "type": 0, "allow": "3072", "deny": "0" }
+      ] },
+      { "id": 24, "type": 2, "name": "Practice voice", "position": 3, "parent_id": 20, "permission_overwrites": [] },
+      { "id": 25, "type": 15, "name": "drills", "position": 4, "parent_id": 20, "permission_overwrites": [] },
+      { "id": 30, "type": 0, "name": "off-topic", "position": 2, "parent_id": null, "permission_overwrites": [] }
+    ],
+    "afk_channel_id": null,
+    "system_channel_id": 21,
+    "system_channel_flags": 0
+  },
+  "is_dirty": null
+}

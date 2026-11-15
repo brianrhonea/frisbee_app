@@ -4,6 +4,22 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.22.0 — 2026-11-14
+
+Needs API 0.21.0.
+
+**Added**
+- Home has For you, Community and Your teams tabs (in the URL). For you
+  shows your teams' posts, followed teams' public posts, followed
+  tournaments' news, and tagged and shared-event posts; a Team post
+  button sits under the composer.
+- Hosts post news on a tournament or league's News tab.
+- Import from Discord in team Settings (owners): preview roles, folders
+  and rooms, and sort rooms into a community's teams.
+- Posts can be tagged with a tournament you follow; a new team event can
+  be shared with your followers; a group tournament's announcement is
+  tagged with it.
+
 ## 0.21.0 — 2026-11-14
 
 Needs API 0.20.0, with the LiveKit settings for calls.

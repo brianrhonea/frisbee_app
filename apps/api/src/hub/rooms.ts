@@ -42,7 +42,7 @@ const denied = () => new ApiError("permission_denied", "You can't manage this te
 const noTeam = () => new ApiError("not_found", "That team doesn't exist.");
 
 /** The access lists as stored, with single members limited to the team's members. */
-function accessFields(team: Data, access: z.output<typeof saveChatRoomRequestSchema>["access"]) {
+export function accessFields(team: Data, access: z.output<typeof saveChatRoomRequestSchema>["access"]) {
   const members = new Set(strings(team.memberIds));
   const sorted = (xs: string[]) => [...new Set(xs)].sort();
   return {

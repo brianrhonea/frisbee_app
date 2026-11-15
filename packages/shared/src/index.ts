@@ -26,3 +26,4 @@ export * from "./group_tournaments.js";
 export * from "./tournament_engine.js";
 export * from "./tournaments.js";
 export * from "./meetings.js";
+export * from "./discord.js";

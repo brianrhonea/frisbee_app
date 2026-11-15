@@ -7,6 +7,22 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.21.0 — 2026-11-14
+
+**Added**
+- Team posts take a `tournamentKey` for one of the team's tournaments or
+  leagues, so hosts post event news.
+- Discord import: `POST /v1/teams/:id/discord/preview` (a port of the
+  `discord-previewTemplate` callable: owner only, discord.com only, 10 s
+  timeout, no redirects, 2 MB cap) and `POST /v1/teams/:id/discord/import`
+  (the roles, folders and rooms the app adds, including community splits
+  with role copies; the server re-runs the mapping on the stored team).
+- `/v1/me/home` adds posts tagged with followed tournaments and events
+  shared from the member's teams.
+- `POST`/`PATCH /v1/posts` take an "At a tournament" tag, and `POST` can
+  share a team event or one from your own schedule (details copied from
+  the stored event).
+
 ## 0.20.1 — 2026-11-14
 
 **Fixed** (security review of 0.14.0–0.19.0)

@@ -12,6 +12,7 @@ import {
   groupTournamentFormatInfo,
   groupTournamentFormats,
   groupTournamentLimits,
+  tournamentFollowKey,
 } from "@stall10/shared";
 import { where } from "firebase/firestore";
 import Link from "next/link";
@@ -146,7 +147,7 @@ function Editor({
   const [busy, setBusy] = useState<"save" | "publish" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [announce, setAnnounce] = useState<string | null>(null);
+  const [announce, setAnnounce] = useState<{ page: string; id: string } | null>(null);
   const [adding, setAdding] = useState("");
   const isNew = id === null;
 
@@ -384,7 +385,7 @@ function Editor({
       setPlan(p);
       const page = `/teams/${encodeURIComponent(teamId)}/tournaments/${encodeURIComponent(saved)}`;
       if (first && window.confirm(`Tell the group? Post ${name.trim()} to the group feed so people see it and sign up. You can edit the post first.`)) {
-        setAnnounce(page);
+        setAnnounce({ page, id: saved });
       } else router.push(page);
     } catch (e) {
       setError((e as Error).message);
@@ -394,7 +395,7 @@ function Editor({
   }
 
   if (announce) {
-    return <Announcement teamId={teamId} group={group} name={name.trim()} settings={settings} teamCount={teams.length} event={event} onDone={() => router.push(announce)} />;
+    return <Announcement teamId={teamId} tournamentId={announce.id} group={group} name={name.trim()} settings={settings} teamCount={teams.length} event={event} onDone={() => router.push(announce.page)} />;
   }
 
   const s = settings;
@@ -746,6 +747,7 @@ function PlayerChip({
 /** The suggested feed post after a first publish, public so outsiders see it too. */
 function Announcement({
   teamId,
+  tournamentId,
   group,
   name,
   settings: s,
@@ -754,6 +756,8 @@ function Announcement({
   onDone,
 }: {
   teamId: string;
+  /** Tags the post with the tournament (its follow key), as the app does. */
+  tournamentId: string;
   group: Doc<TeamDoc>;
   name: string;
   settings: GroupTournamentSettings;
@@ -785,7 +789,7 @@ function Announcement({
     setBusy(true);
     setError(null);
     try {
-      await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/posts`, { method: "POST", body: { title: title.trim(), body, location: location.trim(), public: true } });
+      await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/posts`, { method: "POST", body: { title: title.trim(), body, location: location.trim(), public: true, tournamentKey: tournamentFollowKey(teamId, tournamentId) } });
       onDone();
     } catch (err) {
       setError((err as Error).message);

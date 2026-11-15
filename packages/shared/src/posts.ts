@@ -134,6 +134,19 @@ export const workoutSchema = z.strictObject({
 export type WorkoutInput = z.input<typeof workoutSchema>;
 export type WorkoutPost = z.output<typeof workoutSchema>;
 
+/** Longest tag key and name on a player's post (validUserPost). */
+export const postTournamentKeyMax = 300;
+export const postTournamentNameMax = 100;
+
+/** A post's tournament tag: validUserPost's tournamentKey ('tournament_.+', 300) and tournamentName (100). */
+export const postTournamentTagSchema = z.strictObject({
+  key: z
+    .string()
+    .max(postTournamentKeyMax)
+    .regex(/^tournament_.+$/s, "That isn't a tournament."),
+  name: z.string().trim().max(postTournamentNameMax, `Keep the tournament name under ${postTournamentNameMax} characters.`).default(""),
+});
+
 /**
  * `POST /v1/posts` (a new text post, or a workout post with [workout]) and `PATCH /v1/posts/:id` (the author
  * edits it). [uploadIds] are finished `post` uploads (`/v1/uploads`, with
@@ -156,6 +169,27 @@ export const savePostRequestSchema = z.strictObject({
   keepImages: z.array(z.string().max(1024)).max(postImagesMax).optional(),
   /** New posts only: makes it a workout post. Edits keep the workout as it is. */
   workout: workoutSchema.optional(),
+  /**
+   * "At a tournament": tags the post with a followed tournament (its follow
+   * key and name), so that tournament's followers see it. On an edit,
+   * absent keeps the tag and null removes it. Not on reposts.
+   */
+  tournament: postTournamentTagSchema.nullable().optional(),
+  /**
+   * New posts only: shares an event (the app's "post it on my profile" when
+   * saving one) from a team's schedule ([teamId], whose events the caller
+   * manages) or from the caller's own (null). The API copies its details
+   * from the stored event.
+   */
+  shareEvent: z
+    .strictObject({
+      eventId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+      teamId: z
+        .string()
+        .regex(/^[A-Za-z0-9_-]{1,128}$/)
+        .nullable(),
+    })
+    .optional(),
 });
 export type SavePostRequest = z.input<typeof savePostRequestSchema>;
 

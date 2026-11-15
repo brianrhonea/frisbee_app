@@ -4,6 +4,7 @@ import { accountRoutes } from "./account/routes.js";
 import { AccountService } from "./account/service.js";
 import { TeamDeletion, teamDeletionRoutes } from "./teams/deletion.js";
 import { ChatAdmin, chatAdminRoutes } from "./hub/rooms.js";
+import { DiscordService, discordRoutes } from "./discord/service.js";
 import { PlaybookService, playbookRoutes } from "./playbook/service.js";
 import { MeetingService, meetingRoutes } from "./meetings/service.js";
 import type { LiveKitSigner } from "./meetings/signer.js";
@@ -171,6 +172,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
     hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
     chatAdminRoutes(app, new ChatAdmin(deps.store, deps.teams, deps.media), writes);
+    discordRoutes(app, new DiscordService(deps.store, new ChatAdmin(deps.store, deps.teams, deps.media)), writes);
     playbookRoutes(app, new PlaybookService(deps.store), writes);
     meetingRoutes(app, new MeetingService(deps.store, deps.users, deps.teams, deps.livekit, deps.now), writes);
     const queries = deps.queries ?? listDocQueries(deps.store);

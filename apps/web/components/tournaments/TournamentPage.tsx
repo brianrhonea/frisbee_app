@@ -18,15 +18,15 @@ import {
   type EntryDoc,
   type HostedStatus,
 } from "@stall10/shared";
-import { where } from "firebase/firestore";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FollowButton } from "@/components/FollowButton";
 import { callApi } from "@/lib/client";
-import { type Doc, useLiveQuery } from "@/lib/live";
+import type { Doc } from "@/lib/live";
 import { SignupsSlot } from "./SignupsSlot";
 import { DivisionPicker, NoDivisions, ResultsTab, ScheduleTab } from "./TournamentGames";
+import { TournamentNews } from "./TournamentNews";
 import { datesLabel, StatusBadge } from "./TournamentLists";
 import { type MyTeam, type TournamentState, divisionPath, tournamentPath, useAction, useTournament } from "./useTournament";
 import "./tournaments.css";
@@ -83,7 +83,7 @@ export function TournamentPage({ tournamentId }: { tournamentId: string }) {
       {current === "teams" && <TeamsTab s={s} />}
       {current === "schedule" && <ScheduleTab s={s} />}
       {current === "results" && <ResultsTab s={s} />}
-      {current === "news" && <NewsTab s={s} />}
+      {current === "news" && <TournamentNews s={s} />}
     </div>
   );
 }
@@ -589,32 +589,5 @@ function InviteTeams({ s, divisionId }: { s: TournamentState; divisionId: string
       </div>
       {error && <p className="form-error">{error}</p>}
     </section>
-  );
-}
-
-interface NewsPost {
-  title?: string;
-  body?: string;
-  createdAt?: string;
-}
-
-/** The host's posts about this event (read-only on the website for now). */
-function NewsTab({ s }: { s: TournamentState }) {
-  const hostId = s.t?.hostId ?? "";
-  const key = `tournament_${hostId}_${s.id}`;
-  const posts = useLiveQuery<NewsPost>(hostId ? `teams/${hostId}/posts` : null, [where("public", "==", true), where("tournamentKey", "==", key)], key);
-  const rows = [...(posts.data ?? [])].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-  return (
-    <div className="stack">
-      {posts.data && rows.length === 0 && <p className="empty">No news yet.</p>}
-      {rows.map((p) => (
-        <article key={p.id} className="card">
-          {p.title && <h2 className="card-title">{p.title}</h2>}
-          <p className="hosted-description">{p.body}</p>
-          {p.createdAt && <small className="muted">{new Date(p.createdAt).toLocaleDateString()}</small>}
-        </article>
-      ))}
-      {s.manager && <small className="muted">Post news about this event from the Stall 10 app for now.</small>}
-    </div>
   );
 }

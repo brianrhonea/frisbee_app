@@ -1,0 +1,56 @@
+// An event shared on the caller's profile (SharedEvent in the app's
+// user_post.dart; event_editor_viewmodel.dart's _share): a copy of the
+// event's details, so followers who can't open the event see them. The
+// posts rule's validSharedEvent and sharesOwnTeamEvent, ported: the copy
+// is made here from the stored event (never from the client), and a team's
+// event is shared only by someone who manages its schedule.
+import { teamEventTypes } from "@stall10/shared";
+import type { Caller } from "../auth.js";
+import { ApiError } from "../errors.js";
+import { docIdParam } from "../ids.js";
+import type { Data, DocStore } from "../store.js";
+import { can } from "../teams/access.js";
+
+const clip = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+const asDate = (v: unknown): Date | null => {
+  if (v instanceof Date) return v;
+  if (typeof v === "string" && !Number.isNaN(Date.parse(v))) return new Date(v);
+  return null;
+};
+
+/** The event field of an event post (SharedEvent.toMap). */
+export async function sharedEvent(store: DocStore, caller: Caller, ref: { eventId: string; teamId: string | null }): Promise<Data> {
+  const eventId = docIdParam(ref.eventId);
+  const teamId = ref.teamId === null ? null : docIdParam(ref.teamId);
+  let teamName: string | null = null;
+  let event: Data | null;
+  if (teamId) {
+    const team = await store.get(`teams/${teamId}`);
+    // sharesOwnTeamEvent: can(get(teamPath(e.teamId)).data, 'manageEvents').
+    if (!team || !can(team, caller.uid, "manageEvents")) {
+      throw new ApiError("permission_denied", "Only people who run this team's schedule can share its events.");
+    }
+    teamName = clip(team.name, 100) || null;
+    event = await store.get(`teams/${teamId}/events/${eventId}`);
+  } else {
+    event = await store.get(`users/${caller.uid}/events/${eventId}`);
+  }
+  if (!event) throw new ApiError("not_found", "That event doesn't exist anymore.");
+  // validSharedEvent: a title of 1–100, a known type, a start time.
+  const title = clip(event.title, 100);
+  const startsAt = asDate(event.startsAt);
+  const type = (teamEventTypes as readonly string[]).includes(String(event.type)) ? String(event.type) : "other";
+  if (!title || !startsAt) throw new ApiError("failed_precondition", "That event needs a title and a start time to share.");
+  const endsAt = asDate(event.endsAt);
+  const location = clip(event.location, 200);
+  return {
+    eventId,
+    title,
+    type,
+    startsAt,
+    ...(endsAt && { endsAt }),
+    ...(location && { location }),
+    ...(teamId && { teamId }),
+    ...(teamName && { teamName }),
+  };
+}

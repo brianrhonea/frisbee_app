@@ -11,6 +11,7 @@ import {
   saveTeamPostRequestSchema,
   sendChatMessageRequestSchema,
   teamPostImagesMax,
+  teamPostTournamentKeyMax,
 } from "@stall10/shared";
 import type { z } from "zod";
 import type { Caller, UserLookup } from "../auth.js";
@@ -42,6 +43,21 @@ function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
   const r = schema.safeParse(body ?? {});
   if (!r.success) throw fromZod(r.error);
   return r.data;
+}
+
+/**
+ * validPost's tournamentKey conjunct: absent, or a string of at most 300
+ * characters matching 'tournament_' + teamId + '_.+'. The tournament part
+ * must also be a plain id (stricter than the rule's '.+').
+ */
+export function checkTournamentKey(teamId: string, key: string | undefined): string | undefined {
+  if (key === undefined) return undefined;
+  const prefix = `tournament_${teamId}_`;
+  if (key.length > teamPostTournamentKeyMax || !key.startsWith(prefix) || key.length === prefix.length) {
+    throw new ApiError("invalid_argument", "That isn't one of this team's tournaments.");
+  }
+  docIdParam(key.slice(prefix.length));
+  return key;
 }
 
 /** A per-uid map field without [uid] (FieldValue.delete() on one key). */
@@ -76,6 +92,7 @@ export class HubService {
   async createPost(caller: Caller, rawTeam: unknown, body: unknown): Promise<SaveTeamPostResult> {
     const teamId = docIdParam(rawTeam);
     const req = parse(saveTeamPostRequestSchema, body);
+    const tournamentKey = checkTournamentKey(teamId, req.tournamentKey);
     const team = await this.team(teamId);
     if (!can(team, caller.uid, "manageTeam")) throw denied("Only the team's admins post for it.");
     await checkNotMuted(this.store, caller.uid, this.now());
@@ -100,6 +117,7 @@ export class HubService {
         links: req.links,
         images,
         public: req.public,
+        ...(tournamentKey !== undefined && { tournamentKey }),
         authorId: caller.uid,
         authorName: me.name,
         createdAt: serverTime,
@@ -113,6 +131,7 @@ export class HubService {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawPost);
     const req = parse(saveTeamPostRequestSchema, body);
+    const tournamentKey = checkTournamentKey(teamId, req.tournamentKey);
     const team = await this.team(teamId);
     if (!can(team, caller.uid, "manageTeam")) throw denied("Only the team's admins edit its posts.");
     const current = await this.store.get(p.post(teamId, id));
@@ -140,6 +159,7 @@ export class HubService {
         links: req.links,
         images,
         public: req.public,
+        ...(tournamentKey !== undefined && { tournamentKey }),
         updatedAt: serverTime,
       });
     });

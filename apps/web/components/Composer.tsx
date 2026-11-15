@@ -12,12 +12,15 @@ import {
   workoutExercisesMax,
 } from "@stall10/shared";
 import { type ClipboardEvent, type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
+import { where } from "firebase/firestore";
 import { ApiError, callApi } from "@/lib/client";
+import { useLiveQuery } from "@/lib/live";
 import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { MemberImage } from "./MemberImage";
 import { NavIcon } from "./NavIcons";
+import "./composer_tag.css";
 
 /** A photo on the post: already saved, or chosen now (uploading, then ready). */
 type Photo =
@@ -82,6 +85,8 @@ export interface EditingPost {
   images: PublicImage[];
   /** A repost only has a note; workout and event posts keep their details. */
   kind?: string;
+  /** Its "At a tournament" tag, if any. */
+  tournament?: { key: string; name: string } | null;
 }
 
 /**
@@ -98,7 +103,7 @@ export function Composer({
 }: {
   editing?: EditingPost;
   /** With what was saved: the words and links as sent. */
-  onSaved?: (result: SavePostResult, saved: { body: string; links: string[] }) => void;
+  onSaved?: (result: SavePostResult, saved: { body: string; links: string[]; tournament?: { key: string; name: string } | null }) => void;
   onCancel?: () => void;
   autoFocus?: boolean;
 }) {
@@ -118,6 +123,20 @@ export function Composer({
   const text = useRef<HTMLTextAreaElement>(null);
   const files = useRef<HTMLInputElement>(null);
   const repost = editing?.kind === "repost";
+  // "At a tournament": the tournaments the member follows (the app's tag field).
+  const [tag, setTag] = useState<{ key: string; name: string } | null>(editing?.tournament ?? null);
+  const followed = useLiveQuery<{ key?: string; name?: string; type?: string }>(
+    user && !repost ? `users/${user.uid}/follows` : null,
+    [where("type", "==", "tournament")],
+    `${user?.uid ?? ""}-tournaments`,
+  );
+  const tagOptions = [
+    ...(followed.data ?? []).flatMap((f) => {
+      const key = f.key ?? f.id;
+      return key.startsWith("tournament_") ? [{ key, name: (f.name ?? "Tournament").slice(0, 100) }] : [];
+    }),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+  if (tag && !tagOptions.some((o) => o.key === tag.key)) tagOptions.push(tag);
 
   // Grow the box with what's written.
   useEffect(() => {
@@ -205,6 +224,8 @@ export function Composer({
       links: repost ? [] : links,
       uploadIds: photos.flatMap((p) => (p.kind === "new" && p.uploadId ? [p.uploadId] : [])),
       ...(editing && { keepImages: photos.flatMap((p) => (p.kind === "saved" ? [p.image.path] : [])) }),
+      // An edit sends the tag either way (null removes it); a new post only when tagged.
+      ...(!repost && (editing || tag) && { tournament: tag }),
     };
     try {
       const result = editing
@@ -222,9 +243,10 @@ export function Composer({
         setLinks([]);
         setPhotos([]);
         setWorkout(null);
+        setTag(null);
         setPostId(newId());
       }
-      onSaved?.(result, { body: body.trim(), links: payload.links });
+      onSaved?.(result, { body: body.trim(), links: payload.links, ...(!repost && { tournament: tag }) });
     } catch (e) {
       setError(problem(e));
     } finally {
@@ -330,6 +352,23 @@ export function Composer({
               Add
             </button>
           </div>
+        )}
+
+        {!repost && tagOptions.length > 0 && (
+          <label className="composer-tag small">
+            At a tournament
+            <select
+              value={tag?.key ?? ""}
+              onChange={(e) => setTag(tagOptions.find((o) => o.key === e.target.value) ?? null)}
+            >
+              <option value="">None</option>
+              {tagOptions.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
 
         {error && (
