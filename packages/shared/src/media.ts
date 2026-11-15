@@ -200,6 +200,19 @@ export function chatAttachmentMax(fileName: string, videoType: boolean): number 
 export const chatFileNameMax = 120;
 
 /**
+ * A file name as people see it, safe to show: control characters and bidi
+ * controls (which can make "photo<U+202E>fdp.exe" read as "photoexe.pdf")
+ * removed, and path separators turned into "_". The upload schema applies
+ * it, so a stored `name` never has them.
+ */
+export function cleanFileName(name: string): string {
+  return name
+    .replace(/[\u0000-\u001f\u007f-\u009f؜‎‏‪-‮⁦-⁩]/g, "")
+    .replace(/[/\\]/g, "_")
+    .trim();
+}
+
+/**
  * [name] as a chat file's stored name: readable, with anything that would
  * add path segments or trip up Storage URLs replaced (the app's
  * AttachmentStorage._safeName), and its last 80 characters at most.
@@ -228,7 +241,7 @@ export const createUploadRequestSchema = z
     contentType: z.string().min(1).max(160),
     size: z.number().int().positive(),
     /** The file's own name (`chat`): kept on the message, and decides the video limit as storage.rules does. */
-    name: z.string().trim().min(1).max(chatFileNameMax).optional(),
+    name: z.string().max(chatFileNameMax * 4).transform(cleanFileName).pipe(z.string().min(1).max(chatFileNameMax)).optional(),
     /** The team (teamImage, teamVideo) or chat (chat: `teams/{t}/chats/{r}` or `conversations/{c}`) it's for. */
     targetId: z.string().min(1).max(128).optional(),
     /**

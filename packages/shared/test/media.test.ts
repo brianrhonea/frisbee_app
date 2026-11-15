@@ -1,7 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { createUploadRequestSchema, mediaTypeFor } from "../src/index.js";
+import { cleanFileName, createUploadRequestSchema, mediaTypeFor } from "../src/index.js";
 
 const MB = 1024 * 1024;
+
+describe("upload names", () => {
+  const named = (name: string) =>
+    createUploadRequestSchema.safeParse({ purpose: "chat", targetId: "conversations/a_b", itemId: "m1", contentType: "application/pdf", size: 10, name });
+
+  it.each([
+    ["photo\u202Efdp.exe", "photofdp.exe"],
+    ["a\u2066b\u2069c\u200F.pdf", "abc.pdf"],
+    ["line\ncalls\t.pdf\u0000", "linecalls.pdf"],
+    ["../../users/x.pdf", ".._.._users_x.pdf"],
+    ["C:\\docs\\plan.pdf", "C:_docs_plan.pdf"],
+    ["  Line calls.pdf  ", "Line calls.pdf"],
+    ["Éclair 😀.pdf", "Éclair 😀.pdf"],
+  ])("cleans %j to %j", (raw, clean) => {
+    expect(cleanFileName(raw)).toBe(clean);
+    const r = named(raw);
+    expect(r.success).toBe(true);
+    expect(r.data?.name).toBe(clean);
+  });
+
+  it("refuses a name that's nothing once cleaned, or too long", () => {
+    expect(named("\u202E\u0007 ").success).toBe(false);
+    expect(named(`${"a".repeat(121)}`).success).toBe(false);
+    expect(named(`${"\u202E".repeat(100)}${"a".repeat(120)}`).success).toBe(true);
+  });
+});
 
 describe("mediaTypeFor", () => {
   it.each([
