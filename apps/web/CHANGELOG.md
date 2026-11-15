@@ -6,9 +6,18 @@ here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
 ## 0.30.0 — 2026-11-15
 
-Team pages redesign. Works with API 0.25.x.
+Home and team pages redesign. Works with API 0.25.x.
 
 **Added**
+- Home leads with a greeting and one composer: "To: Everyone" or a team
+  you manage (team posts get Title, Where and Public).
+- Team strip with New / Join; "+" by Your spaces creates or joins.
+- The Your teams tab is a feed of your teams' posts; feeds load as you
+  scroll ("Older posts" as a fallback).
+- Get started checklist on an empty For you feed; a Needs you card for
+  join requests; Invitations and the next event above the feed on
+  phones; a floating Post button on phones.
+- Feed tabs work with the arrow keys (ARIA tabs).
 - Team banner: Invite (with a join-request badge), Follow, Join for
   groups, Share, a Settings gear, member count with avatars and your
   role, a two-line description with "more", and "Invite-only — have a

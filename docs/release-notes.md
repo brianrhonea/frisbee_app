@@ -17,6 +17,12 @@ Firebase project; App Store builds come from `main` and use production.
   community feed. Other tabs ask you to sign up or log in, then bring
   you back.
 
+**Home**
+- The Your teams tab shows your teams' posts.
+- A strip of your teams sits under the composer, with New / Join.
+- An empty feed shows a Get started checklist.
+- A Needs you card lists join requests waiting for you.
+
 **Inviting people**
 - The invite dialog makes a link as soon as it opens, and again when
   you pick another length. It also lists join requests to approve or

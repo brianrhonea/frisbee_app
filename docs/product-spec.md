@@ -285,6 +285,17 @@ everything the app does on the website alone, styled like the website
     can join with a code; only schools/clubs have a Teams section.
     Website only (layout): six tabs, More ▾ and a Settings gear, with
     Playbook, Videos, Stats and Tournaments at their own URLs.
+13. Home: [x] post to Everyone or a team you manage from Home (one
+    composer with an audience chip on the website; "Team post" in the
+    app); [x] the Your teams tab is a feed of your teams' posts; [x] a
+    team strip with New / Join under the composer; [x] a Get started
+    checklist on an empty For you feed (same four steps on both:
+    username, join with a code, find a team, follow people); [x] Needs
+    you: join requests for groups you approve. Tests: app
+    `test/ui/home_test.dart`. Not yet: the app's Home doesn't list
+    invitations (the website's does). Website only (layout): feeds load
+    as you scroll (the app keeps "Show older posts"), and a floating
+    Post button on phones.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 
