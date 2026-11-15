@@ -231,6 +231,22 @@ void main() {
       vm.dispose();
     });
 
+    test('closing the dialog while its link is made is fine', () async {
+      final t = teamWith({testUser.uid: TeamRole.owner});
+      teams.teams['t1'] = t;
+      final vm = InviteMembersViewModel(
+        team: t,
+        teamRepository: teams,
+        directMessageRepository: FakeDirectMessageRepository(),
+        authRepository: auth,
+      )..start();
+      expect(vm.createLink.running, isTrue);
+      // Closed before the link arrives: nothing notifies a disposed model.
+      vm.dispose();
+      await pumpEventQueue();
+      expect(teams.inviteCodes, hasLength(1));
+    });
+
     test("a group's link is its page: opening mints nothing", () async {
       final g = makeGroup(members: {testUser.uid: TeamRole.owner});
       teams.teams['g1'] = g;

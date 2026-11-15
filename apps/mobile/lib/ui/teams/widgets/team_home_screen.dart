@@ -1219,18 +1219,19 @@ List<Widget> _teamActions(
       label: const Text('Message'),
     ),
   if (vm.team case final team? when vm.canManageMembers)
-    // The badge counts people asking to join; they're in the dialog too.
-    Badge(
-      isLabelVisible: vm.joinRequestCount > 0,
-      label: Text(
-        vm.joinRequestCount > 99 ? '99+' : '${vm.joinRequestCount}',
-        semanticsLabel: '${vm.joinRequestCount} asking to join',
+    FilledButton.icon(
+      onPressed: () => showInviteMembers(context, team),
+      // The badge counts people asking to join; they're in the dialog too.
+      // On the icon, so the button keeps its size in the phone's row.
+      icon: Badge(
+        isLabelVisible: vm.joinRequestCount > 0,
+        label: Text(
+          vm.joinRequestCount > 99 ? '99+' : '${vm.joinRequestCount}',
+          semanticsLabel: '${vm.joinRequestCount} asking to join',
+        ),
+        child: const Icon(Icons.person_add_alt, size: 18),
       ),
-      child: FilledButton.icon(
-        onPressed: () => showInviteMembers(context, team),
-        icon: const Icon(Icons.person_add_alt, size: 18),
-        label: Text(summary.isCommunity ? 'Invite members' : 'Invite players'),
-      ),
+      label: Text(summary.isCommunity ? 'Invite members' : 'Invite players'),
     ),
 ];
 

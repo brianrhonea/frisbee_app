@@ -31,6 +31,8 @@ abstract class Command<T> extends ChangeNotifier {
   /// Get last action result.
   Result<T>? get result => _result;
 
+  bool _disposed = false;
+
   /// Clear last action result.
   void clearResult() {
     _result = null;
@@ -38,7 +40,7 @@ abstract class Command<T> extends ChangeNotifier {
   }
 
   Future<void> _execute(CommandAction0<T> action) async {
-    if (_running) return;
+    if (_running || _disposed) return;
 
     _running = true;
     _result = null;
@@ -48,8 +50,15 @@ abstract class Command<T> extends ChangeNotifier {
       _result = await action();
     } finally {
       _running = false;
-      notifyListeners();
+      // Its screen may have closed while the action ran.
+      if (!_disposed) notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 

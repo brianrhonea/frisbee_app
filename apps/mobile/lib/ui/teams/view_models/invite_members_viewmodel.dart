@@ -129,7 +129,8 @@ class InviteMembersViewModel extends ChangeNotifier {
       case Ok(:final value):
         _link = InviteLinks.join(value.code);
         _linkExpiresAt = value.expiresAt;
-        notifyListeners();
+        // The dialog may have closed while the link was made.
+        if (!_disposed) notifyListeners();
         return Result.ok(_link!);
       case Error(:final error):
         return Result.error(error);
@@ -204,7 +205,7 @@ class InviteMembersViewModel extends ChangeNotifier {
       excludeUid: _auth.currentUser?.uid ?? '',
     );
     // A newer search started while this one ran.
-    if (id != _searchId) return;
+    if (id != _searchId || _disposed) return;
     _searching = false;
     switch (result) {
       case Ok(:final value):
@@ -224,7 +225,7 @@ class InviteMembersViewModel extends ChangeNotifier {
       return Result.error(Exception('${person.name} is already a member.'));
     }
     final result = await _teams.inviteToTeam(team, person.uid, user);
-    if (result is! Ok) return result;
+    if (result is! Ok || _disposed) return result;
     _invited.add(person.uid);
     _invitedPeople
       ..removeWhere((p) => p.uid == person.uid)
@@ -248,8 +249,11 @@ class InviteMembersViewModel extends ChangeNotifier {
     };
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _timer?.cancel();
     _requestSub?.cancel();
     invite.dispose();
