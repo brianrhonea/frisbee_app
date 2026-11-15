@@ -18,7 +18,7 @@ import { useLiveQuery } from "@/lib/live";
 import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
-import { MemberImage } from "./MemberImage";
+import { ComposerPhotos } from "./ComposerPhotos";
 import { NavIcon } from "./NavIcons";
 import "./composer_tag.css";
 
@@ -301,24 +301,14 @@ export function Composer({
 
         {workout && <WorkoutFields draft={workout} onChange={setWorkout} onRemove={() => setWorkout(null)} />}
 
-        {photos.length > 0 && (
-          <ul className={`composer-photos n${photos.length}`}>
-            {photos.map((p, i) => (
-              <li key={p.kind === "saved" ? p.image.path : p.key} className={p.kind === "new" && p.error ? "failed" : ""}>
-                {p.kind === "saved" ? (
-                  <MemberImage path={p.image.path} url={p.image.url} alt="" />
-                ) : (
-                  <img src={p.preview} alt="" />
-                )}
-                {p.kind === "new" && !p.uploadId && !p.error && <span className="photo-status">Uploading…</span>}
-                {p.kind === "new" && p.error && <span className="photo-status">{p.error}</span>}
-                <button type="button" className="photo-remove" aria-label="Remove photo" onClick={() => removePhoto(i)}>
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ComposerPhotos
+          photos={photos.map((p) =>
+            p.kind === "saved"
+              ? { kind: "saved", key: p.image.path, path: p.image.path, url: p.image.url, alt: "" }
+              : { kind: "new", key: p.key, preview: p.preview, uploading: !p.uploadId && !p.error, error: p.error },
+          )}
+          onRemove={removePhoto}
+        />
 
         {links.length > 0 && (
           <ul className="composer-links">
