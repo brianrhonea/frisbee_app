@@ -5,7 +5,6 @@
 // from /v1/public/search; tournaments are matched in the browser over the
 // upcoming ones the card already reads, as the app's ExploreViewModel does.
 import type { PublicListing, PublicProfile, SearchPage, TournamentDoc } from "@stall10/shared";
-import { where } from "firebase/firestore";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -18,6 +17,7 @@ import { type DivisionRanking, type PlayerRanking, rankingLabel, rankingOrder, w
 import { datesLabel, TournamentCard, tournamentHref, useUpcomingTournaments } from "../tournaments/TournamentLists";
 import { type ExploreFilter, exploreHref, listingsFor, matchTournaments, minQueryLength } from "./filters";
 import "./explore.css";
+import { useMyTeams } from "../useMyTeams";
 
 const chips: Array<[string, ExploreFilter | null]> = [
   ["All", null],
@@ -37,11 +37,7 @@ const upcomingLimit = 30;
 export function Explore({ initialQuery, initialFilter }: { initialQuery: string; initialFilter: ExploreFilter | null }) {
   const { user } = useAuth();
   const upcoming = useUpcomingTournaments(upcomingLimit);
-  const mine = useLiveQuery<{ kind?: string; level?: string; division?: string }>(
-    user ? "teams" : null,
-    user ? [where("memberIds", "array-contains", user.uid)] : [],
-    user?.uid ?? "",
-  );
+  const mine = useMyTeams<{ kind?: string; level?: string; division?: string }>(user?.uid);
   return (
     <div className="explore">
       <SearchCard initialQuery={initialQuery} initialFilter={initialFilter} upcoming={upcoming.list} mine={mine.data ?? []} />

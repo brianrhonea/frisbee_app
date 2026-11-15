@@ -1,13 +1,13 @@
 "use client";
 import { JoinWithCode } from "./CreateTeam";
-import { where } from "firebase/firestore";
 import Link from "next/link";
 import { useState } from "react";
-import { type Doc, useLiveQuery } from "@/lib/live";
+import { type Doc } from "@/lib/live";
 import { divisionLabels, listingSubtitle } from "@/lib/site";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { roleLabel, TeamList } from "./ProfileDashboard";
+import { useMyTeams } from "./useMyTeams";
 
 interface MyTeam {
   name?: string;
@@ -34,7 +34,7 @@ const byName = (a: { name?: string }, b: { name?: string }) => (a.name ?? "").lo
  */
 export function MyTeams() {
   const { user } = useAuth();
-  const live = useLiveQuery<MyTeam>(user ? "teams" : null, user ? [where("memberIds", "array-contains", user.uid)] : [], user?.uid ?? "");
+  const live = useMyTeams<MyTeam>(user?.uid);
 
   if (user === undefined) return null;
   if (!user) {

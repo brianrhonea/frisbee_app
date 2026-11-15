@@ -1,22 +1,15 @@
 "use client";
 // The home page's "For you" feed and "Team post" picker (the app's
 // HomeScreen: _Tab.forYou and the composer's Team post button).
-import { where } from "firebase/firestore";
 import Link from "next/link";
 import { useState } from "react";
 import { PostCard } from "@/components/PostCard";
 import { TeamPostCard } from "@/components/team/TeamPostCard";
 import { TeamPostComposer } from "@/components/team/TeamPostComposer";
 import { canOn } from "@/components/tournaments/useTournament";
-import type { TeamDoc } from "@/components/team/TeamContext";
-import { useLiveQuery } from "@/lib/live";
 import { type UserPages, useForYou } from "./useForYou";
 import "./home_feed.css";
-
-/** The member's teams, live (rules: members read their teams). */
-export function useMyTeams(uid: string | undefined) {
-  return useLiveQuery<TeamDoc>(uid ? "teams" : null, uid ? [where("memberIds", "array-contains", uid)] : [], uid ?? "");
-}
+import { useMyTeams } from "../useMyTeams";
 
 export function ForYouFeed({ uid, users, onCommunity }: { uid: string; users: UserPages & { busy: boolean; error: boolean }; onCommunity: () => void }) {
   const teams = useMyTeams(uid);

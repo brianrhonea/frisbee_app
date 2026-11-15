@@ -18,12 +18,11 @@ import {
   shareRoleLabels,
   upcomingSchedule,
 } from "@stall10/shared";
-import { where } from "firebase/firestore";
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { colorOf, downloadIcs, loadHidden, saveHidden } from "@/lib/calendar";
 import { callApi, problem } from "@/lib/client";
-import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
+import { type Doc, useLiveQueries } from "@/lib/live";
 import { type Meeting, type MeetingData, meetingHref, teamBase, teamMeetingQueries } from "./team/meetings/model";
 import { memberViewer, type TeamDoc } from "./team/TeamContext";
 import { scheduleMeetings, type TeamEventDoc, teamEventQueries } from "./team/TeamSchedule";
@@ -32,6 +31,7 @@ import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
 import { type ShareChoice, ShareEventField, shareEvent } from "./team/ShareEvent";
 import { fromLocalInput, startOfToday, toLocalInput } from "@/lib/dates";
+import { useMyTeams } from "./useMyTeams";
 
 const dayMs = 86_400_000;
 const canEdit = (c: CalendarInfo | undefined) => c?.role === "owner" || c?.role === "edit";
@@ -111,11 +111,7 @@ export function Schedule() {
   const [editing, setEditing] = useState<(Partial<CalendarEvent> & { calendarId?: string }) | null>(null);
   const [filter, setFilter] = useState<ScheduleFilter>("all");
   // Every team the member is on (watchMyTeams), each listened to by a TeamFeed.
-  const teamsLive = useLiveQuery<TeamDoc>(
-    user ? "teams" : null,
-    user ? [where("memberIds", "array-contains", user.uid)] : [],
-    user?.uid ?? "",
-  );
+  const teamsLive = useMyTeams<TeamDoc>(user?.uid);
   const [feeds, setFeeds] = useState<Record<string, TeamFeedData>>({});
   const onFeed = useCallback((teamId: string, d: TeamFeedData | null) => {
     setFeeds((f) => {

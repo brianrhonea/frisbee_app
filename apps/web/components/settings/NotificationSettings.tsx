@@ -1,10 +1,10 @@
 "use client";
 import { type NotificationCategory, notificationCategories, notificationCategoryInfo } from "@stall10/shared";
-import { where } from "firebase/firestore";
 import { useState } from "react";
 import { callApi, problem } from "@/lib/client";
-import { useLiveDoc, useLiveQuery } from "@/lib/live";
+import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
+import { useMyTeams } from "../useMyTeams";
 
 /** users/{uid}/settings/notifications (NotificationPreferences in the app). */
 interface Prefs {
@@ -23,7 +23,7 @@ const perTeam = notificationCategories.filter((c) => notificationCategoryInfo[c]
 export function NotificationSettings() {
   const { user } = useAuth();
   const prefs = useLiveDoc<Prefs>(user ? `users/${user.uid}/settings/notifications` : null);
-  const teams = useLiveQuery<{ name?: string }>(user ? "teams" : null, user ? [where("memberIds", "array-contains", user.uid)] : [], user?.uid ?? "");
+  const teams = useMyTeams<{ name?: string }>(user?.uid);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState<string | null>(null);
