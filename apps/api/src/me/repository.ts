@@ -22,7 +22,7 @@ export interface MeRepository {
   privateDetails(uid: string): Promise<Data | null>;
   /** Teams listing [uid] in memberIds (rules: members read their teams). */
   teamsOf(uid: string, limit: number): Promise<Doc[]>;
-  /** A team's events from [now], soonest first. */
+  /** A team's events starting at or after [from] ms, soonest first. */
   upcomingEvents(teamId: string, now: number, limit: number): Promise<Doc[]>;
   /** Ids of the people [uid] follows (users/{uid}/follows, type user). */
   followedUsers(uid: string): Promise<string[]>;
@@ -69,10 +69,10 @@ export class FirestoreMeRepository implements MeRepository {
     return snap.docs.map(doc);
   }
 
-  async upcomingEvents(teamId: string, now: number, limit: number) {
+  async upcomingEvents(teamId: string, from: number, limit: number) {
     const snap = await this.db
       .collection(`teams/${teamId}/events`)
-      .where("startsAt", ">=", Timestamp.fromMillis(now))
+      .where("startsAt", ">=", Timestamp.fromMillis(from))
       .orderBy("startsAt")
       .limit(limit)
       .get();

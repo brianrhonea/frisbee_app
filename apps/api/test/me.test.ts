@@ -121,6 +121,26 @@ describe("GET /v1/me/home", () => {
     ]);
   });
 
+  it("upcoming events include ones under way (until their end), not ones that have ended", async () => {
+    t.repo.teams = [team("A", { memberIds: ["me"], members: { me: "player" } })];
+    t.repo.events.set("A", [
+      event("weekend", -1, { endsAt: iso(now + day) }),
+      event("ended", -1, { endsAt: iso(now - 1000) }),
+      event("startedNoEnd", -0.01),
+      event("next", 1),
+    ]);
+    const { events } = (await t.get("/v1/me/home", "me")).json();
+    expect(events.map((e: { id: string }) => e.id)).toEqual(["weekend", "next"]);
+  });
+
+  it("a community member still gets their events when earlier ones are for other audiences", async () => {
+    t.repo.teams = [team("C", { kind: "organization", memberIds: ["me", "boss"], members: { me: "player", boss: "owner" } })];
+    const coaches = Array.from({ length: 8 }, (_, i) => event(`c${i}`, 1 + i / 100, { audience: ["coach"] }));
+    t.repo.events.set("C", [...coaches, event("mine1", 2, { audience: ["player"] }), event("mine2", 3, { audience: ["everyone"] })]);
+    const { events } = (await t.get("/v1/me/home", "me")).json();
+    expect(events.map((e: { id: string }) => e.id)).toEqual(["mine1", "mine2"]);
+  });
+
   it("feed: their own posts and those of people they follow, paged with a cursor", async () => {
     t.repo.follows.set("me", ["f1"]);
     t.repo.posts = Array.from({ length: 25 }, (_, i) => ({

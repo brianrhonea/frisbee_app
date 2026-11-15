@@ -113,6 +113,28 @@ describe("home feed sources (HomeFeed)", () => {
   });
 });
 
+describe("home feed paging when every source is short", () => {
+  it("three short sources merging past a page still give a cursor, and nothing is lost", async () => {
+    const t = setup();
+    t.repo.teams = [{ id: "t1", data: { name: "T1", memberIds: ["me"] } }];
+    t.repo.tournaments = ["tournament_host_x"];
+    t.repo.people.set("pub", { name: "Pub" });
+    for (let i = 0; i < 9; i++) {
+      t.repo.posts.push(post(`m${i}`, i * 3, { authorId: "me" }));
+      t.repo.posts.push(post(`t${i}`, i * 3 + 1, { authorId: "pub", tournamentKey: "tournament_host_x" }));
+      t.repo.posts.push(post(`e${i}`, i * 3 + 2, { authorId: "pub", kind: "event", event: { teamId: "t1", eventId: `e${i}` } }));
+    }
+    const first = (await t.home()).feed;
+    expect(first.posts).toHaveLength(20);
+    expect(first.next).not.toBeNull();
+    const second = (await t.home(first.next)).feed;
+    expect(second.posts).toHaveLength(7);
+    expect(second.next).toBeNull();
+    const ids = [...first.posts, ...second.posts].map((p: { id: string }) => p.id);
+    expect(new Set(ids).size).toBe(27);
+  });
+});
+
 describe("home feed privacy and limits", () => {
   it("hides a followed person's repost of a private stranger's post", async () => {
     const { repo, home } = setup();
