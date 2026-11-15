@@ -21,6 +21,7 @@
     "@stall10/shared": "workspace:*",
     "fastify": "^5.12.0",
     "firebase-admin": "^14.5.0",
+    "livekit-server-sdk": "2.19.2",
     "sharp": "^0.34.5",
     "zod": "^4.6.0"
   },

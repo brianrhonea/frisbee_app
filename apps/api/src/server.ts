@@ -23,6 +23,7 @@ import { FirestoreTeamRepository } from "./teams/repository.js";
 import { LocalCipher, type PersonalCipher } from "./personal/cipher.js";
 import { KmsCipher } from "./personal/kms.js";
 import { webRevalidator } from "./web/revalidate.js";
+import { livekitFromEnv } from "./meetings/livekit.js";
 
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "frisbee-app-brianrhonea-dev";
 const firebase = initializeApp({ projectId });
@@ -103,6 +104,7 @@ const app = buildApp({
     : undefined,
   heic: ffmpegHeicDecoder(),
   personal: personalCipher(),
+  livekit: livekitFromEnv(),
 });
 
 /**

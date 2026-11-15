@@ -356,6 +356,65 @@ groups each request's lines under its trace.
   (firebase/docs/cloud-limits.md); the API doesn't add reads beyond what
   the app did.
 
+## Meetings and voice (LiveKit)
+
+The website gets meeting and voice-channel tokens from the API
+(`POST /v1/teams/:teamId/meetings/:meetingId/token` and
+`POST /v1/teams/:teamId/voice-rooms/:roomId/token`, `src/meetings`). They
+sign with the same LiveKit project as the `meetings` Cloud Functions, so
+the API needs the same three values as environment variables:
+`LIVEKIT_URL` (`wss://…`), `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET`.
+Until all three are set, those two routes answer 412 "Meetings aren't set
+up here yet."; every other route, including scheduling meetings, works
+without them. Never put the values in the repo, `service.yaml` or a
+workflow: they live in Secret Manager.
+
+`firebase functions:secrets:set LIVEKIT_API_KEY` (and so on) already
+stored them in each project's Secret Manager under those same names, for
+the functions. Check, then let `api-runtime` read them:
+
+```sh
+gcloud secrets list --project="$PROJECT" --filter="name~LIVEKIT"
+for s in LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET; do
+  gcloud secrets add-iam-policy-binding "$s" --project="$PROJECT"     --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor
+done
+```
+
+(If a project has none yet, create each with
+`printf %s "<value>" | gcloud secrets create LIVEKIT_URL --data-file=-`,
+values from the LiveKit Cloud project's settings, and set the functions'
+copies with `firebase functions:secrets:set`.)
+
+Only after that, add these under `env:` in `deploy/service.yaml` (a
+reference to a secret that doesn't exist or can't be read fails the
+whole revision, not just meetings, so it isn't there yet):
+
+```yaml
+            # LiveKit for meeting and voice tokens (DEPLOY.md, "Meetings and
+            # voice"): the meetings functions' secrets.
+            - name: LIVEKIT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: LIVEKIT_URL
+                  key: latest
+            - name: LIVEKIT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: LIVEKIT_API_KEY
+                  key: latest
+            - name: LIVEKIT_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: LIVEKIT_API_SECRET
+                  key: latest
+```
+
+Values are trimmed, as the callables trim them, so a secret saved with a
+trailing newline still works. Rotating the key in LiveKit means a new
+version of each secret and a new revision (deploy again); tokens already
+handed out last up to 6 hours. Locally, put the dev values in the
+gitignored `apps/api/.env` (`.env.example` lists the names).
+
 ## Video transcoding (later)
 
 The same Dockerfile's `media` target adds ffmpeg (Debian's: libx264, AAC,
