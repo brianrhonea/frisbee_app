@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { formatDate, formatDateTime } from "@/lib/dates";
+import { formatDate, formatDateTime, serverLocale } from "@/lib/dates";
 
 type Style = "date" | "dateTime" | "relative";
 
 function format(d: Date, style: Style, timeZone?: string): string {
+  // The server's UTC copy has a fixed locale, so the browser's first render matches it.
+  const locale = timeZone ? serverLocale : undefined;
   if (style === "date") {
-    return formatDate(d, { month: "short", day: "numeric", year: "numeric", timeZone });
+    return formatDate(d, { month: "short", day: "numeric", year: "numeric", timeZone }, locale);
   }
   if (style === "dateTime") {
     return formatDateTime(d, {
@@ -17,7 +19,7 @@ function format(d: Date, style: Style, timeZone?: string): string {
       minute: "2-digit",
       timeZone,
       timeZoneName: timeZone === "UTC" ? "short" : undefined,
-    });
+    }, locale);
   }
   const s = Math.round((Date.now() - d.getTime()) / 1000);
   if (s < 60) return "just now";

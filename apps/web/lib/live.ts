@@ -37,6 +37,17 @@ export interface Live<T> {
   denied?: boolean;
 }
 
+/**
+ * Whether [path] names a document ("doc") or a collection: non-empty
+ * segments, none "." or "..", and an even or odd count. Ids from the
+ * address bar can hold a decoded "/" (and Firestore throws on a bad
+ * path), so a path that isn't is read as nothing there.
+ */
+function wellFormed(path: string, kind: "doc" | "collection"): boolean {
+  const parts = path.split("/");
+  return parts.every((p) => p !== "" && p !== "." && p !== "..") && parts.length % 2 === (kind === "doc" ? 0 : 1);
+}
+
 /** A failed listener in words: refused by the rules, or [failed] for anything else. */
 export function liveError(e: { code?: string }, failed = "Couldn't load this. Check your connection and refresh."): string {
   return e.code === "permission-denied" ? "You can't see this." : failed;
@@ -50,7 +61,7 @@ export function useLiveDoc<T = DocumentData>(path: string | null): Live<Doc<T> |
   const [state, setState] = useState<Live<Doc<T> | null>>({ data: undefined, error: null });
   useEffect(() => {
     const db = firestoreDb();
-    if (!path || !db) {
+    if (!path || !db || !wellFormed(path, "doc")) {
       setState({ data: path ? null : undefined, error: null });
       return;
     }
@@ -81,7 +92,7 @@ export function useLiveQuery<T = DocumentData>(
   const [state, setState] = useState<Live<Doc<T>[]>>({ data: undefined, error: null });
   useEffect(() => {
     const db = firestoreDb();
-    if (!path || !db) {
+    if (!path || !db || !wellFormed(path, "collection")) {
       setState({ data: path ? [] : undefined, error: null });
       return;
     }
@@ -151,7 +162,8 @@ export function useChangeSignal(signals: Signal[] | null, key: string): number {
     const db = firestoreDb();
     if (!signals || !db) return;
     const bump = () => setVersion((v) => v + 1);
-    const stops = signals.map((s) =>
+    const sound = signals.filter((s) => ("doc" in s ? wellFormed(s.doc, "doc") : wellFormed(s.collection, "collection")));
+    const stops = sound.map((s) =>
       "doc" in s
         ? onSnapshot(doc(db, s.doc), bump, () => undefined)
         : onSnapshot(query(collection(db, s.collection), ...s.constraints), bump, () => undefined),
@@ -175,7 +187,7 @@ export function useLiveQueries<T = DocumentData>(
   const [state, setState] = useState<Live<Doc<T>[]>>({ data: undefined, error: null });
   useEffect(() => {
     const db = firestoreDb();
-    if (!path || !db) {
+    if (!path || !db || !wellFormed(path, "collection")) {
       setState({ data: path ? [] : undefined, error: null });
       return;
     }

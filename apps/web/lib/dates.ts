@@ -20,11 +20,18 @@ export const fromLocalInput = (v: string): string | null => (v ? new Date(v).toI
 
 const asDate = (at: string | Date) => (typeof at === "string" ? new Date(at) : at);
 
-/** The date part of [at] in the viewer's locale, e.g. formatDate(iso, { month: "short", day: "numeric" }). */
-export const formatDate = (at: string | Date, o: Intl.DateTimeFormatOptions) => asDate(at).toLocaleDateString(undefined, o);
+/**
+ * The date part of [at] in the viewer's locale, e.g. formatDate(iso, { month: "short", day: "numeric" }).
+ * [locale] only for text the server renders before the browser rewrites
+ * it (serverLocale), which must match on both sides.
+ */
+export const formatDate = (at: string | Date, o: Intl.DateTimeFormatOptions, locale?: string) => asDate(at).toLocaleDateString(locale, o);
 
-/** [at] with its time, in the viewer's locale. */
-export const formatDateTime = (at: string | Date, o?: Intl.DateTimeFormatOptions) => asDate(at).toLocaleString(undefined, o);
+/** [at] with its time, in the viewer's locale (or [locale], as for formatDate). */
+export const formatDateTime = (at: string | Date, o?: Intl.DateTimeFormatOptions, locale?: string) => asDate(at).toLocaleString(locale, o);
+
+/** The fixed locale of a date the server renders (in UTC) before the browser shows the viewer's own. */
+export const serverLocale = "en-US";
 
 /** The time of day of [at], in the viewer's locale. */
 export const formatTime = (at: string | Date, o: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" }) =>

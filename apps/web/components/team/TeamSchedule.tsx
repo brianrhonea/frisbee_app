@@ -16,6 +16,7 @@ import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { TeamEventEditor } from "./TeamEventEditor";
 import "./team_schedule_meetings.css";
 import { startOfToday } from "@/lib/dates";
+import { validId } from "@/lib/text";
 
 /** A team event as members read it (TeamEvent in the app). */
 export interface TeamEventDoc extends PublicEvent {
@@ -141,7 +142,7 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   const [editing, setEditing] = useState<string | null>(null);
   const manager = member?.can("manageEvents") ?? false;
   // ?event= for an event that isn't in the list showing (a past one, say): read it by id.
-  const wanted = params.get("event");
+  const wanted = validId(params.get("event"));
   const listed = !!wanted && (member ? (live.data ?? []) : publicEvents).some((e) => e.id === wanted);
   const linked = useLiveDoc<TeamEventDoc>(member && wanted && live.data && !listed ? `teams/${teamId}/events/${wanted}` : null);
 

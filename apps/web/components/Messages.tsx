@@ -17,7 +17,7 @@ import { openConversation } from "./MessageButton";
 import { LoadMore } from "./LoadMore";
 import { loadAtTop, OlderMessages } from "./OlderMessages";
 import { type PickedPerson, PersonPicker } from "./PersonPicker";
-import { isTyping } from "@/lib/text";
+import { isTyping, validId } from "@/lib/text";
 
 /** conversations/{id} (Conversation in the app). */
 interface Conversation {
@@ -51,8 +51,6 @@ interface Message {
 
 const views = ["inbox", "requests", "archived"] as const;
 type View = (typeof views)[number];
-/** A document id from the address bar: anything else (`..`, a slash) opens nothing. */
-const validId = (id: string | null) => (id && /^[A-Za-z0-9_-]{1,300}$/.test(id) ? id : null);
 /** Conversations per page (no index orders them by last message, so "More conversations" reads the next page). */
 const conversationPage = 200;
 const ms = (iso?: string | null) => (iso ? Date.parse(iso) : Number.NaN);

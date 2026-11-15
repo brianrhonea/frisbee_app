@@ -75,7 +75,10 @@ export function LivePlayer({ uid }: { uid: string }) {
     };
   }, [user, uid, version, attempt]);
   // Another player: don't show the last one while this one loads.
-  useEffect(() => setMember(null), [uid]);
+  useEffect(() => {
+    setMember(null);
+    setFailed(null);
+  }, [uid]);
 
   if (!member) {
     return failed?.notFound ? (
