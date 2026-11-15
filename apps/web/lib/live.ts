@@ -32,6 +32,8 @@ export type Doc<T> = T & { id: string };
 export interface Live<T> {
   data: T | undefined;
   error: string | null;
+  /** The rules refused the read (rather than it failing). */
+  denied?: boolean;
 }
 
 const denied = "You can't see this.";
@@ -61,7 +63,7 @@ export function useLiveDoc<T = DocumentData>(path: string | null): Live<Doc<T> |
           data: snap.exists() ? ({ ...(plain(snap.data()) as T), id: snap.id } as Doc<T>) : null,
           error: null,
         }),
-      (e) => setState({ data: undefined, error: message(e) }),
+      (e) => setState({ data: undefined, error: message(e), denied: e.code === "permission-denied" }),
     );
   }, [path]);
   return state;

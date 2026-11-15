@@ -140,6 +140,13 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   useEffect(() => {
     if (state.ended && stage === "inCall") void hangUp(endNotices[state.ended]);
   }, [state.ended, stage, hangUp]);
+  // Signed out (here or in another tab), removed from the team, or no
+  // longer invited: leave the call, so the mic and camera stop (as voice
+  // channels do).
+  const lostAccess = !member || (!!m && !canSee(m, member));
+  useEffect(() => {
+    if ((stage === "inCall" || stage === "joining") && lostAccess) void hangUp("You no longer have access to this meeting.");
+  }, [lostAccess, stage, hangUp]);
 
   const join = useCallback(async () => {
     if (!user || stage !== "lobby") return;

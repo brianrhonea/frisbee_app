@@ -14,13 +14,6 @@ export const themeChoiceLabels: Record<ThemeChoice, string> = { system: "System"
 /** Runs in <head> before the page paints, so a saved choice never flashes. */
 export const themeScript = `try{var t=localStorage.getItem("${themeKey}");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
-/** The theme showing now: the saved choice, else the system's. */
-export function currentTheme(): Theme {
-  const set = document.documentElement.dataset.theme;
-  if (set === "light" || set === "dark") return set;
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-}
-
 /** What the visitor chose: light, dark, or the system's (nothing set). */
 export function currentChoice(): ThemeChoice {
   const set = document.documentElement.dataset.theme;

@@ -1,8 +1,10 @@
 "use client";
-import type { RosterMember, TeamRoster } from "@stall10/shared";
+import { type RosterMember, rosterMax, type TeamRoster } from "@stall10/shared";
+import { limit } from "firebase/firestore";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
+import { type Signal, useChangeSignal } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { roleLabel } from "../ProfileDashboard";
@@ -26,14 +28,36 @@ export function TeamRosterView() {
   // Groups invite with their link in the app; teams invite by name here too.
   const canInvite = kind === "team" && viewer.state === "member" && viewer.can("manageMembers");
 
+  // Members refetch when the team or its roster changes (a join, a new
+  // number); outsiders can't read either, so theirs loads once.
+  const member = viewer.state === "member";
+  const signals: Signal[] | null = member
+    ? [{ doc: `teams/${teamId}` }, ...(kind === "team" ? [{ collection: `teams/${teamId}/roster`, constraints: [limit(rosterMax)] }] : [])]
+    : null;
+  const version = useChangeSignal(signals, member ? `${teamId}|${kind}` : "");
+
   useEffect(() => {
     if (!user) return;
-    setRoster(null);
+    let live = true;
     setError("");
-    callApi<TeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`)
-      .then(setRoster)
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Couldn't load the roster. Try again."));
-  }, [user, teamId]);
+    // A moment's wait: subscribing fires every signal at once.
+    const timer = setTimeout(() => {
+      callApi<TeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`).then(
+        (r) => {
+          if (live) setRoster(r);
+        },
+        (e) => {
+          if (live) setError(problem(e, "Couldn't load the roster. Try again."));
+        },
+      );
+    }, 150);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [user, teamId, version]);
+  // Another team, or another account: don't show the last one's roster.
+  useEffect(() => setRoster(null), [user, teamId]);
 
   if (user === undefined) return null;
   if (!user) {

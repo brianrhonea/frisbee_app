@@ -86,7 +86,7 @@ export function TournamentPage({ tournamentId, fallbackHostId }: { tournamentId:
       </nav>
       {current === "overview" && <Overview s={s} />}
       {current === "players" && (
-        <SignupsSlot tournamentId={tournamentId} tournament={t} divisions={s.divisions} divisionId={s.divisionId} manager={s.manager} uid={s.uid} />
+        <SignupsSlot tournamentId={tournamentId} tournament={t} divisions={s.divisions} divisionId={s.divisionId} manager={s.manager} />
       )}
       {current === "teams" && <TeamsTab s={s} />}
       {current === "schedule" && <ScheduleTab s={s} />}

@@ -54,7 +54,7 @@ function Game({ gameId }: { gameId: string }) {
   const [panel, setPanel] = useState<"gameTo" | "timeouts" | null>(null);
   const [deleteError, setDeleteError] = useState("");
 
-  if (!loaded) return <p className="muted" aria-busy="true">Loading…</p>;
+  if (!loaded && !error) return <p className="muted" aria-busy="true">Loading…</p>;
   if (!t) {
     return (
       <div className="stack">

@@ -155,10 +155,8 @@ export async function attempt(setBusy: (b: boolean) => void, setError: (e: strin
   }
 }
 
-/** Where each view lives until the hosted tournament page mounts them. */
+/** The captains' draft board and the team editor: pages of their own beside the tournament page. */
 export const draftHrefs = {
-  signups: (tournamentId: string, divisionId?: string) =>
-    `/tournaments/${encodeURIComponent(tournamentId)}/signups${divisionId ? `?division=${encodeURIComponent(divisionId)}` : ""}`,
   liveDraft: (tournamentId: string, divisionId: string) => `/tournaments/${encodeURIComponent(tournamentId)}/live-draft/${encodeURIComponent(divisionId)}`,
   teamDraft: (tournamentId: string, divisionId: string) => `/tournaments/${encodeURIComponent(tournamentId)}/draft/${encodeURIComponent(divisionId)}`,
 };
