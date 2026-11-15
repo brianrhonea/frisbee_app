@@ -17,6 +17,7 @@ import { authConfigured, emailForUsername, firebaseAuth } from "@/lib/firebase";
 import { ApiError, callApi } from "@/lib/client";
 import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
+import { isSignInCancelled, popupBlockedMessage } from "@/lib/auth_errors";
 import { PasswordHints } from "./PasswordHints";
 import { localToday, signUpBirthDateProblem } from "./PersonalDetailsForm";
 import { SignUpSteps } from "./SignUpSteps";
@@ -24,6 +25,8 @@ import { suggestUsername, UsernameField, useUsernameCheck } from "./UsernameFiel
 
 /** Firebase's error codes in words. */
 function message(e: unknown): string {
+  // Closing or cancelling the Google or Apple window isn't an error.
+  if (isSignInCancelled(e)) return "";
   const code = e instanceof FirebaseError ? e.code : "";
   // Username sign-in (account-signInEmail) words its own failures.
   // The Functions SDK adds the HTTP status (" [401]"); people don't need it.
@@ -43,9 +46,8 @@ function message(e: unknown): string {
       return "Enter the email address of your account.";
     case "auth/too-many-requests":
       return "Too many tries. Wait a minute and try again.";
-    case "auth/popup-closed-by-user":
-    case "auth/cancelled-popup-request":
-      return "";
+    case "auth/popup-blocked":
+      return popupBlockedMessage;
     case "auth/unauthorized-domain":
       return "Signing in isn't set up for this web address yet.";
     case "auth/operation-not-allowed":

@@ -60,6 +60,9 @@ Plain-language notes for testers are in
   website): losing access to the channel or team drops the call, losing
   the right to talk mutes you, and signing out or switching accounts
   hangs up.
+- Cancelling Google or Apple sign-in (or the check before deleting the
+  account) shows no error, as on the website; it used to show the raw
+  Google exception or "Sign-in was cancelled.".
 - Message drafts are kept per user and cleared on sign-out (as on the
   website).
 - Tests: shared test vectors (`packages/shared/fixtures`, written by

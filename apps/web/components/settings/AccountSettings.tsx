@@ -12,6 +12,7 @@ import { type FormEvent, useState } from "react";
 import { deleteOwnAccount } from "@/lib/firebase";
 import { useAuth } from "../AuthProvider";
 import { ChangePassword } from "./ChangePassword";
+import { isSignInCancelled, popupBlockedMessage } from "@/lib/auth_errors";
 
 type Method = "password" | "google.com" | "apple.com";
 const methodNames: Record<Method, string> = { password: "email and password", "google.com": "Google", "apple.com": "Apple" };
@@ -25,7 +26,8 @@ function methodOf(providers: string[]): Method | null {
 function problem(e: unknown): string {
   const code = e instanceof FirebaseError ? e.code : "";
   if (code === "auth/wrong-password" || code === "auth/invalid-credential") return "That password isn't right.";
-  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return "";
+  if (isSignInCancelled(e)) return "";
+  if (code === "auth/popup-blocked") return popupBlockedMessage;
   if (code === "auth/too-many-requests") return "Too many tries. Wait a minute and try again.";
   if (code === "functions/failed-precondition") return "Confirm it's you again, then delete your account.";
   return "Couldn't delete your account. Try again, or contact us.";

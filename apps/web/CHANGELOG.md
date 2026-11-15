@@ -4,6 +4,13 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.28.1 — 2026-11-15
+
+**Fixed**
+- Cancelling or closing the Google or Apple sign-in window (sign-in,
+  sign-up, and confirming it's you before deleting the account) shows no
+  error; a blocked pop-up says to allow pop-ups. As in the app.
+
 ## 0.28.0 — 2026-11-15
 
 Needs API 0.24.0 (Remove calls `DELETE /v1/uploads/:id`).
