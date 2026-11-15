@@ -148,7 +148,13 @@ export const saveDraftedTeamsRequestSchema = z.strictObject({
   teams: z
     .array(
       z.strictObject({
-        id: z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/, "Invalid team id."),
+        id: z
+          .string()
+          .min(1)
+          .max(100)
+          .regex(/^[A-Za-z0-9_-]+$/, "Invalid team id.")
+          // Real league teams' ids: only createLeagueTeams makes those.
+          .refine((id) => !id.startsWith(leagueTeamPrefix), "Invalid team id."),
         name: z.string().max(80),
         captainId: z.string().min(1).max(128).nullable().default(null),
         playerIds: z.array(z.string().min(1).max(128)).max(200),

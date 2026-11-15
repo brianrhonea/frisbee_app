@@ -2,7 +2,7 @@ import { FieldValue, type Firestore, Timestamp, type Transaction } from "firebas
 import { AlreadyExists, type Data, type DocStore, deleteField, serverTime, type Tx } from "./store.js";
 
 /** Timestamps → Date, recursively, so services see plain data. */
-function fromFirestore(v: unknown): unknown {
+export function fromFirestore(v: unknown): unknown {
   if (v instanceof Timestamp) return v.toDate();
   if (Array.isArray(v)) return v.map(fromFirestore);
   if (v && typeof v === "object" && Object.getPrototypeOf(v) === Object.prototype) {

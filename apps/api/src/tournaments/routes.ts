@@ -7,6 +7,13 @@ import { hubLimits } from "../hub/routes.js";
 import type { MemoryRateLimiter } from "../limits/memory.js";
 import type { TournamentService } from "./service.js";
 
+/**
+ * A published schedule's body: up to tournamentLimits.maxGames (2,100)
+ * games of at most about 900 bytes of JSON each (two 128-character team
+ * ids and sources, a 60-character label), past the API's 64 KB default.
+ */
+const scheduleBodyLimit = 2 * 1024 * 1024;
+
 export function tournamentRoutes(app: FastifyInstance, svc: TournamentService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest): Caller => {
     const c = requireCaller(req);
@@ -45,7 +52,7 @@ export function tournamentRoutes(app: FastifyInstance, svc: TournamentService, l
     await svc.saveSeeds(caller(req), req.params.id, req.params.divisionId, req.body);
     return reply.code(204).send();
   });
-  app.put<D>(`${div}/schedule`, async (req, reply) => {
+  app.put<D>(`${div}/schedule`, { bodyLimit: scheduleBodyLimit }, async (req, reply) => {
     await svc.publish(caller(req), req.params.id, req.params.divisionId, req.body);
     return reply.code(204).send();
   });

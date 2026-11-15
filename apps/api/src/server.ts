@@ -17,6 +17,7 @@ import { closeOnSignals } from "./shutdown.js";
 import { getStorage } from "firebase-admin/storage";
 import { FirestoreDocStore } from "./firestore_store.js";
 import { FirestoreDraftQueries } from "./drafts/repository.js";
+import { FirestoreDocQueries } from "./queries.js";
 import { ffmpegHeicDecoder } from "./media/image.js";
 import { FirebaseMediaStorage } from "./media/storage.js";
 import { FirestoreTeamRepository } from "./teams/repository.js";
@@ -98,6 +99,7 @@ const app = buildApp({
   },
   store: new FirestoreDocStore(db),
   draftQueries: new FirestoreDraftQueries(db),
+  queries: new FirestoreDocQueries(db),
   // Uploads need the bucket named (STORAGE_BUCKET, e.g. <project>.firebasestorage.app).
   media: process.env.STORAGE_BUCKET
     ? new FirebaseMediaStorage(getStorage(firebase).bucket(process.env.STORAGE_BUCKET))

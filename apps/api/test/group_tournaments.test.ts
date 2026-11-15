@@ -218,6 +218,42 @@ describe("delete (allow delete)", () => {
   });
 });
 
+describe("the listing (tournamentDirectory rules)", () => {
+  // Ids join with "_": group "g1" with tournament "x_y" and group "g1_x" with tournament "y" share "g1_x_y".
+  const foreign = (id: string) => ({ groupId: "g1_x", tournamentId: id.replace(/^x_/, ""), name: "Theirs", startsAt: new Date(now), endsOn: null, status: "setup", format: "singleElim" });
+
+  it("update: a listing at this id must keep its groupId and tournamentId (save, publish)", async () => {
+    const id = await created();
+    store.put(`tournamentDirectory/g1_${id}`, { ...store.doc(`tournamentDirectory/g1_${id}`)!, groupId: "g1_x", tournamentId: "other" });
+    const theirs = store.doc(`tournamentDirectory/g1_${id}`);
+    expect((await call("PUT", `${base}/${id}`, draft({ name: "Winter Hat" }))).status).toBe(412);
+    expect((await call("POST", `${base}/${id}/schedule`, draft())).status).toBe(412);
+    expect(store.doc(`tournamentDirectory/g1_${id}`)).toEqual(theirs);
+    expect(store.doc(gPath(id, "g001"))).toBeUndefined();
+    expect(store.doc(tPath(id))!.name).toBe("Fall Hat");
+  });
+
+  it("create: refuses an id whose listing is another group's", async () => {
+    store.put("tournamentDirectory/g1_groupTournaments-new1", foreign("x_groupTournaments-new1"));
+    expect((await call("POST", base, draft())).status).toBe(412);
+    expect(store.doc(tPath("groupTournaments-new1"))).toBeUndefined();
+    expect(store.doc("tournamentDirectory/g1_groupTournaments-new1")!.groupId).toBe("g1_x");
+  });
+
+  it("delete: only the tournament's own listing goes, and only with the tournament", async () => {
+    const id = await created();
+    store.put(`tournamentDirectory/g1_${id}`, { ...store.doc(`tournamentDirectory/g1_${id}`)!, groupId: "g1_x" });
+    expect((await call("DELETE", `${base}/${id}`)).status).toBe(204);
+    expect(store.doc(tPath(id))).toBeUndefined();
+    expect(store.doc(`tournamentDirectory/g1_${id}`)!.groupId).toBe("g1_x");
+    // No tournament: its listing id is left alone.
+    store.put("tournamentDirectory/g1_ghost", { groupId: "g1", tournamentId: "ghost", name: "Gone", startsAt: new Date(now), endsOn: null, status: "setup", format: "singleElim" });
+    expect((await call("DELETE", `${base}/ghost`)).status).toBe(204);
+    expect(store.doc("tournamentDirectory/g1_ghost")).toBeDefined();
+    expect((await call("DELETE", `${base}/ghost`, undefined, "player")).status).toBe(403);
+  });
+});
+
 describe("report()", () => {
   // g001: t1 (captain a1) v t4 (captain d1).
   const url = (id: string, g = "g001") => `${base}/${id}/games/${g}/report`;
@@ -358,6 +394,13 @@ describe("advance()", () => {
     const before = game(id, fin);
     expect((await call("POST", `${base}/${id}/advance`, undefined, "b1")).json().filled).toBe(0);
     expect(game(id, fin)).toEqual(before);
+  });
+  it("someone not playing is refused even when nothing is pending, before the games are read", async () => {
+    const id = await published();
+    expect((await call("POST", `${base}/${id}/advance`, undefined, "player")).status).toBe(403);
+    expect((await call("POST", `${base}/${id}/advance`, undefined, "stranger")).status).toBe(403);
+    expect((await call("POST", `${base}/ghost/advance`, undefined, "b1")).status).toBe(404);
+    expect((await call("POST", `${base}/${id}/advance`, undefined, "b1")).json()).toEqual({ filled: 0 });
   });
   it("pool-rank seeds are organizers' (seed-bracket)", async () => {
     const body = draft({ settings: { ...draft().settings, format: "poolsSingleElim", poolCount: 2, laterDays: [] } });

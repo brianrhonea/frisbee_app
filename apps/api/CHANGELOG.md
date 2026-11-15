@@ -7,6 +7,32 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.20.1 — 2026-11-14
+
+**Fixed** (security review of 0.14.0–0.19.0)
+- League teams: a team already at a league team's id is kept only if the
+  league made it (league, host and captain match); otherwise creating
+  teams fails with 412. The rules now refuse client-made team ids that
+  start with `league_`, and drafted-team ids can't start with it either.
+  The `createLeagueTeams` callable has the same check.
+- Deleting a stats tournament or a video folder, and reading group or
+  hosted tournament games, query only ids or the fields needed
+  (`DocQueries`), with no caps on how many there are.
+- Hosted and group tournament operations check permission before reading
+  games, entries or divisions; group `advance` refuses people not playing.
+- Publishing a schedule is limited to 5 a minute and 50 a day, reconcile
+  to 20 a minute, and failed draft picks and controls count toward the
+  any-write limit.
+- Group tournament listings must belong to the same group and tournament;
+  delete removes only the tournament's own listing.
+- Deleting a tournament removes every subcollection, however large,
+  checking permission on each batch; removing a division deletes all its
+  games.
+- Stats games up to the 900 KB limit and hosted schedules up to 2,100
+  games are accepted (per-route body limits).
+- Playbook permission checks run inside the write transaction; failed
+  video file deletes are logged.
+
 ## 0.20.0 — 2026-11-14
 
 **Added**

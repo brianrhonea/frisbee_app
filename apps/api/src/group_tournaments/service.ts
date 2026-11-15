@@ -24,6 +24,7 @@ import { ApiError, fromZod } from "../errors.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
 import type { MemoryRateLimiter } from "../limits/memory.js";
+import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, isGroup, mapOf, own, strings } from "../teams/access.js";
 import type { TeamRepository } from "../teams/repository.js";
@@ -45,6 +46,8 @@ const p = {
 
 /** More games than any schedule makes (a 64-team round robin is 2,016). */
 const maxGames = 5000;
+/** The fields readGroupGame reads: games are listed with only these. */
+const gameKeys = ["order", "stage", "round", "label", "pool", "field", "startsAt", "teamA", "teamB", "sourceA", "sourceB", "status", "scoreA", "scoreB", "report", "ifNeeded", "place"] as const;
 /** Writes per transaction when a schedule is too big for one. */
 const chunk = 400;
 
@@ -52,6 +55,19 @@ const noTeam = () => new ApiError("not_found", "That group doesn't exist.");
 const noTournament = () => new ApiError("not_found", "That tournament doesn't exist.");
 const noGame = () => new ApiError("not_found", "That game doesn't exist.");
 const notOrganizer = () => new ApiError("permission_denied", "Only the group's organizers can run its tournaments.");
+const notPlaying = () => new ApiError("permission_denied", "Only people playing in it can move teams on.");
+
+/**
+ * The listing rule's update conjuncts (resource.data.groupId and
+ * tournamentId unchanged): a listing already at this id has to be this
+ * tournament's. Ids join with "_", so group "a" with tournament "b_c" and
+ * group "a_b" with tournament "c" would share one.
+ */
+function requireOwnListing(listing: Data | null, groupId: string, id: string) {
+  if (listing && (listing.groupId !== groupId || listing.tournamentId !== id)) {
+    throw new ApiError("failed_precondition", "This tournament's public listing belongs to another tournament.");
+  }
+}
 
 type Draft = z.output<typeof saveGroupTournamentRequestSchema>;
 
@@ -167,10 +183,12 @@ export class GroupTournamentService {
   constructor(
     private readonly store: DocStore,
     private readonly teams: Pick<TeamRepository, "deleteTree">,
+    private readonly queries: DocQueries,
   ) {}
 
+  /** The tournament's games, with only the fields the engine reads. */
   private async games(teamId: string, id: string): Promise<GroupGame[]> {
-    const list = await this.store.list(p.games(teamId, id), maxGames);
+    const list = await this.queries.fields(p.games(teamId, id), gameKeys, maxGames);
     return list.map((g) => readGroupGame(g.id, g.data)).sort((a, b) => a.order - b.order);
   }
 
@@ -214,13 +232,32 @@ export class GroupTournamentService {
     };
   }
 
+  /**
+   * confirm()'s checks on [g]: a report to confirm, by the other team's
+   * captain, for the score they saw, and advance()'s uid() in
+   * participantIds for the games it fills. Answers the report.
+   */
+  private confirmable(t: Data, g: GroupGame, uid: string, s: { scoreA: number; scoreB: number }) {
+    const r = g.report;
+    if (g.status !== "reported" || !r) throw new ApiError("failed_precondition", "There's no score to confirm.");
+    const other = r.byTeam === g.teamA ? g.teamB : g.teamA;
+    if (other === null || own(mapOf(t.captains), other) !== uid) {
+      throw new ApiError("permission_denied", "Only the other team's captain confirms a score.");
+    }
+    if (r.scoreA !== s.scoreA || r.scoreB !== s.scoreB) throw new ApiError("failed_precondition", "The reported score changed. Check it again.");
+    if (!strings(t.participantIds).includes(uid)) throw notPlaying();
+    return r;
+  }
+
   async create(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
     const d = parse(saveGroupTournamentRequestSchema, body);
     requireOrganizer(await this.store.get(p.team(teamId)), caller.uid, true);
     const id = this.store.newId(p.tournaments(teamId));
     await this.store.transact(async (tx) => {
-      const team = requireOrganizer(await tx.get(p.team(teamId)), caller.uid, true);
+      const [t, listing] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.listing(teamId, id))]);
+      const team = requireOrganizer(t, caller.uid, true);
+      requireOwnListing(listing, teamId, id);
       tx.create(p.tournament(teamId, id), { ...tournamentFields(team, d, "setup"), createdBy: caller.uid, createdAt: serverTime });
       tx.set(p.listing(teamId, id), listingFields(teamId, id, d, "setup"));
     });
@@ -233,9 +270,10 @@ export class GroupTournamentService {
     const id = docIdParam(rawId);
     const d = parse(saveGroupTournamentRequestSchema, body);
     await this.store.transact(async (tx) => {
-      const [t, existing] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.tournament(teamId, id))]);
+      const [t, existing, listing] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.tournament(teamId, id)), tx.get(p.listing(teamId, id))]);
       const team = requireOrganizer(t, caller.uid, true);
       if (!existing) throw noTournament();
+      requireOwnListing(listing, teamId, id);
       const published = existing.status !== "setup";
       if (published && teamIdsOf(existing.teams) !== d.teams.map((x) => x.id).sort().join("\n")) {
         throw new ApiError("failed_precondition", "The number of teams changed: publish the schedule again.");
@@ -251,6 +289,12 @@ export class GroupTournamentService {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
     const d = parse(saveGroupTournamentRequestSchema, body);
+    // Checked before the schedule is worked out or any game is replaced
+    // (the biggest schedules take several transactions).
+    const [team, tour, listing] = await Promise.all([this.store.get(p.team(teamId)), this.store.get(p.tournament(teamId, id)), this.store.get(p.listing(teamId, id))]);
+    tournamentFields(requireOrganizer(team, caller.uid, true), d, "scheduled");
+    if (!tour) throw noTournament();
+    requireOwnListing(listing, teamId, id);
     let plan;
     try {
       plan = groupEngine.scheduleFor(
@@ -261,13 +305,10 @@ export class GroupTournamentService {
       if (e instanceof GroupScheduleError) throw new ApiError("failed_precondition", e.message);
       throw e;
     }
-    // Checked before any game is replaced (the biggest schedules take several transactions).
-    tournamentFields(requireOrganizer(await this.store.get(p.team(teamId)), caller.uid, true), d, "scheduled");
-    if (!(await this.store.get(p.tournament(teamId, id)))) throw noTournament();
     const fresh = new Set(plan.games.map((g) => g.id));
-    const old = (await this.store.list(p.games(teamId, id), maxGames)).filter((g) => !fresh.has(g.id));
+    const old = (await this.queries.ids(p.games(teamId, id), maxGames)).filter((g) => !fresh.has(g));
     const writes: Array<(tx: Tx) => void> = [
-      ...old.map((g) => (tx: Tx) => tx.delete(p.game(teamId, id, docIdParam(g.id)))),
+      ...old.map((g) => (tx: Tx) => tx.delete(p.game(teamId, id, docIdParam(g)))),
       ...plan.games.map((g) => {
         const fields = gameFields(g);
         return (tx: Tx) => tx.set(p.game(teamId, id, g.id), fields);
@@ -278,9 +319,10 @@ export class GroupTournamentService {
     for (let i = 0; i < writes.length || i === 0; i += chunk) {
       const last = i + chunk >= writes.length;
       await this.store.transact(async (tx) => {
-        const [t, existing] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.tournament(teamId, id))]);
+        const [t, existing, listing] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.tournament(teamId, id)), tx.get(p.listing(teamId, id))]);
         const team = requireOrganizer(t, caller.uid, true);
         if (!existing) throw noTournament();
+        requireOwnListing(listing, teamId, id);
         const fields = last ? tournamentFields(team, d, "scheduled") : null;
         for (const w of writes.slice(i, i + chunk)) w(tx);
         if (fields) {
@@ -297,10 +339,11 @@ export class GroupTournamentService {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
     const exists = await this.store.transact(async (tx) => {
-      const [t, existing] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.tournament(teamId, id))]);
+      const [t, existing, listing] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.tournament(teamId, id)), tx.get(p.listing(teamId, id))]);
       const team = requireOrganizer(t, caller.uid, false);
-      // The listing's delete rule: organizes(groupId), which needs a group.
-      if (isGroup(team)) tx.delete(p.listing(teamId, id));
+      // The listing's delete rule: organizes(resource.data.groupId), which
+      // needs a group. Only this tournament's own listing goes with it.
+      if (existing && listing && isGroup(team) && listing.groupId === teamId && listing.tournamentId === id) tx.delete(p.listing(teamId, id));
       return existing !== null;
     });
     if (exists) await this.teams.deleteTree(p.tournament(teamId, id));
@@ -337,21 +380,18 @@ export class GroupTournamentService {
     const id = docIdParam(rawId);
     const gameId = docIdParam(rawGame);
     const s = parse(groupGameScoreRequestSchema, body);
+    // Only the other captain gets as far as listing the games.
+    const [tour, game] = await Promise.all([this.store.get(p.tournament(teamId, id)), this.store.get(p.game(teamId, id, gameId))]);
+    if (!tour) throw noTournament();
+    if (!game) throw noGame();
+    this.confirmable(tour, readGroupGame(gameId, game), caller.uid, s);
     const listed = await this.games(teamId, id);
     await this.store.transact(async (tx) => {
       const [t, gd] = await Promise.all([tx.get(p.tournament(teamId, id)), tx.get(p.game(teamId, id, gameId))]);
       if (!t) throw noTournament();
       if (!gd) throw noGame();
       const g = readGroupGame(gameId, gd);
-      const r = g.report;
-      if (g.status !== "reported" || !r) throw new ApiError("failed_precondition", "There's no score to confirm.");
-      const other = r.byTeam === g.teamA ? g.teamB : g.teamA;
-      if (other === null || own(mapOf(t.captains), other) !== caller.uid) {
-        throw new ApiError("permission_denied", "Only the other team's captain confirms a score.");
-      }
-      if (r.scoreA !== s.scoreA || r.scoreB !== s.scoreB) throw new ApiError("failed_precondition", "The reported score changed. Check it again.");
-      // advance(): uid() in tournament().participantIds, for the games it fills.
-      if (!strings(t.participantIds).includes(caller.uid)) throw new ApiError("permission_denied", "Only people playing in it can move teams on.");
+      const r = this.confirmable(t, g, caller.uid, s);
       const done: GroupGame = { ...g, status: "done", scoreA: r.scoreA, scoreB: r.scoreB, report: null };
       const list = listed.map((x) => (x.id === gameId ? done : x));
       // advance(): the confirming captain plays in it (captains are participants).
@@ -367,6 +407,8 @@ export class GroupTournamentService {
     const id = docIdParam(rawId);
     const gameId = docIdParam(rawGame);
     const s = parse(groupGameScoreRequestSchema, body);
+    requireOrganizer(await this.store.get(p.team(teamId)), caller.uid, false);
+    if (!(await this.store.get(p.tournament(teamId, id)))) throw noTournament();
     const listed = await this.games(teamId, id);
     await this.store.transact(async (tx) => {
       const [t, tour, gd] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.tournament(teamId, id)), tx.get(p.game(teamId, id, gameId))]);
@@ -396,6 +438,7 @@ export class GroupTournamentService {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
     requireOrganizer(await this.store.get(p.team(teamId)), caller.uid, false);
+    if (!(await this.store.get(p.tournament(teamId, id)))) throw noTournament();
     const listed = await this.games(teamId, id);
     if (groupEngine.bracketSeeds(listed).length === 0) throw new ApiError("failed_precondition", "The pools aren't done yet.");
     await this.store.transact(async (tx) => {
@@ -422,16 +465,19 @@ export class GroupTournamentService {
   async advance(caller: Caller, rawTeam: unknown, rawId: unknown): Promise<{ filled: number }> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
+    const allowed = async (get: (path: string) => Promise<Data | null>) => {
+      const [t, tour] = await Promise.all([get(p.team(teamId)), get(p.tournament(teamId, id))]);
+      if (!tour) throw noTournament();
+      const organizer = !!t && can(t, caller.uid, "manageEvents");
+      if (!organizer && !strings(tour.participantIds).includes(caller.uid)) throw notPlaying();
+    };
+    // Someone not playing is refused before the games are listed.
+    await allowed((path) => this.store.get(path));
     const listed = await this.games(teamId, id);
     if (groupEngine.pendingFills(listed).length === 0) return { filled: 0 };
     let filled = 0;
     await this.store.transact(async (tx) => {
-      const [t, tour] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.tournament(teamId, id))]);
-      if (!tour) throw noTournament();
-      const organizer = !!t && can(t, caller.uid, "manageEvents");
-      if (!organizer && !strings(tour.participantIds).includes(caller.uid)) {
-        throw new ApiError("permission_denied", "Only people playing in it can move teams on.");
-      }
+      await allowed((path) => tx.get(path));
       const write = await this.fill(
         tx,
         teamId,

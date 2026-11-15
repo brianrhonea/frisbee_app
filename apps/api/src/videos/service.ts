@@ -21,6 +21,7 @@ import { docIdParam } from "../ids.js";
 import type { MemoryRateLimiter } from "../limits/memory.js";
 import type { MediaStorage } from "../media/storage.js";
 import { authorOf, clip } from "../posts/author.js";
+import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { can, isMember } from "../teams/access.js";
 
@@ -32,8 +33,6 @@ const p = {
   folder: (t: string, f: string) => `teams/${t}/videoFolders/${f}`,
 };
 
-/** Videos a folder delete looks through for ones filed in it (DocStore.list has no query). */
-export const folderScanLimit = 5000;
 /** Videos unsorted per transaction, as the app's batches (400). */
 export const unsortChunk = 400;
 
@@ -89,6 +88,7 @@ export class VideoService {
     private readonly store: DocStore,
     private readonly users: UserLookup,
     private readonly media: MediaStorage | undefined,
+    private readonly queries: DocQueries,
   ) {}
 
   /** can(team(), 'manageTeam'), as a member (like the playbook). */
@@ -169,7 +169,8 @@ export class VideoService {
       const file = isMap(video.file) ? video.file : null;
       return file && filePathOk(file.path, teamId, videoId) ? file.path : null;
     });
-    if (path && this.media) await this.media.delete(path).catch(() => undefined);
+    // The video is gone either way; a file left behind is only logged.
+    if (path && this.media) await this.media.delete(path).catch((e: unknown) => console.warn(`video ${teamId}/${videoId}: file ${path} not deleted`, e));
   }
 
   /** `POST /v1/teams/:teamId/video-folders`. */
@@ -207,23 +208,27 @@ export class VideoService {
     const teamId = docIdParam(rawTeam);
     const folderId = docIdParam(rawFolder);
     this.check(await this.store.get(p.team(teamId)), caller);
-    const filed = (await this.store.list(p.videos(teamId), folderScanLimit)).filter((v) => v.data.folderId === folderId).map((v) => docIdParam(v.id));
-    for (let i = 0; i < filed.length; i += unsortChunk) {
-      const ids = filed.slice(i, i + unsortChunk);
-      await this.store.transact(async (tx) => {
+    // A page of the folder's video ids at a time, until none are left in it.
+    for (;;) {
+      const ids = (await this.queries.ids(p.videos(teamId), unsortChunk, { folderId })).map((id) => docIdParam(id));
+      if (ids.length === 0) break;
+      const moved = await this.store.transact(async (tx) => {
         const [team, ...videos] = await Promise.all([tx.get(p.team(teamId)), ...ids.map((id) => tx.get(p.video(teamId, id)))]);
         this.check(team, caller);
         const moves: string[] = [];
         for (const [j, video] of videos.entries()) {
           const id = ids[j]!;
-          // Gone, or moved since the list was read.
+          // Gone, or moved since the ids were read.
           if (!video || video.folderId !== folderId) continue;
           const problem = videoProblem({ ...video, folderId: "" }, teamId, id);
           if (problem) throw new ApiError("failed_precondition", `A video in this folder can't be changed: ${problem}`);
           moves.push(id);
         }
         for (const id of moves) tx.update(p.video(teamId, id), { folderId: "", updatedAt: serverTime });
+        return moves.length;
       });
+      // Nothing moved: the query only saw videos already moved on.
+      if (moved === 0) break;
     }
     await this.store.transact(async (tx) => {
       const [team, folder] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.folder(teamId, folderId))]);

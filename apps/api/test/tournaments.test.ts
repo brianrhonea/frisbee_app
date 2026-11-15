@@ -3,10 +3,13 @@
 import { type EngineGame, scheduleFor, engineSettings } from "@stall10/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
+import { type DocQueries, listDocQueries } from "../src/queries.js";
 import { FakeMediaStorage, FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.UTC(2026, 10, 14, 12);
 let store: FakeStore;
+/** Collections the service queried, to check callers are authorized before any list. */
+let queried: string[];
 type Res = { status: number; json: () => any };
 let call: (method: "POST" | "PUT" | "PATCH" | "DELETE", url: string, body?: object, uid?: string) => Promise<Res>;
 
@@ -57,11 +60,18 @@ const team = (name: string, captain: string, o: Record<string, unknown> = {}) =>
 
 beforeEach(() => {
   store = new FakeStore(() => now);
+  queried = [];
+  const list = listDocQueries(store);
+  const queries: DocQueries = {
+    ids: (c, limit, where) => (queried.push(c), list.ids(c, limit, where)),
+    fields: (c, f, limit) => (queried.push(c), list.fields(c, f, limit)),
+  };
   const app = buildApp({
     verifier: new FakeVerifier(),
     users: new FakeUsers(),
     teams: new FakeTeamRepository(),
     store,
+    queries,
     media: new FakeMediaStorage(),
     now: () => now,
     writeLimits: false,
@@ -308,6 +318,60 @@ describe("status and delete", () => {
     expect((await call("DELETE", `/v1/tournaments/${b.id}/divisions/${open}`)).status).toBe(204);
     expect(store.doc(`tournaments/${b.id}/divisions/${open}`)).toBeUndefined();
     expect(store.doc(`tournaments/${b.id}`)?.divisions).toHaveLength(1);
+  });
+});
+
+describe("authorized before anything is listed", () => {
+  it("strangers and fans are refused before a query, and every chunked write is re-checked", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    const games = plan(["red", "blue"]);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games })).status).toBe(204);
+    store.put(`tournaments/${t.id}/divisions/${t.div}/games/${games[0].id}`, {
+      ...(store.doc(`tournaments/${t.id}/divisions/${t.div}/games/${games[0].id}`) as object),
+      status: "reported",
+      report: { scoreA: 11, scoreB: 5, byTeam: games[0].teamA },
+    });
+    const d = `/v1/tournaments/${t.id}/divisions/${t.div}`;
+    const g = `${d}/games/${games[0].id}`;
+    for (const [method, url, body, uid, status] of [
+      ["POST", `${d}/reconcile`, undefined, "fan", 403],
+      ["POST", `${d}/reconcile`, undefined, "stranger", 403],
+      ["PATCH", `/v1/tournaments/${t.id}`, details(), "fan", 403],
+      ["DELETE", d, undefined, "fan", 403],
+      ["PUT", `${d}/schedule`, { games }, "fan", 403],
+      ["PUT", `${g}/score`, { scoreA: 11, scoreB: 5 }, "fan", 403],
+      ["POST", `${d}/seed-bracket`, undefined, "fan", 403],
+      ["POST", `${g}/confirm`, undefined, "fan", 403],
+      // The reporting captain can't confirm their own report.
+      ["POST", `${g}/confirm`, undefined, games[0].teamA === "red" ? "cap" : "bcap", 403],
+      ["PUT", `/v1/tournaments/${t.id}/entries/green`, { divisionId: t.div, captainIds: ["gcap"] }, "fan", 403],
+    ] as const) {
+      queried = [];
+      const res = await call(method, url, body as object | undefined, uid);
+      expect([res.status, url]).toEqual([status, url]);
+      expect([queried, url]).toEqual([[], url]);
+    }
+  });
+
+  it("a schedule body past the 64 KB default reaches the checks (its own bodyLimit)", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    const [g] = plan(["red", "blue"]);
+    const games = Array.from({ length: 300 }, (_, i) => ({ ...g, id: `g${String(i + 1).padStart(3, "0")}`, order: i, teamA: "x".repeat(128) }));
+    expect(JSON.stringify({ games }).length).toBeGreaterThan(64 * 1024);
+    const res = await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games });
+    expect(res.status).toBe(400);
+    expect(res.json().error.message).toMatch(/doesn't match the division's teams/);
+  });
+
+  it("delete pages through subcollections bigger than one list", async () => {
+    const t = await host();
+    for (let i = 0; i < 2300; i++) store.put(`tournaments/${t.id}/entries/team${String(i).padStart(4, "0")}`, { status: "applied" });
+    for (let i = 0; i < 500; i++) store.put(`tournaments/${t.id}/divisions/${t.div}/games/g${String(i).padStart(4, "0")}`, { order: i });
+    store.put(`tournaments/${t.id}/drafts/${t.div}`, { status: "finished" });
+    store.put(`tournaments/${t.id}/drafts/${t.div}/details/pool`, {});
+    store.put(`tournaments/${t.id}/drafts/${t.div}/details/extra`, {});
+    expect((await call("DELETE", `/v1/tournaments/${t.id}`)).status).toBe(204);
+    expect([...store.docs.keys()].filter((k) => k.startsWith(`tournaments/${t.id}`))).toEqual([]);
   });
 });
 

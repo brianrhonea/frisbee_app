@@ -17,6 +17,14 @@ export const statsLimits = {
   write: { max: 90, windowMs: minute },
 } satisfies Record<string, Limit>;
 
+/**
+ * A game's body: its points, lines and timeouts may be up to
+ * statsLimits.gameBytes (900 KB) of JSON, past the API's 64 KB default.
+ * A little more than that, so the schema's own check is the one that
+ * turns a too-big game down, with its message.
+ */
+const gameBodyLimit = 1280 * 1024;
+
 type TeamP = { Params: { teamId: string } };
 type GameP = { Params: { teamId: string; gameId: string } };
 type TournamentP = { Params: { teamId: string; tournamentId: string } };
@@ -31,10 +39,11 @@ export function statsRoutes(app: FastifyInstance, stats: StatsService, limiter: 
     return c;
   };
 
-  app.post<TeamP>("/v1/teams/:teamId/stats-games", async (req, reply) =>
+  const game = { bodyLimit: gameBodyLimit };
+  app.post<TeamP>("/v1/teams/:teamId/stats-games", game, async (req, reply) =>
     reply.code(201).send(await stats.createGame(caller(req), req.params.teamId, req.body)),
   );
-  app.put<GameP>("/v1/teams/:teamId/stats-games/:gameId", async (req, reply) => {
+  app.put<GameP>("/v1/teams/:teamId/stats-games/:gameId", game, async (req, reply) => {
     await stats.saveGame(caller(req), req.params.teamId, req.params.gameId, req.body);
     return reply.code(204).send();
   });

@@ -84,7 +84,20 @@ export const createLeagueTeams = onCall({ enforceAppCheck }, async (req) => {
   const batch = db.batch();
   // A team made by an earlier, interrupted attempt keeps its own doc.
   const refs = drafted.map((t) => db.doc(`teams/${leagueTeamId(tournamentId, t.id)}`));
-  const existing = new Set((await db.getAll(...refs)).filter((s) => s.exists).map((s) => s.id));
+  const existing = new Set<string>();
+  for (const [i, snap] of (await db.getAll(...refs)).entries()) {
+    if (!snap.exists) continue;
+    // Anything else at that id (someone who guessed it first) stops us:
+    // leagueHostId is the server's alone, and the captain owns the team.
+    const t = snap.data() as Data;
+    if (t.leagueId !== tournamentId || t.leagueHostId !== (tournament.hostId ?? null) || t.ownerId !== drafted[i].captainId) {
+      throw new HttpsError(
+        "failed-precondition",
+        `A team already uses the id for ${drafted[i].name}, and it isn't this league's. Ask us to remove it, then try again.`,
+      );
+    }
+    existing.add(snap.id);
+  }
 
   for (const [i, team] of drafted.entries()) {
     const teamId = refs[i].id;

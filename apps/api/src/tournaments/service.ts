@@ -49,6 +49,7 @@ import type { z } from "zod";
 import type { Caller } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { docIdParam } from "../ids.js";
+import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, kindOf, mapOf, strings } from "../teams/access.js";
 
@@ -172,7 +173,10 @@ function checkDivision(d: Data) {
 const fillUpdate = (f: SlotFill): Data => ({ ...(f.teamA != null && { teamA: f.teamA }), ...(f.teamB != null && { teamB: f.teamB }) });
 
 export class TournamentService {
-  constructor(private readonly store: DocStore) {}
+  constructor(
+    private readonly store: DocStore,
+    private readonly queries: DocQueries,
+  ) {}
 
   // ---- Who's who -----------------------------------------------------------
 
@@ -199,13 +203,35 @@ export class TournamentService {
     return t;
   }
 
-  /** Runs [writes] in transactions of up to [chunk] writes each, in order. */
-  private async inChunks(writes: Array<(tx: Tx) => void>) {
+  /**
+   * Runs [writes] in transactions of up to [chunk] writes each, in order,
+   * each after [check] (the caller still manages the event) in the same
+   * transaction.
+   */
+  private async inChunks(writes: Array<(tx: Tx) => void>, check: (tx: Tx) => Promise<unknown>) {
     for (let i = 0; i < writes.length; i += chunk) {
       const part = writes.slice(i, i + chunk);
       await this.store.transact(async (tx) => {
+        await check(tx);
         for (const w of part) w(tx);
       });
+    }
+  }
+
+  /**
+   * Deletes every document of [collection], a page of ids at a time until
+   * none are left, each page after [check]. [children] deletes a
+   * document's own subcollections first.
+   */
+  private async drain(collection: string, check: (tx: Tx) => Promise<unknown>, children?: (docId: string) => Promise<void>) {
+    for (;;) {
+      const ids = await this.queries.ids(collection, chunk);
+      if (ids.length === 0) return;
+      if (children) for (const docId of ids) await children(docId);
+      await this.inChunks(
+        ids.map((docId) => (tx: Tx) => tx.delete(`${collection}/${docId}`)),
+        check,
+      );
     }
   }
 
@@ -287,10 +313,13 @@ export class TournamentService {
   async save(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const r = parse(saveTournamentRequestSchema, body);
+    // Managers only get as far as the lists (checked again below).
+    await this.managed(this.store, id, caller.uid);
+    const taking = ["status", "divisionId"];
     const [divRows, entries, signups] = await Promise.all([
-      this.store.list(p.divisions(id), 100),
-      this.store.list(p.entries(id), listMax),
-      this.store.list(`tournaments/${id}/signups`, listMax),
+      this.queries.fields(p.divisions(id), ["division"], 100),
+      this.queries.fields(p.entries(id), taking, listMax),
+      this.queries.fields(`tournaments/${id}/signups`, taking, listMax),
     ]);
     const taken = new Set<string>([
       ...entries.filter((e) => !["withdrawn", "declined"].includes(e.data.status as string)).map((e) => String(e.data.divisionId)),
@@ -300,7 +329,7 @@ export class TournamentService {
     const gamesOf = new Map<string, string[]>();
     for (const d of divRows) {
       if (!r.divisions.includes(d.data.division as Division)) {
-        gamesOf.set(d.id, (await this.store.list(p.games(id, d.id), 400)).map((g) => g.id));
+        gamesOf.set(d.id, await this.queries.ids(p.games(id, d.id), 400));
       }
     }
     await this.store.transact(async (tx) => {
@@ -380,22 +409,19 @@ export class TournamentService {
     });
   }
 
-  /** Deletes it with its divisions, games, entries, signups, drafts and payments. */
+  /**
+   * Deletes it with its divisions, games, entries, signups, drafts and
+   * payments: each subcollection a page at a time until it's empty, every
+   * page re-checked, and the tournament last, so a failure part way can be
+   * tried again.
+   */
   async remove(caller: Caller, rawId: unknown): Promise<void> {
     const id = docIdParam(rawId);
-    await this.store.transact(async (tx) => void (await this.managed(tx, id, caller.uid)));
-    const paths: string[] = [];
-    for (const d of await this.store.list(p.divisions(id), 100)) {
-      for (const g of await this.store.list(p.games(id, d.id), listMax)) paths.push(p.game(id, d.id, g.id));
-      paths.push(p.division(id, d.id));
-    }
-    for (const sub of ["entries", "payments", "signups"]) {
-      for (const row of await this.store.list(`tournaments/${id}/${sub}`, listMax)) paths.push(`tournaments/${id}/${sub}/${row.id}`);
-    }
-    for (const d of await this.store.list(`tournaments/${id}/drafts`, 100)) {
-      paths.push(`tournaments/${id}/drafts/${d.id}/details/pool`, `tournaments/${id}/drafts/${d.id}`);
-    }
-    await this.inChunks(paths.map((path) => (tx: Tx) => tx.delete(path)));
+    const check = (tx: Tx) => this.managed(tx, id, caller.uid);
+    await this.store.transact(async (tx) => void (await check(tx)));
+    await this.drain(p.divisions(id), check, (d) => this.drain(p.games(id, d), check));
+    for (const sub of ["entries", "payments", "signups"]) await this.drain(`tournaments/${id}/${sub}`, check);
+    await this.drain(`tournaments/${id}/drafts`, check, (d) => this.drain(`tournaments/${id}/drafts/${d}/details`, check));
     await this.store.transact(async (tx) => {
       if (!(await tx.get(p.tournament(id)))) return;
       await this.managed(tx, id, caller.uid);
@@ -409,16 +435,15 @@ export class TournamentService {
   async removeDivision(caller: Caller, rawId: unknown, rawDiv: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
-    const entries = await this.store.list(p.entries(id), listMax);
-    if (entries.some((e) => e.data.divisionId === divId && e.data.status === "accepted")) {
-      throw new ApiError("failed_precondition", "Move or remove its accepted teams first.");
-    }
+    const check = (tx: Tx) => this.managed(tx, id, caller.uid);
     await this.store.transact(async (tx) => {
-      await this.managed(tx, id, caller.uid);
+      await check(tx);
       if (!(await tx.get(p.division(id, divId)))) throw noDivision();
     });
-    const games = await this.store.list(p.games(id, divId), listMax);
-    await this.inChunks(games.map((g) => (tx: Tx) => tx.delete(p.game(id, divId, g.id))));
+    if ((await this.queries.ids(p.entries(id), 1, { divisionId: divId, status: "accepted" })).length > 0) {
+      throw new ApiError("failed_precondition", "Move or remove its accepted teams first.");
+    }
+    await this.drain(p.games(id, divId), check);
     await this.store.transact(async (tx) => {
       const t = await this.managed(tx, id, caller.uid);
       const draft = `tournaments/${id}/drafts/${divId}`;
@@ -436,7 +461,7 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const { seeds } = parse(seedsRequestSchema, body);
-    if ((await this.store.list(p.games(id, divId), 1)).length > 0) {
+    if ((await this.queries.ids(p.games(id, divId), 1)).length > 0) {
       throw new ApiError("failed_precondition", "Seeds are set: the schedule is published.");
     }
     await this.store.transact(async (tx) => {
@@ -476,7 +501,12 @@ export class TournamentService {
     const teamId = docIdParam(rawTeam);
     const r = parse(entryRequestSchema, body);
     const divId = docIdParam(r.divisionId);
-    const roster = (await this.store.list(`teams/${teamId}/roster`, 500)).length;
+    // The team's admins only get as far as counting its roster (checked again below).
+    await this.visible(this.store, id, caller.uid);
+    const admin = await this.store.get(p.team(teamId));
+    if (!admin) throw new ApiError("not_found", "That team doesn't exist.");
+    if (!can(admin, caller.uid, "manageTeam")) throw new ApiError("permission_denied", "Only the team's admins can enter it.");
+    const roster = (await this.queries.ids(`teams/${teamId}/roster`, 500)).length;
     await this.store.transact(async (tx) => {
       const { t } = await this.visible(tx, id, caller.uid);
       const team = await tx.get(p.team(teamId));
@@ -607,7 +637,7 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const { games } = parse(publishScheduleRequestSchema, body);
-    const old = await this.store.list(p.games(id, divId), listMax);
+    const check = (tx: Tx) => this.managed(tx, id, caller.uid);
     let format: TournamentFormat = "roundRobin";
     await this.store.transact(async (tx) => {
       const t = await this.managed(tx, id, caller.uid);
@@ -633,8 +663,10 @@ export class TournamentService {
       });
       format = formatOf({ kind: t.kind as "league", season: (t.season as never) ?? null }, { settings: { format: mapOf(d.settings).format as TournamentFormat } });
     });
+    const old = await this.queries.ids(p.games(id, divId), listMax);
+    const fresh = new Set(games.map((g) => g.id));
     const writes: Array<(tx: Tx) => void> = [
-      ...old.filter((g) => !games.some((n) => n.id === g.id)).map((g) => (tx: Tx) => tx.delete(p.game(id, divId, g.id))),
+      ...old.filter((g) => !fresh.has(g)).map((g) => (tx: Tx) => tx.delete(p.game(id, divId, g))),
       ...games.map((g) => (tx: Tx) =>
         tx.set(p.game(id, divId, g.id), {
           order: g.order,
@@ -660,7 +692,7 @@ export class TournamentService {
     // The division and status ride in the last chunk, after every game.
     const head = writes.slice(0, Math.max(0, writes.length - (chunk - 2)));
     const tail = writes.slice(head.length);
-    await this.inChunks(head);
+    await this.inChunks(head, check);
     await this.store.transact(async (tx) => {
       const t = await this.managed(tx, id, caller.uid);
       const d = await tx.get(p.division(id, divId));
@@ -689,7 +721,16 @@ export class TournamentService {
   }
 
   private async gameIds(id: string, divId: string) {
-    return (await this.store.list(p.games(id, divId), listMax)).map((g) => g.id);
+    return this.queries.ids(p.games(id, divId), listMax);
+  }
+
+  /** confirm()'s checks: a report on [g], and the caller captains the other team. */
+  private confirmable(d: Data, g: EngineGame, uid: string) {
+    const r = g.report;
+    if (g.status !== "reported" || !r) throw new ApiError("failed_precondition", "There's no score to confirm.");
+    const other = r.byTeam === g.teamA ? g.teamB : g.teamA;
+    if (!this.captainOf(d, other, uid)) throw new ApiError("permission_denied", "The other team's captain confirms the score.");
+    return r;
   }
 
   /** report(): a captain of one of the game's teams reports the score; the other confirms. */
@@ -720,6 +761,11 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const gameId = docIdParam(rawGame);
+    // Only the other captain gets as far as listing the games (checked again below).
+    await this.visible(this.store, id, caller.uid);
+    const [division, game] = await Promise.all([this.store.get(p.division(id, divId)), this.store.get(p.game(id, divId, gameId))]);
+    if (!division || !game) throw new ApiError("not_found", "That game doesn't exist.");
+    this.confirmable(division, engineGame(gameId, game), caller.uid);
     const ids = await this.gameIds(id, divId);
     await this.store.transact(async (tx) => {
       await this.visible(tx, id, caller.uid);
@@ -727,10 +773,7 @@ export class TournamentService {
       const games = await this.gamesIn(tx, id, divId, ids);
       const g = games.find((x) => x.id === gameId);
       if (!d || !g) throw new ApiError("not_found", "That game doesn't exist.");
-      const r = g.report;
-      if (g.status !== "reported" || !r) throw new ApiError("failed_precondition", "There's no score to confirm.");
-      const other = r.byTeam === g.teamA ? g.teamB : g.teamA;
-      if (!this.captainOf(d, other, caller.uid)) throw new ApiError("permission_denied", "The other team's captain confirms the score.");
+      const r = this.confirmable(d, g, caller.uid);
       const done: EngineGame = { ...g, status: "done", scoreA: r.scoreA, scoreB: r.scoreB, report: null };
       tx.update(p.game(id, divId, gameId), { status: "done", scoreA: r.scoreA, scoreB: r.scoreB, report: null });
       for (const f of fillsAfter(done, games)) tx.update(p.game(id, divId, f.gameId), fillUpdate(f));
@@ -743,6 +786,7 @@ export class TournamentService {
     const divId = docIdParam(rawDiv);
     const gameId = docIdParam(rawGame);
     const s = parse(scoreRequestSchema, body);
+    await this.managed(this.store, id, caller.uid);
     const ids = await this.gameIds(id, divId);
     await this.store.transact(async (tx) => {
       await this.managed(tx, id, caller.uid);
@@ -761,6 +805,7 @@ export class TournamentService {
   async seedBracket(caller: Caller, rawId: unknown, rawDiv: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
+    await this.managed(this.store, id, caller.uid);
     const ids = await this.gameIds(id, divId);
     await this.store.transact(async (tx) => {
       await this.managed(tx, id, caller.uid);
@@ -782,21 +827,24 @@ export class TournamentService {
   async reconcile(caller: Caller, rawId: unknown, rawDiv: unknown): Promise<{ changed: string[] }> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
-    const [ids, entryRows, divRows] = await Promise.all([this.gameIds(id, divId), this.store.list(p.entries(id), listMax), this.store.list(p.divisions(id), 100)]);
+    // Managers only get as far as the lists (checked again below).
+    await this.managed(this.store, id, caller.uid);
+    if (!(await this.store.get(p.division(id, divId)))) throw noDivision();
+    const [ids, entryIds, divIds] = await Promise.all([this.gameIds(id, divId), this.queries.ids(p.entries(id), listMax), this.queries.ids(p.divisions(id), 100)]);
     return this.store.transact(async (tx) => {
       const t = await this.managed(tx, id, caller.uid);
       const d = await tx.get(p.division(id, divId));
       if (!d) throw noDivision();
       const others: Data[] = [];
-      for (const row of divRows) {
-        if (row.id === divId) continue;
-        const o = await tx.get(p.division(id, row.id));
+      for (const other of divIds) {
+        if (other === divId) continue;
+        const o = await tx.get(p.division(id, other));
         if (o) others.push(o);
       }
       const entries = new Map<string, Data>();
-      for (const row of entryRows) {
-        const e = await tx.get(p.entry(id, row.id));
-        if (e) entries.set(row.id, e);
+      for (const teamId of entryIds) {
+        const e = await tx.get(p.entry(id, teamId));
+        if (e) entries.set(teamId, e);
       }
       const games = await this.gamesIn(tx, id, divId, ids);
       const changed: string[] = [];
