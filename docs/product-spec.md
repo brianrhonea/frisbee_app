@@ -245,7 +245,12 @@ everything the app does on the website alone, styled like the website
     name and size); [x] older messages in DMs, team rooms and the call
     chat; [x] Message on player pages (`/messages?to=<uid>`); [x] unsent
     drafts per conversation and room (kept in the browser; web 0.25.0,
-    api 0.23.0).
+    api 0.23.0). Both platforms: a conversation is started only by
+    tapping Message (a `?to=` link shows the person and "Message
+    <name>"); drafts are kept per member and cleared on sign-out.
+    Website only (the app writes chat files to Storage directly): a
+    daily chat-upload quota (200 files / 2 GB), and Remove in the
+    composer deletes the unsent file.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

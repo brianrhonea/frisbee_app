@@ -192,7 +192,8 @@ sequenceDiagram
   /v1/teams/:org/linked-teams/:team`; `POST /v1/teams/:org/linked-teams` →
   `{id}`.
 - Media: `POST /v1/uploads` → `{id, uploadUrl, headers, expiresAt}`;
-  `POST /v1/uploads/:id/complete` → `{id, status, path?, thumbPath?, …}`.
+  `POST /v1/uploads/:id/complete` → `{id, status, path?, thumbPath?, …}`;
+  `DELETE /v1/uploads/:id` (an unsent chat file, its owner) → 204.
 - Profile: `POST /v1/me/username` → `{username}`; `PUT
   /v1/me/profile/details`; `PUT /v1/me/profile/privacy`; `PUT
   /v1/me/profile/visibility`.
@@ -317,6 +318,13 @@ which fails when the current version has no entry.
   4. Only the API's service account can write outside `uploads/raw/`
      (storage.rules); raw files are deleted after processing, and a
      lifecycle rule clears abandoned ones after a day.
+  5. Chat files are stored at complete, before a message holds them, so
+     they're bounded per member per UTC day (`chatUploadQuota`: 200 files
+     asked for, 2 GB received; `uploadQuotas/{uid}`), and the composer's
+     Remove deletes an unsent one (`DELETE /v1/uploads/:id`, status
+     `removed`). Complete reads and copies the raw file's generation it
+     checked, so a second PUT to the signed URL can't swap the bytes.
+     Not yet: a sweeper for ready chat uploads no message ever used.
 
   Until this is built the app keeps compressing photos on the device
   (`ImageCompressor`) and uploading under `storage.rules`.

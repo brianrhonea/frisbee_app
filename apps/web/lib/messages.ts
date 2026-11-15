@@ -9,6 +9,7 @@ import {
   type QueryDocumentSnapshot,
   startAfter,
 } from "firebase/firestore";
+import { legacyMessageDraftsKey, messageDraftsKey, withDraft } from "@stall10/shared";
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { firestoreDb } from "./firebase";
 import { type Doc, plain } from "./live";
@@ -173,14 +174,16 @@ export function useThreadScroll(body: RefObject<HTMLElement | null>, firstId: st
 }
 
 // ---- Drafts ------------------------------------------------------------------
+//
+// Kept per member (messageDraftsKey), as the app keeps them, and cleared
+// when that member signs out (clearDrafts), so nobody else on this browser
+// sees what they left unsent.
 
-const draftsKey = "messageDrafts";
-/** Drafts kept, newest last; the oldest go past this (MessageDraftRepositoryPrefs.maxDrafts). */
-export const maxDrafts = 50;
-
-function readDrafts(): Record<string, string> {
+function readDrafts(uid: string): Record<string, string> {
   try {
-    const raw = window.localStorage.getItem(draftsKey);
+    // Drafts from before they were kept per member can't be told apart: forget them.
+    window.localStorage.removeItem(legacyMessageDraftsKey);
+    const raw = window.localStorage.getItem(messageDraftsKey(uid));
     const map = raw ? (JSON.parse(raw) as unknown) : null;
     if (!map || typeof map !== "object" || Array.isArray(map)) return {};
     return Object.fromEntries(Object.entries(map).filter((e): e is [string, string] => typeof e[1] === "string"));
@@ -189,21 +192,26 @@ function readDrafts(): Record<string, string> {
   }
 }
 
-/** What was left unsent in [key]'s composer (`dm_<id>`, `chat_<team>_<room>`, as the app keys them). */
-export function loadDraft(key: string): string {
-  return readDrafts()[key] ?? "";
+/** What [uid] left unsent in [key]'s composer (`dm_<id>`, `chat_<team>_<room>`, as the app keys them). */
+export function loadDraft(uid: string, key: string): string {
+  return readDrafts(uid)[key] ?? "";
 }
 
-/** Remembers [text] for [key] in this browser; blank forgets it. */
-export function saveDraft(key: string, text: string) {
-  const drafts = readDrafts();
-  delete drafts[key];
-  if (text.trim()) drafts[key] = text;
-  const keys = Object.keys(drafts);
-  for (const k of keys.slice(0, Math.max(0, keys.length - maxDrafts))) delete drafts[k];
+/** Remembers [text] for [uid]'s [key] in this browser; blank forgets it. */
+export function saveDraft(uid: string, key: string, text: string) {
   try {
-    window.localStorage.setItem(draftsKey, JSON.stringify(drafts));
+    window.localStorage.setItem(messageDraftsKey(uid), JSON.stringify(withDraft(readDrafts(uid), key, text)));
   } catch {
     // No storage (a private window, say): drafts just aren't kept.
+  }
+}
+
+/** Forgets [uid]'s drafts on this browser (on signing out). */
+export function clearDrafts(uid: string) {
+  try {
+    window.localStorage.removeItem(messageDraftsKey(uid));
+    window.localStorage.removeItem(legacyMessageDraftsKey);
+  } catch {
+    // No storage: nothing was kept.
   }
 }

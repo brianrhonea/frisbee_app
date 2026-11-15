@@ -90,6 +90,14 @@ export async function uploadPhoto(
   return done;
 }
 
+/**
+ * Takes an unsent chat file out of the composer (`DELETE /v1/uploads/{id}`):
+ * the API deletes what it stored. Best effort, as the app's Remove is.
+ */
+export function removeUpload(user: User, id: string): Promise<void> {
+  return callApi<void>(user, `/v1/uploads/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => undefined);
+}
+
 /** A new document id, in Firestore's alphabet, for items whose files upload first. */
 export function newId(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";

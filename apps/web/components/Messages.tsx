@@ -1,6 +1,6 @@
 "use client";
 import { MuteButton } from "./MuteButton";
-import { groupSizeMax, type GroupAddedResult, typingFreshMs } from "@stall10/shared";
+import { directConversationId, groupSizeMax, type GroupAddedResult, typingFreshMs } from "@stall10/shared";
 import { where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -96,8 +96,6 @@ export function Messages() {
   const view = (params.get("view") as View) || "inbox";
   const openId = params.get("c");
   const to = params.get("to");
-  const [toError, setToError] = useState<string | null>(null);
-  const opening = useRef<string | null>(null);
 
   const mineById = useMemo(() => new Map((reads.data ?? []).map((r) => [r.id, r] as const)), [reads.data]);
   const all = useMemo(
@@ -118,23 +116,25 @@ export function Messages() {
     router.push(s ? `${pathname}?${s}` : pathname, { scroll: false });
   };
 
-  // /messages?to=<uid> (a player's Message button, a shared link): open
-  // or start the conversation with them, then show it as ?c=.
+  // /messages?to=<uid> (a shared link): a conversation with them that
+  // already exists just opens. A new one is only started when the member
+  // clicks "Message <name>" (StartConversation), as the app starts one only
+  // from the profile's Message button: following a link never starts a
+  // conversation for anyone.
+  const toUid = to && to !== me && /^[A-Za-z0-9_-]{1,128}$/.test(to) ? to : null;
+  const toId = toUid ? directConversationId(me, toUid) : null;
+  const toExists = !!toId && all.some(({ c }) => c.id === toId);
+  const showConversation = (id: string) => {
+    const next = new URLSearchParams(params);
+    next.delete("to");
+    next.delete("view");
+    next.set("c", id);
+    router.replace(`${pathname}?${next}`, { scroll: false });
+  };
   useEffect(() => {
-    if (!user || !to || opening.current === to) return;
-    opening.current = to;
-    setToError(null);
-    openConversation(user, to).then(
-      (res) => {
-        const next = new URLSearchParams(params);
-        next.delete("to");
-        next.delete("view");
-        next.set("c", res.id);
-        router.replace(`${pathname}?${next}`, { scroll: false });
-      },
-      (e: Error) => setToError(e.message),
-    );
-  }, [user, to, params, pathname, router]);
+    if (toId && toExists) showConversation(toId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once it's known to exist.
+  }, [toId, toExists]);
 
   // j / k move through the list; Esc closes the conversation.
   useEffect(() => {
@@ -216,11 +216,6 @@ export function Messages() {
         )}
       </nav>
       <section className="hub-detail chat-thread">
-        {toError && (
-          <p className="form-error" role="alert">
-            {toError}
-          </p>
-        )}
         {composing ? (
           <NewConversation
             group={composing === "group"}
@@ -233,6 +228,8 @@ export function Messages() {
           <ConversationView key={open.c.id} conv={open.c} info={open.d} mine={mineById.get(open.c.id)} me={me} onClose={() => go({ c: null })} />
         ) : openId && convs.data ? (
           <OpenById id={openId} />
+        ) : toUid && convs.data && !toExists ? (
+          <StartConversation key={toUid} uid={toUid} onStarted={showConversation} onCancel={() => go({ to: null })} />
         ) : (
           <div className="card hub-empty">
             <p className="muted">Pick a conversation, or start a new one.</p>
@@ -240,6 +237,55 @@ export function Messages() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+/**
+ * ?to=<uid> with no conversation yet: who it would be with, and "Message
+ * <name>". Only that click starts it (`POST /v1/conversations`); their
+ * message settings decide whether it's a conversation or a request.
+ */
+function StartConversation({ uid, onStarted, onCancel }: { uid: string; onStarted: (id: string) => void; onCancel: () => void }) {
+  const { user } = useAuth();
+  const profile = useLiveDoc<{ name?: string; photoUrl?: string }>(`profiles/${uid}`);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (profile.data === undefined && !profile.error) return <p className="muted">Loading…</p>;
+  if (profile.data === null) return <p className="empty">That player doesn&apos;t exist.</p>;
+  const name = profile.data?.name || "this player";
+
+  async function start() {
+    if (!user) return;
+    setBusy(true);
+    setError(null);
+    try {
+      onStarted((await openConversation(user, uid)).id);
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card settings-form">
+      <h2>New message</h2>
+      <p>
+        <Avatar name={name} url={profile.data?.photoUrl || undefined} size={36} /> <b>{name}</b>
+      </p>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="form-actions">
+        <button type="button" className="btn" onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void start()}>
+          Message {name}
+        </button>
+      </div>
     </div>
   );
 }

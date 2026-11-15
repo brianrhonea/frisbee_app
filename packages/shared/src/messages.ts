@@ -92,3 +92,31 @@ export function messagePreview(text: string, attachments: number, kind: { image?
   if (kind.video) return attachments === 1 ? "🎬 Video" : `🎬 ${attachments} videos`;
   return attachments === 1 ? "📎 File" : `📎 ${attachments} files`;
 }
+
+// ---- Drafts ------------------------------------------------------------------
+//
+// Unsent composer text is kept on the device, per member, as both the app
+// (MessageDraftRepositoryPrefs) and the website (lib/messages.ts) keep it,
+// and forgotten when that member signs out.
+
+/** Drafts kept per member; the oldest go past this. */
+export const messageDraftsMax = 50;
+
+/** Where one member's drafts are kept on a device (localStorage, SharedPreferences). */
+export const messageDraftsKey = (uid: string) => `messageDrafts_${uid}`;
+
+/** The key every member's drafts once shared; removed wherever it's found. */
+export const legacyMessageDraftsKey = "messageDrafts";
+
+/**
+ * [drafts] with [text] as [key]'s draft (moved to the end, newest last),
+ * or without it when [text] is blank, keeping the newest [max].
+ */
+export function withDraft(drafts: Record<string, string>, key: string, text: string, max = messageDraftsMax): Record<string, string> {
+  const next = { ...drafts };
+  delete next[key];
+  if (text.trim()) next[key] = text;
+  const keys = Object.keys(next);
+  for (const k of keys.slice(0, Math.max(0, keys.length - max))) delete next[k];
+  return next;
+}
