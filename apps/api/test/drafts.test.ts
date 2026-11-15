@@ -165,6 +165,39 @@ describe("captains' draft (draft.server.test.ts)", () => {
     expect([...draftOf().captainIds].sort()).toEqual(["p2", "p3"]);
   });
 
+  /** Runs [change] just before the next transaction, after the service's first reads. */
+  const meanwhile = (change: () => void) => {
+    const transact = store.transact.bind(store);
+    store.transact = (fn) => {
+      store.transact = transact;
+      change();
+      return transact(fn);
+    };
+  };
+
+  it("reads again in the transaction: a signup withdrawn meanwhile isn't drafted", async () => {
+    meanwhile(() => store.put(`tournaments/${T}/signups/p5`, { ...(store.doc(`tournaments/${T}/signups/p5`) as object), status: "withdrawn" }));
+    expect((await start(["p0", "p1"])).status).toBe(201);
+    expect(Object.keys(draftOf().pool).sort()).toEqual(["p2", "p3", "p4"]);
+    expect(Object.keys((store.doc(`tournaments/${T}/drafts/${DIV}/details/pool`) as any).players)).not.toContain("p5");
+  });
+
+  it("reads again in the transaction: a manager removed meanwhile can't start, control or finish", async () => {
+    const demote = () => store.put("teams/host", { ...(store.doc("teams/host") as object), memberPerms: {} });
+    meanwhile(demote);
+    expect((await start(["p0", "p1"], "helper")).status).toBe(403);
+    expect(draftOf()).toBeUndefined();
+    store.put("teams/host", { ...(store.doc("teams/host") as object), memberPerms: { helper: ["manageEvents"] } });
+    expect((await start(["p0", "p1"], "helper")).status).toBe(201);
+    meanwhile(demote);
+    expect((await control("pause", "helper")).status).toBe(403);
+    expect(draftOf().status).toBe("live");
+    store.put("teams/host", { ...(store.doc("teams/host") as object), memberPerms: { helper: ["manageEvents"] } });
+    meanwhile(demote);
+    expect((await finish("helper")).status).toBe(403);
+    expect(draftOf().status).toBe("live");
+  });
+
   it("refuses captains who aren't accepted and events without a captains' draft", async () => {
     expect((await start(["p0", "stranger"])).status).toBe(412);
     store.put(`tournaments/${T}`, { ...(store.doc(`tournaments/${T}`) as object), draftMode: "balanced" });
