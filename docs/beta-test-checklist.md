@@ -223,7 +223,7 @@ console, and note numbers per active tester.
       without "Require admin approval to join".
 - [ ] Only invitees see it on their schedule.
 - [ ] Attending / Not attending RSVP.
-- [ ] Lobby: pick mic, speaker and camera; camera preview; volume.
+- [ ] Lobby: pick mic and camera; camera preview; volume.
 - [ ] Admin starts (even early); others join; with approval on, admin
       admits or denies.
 - [ ] Video, profile photo when the camera is off, speaking highlight,

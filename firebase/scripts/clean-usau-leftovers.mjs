@@ -56,7 +56,6 @@ const legacyStatusKeys = ["onUsau", "paid"];
 
 console.log(`${apply ? "APPLYING to" : "Dry run on"} ${project}`);
 
-const writer = apply ? db.bulkWriter() : null;
 let rosterEntries = 0;
 let statusCreated = 0;
 let eventFollows = 0;
@@ -75,12 +74,16 @@ for (const team of await db.collection("teams").listDocuments()) {
       `${apply ? "" : "would "}clean ${entry.ref.path} (${fields.join(", ")})` +
         (hasStatus ? "" : `; ${apply ? "" : "would "}create ${status.path} {paid: ${data.paid === true}}`),
     );
-    if (!writer) continue;
-    if (!hasStatus) writer.create(status, { paid: data.paid === true });
-    writer.update(entry.ref, Object.fromEntries(legacyStatusKeys.map((k) => [k, FieldValue.delete()])));
+    if (!apply) continue;
+    // One batch per entry, so the mark is never stripped without its copy.
+    const batch = db.batch();
+    if (!hasStatus) batch.create(status, { paid: data.paid === true });
+    batch.update(entry.ref, Object.fromEntries(legacyStatusKeys.map((k) => [k, FieldValue.delete()])));
+    await batch.commit();
   }
 }
 
+const writer = apply ? db.bulkWriter() : null;
 for (const user of await db.collection("users").listDocuments()) {
   const follows = await user.collection("follows").where("type", "==", "event").get();
   for (const follow of follows.docs) {
