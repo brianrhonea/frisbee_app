@@ -33,11 +33,17 @@ import "./tournaments.css";
 
 type Tab = "overview" | "players" | "teams" | "schedule" | "results" | "news";
 
-export function TournamentPage({ tournamentId }: { tournamentId: string }) {
+/** [fallbackHostId] (a group, from ?host=) opens that group's tournament [tournamentId] when no hosted one has the id, as the app does. */
+export function TournamentPage({ tournamentId, fallbackHostId }: { tournamentId: string; fallbackHostId?: string }) {
   const s = useTournament(tournamentId);
   const [tab, setTab] = useState<Tab>("overview");
+  const router = useRouter();
+  const fallback = s.loaded && !s.t && fallbackHostId ? `/teams/${encodeURIComponent(fallbackHostId)}/tournaments/${encodeURIComponent(tournamentId)}` : null;
+  useEffect(() => {
+    if (fallback) router.replace(fallback);
+  }, [fallback, router]);
   useReconcile(s);
-  if (!s.loaded) return <p className="muted" aria-busy="true">Loading…</p>;
+  if (!s.loaded || fallback) return <p className="muted" aria-busy="true">Loading…</p>;
   if (!s.t) return <p className="empty">This event isn&apos;t here: it may have been removed, or it hasn&apos;t been published yet.</p>;
   const t = s.t;
   const league = t.kind === "league";

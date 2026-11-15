@@ -1,35 +1,33 @@
 "use client";
 import { useEffect, useState } from "react";
-import { currentTheme, saveTheme, type Theme } from "@/lib/theme";
+import { currentChoice, saveTheme, type ThemeChoice, themeChoiceLabels } from "@/lib/theme";
 import { NavIcon } from "./NavIcons";
 
-/** Switches the site between light and dark (lib/theme.ts). */
+/** Each click moves to the next choice, as the app's System, Light and Dark. */
+const order: ThemeChoice[] = ["system", "light", "dark"];
+
+/** Switches the site between System, Light and Dark (lib/theme.ts). */
 export function ThemeToggle() {
-  // Unknown until mounted: the server can't see the visitor's choice.
-  const [theme, setTheme] = useState<Theme | null>(null);
+  // Unknown until mounted: the server can't see the visitor's choice. System
+  // needs nothing here: site.css follows prefers-color-scheme itself.
+  const [choice, setChoice] = useState<ThemeChoice | null>(null);
+  useEffect(() => setChoice(currentChoice()), []);
 
-  useEffect(() => {
-    setTheme(currentTheme());
-    // Follow the system while the visitor hasn't chosen.
-    const media = window.matchMedia("(prefers-color-scheme: light)");
-    const onChange = () => setTheme(currentTheme());
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
-
-  const next: Theme = theme === "light" ? "dark" : "light";
+  const now = choice ?? "system";
+  const next = order[(order.indexOf(now) + 1) % order.length]!;
+  const label = `Theme: ${themeChoiceLabels[now]}. Switch to ${themeChoiceLabels[next]}`;
   return (
     <button
       type="button"
       className="icon-btn theme-toggle"
-      aria-label={`Switch to ${next} mode`}
-      title={`Switch to ${next} mode`}
+      aria-label={label}
+      title={label}
       onClick={() => {
         saveTheme(next);
-        setTheme(next);
+        setChoice(next);
       }}
     >
-      <NavIcon name={theme === "light" ? "moon" : "sun"} size={21} />
+      <NavIcon name={now === "light" ? "sun" : now === "dark" ? "moon" : "system"} size={21} />
     </button>
   );
 }

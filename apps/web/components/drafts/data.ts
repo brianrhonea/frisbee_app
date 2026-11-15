@@ -159,6 +159,6 @@ export async function attempt(setBusy: (b: boolean) => void, setError: (e: strin
 export const draftHrefs = {
   signups: (tournamentId: string, divisionId?: string) =>
     `/tournaments/${encodeURIComponent(tournamentId)}/signups${divisionId ? `?division=${encodeURIComponent(divisionId)}` : ""}`,
-  liveDraft: (tournamentId: string, divisionId: string) => `/tournaments/${encodeURIComponent(tournamentId)}/draft/${encodeURIComponent(divisionId)}`,
-  teamDraft: (tournamentId: string, divisionId: string) => `/tournaments/${encodeURIComponent(tournamentId)}/team-draft/${encodeURIComponent(divisionId)}`,
+  liveDraft: (tournamentId: string, divisionId: string) => `/tournaments/${encodeURIComponent(tournamentId)}/live-draft/${encodeURIComponent(divisionId)}`,
+  teamDraft: (tournamentId: string, divisionId: string) => `/tournaments/${encodeURIComponent(tournamentId)}/draft/${encodeURIComponent(divisionId)}`,
 };

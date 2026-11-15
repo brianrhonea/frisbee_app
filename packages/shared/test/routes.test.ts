@@ -8,7 +8,7 @@ const webApp = new URL("apps/web/app/", repo);
 /** Whether apps/web has a page for [path] (dynamic segments match [x] folders). */
 function webHasPage(path: string): boolean {
   let dir = webApp;
-  for (const part of path.split("/").filter(Boolean)) {
+  for (const part of path.split(/[?#]/)[0]!.split("/").filter(Boolean)) {
     const exact = new URL(`${part}/`, dir);
     if (existsSync(exact)) {
       dir = exact;
@@ -27,8 +27,10 @@ function functionRoutes(): string[] {
   const found = new Set<string>();
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
     const src = readFileSync(new URL(file, dir), "utf8");
-    for (const m of src.matchAll(/route:\s*(?:`([^`]*)`|"([^"]*)")/g)) {
-      const raw = (m[1] ?? m[2]) as string;
+    // Every app-route-like literal, so routes built in a variable (a
+    // draft's board, an event's deleted-or-not route) count too.
+    for (const m of src.matchAll(/`(\/[a-z][^`]*)`|"(\/[a-z][^"]*)"|route:\s*`(\$\{meetingRoute[^`]*)`/g)) {
+      const raw = (m[1] ?? m[2] ?? m[3]) as string;
       // meetingRoute(...) is a helper; spell it out.
       const filled = raw.replace(/\$\{meetingRoute\([^)]*\)\}/g, "/team-meetings/t1/m1").replace(/\$\{[^}]+\}/g, "x1");
       if (filled.startsWith("/")) found.add(filled);
@@ -52,19 +54,64 @@ describe("webRoute", () => {
     expect(webRoute("/team-meetings/t1/m1/room")).toBe("/teams/t1/meetings/m1/room");
     expect(webRoute("/team-meetings/t1/m1")).toBe("/teams/t1/meetings/m1");
     expect(webRoute("/my-events/e1")).toBe("/schedule");
-    expect(webRoute("/tournaments/t1/live-draft/d1")).toBe("/events");
+    expect(webRoute("/team-meetings/t1/m1/edit")).toBe("/teams/t1/meetings/m1/edit");
+    expect(webRoute("/teams/t1/plays/p1")).toBe("/teams/t1/plays/p1");
+    expect(webRoute("/team-videos/t1/v1")).toBe("/teams/t1/videos/v1");
+    expect(webRoute("/teams/t1/stats/games/g1")).toBe("/teams/t1/stats/games/g1");
+    expect(webRoute("/teams/t1/stats/tournaments/x1")).toBe("/teams/t1/stats/tournaments/x1");
+    expect(webRoute("/teams/t1/stats/season")).toBe("/teams/t1/stats/season");
+    expect(webRoute("/group-tournaments/g1/x1")).toBe("/teams/g1/tournaments/x1");
+    expect(webRoute("/group-tournaments/g1/x1/edit")).toBe("/teams/g1/tournaments/x1/edit");
+    expect(webRoute("/tournaments")).toBe("/tournaments");
+    expect(webRoute("/tournaments/host")).toBe("/tournaments/host");
+    expect(webRoute("/tournaments/new?host=g1&type=hat&x=1")).toBe("/tournaments/new?host=g1&type=hat");
+    expect(webRoute("/tournaments/x1")).toBe("/tournaments/x1");
+    expect(webRoute("/tournaments/x1?host=g%201")).toBe("/tournaments/x1?host=g%201");
+    expect(webRoute("/tournaments/x1/edit")).toBe("/tournaments/x1/edit");
+    expect(webRoute("/tournaments/x1/signups")).toBe("/tournaments/x1/signups");
+    // As in the app: draft/ is the host's balanced draft, live-draft/ the captains'.
+    expect(webRoute("/tournaments/x1/draft/d1")).toBe("/tournaments/x1/draft/d1");
+    expect(webRoute("/tournaments/x1/live-draft/d1")).toBe("/tournaments/x1/live-draft/d1");
+    expect(webRoute("/tournaments/x1/somewhere")).toBe(appOnlyRoute);
     expect(webRoute("/somewhere/new")).toBe(appOnlyRoute);
     expect(webRoute(null)).toBeNull();
     expect(webRoute("https://example.com")).toBeNull();
+    expect(webRoute("//example.com/posts/p1")).toBeNull();
   });
 
   it("covers every route the notification functions send, each to a page the website has", () => {
     const routes = functionRoutes();
-    expect(routes.length).toBeGreaterThan(10);
+    expect(routes.length).toBeGreaterThan(15);
+    expect(routes).toContain("/tournaments/x1/live-draft/x1");
     for (const r of routes) {
       const to = webRoute(r);
       expect(to, r).not.toBe(appOnlyRoute);
       expect(webHasPage(to!), `${r} -> ${to}`).toBe(true);
+    }
+  });
+
+  it("sends every app page it maps to a page the website has", () => {
+    for (const r of [
+      "/team-meetings/t1/m1/edit",
+      "/teams/t1/plays/p1",
+      "/team-videos/t1/v1",
+      "/teams/t1/stats/games/g1",
+      "/teams/t1/stats/tournaments/x1",
+      "/teams/t1/stats/season",
+      "/group-tournaments/g1/x1",
+      "/group-tournaments/g1/x1/edit",
+      "/tournaments",
+      "/tournaments/host",
+      "/tournaments/new?host=g1",
+      "/tournaments/x1?host=g1",
+      "/tournaments/x1/edit",
+      "/tournaments/x1/signups",
+      "/tournaments/x1/draft/d1",
+      "/tournaments/x1/live-draft/d1",
+    ]) {
+      const to = webRoute(r)!;
+      expect(to, r).not.toBe(appOnlyRoute);
+      expect(webHasPage(to), `${r} -> ${to}`).toBe(true);
     }
   });
 });
