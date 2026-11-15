@@ -1,6 +1,6 @@
 "use client";
 import type { MeetingRsvp, MeetingStatus } from "@stall10/shared";
-import { where } from "firebase/firestore";
+import { type QueryConstraint, where } from "firebase/firestore";
 import { type Doc, useLiveQueries } from "@/lib/live";
 import type { TeamViewer } from "../TeamContext";
 
@@ -59,19 +59,23 @@ export const needsApproval = (m: MeetingData, admin: boolean) => m.requireApprov
 const byStart = (a: Meeting, b: Meeting) => (a.startsAt ?? "").localeCompare(b.startsAt ?? "");
 
 /**
- * The team's meetings the member can see, soonest first, live
- * (watchMeetings): admins read them all; others ask by their tier and by
- * their uid, as the rules require, merged.
+ * The Firestore reads for the meetings a member can see (watchMeetings):
+ * admins read them all; others ask by their tier and by their uid, as the
+ * rules require. [key] names the set for useLiveQueries. Shared with My
+ * schedule.
  */
+export function teamMeetingQueries(member: Extract<TeamViewer, { state: "member" }>) {
+  const admin = member.can("manageEvents");
+  const queries: QueryConstraint[][] = admin
+    ? [[]]
+    : [[where("inviteRoles", "array-contains", inviteTier(member.tier))], [where("inviteUsers", "array-contains", member.uid)]];
+  return { queries, key: admin ? "all" : `${member.tier}|${member.uid}` };
+}
+
+/** The team's meetings the member can see, soonest first, live, merged. */
 export function useTeamMeetings(teamId: string, viewer: TeamViewer) {
   const member = viewer.state === "member" ? viewer : null;
-  const admin = member?.can("manageEvents") ?? false;
-  const queries = !member
-    ? []
-    : admin
-      ? [[]]
-      : [[where("inviteRoles", "array-contains", inviteTier(member.tier))], [where("inviteUsers", "array-contains", member.uid)]];
-  const key = !member ? "" : admin ? "all" : `${member.tier}|${member.uid}`;
+  const { queries, key } = member ? teamMeetingQueries(member) : { queries: [], key: "" };
   const live = useLiveQueries<MeetingData>(member ? `teams/${teamId}/meetings` : null, queries, key);
   return { ...live, data: live.data?.slice().sort(byStart) };
 }

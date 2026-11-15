@@ -64,6 +64,26 @@ const TeamContext = createContext<TeamHubInfo | null>(null);
 
 const editors = ["owner", "coach", "captain"];
 
+/**
+ * The member [uid] of [team] as the hub and the schedule see them: their
+ * tier, what they may do, and the audience ids events and rooms list.
+ */
+export function memberViewer(team: Doc<TeamDoc>, uid: string): Extract<TeamViewer, { state: "member" }> {
+  const tier = team.members?.[uid] ?? "player";
+  const perms = team.memberPerms?.[uid] ?? [];
+  return {
+    state: "member",
+    uid,
+    team,
+    tier,
+    can: (p) => editors.includes(tier) || perms.includes(p),
+    // Chat rooms and a community's events say who sees them by these ids
+    // (ChatAudience in the app): everyone, the tier (a legacy stats member
+    // is a player) and each custom role.
+    audience: ["everyone", tier === "stats" ? "player" : tier, ...(team.memberRoles?.[uid] ?? [])],
+  };
+}
+
 /** Listens to the team doc once for every section of the hub. */
 export function TeamProvider({
   teamId,
@@ -81,23 +101,7 @@ export function TeamProvider({
   else if (live.error) viewer = { state: "outsider", uid: user.uid };
   else if (live.data === undefined) viewer = { state: "loading" };
   else if (!live.data || !live.data.memberIds?.includes(user.uid)) viewer = { state: "outsider", uid: user.uid };
-  else {
-    const team = live.data;
-    const uid = user.uid;
-    const tier = team.members?.[uid] ?? "player";
-    const perms = team.memberPerms?.[uid] ?? [];
-    viewer = {
-      state: "member",
-      uid,
-      team,
-      tier,
-      can: (p) => editors.includes(tier) || perms.includes(p),
-      // Chat rooms and a community's events say who sees them by these ids
-      // (ChatAudience in the app): everyone, the tier (a legacy stats member
-      // is a player) and each custom role.
-      audience: ["everyone", tier === "stats" ? "player" : tier, ...(team.memberRoles?.[uid] ?? [])],
-    };
-  }
+  else viewer = memberViewer(live.data, user.uid);
   return <TeamContext.Provider value={{ teamId, name, kind, privateGroup, viewer }}>{children}</TeamContext.Provider>;
 }
 
