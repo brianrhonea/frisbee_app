@@ -1292,7 +1292,7 @@ button.poll-option.on { border-color: var(--accent); }
 
 /* Create or join (the strip, the "+" by Your spaces, the checklist). */
 .side-add { border: 0; background: none; cursor: pointer; padding: 0; font: inherit; }
-.start-join { display: grid; gap: 12px; max-height: calc(100vh - 64px); overflow: auto; }
+.start-join { color: var(--ink); display: grid; gap: 12px; max-height: calc(100vh - 64px); overflow: auto; }
 .start-join .card-head { display: flex; align-items: center; justify-content: space-between; }
 .start-join .card-head .card-title { margin: 0; }
 .start-join > .settings-form { padding: 0; border: 0; box-shadow: none; }
@@ -1323,9 +1323,10 @@ button.poll-option.on { border-color: var(--accent); }
 .get-started-label { flex: 1; min-width: 0; font-weight: 600; }
 .get-started-list li.done .get-started-label { color: var(--muted); text-decoration: line-through; font-weight: 500; }
 .join-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.join-card .btn:not(.btn-amber) { background: transparent; color: var(--on-brand); border-color: currentColor; }
+.join-card-actions > .btn:not(.btn-amber) { background: transparent; color: var(--on-brand); border-color: currentColor; }
 
 /* Right rail: Needs you. */
+.needs-you[hidden] { display: none; }
 .needs-you-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .needs-you-list a { display: grid; gap: 2px; padding: 8px 10px; margin: 0 -10px; border-radius: 10px; color: var(--ink); text-decoration: none; }
 .needs-you-list a:hover { background: var(--field); }
@@ -1351,6 +1352,8 @@ button.poll-option.on { border-color: var(--accent); }
     box-shadow: 0 6px 18px rgb(0 0 0 / 0.22);
   }
   .fab-post:hover { filter: brightness(1.05); }
-  .frame-main { padding-bottom: 72px; }
+  /* Above the voice bar (sticky at the foot) while in a call. */
+  .frame:has(.voice-bar) .fab-post { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+  .frame.has-fab .frame-main { padding-bottom: 72px; }
 }
 /* ==== end Home: social feed ============================================ */

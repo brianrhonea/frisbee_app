@@ -3,7 +3,9 @@
 // Home's team strip, the "+" beside "Your spaces" and the new-member
 // checklist (the app's _JoinCard: Join with code, Find a group, Create team).
 import Link from "next/link";
-import { type ReactNode, useState } from "react";
+import { usePathname } from "next/navigation";
+import { type ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { JoinWithCode } from "../CreateTeam";
 import { Dialog } from "../Dialog";
 
@@ -51,15 +53,21 @@ export function StartOrJoinDialog({ onClose, join = false }: { onClose: () => vo
   );
 }
 
-/** A button that opens [StartOrJoinDialog]. */
+/**
+ * A button that opens [StartOrJoinDialog], on the page's body (so the
+ * card it sits in doesn't style it). It closes when the page changes:
+ * joining opens the team, and the sidebar's "+" stays mounted across pages.
+ */
 export function StartOrJoinButton({ className, join = false, label, children }: { className: string; join?: boolean; label?: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const path = usePathname();
+  useEffect(() => setOpen(false), [path]);
   return (
     <>
       <button type="button" className={className} aria-label={label} aria-haspopup="dialog" onClick={() => setOpen(true)}>
         {children}
       </button>
-      {open && <StartOrJoinDialog join={join} onClose={() => setOpen(false)} />}
+      {open && createPortal(<StartOrJoinDialog join={join} onClose={() => setOpen(false)} />, document.body)}
     </>
   );
 }

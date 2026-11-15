@@ -157,6 +157,15 @@ class HomeViewModel extends ChangeNotifier {
 
   bool canEdit(Team team) => team.canEdit(_uid);
 
+  /// The strip under the composer, by name. As on the Teams tab, a team
+  /// one of the user's communities lists is reached through the community.
+  List<Team> get stripTeams => [
+    for (final t in teams)
+      if (!(t.inCommunity &&
+          teams.any((c) => c.id == t.orgId && c.linkedTeams.containsKey(t.id))))
+        t,
+  ]..sort((a, b) => a.name.compareTo(b.name));
+
   /// Teams the user may post on: those they own, coach or captain.
   List<Team> get postableTeams => teams.where(canEdit).toList();
 

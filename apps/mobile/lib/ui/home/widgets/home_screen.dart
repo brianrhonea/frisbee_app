@@ -299,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       if (vm.teamsLoaded)
         TeamStrip(
-          teams: vm.teams,
+          teams: vm.stripTeams,
           onOpen: (t) => context.go(Routes.team(t.id)),
           onNewOrJoin: _newOrJoin,
         ),

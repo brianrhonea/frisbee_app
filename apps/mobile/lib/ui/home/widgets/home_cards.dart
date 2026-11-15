@@ -15,6 +15,7 @@ class TeamStrip extends StatelessWidget {
     required this.onNewOrJoin,
   });
 
+  /// In the order shown.
   final List<Team> teams;
   final ValueChanged<Team> onOpen;
   final VoidCallback onNewOrJoin;
@@ -22,7 +23,6 @@ class TeamStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final sorted = [...teams]..sort((a, b) => a.name.compareTo(b.name));
     Widget tile({
       required Widget badge,
       required String label,
@@ -70,7 +70,7 @@ class TeamStrip extends StatelessWidget {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          for (final t in sorted)
+          for (final t in teams)
             tile(
               badge: TeamBadge(size: 40, community: t.isCommunity),
               label: t.name,
@@ -82,7 +82,7 @@ class TeamStrip extends StatelessWidget {
               backgroundColor: c.accentSoft,
               child: Icon(Icons.add, color: c.accent),
             ),
-            label: sorted.isEmpty ? 'Join a team' : 'New / Join',
+            label: teams.isEmpty ? 'Join a team' : 'New / Join',
             onTap: onNewOrJoin,
             dashed: true,
           ),
