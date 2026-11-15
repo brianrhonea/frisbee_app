@@ -24,6 +24,7 @@ import { BackToStats, StatsGate } from "./SeasonStatsPage";
 import { StatSheetTable } from "./StatSheetTable";
 import { confirmAndDelete, deleteGameMessage, GameRow } from "./StatsHome";
 import "./stats.css";
+import { formatDate } from "@/lib/dates";
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`);
 
@@ -101,7 +102,7 @@ function Tournament({ tournamentId }: { tournamentId: string }) {
       <div className="st-game-head">
         <div>
           <h2 className="card-title">{t.name}</h2>
-          <p className="muted small">{[new Date(t.startDate).toLocaleDateString(), ...(t.location ? [t.location] : []), `${wins}–${losses}`].join(" · ")}</p>
+          <p className="muted small">{[formatDate(t.startDate, { month: "short", day: "numeric", year: "numeric" }), ...(t.location ? [t.location] : []), `${wins}–${losses}`].join(" · ")}</p>
         </div>
         <div className="home-actions">
           {access.keepStats && (

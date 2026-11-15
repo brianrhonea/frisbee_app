@@ -5,16 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
 import { NavIcon } from "./NavIcons";
+import { formatDate as fmt, startOfToday } from "@/lib/dates";
 
 /** Local calendar day, as "2026-11-14". */
 function dayKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-const startOfToday = () => {
-  const n = new Date();
-  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
-};
 
 /** The days an event covers: its start day, through a tournament's last day. */
 function daysOf(startsAt?: string, endsOn?: string): string[] {
@@ -29,7 +26,6 @@ function daysOf(startsAt?: string, endsOn?: string): string[] {
   return days;
 }
 
-const fmt = (d: Date, o: Intl.DateTimeFormatOptions) => d.toLocaleDateString("en-US", o);
 
 /**
  * Public events with a week strip over them, like the app's Schedule: seven

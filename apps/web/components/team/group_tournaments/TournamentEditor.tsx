@@ -26,6 +26,7 @@ import { MembersOnlySection } from "../TeamNav";
 import type { TeamEventDoc } from "../TeamSchedule";
 import { gameTime, shortDay, slotLabel, tournamentDates, tournamentView, tournamentWhen } from "./format";
 import "./group_tournaments.css";
+import { formatDate, toLocalInput } from "@/lib/dates";
 
 /**
  * Sets a tournament up (/teams/:id/tournaments/new, or .../:id/edit):
@@ -96,7 +97,6 @@ const timeInput = (iso: string) => {
   const d = new Date(iso);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
-const localInput = (iso: string | null) => (iso ? `${dateInput(iso)}T${timeInput(iso)}` : "");
 const fromDateInput = (v: string) => {
   const [y, m, d] = v.split("-").map(Number);
   return y && m && d ? new Date(y, m - 1, d) : null;
@@ -466,7 +466,7 @@ function Editor({
           <span className="gt-inline">
             <input
               type="datetime-local"
-              value={localInput(s.idealEndsAt)}
+              value={toLocalInput(s.idealEndsAt)}
               onChange={(e) => {
                 const t = e.target.value ? new Date(e.target.value) : null;
                 updateSettings({ ...s, idealEndsAt: t && !Number.isNaN(t.getTime()) ? t.toISOString() : null });
@@ -767,7 +767,7 @@ function Announcement({
   onDone: () => void;
 }) {
   const { user } = useAuth();
-  const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  const day = (iso: string) => formatDate(iso, { weekday: "long", month: "short", day: "numeric" });
   const last = s.laterDays.at(-1);
   const suggested = `${name}: sign up to play!`;
   const [title, setTitle] = useState(suggested.length <= 100 ? suggested : name);

@@ -16,6 +16,7 @@ import { limit, orderBy } from "firebase/firestore";
 import { useMemo } from "react";
 import { useLiveQuery } from "@/lib/live";
 import type { TeamViewer } from "../TeamContext";
+import { formatDate, formatDateTime } from "@/lib/dates";
 
 type Member = Extract<TeamViewer, { state: "member" }>;
 
@@ -127,8 +128,8 @@ export function badge(g: StatsGame, won: boolean | null): { text: string; tone: 
   return { text: g.finished ? "T" : "LIVE", tone: "live" };
 }
 
-export const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+export const shortDate = (iso: string) => formatDate(iso, { month: "short", day: "numeric" });
 export const dateTime = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  formatDateTime(iso, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export type { StatsGame, StatsTournament, StatsPlayer };

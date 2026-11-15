@@ -1,14 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
+import { formatDate, formatDateTime } from "@/lib/dates";
 
 type Style = "date" | "dateTime" | "relative";
 
 function format(d: Date, style: Style, timeZone?: string): string {
   if (style === "date") {
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone });
+    return formatDate(d, { month: "short", day: "numeric", year: "numeric", timeZone });
   }
   if (style === "dateTime") {
-    return d.toLocaleString("en-US", {
+    return formatDateTime(d, {
       weekday: "short",
       month: "short",
       day: "numeric",

@@ -31,25 +31,12 @@ import { useAuth } from "./AuthProvider";
 import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
 import { type ShareChoice, ShareEventField, shareEvent } from "./team/ShareEvent";
+import { fromLocalInput, startOfToday, toLocalInput } from "@/lib/dates";
 
 const dayMs = 86_400_000;
 const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 const canEdit = (c: CalendarInfo | undefined) => c?.role === "owner" || c?.role === "edit";
 
-/** ISO → the value a datetime-local input takes, in the browser's zone. */
-function toLocalInput(iso?: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
-const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
-
-function startOfToday(): number {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
 
 interface Loaded {
   calendars: CalendarInfo[];
@@ -144,7 +131,7 @@ export function Schedule() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    const from = startOfToday() - dayMs;
+    const from = startOfToday().getTime() - dayMs;
     const qs = new URLSearchParams({
       from: new Date(from).toISOString(),
       to: new Date(from + (calendarWindowDays - 1) * dayMs).toISOString(),
@@ -208,7 +195,7 @@ export function Schedule() {
     ]),
   ];
   // Team entries stop where the calendars' window does, so the list has one horizon.
-  const windowEnd = startOfToday() - dayMs + (calendarWindowDays - 1) * dayMs;
+  const windowEnd = startOfToday().getTime() - dayMs + (calendarWindowDays - 1) * dayMs;
   const upcoming = upcomingSchedule(rows, { now: Date.now(), until: windowEnd, filter, hiddenCalendars: hidden });
 
   /** Team events can be deleted from here by the team's event managers, as the app's swipe does. */

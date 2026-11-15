@@ -1,10 +1,11 @@
 "use client";
 import { type ReactNode, useEffect, useState } from "react";
+import { formatDate } from "@/lib/dates";
 
 function parts(d: Date, timeZone?: string) {
   return {
-    month: d.toLocaleDateString("en-US", { month: "short", timeZone }),
-    day: d.toLocaleDateString("en-US", { day: "numeric", timeZone }),
+    month: formatDate(d, { month: "short", timeZone }),
+    day: formatDate(d, { day: "numeric", timeZone }),
   };
 }
 

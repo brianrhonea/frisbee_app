@@ -15,6 +15,7 @@ import { UsernameStep } from "./UsernameStep";
 import { ForYouFeed, TeamPostPicker } from "./home/ForYou";
 import { MyTeams } from "./MyTeams";
 import { TeamInvites } from "./TeamInvites";
+import { formatDate } from "@/lib/dates";
 
 const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Not going" };
 
@@ -36,7 +37,7 @@ const emptyFeed: Feed = { posts: [], next: null, busy: false, error: false };
 /** "Friday, November 14", in the member's time zone once in the browser. */
 function useToday() {
   const [today, setToday] = useState("");
-  useEffect(() => setToday(new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })), []);
+  useEffect(() => setToday(formatDate(new Date(), { weekday: "long", month: "long", day: "numeric" })), []);
   return today;
 }
 

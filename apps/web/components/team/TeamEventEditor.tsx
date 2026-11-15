@@ -7,15 +7,8 @@ import { newId } from "@/lib/upload";
 import { useAuth } from "../AuthProvider";
 import { rolesInOrder, useTeamHub } from "./TeamContext";
 import type { TeamEventDoc } from "./TeamSchedule";
+import { fromLocalInput, toLocalInput } from "@/lib/dates";
 
-/** ISO → the value a datetime-local input takes, in the browser's zone. */
-function toLocalInput(iso?: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
-const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
 
 /**
  * Adds or edits a team event (members with manageEvents): what, when,

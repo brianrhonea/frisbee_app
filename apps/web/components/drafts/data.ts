@@ -15,6 +15,7 @@ import type { User } from "firebase/auth";
 import { limit } from "firebase/firestore";
 import { callApi } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
+import { formatDate } from "@/lib/dates";
 
 // What the signups and draft views read and write. Reads are Firestore
 // listeners, as the app's (the rules decide who sees signups, drafts and
@@ -64,7 +65,7 @@ export function feeLabel(fee: NonNullable<TournamentDoc["bidFee"]>): string {
   const symbol = fee.currency === "USD" ? "$" : `${fee.currency} `;
   return cents === 0 ? `${symbol}${whole}` : `${symbol}${whole}.${String(cents).padStart(2, "0")}`;
 }
-export const dateLabel = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+export const dateLabel = (iso: string) => formatDate(iso, { year: "numeric", month: "short", day: "numeric" });
 
 /** can(team, perm) in the rules, from the host team doc (null when the caller can't read it). */
 function canOn(team: Record<string, unknown> | null | undefined, uid: string, perm: TeamPermission): boolean {

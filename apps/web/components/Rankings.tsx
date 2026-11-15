@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { Avatar } from "./Avatar";
+import { formatDateTime } from "@/lib/dates";
 
 // Stall 10's own rankings (the `rankings` Cloud Functions, nightly), as the
 // app's Rankings screen shows them: rankings/{level-division} for teams and
@@ -45,7 +46,7 @@ export const rankingLabel = (r: DivisionRanking) => `${cap(r.level ?? "club")} $
 export const rankingOrder = (r: DivisionRanking) => levels.indexOf(r.level ?? "") * 10 + divisions.indexOf(r.division ?? "");
 export const whole = (v: unknown) => (typeof v === "number" ? Math.round(v) : 0);
 const updated = (at?: string) =>
-  at ? ` Updated ${new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.` : "";
+  at ? ` Updated ${formatDateTime(at, { dateStyle: "medium", timeStyle: "short" })}.` : "";
 
 /** Team rankings by division, or player ratings (`?kind=players`). */
 export function Rankings() {

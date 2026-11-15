@@ -15,6 +15,7 @@ import { type Meeting, meetingHref, meetingsHref, useTeamMeetings } from "./meet
 import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { TeamEventEditor } from "./TeamEventEditor";
 import "./team_schedule_meetings.css";
+import { startOfToday } from "@/lib/dates";
 
 /** A team event as members read it (TeamEvent in the app). */
 export interface TeamEventDoc extends PublicEvent {
@@ -44,11 +45,6 @@ const rsvpLabels: Array<[string, string, string]> = [
 ];
 const reactionEmoji: Record<string, string> = { thumbsUp: "👍", fire: "🔥", disc: "🥏", clap: "🙌", laugh: "😂", grimace: "😬" };
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return Timestamp.fromDate(d);
-}
 
 /**
  * The Firestore reads for a member's events: upcoming ones from today
@@ -65,7 +61,7 @@ function startOfToday() {
  * limit would keep the oldest), [pastWindowDays] more days per page.
  */
 export function teamEventQueries(member: Extract<TeamViewer, { state: "member" }>, past = false, lookBackDays = 0, pages = 1) {
-  const today = startOfToday();
+  const today = Timestamp.fromDate(startOfToday());
   const since = lookBackDays > 0 ? Timestamp.fromMillis(today.toMillis() - lookBackDays * day) : today;
   const scoped = member.team.kind === "organization" && !member.can("manageEvents");
   const tomorrow = Timestamp.fromMillis(today.toMillis() + day);

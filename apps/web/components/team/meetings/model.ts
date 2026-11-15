@@ -3,6 +3,7 @@ import type { MeetingRsvp, MeetingStatus } from "@stall10/shared";
 import { limit, orderBy, type QueryConstraint, where } from "firebase/firestore";
 import { type Doc, useLiveQueries } from "@/lib/live";
 import type { TeamViewer } from "../TeamContext";
+import { formatDate, formatTime } from "@/lib/dates";
 
 /** A meeting as members read it (TeamMeeting.fromMap). */
 export interface MeetingData {
@@ -91,8 +92,8 @@ export function useTeamMeetings(teamId: string, viewer: TeamViewer) {
 export function whenLine(m: MeetingData): string {
   if (!m.startsAt) return "";
   const start = new Date(m.startsAt);
-  const day = start.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-  const time = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const day = formatDate(start, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const time = (d: Date) => formatTime(d);
   const end = m.endsAt ? new Date(m.endsAt) : null;
   return `${day} · ${time(start)}${end ? `–${time(end)}` : ""}`;
 }
