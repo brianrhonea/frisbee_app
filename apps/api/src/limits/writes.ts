@@ -25,19 +25,31 @@ export const routeWriteLimits: Record<string, Limit[]> = {
   "DELETE /v1/teams/:teamId": [{ max: 3, windowMs: minute }],
   "POST /v1/conversations": [{ max: 10, windowMs: minute }, { max: 100, windowMs: day }],
   "POST /v1/conversations/groups": [{ max: 5, windowMs: minute }, { max: 30, windowMs: day }],
+  // Publishing a schedule rewrites up to thousands of games.
+  "POST /v1/teams/:teamId/group-tournaments/:tournamentId/schedule": [{ max: 5, windowMs: minute }, { max: 50, windowMs: day }],
+  "PUT /v1/tournaments/:id/divisions/:divisionId/schedule": [{ max: 5, windowMs: minute }, { max: 50, windowMs: day }],
+  // The host's open page asks after each change (debounced); each reads every game and entry.
+  "POST /v1/tournaments/:id/divisions/:divisionId/reconcile": [{ max: 20, windowMs: minute }],
 };
 
 const reads = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
- * Live draft picks and the host's controls skip the any-write count: a
- * host auto-picking a 200-player draft would pass 120 a minute. Their own
- * bucket (draftLimits in drafts/routes.ts) bounds them instead.
+ * Live draft picks and the host's controls skip the any-write count up
+ * front: a host auto-picking a 200-player draft would pass 120 a minute.
+ * Their own bucket (draftLimits in drafts/routes.ts) bounds them, and every
+ * call that fails (a stranger, or someone off the clock) is counted
+ * against the any-write bucket after all (countFailedWrite).
  */
-const ownBucket = new Set([
+export const ownBucket = new Set([
   "POST /v1/tournaments/:tournamentId/divisions/:divisionId/draft/picks",
   "POST /v1/tournaments/:tournamentId/divisions/:divisionId/draft/control",
 ]);
+
+/** Counts a failed exempt write against [uid]'s any-write bucket; false once it's over. */
+export function countFailedWrite(limiter: MemoryRateLimiter, uid: string): boolean {
+  return limiter.admit(`any:${uid}`, anyWriteLimit);
+}
 
 /**
  * Counts each signed-in caller's writes in memory (per instance, so the

@@ -401,9 +401,15 @@ service cloud.firestore {
     match /teams/{teamId} {
       allow read: if signedIn() && isMember(resource.data);
 
+      // League teams' ids (league_{tournamentId}_{draftId}) are guessable,
+      // and only the server makes those teams (createLeagueTeams).
+      function serverOnlyId() {
+        return teamId.matches('league_.*');
+      }
+
       // Creator becomes sole owner. Invite codes are minted later, and
       // only for as long as an admin shows or shares one (inviteCodes).
-      allow create: if signedIn() && notMuted()
+      allow create: if signedIn() && notMuted() && !serverOnlyId()
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
              'memberIds', 'memberNames', 'createdAt', 'orgId', 'orgName',
@@ -418,7 +424,7 @@ service cloud.firestore {
 
       // A community group: same owner checks, plus its group fields, and
       // no invite code since anyone can find and join it.
-      allow create: if signedIn() && notMuted()
+      allow create: if signedIn() && notMuted() && !serverOnlyId()
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
              'memberIds', 'memberNames', 'createdAt', 'kind', 'description',

@@ -427,9 +427,17 @@ export class DraftService {
       if (!fresh || JSON.stringify(draftedTeams(fresh.teams)) !== JSON.stringify(drafted)) {
         throw fail("The teams changed while they were being created. Try again.");
       }
-      // A team made by an earlier, interrupted attempt keeps its own doc.
+      // A team made by an earlier, interrupted attempt keeps its own doc;
+      // anything else at that id (someone who guessed it first) stops us.
       const existing = new Set<string>();
-      for (const id of ids) if (await tx.get(p.team(id))) existing.add(id);
+      for (const [i, id] of ids.entries()) {
+        const doc = await tx.get(p.team(id));
+        if (!doc) continue;
+        if (!madeForLeague(doc, tournamentId, tournament.hostId, drafted[i].captainId)) {
+          throw fail(`A team already uses the id for ${drafted[i].name}, and it isn't this league's. Ask us to remove it, then try again.`);
+        }
+        existing.add(id);
+      }
       drafted.forEach((team: DraftedTeam, i) => {
         const teamId = ids[i];
         if (!existing.has(teamId)) {
@@ -447,4 +455,13 @@ export class DraftService {
     });
     return { created, teams: ids.map((teamId, i) => ({ teamId, name: drafted[i].name })) };
   }
+}
+
+/**
+ * Whether [team], already at a league team's id, is the one an earlier
+ * attempt made: leagueHostId is the server's alone (the team create rule
+ * doesn't allow it), and the captain owns it.
+ */
+function madeForLeague(team: Data, tournamentId: string, hostId: unknown, captainId: string | null): boolean {
+  return team.leagueId === tournamentId && team.leagueHostId === (hostId ?? null) && team.ownerId === captainId;
 }

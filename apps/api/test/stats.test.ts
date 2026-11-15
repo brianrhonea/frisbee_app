@@ -172,7 +172,10 @@ describe("stats games: one conjunct each", () => {
     const actions = Array(statsLimits.actionsPerPoint + 1).fill({ kind: "theirTurnover" });
     expect(await bad(game({ points: [{ line, startedOn: "defense", actions, result: null }] }))).toBe(400);
     const big = Array(statsLimits.actionsPerPoint).fill({ kind: "catch_", playerId: "x".repeat(128), throwerId: "y".repeat(128) });
-    expect(await bad(game({ points: Array(4).fill({ line, startedOn: "offense", actions: big, result: null }) }))).toBe(400);
+    // Past the API's 64 KB default body limit but under gameBytes: saved (its own bodyLimit).
+    expect(await bad(game({ points: Array(4).fill({ line, startedOn: "offense", actions: big, result: null }) }))).toBe(201);
+    // Over gameBytes (900 KB): the schema turns it down.
+    expect(await bad(game({ points: Array(7).fill({ line, startedOn: "offense", actions: big, result: null }) }))).toBe(400);
   });
 });
 

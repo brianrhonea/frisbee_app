@@ -1,8 +1,8 @@
 // Team videos and folders, following the videos and videoFolders rules:
 // one test per conjunct of each allow expression (and validVideo/validFile).
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.js";
-import { folderScanLimit, unsortChunk } from "../src/videos/service.js";
+import { unsortChunk } from "../src/videos/service.js";
 import { FakeMediaStorage, FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.UTC(2026, 10, 14, 12);
@@ -243,6 +243,20 @@ describe("removing a video (delete rule)", () => {
     expect(media.files.has("teams/t1/videos/v2/game.mp4")).toBe(false);
   });
 
+  it("a file that won't delete is logged, and the video still goes", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    media.delete = async () => {
+      throw new Error("storage down");
+    };
+    try {
+      expect((await call("DELETE", "/v1/teams/t1/videos/v2")).status).toBe(204);
+      expect(store.doc("teams/t1/videos/v2")).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith("video t1/v2: file teams/t1/videos/v2/game.mp4 not deleted", expect.any(Error));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("never deletes a stored path outside the video's own folder", async () => {
     media.files.set("users/owner/profile/me.jpg", { data: Buffer.from("x") });
     store.put("teams/t1/videos/v2", { ...fileVideo, file: goodFile("users/owner/profile/me.jpg") });
@@ -303,7 +317,7 @@ describe("folders (videoFolders rules)", () => {
     const n = unsortChunk + 5;
     for (let i = 0; i < n; i++) store.put(`teams/t1/videos/m${String(i).padStart(4, "0")}`, { ...youTubeVideo, folderId: "f1" });
     expect((await call("DELETE", "/v1/teams/t1/video-folders/f1")).status).toBe(204);
-    const left = (await store.list("teams/t1/videos", folderScanLimit)).filter((v) => v.data.folderId === "f1");
+    const left = (await store.list("teams/t1/videos", 5000)).filter((v) => v.data.folderId === "f1");
     expect(left).toHaveLength(0);
   });
 

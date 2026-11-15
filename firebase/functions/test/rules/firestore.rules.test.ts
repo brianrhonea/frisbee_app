@@ -105,6 +105,24 @@ describe("team create", () => {
     await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam()));
   });
 
+  it("refuses a league team's id, for teams and groups alike: only the server makes those", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "tournaments", "t1"), { hostId: "host1", teamEntry: true, status: "registration" }),
+    );
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "league_t1_team1"), newTeam()));
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "league_t1_team1"), newTeam({ leagueId: "t1" })));
+    await assertFails(
+      setDoc(doc(db(OUTSIDER), "teams", "league_t1_team2"), newTeam({ kind: "community", description: "", requiresApproval: false, location: null })),
+    );
+    // Nor can anyone forge the server's league host mark.
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t3"), newTeam({ leagueId: "t1", leagueHostId: "host1" })));
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "t3"), newTeam({ leagueId: "t1" })));
+    await assertSucceeds(
+      setDoc(doc(db(OUTSIDER), "teams", "t4"), newTeam({ kind: "community", description: "", requiresApproval: false, location: null })),
+    );
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "myleague_team"), newTeam()));
+  });
+
   it("rejects a team that keeps an invite code on the team doc", async () => {
     await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam({ inviteCode: "ZZZ999" })));
   });

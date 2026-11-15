@@ -155,6 +155,20 @@ describe("captains' draft callables", { timeout: 60_000 }, () => {
     expect(Object.keys(division?.captains ?? {})).toHaveLength(3);
   });
 
+  it("refuses a team someone else made at a league team's id", async () => {
+    const id = await league();
+    const args = { tournamentId: id, divisionId: DIV };
+    await call(startDraft, "director", { ...args, captainIds: ["p0", "p1"] });
+    for (let i = 0; i < 4; i++) await call(draftControl, "director", { ...args, action: "autopick" });
+    await call(finishDraft, "director", args);
+    // Made through the client's team create rule: leagueId, but no leagueHostId.
+    await db.doc(`teams/league_${id}_team1`).set({ name: "Mine", ownerId: "squatter", leagueId: id });
+    await expect(call(createLeagueTeams, "director", args)).rejects.toMatchObject({ code: "failed-precondition" });
+    const division = (await db.doc(`tournaments/${id}/divisions/${DIV}`).get()).data();
+    expect(division?.seeds).toEqual(["team1", "team2"]);
+    expect((await db.doc(`tournaments/${id}/entries/league_${id}_team1`).get()).exists).toBe(false);
+  });
+
   it("cancelling clears the draft so it can start again", async () => {
     const id = await league();
     const args = { tournamentId: id, divisionId: DIV };

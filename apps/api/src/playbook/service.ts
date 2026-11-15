@@ -9,7 +9,7 @@ import { ApiError, fromZod } from "../errors.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
 import type { MemoryRateLimiter } from "../limits/memory.js";
-import { type DocStore, serverTime } from "../store.js";
+import { type DocStore, serverTime, type Tx } from "../store.js";
 import { can, isMember } from "../teams/access.js";
 
 function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
@@ -41,8 +41,9 @@ function playFields(p: SavePlayInput, uid: string) {
 export class PlaybookService {
   constructor(private readonly store: DocStore) {}
 
-  private async editor(teamId: string, caller: Caller) {
-    const team = await this.store.get(`teams/${teamId}`);
+  /** The team, read in the write's transaction, if the caller may edit its plays. */
+  private async editor(tx: Pick<Tx, "get">, teamId: string, caller: Caller) {
+    const team = await tx.get(`teams/${teamId}`);
     if (!team) throw new ApiError("not_found", "That team doesn't exist.");
     if (!isMember(team, caller.uid) || !can(team, caller.uid, "manageTeam")) throw denied();
   }
@@ -50,9 +51,9 @@ export class PlaybookService {
   async create(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
     const play = parse(savePlayRequestSchema, body);
-    await this.editor(teamId, caller);
     const id = this.store.newId(`teams/${teamId}/plays`);
     await this.store.transact(async (tx) => {
+      await this.editor(tx, teamId, caller);
       tx.create(`teams/${teamId}/plays/${id}`, playFields(play, caller.uid));
     });
     return { id };
@@ -62,8 +63,8 @@ export class PlaybookService {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawPlay);
     const play = parse(savePlayRequestSchema, body);
-    await this.editor(teamId, caller);
     await this.store.transact(async (tx) => {
+      await this.editor(tx, teamId, caller);
       if (!(await tx.get(`teams/${teamId}/plays/${id}`))) throw new ApiError("not_found", "That play doesn't exist.");
       tx.set(`teams/${teamId}/plays/${id}`, playFields(play, caller.uid));
     });
@@ -72,8 +73,8 @@ export class PlaybookService {
   async remove(caller: Caller, rawTeam: unknown, rawPlay: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawPlay);
-    await this.editor(teamId, caller);
     await this.store.transact(async (tx) => {
+      await this.editor(tx, teamId, caller);
       tx.delete(`teams/${teamId}/plays/${id}`);
     });
   }

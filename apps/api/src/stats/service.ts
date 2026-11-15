@@ -17,6 +17,7 @@ import type { z } from "zod";
 import type { Caller } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { docIdParam } from "../ids.js";
+import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { can, isMember, own, roleIn, strings } from "../teams/access.js";
 
@@ -31,8 +32,6 @@ export function canKeepStats(t: Data, uid: string): boolean {
   return can(t, uid, "keepStats") || roleIn(t, uid) === "stats" || (isMember(t, uid) && strings(t.statKeepers).includes(uid));
 }
 
-/** Most of a team's games read to find a tournament's (DocStore lists by id, with no query). */
-export const gamesScanMax = 5000;
 /** Deletes per transaction (Firestore allows 500 writes). */
 const deleteChunk = 400;
 
@@ -79,7 +78,10 @@ function tournamentFields(t: SaveStatsTournamentInput): Data {
 }
 
 export class StatsService {
-  constructor(private readonly store: DocStore) {}
+  constructor(
+    private readonly store: DocStore,
+    private readonly queries: DocQueries,
+  ) {}
 
   /** The team, read in [tx], if the caller keeps its stats. */
   private async keeper(get: (path: string) => Promise<Data | null>, teamId: string, uid: string) {
@@ -155,15 +157,14 @@ export class StatsService {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
     await this.keeper((p) => this.store.get(p), teamId, caller.uid);
-    const all = await this.store.list(paths.games(teamId), gamesScanMax + 1);
-    // Never leave games behind that would still count in season totals.
-    if (all.length > gamesScanMax) throw new ApiError("failed_precondition", "This team has too many games to delete a tournament here.");
-    const games = all.filter((g) => g.data.tournamentId === id).map((g) => docIdParam(g.id));
-    for (let i = 0; i < games.length; i += deleteChunk) {
-      const chunk = games.slice(i, i + deleteChunk);
+    // Never leave games behind that would still count in season totals:
+    // a page of the tournament's game ids at a time, until none are left.
+    for (;;) {
+      const games = (await this.queries.ids(paths.games(teamId), deleteChunk, { tournamentId: id })).map((g) => docIdParam(g));
+      if (games.length === 0) break;
       await this.store.transact(async (tx) => {
         await this.keeper((p) => tx.get(p), teamId, caller.uid);
-        for (const g of chunk) tx.delete(paths.game(teamId, g));
+        for (const g of games) tx.delete(paths.game(teamId, g));
       });
     }
     await this.store.transact(async (tx) => {

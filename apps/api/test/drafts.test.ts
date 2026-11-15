@@ -219,6 +219,18 @@ describe("pick rate", () => {
     for (let i = 0; i < 150; i++) expect((await control("autopick")).status).toBe(204);
   });
 
+  it("a stranger hammering picks is counted against the global cap: 429 by the 121st", async () => {
+    seed(42);
+    await start(["p0", "p1"]);
+    const codes: number[] = [];
+    for (let i = 0; i < 125; i++) codes.push((await pick("stranger", "p2")).status);
+    expect(codes.slice(0, 120)).toEqual(Array(120).fill(403));
+    expect(codes[120]).toBe(429);
+    // And their other writes are capped too, while the host's picks go on.
+    expect((await call("PUT", `/v1/tournaments/${T}/signups/me`, {}, "stranger")).status).toBe(429);
+    expect((await control("autopick")).status).toBe(204);
+  });
+
   it("captains alternating fast are only bounded by the pool", async () => {
     seed(42);
     await start(["p0", "p1"]);
@@ -298,10 +310,30 @@ describe("league teams (createLeagueTeams)", () => {
   });
 
   it("keeps a team an interrupted attempt already made", async () => {
-    store.put(`teams/league_${T}_team1`, { name: "Kept", ownerId: "p0" });
+    store.put(`teams/league_${T}_team1`, { name: "Kept", ownerId: "p0", leagueId: T, leagueHostId: "host" });
     expect((await createTeams()).json().created).toBe(1);
     expect(store.doc(`teams/league_${T}_team1`)?.name).toBe("Kept");
     expect(store.doc(`tournaments/${T}/entries/league_${T}_team1`)).toBeDefined();
+  });
+
+  it("refuses a team someone else made at a league team's id (412), writing nothing", async () => {
+    const before = structuredClone(divisionOf());
+    // As the client's team create rule could have made it: leagueId, but no server-only leagueHostId.
+    for (const squat of [
+      { name: "Mine", ownerId: "squatter", leagueId: T },
+      { name: "Mine", ownerId: "p0", leagueId: T },
+      { name: "Mine", ownerId: "squatter", leagueId: T, leagueHostId: "host" },
+      { name: "Mine", ownerId: "p0", leagueId: "other", leagueHostId: "host" },
+      { name: "Mine", ownerId: "p0", leagueId: T, leagueHostId: "elsewhere" },
+    ]) {
+      store.put(`teams/league_${T}_team1`, squat);
+      const res = await createTeams();
+      expect(res.status).toBe(412);
+      expect(res.json().error.message).toMatch(/already uses the id for Reds/);
+      expect(store.doc(`tournaments/${T}/entries/league_${T}_team1`)).toBeUndefined();
+      expect(store.doc(`teams/league_${T}_team2`)).toBeUndefined();
+      expect(divisionOf()).toEqual(before);
+    }
   });
 
   it("refuses non-organizers, tournaments, a published schedule and unaccepted players", async () => {
@@ -343,6 +375,9 @@ describe("saving drafted teams", () => {
     expect((await save({ teams: [teams[0]] })).json().error.message).toBe("Make at least two teams.");
     expect((await save({ teams: [teams[0], { ...teams[1], name: "reds" }] })).json().error.message).toBe("Team names must be different.");
     expect((await save({ teams: [teams[0], { ...teams[1], id: "x/y" }] })).status).toBe(400);
+    // Real league teams' ids are the server's: a client can't make its teams look created.
+    expect((await save({ teams: [teams[0], { ...teams[1], id: `league_${T}_team2` }] })).status).toBe(400);
+    expect((await save({ teams: teams.map((t, i) => ({ ...t, id: `league_${T}_team${i + 1}` })) })).status).toBe(400);
     await save({ teams });
     store.put(`tournaments/${T}/divisions/${DIV}/games/g1`, { order: 1 });
     expect((await save({ teams: [...teams, { id: "team3", name: "Greens", captainId: null, playerIds: ["p4"], playerNames: {} }] })).json().error.message).toMatch(/only be adjusted/);
