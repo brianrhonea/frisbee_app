@@ -1,0 +1,547 @@
+{
+  "about": "standings(teamIds, games): each row in rank order.",
+  "cases": [
+    {
+      "name": "wins first",
+      "teamIds": [
+        "a",
+        "b",
+        "c"
+      ],
+      "games": [
+        {
+          "id": "1",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "a",
+          "teamB": "b",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 10,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "2",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "b",
+          "teamB": "c",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 4,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "3",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "a",
+          "teamB": "c",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 9,
+          "report": null,
+          "ifNeeded": false
+        }
+      ],
+      "expected": [
+        {
+          "teamId": "a",
+          "wins": 2,
+          "losses": 0,
+          "pointsFor": 26,
+          "pointsAgainst": 19
+        },
+        {
+          "teamId": "b",
+          "wins": 1,
+          "losses": 1,
+          "pointsFor": 23,
+          "pointsAgainst": 17
+        },
+        {
+          "teamId": "c",
+          "wins": 0,
+          "losses": 2,
+          "pointsFor": 13,
+          "pointsAgainst": 26
+        }
+      ]
+    },
+    {
+      "name": "head to head breaks a two-way tie over point differential",
+      "teamIds": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "games": [
+        {
+          "id": "1",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "a",
+          "teamB": "b",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 10,
+          "scoreB": 13,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "2",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "a",
+          "teamB": "c",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 1,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "3",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "a",
+          "teamB": "d",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 2,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "4",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "b",
+          "teamB": "c",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 9,
+          "scoreB": 13,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "5",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "b",
+          "teamB": "d",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 12,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "6",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "c",
+          "teamB": "d",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 5,
+          "scoreB": 13,
+          "report": null,
+          "ifNeeded": false
+        }
+      ],
+      "expected": [
+        {
+          "teamId": "b",
+          "wins": 2,
+          "losses": 1,
+          "pointsFor": 35,
+          "pointsAgainst": 35
+        },
+        {
+          "teamId": "a",
+          "wins": 2,
+          "losses": 1,
+          "pointsFor": 36,
+          "pointsAgainst": 16
+        },
+        {
+          "teamId": "d",
+          "wins": 1,
+          "losses": 2,
+          "pointsFor": 27,
+          "pointsAgainst": 31
+        },
+        {
+          "teamId": "c",
+          "wins": 1,
+          "losses": 2,
+          "pointsFor": 19,
+          "pointsAgainst": 35
+        }
+      ]
+    },
+    {
+      "name": "three-way tie: head to head even, then point differential",
+      "teamIds": [
+        "a",
+        "b",
+        "c"
+      ],
+      "games": [
+        {
+          "id": "1",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "a",
+          "teamB": "b",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 11,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "2",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "b",
+          "teamB": "c",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 5,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "3",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "c",
+          "teamB": "a",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 12,
+          "report": null,
+          "ifNeeded": false
+        }
+      ],
+      "expected": [
+        {
+          "teamId": "b",
+          "wins": 1,
+          "losses": 1,
+          "pointsFor": 24,
+          "pointsAgainst": 18
+        },
+        {
+          "teamId": "a",
+          "wins": 1,
+          "losses": 1,
+          "pointsFor": 25,
+          "pointsAgainst": 24
+        },
+        {
+          "teamId": "c",
+          "wins": 1,
+          "losses": 1,
+          "pointsFor": 18,
+          "pointsAgainst": 25
+        }
+      ]
+    },
+    {
+      "name": "then points scored, then seed order",
+      "teamIds": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "games": [
+        {
+          "id": "1",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "a",
+          "teamB": "b",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 11,
+          "scoreB": 13,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "2",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "b",
+          "teamB": "c",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 9,
+          "scoreB": 11,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "3",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "c",
+          "teamB": "a",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 15,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "4",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "d",
+          "teamB": "a",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 5,
+          "scoreB": 13,
+          "report": null,
+          "ifNeeded": false
+        }
+      ],
+      "expected": [
+        {
+          "teamId": "a",
+          "wins": 2,
+          "losses": 1,
+          "pointsFor": 39,
+          "pointsAgainst": 31
+        },
+        {
+          "teamId": "c",
+          "wins": 1,
+          "losses": 1,
+          "pointsFor": 24,
+          "pointsAgainst": 24
+        },
+        {
+          "teamId": "b",
+          "wins": 1,
+          "losses": 1,
+          "pointsFor": 22,
+          "pointsAgainst": 22
+        },
+        {
+          "teamId": "d",
+          "wins": 0,
+          "losses": 1,
+          "pointsFor": 5,
+          "pointsAgainst": 13
+        }
+      ]
+    },
+    {
+      "name": "unplayed and outside games are ignored",
+      "teamIds": [
+        "a",
+        "b",
+        "c"
+      ],
+      "games": [
+        {
+          "id": "1",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "a",
+          "teamB": "b",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 4,
+          "scoreB": 13,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "2",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "a",
+          "teamB": "x",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "done",
+          "scoreA": 13,
+          "scoreB": 0,
+          "report": null,
+          "ifNeeded": false
+        },
+        {
+          "id": "3",
+          "order": 0,
+          "stage": "pool",
+          "round": 1,
+          "label": "",
+          "pool": "A",
+          "field": 1,
+          "startsAt": null,
+          "teamA": "b",
+          "teamB": "c",
+          "sourceA": null,
+          "sourceB": null,
+          "status": "reported",
+          "scoreA": 13,
+          "scoreB": 0,
+          "report": null,
+          "ifNeeded": false
+        }
+      ],
+      "expected": [
+        {
+          "teamId": "b",
+          "wins": 1,
+          "losses": 0,
+          "pointsFor": 13,
+          "pointsAgainst": 4
+        },
+        {
+          "teamId": "c",
+          "wins": 0,
+          "losses": 0,
+          "pointsFor": 0,
+          "pointsAgainst": 0
+        },
+        {
+          "teamId": "a",
+          "wins": 0,
+          "losses": 1,
+          "pointsFor": 4,
+          "pointsAgainst": 13
+        }
+      ]
+    }
+  ]
+}

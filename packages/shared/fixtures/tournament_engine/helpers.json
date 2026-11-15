@@ -1,0 +1,1385 @@
+{
+  "about": "roundRobin, seedOrder, suggestedPools, suggestedFormat, ordinal, gamesPerDay, poolName and scoreError.",
+  "cases": [
+    {
+      "name": "roundRobin",
+      "cases": [
+        {
+          "teams": [],
+          "rounds": []
+        },
+        {
+          "teams": [
+            "t1"
+          ],
+          "rounds": [
+            []
+          ]
+        },
+        {
+          "teams": [
+            "t1",
+            "t2"
+          ],
+          "rounds": [
+            [
+              [
+                "t1",
+                "t2"
+              ]
+            ]
+          ]
+        },
+        {
+          "teams": [
+            "t1",
+            "t2",
+            "t3"
+          ],
+          "rounds": [
+            [
+              [
+                "t2",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t2"
+              ]
+            ]
+          ]
+        },
+        {
+          "teams": [
+            "t1",
+            "t2",
+            "t3",
+            "t4"
+          ],
+          "rounds": [
+            [
+              [
+                "t1",
+                "t4"
+              ],
+              [
+                "t2",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t3"
+              ],
+              [
+                "t4",
+                "t2"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t2"
+              ],
+              [
+                "t3",
+                "t4"
+              ]
+            ]
+          ]
+        },
+        {
+          "teams": [
+            "t1",
+            "t2",
+            "t3",
+            "t4",
+            "t5"
+          ],
+          "rounds": [
+            [
+              [
+                "t2",
+                "t5"
+              ],
+              [
+                "t3",
+                "t4"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t5"
+              ],
+              [
+                "t2",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t4"
+              ],
+              [
+                "t5",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t3"
+              ],
+              [
+                "t4",
+                "t2"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t2"
+              ],
+              [
+                "t4",
+                "t5"
+              ]
+            ]
+          ]
+        },
+        {
+          "teams": [
+            "t1",
+            "t2",
+            "t3",
+            "t4",
+            "t5",
+            "t6"
+          ],
+          "rounds": [
+            [
+              [
+                "t1",
+                "t6"
+              ],
+              [
+                "t2",
+                "t5"
+              ],
+              [
+                "t3",
+                "t4"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t5"
+              ],
+              [
+                "t6",
+                "t4"
+              ],
+              [
+                "t2",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t4"
+              ],
+              [
+                "t5",
+                "t3"
+              ],
+              [
+                "t6",
+                "t2"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t3"
+              ],
+              [
+                "t4",
+                "t2"
+              ],
+              [
+                "t5",
+                "t6"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t2"
+              ],
+              [
+                "t3",
+                "t6"
+              ],
+              [
+                "t4",
+                "t5"
+              ]
+            ]
+          ]
+        },
+        {
+          "teams": [
+            "t1",
+            "t2",
+            "t3",
+            "t4",
+            "t5",
+            "t6",
+            "t7"
+          ],
+          "rounds": [
+            [
+              [
+                "t2",
+                "t7"
+              ],
+              [
+                "t3",
+                "t6"
+              ],
+              [
+                "t4",
+                "t5"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t7"
+              ],
+              [
+                "t2",
+                "t5"
+              ],
+              [
+                "t3",
+                "t4"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t6"
+              ],
+              [
+                "t7",
+                "t5"
+              ],
+              [
+                "t2",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t5"
+              ],
+              [
+                "t6",
+                "t4"
+              ],
+              [
+                "t7",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t4"
+              ],
+              [
+                "t5",
+                "t3"
+              ],
+              [
+                "t6",
+                "t2"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t3"
+              ],
+              [
+                "t4",
+                "t2"
+              ],
+              [
+                "t6",
+                "t7"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t2"
+              ],
+              [
+                "t4",
+                "t7"
+              ],
+              [
+                "t5",
+                "t6"
+              ]
+            ]
+          ]
+        },
+        {
+          "teams": [
+            "t1",
+            "t2",
+            "t3",
+            "t4",
+            "t5",
+            "t6",
+            "t7",
+            "t8"
+          ],
+          "rounds": [
+            [
+              [
+                "t1",
+                "t8"
+              ],
+              [
+                "t2",
+                "t7"
+              ],
+              [
+                "t3",
+                "t6"
+              ],
+              [
+                "t4",
+                "t5"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t7"
+              ],
+              [
+                "t8",
+                "t6"
+              ],
+              [
+                "t2",
+                "t5"
+              ],
+              [
+                "t3",
+                "t4"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t6"
+              ],
+              [
+                "t7",
+                "t5"
+              ],
+              [
+                "t8",
+                "t4"
+              ],
+              [
+                "t2",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t5"
+              ],
+              [
+                "t6",
+                "t4"
+              ],
+              [
+                "t7",
+                "t3"
+              ],
+              [
+                "t8",
+                "t2"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t4"
+              ],
+              [
+                "t5",
+                "t3"
+              ],
+              [
+                "t6",
+                "t2"
+              ],
+              [
+                "t7",
+                "t8"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t3"
+              ],
+              [
+                "t4",
+                "t2"
+              ],
+              [
+                "t5",
+                "t8"
+              ],
+              [
+                "t6",
+                "t7"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t2"
+              ],
+              [
+                "t3",
+                "t8"
+              ],
+              [
+                "t4",
+                "t7"
+              ],
+              [
+                "t5",
+                "t6"
+              ]
+            ]
+          ]
+        },
+        {
+          "teams": [
+            "t1",
+            "t2",
+            "t3",
+            "t4",
+            "t5",
+            "t6",
+            "t7",
+            "t8",
+            "t9"
+          ],
+          "rounds": [
+            [
+              [
+                "t2",
+                "t9"
+              ],
+              [
+                "t3",
+                "t8"
+              ],
+              [
+                "t4",
+                "t7"
+              ],
+              [
+                "t5",
+                "t6"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t9"
+              ],
+              [
+                "t2",
+                "t7"
+              ],
+              [
+                "t3",
+                "t6"
+              ],
+              [
+                "t4",
+                "t5"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t8"
+              ],
+              [
+                "t9",
+                "t7"
+              ],
+              [
+                "t2",
+                "t5"
+              ],
+              [
+                "t3",
+                "t4"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t7"
+              ],
+              [
+                "t8",
+                "t6"
+              ],
+              [
+                "t9",
+                "t5"
+              ],
+              [
+                "t2",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t6"
+              ],
+              [
+                "t7",
+                "t5"
+              ],
+              [
+                "t8",
+                "t4"
+              ],
+              [
+                "t9",
+                "t3"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t5"
+              ],
+              [
+                "t6",
+                "t4"
+              ],
+              [
+                "t7",
+                "t3"
+              ],
+              [
+                "t8",
+                "t2"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t4"
+              ],
+              [
+                "t5",
+                "t3"
+              ],
+              [
+                "t6",
+                "t2"
+              ],
+              [
+                "t8",
+                "t9"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t3"
+              ],
+              [
+                "t4",
+                "t2"
+              ],
+              [
+                "t6",
+                "t9"
+              ],
+              [
+                "t7",
+                "t8"
+              ]
+            ],
+            [
+              [
+                "t1",
+                "t2"
+              ],
+              [
+                "t4",
+                "t9"
+              ],
+              [
+                "t5",
+                "t8"
+              ],
+              [
+                "t6",
+                "t7"
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "seedOrder",
+      "cases": [
+        {
+          "size": 1,
+          "order": [
+            1
+          ]
+        },
+        {
+          "size": 2,
+          "order": [
+            1,
+            2
+          ]
+        },
+        {
+          "size": 4,
+          "order": [
+            1,
+            4,
+            2,
+            3
+          ]
+        },
+        {
+          "size": 8,
+          "order": [
+            1,
+            8,
+            4,
+            5,
+            2,
+            7,
+            3,
+            6
+          ]
+        },
+        {
+          "size": 16,
+          "order": [
+            1,
+            16,
+            8,
+            9,
+            4,
+            13,
+            5,
+            12,
+            2,
+            15,
+            7,
+            10,
+            3,
+            14,
+            6,
+            11
+          ]
+        },
+        {
+          "size": 32,
+          "order": [
+            1,
+            32,
+            16,
+            17,
+            8,
+            25,
+            9,
+            24,
+            4,
+            29,
+            13,
+            20,
+            5,
+            28,
+            12,
+            21,
+            2,
+            31,
+            15,
+            18,
+            7,
+            26,
+            10,
+            23,
+            3,
+            30,
+            14,
+            19,
+            6,
+            27,
+            11,
+            22
+          ]
+        }
+      ]
+    },
+    {
+      "name": "suggestedPools and suggestedFormat",
+      "cases": [
+        {
+          "teams": 2,
+          "pools": 1,
+          "format": "roundRobin"
+        },
+        {
+          "teams": 3,
+          "pools": 1,
+          "format": "roundRobin"
+        },
+        {
+          "teams": 4,
+          "pools": 1,
+          "format": "roundRobin"
+        },
+        {
+          "teams": 5,
+          "pools": 1,
+          "format": "roundRobin"
+        },
+        {
+          "teams": 6,
+          "pools": 1,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 7,
+          "pools": 2,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 8,
+          "pools": 2,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 9,
+          "pools": 2,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 10,
+          "pools": 2,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 11,
+          "pools": 2,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 12,
+          "pools": 3,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 13,
+          "pools": 3,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 14,
+          "pools": 3,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 15,
+          "pools": 3,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 16,
+          "pools": 4,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 17,
+          "pools": 4,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 18,
+          "pools": 4,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 19,
+          "pools": 4,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 20,
+          "pools": 4,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 21,
+          "pools": 5,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 22,
+          "pools": 5,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 23,
+          "pools": 5,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 24,
+          "pools": 5,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 25,
+          "pools": 6,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 26,
+          "pools": 6,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 27,
+          "pools": 6,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 28,
+          "pools": 6,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 29,
+          "pools": 6,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 30,
+          "pools": 7,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 31,
+          "pools": 7,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 32,
+          "pools": 7,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 33,
+          "pools": 7,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 34,
+          "pools": 8,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 35,
+          "pools": 8,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 36,
+          "pools": 8,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 37,
+          "pools": 8,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 38,
+          "pools": 8,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 39,
+          "pools": 9,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 40,
+          "pools": 9,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 41,
+          "pools": 9,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 42,
+          "pools": 9,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 43,
+          "pools": 10,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 44,
+          "pools": 10,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 45,
+          "pools": 10,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 46,
+          "pools": 10,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 47,
+          "pools": 10,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 48,
+          "pools": 11,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 49,
+          "pools": 11,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 50,
+          "pools": 11,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 51,
+          "pools": 11,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 52,
+          "pools": 12,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 53,
+          "pools": 12,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 54,
+          "pools": 12,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 55,
+          "pools": 12,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 56,
+          "pools": 12,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 57,
+          "pools": 13,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 58,
+          "pools": 13,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 59,
+          "pools": 13,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 60,
+          "pools": 13,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 61,
+          "pools": 14,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 62,
+          "pools": 14,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 63,
+          "pools": 14,
+          "format": "poolsPlacement"
+        },
+        {
+          "teams": 64,
+          "pools": 14,
+          "format": "poolsPlacement"
+        }
+      ]
+    },
+    {
+      "name": "ordinal",
+      "cases": [
+        {
+          "n": 1,
+          "text": "1st"
+        },
+        {
+          "n": 2,
+          "text": "2nd"
+        },
+        {
+          "n": 3,
+          "text": "3rd"
+        },
+        {
+          "n": 4,
+          "text": "4th"
+        },
+        {
+          "n": 5,
+          "text": "5th"
+        },
+        {
+          "n": 6,
+          "text": "6th"
+        },
+        {
+          "n": 7,
+          "text": "7th"
+        },
+        {
+          "n": 8,
+          "text": "8th"
+        },
+        {
+          "n": 9,
+          "text": "9th"
+        },
+        {
+          "n": 10,
+          "text": "10th"
+        },
+        {
+          "n": 11,
+          "text": "11th"
+        },
+        {
+          "n": 12,
+          "text": "12th"
+        },
+        {
+          "n": 13,
+          "text": "13th"
+        },
+        {
+          "n": 14,
+          "text": "14th"
+        },
+        {
+          "n": 15,
+          "text": "15th"
+        },
+        {
+          "n": 16,
+          "text": "16th"
+        },
+        {
+          "n": 17,
+          "text": "17th"
+        },
+        {
+          "n": 18,
+          "text": "18th"
+        },
+        {
+          "n": 19,
+          "text": "19th"
+        },
+        {
+          "n": 20,
+          "text": "20th"
+        },
+        {
+          "n": 21,
+          "text": "21st"
+        },
+        {
+          "n": 22,
+          "text": "22nd"
+        },
+        {
+          "n": 23,
+          "text": "23rd"
+        },
+        {
+          "n": 24,
+          "text": "24th"
+        },
+        {
+          "n": 25,
+          "text": "25th"
+        },
+        {
+          "n": 100,
+          "text": "100th"
+        },
+        {
+          "n": 101,
+          "text": "101st"
+        },
+        {
+          "n": 102,
+          "text": "102nd"
+        },
+        {
+          "n": 103,
+          "text": "103rd"
+        },
+        {
+          "n": 104,
+          "text": "104th"
+        },
+        {
+          "n": 111,
+          "text": "111th"
+        },
+        {
+          "n": 112,
+          "text": "112th"
+        },
+        {
+          "n": 113,
+          "text": "113th"
+        },
+        {
+          "n": 121,
+          "text": "121st"
+        },
+        {
+          "n": 1011,
+          "text": "1011th"
+        }
+      ]
+    },
+    {
+      "name": "gamesPerDay",
+      "cases": [
+        {
+          "total": 0,
+          "days": 1,
+          "perDay": [
+            0
+          ]
+        },
+        {
+          "total": 7,
+          "days": 1,
+          "perDay": [
+            7
+          ]
+        },
+        {
+          "total": 7,
+          "days": 2,
+          "perDay": [
+            4,
+            3
+          ]
+        },
+        {
+          "total": 7,
+          "days": 3,
+          "perDay": [
+            3,
+            2,
+            2
+          ]
+        },
+        {
+          "total": 12,
+          "days": 3,
+          "perDay": [
+            4,
+            4,
+            4
+          ]
+        },
+        {
+          "total": 2,
+          "days": 3,
+          "perDay": [
+            1,
+            1,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "poolName",
+      "cases": [
+        {
+          "index": 0,
+          "name": "A"
+        },
+        {
+          "index": 1,
+          "name": "B"
+        },
+        {
+          "index": 2,
+          "name": "C"
+        },
+        {
+          "index": 3,
+          "name": "D"
+        },
+        {
+          "index": 4,
+          "name": "E"
+        },
+        {
+          "index": 5,
+          "name": "F"
+        }
+      ]
+    },
+    {
+      "name": "scoreError",
+      "cases": [
+        {
+          "a": null,
+          "b": 3,
+          "max": null,
+          "error": "Enter both scores."
+        },
+        {
+          "a": 3,
+          "b": null,
+          "max": null,
+          "error": "Enter both scores."
+        },
+        {
+          "a": 13,
+          "b": 11,
+          "max": null,
+          "error": null
+        },
+        {
+          "a": 0,
+          "b": 1,
+          "max": null,
+          "error": null
+        },
+        {
+          "a": -1,
+          "b": 4,
+          "max": null,
+          "error": "Scores go from 0 to 99."
+        },
+        {
+          "a": 100,
+          "b": 4,
+          "max": null,
+          "error": "Scores go from 0 to 99."
+        },
+        {
+          "a": 99,
+          "b": 98,
+          "max": null,
+          "error": null
+        },
+        {
+          "a": 7,
+          "b": 7,
+          "max": null,
+          "error": "Games can't end in a tie."
+        },
+        {
+          "a": 16,
+          "b": 14,
+          "max": 15,
+          "error": "Scores go from 0 to 15."
+        },
+        {
+          "a": 15,
+          "b": 14,
+          "max": 15,
+          "error": null
+        }
+      ]
+    }
+  ]
+}

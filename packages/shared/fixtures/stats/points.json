@@ -1,0 +1,6382 @@
+{
+  "about": "For each point (StatPoint.toMap): onField, played (in order), side, holder and hasPull.",
+  "cases": [
+    {
+      "name": "opponent score with no line",
+      "point": {
+        "line": [],
+        "startedOn": "defense",
+        "actions": [],
+        "result": "theyScored"
+      },
+      "onField": [],
+      "played": [],
+      "side": "defense",
+      "holder": null,
+      "hasPull": false
+    },
+    {
+      "name": "a sub for someone not on the field changes nothing on it",
+      "point": {
+        "line": [
+          "a",
+          "b"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "a"
+          },
+          {
+            "kind": "sub",
+            "playerId": "z",
+            "subOutId": "x"
+          },
+          {
+            "kind": "sub",
+            "subOutId": "b"
+          }
+        ],
+        "result": null
+      },
+      "onField": [
+        "a",
+        "b"
+      ],
+      "played": [
+        "a",
+        "b",
+        "z"
+      ],
+      "side": "offense",
+      "holder": "a",
+      "hasPull": false
+    },
+    {
+      "name": "a sub for a player who isn't holding keeps the holder",
+      "point": {
+        "line": [
+          "a",
+          "b",
+          "c"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "a"
+          },
+          {
+            "kind": "sub",
+            "playerId": "d",
+            "subOutId": "b"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "c",
+            "throwerId": "a"
+          },
+          {
+            "kind": "sub",
+            "playerId": "e",
+            "subOutId": "c"
+          }
+        ],
+        "result": null
+      },
+      "onField": [
+        "a",
+        "d",
+        "e"
+      ],
+      "played": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+      ],
+      "side": "offense",
+      "holder": "e",
+      "hasPull": false
+    },
+    {
+      "name": "goals and pulls with no player or thrower",
+      "point": {
+        "line": [
+          "a",
+          "b"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "hangTimeMs": 5000
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "b"
+          },
+          {
+            "kind": "goal",
+            "playerId": "a"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "a",
+        "b"
+      ],
+      "played": [
+        "a",
+        "b"
+      ],
+      "side": "offense",
+      "holder": "a",
+      "hasPull": true
+    },
+    {
+      "name": "block, then turnover on a lost point goes negative",
+      "point": {
+        "line": [
+          "a",
+          "b",
+          "c"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "c",
+            "outOfBounds": true
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "a"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "b"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "b"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "b"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "a"
+          },
+          {
+            "kind": "drop",
+            "playerId": "c",
+            "throwerId": "a"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "a",
+        "b",
+        "c"
+      ],
+      "played": [
+        "a",
+        "b",
+        "c"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 1",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p01"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 2",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p08"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p08"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p06"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p05"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p09",
+            "throwerId": "p06"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p09",
+      "hasPull": false
+    },
+    {
+      "name": "g1 point 3",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p09",
+            "hangTimeMs": 5974
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 4",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p11"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p02"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p12"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p11"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p11"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p10",
+            "throwerId": "p03"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p10",
+      "hasPull": false
+    },
+    {
+      "name": "g1 point 5",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p02",
+            "hangTimeMs": 5866
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p07"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p07",
+            "throwerId": "p06"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p07",
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 6",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p09",
+            "outOfBounds": true
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p09",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p09"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p08"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p08",
+            "throwerId": "p06"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p08",
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 7",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p10",
+            "hangTimeMs": 6423
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p08"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p11",
+            "throwerId": "p07"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p11",
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 8",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p12",
+            "hangTimeMs": 4424,
+            "outOfBounds": true
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p02"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p11",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p11"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p10",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p11",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p06",
+            "subOutId": "p11"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p11",
+            "subOutId": "p06"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p03",
+            "throwerId": "p11"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p06"
+      ],
+      "side": "offense",
+      "holder": "p03",
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 9",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p02",
+            "hangTimeMs": 4922
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p07"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p04",
+            "throwerId": "p03"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p04",
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 10",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p05"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 11",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p08"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p11",
+            "throwerId": "p08"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p11",
+      "hasPull": false
+    },
+    {
+      "name": "g1 point 12",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p10",
+            "hangTimeMs": 5287
+          },
+          {
+            "kind": "beat",
+            "playerId": "p12"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p01"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p02",
+            "throwerId": "p10"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p02",
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 13",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p01",
+            "hangTimeMs": 6442,
+            "outOfBounds": true
+          },
+          {
+            "kind": "sub",
+            "playerId": "p11",
+            "subOutId": "p02"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p01",
+            "throwerId": "p03"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p11",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p11"
+      ],
+      "side": "offense",
+      "holder": "p01",
+      "hasPull": true
+    },
+    {
+      "name": "g1 point 14",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p07",
+            "hangTimeMs": 6333
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p05",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p09",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p08"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p08",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p08"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p08",
+            "throwerId": "p04"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p08",
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 1",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p03",
+            "hangTimeMs": 5613
+          },
+          {
+            "kind": "beat",
+            "playerId": "p04"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p01"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p04"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p07",
+            "throwerId": "p02"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p07",
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 2",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p05",
+            "hangTimeMs": 5044,
+            "outOfBounds": true
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p09"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p09",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p04",
+            "throwerId": "p05"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p04",
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 3",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p12"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p07"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 4",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p04",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p12"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p04",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p03",
+            "throwerId": "p02"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p03",
+      "hasPull": false
+    },
+    {
+      "name": "g2 point 5",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p07",
+            "hangTimeMs": 4836
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p02",
+            "throwerId": "p03"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 6",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p09",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p04"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p09"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p08"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p08"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p04",
+            "throwerId": "p05"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p04",
+      "hasPull": false
+    },
+    {
+      "name": "g2 point 7",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p08"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p07"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p01"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p11"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p12"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p09",
+            "throwerId": "p12"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p08",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p10",
+            "throwerId": "p08"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p10",
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 8",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p01"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p11",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p11"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 9",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p07",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p08",
+            "subOutId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p08"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p06",
+            "throwerId": "p01"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p08",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08"
+      ],
+      "side": "offense",
+      "holder": "p06",
+      "hasPull": false
+    },
+    {
+      "name": "g2 point 10",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p08"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 11",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p11"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p01",
+            "throwerId": "p11"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p01",
+      "hasPull": false
+    },
+    {
+      "name": "g2 point 12",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p11",
+            "outOfBounds": true
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p02",
+            "throwerId": "p04"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p02",
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 13",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p01",
+            "outOfBounds": true
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 14",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p08",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p08"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p05",
+            "throwerId": "p07"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p05",
+      "hasPull": false
+    },
+    {
+      "name": "g2 point 15",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p07",
+            "hangTimeMs": 6489
+          },
+          {
+            "kind": "beat",
+            "playerId": "p11"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p08",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p07",
+            "throwerId": "p08"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p07",
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 16",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p02"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p12"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p12"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p12"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p12",
+            "throwerId": "p02"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p12",
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 17",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p01"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p08",
+            "subOutId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p08"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p03"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p01",
+            "throwerId": "p04"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p08"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08"
+      ],
+      "side": "offense",
+      "holder": "p01",
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 18",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p07",
+            "hangTimeMs": 6797
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p06"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p10",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p09"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p09",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p08",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p08"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p09",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p09"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p04",
+            "throwerId": "p05"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p04",
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 19",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p10",
+            "hangTimeMs": 5484
+          },
+          {
+            "kind": "beat",
+            "playerId": "p09"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g2 point 20",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p10"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p12"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p11",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p11"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p12",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p02"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p08",
+            "subOutId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p08"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p05",
+            "subOutId": "p03"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p12",
+            "throwerId": "p05"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p08",
+        "p05",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p08",
+        "p05"
+      ],
+      "side": "offense",
+      "holder": "p12",
+      "hasPull": false
+    },
+    {
+      "name": "g2 point 21",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p02",
+            "hangTimeMs": 6013
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p06",
+            "throwerId": "p07"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p06",
+      "hasPull": true
+    },
+    {
+      "name": "g3 point 1",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p01",
+            "hangTimeMs": 4224
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p01"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p09",
+            "subOutId": "p01"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p03"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p09"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p05",
+            "throwerId": "p07"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p09",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p09"
+      ],
+      "side": "offense",
+      "holder": "p05",
+      "hasPull": true
+    },
+    {
+      "name": "g3 point 2",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p09"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p09"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p08",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p08"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g3 point 3",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p09"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p12",
+            "throwerId": "p09"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p12",
+      "hasPull": false
+    },
+    {
+      "name": "g3 point 4",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p01"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p09",
+            "subOutId": "p02"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p09",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p09"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g3 point 5",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p05",
+            "throwerId": "p03"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p05",
+      "hasPull": false
+    },
+    {
+      "name": "g3 point 6",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p06",
+            "outOfBounds": true
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g3 point 7",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p12"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p12"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p09"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p11"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p11"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p01"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": false
+    },
+    {
+      "name": "g3 point 8",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p09",
+            "subOutId": "p02"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p11",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p04"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p09",
+            "throwerId": "p10"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p09",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p09"
+      ],
+      "side": "offense",
+      "holder": "p09",
+      "hasPull": false
+    },
+    {
+      "name": "g3 point 9",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p02",
+            "outOfBounds": true
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g3 point 10",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p01",
+            "subOutId": "p06"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p04",
+            "throwerId": "p01"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p01",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p04",
+      "hasPull": false
+    },
+    {
+      "name": "g3 point 11",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p09"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p11"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p12",
+            "throwerId": "p11"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p12",
+      "hasPull": true
+    },
+    {
+      "name": "g3 point 12",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p02",
+            "outOfBounds": true
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p03",
+            "throwerId": "p02"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p03",
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 1",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p03",
+            "hangTimeMs": 4245
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p05",
+            "throwerId": "p07"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p05",
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 2",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p09",
+            "hangTimeMs": 6197
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p09",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p06"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p09"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p08",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p08"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p09"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p06",
+            "throwerId": "p04"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p06",
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 3",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p10",
+            "hangTimeMs": 6860
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 4",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p11"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p01",
+            "throwerId": "p11"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p01",
+      "hasPull": false
+    },
+    {
+      "name": "g4 point 5",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p01"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p05"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p07",
+            "throwerId": "p05"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p07",
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 6",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p06"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p08",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p08"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 7",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p01",
+            "throwerId": "p10"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p01",
+      "hasPull": false
+    },
+    {
+      "name": "g4 point 8",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p02",
+            "hangTimeMs": 6126
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p11"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p12"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p11"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p11",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p11"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p12",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p04",
+            "throwerId": "p12"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p04",
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 9",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p02"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p07"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 10",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p10",
+            "throwerId": "p04"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p10",
+      "hasPull": false
+    },
+    {
+      "name": "g4 point 11",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p08",
+            "hangTimeMs": 6210
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 12",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p10"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p01",
+            "throwerId": "p04"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p01",
+      "hasPull": false
+    },
+    {
+      "name": "g4 point 13",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p04"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p07"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p01",
+            "throwerId": "p03"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p01",
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 14",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p10",
+            "hangTimeMs": 6666
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 15",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p09"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p11",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p09",
+            "throwerId": "p11"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p09",
+      "hasPull": false
+    },
+    {
+      "name": "g4 point 16",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p12",
+            "hangTimeMs": 5746
+          },
+          {
+            "kind": "sub",
+            "playerId": "p08",
+            "subOutId": "p10"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p08",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p08"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g4 point 17",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p08",
+            "subOutId": "p03"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p08"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p08",
+            "throwerId": "p05"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p08",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08"
+      ],
+      "side": "offense",
+      "holder": "p08",
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 1",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p06",
+            "hangTimeMs": 5869,
+            "outOfBounds": true
+          },
+          {
+            "kind": "beat",
+            "playerId": "p06"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p02"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p08",
+            "subOutId": "p05"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p08",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p08"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p01"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p03",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p06",
+            "throwerId": "p03"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p08",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 2",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p09"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p04",
+            "throwerId": "p09"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p04",
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 3",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p11"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 4",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p12"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p11",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p12",
+            "throwerId": "p11"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 5",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p03"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p05"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p01"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p04",
+            "throwerId": "p07"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 6",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p09",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p09",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p06",
+            "throwerId": "p09"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p06",
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 7",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p07",
+            "hangTimeMs": 6870
+          },
+          {
+            "kind": "sub",
+            "playerId": "p02",
+            "subOutId": "p12"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p02",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 8",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p12",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p12"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p11",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p10"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p11"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p12",
+            "throwerId": "p11"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p12",
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 9",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p02"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p05",
+            "throwerId": "p01"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p05",
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 10",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p04",
+            "hangTimeMs": 5000
+          },
+          {
+            "kind": "beat",
+            "playerId": "p10"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p10"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 11",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p08",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p08"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p07"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p09"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 12",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p11",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p12",
+            "throwerId": "p11"
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p03"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p11",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p11"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p01",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p02"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p11"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p11"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p01",
+            "throwerId": "p10"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p01",
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 13",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p04",
+            "hangTimeMs": 5501
+          },
+          {
+            "kind": "handBlock",
+            "playerId": "p04"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p05"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p02"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p06",
+            "throwerId": "p01"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p06",
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 14",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p09"
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p09",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p09"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p05"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p05"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p01",
+            "subOutId": "p08"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p04"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p01",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p05",
+            "throwerId": "p01"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p05"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p07",
+            "throwerId": "p05"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p01",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 15",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p07",
+            "throwerId": "p10"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "offense",
+      "holder": "p07",
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 16",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p10"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p12"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p12"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p12",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p09",
+            "subOutId": "p12"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p07",
+            "subOutId": "p09"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p07"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p04",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p10",
+            "throwerId": "p04"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p07",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p09",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p10",
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 17",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p05"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p05"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p06",
+            "throwerId": "p05"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "offense",
+      "holder": "p06",
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 18",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p05"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p07"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p07",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p07"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p05"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p06",
+            "throwerId": "p05"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p06",
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 19",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p12",
+            "hangTimeMs": 4357
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 20",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p02",
+            "throwerId": "p03"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "side": "offense",
+      "holder": "p02",
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 21",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p04",
+            "hangTimeMs": 6566
+          },
+          {
+            "kind": "breakup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p03"
+          },
+          {
+            "kind": "drop",
+            "playerId": "p04",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p01"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 22",
+      "point": {
+        "line": [
+          "p04",
+          "p05",
+          "p06",
+          "p07",
+          "p08",
+          "p09",
+          "p10"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p08"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p08"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p05"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p05",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p05"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p10"
+          },
+          {
+            "kind": "theirTurnover"
+          },
+          {
+            "kind": "pickup",
+            "playerId": "p10"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p06",
+            "throwerId": "p10"
+          },
+          {
+            "kind": "goal",
+            "playerId": "p04",
+            "throwerId": "p06"
+          }
+        ],
+        "result": "weScored"
+      },
+      "onField": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "played": [
+        "p04",
+        "p05",
+        "p06",
+        "p07",
+        "p08",
+        "p09",
+        "p10"
+      ],
+      "side": "offense",
+      "holder": "p04",
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 23",
+      "point": {
+        "line": [
+          "p07",
+          "p08",
+          "p09",
+          "p10",
+          "p11",
+          "p12",
+          "p01"
+        ],
+        "startedOn": "defense",
+        "actions": [
+          {
+            "kind": "pull",
+            "playerId": "p10",
+            "hangTimeMs": 4146
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "played": [
+        "p07",
+        "p08",
+        "p09",
+        "p10",
+        "p11",
+        "p12",
+        "p01"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": true
+    },
+    {
+      "name": "g5 point 24",
+      "point": {
+        "line": [
+          "p10",
+          "p11",
+          "p12",
+          "p01",
+          "p02",
+          "p03",
+          "p04"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p01"
+          },
+          {
+            "kind": "sub",
+            "playerId": "p06",
+            "subOutId": "p01"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p02",
+            "throwerId": "p06"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p02"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p10",
+            "throwerId": "p03"
+          },
+          {
+            "kind": "beat",
+            "playerId": "p02"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p10"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p10",
+        "p11",
+        "p12",
+        "p06",
+        "p02",
+        "p03",
+        "p04"
+      ],
+      "played": [
+        "p10",
+        "p11",
+        "p12",
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p06"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": false
+    },
+    {
+      "name": "g5 point 25",
+      "point": {
+        "line": [
+          "p01",
+          "p02",
+          "p03",
+          "p04",
+          "p05",
+          "p06",
+          "p07"
+        ],
+        "startedOn": "offense",
+        "actions": [
+          {
+            "kind": "pickup",
+            "playerId": "p04"
+          },
+          {
+            "kind": "catch_",
+            "playerId": "p03",
+            "throwerId": "p04"
+          },
+          {
+            "kind": "throwaway",
+            "playerId": "p03"
+          }
+        ],
+        "result": "theyScored"
+      },
+      "onField": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "played": [
+        "p01",
+        "p02",
+        "p03",
+        "p04",
+        "p05",
+        "p06",
+        "p07"
+      ],
+      "side": "defense",
+      "holder": null,
+      "hasPull": false
+    }
+  ]
+}

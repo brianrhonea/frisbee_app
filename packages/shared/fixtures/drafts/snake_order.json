@@ -1,0 +1,313 @@
+{
+  "about": "LiveDraft: snakeIndex for every pick, then onTheClock and teamOf as the picks come in (captains pick in snake order).",
+  "cases": [
+    {
+      "captains": [
+        "c0",
+        "c1"
+      ],
+      "poolSize": 5,
+      "snake": [
+        0,
+        1,
+        1,
+        0,
+        0
+      ],
+      "onTheClock": [
+        "c0",
+        "c1",
+        "c1",
+        "c0",
+        "c0",
+        null
+      ],
+      "picks": [
+        {
+          "uid": "p0",
+          "captainId": "c0"
+        },
+        {
+          "uid": "p1",
+          "captainId": "c1"
+        },
+        {
+          "uid": "p2",
+          "captainId": "c1"
+        },
+        {
+          "uid": "p3",
+          "captainId": "c0"
+        },
+        {
+          "uid": "p4",
+          "captainId": "c0"
+        }
+      ],
+      "teams": {
+        "c0": [
+          "c0",
+          "p0",
+          "p3",
+          "p4"
+        ],
+        "c1": [
+          "c1",
+          "p1",
+          "p2"
+        ]
+      }
+    },
+    {
+      "captains": [
+        "c0",
+        "c1",
+        "c2"
+      ],
+      "poolSize": 9,
+      "snake": [
+        0,
+        1,
+        2,
+        2,
+        1,
+        0,
+        0,
+        1,
+        2
+      ],
+      "onTheClock": [
+        "c0",
+        "c1",
+        "c2",
+        "c2",
+        "c1",
+        "c0",
+        "c0",
+        "c1",
+        "c2",
+        null
+      ],
+      "picks": [
+        {
+          "uid": "p0",
+          "captainId": "c0"
+        },
+        {
+          "uid": "p1",
+          "captainId": "c1"
+        },
+        {
+          "uid": "p2",
+          "captainId": "c2"
+        },
+        {
+          "uid": "p3",
+          "captainId": "c2"
+        },
+        {
+          "uid": "p4",
+          "captainId": "c1"
+        },
+        {
+          "uid": "p5",
+          "captainId": "c0"
+        },
+        {
+          "uid": "p6",
+          "captainId": "c0"
+        },
+        {
+          "uid": "p7",
+          "captainId": "c1"
+        },
+        {
+          "uid": "p8",
+          "captainId": "c2"
+        }
+      ],
+      "teams": {
+        "c0": [
+          "c0",
+          "p0",
+          "p5",
+          "p6"
+        ],
+        "c1": [
+          "c1",
+          "p1",
+          "p4",
+          "p7"
+        ],
+        "c2": [
+          "c2",
+          "p2",
+          "p3",
+          "p8"
+        ]
+      }
+    },
+    {
+      "captains": [
+        "c0",
+        "c1",
+        "c2",
+        "c3"
+      ],
+      "poolSize": 10,
+      "snake": [
+        0,
+        1,
+        2,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        1
+      ],
+      "onTheClock": [
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c3",
+        "c2",
+        "c1",
+        "c0",
+        "c0",
+        "c1",
+        null
+      ],
+      "picks": [
+        {
+          "uid": "p0",
+          "captainId": "c0"
+        },
+        {
+          "uid": "p1",
+          "captainId": "c1"
+        },
+        {
+          "uid": "p2",
+          "captainId": "c2"
+        },
+        {
+          "uid": "p3",
+          "captainId": "c3"
+        },
+        {
+          "uid": "p4",
+          "captainId": "c3"
+        },
+        {
+          "uid": "p5",
+          "captainId": "c2"
+        },
+        {
+          "uid": "p6",
+          "captainId": "c1"
+        },
+        {
+          "uid": "p7",
+          "captainId": "c0"
+        },
+        {
+          "uid": "p8",
+          "captainId": "c0"
+        },
+        {
+          "uid": "p9",
+          "captainId": "c1"
+        }
+      ],
+      "teams": {
+        "c0": [
+          "c0",
+          "p0",
+          "p7",
+          "p8"
+        ],
+        "c1": [
+          "c1",
+          "p1",
+          "p6",
+          "p9"
+        ],
+        "c2": [
+          "c2",
+          "p2",
+          "p5"
+        ],
+        "c3": [
+          "c3",
+          "p3",
+          "p4"
+        ]
+      }
+    },
+    {
+      "captains": [
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4"
+      ],
+      "poolSize": 4,
+      "snake": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "onTheClock": [
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        null
+      ],
+      "picks": [
+        {
+          "uid": "p0",
+          "captainId": "c0"
+        },
+        {
+          "uid": "p1",
+          "captainId": "c1"
+        },
+        {
+          "uid": "p2",
+          "captainId": "c2"
+        },
+        {
+          "uid": "p3",
+          "captainId": "c3"
+        }
+      ],
+      "teams": {
+        "c0": [
+          "c0",
+          "p0"
+        ],
+        "c1": [
+          "c1",
+          "p1"
+        ],
+        "c2": [
+          "c2",
+          "p2"
+        ],
+        "c3": [
+          "c3",
+          "p3"
+        ],
+        "c4": [
+          "c4"
+        ]
+      }
+    }
+  ]
+}

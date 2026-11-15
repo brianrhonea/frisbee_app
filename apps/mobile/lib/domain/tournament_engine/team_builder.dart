@@ -2,6 +2,7 @@ import 'dart:math';
 
 import '../models/group_tournament.dart';
 import '../models/hosted_tournament.dart';
+import 'seeded_random.dart';
 
 /// Someone who can be put on a team.
 typedef TournamentPlayer = ({String uid, String name});
@@ -25,8 +26,9 @@ typedef DraftPlayer = ({
 /// go last, to whichever teams are short.
 ///
 /// The same [seed] with the same players gives the same teams (it only
-/// breaks ties between equally skilled players). Each team's captain is
-/// its most skilled player.
+/// breaks ties between equally skilled players), here and on the website:
+/// both shuffle with [SeededRandom]. Each team's captain is its most
+/// skilled player.
 List<TournamentTeam> balancedDraft(
   List<DraftPlayer> players,
   List<TournamentTeam> teams, {
@@ -34,9 +36,8 @@ List<TournamentTeam> balancedDraft(
   bool mixed = false,
 }) {
   if (teams.isEmpty) return const [];
-  final random = Random(seed);
-  final unique = {for (final p in players) p.uid: p}.values.toList()
-    ..shuffle(random);
+  final unique = {for (final p in players) p.uid: p}.values.toList();
+  shuffleWith(unique, SeededRandom(seed));
   // Strongest first; the shuffle above settles ties.
   final order = {for (var i = 0; i < unique.length; i++) unique[i].uid: i};
   unique.sort((a, b) {
@@ -104,8 +105,8 @@ List<TournamentTeam> dealPlayers(
   Random? random,
 }) {
   if (teams.isEmpty) return const [];
-  final unique = {for (final p in players) p.uid: p}.values.toList()
-    ..shuffle(random);
+  final unique = {for (final p in players) p.uid: p}.values.toList();
+  shuffleWith(unique, random ?? Random());
   final rosters = List.generate(teams.length, (_) => <TournamentPlayer>[]);
   for (var i = 0; i < unique.length; i++) {
     rosters[i % teams.length].add(unique[i]);
