@@ -122,7 +122,8 @@ function SearchCard({
   const playersShown = all || only === "players";
   const tournamentsShown = all || only === "tournaments";
   const current = found && found.q === query ? found : null;
-  const running = ready && !current;
+  // Tournaments are matched here, so only players and teams wait on the search.
+  const running = ready && !current && (playersShown || teamsShown);
   const failed = ready && current?.page === null;
   const people: PublicProfile[] = ready && playersShown ? (current?.page?.players ?? []) : [];
   const teams: PublicListing[] = ready && teamsShown ? listingsFor(current?.page?.teams ?? [], only) : [];

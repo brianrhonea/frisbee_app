@@ -5,7 +5,7 @@
 // Leaving the team, losing access to the room, the room being deleted or
 // signing out disconnects.
 import type { VoiceTokenResult } from "@stall10/shared";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, getDocFromServer, onSnapshot } from "firebase/firestore";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
 import { firestoreDb } from "@/lib/firebase";
@@ -101,8 +101,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       if (!user) return;
       const cur = channelRef.current;
       if (cur && cur.teamId === next.teamId && cur.roomId === next.roomId) return;
-      await hangUp();
+      // Bumped before hanging up, so a join still in flight can't take over meanwhile.
       const mine = ++attempt.current;
+      await hangUp();
+      if (mine !== attempt.current) return;
       channelRef.current = next;
       setChannel(next);
       setConnecting(true);
@@ -161,24 +163,60 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     lastUid.current = uid;
   }, [uid, drop]);
 
-  // While in a channel, watch its room: leaving the team or losing access
-  // makes the rules refuse the read, and a deleted room closes it. A
-  // passing network error doesn't disconnect; LiveKit reconnects.
+  // While in a channel, watch its room and its team. Whether the room can
+  // be read depends on the team (membership, roles), so: leaving the team
+  // or the team going drops the call, and any other change to the team
+  // re-checks the room with the server. A deleted room closes the channel.
+  // A passing network error doesn't disconnect; LiveKit reconnects.
   const teamId = channel?.teamId;
   const roomId = channel?.roomId;
   useEffect(() => {
     const db = firestoreDb();
-    if (!db || !teamId || !roomId) return;
-    return onSnapshot(
-      doc(db, `teams/${teamId}/chats/${roomId}`),
+    if (!db || !teamId || !roomId || !uid) return;
+    const roomRef = doc(db, `teams/${teamId}/chats/${roomId}`);
+    const denied = (e: unknown) => (e as { code?: string })?.code === "permission-denied";
+    const stopRoom = onSnapshot(
+      roomRef,
       (snap) => {
-        if (!snap.exists()) void drop(dropNotices.meetingEnded);
+        if (!snap.exists() && !snap.metadata.fromCache) void drop(dropNotices.meetingEnded);
       },
       (e) => {
-        if ((e as { code?: string }).code === "permission-denied") void drop(lostAccessNotice);
+        if (denied(e)) void drop(lostAccessNotice);
       },
     );
-  }, [teamId, roomId, drop]);
+    let first = true;
+    const stopTeam = onSnapshot(
+      doc(db, `teams/${teamId}`),
+      (snap) => {
+        if (snap.metadata.fromCache) return;
+        const memberIds = (snap.data()?.memberIds as string[] | undefined) ?? [];
+        if (!snap.exists() || !memberIds.includes(uid)) {
+          void drop(lostAccessNotice);
+          return;
+        }
+        if (first) {
+          first = false;
+          return;
+        }
+        // Roles or room access may have changed.
+        getDocFromServer(roomRef).then(
+          (r) => {
+            if (!r.exists()) void drop(dropNotices.meetingEnded);
+          },
+          (e) => {
+            if (denied(e)) void drop(lostAccessNotice);
+          },
+        );
+      },
+      (e) => {
+        if (denied(e)) void drop(lostAccessNotice);
+      },
+    );
+    return () => {
+      stopRoom();
+      stopTeam();
+    };
+  }, [teamId, roomId, uid, drop]);
 
   // Closing the tab hangs up.
   useEffect(
