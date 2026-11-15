@@ -337,6 +337,110 @@ void main() {
       expect(vm.canEditPost(pub), isFalse);
     });
 
+    group('the Community tab', () {
+      test("loads only once opened, in the API's order", () async {
+        final vm = await load();
+        userPosts.posts.addAll([
+          userPost('a', 'zed', DateTime(2026, 10, 28, 8)),
+          userPost('b', 'sam', DateTime(2026, 10, 28, 7)),
+        ]);
+        userPosts.communityPages[null] = (ids: ['a', 'b'], next: 100);
+        await pumpEventQueue();
+        expect(vm.hasCommunity, isTrue);
+        expect(userPosts.communityRequests, isEmpty, reason: 'lazy');
+        expect(vm.community.loaded, isFalse);
+
+        vm.openCommunity();
+        vm.openCommunity();
+        await pumpEventQueue();
+        expect(userPosts.communityRequests, [null], reason: 'once');
+        expect(vm.community.loaded, isTrue);
+        expect(vm.communityPosts.map((p) => p.id), ['a', 'b']);
+        expect(vm.community.hasMore, isTrue);
+      });
+
+      test('pages on past short pages, without repeats, to the end', () async {
+        final vm = await load();
+        userPosts.posts.addAll([
+          userPost('a', 'zed', DateTime(2026, 10, 28, 8)),
+          userPost('b', 'sam', DateTime(2026, 10, 28, 7)),
+          userPost('c', 'sam', DateTime(2026, 10, 27)),
+        ]);
+        userPosts.communityPages.addAll({
+          null: (ids: ['a'], next: 300),
+          // All private: an empty page, with more after it.
+          300: (ids: const [], next: 200),
+          200: (ids: ['a', 'b', 'c'], next: null),
+        });
+        vm.openCommunity();
+        await pumpEventQueue();
+        await vm.community.loadMore();
+        await pumpEventQueue();
+        expect(vm.communityPosts.map((p) => p.id), ['a']);
+        expect(vm.community.hasMore, isTrue, reason: 'not caught up yet');
+        await vm.community.loadMore();
+        await pumpEventQueue();
+        expect(vm.communityPosts.map((p) => p.id), ['a', 'b', 'c']);
+        expect(vm.community.hasMore, isFalse);
+        await vm.community.loadMore();
+        expect(userPosts.communityRequests, [null, 300, 200]);
+      });
+
+      test('a failed page keeps the posts and is tried again', () async {
+        final vm = await load();
+        userPosts.posts.add(userPost('a', 'zed', DateTime(2026, 10, 28)));
+        userPosts.communityPages[null] = (ids: ['a'], next: 100);
+        vm.openCommunity();
+        await pumpEventQueue();
+        userPosts.communityError = Exception('offline');
+        await vm.community.loadMore();
+        expect(vm.community.error, isTrue);
+        expect(vm.communityPosts.map((p) => p.id), ['a']);
+        userPosts.communityError = null;
+        await vm.community.loadMore();
+        expect(vm.community.error, isFalse);
+        expect(userPosts.communityRequests, [null, 100, 100]);
+      });
+
+      test('posts stay live: likes show and deleted ones go', () async {
+        final vm = await load();
+        userPosts.posts.addAll([
+          userPost('a', 'zed', DateTime(2026, 10, 28, 8)),
+          userPost('b', 'sam', DateTime(2026, 10, 28, 7)),
+        ]);
+        userPosts.communityPages[null] = (ids: ['a', 'b'], next: null);
+        vm.openCommunity();
+        await pumpEventQueue();
+        final a = vm.communityPosts.first;
+        expect(vm.actions.isLiked(a), isFalse);
+        await vm.actions.toggleLike.execute(a);
+        await pumpEventQueue();
+        expect(vm.actions.isLiked(vm.communityPosts.first), isTrue);
+
+        userPosts.posts.removeWhere((p) => p.id == 'b');
+        userPosts.changed();
+        await pumpEventQueue();
+        expect(vm.communityPosts.map((p) => p.id), ['a']);
+      });
+
+      test('refreshing Home reloads it once it has been opened', () async {
+        final vm = await load();
+        await vm.refreshFeed();
+        expect(userPosts.communityRequests, isEmpty);
+        vm.openCommunity();
+        await pumpEventQueue();
+        await vm.refreshFeed();
+        await pumpEventQueue();
+        expect(userPosts.communityRequests, [null, null]);
+      });
+
+      test("builds without the API don't have it", () async {
+        final vm = await load();
+        userPosts.hasCommunityFeed = false;
+        expect(vm.hasCommunity, isFalse);
+      });
+    });
+
     test('joins a team by invite code', () async {
       final vm = await load(withTeam: false);
       teams.teams['t9'] = team('t9', 'Other', owner: 'u9');
@@ -417,6 +521,61 @@ void main() {
     expect(find.text('Coming up'), findsOneWidget);
     // One way to post: the composer, not a second header button.
     expect(find.text('Create post'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the Community tab lists public posts to like and page', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final vm = await tester.runAsync(() async {
+      final vm = await load();
+      userPosts.posts.add(
+        UserPost(
+          id: 'z1',
+          authorId: 'zed',
+          authorName: 'Zed Park',
+          body: 'Pickup at the lake, all welcome',
+          createdAt: now.subtract(const Duration(hours: 2)),
+        ),
+      );
+      userPosts.communityPages[null] = (ids: ['z1'], next: 50);
+      return vm;
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: HomeScreen(viewModel: vm!),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Pickup at the lake, all welcome'), findsNothing);
+
+    await tester.tap(find.text('Community'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Pickup at the lake, all welcome'), findsOneWidget);
+    expect(find.text('Zed Park'), findsOneWidget);
+    // Not the For you tab: no composer.
+    expect(find.text("What's happening on your sideline?"), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.favorite_border));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byIcon(Icons.favorite), findsOneWidget, reason: 'liked');
+
+    await tester.scrollUntilVisible(
+      find.text('Show older posts'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Show older posts'));
+    await tester.pump();
+    await tester.pump();
+    expect(userPosts.communityRequests, [null, 50]);
+    expect(find.text("You're all caught up."), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

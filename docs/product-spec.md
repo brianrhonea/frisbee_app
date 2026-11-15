@@ -195,7 +195,9 @@ everything the app does on the website alone, styled like the website
    settings and muting chats (api 0.11.0, web 0.12.0).
 2. Team admin: [x] custom roles and permissions; [x] chat rooms and
    folders; [x] adding teams to a community; [x] deleting a team
-   (api 0.12.0, web 0.13.0). Roster players (people without accounts,
+   (api 0.12.0, web 0.13.0; both type the name to confirm and delete
+   through `DELETE /v1/teams/:id`, the app's direct cascade only with
+   `use_api_membership` off). Roster players (people without accounts,
    for stats) come with stats.
 3. Messages: [x] typing indicators and read receipts (api 0.13.0, web
    0.14.0). The app has no message editing and keeps team rooms out of
@@ -225,7 +227,9 @@ everything the app does on the website alone, styled like the website
    `test/data/voice_repository_test.dart`). [x] Meetings on the team schedule
    beside events, with New meeting (the website keeps its Meetings tab
    too; the app has none).
-7. Posts: [ ] video in posts (waits on the transcode job); [x] feed tabs;
+7. Posts: [ ] video in posts (waits on the transcode job); [x] feed tabs
+   (For you / Community / Your teams on both; Community pages through
+   `GET /v1/feed`, app `test/ui/home_test.dart`);
    [x] Discord import (api 0.21.0, web 0.22.0); [x] sharing My calendar
    and shared-calendar events with followers (as the app's editor does;
    the API checks the caller can edit that calendar).
