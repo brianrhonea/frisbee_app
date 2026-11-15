@@ -7,7 +7,12 @@ import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { EventItem } from "../EventItem";
 import { LocalTime } from "../LocalTime";
+import { roleLabel } from "../ProfileDashboard";
 import { useLiveQuery } from "@/lib/live";
+import { EmptyState, ErrorNote, Loading } from "../StatusViews";
+import { Avatar } from "../Avatar";
+import { InviteButton } from "./InviteDialog";
+import { membersInOrder } from "./TeamBanner";
 import { useTeamHub } from "./TeamContext";
 import { type TeamPostView, TeamPostCard } from "./TeamPostCard";
 import { TeamPostComposer } from "./TeamPostComposer";
@@ -40,13 +45,13 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
       <section className="stack">
         {admin && <TeamPostComposer teamId={teamId} />}
         {viewer.state === "loading" || (member && !live.data && !live.error) ? (
-          <p className="muted" aria-busy="true">Loading posts…</p>
+          <Loading label="Loading posts…" />
         ) : live.error ? (
-          <p className="form-error">{live.error}</p>
+          <ErrorNote>{live.error}</ErrorNote>
         ) : hidden ? (
-          <p className="empty">Only members see this group&apos;s posts and events.</p>
+          <EmptyState>Only members see this group&apos;s posts and events.</EmptyState>
         ) : posts.length === 0 ? (
-          <p className="empty">{member ? "No posts yet." : "No public posts yet."}</p>
+          <EmptyState>{member ? "No posts yet." : "No public posts yet."}</EmptyState>
         ) : (
           posts.map((p) =>
             editing === p.id ? (
@@ -88,14 +93,54 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
             </p>
           </div>
         )}
-        <div className="card">
-          <h2 className="card-title">People</h2>
-          <p className="muted small">See who&apos;s on the roster and open their profiles.</p>
-          <Link className="btn btn-small" href={`/teams/${teamId}/roster`}>
-            Open the roster
-          </Link>
-        </div>
+        <MemberPreview />
       </aside>
+    </div>
+  );
+}
+
+/**
+ * The side column's people: for members, the first few with their role,
+ * all of them on the roster, and Invite for member managers; for everyone
+ * else, a link to the roster.
+ */
+function MemberPreview() {
+  const { teamId, kind, viewer } = useTeamHub();
+  const roster = `/teams/${teamId}/roster`;
+  if (viewer.state !== "member") {
+    return (
+      <div className="card">
+        <h2 className="card-title">{kind === "team" ? "Roster" : "Members"}</h2>
+        <p className="muted small">See who&apos;s on it and open their profiles.</p>
+        <Link className="btn btn-small" href={roster}>
+          Open the {kind === "team" ? "roster" : "members"}
+        </Link>
+      </div>
+    );
+  }
+  const people = membersInOrder(viewer.team);
+  return (
+    <div className="card member-preview">
+      <h2 className="card-title">{kind === "team" ? "The team" : "Members"}</h2>
+      <ul className="member-preview-list">
+        {people.slice(0, 6).map((p) => (
+          <li key={p.uid}>
+            <Link className="person" href={`/players/${p.uid}`}>
+              <Avatar name={p.name} size={32} />
+              <span>
+                {p.name}
+                {p.tier !== "player" && <small className="muted"> {roleLabel(p.tier, kind)}</small>}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="member-preview-actions">
+        <Link href={roster} className="small">
+          All {people.length} {people.length === 1 ? "member" : "members"}
+        </Link>
+        <InviteButton />
+      </div>
     </div>
   );
 }

@@ -11,7 +11,15 @@ export const postUrl = (id: string) => new URL(`/posts/${encodeURIComponent(id)}
  * Shares [url] with the device's share sheet where there is one (phones,
  * some desktops), otherwise copies it.
  */
-export function ShareButton({ url, title = "A post on Stall 10" }: { url: string; title?: string }) {
+export function ShareButton({
+  url,
+  title = "A post on Stall 10",
+  className = "post-action",
+}: {
+  url: string;
+  title?: string;
+  className?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function share() {
@@ -34,7 +42,7 @@ export function ShareButton({ url, title = "A post on Stall 10" }: { url: string
   }
 
   return (
-    <button type="button" className="post-action" onClick={() => void share()} title="Share or copy the link">
+    <button type="button" className={className} onClick={() => void share()} title="Share or copy the link">
       <NavIcon name="share" size={18} /> {copied ? "Link copied" : "Share"}
     </button>
   );

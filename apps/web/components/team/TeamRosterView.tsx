@@ -7,7 +7,8 @@ import { type Signal, useChangeSignal } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { roleLabel } from "../ProfileDashboard";
-import { InvitePeople } from "./InvitePeople";
+import { ErrorNote, Loading } from "../StatusViews";
+import { InviteButton } from "./InviteDialog";
 import { useTeamHub } from "./TeamContext";
 
 const positionLabels: Record<string, string> = { handler: "Handler", cutter: "Cutter", hybrid: "Hybrid" };
@@ -15,17 +16,15 @@ const positionLabels: Record<string, string> = { handler: "Handler", cutter: "Cu
 /**
  * Who's on the team, for anyone signed in (`GET /v1/teams/:id/roster`):
  * the roster as a table, then the members, each linking to their profile.
- * Visitors are asked to log in; a team's member managers invite people.
+ * Visitors are asked to log in; member managers of any kind invite people
+ * (the hub's invite dialog).
  */
 export function TeamRosterView() {
-  const { teamId, name, kind, viewer } = useTeamHub();
+  const { teamId, kind, viewer } = useTeamHub();
   const { user } = useAuth();
   const [roster, setRoster] = useState<TeamRoster | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("");
-  const [inviting, setInviting] = useState(false);
-  // Groups invite with their link in the app; teams invite by name here too.
-  const canInvite = kind === "team" && viewer.state === "member" && viewer.can("manageMembers");
 
   // Members refetch when the team doc changes (someone joins, leaves or
   // changes role); outsiders can't read it, so theirs loads once.
@@ -73,8 +72,8 @@ export function TeamRosterView() {
     );
   }
   // A failed refetch keeps the roster already showing.
-  if (error && !roster) return <p className="empty">{error}</p>;
-  if (!roster) return <p className="muted" aria-busy="true">Loading the roster…</p>;
+  if (error && !roster) return <ErrorNote>{error}</ErrorNote>;
+  if (!roster) return <Loading label="Loading the roster…" />;
 
   const q = filter.trim().toLowerCase();
   const match = (...s: Array<string | undefined>) => !q || s.some((x) => x?.toLowerCase().includes(q));
@@ -96,13 +95,8 @@ export function TeamRosterView() {
           {roster.kind === "team" && `${roster.players.length} players · `}
           {roster.members.length} {roster.members.length === 1 ? "member" : "members"}
         </span>
-        {canInvite && !inviting && (
-          <button type="button" className="btn btn-small btn-primary" onClick={() => setInviting(true)}>
-            Invite people
-          </button>
-        )}
+        <InviteButton />
       </div>
-      {inviting && <InvitePeople teamId={teamId} teamName={name} onClose={() => setInviting(false)} />}
 
       {roster.kind === "team" && (
         <section className="card">

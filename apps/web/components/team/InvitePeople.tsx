@@ -9,13 +9,29 @@ import { Avatar } from "../Avatar";
  * Find people by name and invite them to [teamId] (`POST
  * /v1/teams/:id/invites`); they accept from their Teams page (or the home
  * page's Invitations) on the website, or the Teams tab in the app. For the
- * team's member managers, and a community's for the teams it links.
+ * member managers of any team or group, and a community's for the teams
+ * it links. [embedded] (the invite dialog's "Search people") drops the
+ * card and Done, and lists who was invited while it's open.
  */
-export function InvitePeople({ teamId, teamName, onClose }: { teamId: string; teamName: string; onClose: () => void }) {
+export function InvitePeople({
+  teamId,
+  teamName,
+  onClose,
+  embedded = false,
+}: {
+  teamId: string;
+  teamName: string;
+  onClose?: () => void;
+  embedded?: boolean;
+}) {
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchPage["players"] | null>(null);
   const [invited, setInvited] = useState<Record<string, string>>({});
+  // Who was invited while this is open, newest first. The API keeps no
+  // list of a team's pending invites to read back (each is under the
+  // invitee's users/:uid/teamInvites), so this is the session's.
+  const [sent, setSent] = useState<Array<{ id: string; name: string }>>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -37,13 +53,14 @@ export function InvitePeople({ teamId, teamName, onClose }: { teamId: string; te
     };
   }, [q, user]);
 
-  async function invite(uid: string) {
+  async function invite(uid: string, name: string) {
     if (!user) return;
     setBusy(uid);
     setError("");
     try {
       await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/invites`, { method: "POST", body: { uid } });
       setInvited((m) => ({ ...m, [uid]: "Invited" }));
+      setSent((s) => [{ id: uid, name }, ...s.filter((p) => p.id !== uid)]);
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setInvited((m) => ({ ...m, [uid]: "Already on it" }));
       else setError(problem(e, "Couldn't send the invite. Try again."));
@@ -52,14 +69,8 @@ export function InvitePeople({ teamId, teamName, onClose }: { teamId: string; te
     }
   }
 
-  return (
-    <section className="card invite-panel" aria-label={`Invite people to ${teamName}`}>
-      <div className="invite-head">
-        <h2 className="card-title">Invite to {teamName}</h2>
-        <button type="button" className="btn btn-small" onClick={onClose}>
-          Done
-        </button>
-      </div>
+  const search = (
+    <>
       <input
         className="search-input"
         type="search"
@@ -67,7 +78,7 @@ export function InvitePeople({ teamId, teamName, onClose }: { teamId: string; te
         value={q}
         onChange={(e) => setQ(e.target.value)}
         aria-label="Search people by name"
-        autoFocus
+        autoFocus={!embedded}
       />
       {error && <p className="form-error">{error}</p>}
       {results === null ? (
@@ -88,7 +99,7 @@ export function InvitePeople({ teamId, teamName, onClose }: { teamId: string; te
               {invited[p.id] ? (
                 <span className="pill">{invited[p.id]}</span>
               ) : (
-                <button type="button" className="btn btn-small btn-primary" disabled={busy !== null} onClick={() => void invite(p.id)}>
+                <button type="button" className="btn btn-small btn-primary" disabled={busy !== null} onClick={() => void invite(p.id, p.name ?? "Player")}>
                   Invite
                 </button>
               )}
@@ -96,6 +107,42 @@ export function InvitePeople({ teamId, teamName, onClose }: { teamId: string; te
           ))}
         </ul>
       )}
+    </>
+  );
+  if (embedded) {
+    return (
+      <div className="invite-panel">
+        {search}
+        {sent.length > 0 && (
+          <div className="invite-sent">
+            <h3 className="small">Invited just now</h3>
+            <ul className="invite-results">
+              {sent.map((p) => (
+                <li key={p.id}>
+                  <span className="person">
+                    <Avatar name={p.name} size={28} />
+                    <span>{p.name}</span>
+                  </span>
+                  <span className="pill pill-soft">Pending</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+  }
+  return (
+    <section className="card invite-panel" aria-label={`Invite people to ${teamName}`}>
+      <div className="invite-head">
+        <h2 className="card-title">Invite to {teamName}</h2>
+        {onClose && (
+          <button type="button" className="btn btn-small" onClick={onClose}>
+            Done
+          </button>
+        )}
+      </div>
+      {search}
     </section>
   );
 }

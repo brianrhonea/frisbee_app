@@ -1,22 +1,17 @@
 "use client";
-import {
-  competitionLevels,
-  type EditTeamRequest,
-  type InviteCodeResponse,
-  inviteTtls,
-} from "@stall10/shared";
+import { competitionLevels, type EditTeamRequest } from "@stall10/shared";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { callApi } from "@/lib/client";
-import { useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { roleLabel } from "../ProfileDashboard";
+import { InviteButton, useInvite } from "./InviteDialog";
+import { JoinRequests } from "./JoinRequests";
 import { useTeamHub } from "./TeamContext";
 import { TeamRoles } from "./TeamRoles";
 import { DiscordImport } from "./DiscordImport";
 import { TeamCommunity } from "./CommunityAdmin";
 import { MembersOnlySection } from "./TeamNav";
-import { formatDateTime } from "@/lib/dates";
 
 /** The team doc's editable details (Team.toEditableMap in the app). */
 interface Details {
@@ -29,23 +24,22 @@ interface Details {
 }
 
 const levelLabels: Record<string, string> = { club: "Club", college: "College", youth: "Youth", league: "League", pickup: "Pickup" };
-const ttlLabels: Record<number, string> = { 45: "45 seconds (a code to read out)", 3600: "1 hour", 86400: "1 day", 604800: "7 days", 2592000: "30 days" };
-const site = process.env.NEXT_PUBLIC_SITE_URL || "";
 
 /**
  * A team's or group's settings, for its members: details (manageTeam),
- * invite links, join requests and who has which role (manageMembers),
+ * the invite dialog, join requests and who has which role (manageMembers),
  * handing it to someone else (the owner), and leaving.
  */
 export function TeamSettings() {
   const { teamId, kind, viewer } = useTeamHub();
+  const invite = useInvite();
   if (viewer.state !== "member") return <MembersOnlySection what="settings" />;
   const owner = viewer.tier === "owner";
   return (
     <div className="stack settings-stack">
       {viewer.can("manageTeam") && <DetailsForm />}
-      {viewer.can("manageMembers") && <InviteLinks />}
-      {viewer.can("manageMembers") && kind !== "team" && viewer.team.requiresApproval && <JoinRequests />}
+      {viewer.can("manageMembers") && <InviteCard />}
+      {invite.hasRequests && <JoinRequests teamId={teamId} requests={invite.requests} />}
       {viewer.can("manageMembers") && <MemberRoles />}
       {owner && <TeamRoles />}
       {owner && <DiscordImport />}
@@ -153,94 +147,23 @@ function DetailsForm() {
   );
 }
 
-function InviteLinks() {
-  const { teamId } = useTeamHub();
-  const [ttl, setTtl] = useState<number>(604800);
-  const [invite, setInvite] = useState<InviteCodeResponse | null>(null);
-  const { act, busy, error } = useAct();
-  const link = invite ? `${site || window.location.origin}/join/${encodeURIComponent(invite.code)}` : "";
+/**
+ * Inviting lives in the hub's one invite dialog (a link, people by name,
+ * join requests); Settings opens it too.
+ */
+function InviteCard() {
+  const { kind } = useTeamHub();
+  const { hasRequests, requestCount } = useInvite();
   return (
     <section className="card settings-form">
-      <h2 className="card-title">Invite with a link</h2>
-      <p className="muted small">Anyone with the link joins while it lasts. Invite people by name from Roster.</p>
-      <div className="form-row">
-        <label>
-          Lasts
-          <select value={ttl} onChange={(e) => setTtl(Number(e.target.value))}>
-            {inviteTtls.map((t) => (
-              <option key={t} value={t}>
-                {ttlLabels[t]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <h2 className="card-title">Invite people</h2>
+      <p className="muted small">
+        Share a link{kind === "community" ? "" : " or a code to read out"}, or invite people by name
+        {hasRequests ? `; ${requestCount === 1 ? "1 person is" : `${requestCount} people are`} asking to join` : ""}.
+      </p>
       <div className="form-actions">
-        <Status error={error} ok={null} />
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={busy}
-          onClick={() => void act<InviteCodeResponse>("/v1/invite-codes", "POST", { teamId, ttl }).then((r) => r && setInvite(r))}
-        >
-          Make a link
-        </button>
+        <InviteButton className="btn btn-primary" />
       </div>
-      {invite && (
-        <p className="invite-panel">
-          {ttl === 45 ? (
-            <>
-              Code: <b className="invite-code">{invite.code}</b>{" "}
-            </>
-          ) : (
-            <>
-              <input readOnly value={link} aria-label="Invite link" onFocus={(e) => e.currentTarget.select()} />{" "}
-              <button type="button" className="btn btn-small" onClick={() => void navigator.clipboard?.writeText(link)}>
-                Copy
-              </button>
-            </>
-          )}
-          <small className="muted">
-            {" "}
-            Expires {formatDateTime(invite.expiresAt, { dateStyle: "medium", timeStyle: "short" })}
-          </small>
-        </p>
-      )}
-    </section>
-  );
-}
-
-function JoinRequests() {
-  const { teamId } = useTeamHub();
-  const requests = useLiveQuery<{ name?: string }>(`teams/${teamId}/joinRequests`, [], teamId);
-  const { act, busy, error } = useAct();
-  return (
-    <section className="card">
-      <h2 className="card-title">Asking to join</h2>
-      {requests.error ? (
-        <p className="form-error">{requests.error}</p>
-      ) : !requests.data ? (
-        <p className="muted small">Loading…</p>
-      ) : requests.data.length === 0 ? (
-        <p className="muted small">No one is waiting.</p>
-      ) : (
-        <ul className="people-list">
-          {requests.data.map((r) => (
-            <li key={r.id} className="person-row">
-              <span>{r.name || "Player"}</span>
-              <span className="post-admin">
-                <button type="button" className="btn btn-small btn-primary" disabled={busy} onClick={() => void act(`/v1/teams/${encodeURIComponent(teamId)}/join-requests/${encodeURIComponent(r.id)}/approve`, "POST")}>
-                  Approve
-                </button>
-                <button type="button" className="btn btn-small" disabled={busy} onClick={() => void act(`/v1/teams/${encodeURIComponent(teamId)}/join-requests/${encodeURIComponent(r.id)}`, "DELETE")}>
-                  Decline
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <Status error={error} ok={null} />
     </section>
   );
 }

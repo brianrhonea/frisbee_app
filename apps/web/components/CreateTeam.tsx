@@ -111,8 +111,21 @@ export function CreateTeam() {
   );
 }
 
-/** Join with an invite code or link (`POST /v1/teams/join`). */
-export function JoinWithCode({ initial = "", auto = false }: { initial?: string; auto?: boolean }) {
+/**
+ * Join with an invite code or link (`POST /v1/teams/join`), then open the
+ * team, or hand its id to [onJoined]. [onCancel] adds a Cancel button.
+ */
+export function JoinWithCode({
+  initial = "",
+  auto = false,
+  onJoined,
+  onCancel,
+}: {
+  initial?: string;
+  auto?: boolean;
+  onJoined?: (teamId: string) => void;
+  onCancel?: () => void;
+}) {
   const { user } = useAuth();
   const router = useRouter();
   const [code, setCode] = useState(initial);
@@ -126,7 +139,8 @@ export function JoinWithCode({ initial = "", auto = false }: { initial?: string;
     setError(null);
     try {
       const res = await callApi<JoinByCodeResponse>(user, "/v1/teams/join", { method: "POST", body: { code: code.trim() } });
-      router.push(`/teams/${encodeURIComponent(res.teamId)}`);
+      if (onJoined) onJoined(res.teamId);
+      else router.push(`/teams/${encodeURIComponent(res.teamId)}`);
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
@@ -147,6 +161,11 @@ export function JoinWithCode({ initial = "", auto = false }: { initial?: string;
           <span className="form-error" role="alert">
             {error}
           </span>
+        )}
+        {onCancel && (
+          <button type="button" className="btn" onClick={onCancel}>
+            Cancel
+          </button>
         )}
         <button type="submit" className="btn btn-primary" disabled={busy || !code.trim()}>
           {busy ? "Joining…" : "Join"}
