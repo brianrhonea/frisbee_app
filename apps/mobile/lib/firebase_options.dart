@@ -6,7 +6,7 @@
 // ignore_for_file: type=lint
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+    show defaultTargetPlatform, TargetPlatform;
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -28,7 +28,6 @@ class DefaultFirebaseOptions {
   static const _env = String.fromEnvironment('FIREBASE_ENV');
   static const _androidKey = String.fromEnvironment('FIREBASE_ANDROID_API_KEY');
   static const _appleKey = String.fromEnvironment('FIREBASE_APPLE_API_KEY');
-  static const _windowsKey = String.fromEnvironment('FIREBASE_WINDOWS_API_KEY');
 
   static FirebaseEnv get env =>
       _env == 'prod' ? FirebaseEnv.prod : FirebaseEnv.dev;
@@ -54,13 +53,9 @@ class DefaultFirebaseOptions {
 
   static FirebaseOptions get currentPlatform {
     final prod = env == FirebaseEnv.prod;
-    // The website (lib/main_web.dart, served at /app) shares the Windows
-    // build's Firebase web app: same app id, auth domain and API key.
-    if (kIsWeb) return prod ? windows : devWindows;
     return switch (defaultTargetPlatform) {
       TargetPlatform.android => prod ? android : devAndroid,
-      TargetPlatform.iOS || TargetPlatform.macOS => prod ? ios : devIos,
-      TargetPlatform.windows => prod ? windows : devWindows,
+      TargetPlatform.iOS => prod ? ios : devIos,
       _ => throw UnsupportedError(
         'DefaultFirebaseOptions are not supported for this platform.',
       ),
@@ -86,15 +81,6 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.brianrhonea.frisbeeApp',
   );
 
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: _windowsKey,
-    appId: '1:275864055352:web:3333768309233c043280cd',
-    messagingSenderId: '275864055352',
-    projectId: 'frisbee-app-brianrhonea',
-    authDomain: 'frisbee-app-brianrhonea.firebaseapp.com',
-    storageBucket: 'frisbee-app-brianrhonea.firebasestorage.app',
-  );
-
   // Development: frisbee-app-brianrhonea-dev.
 
   static const FirebaseOptions devAndroid = FirebaseOptions(
@@ -112,14 +98,5 @@ class DefaultFirebaseOptions {
     projectId: 'frisbee-app-brianrhonea-dev',
     storageBucket: 'frisbee-app-brianrhonea-dev.firebasestorage.app',
     iosBundleId: 'com.brianrhonea.frisbeeApp',
-  );
-
-  static const FirebaseOptions devWindows = FirebaseOptions(
-    apiKey: _windowsKey,
-    appId: '1:971051401974:web:b9d6b579767312cd2ba2d7',
-    messagingSenderId: '971051401974',
-    projectId: 'frisbee-app-brianrhonea-dev',
-    authDomain: 'frisbee-app-brianrhonea-dev.firebaseapp.com',
-    storageBucket: 'frisbee-app-brianrhonea-dev.firebasestorage.app',
   );
 }

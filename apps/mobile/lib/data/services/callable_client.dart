@@ -17,8 +17,7 @@ class CallableException implements Exception {
 
 /// Calls callable Cloud Functions (`group-name`) over HTTPS with the
 /// user's ID token. Like MeetingTokenService, it speaks the callable
-/// protocol directly so it works on Windows too, where the cloud_functions
-/// plugin isn't available.
+/// protocol directly rather than through the cloud_functions plugin.
 class CallableClient {
   CallableClient({
     required String projectId,

@@ -769,56 +769,6 @@ void main() {
     expect(find.byTooltip('Chats'), findsNothing);
   });
 
-  for (final (platform, strip) in [
-    (TargetPlatform.windows, true),
-    (TargetPlatform.android, false),
-  ]) {
-    testWidgets('react and reply sit at the end of each message with a '
-        'mouse, not on a phone (${platform.name})', (tester) async {
-      await dms.openConversation(
-        testUser,
-        const UserProfile(uid: 'a', name: 'Avery'),
-      );
-      await dms.sendMessage(
-        'a_u1',
-        author: const AppUser(uid: 'a', displayName: 'Avery'),
-        text: 'Pickup at 6?',
-      );
-      final vm = DirectChatViewModel(
-        conversationId: 'a_u1',
-        directMessageRepository: dms,
-        authRepository: auth,
-        filePicker: FakeFilePickerService(),
-      );
-      addTearDown(vm.dispose);
-      await tester.pumpWidget(
-        withRepos(
-          MaterialApp(
-            theme: AppTheme.light.copyWith(platform: platform),
-            home: DirectChatScreen(viewModel: vm),
-          ),
-        ),
-      );
-      await tester.pump();
-      expect(find.byTooltip('React'), strip ? findsOneWidget : findsNothing);
-      expect(find.byTooltip('Reply'), strip ? findsOneWidget : findsNothing);
-      if (!strip) return;
-      // Beside the bubble, on the same line, not floating over it.
-      final bubble = tester.getRect(find.text('Pickup at 6?'));
-      final react = tester.getRect(find.byTooltip('React'));
-      expect(react.left, greaterThan(bubble.right));
-      expect((react.center.dy - bubble.center.dy).abs(), lessThan(12));
-      await tester.tap(find.byTooltip('React'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('😂'));
-      await tester.pumpAndSettle();
-      expect(vm.messages.single.reactionOf(testUser.uid), '😂');
-      await tester.tap(find.byTooltip('Reply'));
-      await tester.pump();
-      expect(vm.replyingTo?.text, 'Pickup at 6?');
-    });
-  }
-
   testWidgets('on a phone, press and hold a message to react, reply or '
       'see their profile; tap the header for it', (tester) async {
     await dms.openConversation(

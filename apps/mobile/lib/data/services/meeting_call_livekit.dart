@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show showDialog;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_background/flutter_background.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
@@ -63,29 +62,8 @@ class LiveKitMediaService implements MeetingMediaService {
     }
   }
 
-  static bool get _isDesktop =>
-      defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.macOS ||
-      defaultTargetPlatform == TargetPlatform.linux;
-
   @override
-  bool get canShareScreen =>
-      _isDesktop || defaultTargetPlatform == TargetPlatform.android;
-
-  @override
-  bool get picksScreenSource => _isDesktop;
-
-  @override
-  Future<String?> pickScreenSource(BuildContext context) async {
-    final source = await showDialog<rtc.DesktopCapturerSource>(
-      context: context,
-      builder: (_) => lk.ScreenSelectDialog(),
-    );
-    return source?.id;
-  }
-
-  @override
-  bool get canPickSpeaker => _isDesktop;
+  bool get canShareScreen => defaultTargetPlatform == TargetPlatform.android;
 
   @override
   MeetingCall createCall() => LiveKitMeetingCall();

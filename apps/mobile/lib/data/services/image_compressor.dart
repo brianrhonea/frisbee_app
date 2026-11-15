@@ -13,8 +13,7 @@ typedef ShrunkImage = ({String name, Uint8List bytes});
 
 /// Shrinks and re-encodes photos before upload to save storage and data.
 ///
-/// Uses the pure-Dart `image` package, so it works on every platform
-/// (Windows and web included), off the UI thread.
+/// Uses the pure-Dart `image` package, off the UI thread.
 class ImageCompressor {
   const ImageCompressor({
     this.maxDimension = 1920,

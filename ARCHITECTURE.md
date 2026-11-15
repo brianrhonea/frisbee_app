@@ -44,8 +44,7 @@ Stall10/                          (this repo)
 │   ├── mobile/                   Flutter app: iOS + Android (Dart package `frisbee_app`)
 │   │   ├── lib/                  MVVM: data/services → data/repositories → ui/<feature>/view_models → widgets
 │   │   ├── test/                 Unit and widget tests (flutter test)
-│   │   ├── ios/ android/         Shipping platforms
-│   │   └── web/ windows/ macos/  Transitional (see §9): web is today's website, Windows is the dev target
+│   │   └── ios/ android/         The only platforms (web, Windows and macOS were removed; see §9)
 │   ├── api/                      Node.js API (TypeScript, Fastify, firebase-admin, zod)
 │   │   ├── src/                  app.ts, server.ts, auth.ts, errors.ts, <feature>/{routes,service,repository}.ts
 │   │   └── test/                 Unit tests (fakes) + *.emulator.test.ts (Firestore/Auth emulators)

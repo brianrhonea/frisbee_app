@@ -79,7 +79,7 @@ firestore.rules, storage.rules, firestore.indexes.json, firebase.json
 
 | Area | What people can do |
 |---|---|
-| **Accounts** | Sign up and sign in with email, username, Google or Apple (browser OAuth for Google on Windows); pick a unique @username; delete the account. |
+| **Accounts** | Sign up and sign in with email, username, Google or Apple; pick a unique @username; delete the account. |
 | **Home** | This week's events, your team, a playbook preview, coming-up events and a feed of posts from people, teams and tournaments you follow. |
 | **Teams** | Create a team, join by invite code, link or invite; custom roles with Discord-style permissions; roster with admin-only paid marks; team home page and public page. |
 | **Community groups, schools and clubs** | Open or approval-only groups with a map location; schools and clubs that link several teams and hand out membership by role. |
@@ -104,7 +104,7 @@ firestore.rules, storage.rules, firestore.indexes.json, firebase.json
 
 ```mermaid
 flowchart LR
-  subgraph Device["Flutter app (Android, iOS, macOS, Windows)"]
+  subgraph Device["Flutter app (Android, iOS)"]
     W[Widgets] -->|commands| VM[View models]
     VM -->|Stream / Future&lt;Result&gt;| R[Repositories]
     R --> SS[SharedStreams<br/>one listener per query]
@@ -201,7 +201,7 @@ and tests swap in the fakes in `test/testing/`.
 | Provided | Implementation | Depends on |
 |---|---|---|
 | `FeatureFlags` (`ChangeNotifier`) | Live `meta/flags` doc (kill switches) | – |
-| `CallableClient` | Callables over raw HTTPS (no `cloud_functions` plugin on Windows), adds ID and App Check tokens | – |
+| `CallableClient` | Callables over raw HTTPS, adds ID and App Check tokens | – |
 | `ApiSearch` | `api-search` callable | `CallableClient`, `FeatureFlags` |
 | `AuthService`, `AccountService` | Firebase Auth + Google/Apple; `account-*` functions | – |
 | `AuthRepository` (`ChangeNotifier`) | `AuthRepositoryFirebase` | `AuthService`, `AccountService` |
@@ -218,7 +218,7 @@ and tests swap in the fakes in `test/testing/`.
 | `DiscordImportRepository` | `discord-previewTemplate`, then client writes | `CallableClient` |
 | `YouTubeInfoService`, `GeocodingService`, `LocationService` | oEmbed, Nominatim, geolocator | – |
 | `WorkoutRecorder` (`ChangeNotifier`) | GPS run/ride recording, app-wide | `LocationService` |
-| `PushService`, `NotificationRepository` | `firebase_messaging` (no-op on Windows); Firebase | – |
+| `PushService`, `NotificationRepository` | `firebase_messaging`; Firebase | – |
 | `StatsRepository` | `StatsRepositoryFirebase` | `TeamRepository` |
 | `ThemeRepository` (`ChangeNotifier`) | `ThemeRepositoryPrefs`, loaded before `runApp` | – |
 
@@ -302,7 +302,7 @@ their own `limits` doc but never write it.
 
 **App Check.** `AppCheck.activate()` runs at startup: Play Integrity on
 Android, App Attest (DeviceCheck fallback) on Apple, debug providers in
-debug builds and a debug token (`APP_CHECK_DEBUG_TOKEN`) on Windows. HTTP
+debug builds (with `APP_CHECK_DEBUG_TOKEN`). HTTP
 calls carry the `X-Firebase-AppCheck` header. Enforcement rolls out as
 described in `docs/app-check.md`.
 
@@ -428,7 +428,6 @@ agent to hold the *Firebase Rules Firestore Service Agent* role.
 | API | Used for | Called from |
 |---|---|---|
 | Firebase Auth | Sign-in, account deletion | `AuthService` |
-| Google OAuth (browser + loopback) | Google sign-in on Windows | `GoogleDesktopOAuth` |
 | Firestore, Storage, FCM, App Check | App data, files, push, attestation | Repositories, `AttachmentStorage`, `PushService`, `AppCheck` |
 | Cloud Functions (HTTPS) | Search, sign-in, tokens, Discord preview | `CallableClient`, `AccountService`, `MeetingTokenService` |
 | LiveKit Cloud | Meeting and voice-channel audio, video, screen share | `meeting_call_livekit.dart` |
@@ -463,8 +462,8 @@ layers) and its subfeatures.
   frees the username and deletes the Auth user; `follows` functions clean
   up others' follows.
 
-**Subfeatures:** email/password, Google, Apple (Google and Apple hidden
-on Windows except browser Google), sign-out unregisters the device first.
+**Subfeatures:** email/password, Google, Apple; sign-out unregisters the
+device first.
 
 ### 5.2 Home and the feed
 
@@ -642,7 +641,7 @@ non-admins may only see the ones they're invited to.
   admin can take control; Stop deletes the doc.
 - **End:** an admin ends it; `closeRoom` deletes the LiveKit room.
 
-**Subfeatures:** camera, mic, screen share (Windows, macOS, Android),
+**Subfeatures:** camera, mic, screen share (Android),
 device choice and per-person volume (`MeetingSettings`), in-call chat
 (paged, flood-limited).
 
@@ -665,8 +664,8 @@ the steps.
   `teams/{teamId}/videos/{videoId}/{name}`, then writes the doc; the file
   is deleted if the write fails. 500 MB per file (app, Firestore and
   Storage rules) and 5 GB per team (app only).
-- **Watch:** YouTube embed (`youtube_player_iframe`; WebView2 on Windows
-  from a virtual host) or media_kit for uploads.
+- **Watch:** YouTube embed (`youtube_player_iframe`) or media_kit for
+  uploads.
 
 **Subfeatures:** folders (deleting one moves its videos to Unsorted),
 thumbnails, quota display, watch together in meetings.
@@ -742,8 +741,7 @@ keyword, rate-limits per user and returns at most 50 results.
   entries while the app is open.
 
 **Subfeatures:** per-category and per-team settings, per-room mute,
-times in the recipient's UTC offset, feed pruned after 60 days. Windows
-has the feed only (no FCM plugin).
+times in the recipient's UTC offset, feed pruned after 60 days.
 
 ### 5.17 Settings
 

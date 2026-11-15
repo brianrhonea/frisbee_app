@@ -22,12 +22,11 @@ tells them "You're going too fast".
 
 1. **Register the apps** in Firebase console → App Check:
    - Android: Play Integrity (add the app's SHA-256 signing fingerprint).
-   - iOS/macOS: App Attest (DeviceCheck fallback). Add the App Attest
+   - iOS: App Attest (DeviceCheck fallback). Add the App Attest
      capability in Xcode (Codemagic signs it).
-2. **Debug token for Windows and debug builds**: App Check → Apps →
-   Manage debug tokens → Add. Put the token in `APP_CHECK_DEBUG_TOKEN` in
-   `secrets.local.json` (never commit it). Without one, Windows runs
-   without App Check.
+2. **Debug token for debug builds**: App Check → Apps → Manage debug
+   tokens → Add. Put the token in `APP_CHECK_DEBUG_TOKEN` in
+   `secrets.local.json` (never commit it).
 3. **Watch** App Check → APIs → Firestore / Storage / Functions metrics for
    a week. "Verified" should cover nearly all requests from current builds.
 4. **Enforce** in the console (Firestore, Storage) once older builds without

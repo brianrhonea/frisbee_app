@@ -54,15 +54,6 @@ class DeviceSettings extends StatelessWidget {
             label: 'Camera',
             icon: Icons.videocam_outlined,
           ),
-          if (vm.canPickSpeaker) ...[
-            const SizedBox(height: 12),
-            _DevicePicker(
-              viewModel: vm,
-              kind: MediaDeviceKind.audioOutput,
-              label: 'Speaker',
-              icon: Icons.volume_up_outlined,
-            ),
-          ],
           const SizedBox(height: 16),
           Text('Meeting volume', style: Theme.of(context).textTheme.labelLarge),
           Row(

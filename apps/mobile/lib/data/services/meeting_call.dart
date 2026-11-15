@@ -142,15 +142,5 @@ abstract class MeetingMediaService {
   /// extension the app doesn't have yet.
   bool get canShareScreen;
 
-  /// Whether screen sharing starts with a picker of screens and windows.
-  bool get picksScreenSource;
-
-  /// Shows the screen and window picker; the chosen source's id, or null
-  /// if cancelled. Only where [picksScreenSource].
-  Future<String?> pickScreenSource(BuildContext context);
-
-  /// Whether the speaker can be chosen; phones route audio themselves.
-  bool get canPickSpeaker;
-
   MeetingCall createCall();
 }
