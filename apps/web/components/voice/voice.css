@@ -1,0 +1,23 @@
+/* The voice bar on every page while the user is in a voice channel. */
+.voice-bar {
+  position: sticky; bottom: 0; z-index: 20;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 12px 0 0; padding: 8px 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+}
+.voice-bar-signal {
+  flex: none; width: 10px; height: 10px; border-radius: 50%; background: #d97706;
+}
+.voice-bar.on .voice-bar-signal { background: #16a34a; }
+.voice-bar-where { display: grid; flex: 1; min-width: 120px; color: inherit; text-decoration: none; }
+.voice-bar-where b { font-size: 0.9rem; color: #fbbf24; }
+.voice-bar.on .voice-bar-where b { color: #4ade80; }
+.voice-bar-where small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice-bar-where:hover small { text-decoration: underline; }
+.voice-bar-mic.off { border-color: var(--danger); color: var(--danger); }
+:root[data-theme="light"] .voice-bar-where b { color: #b45309; }
+:root[data-theme="light"] .voice-bar.on .voice-bar-where b { color: #15803d; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .voice-bar-where b { color: #b45309; }
+  :root:not([data-theme="dark"]) .voice-bar.on .voice-bar-where b { color: #15803d; }
+}

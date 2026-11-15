@@ -5,6 +5,7 @@ import { AppFrame } from "@/components/AppFrame";
 import { AuthProvider } from "@/components/AuthProvider";
 import { PersonalGate } from "@/components/PersonalGate";
 import { SiteFooter } from "@/components/SiteFooter";
+import { VoiceProvider } from "@/components/voice/VoiceProvider";
 import { themeScript } from "@/lib/theme";
 import "./site.css";
 import "./app.css";
@@ -36,9 +37,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {themeScript}
         </Script>
         <AuthProvider>
-          <AppFrame footer={<SiteFooter />}>
-            <PersonalGate>{children}</PersonalGate>
-          </AppFrame>
+          {/* Above the frame, so a voice call stays up from page to page. */}
+          <VoiceProvider>
+            <AppFrame footer={<SiteFooter />}>
+              <PersonalGate>{children}</PersonalGate>
+            </AppFrame>
+          </VoiceProvider>
         </AuthProvider>
       </body>
     </html>

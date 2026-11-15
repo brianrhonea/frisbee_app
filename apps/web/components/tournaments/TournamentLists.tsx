@@ -113,31 +113,42 @@ const midnight = () => {
 };
 const openStatuses: HostedStatus[] = ["registration", "seeding", "scheduled", "live"];
 
-/** Upcoming published tournaments and leagues, soonest first (watchUpcoming). */
-export function FindTournaments() {
+/**
+ * Upcoming published tournaments and leagues, soonest first, at most
+ * [max] (watchUpcoming): ones starting from a week ago on, plus leagues
+ * still running. Find tournaments and Explore read it.
+ */
+export function useUpcomingTournaments(max = 50) {
   const { user } = useAuth();
   const [since] = useState(midnight);
   const weekAgo = new Date(since.getFullYear(), since.getMonth(), since.getDate() - 7);
   const starting = useLiveQuery<TournamentDoc>(
     user ? "tournaments" : null,
-    [where("status", "in", openStatuses), where("startsOn", ">=", weekAgo), orderBy("startsOn"), limit(50)],
-    `start${since.getTime()}`,
+    [where("status", "in", openStatuses), where("startsOn", ">=", weekAgo), orderBy("startsOn"), limit(max)],
+    `start${since.getTime()}:${max}`,
   );
   // A league that began weeks ago still runs until its last night.
   const running = useLiveQuery<TournamentDoc>(
     user ? "tournaments" : null,
-    [where("status", "in", openStatuses), where("endsOn", ">=", since), orderBy("endsOn"), limit(50)],
-    `run${since.getTime()}`,
+    [where("status", "in", openStatuses), where("endsOn", ">=", since), orderBy("endsOn"), limit(max)],
+    `run${since.getTime()}:${max}`,
   );
   const list = useMemo(() => {
     const byId = new Map<string, Doc<TournamentDoc>>();
     for (const t of [...(starting.data ?? []), ...(running.data ?? [])]) byId.set(t.id, t);
-    return [...byId.values()].sort((a, b) => a.startsOn.localeCompare(b.startsOn)).slice(0, 50);
-  }, [starting.data, running.data]);
-  const f = useFiltered(list);
+    return [...byId.values()].sort((a, b) => a.startsOn.localeCompare(b.startsOn)).slice(0, max);
+  }, [starting.data, running.data, max]);
+  // Without its index yet, the running query fails; the first still lists everything else.
+  return { list: starting.data ? list : undefined, error: starting.error };
+}
 
-  if (starting.error) return <p className="form-error">{starting.error}</p>;
-  if (!starting.data) return <p className="muted" aria-busy="true">Loading…</p>;
+/** Upcoming published tournaments and leagues, soonest first (FindTournamentsScreen). */
+export function FindTournaments() {
+  const upcoming = useUpcomingTournaments();
+  const f = useFiltered(upcoming.list ?? []);
+
+  if (upcoming.error) return <p className="form-error">{upcoming.error}</p>;
+  if (!upcoming.list) return <p className="muted" aria-busy="true">Loading…</p>;
   return (
     <div className="stack">
       <div className="hosted-toolbar">

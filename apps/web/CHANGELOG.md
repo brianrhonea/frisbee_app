@@ -4,6 +4,21 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.24.0 — 2026-11-15
+
+**Added**
+- Explore searches tournaments as well as players, teams and groups,
+  with the app's All / Players / Teams / Groups / Tournaments filters.
+  Below search: upcoming tournaments and leagues, recent results, a
+  rankings preview and shortcuts, as in the app.
+- A voice channel call stays connected as you move around the site. A
+  voice bar on every page shows the channel, with mute and disconnect;
+  leaving the team or losing access to the room disconnects.
+- Meetings: pick your microphone, camera and speaker (where the browser
+  allows), preview your camera in the lobby, set the meeting volume,
+  mute audio, and turn each person up to 200%. Choices are remembered
+  on this browser; the meeting volume also applies to watch together.
+
 ## 0.23.0 — 2026-11-15
 
 Needs API 0.22.0 (sharing calendar events sends `calendarId`).

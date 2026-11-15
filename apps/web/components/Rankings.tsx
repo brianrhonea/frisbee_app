@@ -8,7 +8,7 @@ import { Avatar } from "./Avatar";
 // app's Rankings screen shows them: rankings/{level-division} for teams and
 // playerRankings/all for players. firestore.rules lets members read them.
 
-interface RankedTeam {
+export interface RankedTeam {
   rank: number;
   teamId: string;
   name: string;
@@ -16,14 +16,14 @@ interface RankedTeam {
   wins: number;
   losses: number;
 }
-interface DivisionRanking {
+export interface DivisionRanking {
   level?: string;
   division?: string;
   teams?: RankedTeam[];
   minGames?: number;
   updatedAt?: string;
 }
-interface RankedPlayer {
+export interface RankedPlayer {
   rank: number;
   uid: string;
   name: string;
@@ -32,7 +32,7 @@ interface RankedPlayer {
   rating: number;
   games: number;
 }
-interface PlayerRanking {
+export interface PlayerRanking {
   players?: RankedPlayer[];
   minGames?: number;
   updatedAt?: string;
@@ -41,9 +41,9 @@ interface PlayerRanking {
 const levels = ["club", "college", "youth", "league", "pickup"];
 const divisions = ["mixed", "open", "women", "masters"];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const label = (r: DivisionRanking) => `${cap(r.level ?? "club")} ${cap(r.division ?? "mixed")}`;
-const order = (r: DivisionRanking) => levels.indexOf(r.level ?? "") * 10 + divisions.indexOf(r.division ?? "");
-const n = (v: unknown) => (typeof v === "number" ? Math.round(v) : 0);
+export const rankingLabel = (r: DivisionRanking) => `${cap(r.level ?? "club")} ${cap(r.division ?? "mixed")}`;
+export const rankingOrder = (r: DivisionRanking) => levels.indexOf(r.level ?? "") * 10 + divisions.indexOf(r.division ?? "");
+export const whole = (v: unknown) => (typeof v === "number" ? Math.round(v) : 0);
 const updated = (at?: string) =>
   at ? ` Updated ${new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.` : "";
 
@@ -74,7 +74,7 @@ function Teams() {
   const { data, error } = useLiveQuery<DivisionRanking>("rankings", [], "rankings");
   if (error) return <p className="form-error">{error}</p>;
   if (!data) return <p className="muted">Loading…</p>;
-  const ranked = data.filter((r) => (r.teams?.length ?? 0) > 0).sort((a, b) => order(a) - order(b));
+  const ranked = data.filter((r) => (r.teams?.length ?? 0) > 0).sort((a, b) => rankingOrder(a) - rankingOrder(b));
   if (ranked.length === 0) {
     return (
       <div className="card">
@@ -91,13 +91,13 @@ function Teams() {
         <select value={current.id} onChange={(e) => router.replace(`/rankings?division=${encodeURIComponent(e.target.value)}`)}>
           {ranked.map((r) => (
             <option key={r.id} value={r.id}>
-              {label(r)}
+              {rankingLabel(r)}
             </option>
           ))}
         </select>
       </label>
       <div className="card">
-        <h2 className="card-title">{label(current)}</h2>
+        <h2 className="card-title">{rankingLabel(current)}</h2>
         <table className="rankings-table">
           <thead>
             <tr>
@@ -110,12 +110,12 @@ function Teams() {
           <tbody>
             {(current.teams ?? []).map((t) => (
               <tr key={t.teamId || t.rank}>
-                <td>{n(t.rank)}</td>
+                <td>{whole(t.rank)}</td>
                 <td>{t.teamId ? <Link href={`/teams/${encodeURIComponent(t.teamId)}`}>{t.name}</Link> : t.name}</td>
                 <td>
-                  {n(t.wins)}–{n(t.losses)}
+                  {whole(t.wins)}–{whole(t.losses)}
                 </td>
-                <td>{n(t.rating)}</td>
+                <td>{whole(t.rating)}</td>
               </tr>
             ))}
           </tbody>
@@ -161,7 +161,7 @@ function Players() {
         <tbody>
           {players.map((p) => (
             <tr key={p.uid || p.rank}>
-              <td>{n(p.rank)}</td>
+              <td>{whole(p.rank)}</td>
               <td>
                 <Link className="rankings-player" href={`/players/${encodeURIComponent(p.uid)}`}>
                   <Avatar name={p.name} url={p.photoUrl} size={28} />
@@ -171,8 +171,8 @@ function Players() {
                   </span>
                 </Link>
               </td>
-              <td>{n(p.games)}</td>
-              <td>{n(p.rating)}</td>
+              <td>{whole(p.games)}</td>
+              <td>{whole(p.rating)}</td>
             </tr>
           ))}
         </tbody>

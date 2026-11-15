@@ -1,69 +1,33 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ExploreResults } from "@/components/ExploreResults";
+import { Explore } from "@/components/explore/Explore";
+import { type ExploreFilter, exploreFilters } from "@/components/explore/filters";
 import { MembersOnly } from "@/components/MembersOnly";
 
 export const metadata: Metadata = {
   title: "Explore",
-  description: "Search for ultimate players, teams and pickup groups on Stall 10.",
+  description: "Search for ultimate players, teams, pickup groups and tournaments on Stall 10.",
 };
 
-type Props = { searchParams: Promise<{ q?: string | string[] }> };
+type Props = { searchParams: Promise<{ q?: string | string[]; only?: string | string[] }> };
+
+const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 /** Members only: search runs in the browser with their token. */
-export default async function Explore({ searchParams }: Props) {
-  const raw = (await searchParams).q;
-  const q = (Array.isArray(raw) ? raw[0] : raw)?.trim().slice(0, 100) ?? "";
-  const next = q ? `/explore?q=${encodeURIComponent(q)}` : "/explore";
+export default async function ExplorePage({ searchParams }: Props) {
+  const params = await searchParams;
+  const q = first(params.q)?.trim().slice(0, 100) ?? "";
+  const raw = first(params.only);
+  const only = exploreFilters.includes(raw as ExploreFilter) ? (raw as ExploreFilter) : null;
+  const query = new URLSearchParams({ ...(q && { q }), ...(only && { only }) }).toString();
+  const next = query ? `/explore?${query}` : "/explore";
   return (
     <div className="page">
       <div className="page-head">
         <h1>Explore</h1>
-        <p>Find players, teams and pickup groups.</p>
+        <p>Find your next point. Players, teams, pickup groups and tournaments.</p>
       </div>
-      <MembersOnly next={next} what="Sign up free or log in to search for players, teams and pickup groups.">
-        <form className="search-form" action="/explore" method="get" role="search">
-          <label className="visually-hidden" htmlFor="q">
-            Search Stall 10
-          </label>
-          <input id="q" name="q" type="search" defaultValue={q} placeholder="Search players and teams" autoComplete="off" />
-          <button className="btn btn-primary" type="submit">
-            Search
-          </button>
-        </form>
-        {q ? (
-          <ExploreResults q={q} />
-        ) : (
-          <>
-            <h2 className="section-title">Browse</h2>
-            <div className="stack">
-              <Link className="row-card" href="/tournaments">
-                <span>
-                  <b>Find a tournament or league</b>
-                  <small>Apply with your team, sign up to play, or follow results</small>
-                </span>
-              </Link>
-              <Link className="row-card" href="/tournaments/host">
-                <span>
-                  <b>Host a league or tournament</b>
-                  <small>Run it from your group or school or club</small>
-                </span>
-              </Link>
-              <Link className="row-card" href="/rankings">
-                <span>
-                  <b>Team rankings</b>
-                  <small>Teams by division, from public tournaments</small>
-                </span>
-              </Link>
-              <Link className="row-card" href="/rankings?kind=players">
-                <span>
-                  <b>Player ratings</b>
-                  <small>From stats logged with the game tracker</small>
-                </span>
-              </Link>
-            </div>
-          </>
-        )}
+      <MembersOnly next={next} what="Sign up free or log in to search for players, teams, pickup groups and tournaments.">
+        <Explore initialQuery={q} initialFilter={only} />
       </MembersOnly>
     </div>
   );

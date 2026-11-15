@@ -1,5 +1,6 @@
 "use client";
 import type { MeetingTokenResult } from "@stall10/shared";
+import type { LocalVideoTrack } from "livekit-client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
@@ -7,34 +8,19 @@ import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../../AuthProvider";
 import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
-import { CallSession, endNotices, useCall } from "./call";
-import { CallStage, PeopleList } from "./CallTiles";
+import { CallSession, deviceProblem, endNotices, useCall } from "./call";
+import { CallStage, PeopleList, VideoView } from "./CallTiles";
+import { type DeviceKind, DeviceSettings, selectedDevice, useDevices, withDevice } from "./DeviceSettings";
 import { MeetingChat } from "./MeetingChat";
 import { canSee, type JoinRequestData, type MeetingData, meetingApi, meetingHref, needsApproval } from "./model";
+import { defaultSettings, loadSettings, type MeetingSettings, saveSettings } from "./settings";
 import { WatchTogether } from "./WatchTogether";
 import "./meetings.css";
+import "./devices.css";
 
 /** What the lobby offers right now (LobbyState). */
 type Lobby = "loading" | "unavailable" | "ended" | "canStart" | "waitingToStart" | "canAsk" | "waitingForApproval" | "canJoin";
 type Stage = "lobby" | "joining" | "inCall" | "left";
-
-/** The user's own start-up choices, remembered on this browser (MeetingSettings.micOn / cameraOn). */
-const prefsKey = "stall10.meetingPrefs";
-function loadPrefs(): { micOn: boolean; cameraOn: boolean } {
-  try {
-    const p = JSON.parse(localStorage.getItem(prefsKey) ?? "{}") as { micOn?: unknown; cameraOn?: unknown };
-    return { micOn: p.micOn !== false, cameraOn: p.cameraOn === true };
-  } catch {
-    return { micOn: true, cameraOn: false };
-  }
-}
-function savePrefs(p: { micOn: boolean; cameraOn: boolean }) {
-  try {
-    localStorage.setItem(prefsKey, JSON.stringify(p));
-  } catch {
-    // Only means it isn't remembered.
-  }
-}
 
 /**
  * The meeting room (MeetingRoomScreen): the lobby, then the call with its
@@ -57,14 +43,25 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   const [stage, setStage] = useState<Stage>("lobby");
   const [call, setCall] = useState<CallSession | null>(null);
   const state = useCall(call);
-  const [prefs, setPrefs] = useState({ micOn: true, cameraOn: false });
-  useEffect(() => setPrefs(loadPrefs()), []);
+  // Remembered on this browser (MeetingSettings): start-up mic and camera, devices and volumes.
+  const [settings, setSettings] = useState<MeetingSettings>(defaultSettings);
+  useEffect(() => setSettings(loadSettings()), []);
+  const update = useCallback((fn: (s: MeetingSettings) => MeetingSettings) => {
+    setSettings((cur) => {
+      const next = fn(cur);
+      saveSettings(next);
+      return next;
+    });
+  }, []);
+  const { devices, reload: reloadDevices, speaker } = useDevices();
+  const [preview, setPreview] = useState<LocalVideoTrack | null>(null);
+  const previewRef = useRef<LocalVideoTrack | null>(null);
+  const [mediaNotice, setMediaNotice] = useState<string | null>(null);
   const [wantsIn, setWantsIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [panel, setPanel] = useState<"people" | "chat" | "watch">("people");
-  const [volumes, setVolumes] = useState<Record<string, number>>({});
+  const [panel, setPanel] = useState<"people" | "chat" | "watch" | "settings">("people");
   const callRef = useRef<CallSession | null>(null);
   // Bumped on hang-up and unmount: a connect that finishes after either is dropped.
   const generation = useRef(0);
@@ -96,6 +93,42 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
     [],
   );
 
+  const stopPreview = useCallback(() => {
+    previewRef.current?.stop();
+    previewRef.current = null;
+    setPreview(null);
+  }, []);
+  // The lobby's camera preview while the camera is on (CameraPreview): the
+  // browser asks for the camera here. It stops on joining, turning the
+  // camera off, picking another camera and leaving the page.
+  const previewCamera = selectedDevice(settings, devices, "videoinput");
+  const wantsPreview = !!member && stage === "lobby" && settings.cameraOn;
+  useEffect(() => {
+    if (!wantsPreview) return;
+    let live = true;
+    CallSession.previewCamera(previewCamera).then(
+      (track) => {
+        if (!live) {
+          track.stop();
+          return;
+        }
+        previewRef.current = track;
+        setPreview(track);
+        setMediaNotice(null);
+        reloadDevices(); // Names show once the browser allows the camera.
+      },
+      (e) => {
+        if (!live) return;
+        setMediaNotice(`${deviceProblem(e, "camera")} Or pick another camera.`);
+        update((s) => ({ ...s, cameraOn: false }));
+      },
+    );
+    return () => {
+      live = false;
+      stopPreview();
+    };
+  }, [wantsPreview, previewCamera, reloadDevices, stopPreview, update]);
+
   // The meeting ended or was deleted, or the server closed the room.
   useEffect(() => {
     if ((stage === "inCall" || stage === "joining") && meeting.data !== undefined && (!m || m.status === "ended")) void hangUp(endNotices.meetingEnded);
@@ -113,7 +146,18 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
     try {
       const access = await callApi<MeetingTokenResult>(user, `${meetingApi(teamId, meetingId)}/token`, { method: "POST" });
       if (mine !== generation.current) return;
-      const c = await CallSession.connect({ url: access.url, token: access.token, micOn: prefs.micOn, cameraOn: prefs.cameraOn });
+      // The call opens the camera itself; release the preview's first.
+      stopPreview();
+      const c = await CallSession.connect({
+        url: access.url,
+        token: access.token,
+        micOn: settings.micOn,
+        cameraOn: settings.cameraOn,
+        audioInputId: selectedDevice(settings, devices, "audioinput"),
+        videoInputId: selectedDevice(settings, devices, "videoinput"),
+        audioOutputId: speaker ? selectedDevice(settings, devices, "audiooutput") : null,
+        volumes: { output: settings.outputVolume, people: settings.participantVolumes },
+      });
       if (mine !== generation.current) {
         await c.leave();
         return;
@@ -127,7 +171,26 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
       setError(e instanceof ApiError ? e.message : "Couldn't connect to the call. Check your connection and try again.");
       setStage("lobby");
     }
-  }, [user, stage, teamId, meetingId, prefs]);
+  }, [user, stage, teamId, meetingId, settings, devices, speaker, stopPreview]);
+
+  /** A device picked in the lobby or the call (useDevice); null is the system default. */
+  function pickDevice(kind: DeviceKind, id: string | null) {
+    update((s) => withDevice(s, kind, id));
+    if (call) {
+      const target = id ?? (kind === "videoinput" ? devices.videoinput[0]?.deviceId : "default");
+      if (target) void call.useDevice(kind, target);
+    }
+  }
+  function setOutputVolume(v: number) {
+    update((s) => ({ ...s, outputVolume: v }));
+    call?.setOutputVolume(v);
+  }
+  function setPersonVolume(uid: string, v: number) {
+    update((s) => ({ ...s, participantVolumes: { ...s.participantVolumes, [uid]: v } }));
+    call?.setVolume(uid, v);
+  }
+  const deviceSettings = <DeviceSettings settings={settings} devices={devices} speaker={speaker} onDevice={pickDevice} onOutputVolume={setOutputVolume} />;
+  const watchVolume = state.audioMuted ? 0 : settings.outputVolume;
 
   // Asked to join before it opened, or while waiting to be let in: straight in once they can.
   useEffect(() => {
@@ -200,7 +263,7 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
         {admin && pending.length > 0 && <Requests pending={pending} busy={busy} onDecide={decide} />}
         <div className="call-body">
           <div className="call-stage-wrap">
-            <WatchTogether teamId={teamId} meetingId={meetingId} canControl={admin} stage />
+            <WatchTogether teamId={teamId} meetingId={meetingId} canControl={admin} stage volume={watchVolume} />
             <CallStage people={state.people} />
           </div>
           <aside className="card call-side">
@@ -210,6 +273,7 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
                   ["people", `People (${state.people.length})`],
                   ["chat", "Chat"],
                   ["watch", "Watch together"],
+                  ["settings", "Settings"],
                 ] as const
               ).map(([k, label]) => (
                 <button key={k} type="button" role="tab" className={panel === k ? "on" : ""} aria-selected={panel === k} onClick={() => setPanel(k)}>
@@ -217,9 +281,10 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
                 </button>
               ))}
             </div>
-            {panel === "people" && <PeopleList call={call} people={state.people} volumes={volumes} onVolume={(uid, v) => setVolumes({ ...volumes, [uid]: v })} />}
+            {panel === "people" && <PeopleList people={state.people} volumes={settings.participantVolumes} onVolume={setPersonVolume} />}
             {panel === "chat" && <MeetingChat teamId={teamId} meetingId={meetingId} canModerate={admin} />}
-            {panel === "watch" && <WatchTogether teamId={teamId} meetingId={meetingId} canControl={admin} stage={false} />}
+            {panel === "watch" && <WatchTogether teamId={teamId} meetingId={meetingId} canControl={admin} stage={false} volume={watchVolume} />}
+            {panel === "settings" && deviceSettings}
           </aside>
         </div>
         {state.notice && (
@@ -238,6 +303,9 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
           </button>
           <button type="button" className={`btn btn-small${state.cameraOn ? "" : " off"}`} aria-pressed={state.cameraOn} onClick={() => void call.setCamera(!state.cameraOn)}>
             {state.cameraOn ? "Stop camera" : "Start camera"}
+          </button>
+          <button type="button" className={`btn btn-small${state.audioMuted ? " off" : ""}`} aria-pressed={state.audioMuted} onClick={() => call.setAudioMuted(!state.audioMuted)}>
+            {state.audioMuted ? "Unmute audio" : "Mute audio"}
           </button>
           {typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia && (
             <button type="button" className="btn btn-small" aria-pressed={state.screenSharing} onClick={() => void call.setScreen(!state.screenSharing)}>
@@ -282,34 +350,36 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
             {lobby === "ended" && <p className="empty">This meeting has ended.</p>}
             {!["loading", "unavailable", "ended"].includes(lobby) && (
               <>
+                <div className="lobby-preview" aria-label="Camera preview">
+                  {preview ? <VideoView track={preview} mirror /> : <span className="lobby-preview-off">Camera is off</span>}
+                </div>
+                {mediaNotice && (
+                  <p className="form-error" role="alert">
+                    {mediaNotice}
+                  </p>
+                )}
                 <fieldset>
                   <legend>Join with</legend>
                   <label className="switch-row">
-                    <input
-                      type="checkbox"
-                      checked={prefs.micOn}
-                      onChange={(e) => {
-                        const p = { ...prefs, micOn: e.target.checked };
-                        setPrefs(p);
-                        savePrefs(p);
-                      }}
-                    />{" "}
-                    Microphone on
+                    <input type="checkbox" checked={settings.micOn} onChange={(e) => update((s) => ({ ...s, micOn: e.target.checked }))} /> Microphone on
                   </label>
                   <label className="switch-row">
                     <input
                       type="checkbox"
-                      checked={prefs.cameraOn}
+                      checked={settings.cameraOn}
                       onChange={(e) => {
-                        const p = { ...prefs, cameraOn: e.target.checked };
-                        setPrefs(p);
-                        savePrefs(p);
+                        const on = e.target.checked;
+                        if (on) setMediaNotice(null);
+                        update((s) => ({ ...s, cameraOn: on }));
                       }}
                     />{" "}
                     Camera on
                   </label>
-                  <p className="muted small">Your browser asks for them when you join. You can turn them on or off in the call.</p>
+                  <p className="muted small">
+                    Your browser asks for the camera for the preview, and for the microphone when you join. You can turn them on or off in the call.
+                  </p>
                 </fieldset>
+                {deviceSettings}
                 <div className="home-actions">
                   {lobby === "canStart" && (
                     <>

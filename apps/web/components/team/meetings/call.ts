@@ -3,7 +3,7 @@
 // MeetingCallLivekit: who's in it, the local mic, camera and screen, and
 // why it ended. livekit-client is large, so it's imported only when
 // someone joins. React reads it through subscribe/snapshot (useCall).
-import type { Participant, RemoteTrack, Room, Track, VideoTrack } from "livekit-client";
+import type { LocalVideoTrack, Participant, RemoteTrack, Room, Track, VideoTrack } from "livekit-client";
 import { useSyncExternalStore } from "react";
 
 /** One person in the call, as last seen (CallParticipant). */
@@ -35,6 +35,8 @@ export interface CallState {
   screenSharing: boolean;
   /** The browser won't play sound until the user clicks (autoplay rules). */
   audioBlocked: boolean;
+  /** Everyone else silenced on this browser (the mic is separate). */
+  audioMuted: boolean;
   /** A plain note about the mic, camera or screen, e.g. permission refused. */
   notice: string | null;
   ended: CallEnd | null;
@@ -47,6 +49,7 @@ const idle: CallState = {
   cameraOn: false,
   screenSharing: false,
   audioBlocked: false,
+  audioMuted: false,
   notice: null,
   ended: null,
 };
@@ -76,11 +79,18 @@ function photoOf(metadata: string | undefined): string | null {
 
 type LK = typeof import("livekit-client");
 
+/** How loud the call plays: everyone, and each person relative to that (0–2). */
+export interface CallVolumes {
+  output: number;
+  people: Record<string, number>;
+}
+
 export class CallSession {
   private state: CallState = idle;
   private listeners = new Set<() => void>();
   private audio = new Map<string, HTMLMediaElement[]>();
   private left = false;
+  private volumes: CallVolumes = { output: 1, people: {} };
 
   private constructor(
     private readonly lk: LK,
@@ -92,15 +102,28 @@ export class CallSession {
    * The browser asks for them here, on joining, never before; a refusal
    * leaves that device off with a note, not a failed join.
    */
-  static async connect(a: { url: string; token: string; micOn: boolean; cameraOn: boolean; audioInputId?: string; videoInputId?: string }) {
+  static async connect(a: {
+    url: string;
+    token: string;
+    micOn: boolean;
+    cameraOn: boolean;
+    audioInputId?: string | null;
+    audioOutputId?: string | null;
+    videoInputId?: string | null;
+    volumes?: CallVolumes;
+  }) {
     const lk = await import("livekit-client");
     const room = new lk.Room({
       adaptiveStream: true,
       dynacast: true,
+      // Sound goes through Web Audio gain, so a person can be turned up past 100%.
+      webAudioMix: true,
       audioCaptureDefaults: a.audioInputId ? { deviceId: a.audioInputId } : undefined,
       videoCaptureDefaults: a.videoInputId ? { deviceId: a.videoInputId } : undefined,
+      audioOutput: a.audioOutputId ? { deviceId: a.audioOutputId } : undefined,
     });
     const call = new CallSession(lk, room);
+    if (a.volumes) call.volumes = { output: a.volumes.output, people: { ...a.volumes.people } };
     call.listen();
     await room.connect(a.url, a.token);
     call.refresh();
@@ -136,6 +159,7 @@ export class CallSession {
         document.body.appendChild(el);
         const key = `${p.identity}:${track.sid}`;
         this.audio.set(key, [...(this.audio.get(key) ?? []), el]);
+        this.applyVolume(p.identity);
       }
       update();
     });
@@ -146,6 +170,7 @@ export class CallSession {
       }
       update();
     });
+    r.on(RoomEvent.ParticipantConnected, (p: Participant) => this.applyVolume(p.identity));
     r.on(RoomEvent.AudioPlaybackStatusChanged, update);
     r.on(RoomEvent.Disconnected, (reason?: number) => {
       if (this.left) return;
@@ -224,9 +249,30 @@ export class CallSession {
     return this.device("screen", () => this.room.localParticipant.setScreenShareEnabled(on, { audio: true }));
   }
 
-  /** How loud [uid] plays here: 0 silent, 1 as sent (the app goes to 2). */
+  private applyVolume(uid: string) {
+    const v = this.state.audioMuted ? 0 : this.volumes.output * (this.volumes.people[uid] ?? 1);
+    this.room.remoteParticipants.get(uid)?.setVolume(v);
+  }
+  private applyVolumes() {
+    for (const uid of this.room.remoteParticipants.keys()) this.applyVolume(uid);
+  }
+
+  /** How loud [uid] plays here, relative to the call's volume: 0 silent, 1 as sent, up to 2. */
   setVolume(uid: string, volume: number) {
-    this.room.remoteParticipants.get(uid)?.setVolume(volume);
+    this.volumes = { ...this.volumes, people: { ...this.volumes.people, [uid]: Math.min(2, Math.max(0, volume)) } };
+    this.applyVolume(uid);
+  }
+
+  /** How loud everyone plays here, 0–1. */
+  setOutputVolume(volume: number) {
+    this.volumes = { ...this.volumes, output: Math.min(1, Math.max(0, volume)) };
+    this.applyVolumes();
+  }
+
+  /** Silences everyone else on this browser, or brings them back. */
+  setAudioMuted(muted: boolean) {
+    this.set({ ...this.state, audioMuted: muted });
+    this.applyVolumes();
   }
 
   /** After a click, when the browser held sound back. */
@@ -235,12 +281,25 @@ export class CallSession {
     this.refresh();
   }
 
-  async devices(kind: MediaDeviceKind) {
-    return this.lk.Room.getLocalDevices(kind, false).catch(() => [] as MediaDeviceInfo[]);
+  /** Switches the mic, camera or speaker in the call. False if it couldn't. */
+  async useDevice(kind: MediaDeviceKind, id: string): Promise<boolean> {
+    const ok = await this.room.switchActiveDevice(kind, id).catch(() => false);
+    this.refresh();
+    return ok;
   }
 
-  async useDevice(kind: MediaDeviceKind, id: string) {
-    await this.room.switchActiveDevice(kind, id).catch(() => undefined);
+  /** The browser's mics, cameras or speakers; names only once it has allowed one. */
+  static async devices(kind: MediaDeviceKind): Promise<MediaDeviceInfo[]> {
+    const lk = await import("livekit-client");
+    const list = await lk.Room.getLocalDevices(kind, false).catch(() => [] as MediaDeviceInfo[]);
+    // "default" and "communications" repeat a real device on Chrome; "System default" covers them.
+    return list.filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications");
+  }
+
+  /** The lobby's camera preview (CameraPreview): stop it before joining. */
+  static async previewCamera(deviceId: string | null): Promise<LocalVideoTrack> {
+    const lk = await import("livekit-client");
+    return lk.createLocalVideoTrack(deviceId ? { deviceId } : {});
   }
 
   private dropAudio() {

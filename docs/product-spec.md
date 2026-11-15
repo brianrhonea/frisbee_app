@@ -215,9 +215,11 @@ everything the app does on the website alone, styled like the website
    switches.
 6. W7: [x] team meetings and voice rooms (LiveKit web SDK, tokens from
    the API; api 0.20.0, web 0.21.0; needs the LiveKit secrets on Cloud
-   Run). Recording stays deferred. Not yet on the website: device
-   pickers and camera preview, output volume, older call chat, a voice
-   call that stays up across pages. [x] Meetings on the team schedule
+   Run). Recording stays deferred. [x] device pickers (speaker where
+   the browser can switch output), lobby camera preview, meeting
+   volume, mute audio, per-person volume to 200%; [x] a voice call that
+   stays up across pages, with a voice bar (web 0.24.0). Not yet on the
+   website: older call chat. [x] Meetings on the team schedule
    beside events, with New meeting (the website keeps its Meetings tab
    too; the app has none).
 7. Posts: [ ] video in posts (waits on the transcode job); [x] feed tabs;
@@ -231,6 +233,12 @@ everything the app does on the website alone, styled like the website
    captains', as in the app); [x] change password, with the app's
    password policy (`@stall10/shared`, on sign-up too); [x] a System
    theme choice beside Light and Dark.
+9. Explore: [x] tournament search beside players, teams and groups, the
+   app's All / Players / Teams / Groups / Tournaments filters (`?only=`),
+   upcoming tournaments and leagues, recent results, a rankings preview
+   and the Jump in shortcuts (web 0.24.0). Not yet: player rows show
+   only @username (the app adds team, school and hometown; the public
+   search returns neither).
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 
