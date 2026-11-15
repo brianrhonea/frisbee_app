@@ -142,6 +142,24 @@ describe("messages", () => {
     ]);
   });
 
+  it("names a compressed photo as it's saved, not as it was sent", async () => {
+    s.store.put("uploads/u4", {
+      uid: "amy",
+      purpose: "chat",
+      targetId: "conversations/amy_ben",
+      itemId: "m3",
+      status: "ready",
+      path: "conversations/amy_ben/amy/m3/u4.jpg",
+      name: "IMG_1.HEIC",
+      contentType: "image/jpeg",
+      actualSize: 4096,
+    });
+    expect((await s.call("POST", "/v1/conversations/amy_ben/messages", { id: "m3", uploadIds: ["u4"] })).statusCode).toBe(201);
+    expect(s.store.doc("conversations/amy_ben/messages/m3")?.attachments).toEqual([
+      { path: "conversations/amy_ben/amy/m3/u4.jpg", name: "u4.jpg", contentType: "image/jpeg", size: 4096 },
+    ]);
+  });
+
   it("reacts as the caller and deletes only their own", async () => {
     s.store.put("conversations/amy_ben/messages/m1", { authorId: "ben", text: "yo" });
     expect((await s.call("PUT", "/v1/conversations/amy_ben/messages/m1/reaction", { emoji: "🔥" })).statusCode).toBe(204);

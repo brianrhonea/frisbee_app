@@ -89,6 +89,31 @@ describe("uploads on the emulators", () => {
     expect((await db.doc(`uploads/${id}`).get()).get("status")).toBe("ready");
   });
 
+  it("copies a chat file into the message's folder as sent, in the bucket", async () => {
+    const pdf = Buffer.from("%PDF-1.7 a small document");
+    const res = await call("/v1/uploads", {
+      purpose: "chat",
+      targetId: "conversations/up-other_up-user",
+      itemId: "m1",
+      contentType: "application/pdf",
+      name: "Line calls.pdf",
+      size: pdf.length,
+    });
+    expect(res.statusCode).toBe(201);
+    const { id } = res.json();
+    await bucket.file(`uploads/raw/up-user/${id}`).save(pdf, { contentType: "application/pdf", resumable: false });
+
+    const done = await call(`/v1/uploads/${id}/complete`);
+    const path = `conversations/up-other_up-user/up-user/m1/${id}-Line calls.pdf`;
+    expect(done.json()).toEqual({ id, status: "ready", path, contentType: "application/pdf" });
+    const [saved] = await bucket.file(path).download();
+    expect(saved.equals(pdf)).toBe(true);
+    const [meta] = await bucket.file(path).getMetadata();
+    expect(meta.contentType).toBe("application/pdf");
+    expect(meta.cacheControl).toBe("public, max-age=31536000, immutable");
+    expect((await bucket.file(`uploads/raw/up-user/${id}`).exists())[0]).toBe(false);
+  });
+
   it("rejects a file whose bytes aren't media", async () => {
     const res = await call("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "image/png", size: 20 });
     const { id } = res.json();

@@ -93,7 +93,7 @@ export class FirebaseMediaStorage implements MediaStorage {
   }
 
   async copy(from: string, to: string, contentType: string) {
-    await this.bucket.file(from).copy(this.bucket.file(to), { contentType, metadata: { cacheControl: mediaCacheControl } });
+    await this.bucket.file(from).copy(this.bucket.file(to), { contentType, cacheControl: mediaCacheControl });
   }
 
   async downloadTo(path: string, file: string) {
