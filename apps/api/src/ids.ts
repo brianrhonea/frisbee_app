@@ -11,3 +11,15 @@ export function docIdParam(v: unknown): string {
   }
   return v;
 }
+
+/** A stored id that is safe to put in a path (as docIdParam allows), or null. */
+export function storedId(v: unknown): string | null {
+  try {
+    return docIdParam(v);
+  } catch {
+    return null;
+  }
+}
+
+/** Whether [v] is an id docIdParam accepts. */
+export const isDocId = (v: unknown): v is string => storedId(v) !== null;

@@ -10,6 +10,7 @@
 // and its direct writes; the closeRoom trigger still closes the call when
 // a meeting ends or is deleted, whoever wrote it.
 import {
+  audienceTier,
   meetingDisplayName,
   type JoinRequestDoc,
   meetingInviteRoles,
@@ -36,14 +37,15 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
 import { type Caller, requireCaller, type UserLookup } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
+import { chatRole } from "../hub/access.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { Limit } from "../limits/model.js";
 import { authorOf, checkNotMuted } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
-import { can, clip, isMember, mapOf, roleIn, strings } from "../teams/access.js";
+import { can, clip, isMember, mapOf, strings } from "../teams/access.js";
 import type { TeamRepository } from "../teams/repository.js";
 import type { LiveKitSigner } from "./signer.js";
 
@@ -72,12 +74,6 @@ const p = {
   profile: (u: string) => `profiles/${u}`,
 };
 
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
-
 const noTeam = () => new ApiError("not_found", "That team doesn't exist.");
 const notOnTeam = () => new ApiError("permission_denied", "You're not on this team.");
 const noMeeting = () => new ApiError("not_found", meetingJoinMessages.missing);
@@ -86,9 +82,6 @@ const adminsOnly = () => new ApiError("permission_denied", "Only admins can mana
 const notSetUp = () => new ApiError("failed_precondition", "Meetings aren't set up here yet.");
 
 // ---- The rules' helpers (match /meetings/{meetingId}) ----------------------
-
-/** chatRole(team()): a legacy "stats" member counts as a player. */
-const chatRole = (team: Data, uid: string) => (roleIn(team, uid) === "stats" ? "player" : roleIn(team, uid));
 
 /** canManage: can(team(), 'manageEvents'). */
 const manages = (team: Data, uid: string) => can(team, uid, "manageEvents");
@@ -115,7 +108,7 @@ function editableFields(team: Data, m: z.output<typeof saveMeetingRequestSchema>
   const users = [...new Set(m.inviteUsers)].filter((uid) => {
     const raw = Object.hasOwn(members, uid) ? members[uid] : undefined;
     if (typeof raw !== "string") return false;
-    const role = raw === "stats" ? "player" : raw;
+    const role = audienceTier(raw);
     return !["owner", "coach", "captain"].includes(role) && !roles.includes(role as (typeof roles)[number]);
   });
   return {
@@ -146,7 +139,7 @@ export class MeetingService {
   /** allow create: an admin, status scheduled, no answers yet, made by the caller, validMeeting. */
   async create(caller: Caller, rawTeam: unknown, body: unknown): Promise<SaveMeetingResult> {
     const teamId = docIdParam(rawTeam);
-    const req = parse(saveMeetingRequestSchema, body);
+    const req = parseBody(saveMeetingRequestSchema, body);
     const id = this.store.newId(p.meetings(teamId));
     await this.store.transact(async (tx) => {
       const team = await tx.get(p.team(teamId));
@@ -168,7 +161,7 @@ export class MeetingService {
   async edit(caller: Caller, rawTeam: unknown, rawMeeting: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
-    const req = parse(saveMeetingRequestSchema, body);
+    const req = parseBody(saveMeetingRequestSchema, body);
     await this.store.transact(async (tx) => {
       const [team, meeting] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.meeting(teamId, meetingId))]);
       if (!team) throw noTeam();
@@ -197,7 +190,7 @@ export class MeetingService {
   async rsvp(caller: Caller, rawTeam: unknown, rawMeeting: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
-    const { answer } = parse(meetingRsvpRequestSchema, body);
+    const { answer } = parseBody(meetingRsvpRequestSchema, body);
     await this.store.transact(async (tx) => {
       const [team, meeting] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.meeting(teamId, meetingId))]);
       if (!team) throw noTeam();
@@ -275,7 +268,7 @@ export class MeetingService {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
     const userId = docIdParam(rawUser);
-    const { admit } = parse(meetingJoinDecisionRequestSchema, body);
+    const { admit } = parseBody(meetingJoinDecisionRequestSchema, body);
     await this.store.transact(async (tx) => {
       const [team, request] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.request(teamId, meetingId, userId))]);
       if (!team) throw noTeam();
@@ -311,7 +304,7 @@ export class MeetingService {
   async setPlayback(caller: Caller, rawTeam: unknown, rawMeeting: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
-    const req = parse(meetingPlaybackRequestSchema, body);
+    const req = parseBody(meetingPlaybackRequestSchema, body);
     const videoId = docIdParam(req.videoId);
     const presenterName = await this.nameOf(caller);
     await this.store.transact(async (tx) => {
@@ -352,7 +345,7 @@ export class MeetingService {
   async sendMessage(caller: Caller, rawTeam: unknown, rawMeeting: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
     const meetingId = docIdParam(rawMeeting);
-    const { text } = parse(meetingMessageRequestSchema, body);
+    const { text } = parseBody(meetingMessageRequestSchema, body);
     await checkNotMuted(this.store, caller.uid, this.now());
     const authorName = await this.nameOf(caller);
     const id = this.store.newId(p.messages(teamId, meetingId));
@@ -469,9 +462,7 @@ export function meetingRoutes(app: FastifyInstance, meetings: MeetingService, li
   const caller = (req: FastifyRequest, bucket: keyof typeof buckets): Caller => {
     const c = requireCaller(req);
     const key = bucket in meetingRateLimits ? `meeting-${bucket}:${c.uid}` : `${bucket}:${c.uid}`;
-    if (!limiter.admit(key, buckets[bucket])) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, key, buckets[bucket]);
     return c;
   };
   const noContent = async (reply: FastifyReply, work: () => Promise<void>) => {

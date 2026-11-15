@@ -31,9 +31,10 @@ import {
 import type { Caller } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { docIdParam } from "../ids.js";
-import { checkNotMuted, clip, nameMax, text } from "../posts/author.js";
+import { checkNotMuted, nameMax, text } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import type { CalendarRepository } from "./repository.js";
+import { clip } from "../teams/access.js";
 
 const p = {
   profile: (uid: string) => `profiles/${uid}`,

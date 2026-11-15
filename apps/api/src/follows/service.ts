@@ -8,8 +8,9 @@ import {
 import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { docIdParam } from "../ids.js";
-import { authorOf, checkNotMuted, clip, photoMax, text } from "../posts/author.js";
+import { authorOf, checkNotMuted, photoMax, text } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
+import { clip } from "../teams/access.js";
 
 const p = {
   follow: (uid: string, key: string) => `users/${uid}/follows/${key}`,

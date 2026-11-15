@@ -35,24 +35,16 @@ import {
   teamsFromDraft,
   withDrafted,
 } from "@stall10/shared";
-import type { z } from "zod";
 import type { Caller } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
-import { docIdParam } from "../ids.js";
+import { ApiError, parseBody } from "../errors.js";
+import { docIdParam, storedId } from "../ids.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
-import { can, mapOf, own, strings } from "../teams/access.js";
+import { can, clipText, mapOf, own, strings } from "../teams/access.js";
 import type { DraftQueries } from "./repository.js";
 import { paymentProblem, signupCreateProblem, signupUpdateProblem, validDivision } from "./rules.js";
 
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
-
 /** The callables' id check (idPattern in draft.ts and callables.ts). */
 const idPattern = /^[A-Za-z0-9_-]{1,60}$/;
-const clipName = (s: unknown): string => (typeof s === "string" ? s.trim().slice(0, 100) : "");
 
 const p = {
   tournament: (t: string) => `tournaments/${t}`,
@@ -69,15 +61,6 @@ const p = {
 const fail = (m: string) => new ApiError("failed_precondition", m);
 const organizersOnly = () => new ApiError("permission_denied", "Only the event's organizers can do that.");
 const noEvent = () => new ApiError("not_found", "That event doesn't exist.");
-
-/** A stored id fit for a document path, or null (a host id the callables would read as a missing team). */
-function storedId(v: unknown): string | null {
-  try {
-    return docIdParam(v);
-  } catch {
-    return null;
-  }
-}
 
 /** Fisher-Yates: every order equally likely. */
 function shuffled<T>(list: readonly T[], random: () => number): T[] {
@@ -129,7 +112,7 @@ export class DraftService {
    */
   async saveMySignup(caller: Caller, rawTournament: unknown, body: unknown): Promise<{ status: string }> {
     const tournamentId = docIdParam(rawTournament);
-    const input = parse(saveSignupRequestSchema, body);
+    const input = parseBody(saveSignupRequestSchema, body);
     const divisionId = docIdParam(input.divisionId);
     const profile = await this.store.get(p.user(caller.uid));
     const username = typeof profile?.username === "string" ? profile.username.trim() : "";
@@ -162,7 +145,7 @@ export class DraftService {
   async setSignupStatus(caller: Caller, rawTournament: unknown, rawUid: unknown, body: unknown): Promise<void> {
     const tournamentId = docIdParam(rawTournament);
     const userId = docIdParam(rawUid);
-    const { status } = parse(signupStatusRequestSchema, body);
+    const { status } = parseBody(signupStatusRequestSchema, body);
     await this.store.transact(async (tx) => {
       const tournament = await tx.get(p.tournament(tournamentId));
       if (!tournament) throw noEvent();
@@ -179,7 +162,7 @@ export class DraftService {
   async setSignupPayment(caller: Caller, rawTournament: unknown, rawUid: unknown, body: unknown): Promise<void> {
     const tournamentId = docIdParam(rawTournament);
     const userId = docIdParam(rawUid);
-    const { paid } = parse(signupPaymentRequestSchema, body);
+    const { paid } = parseBody(signupPaymentRequestSchema, body);
     await this.store.transact(async (tx) => {
       const tournament = await tx.get(p.tournament(tournamentId));
       if (!tournament) throw noEvent();
@@ -202,7 +185,7 @@ export class DraftService {
   async saveDraftedTeams(caller: Caller, rawTournament: unknown, rawDivision: unknown, body: unknown): Promise<void> {
     const tournamentId = docIdParam(rawTournament);
     const divisionId = docIdParam(rawDivision);
-    const input = parse(saveDraftedTeamsRequestSchema, body);
+    const input = parseBody(saveDraftedTeamsRequestSchema, body);
     const locked = await this.queries.hasGames(tournamentId, divisionId);
     await this.store.transact(async (tx) => {
       const tournament = await tx.get(p.tournament(tournamentId));
@@ -299,7 +282,7 @@ export class DraftService {
     const c = await this.context(caller, rawTournament, rawDivision);
     this.requireManager(c);
     await this.requireOpen(c);
-    const input = parse(startDraftRequestSchema, body);
+    const input = parseBody(startDraftRequestSchema, body);
     const signups = await this.queries.acceptedSignups(c.tournamentId, c.divisionId);
     const accepted = new Map(signups.map((s) => [s.id, s.data]));
     return this.store.transact(async (tx) => {
@@ -320,9 +303,9 @@ export class DraftService {
       const players = [...accepted.entries()].filter(([id]) => !captainIds.includes(id));
       tx.set(p.draft(c.tournamentId, c.divisionId), {
         status: "live",
-        captains: order.map((id) => ({ uid: id, name: clipName(accepted.get(id)?.name) || "Captain" })),
+        captains: order.map((id) => ({ uid: id, name: clipText(accepted.get(id)?.name, 100) || "Captain" })),
         captainIds: order,
-        pool: Object.fromEntries(players.map(([id, s]) => [id, clipName(s.name) || "Player"])),
+        pool: Object.fromEntries(players.map(([id, s]) => [id, clipText(s.name, 100) || "Player"])),
         picks: [],
         pickSeconds: input.pickSeconds,
         mixed: now.division.division === "mixed",
@@ -339,7 +322,7 @@ export class DraftService {
   /** The captain on the clock picks a player (the host can pick for them). */
   async pick(caller: Caller, rawTournament: unknown, rawDivision: unknown, body: unknown): Promise<void> {
     const c = await this.context(caller, rawTournament, rawDivision);
-    const { uid } = parse(draftPickRequestSchema, body);
+    const { uid } = parseBody(draftPickRequestSchema, body);
     await this.store.transact(async (tx) => {
       const now = await this.fresh(tx, c);
       const l = await this.load(tx, c);
@@ -355,7 +338,7 @@ export class DraftService {
   async control(caller: Caller, rawTournament: unknown, rawDivision: unknown, body: unknown): Promise<void> {
     const c = await this.context(caller, rawTournament, rawDivision);
     this.requireManager(c);
-    const { action } = parse(draftControlRequestSchema, body);
+    const { action } = parseBody(draftControlRequestSchema, body);
     await this.store.transact(async (tx) => {
       this.requireManager(await this.fresh(tx, c));
       const l = await this.load(tx, c);

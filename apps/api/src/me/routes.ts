@@ -1,7 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
-import { ApiError } from "../errors.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { MeService } from "./service.js";
 
 /**
@@ -16,9 +15,7 @@ export const meReadLimits = {
 export function meRoutes(app: FastifyInstance, me: MeService, limiter?: MemoryRateLimiter) {
   const caller = (req: FastifyRequest, bucket: keyof typeof meReadLimits): Caller => {
     const c = requireCaller(req);
-    if (limiter && !limiter.admit(`me-${bucket}:${c.uid}`, meReadLimits[bucket])) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `me-${bucket}:${c.uid}`, meReadLimits[bucket]);
     return c;
   };
   app.get<{ Querystring: { before?: string } }>("/v1/me/home", async (req, reply) => {

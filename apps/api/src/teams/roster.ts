@@ -10,6 +10,7 @@ import type { Caller } from "../auth.js";
 import { ApiError } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { Data, DocStore } from "../store.js";
+import { mapOf } from "./access.js";
 
 const positions = ["handler", "cutter", "hybrid"] as const;
 const kinds = ["team", "community", "organization"] as const;
@@ -17,7 +18,6 @@ const kinds = ["team", "community", "organization"] as const;
 const tierOrder = ["owner", "coach", "captain", "stats", "player"];
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
-const asMap = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
 /**
  * Who's on a team, for anyone signed in: the roster's players and the
@@ -37,7 +37,7 @@ export class RosterService {
     const teamId = docIdParam(rawTeamId);
     const team = await this.store.get(`teams/${teamId}`);
     if (!team) throw new ApiError("not_found", "That team doesn't exist any more.");
-    const tiers = asMap(team.members);
+    const tiers = mapOf(team.members);
     const kind = kinds.find((k) => k === team.kind) ?? "team";
     const isMember = Array.isArray(team.memberIds) && team.memberIds.includes(caller.uid);
     if (kind !== "team" && team.requiresApproval === true && !isMember) {
@@ -47,13 +47,13 @@ export class RosterService {
     const players = kind === "team" ? await this.store.list(`teams/${teamId}/roster`, rosterMax) : [];
     const uids = Object.keys(tiers).slice(0, rosterMax);
     const linked = players.map((p) => str(p.data.userId)).filter(Boolean);
-    const cards = await this.cards([...new Set([...uids, ...linked])], asMap(team.memberNames));
+    const cards = await this.cards([...new Set([...uids, ...linked])], mapOf(team.memberNames));
 
-    const roleDefs = asMap(team.roles);
+    const roleDefs = mapOf(team.roles);
     const roleIds = Object.keys(roleDefs).sort(
-      (a, b) => Number(asMap(roleDefs[a]).position ?? 0) - Number(asMap(roleDefs[b]).position ?? 0),
+      (a, b) => Number(mapOf(roleDefs[a]).position ?? 0) - Number(mapOf(roleDefs[b]).position ?? 0),
     );
-    const memberRoles = asMap(team.memberRoles);
+    const memberRoles = mapOf(team.memberRoles);
 
     const members: RosterMember[] = uids
       .map((uid) => {
@@ -61,7 +61,7 @@ export class RosterService {
         return {
           ...cards.get(uid)!,
           tier: str(tiers[uid]) || "player",
-          roles: roleIds.filter((id) => mine.has(id)).map((id) => str(asMap(roleDefs[id]).name)).filter(Boolean),
+          roles: roleIds.filter((id) => mine.has(id)).map((id) => str(mapOf(roleDefs[id]).name)).filter(Boolean),
         };
       })
       .sort((a, b) => rank(a.tier) - rank(b.tier) || a.name.localeCompare(b.name));
@@ -100,9 +100,9 @@ const rank = (tier: string) => {
 
 /** A community's teams (linkedTeams: id → {name, division, roles}), without the roles. */
 function linkedTeams(raw: unknown): RosterTeam[] {
-  return Object.entries(asMap(raw))
+  return Object.entries(mapOf(raw))
     .map(([id, v]) => {
-      const t = asMap(v);
+      const t = mapOf(v);
       const out: RosterTeam = { id, name: str(t.name) || "Team" };
       if (str(t.division)) out.division = str(t.division);
       return out;

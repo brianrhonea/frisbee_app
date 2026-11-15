@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { ApiError } from "../errors.js";
-import type { MemoryRateLimiter } from "./memory.js";
+import { type MemoryRateLimiter, tooFast } from "./memory.js";
 import type { Limit } from "./model.js";
 
 const minute = 60_000;
@@ -63,6 +62,6 @@ export function registerWriteLimits(app: FastifyInstance, limiter: MemoryRateLim
     const route = `${req.method} ${req.routeOptions.url ?? ""}`;
     const limits = routeWriteLimits[route] ?? [];
     const ok = (ownBucket.has(route) || limiter.admit(`any:${uid}`, anyWriteLimit)) && limits.every((limit, i) => limiter.admit(`${route}#${i}:${uid}`, limit));
-    if (!ok) throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
+    if (!ok) throw tooFast();
   });
 }

@@ -45,29 +45,13 @@ import {
   bracketSeeds,
   type TournamentFormat,
 } from "@stall10/shared";
-import type { z } from "zod";
 import type { Caller } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
-import { docIdParam } from "../ids.js";
+import { ApiError, parseBody } from "../errors.js";
+import { docIdParam, storedId } from "../ids.js";
 import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, kindOf, mapOf, strings } from "../teams/access.js";
 
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
-
-/** A stored id that is safe to put in a path, or null. */
-function safeId(v: unknown): string | null {
-  if (typeof v !== "string" || !v) return null;
-  try {
-    return docIdParam(v);
-  } catch {
-    return null;
-  }
-}
 
 const p = {
   tournament: (id: string) => `tournaments/${id}`,
@@ -182,7 +166,7 @@ export class TournamentService {
 
   /** manages(t): the host's members with Manage events. */
   private async manages(tx: Pick<Tx, "get">, t: Data, uid: string): Promise<boolean> {
-    const host = safeId(t.hostId);
+    const host = storedId(t.hostId);
     if (!host) return false;
     const team = await tx.get(p.team(host));
     return !!team && can(team, uid, "manageEvents");
@@ -279,7 +263,7 @@ export class TournamentService {
   }
 
   async create(caller: Caller, body: unknown): Promise<{ id: string }> {
-    const r: CreateTournamentInput = parse(createTournamentRequestSchema, body);
+    const r: CreateTournamentInput = parseBody(createTournamentRequestSchema, body);
     const hostId = docIdParam(r.hostId);
     this.checkHosted(r.kind, r.entryType, r);
     const id = this.store.newId("tournaments");
@@ -312,7 +296,7 @@ export class TournamentService {
    */
   async save(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
-    const r = parse(saveTournamentRequestSchema, body);
+    const r = parseBody(saveTournamentRequestSchema, body);
     // Managers only get as far as the lists (checked again below).
     const first = await this.managed(this.store, id, caller.uid);
     const taking = ["status", "divisionId"];
@@ -347,7 +331,7 @@ export class TournamentService {
     for (const divId of closing) gamesOf.set(divId, await this.queries.ids(p.games(id, divId), 100));
     await this.store.transact(async (tx) => {
       const t = await this.managed(tx, id, caller.uid);
-      const hostId = safeId(t.hostId) as string;
+      const hostId = storedId(t.hostId) as string;
       const host = (await tx.get(p.team(hostId))) as Data;
       const kind = t.kind === "league" ? "league" : "tournament";
       const entryType = t.entryType === "players" ? "players" : "teams";
@@ -360,7 +344,7 @@ export class TournamentService {
       const editable = statusIndex(statusOf(t)) < statusIndex("scheduled");
       const summaries: Array<{ id: string; division: unknown; level: unknown }> = [];
       const order = [
-        ...(Array.isArray(t.divisions) ? t.divisions.map((x) => safeId(mapOf(x).id)).filter((x): x is string => !!x) : []),
+        ...(Array.isArray(t.divisions) ? t.divisions.map((x) => storedId(mapOf(x).id)).filter((x): x is string => !!x) : []),
         ...[...stored.keys()],
       ].filter((x, i, l) => l.indexOf(x) === i && stored.has(x));
       const writes: Array<() => void> = [];
@@ -415,7 +399,7 @@ export class TournamentService {
 
   async setStatus(caller: Caller, rawId: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
-    const { status } = parse(tournamentStatusRequestSchema, body);
+    const { status } = parseBody(tournamentStatusRequestSchema, body);
     await this.store.transact(async (tx) => {
       await this.managed(tx, id, caller.uid);
       tx.update(p.tournament(id), { status });
@@ -473,7 +457,7 @@ export class TournamentService {
   async saveSeeds(caller: Caller, rawId: unknown, rawDiv: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
-    const { seeds } = parse(seedsRequestSchema, body);
+    const { seeds } = parseBody(seedsRequestSchema, body);
     if ((await this.queries.ids(p.games(id, divId), 1)).length > 0) {
       throw new ApiError("failed_precondition", "Seeds are set: the schedule is published.");
     }
@@ -512,7 +496,7 @@ export class TournamentService {
   async putEntry(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const teamId = docIdParam(rawTeam);
-    const r = parse(entryRequestSchema, body);
+    const r = parseBody(entryRequestSchema, body);
     const divId = docIdParam(r.divisionId);
     // The team's admins only get as far as counting its roster (checked again below).
     await this.visible(this.store, id, caller.uid);
@@ -572,7 +556,7 @@ export class TournamentService {
   async invite(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const teamId = docIdParam(rawTeam);
-    const divId = docIdParam(parse(inviteRequestSchema, body).divisionId);
+    const divId = docIdParam(parseBody(inviteRequestSchema, body).divisionId);
     await this.store.transact(async (tx) => {
       await this.managed(tx, id, caller.uid);
       const team = await tx.get(p.team(teamId));
@@ -596,14 +580,14 @@ export class TournamentService {
   async setEntryStatus(caller: Caller, rawId: unknown, rawTeam: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const teamId = docIdParam(rawTeam);
-    const { status } = parse(entryStatusRequestSchema, body);
+    const { status } = parseBody(entryStatusRequestSchema, body);
     await this.store.transact(async (tx) => {
       const { manager } = await this.visible(tx, id, caller.uid);
       const entry = await tx.get(p.entry(id, teamId));
       if (!entry) throw new ApiError("not_found", "That team hasn't entered.");
       const team = await tx.get(p.team(teamId));
       if (!team) throw new ApiError("not_found", "That team doesn't exist.");
-      const divId = safeId(entry.divisionId);
+      const divId = storedId(entry.divisionId);
       const division = divId ? await tx.get(p.division(id, divId)) : null;
       const fields = { teamName: String(entry.teamName ?? ""), divisionId: String(entry.divisionId ?? ""), captainIds: strings(entry.captainIds) };
       if (!manager) {
@@ -649,7 +633,7 @@ export class TournamentService {
   async publish(caller: Caller, rawId: unknown, rawDiv: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
-    const { games } = parse(publishScheduleRequestSchema, body);
+    const { games } = parseBody(publishScheduleRequestSchema, body);
     const check = (tx: Tx) => this.managed(tx, id, caller.uid);
     let format: TournamentFormat = "roundRobin";
     await this.store.transact(async (tx) => {
@@ -756,7 +740,7 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const gameId = docIdParam(rawGame);
-    const s = parse(scoreRequestSchema, body);
+    const s = parseBody(scoreRequestSchema, body);
     await this.store.transact(async (tx) => {
       await this.visible(tx, id, caller.uid);
       const d = await tx.get(p.division(id, divId));
@@ -782,7 +766,7 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const gameId = docIdParam(rawGame);
-    const s = parse(scoreRequestSchema, body);
+    const s = parseBody(scoreRequestSchema, body);
     // Only the other captain gets as far as listing the games (checked again below).
     await this.visible(this.store, id, caller.uid);
     const [division, game] = await Promise.all([this.store.get(p.division(id, divId)), this.store.get(p.game(id, divId, gameId))]);
@@ -807,7 +791,7 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const gameId = docIdParam(rawGame);
-    const s = parse(scoreRequestSchema, body);
+    const s = parseBody(scoreRequestSchema, body);
     await this.managed(this.store, id, caller.uid);
     const ids = await this.gameIds(id, divId);
     await this.store.transact(async (tx) => {
@@ -863,7 +847,7 @@ export class TournamentService {
     // A seed's entry may name another division now (moved, then withdrawn).
     const entries = new Map(entryRows.map((e) => [e.id, e.data]));
     const elsewhere = strings(division.seeds)
-      .map(safeId)
+      .map(storedId)
       .filter((s): s is string => s !== null && !entries.has(s));
     const moved = await this.store.getAll(elsewhere.map((s) => p.entry(id, s)));
     elsewhere.forEach((s, i) => {
@@ -910,7 +894,7 @@ export class TournamentService {
       }
       // The division's entries and every seed's (a seed's entry may have moved).
       const entries = new Map<string, Data>();
-      for (const teamId of new Set([...entryRows.map((e) => e.id), ...strings(d.seeds).map(safeId).filter((s): s is string => s !== null)])) {
+      for (const teamId of new Set([...entryRows.map((e) => e.id), ...strings(d.seeds).map(storedId).filter((s): s is string => s !== null)])) {
         const e = await tx.get(p.entry(id, teamId));
         if (e) entries.set(teamId, e);
       }

@@ -64,8 +64,6 @@ export const entryStatusLabels: Record<EntryStatus, string> = {
   declined: "Declined",
   withdrawn: "Withdrawn",
 };
-/** Still in the running for a spot. */
-export const entryActive = (s: EntryStatus) => s === "invited" || s === "applied" || s === "waitlisted";
 
 export const divisionLabels: Record<Division, string> = { mixed: "Mixed", open: "Open", women: "Women", masters: "Masters" };
 export const levelLabels: Record<CompetitionLevel, string> = {
@@ -184,12 +182,10 @@ export const createTournamentRequestSchema = z.strictObject({
   entryType: z.enum(entryTypes),
   ...detailsShape,
 });
-export type CreateTournamentRequest = z.input<typeof createTournamentRequestSchema>;
 export type CreateTournamentInput = z.output<typeof createTournamentRequestSchema>;
 
 /** PATCH /v1/tournaments/:id: everything but the host, kind and entry type, which are fixed. */
 export const saveTournamentRequestSchema = z.strictObject(detailsShape);
-export type SaveTournamentRequest = z.input<typeof saveTournamentRequestSchema>;
 export type SaveTournamentInput = z.output<typeof saveTournamentRequestSchema>;
 
 /** PUT /v1/tournaments/:id/status */
@@ -208,7 +204,6 @@ export const entryRequestSchema = z.strictObject({
     .min(1, "Pick at least one captain.")
     .max(tournamentLimits.maxCaptains, `Pick up to ${tournamentLimits.maxCaptains} captains.`),
 });
-export type EntryRequest = z.input<typeof entryRequestSchema>;
 
 /** POST /v1/tournaments/:id/entries/:teamId/invite: the host invites a team. */
 export const inviteRequestSchema = z.strictObject({ divisionId: z.string().min(1).max(tournamentLimits.divisionId) });
@@ -254,7 +249,6 @@ export const publishGameSchema = z.strictObject({
 export const publishScheduleRequestSchema = z.strictObject({
   games: z.array(publishGameSchema).min(1).max(tournamentLimits.maxGames),
 });
-export type PublishScheduleRequest = z.input<typeof publishScheduleRequestSchema>;
 
 // ---- Documents as the website reads them (timestamps as ISO strings) ---------
 

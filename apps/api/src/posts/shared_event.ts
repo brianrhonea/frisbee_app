@@ -15,9 +15,8 @@ import { editableEventsPath } from "../calendar/service.js";
 import { ApiError } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { Data, DocStore } from "../store.js";
-import { can } from "../teams/access.js";
+import { can, clipText } from "../teams/access.js";
 
-const clip = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const asDate = (v: unknown): Date | null => {
   if (v instanceof Date) return v;
   if (typeof v === "string" && !Number.isNaN(Date.parse(v))) return new Date(v);
@@ -44,7 +43,7 @@ export async function sharedEvent(
     if (isPrivateGroup(team)) {
       throw new ApiError("failed_precondition", "Events of a group that approves who joins stay with its members.");
     }
-    teamName = clip(team.name, 100) || null;
+    teamName = clipText(team.name, 100) || null;
     event = await store.get(`teams/${teamId}/events/${eventId}`);
   } else if (ref.calendarId) {
     event = await store.get(`${await editableEventsPath(store, caller.uid, ref.calendarId)}/${eventId}`);
@@ -53,12 +52,12 @@ export async function sharedEvent(
   }
   if (!event) throw new ApiError("not_found", "That event doesn't exist anymore.");
   // validSharedEvent: a title of 1–100, a known type, a start time.
-  const title = clip(event.title, 100);
+  const title = clipText(event.title, 100);
   const startsAt = asDate(event.startsAt);
   const type = (teamEventTypes as readonly string[]).includes(String(event.type)) ? String(event.type) : "other";
   if (!title || !startsAt) throw new ApiError("failed_precondition", "That event needs a title and a start time to share.");
   const endsAt = asDate(event.endsAt);
-  const location = clip(event.location, 200);
+  const location = clipText(event.location, 200);
   return {
     eventId,
     title,

@@ -77,7 +77,6 @@ export const everyoneAudience = "everyone";
 export const discordPreviewRequestSchema = z.strictObject({
   link: z.string().trim().min(1, "Paste a server template link.").max(discordLimits.link),
 });
-export type DiscordPreviewRequest = z.input<typeof discordPreviewRequestSchema>;
 
 // Keys index plain objects: never one of Object.prototype's names.
 const reservedKeys = new Set(["__proto__", "constructor", "prototype", "hasOwnProperty", "toString", "valueOf"]);
@@ -145,7 +144,6 @@ export const discordImportRequestSchema = z.strictObject({
     .max(discordLimits.rooms)
     .default([]),
 });
-export type DiscordImportRequest = z.input<typeof discordImportRequestSchema>;
 
 /** After an import: what was added, by team. */
 export interface DiscordImportResult {

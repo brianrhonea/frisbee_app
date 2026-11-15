@@ -10,9 +10,10 @@ import {
 } from "@stall10/shared";
 import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
-import { docIdParam } from "../ids.js";
+import { docIdParam, isDocId } from "../ids.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
-import { authorOf, checkNotMuted, clip, nameMax, text } from "./author.js";
+import { authorOf, checkNotMuted, nameMax, text } from "./author.js";
+import { clip } from "../teams/access.js";
 
 const p = {
   post: (id: string) => `posts/${id}`,
@@ -21,14 +22,6 @@ const p = {
 export const people = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 
-export function validId(v: unknown): v is string {
-  try {
-    docIdParam(v);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export const noPost = () => new ApiError("not_found", "This post was deleted.");
 
@@ -64,7 +57,7 @@ export class PostService {
     const r = data.repostOf;
     if (!r || typeof r !== "object") return { id, data };
     const originalId = (r as Data).postId;
-    if (!validId(originalId)) throw noPost();
+    if (!isDocId(originalId)) throw noPost();
     const original = await tx.get(p.post(originalId));
     if (!original) throw noPost();
     return { id: originalId, data: original };
@@ -145,7 +138,7 @@ export class PostService {
       if (!data) throw noPost();
       const r = data.repostOf;
       const originalId = r && typeof r === "object" ? (r as Data).postId : id;
-      if (!validId(originalId)) throw noPost();
+      if (!isDocId(originalId)) throw noPost();
       const original = originalId === id ? data : await tx.get(p.post(originalId));
       const mine = p.post(repostId(originalId, caller.uid));
       const existing = mine === p.post(id) ? data : await tx.get(mine);
@@ -160,7 +153,7 @@ export class PostService {
 
   /** The caller's likes and reposts of up to 50 posts (`ids`: comma-separated). */
   async states(caller: Caller, rawIds: unknown): Promise<PostStates> {
-    const ids = [...new Set(typeof rawIds === "string" ? rawIds.split(",") : [])].filter(validId);
+    const ids = [...new Set(typeof rawIds === "string" ? rawIds.split(",") : [])].filter(isDocId);
     if (ids.length > postStateLimit) {
       throw new ApiError("invalid_argument", `Ask about at most ${postStateLimit} posts at a time.`);
     }

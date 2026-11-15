@@ -26,7 +26,6 @@ export const followRequestSchema = z.strictObject({
     .optional(),
   notify: z.boolean().default(false),
 });
-export type FollowRequest = z.input<typeof followRequestSchema>;
 
 /**
  * After `PUT /v1/follows`: `following`, or `requested` when the player's

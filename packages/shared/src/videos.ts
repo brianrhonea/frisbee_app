@@ -95,7 +95,6 @@ export const createVideoRequestSchema = z.strictObject({
   title: titleField,
   description: descriptionField.default(""),
 });
-export type CreateVideoRequest = z.input<typeof createVideoRequestSchema>;
 
 /**
  * `PATCH /v1/teams/:teamId/videos/:videoId`: any of the fields editors may
@@ -110,13 +109,11 @@ export const editVideoRequestSchema = z
     description: descriptionField.optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), "Nothing to change.");
-export type EditVideoRequest = z.input<typeof editVideoRequestSchema>;
 
 /** `POST /v1/teams/:teamId/video-folders` and `PATCH .../video-folders/:folderId`. */
 export const saveVideoFolderRequestSchema = z.strictObject({
   name: z.string().trim().min(1, "Name the folder.").max(videoLimits.folderName),
 });
-export type SaveVideoFolderRequest = z.input<typeof saveVideoFolderRequestSchema>;
 
 /** An uploaded file (VideoFile). */
 export interface VideoFileDoc {

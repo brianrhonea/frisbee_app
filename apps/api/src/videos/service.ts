@@ -13,17 +13,16 @@ import {
   youtubeIdPattern,
 } from "@stall10/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import type { z } from "zod";
 import { type Caller, requireCaller, type UserLookup } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { MediaStorage } from "../media/storage.js";
-import { authorOf, clip } from "../posts/author.js";
+import { authorOf } from "../posts/author.js";
 import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
-import { can, isMember } from "../teams/access.js";
+import { can, clip, isMap, isMember } from "../teams/access.js";
 
 const p = {
   team: (t: string) => `teams/${t}`,
@@ -36,19 +35,11 @@ const p = {
 /** Videos unsorted per transaction, as the app's batches (400). */
 export const unsortChunk = 400;
 
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
-
 const denied = () => new ApiError("permission_denied", "Only the team's admins can change its videos.");
 const noTeam = () => new ApiError("not_found", "That team doesn't exist.");
 const noVideo = () => new ApiError("not_found", "That video doesn't exist anymore.");
 const noFolder = () => new ApiError("not_found", "That folder doesn't exist anymore.");
 
-const isMap = (v: unknown): v is Record<string, unknown> =>
-  !!v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date);
 /** Firestore rules count characters, not UTF-16 units. */
 const chars = (s: string) => [...s].length;
 const validString = (v: unknown, max: number): v is string => typeof v === "string" && chars(v) <= max;
@@ -101,7 +92,7 @@ export class VideoService {
   /** `POST /v1/teams/:teamId/videos`: a YouTube video. */
   async create(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
-    const req = parse(createVideoRequestSchema, body);
+    const req = parseBody(createVideoRequestSchema, body);
     const folderId = req.folderId ? docIdParam(req.folderId) : "";
     this.check(await this.store.get(p.team(teamId)), caller);
     const me = await authorOf(this.store, this.users, caller);
@@ -133,7 +124,7 @@ export class VideoService {
   async edit(caller: Caller, rawTeam: unknown, rawVideo: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const videoId = docIdParam(rawVideo);
-    const req = parse(editVideoRequestSchema, body);
+    const req = parseBody(editVideoRequestSchema, body);
     const folderId = req.folderId ? docIdParam(req.folderId) : req.folderId;
     await this.store.transact(async (tx) => {
       const [team, video] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.video(teamId, videoId))]);
@@ -176,7 +167,7 @@ export class VideoService {
   /** `POST /v1/teams/:teamId/video-folders`. */
   async createFolder(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
-    const req = parse(saveVideoFolderRequestSchema, body);
+    const req = parseBody(saveVideoFolderRequestSchema, body);
     const id = this.store.newId(p.folders(teamId)).slice(0, videoLimits.folderId);
     await this.store.transact(async (tx) => {
       this.check(await tx.get(p.team(teamId)), caller);
@@ -190,7 +181,7 @@ export class VideoService {
   async renameFolder(caller: Caller, rawTeam: unknown, rawFolder: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const folderId = docIdParam(rawFolder);
-    const req = parse(saveVideoFolderRequestSchema, body);
+    const req = parseBody(saveVideoFolderRequestSchema, body);
     await this.store.transact(async (tx) => {
       const [team, folder] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.folder(teamId, folderId))]);
       this.check(team, caller);
@@ -242,9 +233,7 @@ export class VideoService {
 export function videoRoutes(app: FastifyInstance, videos: VideoService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest): Caller => {
     const c = requireCaller(req);
-    if (!limiter.admit(`write:${c.uid}`, hubLimits.write)) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `write:${c.uid}`, hubLimits.write);
     return c;
   };
   type T = { Params: { teamId: string } };

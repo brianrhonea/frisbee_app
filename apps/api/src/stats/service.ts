@@ -13,19 +13,12 @@ import {
   saveStatsGameSchema,
   saveStatsTournamentSchema,
 } from "@stall10/shared";
-import type { z } from "zod";
 import type { Caller } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { can, isMember, own, roleIn, strings } from "../teams/access.js";
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 /** canKeepStats(team) in the rules. */
 export function canKeepStats(t: Data, uid: string): boolean {
@@ -95,7 +88,7 @@ export class StatsService {
 
   async createGame(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
-    const game = parse(saveStatsGameSchema, body);
+    const game = parseBody(saveStatsGameSchema, body);
     const id = this.store.newId(paths.games(teamId));
     await this.store.transact(async (tx) => {
       await this.keeper((p) => tx.get(p), teamId, caller.uid);
@@ -107,7 +100,7 @@ export class StatsService {
   async saveGame(caller: Caller, rawTeam: unknown, rawGame: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawGame);
-    const game = parse(saveStatsGameSchema, body);
+    const game = parseBody(saveStatsGameSchema, body);
     await this.store.transact(async (tx) => {
       await this.keeper((p) => tx.get(p), teamId, caller.uid);
       if (!(await tx.get(paths.game(teamId, id)))) throw new ApiError("not_found", "That game was deleted.");
@@ -128,7 +121,7 @@ export class StatsService {
 
   async createTournament(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
-    const t = parse(saveStatsTournamentSchema, body);
+    const t = parseBody(saveStatsTournamentSchema, body);
     const id = this.store.newId(`teams/${teamId}/statsTournaments`);
     await this.store.transact(async (tx) => {
       await this.keeper((p) => tx.get(p), teamId, caller.uid);
@@ -140,7 +133,7 @@ export class StatsService {
   async saveTournament(caller: Caller, rawTeam: unknown, rawId: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawId);
-    const t = parse(saveStatsTournamentSchema, body);
+    const t = parseBody(saveStatsTournamentSchema, body);
     await this.store.transact(async (tx) => {
       await this.keeper((p) => tx.get(p), teamId, caller.uid);
       if (!(await tx.get(paths.tournament(teamId, id)))) throw new ApiError("not_found", "That tournament was deleted.");
@@ -184,7 +177,7 @@ export class StatsService {
     const teamId = docIdParam(rawTeam);
     const creating = rawPlayer === undefined;
     const id = creating ? this.store.newId(`teams/${teamId}/roster`) : docIdParam(rawPlayer);
-    const p = parse(saveRosterPlayerSchema, body);
+    const p = parseBody(saveRosterPlayerSchema, body);
     await this.store.transact(async (tx) => {
       const team = await tx.get(paths.team(teamId));
       const existing = await tx.get(paths.player(teamId, id));
@@ -224,7 +217,7 @@ export class StatsService {
   async linkPlayer(caller: Caller, rawTeam: unknown, rawPlayer: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawPlayer);
-    const { userId } = parse(linkRosterPlayerSchema, body);
+    const { userId } = parseBody(linkRosterPlayerSchema, body);
     await this.store.transact(async (tx) => {
       const team = await tx.get(paths.team(teamId));
       const spot = await tx.get(paths.player(teamId, id));

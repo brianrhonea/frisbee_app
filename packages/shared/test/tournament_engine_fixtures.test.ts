@@ -1,6 +1,7 @@
 // The app's tournament engine (apps/mobile/lib/domain/tournament_engine)
-// against both TypeScript ports, tournament_engine.ts (hosted tournaments
-// and leagues) and group_tournaments.ts's groupEngine, on the vectors in
+// against the TypeScript engine, tournament_engine.ts, as both callers use
+// it: directly (hosted tournaments and leagues, Date games) and through
+// group_tournaments.ts's groupEngine (ISO-string games), on the vectors in
 // fixtures/tournament_engine (written by
 // apps/mobile/test/shared_fixtures/tournament_engine_fixtures_test.dart).
 import { describe, expect, it } from "vitest";

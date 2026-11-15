@@ -9,6 +9,9 @@ import { competitionLevels, divisions, groupLocationSchema, teamLimits } from ".
 export const teamTiers = ["owner", "coach", "captain", "stats", "player"] as const;
 export type TeamTier = (typeof teamTiers)[number];
 
+/** The tier rooms, events and meetings go by: a legacy "stats" member counts as a player (chatRole). */
+export const audienceTier = <R extends string | undefined>(role: R): R | "player" => (role === "stats" ? "player" : role);
+
 /** What a custom role can grant (TeamPermission), in the app's order. */
 export const teamPermissions = [
   "manageTeam",
@@ -99,7 +102,6 @@ export const saveRolesRequestSchema = z.strictObject({
     .refine((r) => Object.keys(r).length <= roleLimits.roles, `A team can have up to ${roleLimits.roles} roles.`),
   memberRoles: z.record(docId, z.array(roleId).max(roleLimits.roles)),
 });
-export type SaveRolesRequest = z.input<typeof saveRolesRequestSchema>;
 
 /**
  * `PATCH /v1/teams/:id`: a team's or group's details (Team.toEditableMap).
@@ -135,7 +137,6 @@ export const createCommunityTeamRequestSchema = z.strictObject({
   city: z.string().trim().max(teamLimits.city).default(""),
   roles: linkRoles.default([]),
 });
-export type CreateCommunityTeamInput = z.output<typeof createCommunityTeamRequestSchema>;
 
 // ---- Role logic (team_role.dart) -------------------------------------------
 

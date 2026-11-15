@@ -4,7 +4,8 @@ import { ApiError } from "../errors.js";
 import { eventView, isPrivateProfile, parseBefore, postAuthors, postView, profileView, validId } from "../browse/model.js";
 import type { Data, Doc } from "../browse/repository.js";
 import { nextCursor, originalsOf, withOriginal } from "../browse/reposts.js";
-import { can, isOrg, kindOf, mapOf, roleIn, strings } from "../teams/access.js";
+import { seesEvent as seesTeamEvent } from "../hub/access.js";
+import { isMember, kindOf, mapOf, roleIn } from "../teams/access.js";
 import type { MeRepository } from "./repository.js";
 
 /** Teams read for the dashboard (the app's home shows them all; few have more). */
@@ -32,14 +33,7 @@ export const feedPageSize = 20;
  * managers and to the event's audience ('everyone', the caller's role, one
  * of their custom roles; `inAudience` checks the first 10 custom roles).
  */
-export function seesEvent(team: Data, uid: string, event: Data): boolean {
-  if (!strings(team.memberIds).includes(uid)) return false;
-  if (!isOrg(team) || can(team, uid, "manageEvents")) return true;
-  const audience = strings(event.audience);
-  const role = roleIn(team, uid) === "stats" ? "player" : roleIn(team, uid);
-  const mine = strings(mapOf(team.memberRoles)[uid]).slice(0, 10);
-  return audience.includes("everyone") || audience.includes(role) || mine.some((r) => audience.includes(r));
-}
+export const seesEvent = (team: Data, uid: string, event: Data): boolean => isMember(team, uid) && seesTeamEvent(team, uid, event);
 
 /** The event hasn't ended at [now]: its end (or start, without one) is not before it. */
 export function notEnded(event: Data, now: number): boolean {

@@ -13,14 +13,13 @@ import {
   teamPostImagesMax,
   teamPostTournamentKeyMax,
 } from "@stall10/shared";
-import type { z } from "zod";
 import type { Caller, UserLookup } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
-import { authorOf, checkNotMuted, clip } from "../posts/author.js";
+import { authorOf, checkNotMuted } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
-import { can, isMember, isOrg, isOwner, mapOf, strings } from "../teams/access.js";
+import { can, clip, isMember, isOrg, isOwner, mapOf, strings } from "../teams/access.js";
 import { canReadRoom, canWriteRoom, seesEvent } from "./access.js";
 import { deleteFilesUnder, filesOf, uploadedFiles } from "./uploads.js";
 
@@ -38,12 +37,6 @@ const noTeam = () => new ApiError("not_found", "That team doesn't exist anymore.
 const noEvent = () => new ApiError("not_found", "This event was deleted.");
 const noRoom = () => new ApiError("not_found", "That chat doesn't exist anymore.");
 const noMessage = () => new ApiError("not_found", "This message was deleted.");
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 /**
  * validPost's tournamentKey conjunct: absent, or a string of at most 300
@@ -91,7 +84,7 @@ export class HubService {
 
   async createPost(caller: Caller, rawTeam: unknown, body: unknown): Promise<SaveTeamPostResult> {
     const teamId = docIdParam(rawTeam);
-    const req = parse(saveTeamPostRequestSchema, body);
+    const req = parseBody(saveTeamPostRequestSchema, body);
     const tournamentKey = checkTournamentKey(teamId, req.tournamentKey);
     const team = await this.team(teamId);
     if (!can(team, caller.uid, "manageTeam")) throw denied("Only the team's admins post for it.");
@@ -130,7 +123,7 @@ export class HubService {
   async editPost(caller: Caller, rawTeam: unknown, rawPost: unknown, body: unknown): Promise<SaveTeamPostResult> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawPost);
-    const req = parse(saveTeamPostRequestSchema, body);
+    const req = parseBody(saveTeamPostRequestSchema, body);
     const tournamentKey = checkTournamentKey(teamId, req.tournamentKey);
     const team = await this.team(teamId);
     if (!can(team, caller.uid, "manageTeam")) throw denied("Only the team's admins edit its posts.");
@@ -186,7 +179,7 @@ export class HubService {
 
   /** The event's fields as the app writes them (toEditableMap), and its public copy. */
   private eventFields(team: Data, body: unknown, editing = false) {
-    const req = parse(saveTeamEventRequestSchema, body);
+    const req = parseBody(saveTeamEventRequestSchema, body);
     // An edit without an audience keeps the event's own; a new one is for everyone.
     const keep = !isOrg(team) || (editing && req.audience === undefined);
     const audience = keep ? null : [...new Set(req.audience?.length ? req.audience : ["everyone"])].sort();
@@ -290,7 +283,7 @@ export class HubService {
   }
 
   async setRsvp(caller: Caller, rawTeam: unknown, rawEvent: unknown, body: unknown): Promise<void> {
-    const { status } = parse(rsvpRequestSchema, body);
+    const { status } = parseBody(rsvpRequestSchema, body);
     const uid = caller.uid;
     await this.respond(caller, rawTeam, rawEvent, (event) => ({
       rsvps: status ? { ...mapOf(event.rsvps), [uid]: status } : without(event.rsvps, uid),
@@ -300,7 +293,7 @@ export class HubService {
   }
 
   async setEventReaction(caller: Caller, rawTeam: unknown, rawEvent: unknown, body: unknown): Promise<void> {
-    const { reaction, on } = parse(eventReactionRequestSchema, body);
+    const { reaction, on } = parseBody(eventReactionRequestSchema, body);
     const uid = caller.uid;
     await this.respond(caller, rawTeam, rawEvent, (event) => {
       if (mapOf(event.rsvps)[uid] !== "going") throw new ApiError("failed_precondition", "Say you're going to react.");
@@ -311,7 +304,7 @@ export class HubService {
   }
 
   async setEventVotes(caller: Caller, rawTeam: unknown, rawEvent: unknown, body: unknown): Promise<void> {
-    const { optionIds } = parse(eventVotesRequestSchema, body);
+    const { optionIds } = parseBody(eventVotesRequestSchema, body);
     const uid = caller.uid;
     await this.respond(caller, rawTeam, rawEvent, (event) => {
       const poll = event.poll && typeof event.poll === "object" ? (event.poll as Data) : null;
@@ -332,7 +325,7 @@ export class HubService {
   async sendMessage(caller: Caller, rawTeam: unknown, rawRoom: unknown, body: unknown): Promise<SendChatMessageResult> {
     const teamId = docIdParam(rawTeam);
     const roomId = docIdParam(rawRoom);
-    const req = parse(sendChatMessageRequestSchema, body);
+    const req = parseBody(sendChatMessageRequestSchema, body);
     await checkNotMuted(this.store, caller.uid, this.now());
     const [team, room] = await Promise.all([this.store.get(p.team(teamId)), this.store.get(p.room(teamId, roomId))]);
     if (!team || !room) throw noRoom();
@@ -380,7 +373,7 @@ export class HubService {
     const teamId = docIdParam(rawTeam);
     const roomId = docIdParam(rawRoom);
     const id = docIdParam(rawMessage);
-    const { emoji } = parse(chatReactionRequestSchema, body);
+    const { emoji } = parseBody(chatReactionRequestSchema, body);
     if (emoji !== null && !(chatReactionChoices as readonly string[]).includes(emoji)) {
       throw new ApiError("invalid_argument", "Pick one of the reactions.");
     }

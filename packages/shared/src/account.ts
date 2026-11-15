@@ -19,7 +19,6 @@ export const identityRequestSchema = z
   .refine((b) => b.name !== undefined || b.photoUploadId !== undefined || b.headerUploadId !== undefined, {
     message: "Nothing to change.",
   });
-export type IdentityRequest = z.input<typeof identityRequestSchema>;
 
 /** What `PUT /v1/me/identity` answers: the profile's name and picture URLs now. */
 export interface IdentityResult {

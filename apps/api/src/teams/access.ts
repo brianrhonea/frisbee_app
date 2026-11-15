@@ -17,7 +17,7 @@ import type { Data } from "../store.js";
 
 // ---- Reading a team doc (no prototype keys: a uid can be "constructor") ----
 
-const isMap = (v: unknown): v is Record<string, unknown> =>
+export const isMap = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date);
 export const mapOf = (v: unknown): Record<string, unknown> => (isMap(v) ? v : {});
 export const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
@@ -25,6 +25,12 @@ export const own = (m: unknown, key: string): unknown => (isMap(m) && Object.has
 const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
 
 export const clip = (s: string, max: number) => (s.length > max ? s.substring(0, max) : s);
+
+/** [v] trimmed and cut to [max] characters; [fallback] (cut too) when it isn't text or is blank. */
+export const clipText = (v: unknown, max: number, fallback = "") => {
+  const t = typeof v === "string" ? v.trim() : "";
+  return (t.length > 0 ? t : fallback).slice(0, max);
+};
 
 // ---- The rules' helpers --------------------------------------------------
 

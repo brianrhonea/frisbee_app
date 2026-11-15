@@ -16,7 +16,6 @@ export const postStateLimit = 50;
 export const repostRequestSchema = z.object({
   note: z.string().max(repostNoteMax, `Keep the note under ${repostNoteMax} characters.`).optional(),
 });
-export type RepostRequest = z.infer<typeof repostRequestSchema>;
 
 /** After `PUT|DELETE /v1/posts/:id/like`. */
 export interface LikeResult {
@@ -198,7 +197,6 @@ export const savePostRequestSchema = z.strictObject({
     .refine((e) => !(e.teamId && e.calendarId), { message: "Share a team's event or a calendar's, not both." })
     .optional(),
 });
-export type SavePostRequest = z.input<typeof savePostRequestSchema>;
 
 /** After `POST /v1/posts` or `PATCH /v1/posts/:id`. */
 export interface SavePostResult {
@@ -218,11 +216,9 @@ export const commentRequestSchema = z.strictObject({
     .regex(/^[A-Za-z0-9_-]{1,128}$/)
     .optional(),
 });
-export type CommentRequest = z.input<typeof commentRequestSchema>;
 
 /** `PATCH /v1/posts/:id/comments/:commentId`: its author rewrites it. */
 export const editCommentRequestSchema = commentRequestSchema.pick({ body: true });
-export type EditCommentRequest = z.input<typeof editCommentRequestSchema>;
 
 /** After `POST /v1/posts/:id/comments`. */
 export interface CommentResult {

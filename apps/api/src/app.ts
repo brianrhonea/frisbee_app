@@ -173,8 +173,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
     hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
-    chatAdminRoutes(app, new ChatAdmin(deps.store, deps.teams, deps.media), writes);
-    discordRoutes(app, new DiscordService(deps.store, new ChatAdmin(deps.store, deps.teams, deps.media)), writes);
+    const chats = new ChatAdmin(deps.store, deps.teams, deps.media);
+    chatAdminRoutes(app, chats, writes);
+    discordRoutes(app, new DiscordService(deps.store, chats), writes);
     playbookRoutes(app, new PlaybookService(deps.store), writes);
     meetingRoutes(app, new MeetingService(deps.store, deps.users, deps.teams, deps.livekit, deps.now), writes);
     videoRoutes(app, new VideoService(deps.store, deps.users, deps.media, queries), writes);
