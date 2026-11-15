@@ -9,6 +9,9 @@ export function requestHomeRefresh() {
   window.dispatchEvent(new Event(event));
 }
 
+/** Home's new-post box (never a post being edited): what `n` and #compose focus. */
+export const newPostBox = ".composer[data-compose=new] textarea";
+
 export function onHomeRefresh(fn: () => void): () => void {
   window.addEventListener(event, fn);
   return () => window.removeEventListener(event, fn);

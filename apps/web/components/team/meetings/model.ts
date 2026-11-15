@@ -1,6 +1,6 @@
 "use client";
 import type { MeetingRsvp, MeetingStatus } from "@stall10/shared";
-import { type QueryConstraint, where } from "firebase/firestore";
+import { limit, orderBy, type QueryConstraint, where } from "firebase/firestore";
 import { type Doc, useLiveQueries } from "@/lib/live";
 import type { TeamViewer } from "../TeamContext";
 
@@ -58,17 +58,24 @@ export const needsApproval = (m: MeetingData, admin: boolean) => m.requireApprov
 
 const byStart = (a: Meeting, b: Meeting) => (a.startsAt ?? "").localeCompare(b.startsAt ?? "");
 
+/** How many meetings a team's lists read. */
+const meetingCap = 200;
+
 /**
  * The Firestore reads for the meetings a member can see (watchMeetings):
  * admins read them all; others ask by their tier and by their uid, as the
  * rules require. [key] names the set for useLiveQueries. Shared with My
- * schedule.
+ * schedule. Bounded: admins read the [meetingCap] made most recently; an
+ * invitee's reads (no index to order them) stop at [meetingCap] each.
  */
 export function teamMeetingQueries(member: Extract<TeamViewer, { state: "member" }>) {
   const admin = member.can("manageEvents");
   const queries: QueryConstraint[][] = admin
-    ? [[]]
-    : [[where("inviteRoles", "array-contains", inviteTier(member.tier))], [where("inviteUsers", "array-contains", member.uid)]];
+    ? [[orderBy("createdAt", "desc"), limit(meetingCap)]]
+    : [
+        [where("inviteRoles", "array-contains", inviteTier(member.tier)), limit(meetingCap)],
+        [where("inviteUsers", "array-contains", member.uid), limit(meetingCap)],
+      ];
   return { queries, key: admin ? "all" : `${member.tier}|${member.uid}` };
 }
 

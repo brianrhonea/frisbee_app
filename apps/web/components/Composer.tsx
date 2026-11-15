@@ -150,12 +150,11 @@ export function Composer({
     if (autoFocus) text.current?.focus();
   }, [autoFocus]);
 
-  // Previews are object URLs; free them when they go.
-  useEffect(
-    () => () => photos.forEach((p) => p.kind === "new" && URL.revokeObjectURL(p.preview)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on unmount
-    [],
-  );
+  // Previews are object URLs; free them when they go (the ref sees the
+  // photos at unmount, not the first render's).
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
+  useEffect(() => () => photosRef.current.forEach((p) => p.kind === "new" && URL.revokeObjectURL(p.preview)), []);
 
   if (!user) return null;
   const me = user;
@@ -271,6 +270,8 @@ export function Composer({
   return (
     <form
       className={`composer${dragging ? " dragging" : ""}`}
+      // The new-post composer (not a post being edited): what `n` and #compose focus.
+      data-compose={editing ? undefined : "new"}
       onSubmit={(e) => void submit(e)}
       onDragOver={(e) => {
         if (repost) return;

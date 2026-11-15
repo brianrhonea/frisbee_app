@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type FormEvent, type ReactNode, useEffect } from "react";
-import { requestHomeRefresh } from "@/lib/homeRefresh";
+import { newPostBox, requestHomeRefresh } from "@/lib/homeRefresh";
 import { useAuth } from "./AuthProvider";
 import { MeetingAlerts } from "./team/meetings/MeetingAlerts";
 import { HeaderAuth } from "./HeaderAuth";
@@ -36,7 +36,7 @@ const secondary = [
 
 /** Focuses Home's composer, or goes Home to write a post. */
 function compose(router: ReturnType<typeof useRouter>) {
-  const composer = document.querySelector<HTMLTextAreaElement>(".composer textarea");
+  const composer = document.querySelector<HTMLTextAreaElement>(newPostBox);
   if (composer) {
     composer.scrollIntoView({ block: "center", behavior: "smooth" });
     composer.focus({ preventScroll: true });
@@ -72,7 +72,8 @@ function useShortcuts(signedIn: boolean) {
       pendingG = e.key === "g" ? Date.now() : 0;
       if (e.key === "/") {
         e.preventDefault();
-        const search = document.querySelector<HTMLInputElement>("input[type=search]");
+        // The site search: the top bar's, or Explore's own (never a list's filter box).
+        const search = document.querySelector<HTMLInputElement>(".top-search input, input#q");
         if (search) search.focus();
         else router.push("/explore");
       } else if (e.key === "n" && signedIn) {

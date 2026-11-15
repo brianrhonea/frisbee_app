@@ -2,7 +2,7 @@
 import type { MemberProfilePage, ProfilePage, StatTotals } from "@stall10/shared";
 import { limit, orderBy, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { callApi } from "@/lib/client";
+import { ApiError, callApi, problem } from "@/lib/client";
 import { type Signal, useChangeSignal } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
 import { FollowButton } from "./FollowButton";
@@ -32,22 +32,27 @@ const statColumns: Array<[keyof StatTotals, string]> = [
 export function LivePlayer({ uid }: { uid: string }) {
   const { user } = useAuth();
   const [member, setMember] = useState<MemberProfilePage | null>(null);
-  const [failed, setFailed] = useState(false);
+  // Why it isn't showing: not found (404), or a failure to retry.
+  const [failed, setFailed] = useState<{ notFound: boolean; text: string } | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const unlocked = member ? !member.locked : false;
+  const privateDetails = unlocked && member?.profile.private === true;
   const signals: Signal[] | null = user
     ? [
         { doc: `profiles/${uid}` },
         { doc: `users/${user.uid}/follows/user_${uid}` },
         { collection: "posts", constraints: [where("authorId", "==", uid), orderBy("createdAt", "desc"), limit(20)] },
         // A private profile's details: only once the rules let this member read them.
-        ...(unlocked && member?.profile.private ? [{ doc: `profiles/${uid}/private/details` }] : []),
+        ...(privateDetails ? [{ doc: `profiles/${uid}/private/details` }] : []),
       ]
     : null;
-  const version = useChangeSignal(signals, user ? `${user.uid}|${uid}|${unlocked}` : "");
+  // Every signal's shape is in the key, so the private details' signal starts and stops with it.
+  const version = useChangeSignal(signals, user ? `${user.uid}|${uid}|${privateDetails}` : "");
 
   useEffect(() => {
     if (!user) {
       setMember(null);
+      setFailed(null);
       return;
     }
     let live = true;
@@ -57,21 +62,39 @@ export function LivePlayer({ uid }: { uid: string }) {
         (page) => {
           if (!live) return;
           setMember(page);
-          setFailed(false);
+          setFailed(null);
         },
-        () => live && setFailed(true),
+        (e) => {
+          if (live) setFailed({ notFound: e instanceof ApiError && e.status === 404, text: problem(e, "Couldn't load this profile. Check your connection and try again.") });
+        },
       );
     }, 150);
     return () => {
       live = false;
       clearTimeout(timer);
     };
-  }, [user, uid, version]);
+  }, [user, uid, version, attempt]);
+  // Another player: don't show the last one while this one loads.
+  useEffect(() => setMember(null), [uid]);
 
   if (!member) {
-    return failed ? (
+    return failed?.notFound ? (
       <div className="page">
         <p className="empty">This player couldn&apos;t be found.</p>
+      </div>
+    ) : failed ? (
+      <div className="page">
+        <p className="form-error">{failed.text}</p>
+        <button
+          type="button"
+          className="btn btn-small"
+          onClick={() => {
+            setFailed(null);
+            setAttempt((n) => n + 1);
+          }}
+        >
+          Try again
+        </button>
       </div>
     ) : (
       <div className="page">

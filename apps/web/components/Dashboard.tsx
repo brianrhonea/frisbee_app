@@ -3,7 +3,7 @@ import type { MeHome, PostPage, PublicPost } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { onHomeRefresh } from "@/lib/homeRefresh";
+import { newPostBox, onHomeRefresh } from "@/lib/homeRefresh";
 import { ApiError, callApi } from "@/lib/client";
 import { Composer } from "./Composer";
 import { EventItem } from "./EventItem";
@@ -100,10 +100,10 @@ export function Dashboard({ user }: { user: User }) {
   // "Create a post" from another page lands here with #compose.
   useEffect(() => {
     if (!home || window.location.hash !== "#compose") return;
-    const box = document.querySelector<HTMLTextAreaElement>(".composer textarea");
+    const box = document.querySelector<HTMLTextAreaElement>(newPostBox);
     box?.scrollIntoView({ block: "center" });
     box?.focus({ preventScroll: true });
-    history.replaceState(null, "", "/");
+    history.replaceState(null, "", window.location.pathname + window.location.search); // Drops #compose, keeps ?tab=.
   }, [home]);
 
   function pickTab(t: Tab, push = true) {

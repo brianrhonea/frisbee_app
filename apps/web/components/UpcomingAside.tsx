@@ -33,13 +33,14 @@ export function UpcomingAside() {
       id: `t-${t.id}`,
       startsAt: t.startsAt,
       title: t.name || "Tournament",
-      href: "/events",
+      // A group's tournament has its own page; anything else is on Events.
+      href: t.groupId && t.tournamentId ? `/teams/${encodeURIComponent(t.groupId)}/tournaments/${encodeURIComponent(t.tournamentId)}` : "/events",
     })),
     ...(page?.events ?? []).map((e) => ({
       id: `e-${e.id}`,
       startsAt: e.startsAt,
       title: e.title || "Event",
-      href: `/teams/${encodeURIComponent(e.teamId)}`,
+      href: `/teams/${encodeURIComponent(e.teamId)}/schedule?event=${encodeURIComponent(e.id)}`,
     })),
   ]
     .sort((a, b) => (a.startsAt ?? "").localeCompare(b.startsAt ?? ""))
