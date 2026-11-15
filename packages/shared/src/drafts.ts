@@ -32,10 +32,12 @@ export const genderMatchLabels: Record<GenderMatch, string> = { mmp: "MMP", wmp:
  * (PlayerSignup.compareByName): the order players are drafted in, so a
  * seed deals the same teams on the app and the website.
  */
-export function signupOrder(a: { name: string }, b: { name: string }): number {
+export function signupOrder(a: { name: string; uid: string }, b: { name: string; uid: string }): number {
   const x = a.name.toLowerCase();
   const y = b.name.toLowerCase();
-  return x < y ? -1 : x > y ? 1 : 0;
+  // Equal names go by uid, so every sort gives one order.
+  if (x !== y) return x < y ? -1 : 1;
+  return a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0;
 }
 
 /** What the rules and the app allow (validSignup, PlayerSignup). */
