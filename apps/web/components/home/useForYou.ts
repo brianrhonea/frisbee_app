@@ -28,9 +28,9 @@ import type { TeamPostView } from "@/components/team/TeamPostCard";
 import { firestoreDb } from "@/lib/firebase";
 import { type Doc, plain, useLiveQuery } from "@/lib/live";
 
-export const feedPageSize = 20;
+const feedPageSize = 20;
 
-export type FeedItem =
+type FeedItem =
   | { kind: "user"; id: string; createdAt: string | undefined; post: PublicPost }
   | { kind: "team"; id: string; createdAt: string | undefined; teamId: string; teamName: string; member: boolean; post: Doc<TeamPostView> };
 

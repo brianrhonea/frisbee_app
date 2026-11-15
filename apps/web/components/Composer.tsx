@@ -78,7 +78,7 @@ function workoutOf(d: WorkoutDraft): WorkoutInput | string {
 const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 
 /** The post being edited, when not writing a new one. */
-export interface EditingPost {
+interface EditingPost {
   id: string;
   body: string;
   links: string[];

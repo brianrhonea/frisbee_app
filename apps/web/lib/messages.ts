@@ -34,7 +34,7 @@ function rows<T>(docs: QueryDocumentSnapshot[]): Row<T>[] {
  * pushed-out message is older than everything still in a full page; a
  * deleted one isn't, or the page wasn't full.
  */
-export function pushedOut<T extends { createdAt?: string | null }>(
+function pushedOut<T extends { createdAt?: string | null }>(
   before: Doc<T>[] | null,
   after: Doc<T>[],
   pageLimit: number,

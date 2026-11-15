@@ -36,7 +36,7 @@ export function PlayerChooser({
   );
 }
 
-export interface LineChoice {
+interface LineChoice {
   players: string[];
   saveAs: string | null;
   side: StatSide | null;

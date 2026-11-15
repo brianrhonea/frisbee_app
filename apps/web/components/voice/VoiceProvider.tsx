@@ -14,7 +14,7 @@ import { type CallEnd, CallCancelled, CallSession, type CallState, useCall } fro
 import { canPickSpeaker, loadSettings, present, updateSettings, withPersonVolume } from "../team/meetings/settings";
 
 /** The voice channel the user is in (VoiceChannel). */
-export interface VoiceChannel {
+interface VoiceChannel {
   teamId: string;
   roomId: string;
   name: string;
@@ -27,7 +27,7 @@ const dropNotices: Record<CallEnd, string> = {
   connectionLost: "Lost the connection to voice.",
   meetingEnded: "The voice channel closed.",
 };
-export const lostAccessNotice = "You no longer have access to this channel.";
+const lostAccessNotice = "You no longer have access to this channel.";
 
 const denied = (e: unknown) => (e as { code?: string })?.code === "permission-denied";
 

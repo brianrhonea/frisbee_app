@@ -43,7 +43,7 @@ export interface DivisionDoc {
   teams?: unknown[];
 }
 
-export interface PaymentDoc {
+interface PaymentDoc {
   paid?: boolean;
   paidAt?: string | null;
   note?: string;

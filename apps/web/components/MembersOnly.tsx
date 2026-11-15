@@ -20,7 +20,7 @@ export function MembersOnly({ children, next, what }: { children: ReactNode; nex
 }
 
 /** Asks a visitor to sign up or log in, then come back to [next]. */
-export function JoinPrompt({ next, what }: { next: string; what?: string }) {
+function JoinPrompt({ next, what }: { next: string; what?: string }) {
   const q = `?next=${encodeURIComponent(next)}`;
   return (
     <div className="card join-prompt">

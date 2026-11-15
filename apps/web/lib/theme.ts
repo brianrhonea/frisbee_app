@@ -7,7 +7,7 @@
 export type Theme = "light" | "dark";
 export type ThemeChoice = Theme | "system";
 
-export const themeKey = "stall10.theme";
+const themeKey = "stall10.theme";
 
 export const themeChoiceLabels: Record<ThemeChoice, string> = { system: "System", light: "Light", dark: "Dark" };
 

@@ -22,7 +22,7 @@ interface Notice {
 }
 
 /** The app route `/team-meetings/:teamId/:meetingId/room` as the site's room page. */
-export function meetingRoute(route: string | null | undefined): { teamId: string; meetingId: string; href: string } | null {
+function meetingRoute(route: string | null | undefined): { teamId: string; meetingId: string; href: string } | null {
   const m = /^\/team-meetings\/([^/]+)\/([^/]+)(?:\/room)?$/.exec(route ?? "");
   if (!m) return null;
   const [teamId, meetingId] = [decodeURIComponent(m[1]!), decodeURIComponent(m[2]!)];

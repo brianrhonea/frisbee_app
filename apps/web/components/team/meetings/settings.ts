@@ -33,14 +33,14 @@ export const defaultSettings: MeetingSettings = {
 export const maxPersonVolume = 2;
 
 /** The most per-person volumes remembered; the oldest set are dropped first. */
-export const maxPersonVolumes = 200;
+const maxPersonVolumes = 200;
 
 const legacyKey = "stall10.meetingPrefs";
 const keyFor = (uid: string) => `${legacyKey}.${uid}`;
 const clamp = (v: unknown, max: number, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(0, v)) : fallback);
 const id = (v: unknown) => (typeof v === "string" && v ? v : null);
 
-export function parseSettings(raw: string | null): MeetingSettings {
+function parseSettings(raw: string | null): MeetingSettings {
   try {
     const p = JSON.parse(raw ?? "{}") as Record<string, unknown>;
     const volumes: Record<string, number> = {};
@@ -88,7 +88,7 @@ export function loadSettings(uid: string | null | undefined): MeetingSettings {
 }
 
 /** Best effort: a failure only means it isn't remembered. */
-export function saveSettings(uid: string | null | undefined, s: MeetingSettings) {
+function saveSettings(uid: string | null | undefined, s: MeetingSettings) {
   if (!uid) return;
   try {
     localStorage.setItem(keyFor(uid), JSON.stringify({ ...s, participantVolumes: capVolumes(s.participantVolumes) }));

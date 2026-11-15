@@ -6,9 +6,6 @@ import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
 import { NavIcon } from "./NavIcons";
 
-type Tournament = EventsPage["tournaments"][number];
-type TeamEvent = EventsPage["events"][number];
-
 /** Local calendar day, as "2026-11-14". */
 function dayKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

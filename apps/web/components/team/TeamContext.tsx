@@ -53,7 +53,7 @@ export type TeamViewer =
   | { state: "error"; uid: string; message: string }
   | { state: "member"; uid: string; team: Doc<TeamDoc>; tier: string; can: (p: TeamPermission) => boolean; audience: string[] };
 
-export interface TeamHubInfo {
+interface TeamHubInfo {
   teamId: string;
   name: string;
   kind: "team" | "community" | "organization";

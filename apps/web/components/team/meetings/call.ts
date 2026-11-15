@@ -93,7 +93,7 @@ function hasWebAudio(): boolean {
 }
 
 /** How loud the call plays: everyone, and each person relative to that (0–2). */
-export interface CallVolumes {
+interface CallVolumes {
   output: number;
   people: Record<string, number>;
 }

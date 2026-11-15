@@ -8,7 +8,7 @@ import { Avatar } from "./Avatar";
 // app's Rankings screen shows them: rankings/{level-division} for teams and
 // playerRankings/all for players. firestore.rules lets members read them.
 
-export interface RankedTeam {
+interface RankedTeam {
   rank: number;
   teamId: string;
   name: string;
@@ -23,7 +23,7 @@ export interface DivisionRanking {
   minGames?: number;
   updatedAt?: string;
 }
-export interface RankedPlayer {
+interface RankedPlayer {
   rank: number;
   uid: string;
   name: string;

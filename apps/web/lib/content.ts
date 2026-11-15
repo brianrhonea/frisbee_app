@@ -5,7 +5,7 @@ import path from "node:path";
 export const contentPages = ["about", "help", "privacy", "terms", "cookies", "delete-account"] as const;
 export type ContentSlug = (typeof contentPages)[number];
 
-export interface ContentPage {
+interface ContentPage {
   html: string;
   title: string;
   description: string;

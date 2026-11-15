@@ -52,7 +52,7 @@ function nextLabel(elements: PlayElement[], kind: PlayElementKind): string {
 }
 
 /** Plays a play's steps in order, one a second and a bit, easing each. */
-export function usePlayback(play: Pick<PlayDoc, "elements" | "steps">) {
+function usePlayback(play: Pick<PlayDoc, "elements" | "steps">) {
   const [t, setT] = useState<number | null>(null);
   const frame = useRef(0);
   const steps = play.steps?.length ?? 0;

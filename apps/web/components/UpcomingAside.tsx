@@ -1,32 +1,19 @@
 "use client";
-import type { EventsPage } from "@stall10/shared";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { callApi } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { EventItem } from "./EventItem";
 import { ForVisitors } from "./ForVisitors";
 import { PickupCard } from "./HomeCards";
 import { LocalTime } from "./LocalTime";
 import { NavIcon } from "./NavIcons";
+import { usePublicEvents } from "./usePublicEvents";
 
 const shown = 4;
 
 /** The right column: what's coming up for members, and a sign-up prompt for visitors. */
 export function UpcomingAside() {
   const { user } = useAuth();
-  const [page, setPage] = useState<EventsPage | null | undefined>(undefined);
-  useEffect(() => {
-    if (!user) return;
-    let live = true;
-    callApi<EventsPage>(user, "/v1/public/events").then(
-      (p) => live && setPage(p),
-      () => live && setPage(null),
-    );
-    return () => {
-      live = false;
-    };
-  }, [user]);
+  const page = usePublicEvents();
 
   const items = [
     ...(page?.tournaments ?? []).map((t) => ({

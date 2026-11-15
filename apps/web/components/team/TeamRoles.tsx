@@ -16,10 +16,10 @@ export const permissionInfo: Record<TeamPermission, { label: string; summary: st
 };
 
 /** The app's role colors (roleColors); 0 is no color. */
-export const roleColors = [0, 0xffe53935, 0xfffb8c00, 0xfffdd835, 0xff43a047, 0xff00acc1, 0xff1e88e5, 0xff8e24aa, 0xffd81b60, 0xff6d4c41, 0xff546e7a];
+const roleColors = [0, 0xffe53935, 0xfffb8c00, 0xfffdd835, 0xff43a047, 0xff00acc1, 0xff1e88e5, 0xff8e24aa, 0xffd81b60, 0xff6d4c41, 0xff546e7a];
 
 /** A Flutter ARGB color as CSS; null for none. */
-export function roleCss(color: number | undefined): string | null {
+function roleCss(color: number | undefined): string | null {
   if (!color) return null;
   return `#${(color & 0xffffff).toString(16).padStart(6, "0")}`;
 }

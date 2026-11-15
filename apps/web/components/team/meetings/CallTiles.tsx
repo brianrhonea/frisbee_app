@@ -21,7 +21,7 @@ export function VideoView({ track, mirror = false, contain = false }: { track: V
 }
 
 /** One person: their camera, or their photo and name; a ring while they talk. */
-export function PersonTile({ person }: { person: CallPerson }) {
+function PersonTile({ person }: { person: CallPerson }) {
   return (
     <div className={`call-tile${person.speaking ? " speaking" : ""}`}>
       {person.camera ? (

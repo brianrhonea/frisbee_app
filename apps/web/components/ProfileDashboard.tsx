@@ -77,7 +77,7 @@ export function StatTiles({ stats }: { stats?: Record<string, StatTotals> }) {
   );
 }
 
-export interface TeamRow {
+interface TeamRow {
   id: string;
   name: string;
   subtitle?: string;
