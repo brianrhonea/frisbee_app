@@ -12,6 +12,7 @@ import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
+import { VoiceRoom } from "./meetings/VoiceRoom";
 
 type Room = ManagedRoom;
 type Folder = ManagedFolder;
@@ -105,10 +106,13 @@ export function TeamChat() {
           <ChatManager rooms={sorted} folders={folders.data ?? []} onDone={() => router.replace(pathname, { scroll: false })} />
         ) : open ? (
           open.kind === "voice" ? (
-            <div className="card hub-empty">
-              <h2>{open.name}</h2>
-              <p className="muted">Voice rooms open in the app for now.</p>
-            </div>
+            <VoiceRoom
+              key={open.id}
+              teamId={teamId}
+              roomId={open.id}
+              name={open.name ?? "Voice"}
+              canSpeak={member.tier === "owner" || member.audience.some((a) => open.writeRoles?.includes(a)) || (open.writeUsers ?? []).includes(member.uid)}
+            />
           ) : (
             <Thread
               teamId={teamId}
