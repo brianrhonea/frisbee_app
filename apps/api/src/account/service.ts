@@ -12,7 +12,8 @@ import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
-import { type Data, type DocStore, deleteField, serverTime } from "../store.js";
+import { type DocStore, deleteField, serverTime } from "../store.js";
+import { mapOf } from "../teams/access.js";
 
 const p = {
   profile: (uid: string) => `profiles/${uid}`,
@@ -22,7 +23,6 @@ const p = {
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : null);
-const mapOf = (v: unknown): Data => (v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date) ? (v as Data) : {});
 
 /**
  * The caller's own account: their name and pictures (the Auth record, as

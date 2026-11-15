@@ -19,10 +19,10 @@ import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
 import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { MediaStorage } from "../media/storage.js";
-import { authorOf, clip } from "../posts/author.js";
+import { authorOf } from "../posts/author.js";
 import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
-import { can, isMember } from "../teams/access.js";
+import { can, clip, isMap, isMember } from "../teams/access.js";
 
 const p = {
   team: (t: string) => `teams/${t}`,
@@ -40,8 +40,6 @@ const noTeam = () => new ApiError("not_found", "That team doesn't exist.");
 const noVideo = () => new ApiError("not_found", "That video doesn't exist anymore.");
 const noFolder = () => new ApiError("not_found", "That folder doesn't exist anymore.");
 
-const isMap = (v: unknown): v is Record<string, unknown> =>
-  !!v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date);
 /** Firestore rules count characters, not UTF-16 units. */
 const chars = (s: string) => [...s].length;
 const validString = (v: unknown, max: number): v is string => typeof v === "string" && chars(v) <= max;

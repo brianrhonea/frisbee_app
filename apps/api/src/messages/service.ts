@@ -22,9 +22,9 @@ import { ApiError, parseBody } from "../errors.js";
 import { deleteFilesUnder, filesOf, uploadedFiles } from "../hub/uploads.js";
 import { docIdParam } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
-import { authorOf, checkNotMuted, clip } from "../posts/author.js";
+import { authorOf, checkNotMuted } from "../posts/author.js";
 import { type Data, type DocStore, deleteField, serverTime } from "../store.js";
-import { mapOf, strings } from "../teams/access.js";
+import { clip, mapOf, strings } from "../teams/access.js";
 
 const p = {
   conv: (id: string) => `conversations/${id}`,

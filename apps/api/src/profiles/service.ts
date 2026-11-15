@@ -16,6 +16,7 @@ import {
 import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, parseBody } from "../errors.js";
 import { type Data, type DocStore, deleteField, serverTime } from "../store.js";
+import { clip } from "../teams/access.js";
 
 const p = {
   profile: (uid: string) => `profiles/${uid}`,
@@ -24,7 +25,6 @@ const p = {
   user: (uid: string) => `users/${uid}`,
 };
 
-const clip = (s: string, max: number) => (s.length > max ? s.substring(0, max) : s);
 const usernameOf = (profile: Data | null) => (typeof profile?.username === "string" ? profile.username : null);
 
 /**

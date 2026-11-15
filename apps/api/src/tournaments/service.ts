@@ -47,20 +47,11 @@ import {
 } from "@stall10/shared";
 import type { Caller } from "../auth.js";
 import { ApiError, parseBody } from "../errors.js";
-import { docIdParam } from "../ids.js";
+import { docIdParam, storedId } from "../ids.js";
 import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, kindOf, mapOf, strings } from "../teams/access.js";
 
-/** A stored id that is safe to put in a path, or null. */
-function safeId(v: unknown): string | null {
-  if (typeof v !== "string" || !v) return null;
-  try {
-    return docIdParam(v);
-  } catch {
-    return null;
-  }
-}
 
 const p = {
   tournament: (id: string) => `tournaments/${id}`,
@@ -175,7 +166,7 @@ export class TournamentService {
 
   /** manages(t): the host's members with Manage events. */
   private async manages(tx: Pick<Tx, "get">, t: Data, uid: string): Promise<boolean> {
-    const host = safeId(t.hostId);
+    const host = storedId(t.hostId);
     if (!host) return false;
     const team = await tx.get(p.team(host));
     return !!team && can(team, uid, "manageEvents");
@@ -340,7 +331,7 @@ export class TournamentService {
     for (const divId of closing) gamesOf.set(divId, await this.queries.ids(p.games(id, divId), 100));
     await this.store.transact(async (tx) => {
       const t = await this.managed(tx, id, caller.uid);
-      const hostId = safeId(t.hostId) as string;
+      const hostId = storedId(t.hostId) as string;
       const host = (await tx.get(p.team(hostId))) as Data;
       const kind = t.kind === "league" ? "league" : "tournament";
       const entryType = t.entryType === "players" ? "players" : "teams";
@@ -353,7 +344,7 @@ export class TournamentService {
       const editable = statusIndex(statusOf(t)) < statusIndex("scheduled");
       const summaries: Array<{ id: string; division: unknown; level: unknown }> = [];
       const order = [
-        ...(Array.isArray(t.divisions) ? t.divisions.map((x) => safeId(mapOf(x).id)).filter((x): x is string => !!x) : []),
+        ...(Array.isArray(t.divisions) ? t.divisions.map((x) => storedId(mapOf(x).id)).filter((x): x is string => !!x) : []),
         ...[...stored.keys()],
       ].filter((x, i, l) => l.indexOf(x) === i && stored.has(x));
       const writes: Array<() => void> = [];
@@ -596,7 +587,7 @@ export class TournamentService {
       if (!entry) throw new ApiError("not_found", "That team hasn't entered.");
       const team = await tx.get(p.team(teamId));
       if (!team) throw new ApiError("not_found", "That team doesn't exist.");
-      const divId = safeId(entry.divisionId);
+      const divId = storedId(entry.divisionId);
       const division = divId ? await tx.get(p.division(id, divId)) : null;
       const fields = { teamName: String(entry.teamName ?? ""), divisionId: String(entry.divisionId ?? ""), captainIds: strings(entry.captainIds) };
       if (!manager) {
@@ -856,7 +847,7 @@ export class TournamentService {
     // A seed's entry may name another division now (moved, then withdrawn).
     const entries = new Map(entryRows.map((e) => [e.id, e.data]));
     const elsewhere = strings(division.seeds)
-      .map(safeId)
+      .map(storedId)
       .filter((s): s is string => s !== null && !entries.has(s));
     const moved = await this.store.getAll(elsewhere.map((s) => p.entry(id, s)));
     elsewhere.forEach((s, i) => {
@@ -903,7 +894,7 @@ export class TournamentService {
       }
       // The division's entries and every seed's (a seed's entry may have moved).
       const entries = new Map<string, Data>();
-      for (const teamId of new Set([...entryRows.map((e) => e.id), ...strings(d.seeds).map(safeId).filter((s): s is string => s !== null)])) {
+      for (const teamId of new Set([...entryRows.map((e) => e.id), ...strings(d.seeds).map(storedId).filter((s): s is string => s !== null)])) {
         const e = await tx.get(p.entry(id, teamId));
         if (e) entries.set(teamId, e);
       }

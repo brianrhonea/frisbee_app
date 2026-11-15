@@ -7,6 +7,7 @@
 // the rule's order.
 import { ApiError } from "../errors.js";
 import { type Data, serverTime } from "../store.js";
+import { isMap } from "../teams/access.js";
 
 type Problem = ApiError | null;
 const bad = (m: string) => new ApiError("invalid_argument", m);
@@ -14,7 +15,6 @@ const denied = (m: string) => new ApiError("permission_denied", m);
 const closed = (m: string) => new ApiError("failed_precondition", m);
 
 const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
-const isMap = (v: unknown): v is Data => !!v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date);
 /** validString(v, max). */
 const validString = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
 /** `x is timestamp`: a stored Date, or the server's clock being written. */

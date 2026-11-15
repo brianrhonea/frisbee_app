@@ -17,9 +17,9 @@ import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
-import { authorOf, checkNotMuted, clip } from "../posts/author.js";
+import { authorOf, checkNotMuted } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
-import { can, isMember, isOrg, isOwner, mapOf, strings } from "../teams/access.js";
+import { can, clip, isMember, isOrg, isOwner, mapOf, strings } from "../teams/access.js";
 import { canReadRoom, canWriteRoom, seesEvent } from "./access.js";
 import { deleteFilesUnder, filesOf, uploadedFiles } from "./uploads.js";
 

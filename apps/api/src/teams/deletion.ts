@@ -1,26 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
 import { ApiError } from "../errors.js";
-import { docIdParam } from "../ids.js";
+import { docIdParam, storedId } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
 import type { DocQueries } from "../queries.js";
-import { type Data, type DocStore, serverTime } from "../store.js";
+import { type DocStore, serverTime } from "../store.js";
 import type { TeamRepository } from "./repository.js";
+import { mapOf } from "./access.js";
 
-/** A stored id that is safe to put in a path, or null. */
-function safeId(v: unknown): string | null {
-  if (typeof v !== "string" || !v) return null;
-  try {
-    return docIdParam(v);
-  } catch {
-    return null;
-  }
-}
 
 /** Hosted events read to find an unfinished one (a team hosts few). */
 const hostedReadLimit = 1000;
 
-const mapOf = (v: unknown): Data => (v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date) ? (v as Data) : {});
 
 /**
  * Deleting a team, group or community (the owner only; teams delete rule),
@@ -65,7 +56,7 @@ export class TeamDeletion {
         throw new ApiError("failed_precondition", "Remove everyone else or hand it on before deleting it.");
       }
       // inActiveLeague(): a league's games and standings refer to its teams until it's final.
-      const leagueId = safeId(team.leagueId);
+      const leagueId = storedId(team.leagueId);
       if (team.leagueId != null && !leagueId) throw new ApiError("failed_precondition", "It plays in a league, so it can't be deleted yet.");
       if (leagueId) {
         const league = await tx.get(`tournaments/${leagueId}`);
@@ -80,8 +71,8 @@ export class TeamDeletion {
       if (typed === null || typed.toLowerCase() !== String(team.name ?? "").trim().toLowerCase()) {
         throw new ApiError("invalid_argument", "Type the name exactly to delete it.");
       }
-      const orgId = safeId(team.orgId);
-      const linked = Object.keys(mapOf(team.linkedTeams)).filter((id) => safeId(id) !== null).slice(0, 50);
+      const orgId = storedId(team.orgId);
+      const linked = Object.keys(mapOf(team.linkedTeams)).filter((id) => storedId(id) !== null).slice(0, 50);
       const [org, request, ...members] = await Promise.all([
         orgId ? tx.get(`teams/${orgId}`) : Promise.resolve(null),
         orgId ? tx.get(`teams/${orgId}/linkRequests/${teamId}`) : Promise.resolve(null),
