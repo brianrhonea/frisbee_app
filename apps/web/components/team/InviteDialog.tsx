@@ -175,7 +175,13 @@ function ShareLink({ link }: { link: TeamLink }) {
   useEffect(() => {
     if (team) void ensure(ttl);
   }, [team, ensure, ttl]);
-  const url = team ? link.url : `${site || window.location.origin}/teams/${encodeURIComponent(teamId)}`;
+  // A team's link, once made for the picked duration; a group's is its
+  // share link (/g/:id, as the app's), which opens the app or the page.
+  const url = team
+    ? link.invite?.ttl === ttl
+      ? link.url
+      : null
+    : `${site || window.location.origin}/g/${encodeURIComponent(teamId)}`;
 
   return (
     <div className="stack invite-share">

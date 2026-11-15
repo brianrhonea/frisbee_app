@@ -43,6 +43,11 @@ export function OpenInApp({ kind, id }: { kind: LinkKind; id: string }) {
           <Link href={`/posts/${encodeURIComponent(id)}`}>See the post on the web</Link>
         </p>
       )}
+      {kind === "g" && (
+        <p>
+          <Link href={`/teams/${encodeURIComponent(id)}`}>See the group on the web</Link>
+        </p>
+      )}
       <p className="muted">No app yet?</p>
       <StoreBadges center />
       <p className="web-cta">

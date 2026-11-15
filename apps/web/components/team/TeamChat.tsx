@@ -15,6 +15,7 @@ import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
 import { VoiceRoom } from "./meetings/VoiceRoom";
+import { EmptyState, Loading } from "../StatusViews";
 
 type Room = ManagedRoom;
 type Folder = ManagedFolder;
@@ -56,7 +57,7 @@ export function TeamChat() {
 
   if (!member) return <MembersOnlySection what="chat" />;
   if (rooms.error) return <p className="form-error">{rooms.error}</p>;
-  if (!rooms.data) return <p className="muted" aria-busy="true">Loading chat…</p>;
+  if (!rooms.data) return <Loading label="Loading chat…" />;
 
   const managing = all && params.get("manage") === "1";
   const sorted = rooms.data.slice().sort(byPosition);
@@ -78,7 +79,7 @@ export function TeamChat() {
             {managing ? "Back to chat" : "Manage rooms"}
           </Link>
         )}
-        {groups.length === 0 && <p className="empty">No rooms you can read.</p>}
+        {groups.length === 0 && <EmptyState>No rooms you can read.</EmptyState>}
         {groups.map((g) => (
           <div key={g.id || "top"}>
             {g.name && <h3 className="chat-folder">{g.name}</h3>}
@@ -127,7 +128,7 @@ export function TeamChat() {
             />
           )
         ) : (
-          <p className="empty">Pick a room.</p>
+          <EmptyState>Pick a room.</EmptyState>
         )}
       </section>
     </div>
@@ -169,9 +170,9 @@ function Thread({
         {messages.error ? (
           <p className="form-error">{messages.error}</p>
         ) : !messages.list ? (
-          <p className="muted" aria-busy="true">Loading messages…</p>
+          <Loading label="Loading messages…" />
         ) : list.length === 0 ? (
-          <p className="empty">No messages yet.</p>
+          <EmptyState>No messages yet.</EmptyState>
         ) : (
           list.map((m, i) => {
             const prev = list[i - 1];

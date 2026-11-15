@@ -13,6 +13,7 @@ import { useLiveQuery } from "@/lib/live";
 import { divisionLabels } from "@/lib/site";
 import { useAuth } from "../AuthProvider";
 import { rolesInOrder, useTeamHub } from "./TeamContext";
+import { EmptyState } from "../StatusViews";
 
 const levelLabels: Record<string, string> = { club: "Club", college: "College", youth: "Youth", league: "League", pickup: "Pickup" };
 
@@ -295,7 +296,7 @@ export function TeamCommunity() {
               Search
             </button>
           </form>
-          {found && found.length === 0 && <p className="empty">No schools or clubs found.</p>}
+          {found && found.length === 0 && <EmptyState>No schools or clubs found.</EmptyState>}
           {found && found.length > 0 && (
             <ul className="role-list">
               {found.map((o) => (

@@ -17,6 +17,7 @@ import { TeamEventEditor } from "./TeamEventEditor";
 import "./team_schedule_meetings.css";
 import { startOfToday } from "@/lib/dates";
 import { validId } from "@/lib/text";
+import { EmptyState, Loading } from "../StatusViews";
 
 /** A team event as members read it (TeamEvent in the app). */
 export interface TeamEventDoc extends PublicEvent {
@@ -146,13 +147,13 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   const listed = !!wanted && (member ? (live.data ?? []) : publicEvents).some((e) => e.id === wanted);
   const linked = useLiveDoc<TeamEventDoc>(member && wanted && live.data && !listed ? `teams/${teamId}/events/${wanted}` : null);
 
-  if (viewer.state === "loading") return <p className="muted" aria-busy="true">Loading…</p>;
+  if (viewer.state === "loading") return <Loading />;
   if (!member && privateGroup) {
-    return <p className="empty">Only members see this group&apos;s events.</p>;
+    return <EmptyState>Only members see this group&apos;s events.</EmptyState>;
   }
   if (live.error) return <p className="form-error">{live.error}</p>;
   const events: Array<Doc<TeamEventDoc>> = member ? (live.data ?? []) : publicEvents;
-  if (member && !live.data) return <p className="muted" aria-busy="true">Loading the schedule…</p>;
+  if (member && !live.data) return <Loading label="Loading the schedule…" />;
 
   const entries: Entry[] = [
     ...events.map((event) => ({ kind: "event" as const, event })),
@@ -192,7 +193,7 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
           </div>
         )}
         {entries.length === 0 ? (
-          <p className="empty">{past ? "No past events." : "Nothing scheduled."}</p>
+          <EmptyState>{past ? "No past events." : "Nothing scheduled."}</EmptyState>
         ) : (
           <ul className="hub-items">
             {entries.map((x) => {

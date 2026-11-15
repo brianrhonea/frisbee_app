@@ -4,6 +4,7 @@ import { type FormEvent, useState } from "react";
 import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { type CustomRoleDoc, useTeamHub } from "./TeamContext";
+import { EmptyState } from "../StatusViews";
 
 /** What each permission lets a role do (TeamPermission in the app). */
 export const permissionInfo: Record<TeamPermission, { label: string; summary: string }> = {
@@ -129,7 +130,7 @@ export function TeamRoles() {
         Roles give members permissions on top of their tier, and pick who sees chat rooms and events. Higher roles are
         listed first.
       </p>
-      {list.length === 0 && !draft && <p className="empty">No custom roles yet.</p>}
+      {list.length === 0 && !draft && <EmptyState>No custom roles yet.</EmptyState>}
       <ul className="role-list">
         {list.map(([id, r], i) => {
           const color = roleCss(r.color);

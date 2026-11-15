@@ -6,6 +6,7 @@ import { Avatar } from "../Avatar";
 import { FollowButton } from "../FollowButton";
 import { roleLabel } from "../ProfileDashboard";
 import { JoinWithCode } from "../CreateTeam";
+import { NavIcon } from "../NavIcons";
 import { Dialog } from "../Dialog";
 import { ShareButton } from "../ShareButton";
 import { InviteButton } from "./InviteDialog";
@@ -14,15 +15,20 @@ import { JoinButton } from "./TeamNav";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-/** The banner's buttons: Invite (member managers), Join (groups' outsiders), Follow and Share. */
+/** The banner's buttons: Invite (member managers), Join (groups' outsiders), Follow, Share and, for members, the Settings gear. */
 export function TeamBannerActions() {
-  const { teamId, name } = useTeamHub();
+  const { teamId, name, viewer } = useTeamHub();
   return (
     <>
       <InviteButton />
       <JoinButton />
       <FollowButton type="team" targetId={teamId} />
       <ShareButton url={new URL(`/teams/${encodeURIComponent(teamId)}`, siteUrl).toString()} title={`${name} on Stall 10`} className="btn btn-small" />
+      {viewer.state === "member" && (
+        <Link href={`/teams/${teamId}/settings`} className="icon-btn" aria-label="Settings" title="Settings">
+          <NavIcon name="settings" size={20} />
+        </Link>
+      )}
     </>
   );
 }

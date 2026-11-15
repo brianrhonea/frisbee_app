@@ -9,6 +9,7 @@ import { Avatar } from "../Avatar";
 import { CommunityAdmin } from "./CommunityAdmin";
 import { InvitePeople } from "./InvitePeople";
 import { useTeamHub } from "./TeamContext";
+import { EmptyState, ErrorNote, Loading } from "../StatusViews";
 
 /**
  * A community's teams (`teams` in `GET /v1/teams/:id/roster`), for anyone
@@ -44,10 +45,10 @@ export function CommunityTeams() {
       </div>
     );
   }
-  if (error) return <p className="empty">{error}</p>;
-  if (!teams) return <p className="muted" aria-busy="true">Loading the teams…</p>;
+  if (error) return <ErrorNote>{error}</ErrorNote>;
+  if (!teams) return <Loading label="Loading the teams…" />;
   const admin = viewer.state === "member" && viewer.can("manageTeam") && viewer.team.kind === "organization";
-  if (teams.length === 0 && !admin) return <p className="empty">No teams here yet.</p>;
+  if (teams.length === 0 && !admin) return <EmptyState>No teams here yet.</EmptyState>;
 
   return (
     <div className="stack">
