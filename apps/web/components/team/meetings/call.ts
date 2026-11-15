@@ -281,9 +281,9 @@ export class CallSession {
     this.refresh();
   }
 
-  /** Switches the mic, camera or speaker in the call; "" is the system default. False if it couldn't. */
+  /** Switches the mic, camera or speaker in the call. False if it couldn't. */
   async useDevice(kind: MediaDeviceKind, id: string): Promise<boolean> {
-    const ok = await this.room.switchActiveDevice(kind, id || "default").catch(() => false);
+    const ok = await this.room.switchActiveDevice(kind, id).catch(() => false);
     this.refresh();
     return ok;
   }

@@ -21,6 +21,8 @@ interface SyncedPlayer {
   pause(): Promise<void>;
   seekTo(ms: number): Promise<void>;
   status(): PlayerStatus | null;
+  /** 0–1: the meeting volume, or 0 with audio muted (MeetingRoomViewModel._applyVolumes). */
+  setVolume(volume: number): void;
 }
 
 type Video = Doc<TeamVideoDoc>;
@@ -36,7 +38,7 @@ type Video = Doc<TeamVideoDoc>;
  * a seek when it's more than 1.5 s off. While it plays, the presenter
  * rewrites the state every 10 s so viewers correct for buffering.
  */
-export function WatchTogether({ teamId, meetingId, canControl, stage }: { teamId: string; meetingId: string; canControl: boolean; stage: boolean }) {
+export function WatchTogether({ teamId, meetingId, canControl, stage, volume = 1 }: { teamId: string; meetingId: string; canControl: boolean; stage: boolean; volume?: number }) {
   const { user } = useAuth();
   const playback = useLiveDoc<MeetingPlaybackDoc>(`teams/${teamId}/meetings/${meetingId}/playback/current`);
   const videos = useLiveQuery<TeamVideoDoc>(`teams/${teamId}/videos`, [], "watch-videos");
@@ -120,10 +122,17 @@ export function WatchTogether({ teamId, meetingId, canControl, stage }: { teamId
     setStatus(null);
   }, [p?.videoId]);
 
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+  useEffect(() => player.current?.setVolume(volume), [volume]);
+
   const attach = useCallback(
     (c: SyncedPlayer | null) => {
       player.current = c;
-      if (c) void tick();
+      if (c) {
+        c.setVolume(volumeRef.current);
+        void tick();
+      }
     },
     [tick],
   );
@@ -299,6 +308,9 @@ function FileSyncedPlayer({ path, title, onReady }: { path: string; title: strin
       },
       status: () =>
         v.readyState >= 1 ? { positionMs: v.currentTime * 1000, durationMs: Number.isFinite(v.duration) ? v.duration * 1000 : null, playing: !v.paused && !v.ended } : null,
+      setVolume: (volume) => {
+        v.volume = Math.min(1, Math.max(0, volume));
+      },
     });
     return () => onReady(null);
   }, [url, onReady]);
@@ -315,6 +327,7 @@ interface YTPlayer {
   getCurrentTime(): number;
   getDuration(): number;
   getPlayerState(): number;
+  setVolume(volume: number): void;
   destroy(): void;
 }
 type YTNamespace = { Player: new (el: HTMLElement, opts: object) => YTPlayer };
@@ -365,6 +378,7 @@ function YouTubeSyncedPlayer({ youtubeId, onReady }: { youtubeId: string; onRead
                 pause: async () => p.pauseVideo(),
                 seekTo: async (ms) => p.seekTo(ms / 1000, true),
                 status: () => ({ positionMs: p.getCurrentTime() * 1000, durationMs: p.getDuration() > 0 ? p.getDuration() * 1000 : null, playing: p.getPlayerState() === 1 }),
+                setVolume: (volume) => p.setVolume(Math.round(Math.min(1, Math.max(0, volume)) * 100)),
               });
             },
             onError: () => live && setProblem("This YouTube video can't play here."),

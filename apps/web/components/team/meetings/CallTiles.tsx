@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Avatar } from "../../Avatar";
 import type { CallPerson, CallSession } from "./call";
 import { maxPersonVolume } from "./settings";
+import "./devices.css";
 
 /** A camera or screen, attached while shown. [mirror] flips the user's own camera. */
 export function VideoView({ track, mirror = false, contain = false }: { track: VideoTrack; mirror?: boolean; contain?: boolean }) {
