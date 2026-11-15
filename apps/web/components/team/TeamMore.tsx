@@ -6,6 +6,7 @@ import { useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection, moreTabs } from "./TeamNav";
 import { PlayField } from "./playbook/PlayField";
+import { HostedTournamentsSection } from "../tournaments/TournamentLists";
 import { GroupTournamentsList } from "./group_tournaments/GroupTournamentsList";
 import { StatsHome } from "./stats/StatsHome";
 import { TeamVideos } from "./videos/TeamVideos";
@@ -38,6 +39,7 @@ export function TeamMore() {
       {tab === "playbook" && <Playbook teamId={teamId} editor={viewer.can("manageTeam")} />}
       {tab === "videos" && <TeamVideos />}
       {tab === "stats" && <StatsHome />}
+      {tab === "tournaments" && <HostedTournamentsSection teamId={teamId} kind={kind} manager={viewer.can("manageEvents")} member />}
       {tab === "tournaments" && <GroupTournamentsList />}
     </div>
   );

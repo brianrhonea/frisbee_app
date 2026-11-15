@@ -7,6 +7,18 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.19.0 — 2026-11-14
+
+**Added**
+- Hosted tournaments and leagues (`/v1/tournaments`): create, edit,
+  publish and delete events; status steps; divisions; seeds; team
+  entries with the host's approval, invites and captains; publishing the
+  schedule; captains report and confirm scores and the host sets final
+  scores; seeding the bracket; and a host-only reconcile (bracket
+  catch-up, going live, final places, withdrawn teams, captains).
+- Every conjunct of the tournament rules is ported, with one test each;
+  the scheduling engine is shared (`packages/shared/src/tournament_engine.ts`).
+
 ## 0.18.0 — 2026-11-14
 
 **Added**

@@ -31,6 +31,7 @@ function hrefOf(f: Follow): string {
     const id = f.targetId.slice(f.groupId.length + 1);
     return `/teams/${encodeURIComponent(f.groupId)}/tournaments/${encodeURIComponent(id)}`;
   }
+  if (f.type === "tournament") return `/tournaments/${encodeURIComponent(f.targetId)}`;
   return "/events";
 }
 

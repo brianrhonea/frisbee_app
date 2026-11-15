@@ -4,6 +4,25 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.20.0 — 2026-11-14
+
+Needs API 0.19.0.
+
+**Added**
+- Tournaments and leagues: find upcoming events (from Explore too); host
+  one (tournament, hat or league) with format, divisions, who can play
+  and fees; edit or delete it; the host's checklist to publish, open and
+  close registration.
+- Teams apply, accept invites, pick captains, withdraw or reserve a
+  spot; hosts accept, waitlist or decline teams, invite teams and seed
+  them.
+- Schedules by day and league week; report, confirm and correct scores;
+  pool and league standings, brackets and final places; event news.
+- Player-entry events show signups on the event's Players tab, with
+  links to each division's draft board and team editor.
+- A team's Tournaments tab lists what it hosts and plays in; followed
+  tournaments open their page.
+
 ## 0.19.0 — 2026-11-14
 
 Needs API 0.18.0.

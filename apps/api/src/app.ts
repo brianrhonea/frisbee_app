@@ -12,6 +12,8 @@ import { DraftService } from "./drafts/service.js";
 import { statsRoutes } from "./stats/routes.js";
 import { StatsService } from "./stats/service.js";
 import { GroupTournamentService, groupTournamentRoutes } from "./group_tournaments/service.js";
+import { tournamentRoutes } from "./tournaments/routes.js";
+import { TournamentService } from "./tournaments/service.js";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
@@ -167,6 +169,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     draftRoutes(app, new DraftService(deps.store, deps.draftQueries ?? listDraftQueries(deps.store)), writes);
     statsRoutes(app, new StatsService(deps.store), writes);
     groupTournamentRoutes(app, new GroupTournamentService(deps.store, deps.teams), writes);
+    tournamentRoutes(app, new TournamentService(deps.store), writes);
     conversationRoutes(app, new ConversationService(deps.store, deps.users, deps.media, deps.now), writes);
     if (deps.calendar) {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {

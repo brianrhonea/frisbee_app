@@ -37,6 +37,18 @@ export default async function Explore({ searchParams }: Props) {
           <>
             <h2 className="section-title">Browse</h2>
             <div className="stack">
+              <Link className="row-card" href="/tournaments">
+                <span>
+                  <b>Find a tournament or league</b>
+                  <small>Apply with your team, sign up to play, or follow results</small>
+                </span>
+              </Link>
+              <Link className="row-card" href="/tournaments/host">
+                <span>
+                  <b>Host a league or tournament</b>
+                  <small>Run it from your group or school or club</small>
+                </span>
+              </Link>
               <Link className="row-card" href="/rankings">
                 <span>
                   <b>Team rankings</b>

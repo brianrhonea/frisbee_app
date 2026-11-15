@@ -1,0 +1,549 @@
+// Hosted tournaments and leagues, following `match /tournaments/{id}` in
+// firestore.rules (one case per conjunct) and the app's own checks.
+import { type EngineGame, scheduleFor, engineSettings } from "@stall10/shared";
+import { beforeEach, describe, expect, it } from "vitest";
+import { buildApp } from "../src/app.js";
+import { FakeMediaStorage, FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
+
+const now = Date.UTC(2026, 10, 14, 12);
+let store: FakeStore;
+type Res = { status: number; json: () => any };
+let call: (method: "POST" | "PUT" | "PATCH" | "DELETE", url: string, body?: object, uid?: string) => Promise<Res>;
+
+const iso = (y: number, m: number, d: number, h = 0) => new Date(Date.UTC(y, m, d, h)).toISOString();
+const settings = {
+  format: "roundRobin",
+  playersOnField: 7,
+  poolCount: 2,
+  gameMinutes: 60,
+  breakMinutes: 10,
+  scoreCap: 15,
+  timeoutsPerHalf: 2,
+  fields: 2,
+  startsAt: iso(2026, 11, 5, 9),
+  idealEndsAt: null,
+  laterDays: [],
+  scoring: "points",
+};
+const details = (o: Record<string, unknown> = {}) => ({
+  name: "Spring Fling",
+  description: "",
+  location: "Park",
+  startsOn: iso(2026, 11, 5),
+  endsOn: null,
+  visibility: "public",
+  bidFee: null,
+  teamEntry: false,
+  teamFee: null,
+  season: null,
+  draftMode: "balanced",
+  format: { settings, level: "club", maxTeams: 8, minRoster: null },
+  divisions: ["mixed"],
+  ...o,
+});
+const hosting = (o: Record<string, unknown> = {}) => ({ hostId: "host", kind: "tournament", entryType: "teams", ...details(), ...o });
+
+const code = (r: Res) => r.json().error?.code;
+const team = (name: string, captain: string, o: Record<string, unknown> = {}) => ({
+  name,
+  kind: "team",
+  division: "mixed",
+  level: "club",
+  ownerId: captain,
+  members: { [captain]: "owner", [`${captain}2`]: "player" },
+  memberIds: [captain, `${captain}2`],
+  ...o,
+});
+
+beforeEach(() => {
+  store = new FakeStore(() => now);
+  const app = buildApp({
+    verifier: new FakeVerifier(),
+    users: new FakeUsers(),
+    teams: new FakeTeamRepository(),
+    store,
+    media: new FakeMediaStorage(),
+    now: () => now,
+    writeLimits: false,
+  });
+  call = async (method, url, body, uid = "mgr") => {
+    const res = await app.inject({ method, url, ...(body && { payload: body }), headers: { authorization: `Bearer token:${uid}` } });
+    return { status: res.statusCode, json: () => res.json() };
+  };
+  store.put("teams/host", {
+    name: "Host Club",
+    kind: "community",
+    ownerId: "owner",
+    members: { owner: "owner", mgr: "player", fan: "player" },
+    memberIds: ["owner", "mgr", "fan"],
+    memberPerms: { mgr: ["manageEvents"] },
+  });
+  store.put("teams/red", team("Red", "cap"));
+  store.put("teams/blue", team("Blue", "bcap"));
+  store.put("teams/green", team("Green", "gcap"));
+  for (const t of ["red", "blue", "green"]) for (let i = 0; i < 7; i++) store.put(`teams/${t}/roster/p${i}`, { name: `P${i}` });
+});
+
+async function host(o: Record<string, unknown> = {}) {
+  const res = await call("POST", "/v1/tournaments", hosting(o));
+  expect(res.status).toBe(201);
+  const id = res.json().id as string;
+  return { id, div: (store.doc(`tournaments/${id}`)?.divisions as Array<{ id: string }>)[0].id };
+}
+async function open(o: Record<string, unknown> = {}) {
+  const t = await host(o);
+  expect((await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "registration" })).status).toBe(204);
+  return t;
+}
+async function enter(id: string, div: string, teamId: string, captain: string) {
+  return call("PUT", `/v1/tournaments/${id}/entries/${teamId}`, { divisionId: div, captainIds: [captain] }, captain);
+}
+async function accepted(teams: Array<[string, string]>) {
+  const t = await open();
+  for (const [teamId, cap] of teams) {
+    expect((await enter(t.id, t.div, teamId, cap)).status).toBe(204);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/${teamId}/status`, { status: "accepted" })).status).toBe(204);
+  }
+  return t;
+}
+const gameBody = (g: EngineGame) => ({
+  id: g.id,
+  order: g.order,
+  stage: g.stage,
+  round: g.round,
+  label: g.label,
+  pool: g.pool,
+  field: g.field,
+  startsAt: g.startsAt?.toISOString() ?? null,
+  teamA: g.teamA,
+  teamB: g.teamB,
+  sourceA: g.sourceA,
+  sourceB: g.sourceB,
+  ifNeeded: g.ifNeeded,
+  ...(g.place != null && { place: g.place }),
+});
+const plan = (seeds: string[], format = "roundRobin") =>
+  scheduleFor(seeds, engineSettings({ ...settings, format })).games.map(gameBody);
+
+describe("hosting (create: manages, createdBy, createdAt, validHosted, officialHost)", () => {
+  it("manages(): only the host's members with Manage events", async () => {
+    expect((await call("POST", "/v1/tournaments", hosting(), "fan")).status).toBe(403);
+    expect((await call("POST", "/v1/tournaments", hosting(), "stranger")).status).toBe(403);
+    expect((await call("POST", "/v1/tournaments", hosting({ hostId: "ghost" }))).status).toBe(404);
+  });
+
+  it("writes the app's document: createdBy the caller, createdAt the server's time, host details from the team, a draft", async () => {
+    const { id, div } = await host();
+    const t = store.doc(`tournaments/${id}`) as Record<string, unknown>;
+    expect(Object.keys(t).sort()).toEqual(
+      [
+        "hostId", "hostName", "hostKind", "hostOfficial", "name", "startsOn", "endsOn", "description", "location", "visibility",
+        "entryType", "status", "bidFee", "teamEntry", "teamFee", "kind", "season", "draftMode", "divisions", "format", "createdBy", "createdAt",
+      ].sort(),
+    );
+    expect(t).toMatchObject({ createdBy: "mgr", createdAt: new Date(now), hostName: "Host Club", hostKind: "community", hostOfficial: false, status: "draft" });
+    expect(t.startsOn).toBeInstanceOf(Date);
+    expect(store.doc(`tournaments/${id}/divisions/${div}`)).toMatchObject({ division: "mixed", level: "club", maxTeams: 8, seeds: [], captains: {}, placements: [], teams: [] });
+  });
+
+  it("extra keys in the body are refused (hasOnly), so createdBy can't be forged", async () => {
+    expect((await call("POST", "/v1/tournaments", { ...hosting(), createdBy: "owner" })).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", { ...hosting(), status: "live" })).status).toBe(400);
+  });
+
+  it("officialHost(): the badge comes only from an official host team", async () => {
+    const { id } = await host();
+    expect(store.doc(`tournaments/${id}`)?.hostOfficial).toBe(false);
+    store.put("teams/host", { ...store.doc("teams/host"), official: true });
+    const b = await host();
+    expect(store.doc(`tournaments/${b.id}`)?.hostOfficial).toBe(true);
+  });
+
+  it("teamEntry only when players sign up", async () => {
+    expect((await call("POST", "/v1/tournaments", hosting({ teamEntry: true }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ teamEntry: true, entryType: "players" }))).status).toBe(201);
+  });
+
+  it("validBidFee(): amount 0 to 10,000,000 cents, a three-letter currency, instructions up to 500, dueAt a date", async () => {
+    const fee = { amountCents: 25000, currency: "USD", instructions: "Venmo", dueAt: iso(2026, 11, 1) };
+    expect((await call("POST", "/v1/tournaments", hosting({ bidFee: fee }))).status).toBe(201);
+    expect((await call("POST", "/v1/tournaments", hosting({ bidFee: { ...fee, amountCents: 10_000_001 } }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ bidFee: { ...fee, amountCents: -1 } }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ bidFee: { ...fee, amountCents: 1.5 } }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ bidFee: { ...fee, currency: "usd" } }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ bidFee: { ...fee, instructions: "x".repeat(501) } }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ bidFee: { ...fee, dueAt: "soon" } }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ bidFee: { ...fee, extra: 1 } }))).status).toBe(400);
+  });
+
+  it("the team spot fee follows the same rules and is needed with a fee", async () => {
+    const fee = { amountCents: 1000, currency: "USD", instructions: "", dueAt: null };
+    const players = { entryType: "players", teamEntry: true, bidFee: fee };
+    expect((await call("POST", "/v1/tournaments", hosting(players))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ ...players, teamFee: { ...fee, currency: "X" } }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ ...players, teamFee: { ...fee, amountCents: 30000 } }))).status).toBe(201);
+  });
+
+  it("validSeason(): leagues only; weeks 1-26, playoff weeks 0-3 and no more than the weeks, playoffs of 0, 2, 4 or 8, 1-2 games a night, up to 10 skipped dates", async () => {
+    const season = { weeks: 8, playoffWeeks: 1, playoffTeams: 4, gamesPerNight: 1, skipDates: [] };
+    const league = (s: Record<string, unknown>) => hosting({ kind: "league", season: { ...season, ...s } });
+    expect((await call("POST", "/v1/tournaments", hosting({ season }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", league({}))).status).toBe(201);
+    expect((await call("POST", "/v1/tournaments", league({ weeks: 0 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", league({ weeks: 27 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", league({ playoffWeeks: 4 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", league({ weeks: 2, playoffWeeks: 3 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", league({ weeks: 2, playoffWeeks: 2 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", league({ playoffTeams: 3 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", league({ gamesPerNight: 3 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", league({ skipDates: Array.from({ length: 11 }, (_, i) => iso(2027, 0, i + 1)) }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", league({ playoffTeams: 4, playoffWeeks: 0 }))).status).toBe(400);
+  });
+
+  it("validFormat(): a settings map, a level, 2-64 teams, roster minimum 2-30", async () => {
+    const format = (f: Record<string, unknown>) => hosting({ format: { settings, level: "club", maxTeams: 8, minRoster: null, ...f } });
+    expect((await call("POST", "/v1/tournaments", format({ level: "pro" }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", format({ maxTeams: 1 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", format({ maxTeams: 65 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", format({ minRoster: 1 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", format({ minRoster: 31 }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", format({ settings: { ...settings, format: "swiss" } }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", format({ extra: true }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", format({ minRoster: 5 }))).status).toBe(201);
+  });
+
+  it("names, text and choices: name 1-100, description 2000, location 200, visibility, kind, entry type, draft mode, dates", async () => {
+    expect((await call("POST", "/v1/tournaments", hosting({ name: "" }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ name: "x".repeat(101) }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ description: "x".repeat(2001) }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ location: "x".repeat(201) }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ visibility: "secret" }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ kind: "camp" }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ entryType: "both" }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ draftMode: "random" }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ startsOn: "tomorrow" }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ endsOn: iso(2026, 11, 1) }))).status).toBe(400);
+  });
+
+  it("divisions: at least one, each once", async () => {
+    expect((await call("POST", "/v1/tournaments", hosting({ divisions: [] }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ divisions: ["mixed", "mixed"] }))).status).toBe(400);
+    expect((await call("POST", "/v1/tournaments", hosting({ divisions: ["coed"] }))).status).toBe(400);
+    const res = await call("POST", "/v1/tournaments", hosting({ divisions: ["women", "mixed"] }));
+    expect((store.doc(`tournaments/${res.json().id}`)?.divisions as Array<{ division: string }>).map((d) => d.division)).toEqual(["mixed", "women"]);
+  });
+});
+
+describe("editing (update: manages, hostId/createdBy/createdAt kept, validHosted)", () => {
+  it("only managers; a draft is hidden from everyone else", async () => {
+    const { id } = await host();
+    expect((await call("PATCH", `/v1/tournaments/${id}`, details(), "fan")).status).toBe(404);
+    await call("PUT", `/v1/tournaments/${id}/status`, { status: "registration" });
+    expect((await call("PATCH", `/v1/tournaments/${id}`, details(), "fan")).status).toBe(403);
+    expect((await call("PATCH", "/v1/tournaments/ghost", details())).status).toBe(404);
+  });
+
+  it("keeps hostId, createdBy, createdAt, kind and entry type; can't take them in the body", async () => {
+    const { id } = await host();
+    expect((await call("PATCH", `/v1/tournaments/${id}`, { ...details(), hostId: "red" })).status).toBe(400);
+    expect((await call("PATCH", `/v1/tournaments/${id}`, { ...details(), kind: "league" })).status).toBe(400);
+    expect((await call("PATCH", `/v1/tournaments/${id}`, details({ name: "Fall Fling" }), "owner")).status).toBe(204);
+    expect(store.doc(`tournaments/${id}`)).toMatchObject({ name: "Fall Fling", hostId: "host", createdBy: "mgr", createdAt: new Date(now), kind: "tournament" });
+  });
+
+  it("validHosted() on update too", async () => {
+    const { id } = await host();
+    expect((await call("PATCH", `/v1/tournaments/${id}`, details({ season: { weeks: 8, playoffWeeks: 0, playoffTeams: 0, gamesPerNight: 1, skipDates: [] } }))).status).toBe(400);
+    expect((await call("PATCH", `/v1/tournaments/${id}`, details({ teamEntry: true }))).status).toBe(400);
+  });
+
+  it("opens and closes divisions; a division with teams stays; the format follows until schedules are out", async () => {
+    const t = await accepted([["red", "cap"]]);
+    expect((await call("PATCH", `/v1/tournaments/${t.id}`, details({ divisions: ["women"], format: { settings, level: "club", maxTeams: 12, minRoster: null } }))).status).toBe(204);
+    const list = store.doc(`tournaments/${t.id}`)?.divisions as Array<{ id: string; division: string }>;
+    expect(list.map((d) => d.division)).toEqual(["mixed", "women"]);
+    // Unticked but locked: it stays, as it was.
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.maxTeams).toBe(8);
+    expect(store.doc(`tournaments/${t.id}/divisions/${list[1].id}`)?.maxTeams).toBe(12);
+    expect((await call("PATCH", `/v1/tournaments/${t.id}`, details({ divisions: ["mixed", "women"], format: { settings, level: "club", maxTeams: 12, minRoster: null } }))).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.maxTeams).toBe(12);
+    const women = list[1].id;
+    expect((await call("PATCH", `/v1/tournaments/${t.id}`, details({ divisions: ["mixed"] }))).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/divisions/${women}`)).toBeUndefined();
+    await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "scheduled" });
+    expect((await call("PATCH", `/v1/tournaments/${t.id}`, details({ format: { settings, level: "club", maxTeams: 16, minRoster: null } }))).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.maxTeams).toBe(8);
+  });
+});
+
+describe("status and delete", () => {
+  it("managers set any listed status", async () => {
+    const { id } = await host();
+    expect((await call("PUT", `/v1/tournaments/${id}/status`, { status: "registration" }, "fan")).status).toBe(404);
+    await call("PUT", `/v1/tournaments/${id}/status`, { status: "registration" });
+    expect((await call("PUT", `/v1/tournaments/${id}/status`, { status: "draft" }, "fan")).status).toBe(403);
+    expect((await call("PUT", `/v1/tournaments/${id}/status`, { status: "over" })).status).toBe(400);
+    expect((await call("PUT", `/v1/tournaments/${id}/status`, { status: "seeding" })).status).toBe(204);
+    expect(store.doc(`tournaments/${id}`)?.status).toBe("seeding");
+  });
+
+  it("delete: managers only, with every subcollection", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games: plan(["red", "blue"]) });
+    store.put(`tournaments/${t.id}/payments/red`, { paid: true });
+    store.put(`tournaments/${t.id}/signups/u1`, { name: "U" });
+    store.put(`tournaments/${t.id}/drafts/${t.div}`, { captainIds: [] });
+    store.put(`tournaments/${t.id}/drafts/${t.div}/details/pool`, {});
+    expect((await call("DELETE", `/v1/tournaments/${t.id}`, undefined, "cap")).status).toBe(403);
+    expect((await call("DELETE", `/v1/tournaments/${t.id}`)).status).toBe(204);
+    expect([...store.docs.keys()].filter((k) => k.startsWith(`tournaments/${t.id}`))).toEqual([]);
+  });
+
+  it("a division with accepted teams can't be removed; an empty one goes with its games and its place in the list", async () => {
+    const t = await accepted([["red", "cap"]]);
+    expect(code(await call("DELETE", `/v1/tournaments/${t.id}/divisions/${t.div}`))).toBe("failed_precondition");
+    const b = await host({ divisions: ["mixed", "open"] });
+    const open = (store.doc(`tournaments/${b.id}`)?.divisions as Array<{ id: string }>)[1].id;
+    expect((await call("DELETE", `/v1/tournaments/${b.id}/divisions/${open}`, undefined, "fan")).status).toBe(404);
+    expect((await call("DELETE", `/v1/tournaments/${b.id}/divisions/${open}`)).status).toBe(204);
+    expect(store.doc(`tournaments/${b.id}/divisions/${open}`)).toBeUndefined();
+    expect(store.doc(`tournaments/${b.id}`)?.divisions).toHaveLength(1);
+  });
+});
+
+describe("entries (validEntry, teamApplies, teamEdits, teamWithdraws, manages)", () => {
+  it("teamApplies(): teamAdmin, status applied, registration open, a team, written with the server's time", async () => {
+    const t = await host();
+    expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("not_found");
+    await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "registration" });
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["cap"] }, "cap2")).status).toBe(403);
+    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toEqual({ teamName: "Red", divisionId: t.div, status: "applied", captainIds: ["cap"], updatedAt: new Date(now) });
+    await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "seeding" });
+    expect(code(await enter(t.id, t.div, "blue", "bcap"))).toBe("failed_precondition");
+    store.put("teams/group", { ...team("Group", "gl"), kind: "community" });
+    await call("PUT", `/v1/tournaments/${t.id}/status`, { status: "registration" });
+    expect(code(await call("PUT", `/v1/tournaments/${t.id}/entries/group`, { divisionId: t.div, captainIds: ["gl"] }, "gl"))).toBe("invalid_argument");
+  });
+
+  it("player-entry events take teams only when they reserve spots", async () => {
+    const t = await open({ entryType: "players" });
+    expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("failed_precondition");
+    const m = await open({ entryType: "players", teamEntry: true });
+    store.put("teams/new", team("New", "nc"));
+    expect((await enter(m.id, m.div, "new", "nc")).status).toBe(204);
+  });
+
+  it("invite only: a team enters by accepting the host's invite", async () => {
+    const t = await open({ visibility: "inviteOnly" });
+    expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("permission_denied");
+    expect((await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div }, "cap")).status).toBe(403);
+    expect((await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div })).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "invited", captainIds: [] });
+    expect(code(await call("POST", `/v1/tournaments/${t.id}/entries/red/invite`, { divisionId: t.div }))).toBe("already_exists");
+    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)?.status).toBe("applied");
+  });
+
+  it("validEntry(): 1-4 captains, every one on the team; a real division", async () => {
+    const t = await open();
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: [] }, "cap")).status).toBe(400);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["a", "b", "c", "d", "e"] }, "cap")).status).toBe(400);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["bcap"] }, "cap")).status).toBe(400);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: "nope", captainIds: ["cap"] }, "cap")).status).toBe(404);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["cap", "cap2"] }, "cap")).status).toBe(204);
+  });
+
+  it("the roster minimum, except where teams reserve spots", async () => {
+    const t = await open({ format: { settings, level: "club", maxTeams: 8, minRoster: 10 } });
+    expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("failed_precondition");
+    store.put("teams/small", team("Small", "sc"));
+    const m = await open({ entryType: "players", teamEntry: true });
+    expect((await enter(m.id, m.div, "small", "sc")).status).toBe(204);
+  });
+
+  it("a league division takes teams of its division and level", async () => {
+    const season = { weeks: 8, playoffWeeks: 0, playoffTeams: 0, gamesPerNight: 1, skipDates: [] };
+    const t = await open({ kind: "league", season, format: { settings, level: "college", maxTeams: 8, minRoster: null } });
+    expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("failed_precondition");
+    store.put("teams/red", { ...store.doc("teams/red"), level: "college" });
+    expect((await enter(t.id, t.div, "red", "cap"))?.status).toBe(204);
+  });
+
+  it("teamEdits(): captains change, status and division stay", async () => {
+    const t = await accepted([["red", "cap"]]);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: t.div, captainIds: ["cap2"] }, "cap")).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "accepted", captainIds: ["cap2"] });
+    expect(code(await call("PUT", `/v1/tournaments/${t.id}/entries/red`, { divisionId: "other", captainIds: ["cap"] }, "cap"))).toBe("not_found");
+  });
+
+  it("a declined team doesn't apply again on its own", async () => {
+    const t = await open();
+    await enter(t.id, t.div, "red", "cap");
+    await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "declined" });
+    expect(code(await enter(t.id, t.div, "red", "cap"))).toBe("failed_precondition");
+  });
+
+  it("teamWithdraws(): the team's admins withdraw, only that", async () => {
+    const t = await open();
+    await enter(t.id, t.div, "red", "cap");
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "accepted" }, "cap")).status).toBe(403);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "withdrawn" }, "cap2")).status).toBe(403);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "withdrawn" }, "cap")).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/entries/red`)).toMatchObject({ status: "withdrawn", captainIds: ["cap"], teamName: "Red" });
+    expect((await enter(t.id, t.div, "red", "cap")).status).toBe(204);
+  });
+
+  it("the host accepts (seeded last, captains report), unless the division is full; anything else unseeds", async () => {
+    const t = await open({ format: { settings, level: "club", maxTeams: 2, minRoster: null } });
+    for (const [id, c] of [["red", "cap"], ["blue", "bcap"], ["green", "gcap"]]) await enter(t.id, t.div, id, c);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "accepted" })).status).toBe(204);
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/blue/status`, { status: "accepted" })).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)).toMatchObject({ seeds: ["red", "blue"], captains: { red: ["cap"], blue: ["bcap"] } });
+    expect(code(await call("PUT", `/v1/tournaments/${t.id}/entries/green/status`, { status: "accepted" }))).toBe("failed_precondition");
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "waitlisted" })).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)).toMatchObject({ seeds: ["blue"], captains: { blue: ["bcap"] } });
+    expect((await call("PUT", `/v1/tournaments/${t.id}/entries/ghost/status`, { status: "accepted" })).status).toBe(404);
+  });
+
+  it("seeds: the host reorders the accepted teams, not adds or drops them, until the schedule is out", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    const url = `/v1/tournaments/${t.id}/divisions/${t.div}/seeds`;
+    expect((await call("PUT", url, { seeds: ["blue", "red"] }, "cap")).status).toBe(403);
+    expect(code(await call("PUT", url, { seeds: ["blue", "green"] }))).toBe("failed_precondition");
+    expect((await call("PUT", url, { seeds: ["blue", "red"] })).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.seeds).toEqual(["blue", "red"]);
+    await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games: plan(["blue", "red"]) });
+    expect(code(await call("PUT", url, { seeds: ["red", "blue"] }))).toBe("failed_precondition");
+  });
+});
+
+describe("schedule (games create: manages, validGame)", () => {
+  it("publishes the generated games: managers only, at least two teams, teams from the seeds", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    const url = `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`;
+    expect((await call("PUT", url, { games: plan(["red", "blue"]) }, "cap")).status).toBe(403);
+    expect((await call("PUT", url, { games: plan(["red", "green"]) })).status).toBe(400);
+    expect((await call("PUT", url, { games: plan(["red", "blue"]) })).status).toBe(204);
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}/games/g001`)).toMatchObject({
+      teamA: "red", teamB: "blue", status: "scheduled", scoreA: null, scoreB: null, report: null, ifNeeded: false,
+    });
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}/games/g001`)?.startsAt).toBeInstanceOf(Date);
+    expect(store.doc(`tournaments/${t.id}`)?.status).toBe("scheduled");
+    const one = await accepted([["green", "gcap"]]);
+    expect(code(await call("PUT", `/v1/tournaments/${one.id}/divisions/${one.div}/schedule`, { games: plan(["green", "x"]) }))).toBe("failed_precondition");
+  });
+
+  it("validGame(): stages, statuses, a label up to 60, places 1-64, ids once, in order", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    const url = `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`;
+    const [g] = plan(["red", "blue"]);
+    expect((await call("PUT", url, { games: [{ ...g, stage: "semis" }] })).status).toBe(400);
+    expect((await call("PUT", url, { games: [{ ...g, label: "x".repeat(61) }] })).status).toBe(400);
+    expect((await call("PUT", url, { games: [{ ...g, place: 65 }] })).status).toBe(400);
+    expect((await call("PUT", url, { games: [{ ...g, status: "done" }] })).status).toBe(400);
+    expect((await call("PUT", url, { games: [g, g] })).status).toBe(400);
+    expect((await call("PUT", url, { games: [{ ...g, order: 3 }] })).status).toBe(400);
+    expect((await call("PUT", url, { games: [{ ...g, sourceA: { type: "winner", game: "g099" } }] })).status).toBe(400);
+  });
+
+  it("republishing replaces the games and clears the division's results", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"], ["green", "gcap"]]);
+    const url = `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`;
+    await call("PUT", url, { games: plan(["red", "blue", "green"]) });
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}/games/g003`)).toBeDefined();
+    store.put(`tournaments/${t.id}/divisions/${t.div}`, { ...store.doc(`tournaments/${t.id}/divisions/${t.div}`), placements: ["red"] });
+    await call("PUT", url, { games: plan(["red", "blue"]) });
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}/games/g003`)).toBeUndefined();
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.placements).toEqual([]);
+  });
+});
+
+describe("scores (report, confirm, advance, managers)", () => {
+  async function bracket() {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"], ["green", "gcap"]]);
+    await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games: plan(["red", "blue", "green"], "singleElim") });
+    // 3 teams: red has a bye; g001 is blue v green, g002 red v its winner.
+    const g = (id: string) => store.doc(`tournaments/${t.id}/divisions/${t.div}/games/${id}`) as Record<string, unknown>;
+    return { ...t, g, url: (id: string, what: string) => `/v1/tournaments/${t.id}/divisions/${t.div}/games/${id}/${what}` };
+  }
+
+  it("report(): a captain of either team, both teams known, not final, scores 0-99 and no tie", async () => {
+    const b = await bracket();
+    expect(b.g("g001")).toMatchObject({ teamA: "blue", teamB: "green" });
+    expect((await call("POST", b.url("g001", "report"), { scoreA: 15, scoreB: 10 }, "cap")).status).toBe(403);
+    expect((await call("POST", b.url("g001", "report"), { scoreA: 15, scoreB: 15 }, "bcap")).status).toBe(400);
+    expect((await call("POST", b.url("g001", "report"), { scoreA: 100, scoreB: 1 }, "bcap")).status).toBe(400);
+    expect(code(await call("POST", b.url("g002", "report"), { scoreA: 15, scoreB: 1 }, "cap"))).toBe("failed_precondition");
+    expect((await call("POST", b.url("g001", "report"), { scoreA: 15, scoreB: 10 }, "bcap")).status).toBe(204);
+    expect(b.g("g001")).toMatchObject({ status: "reported", report: { scoreA: 15, scoreB: 10, byTeam: "blue" } });
+  });
+
+  it("confirm(): only the other team's captain; the result moves the winner on", async () => {
+    const b = await bracket();
+    expect(code(await call("POST", b.url("g001", "confirm"), undefined, "gcap"))).toBe("failed_precondition");
+    await call("POST", b.url("g001", "report"), { scoreA: 15, scoreB: 10 }, "bcap");
+    expect((await call("POST", b.url("g001", "confirm"), undefined, "bcap")).status).toBe(403);
+    expect((await call("POST", b.url("g001", "confirm"), undefined, "cap")).status).toBe(403);
+    expect((await call("POST", b.url("g001", "confirm"), undefined, "gcap")).status).toBe(204);
+    expect(b.g("g001")).toMatchObject({ status: "done", scoreA: 15, scoreB: 10, report: null });
+    expect(b.g("g002")).toMatchObject({ teamA: "red", teamB: "blue" });
+    expect(code(await call("POST", b.url("g001", "report"), { scoreA: 1, scoreB: 15 }, "gcap"))).toBe("failed_precondition");
+  });
+
+  it("the host sets or corrects a final score, until later games depend on it", async () => {
+    const b = await bracket();
+    expect((await call("PUT", b.url("g001", "score"), { scoreA: 15, scoreB: 10 }, "bcap")).status).toBe(403);
+    expect((await call("PUT", b.url("g002", "score"), { scoreA: 15, scoreB: 10 })).status).toBe(412);
+    expect((await call("PUT", b.url("g001", "score"), { scoreA: 15, scoreB: 10 })).status).toBe(204);
+    expect(b.g("g002")?.teamB).toBe("blue");
+    expect((await call("PUT", b.url("g001", "score"), { scoreA: 10, scoreB: 15 })).status).toBe(204);
+    expect(b.g("g002")?.teamB).toBe("green");
+    await call("PUT", b.url("g002", "score"), { scoreA: 15, scoreB: 3 });
+    expect(code(await call("PUT", b.url("g001", "score"), { scoreA: 15, scoreB: 10 }))).toBe("failed_precondition");
+  });
+
+  it("the host seeds a bracket from the pools once they're done", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"], ["green", "gcap"]]);
+    store.put("teams/gold", team("Gold", "ycap"));
+    for (let i = 0; i < 7; i++) store.put(`teams/gold/roster/p${i}`, {});
+    await enter(t.id, t.div, "gold", "ycap");
+    await call("PUT", `/v1/tournaments/${t.id}/entries/gold/status`, { status: "accepted" });
+    const seeds = ["red", "blue", "green", "gold"];
+    const games = plan(seeds, "poolsSingleElim");
+    await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games });
+    const url = `/v1/tournaments/${t.id}/divisions/${t.div}/seed-bracket`;
+    expect(code(await call("POST", url))).toBe("failed_precondition");
+    for (const g of games.filter((x) => x.stage === "pool")) {
+      await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/games/${g.id}/score`, { scoreA: 15, scoreB: 10 });
+    }
+    expect((await call("POST", url, undefined, "cap")).status).toBe(403);
+    expect((await call("POST", url)).status).toBe(204);
+    const final = games.find((g) => g.stage === "winners") as { id: string };
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}/games/${final.id}`)?.teamA).not.toBeNull();
+  });
+});
+
+describe("the host's view keeps things in step (reconcile)", () => {
+  it("goes live with the first result, records places when the division is done, then final", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    await call("PUT", `/v1/tournaments/${t.id}/divisions/${t.div}/schedule`, { games: plan(["red", "blue"]) });
+    const url = `/v1/tournaments/${t.id}/divisions/${t.div}/reconcile`;
+    expect((await call("POST", url, undefined, "cap")).status).toBe(403);
+    expect((await call("POST", url)).json().changed).toEqual([]);
+    await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/games/g001/report`, { scoreA: 15, scoreB: 9 }, "cap");
+    await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/games/g001/confirm`, undefined, "bcap");
+    expect((await call("POST", url)).json().changed).toEqual(["live", "placements", "finished"]);
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.placements).toEqual(["red", "blue"]);
+    expect(store.doc(`tournaments/${t.id}`)?.status).toBe("finished");
+  });
+
+  it("drops withdrawn teams from unpublished seeds and copies captains from entries", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    await call("PUT", `/v1/tournaments/${t.id}/entries/red/status`, { status: "withdrawn" }, "cap");
+    await call("PUT", `/v1/tournaments/${t.id}/entries/blue`, { divisionId: t.div, captainIds: ["bcap2"] }, "bcap");
+    const res = await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/reconcile`);
+    expect(res.json().changed).toEqual(["withdrawn", "captains"]);
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)).toMatchObject({ seeds: ["blue"], captains: { blue: ["bcap2"] } });
+  });
+});

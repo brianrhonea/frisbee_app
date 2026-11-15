@@ -23,3 +23,5 @@ export * from "./drafts.js";
 export * from "./stats.js";
 export * from "./stats_tracker.js";
 export * from "./group_tournaments.js";
+export * from "./tournament_engine.js";
+export * from "./tournaments.js";

@@ -21,7 +21,7 @@ const tabs: Tab[] = [
   { href: "/explore", label: "Explore", icon: "explore", also: ["/players", "/rankings"] },
   { href: "/teams", label: "Teams", icon: "teams" },
   { href: "/messages", label: "Messages", icon: "messages" },
-  { href: "/events", label: "Events", icon: "events", also: ["/schedule"] },
+  { href: "/events", label: "Events", icon: "events", also: ["/schedule", "/tournaments"] },
   { href: "/learn", label: "Learn", icon: "learn" },
 ];
 
