@@ -7,6 +7,22 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.21.1 — 2026-11-15
+
+**Fixed** (security review of the meetings and posts slices)
+- `GET /v1/me/home`: every feed post goes through the privacy check,
+  including the caller's own and followed people's, so a followed
+  person's repost of a private stranger's post no longer shows it.
+- The home feed reads at most 300 followed people and 300 followed
+  tournaments (`followReadLimit`), and `/v1/me/home` (60/min),
+  `/v1/players/:uid` and `/v1/posts/:id` (120/min) are rate-limited per
+  member.
+- Discord import: plan keys can't be `__proto__`, `constructor` or other
+  Object.prototype names, and key lookups only read own properties.
+- Discord import: moving rooms to linked teams never deletes the
+  community's General room (it used to fail partway after the import).
+- Meeting and voice tokens are sent with `cache-control: no-store`.
+
 ## 0.21.0 — 2026-11-14
 
 **Added**

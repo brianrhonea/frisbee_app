@@ -112,3 +112,23 @@ describe("home feed sources (HomeFeed)", () => {
     expect(ids.slice(0, 4)).toEqual(["m0", "t0", "m1", "t1"]);
   });
 });
+
+describe("home feed privacy and limits", () => {
+  it("hides a followed person's repost of a private stranger's post", async () => {
+    const { repo, home } = setup();
+    repo.follows = ["friend"];
+    repo.people.set("friend", { name: "Friend" });
+    repo.people.set("hidden", { name: "Hidden", private: true });
+    repo.posts = [post("orig", 60, { authorId: "hidden" }), post("rp", 10, { authorId: "friend", kind: "repost", repostOf: { postId: "orig", authorId: "hidden" } })];
+    const { feed } = await home();
+    const ids = feed.posts.map((p: Data) => p.id);
+    expect(ids).not.toContain("orig");
+    for (const p of feed.posts) expect(JSON.stringify(p)).not.toContain('"body":"orig"');
+  });
+
+  it("caps home reads per member", async () => {
+    const { home } = setup();
+    for (let i = 0; i < 60; i++) expect((await home()).error).toBeUndefined();
+    expect((await home()).error?.code).toBe("resource_exhausted");
+  });
+});

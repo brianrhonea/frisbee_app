@@ -79,7 +79,18 @@ export const discordPreviewRequestSchema = z.strictObject({
 });
 export type DiscordPreviewRequest = z.input<typeof discordPreviewRequestSchema>;
 
-const planKey = z.string().min(1).max(64).regex(/^[^/]+$/);
+// Keys index plain objects: never one of Object.prototype's names.
+const reservedKeys = new Set(["__proto__", "constructor", "prototype", "hasOwnProperty", "toString", "valueOf"]);
+const planKey = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[^/]+$/)
+  .refine((k) => !reservedKeys.has(k), "That name is reserved.");
+
+/** [map]'s own value for [key] (never an inherited one like `constructor`). */
+const ownValue = (map: Record<string, string>, key: string): string | undefined =>
+  Object.hasOwn(map, key) ? map[key] : undefined;
 const accessKeys = z.array(planKey).max(discordLimits.roles + 1);
 const planAccess = { readRoles: accessKeys, writeRoles: accessKeys };
 
@@ -252,7 +263,7 @@ export function planImport(
 ): DiscordImport {
   // Roles: reuse by name, else add while there's room.
   const roles = rolesOf(team);
-  const roleIds: Record<string, string> = {};
+  const roleIds: Record<string, string> = Object.create(null);
   const newRoles: string[] = [];
   const tooMany = [...plan.skippedRoles];
   const existing = Object.values(roles);
@@ -275,10 +286,10 @@ export function planImport(
 
   // Access lists in this team's ids. Roles that didn't make it are dropped,
   // which only ever narrows access.
-  const ids = (keys: readonly string[]) => [...new Set(keys.flatMap((k) => (k === everyoneAudience ? [k] : roleIds[k] ? [roleIds[k]!] : [])))];
+  const ids = (keys: readonly string[]) => [...new Set(keys.flatMap((k) => (k === everyoneAudience ? [k] : ownValue(roleIds, k) ? [ownValue(roleIds, k)!] : [])))];
 
   // Folders: reuse by name, else add after the team's own.
-  const folderIds: Record<string, string> = {};
+  const folderIds: Record<string, string> = Object.create(null);
   const newFolders: NewFolder[] = [];
   let folderPosition = folders.length === 0 ? 0 : Math.max(...folders.map((f) => f.position ?? 0)) + 1;
   for (const f of plan.folders) {
@@ -309,7 +320,7 @@ export function planImport(
   const newRooms: NewRoom[] = [];
   const alreadyHere: string[] = [];
   for (const r of plan.rooms) {
-    const folderId = r.folderKey === null ? null : (folderIds[r.folderKey] ?? null);
+    const folderId = r.folderKey === null ? null : (ownValue(folderIds, r.folderKey) ?? null);
     const key = slot(folderId, r.name);
     if (taken.has(key)) {
       alreadyHere.push(r.name);
@@ -362,7 +373,7 @@ export function splitPlan(
 ): DiscordTeamSplit {
   const linked = Object.entries(org.linkedTeams ?? {});
   const teamsOf = (key: string) => {
-    const id = roleIds[key];
+    const id = ownValue(roleIds, key);
     return new Set(id ? linked.filter(([, t]) => (t?.roles ?? []).includes(id)).map(([tid]) => tid) : []);
   };
   const suggest = (r: PlannedRoom): string | null => {
@@ -449,7 +460,7 @@ export function teamChatImport(
   // them means the whole team.
   const access = (keys: readonly string[]): string[] => {
     if (keys.includes(everyoneAudience)) return [everyoneAudience];
-    const ids = new Set(keys.flatMap((k) => (roleIds[k] && grantingIds.has(roleIds[k]!) ? [roleIds[k]!] : [])));
+    const ids = new Set(keys.flatMap((k) => (ownValue(roleIds, k) && grantingIds.has(ownValue(roleIds, k)!) ? [ownValue(roleIds, k)!] : [])));
     if (grantingIds.size > 0 && [...grantingIds].every((g) => ids.has(g))) return [everyoneAudience];
     return [...ids];
   };
@@ -492,7 +503,8 @@ export function movingRooms(
   const going = new Set(
     plan.rooms.flatMap((r, i) => (split.destinations[i] !== null ? [`${(r.folderKey !== null && planFolders.get(r.folderKey)) || ""}/${norm(r.name)}`] : [])),
   );
-  return rooms.filter((r) => going.has(`${(r.folderId && folderNames.get(r.folderId)) || ""}/${norm(r.name)}`));
+  // Every team keeps its General room (ChatRoom.generalId), so it never moves out.
+  return rooms.filter((r) => r.id !== "general" && going.has(`${(r.folderId && folderNames.get(r.folderId)) || ""}/${norm(r.name)}`));
 }
 
 /** Folders that [moving] leaves empty. */

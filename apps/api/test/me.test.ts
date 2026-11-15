@@ -138,8 +138,9 @@ describe("GET /v1/me/home", () => {
     expect(second.next).toBeNull();
   });
 
-  it("feed: a repost carries its original, even from someone they don't follow", async () => {
+  it("feed: a repost carries its original, even from someone they don't follow (if public)", async () => {
     t.repo.follows.set("me", ["f1"]);
+    t.repo.people.set("x", { name: "X" });
     t.repo.posts = [
       { id: "r_o1_f1", data: { authorId: "f1", kind: "repost", body: "see", createdAt: iso(now - 1000), repostOf: { postId: "o1", authorId: "x", authorName: "X" } } },
       { id: "o1", data: { authorId: "x", body: "original", likedBy: ["a", "b"], createdAt: iso(now - 5000) } },
@@ -147,6 +148,18 @@ describe("GET /v1/me/home", () => {
     const [repost] = (await t.get("/v1/me/home", "me")).json().feed.posts;
     expect(repost.id).toBe("r_o1_f1");
     expect(repost.original).toMatchObject({ id: "o1", body: "original", likeCount: 2 });
+  });
+
+  it("feed: a followed person's repost of a private stranger's post stays hidden", async () => {
+    t.repo.follows.set("me", ["f1"]);
+    t.repo.people.set("x", { name: "X", private: true });
+    t.repo.posts = [
+      { id: "r_o1_f1", data: { authorId: "f1", kind: "repost", body: "see", createdAt: iso(now - 1000), repostOf: { postId: "o1", authorId: "x", authorName: "X" } } },
+      { id: "o1", data: { authorId: "x", body: "original", createdAt: iso(now - 5000) } },
+    ];
+    const res = await t.get("/v1/me/home", "me");
+    expect(res.json().feed.posts).toEqual([]);
+    expect(res.body).not.toContain("original");
   });
 });
 

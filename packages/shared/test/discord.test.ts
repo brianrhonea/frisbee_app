@@ -8,6 +8,7 @@ import {
   type ImportPlan,
   type ImportTeam,
   importIsEmpty,
+  importPlanSchema,
   movingRooms,
   planFor,
   planImport,
@@ -204,5 +205,25 @@ describe("splitPlan (DiscordTeamSplit)", () => {
     expect(moving.map((r) => r.id)).toEqual(["old", "cap"]);
     expect(emptiedFolders(moving, folders, rooms).map((f) => f.id)).toEqual(["fW"]);
     expect(emptiedFolders(moving.slice(0, 1), folders, rooms)).toEqual([]);
+  });
+});
+
+describe("plan keys", () => {
+  it("refuses Object.prototype's names, so lookups can't reach inherited values", () => {
+    for (const key of ["__proto__", "constructor", "toString"]) {
+      const bad = { ...plan, roles: [{ ...plan.roles[0]!, key }] };
+      expect(importPlanSchema.safeParse(bad).success).toBe(false);
+    }
+    expect(importPlanSchema.safeParse(plan).success).toBe(true);
+  });
+
+  it("never moves the General room out", () => {
+    const split = { destinations: plan.rooms.map(() => "t2"), teams: [] } as unknown as Parameters<typeof movingRooms>[1];
+    const rooms = [
+      { id: "general", name: "general", folderId: "f20" },
+      { id: "r2", name: "off-topic", folderId: null },
+    ];
+    const moving = movingRooms(plan, split, [{ id: "f20", name: "Team" }], rooms);
+    expect(moving.map((r) => r.id)).toEqual(["r2"]);
   });
 });

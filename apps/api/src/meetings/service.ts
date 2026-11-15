@@ -517,6 +517,11 @@ export function meetingRoutes(app: FastifyInstance, meetings: MeetingService, li
     noContent(reply, () => meetings.deleteMessage(caller(req, "chat"), req.params.teamId, req.params.meetingId, req.params.messageId)),
   );
   // Tokens are credentials: answered, never logged.
-  app.post<M>(`${base}/:meetingId/token`, async (req) => meetings.joinToken(caller(req, "token"), req.params.teamId, req.params.meetingId));
-  app.post<V>("/v1/teams/:teamId/voice-rooms/:roomId/token", async (req) => meetings.voiceToken(caller(req, "token"), req.params.teamId, req.params.roomId));
+  // Tokens are bearer credentials: never kept by a cache.
+  app.post<M>(`${base}/:meetingId/token`, async (req, reply) =>
+    reply.header("cache-control", "no-store").send(await meetings.joinToken(caller(req, "token"), req.params.teamId, req.params.meetingId)),
+  );
+  app.post<V>("/v1/teams/:teamId/voice-rooms/:roomId/token", async (req, reply) =>
+    reply.header("cache-control", "no-store").send(await meetings.voiceToken(caller(req, "token"), req.params.teamId, req.params.roomId)),
+  );
 }

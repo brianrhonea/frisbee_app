@@ -5,6 +5,13 @@ import { type Data, type Doc, plain } from "../browse/repository.js";
 const inLimit = 30;
 
 /**
+ * Follows read per feed: the follows rule has no count cap, so a feed
+ * never reads more than this many of each kind (and so runs at most
+ * followReadLimit / 30 queries a source).
+ */
+export const followReadLimit = 300;
+
+/**
  * Raw reads for the caller's own dashboard. Every read is one the caller
  * may make under firestore.rules (the service checks the rest); values come
  * back with Timestamps as ISO strings.
@@ -73,7 +80,7 @@ export class FirestoreMeRepository implements MeRepository {
   }
 
   async followedUsers(uid: string) {
-    const snap = await this.db.collection(`users/${uid}/follows`).where("type", "==", "user").get();
+    const snap = await this.db.collection(`users/${uid}/follows`).where("type", "==", "user").limit(followReadLimit).get();
     return snap.docs.map((d) => d.get("targetId")).filter((id): id is string => typeof id === "string" && id !== "");
   }
 
@@ -90,7 +97,7 @@ export class FirestoreMeRepository implements MeRepository {
   }
 
   async followedTournaments(uid: string) {
-    const snap = await this.db.collection(`users/${uid}/follows`).where("type", "==", "tournament").get();
+    const snap = await this.db.collection(`users/${uid}/follows`).where("type", "==", "tournament").limit(followReadLimit).get();
     return snap.docs.map((d) => d.get("key") ?? d.id).filter((k): k is string => typeof k === "string" && k.startsWith("tournament_"));
   }
 

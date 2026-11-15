@@ -50,6 +50,8 @@ Plain-language notes for testers are in
   open. School/club communities that approve members are private groups
   on public pages, like groups (review S6).
 - The native app is unchanged: it already needs a sign-in.
+- Discord import: moving rooms to linked teams never moves the
+  community's General room (as on the website).
 
 ## 0.0.22 — An indigo logo
 

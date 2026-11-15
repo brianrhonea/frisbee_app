@@ -26,7 +26,7 @@ function setup(signer: LiveKitSigner | null = new FakeSigner()) {
   const app = buildApp({ verifier: new FakeVerifier(), users, teams, store, media: new FakeMediaStorage(), now: () => now, livekit: signer ?? undefined });
   const call = async (method: "POST" | "PATCH" | "PUT" | "DELETE", url: string, body?: object, uid: string | null = "coach") => {
     const res = await app.inject({ method, url, ...(body && { payload: body }), headers: uid ? { authorization: `Bearer token:${uid}` } : {} });
-    return { status: res.statusCode, json: () => res.json(), message: () => res.json()?.error?.message as string | undefined };
+    return { status: res.statusCode, headers: res.headers, json: () => res.json(), message: () => res.json()?.error?.message as string | undefined };
   };
   return { store, users, call, signer };
 }
@@ -520,6 +520,7 @@ describe("join token (meetings-joinToken)", () => {
     const res = await s.call("POST", T, undefined, "player");
     expect(res.status).toBe(200);
     expect(res.json()).toEqual({ url: "wss://livekit.test", token: "jwt:t1_m1:player" });
+    expect(res.headers["cache-control"]).toBe("no-store");
     expect((s.signer as FakeSigner).signed).toEqual([
       { identity: "player", name: "Pat", metadata: JSON.stringify({ photoUrl: "https://img.test/p.jpg" }), ttl: "6h", room: "t1_m1", canPublish: true },
     ]);
@@ -590,6 +591,7 @@ describe("voice token (meetings-voiceToken)", () => {
   it("readers listen and writers talk, in the channel's own room", async () => {
     const res = await s.call("POST", V("handlers"), undefined, "p2");
     expect(res.json()).toEqual({ url: "wss://livekit.test", token: "jwt:voice:t1:handlers:p2", canSpeak: true });
+    expect(res.headers["cache-control"]).toBe("no-store");
     const coach = await s.call("POST", V("handlers"), undefined, "coach");
     expect(coach.json().canSpeak).toBe(false);
     expect((s.signer as FakeSigner).signed[1]).toMatchObject({ identity: "coach", room: "voice:t1:handlers", canPublish: false, ttl: "6h" });

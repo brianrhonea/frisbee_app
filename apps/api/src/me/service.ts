@@ -134,18 +134,10 @@ export class MeService {
       .slice(0, feedPageSize);
     // A source with a full page may hold more: the page ends at the 20th post.
     const more = [byAuthors, tagged, shared].some((d) => d.length >= feedPageSize);
-    // The caller's and followed people's posts show as before (rules: anyone
-    // signed in reads posts); strangers' only if their profiles are public.
-    const mine = new Set(byAuthors.map((d) => d.id));
-    const show = (d: Doc) => {
-      const view = postView(d.data);
-      return { ...view, id: d.id, images: this.images(view.images) } as PublicPost;
-    };
-    const known = docs.filter((d) => mine.has(d.id));
-    const originals = await originalsOf(known, (id) => this.repo.post(id));
-    const views = new Map(known.map((d) => [d.id, withOriginal(show(d), d, originals, show)]));
-    const others = docs.filter((d) => !mine.has(d.id));
-    if (others.length) for (const v of await this.visiblePosts(viewer, others, new Set(src.followed))) views.set(v.id, v);
+    // Every post is checked, the caller's and followed people's too: a
+    // repost's original by a private author they don't follow stays hidden
+    // (posts are readable by anyone signed in, so privacy is kept here).
+    const views = new Map((await this.visiblePosts(viewer, docs, new Set(src.followed))).map((v) => [v.id, v]));
     const posts = docs.flatMap((d) => (views.has(d.id) ? [views.get(d.id)!] : []));
     return { posts, next: more ? nextCursor(docs, feedPageSize) : null };
   }
