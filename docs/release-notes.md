@@ -17,6 +17,12 @@ Firebase project; App Store builds come from `main` and use production.
   community feed. Other tabs ask you to sign up or log in, then bring
   you back.
 
+**Inviting people**
+- The invite dialog makes a link as soon as it opens, and again when
+  you pick another length. It also lists join requests to approve or
+  decline, and the people you've just invited.
+- The Invite button shows how many join requests are waiting.
+
 ## 0.0.22
 
 **A new icon**

@@ -4,6 +4,27 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.30.0 — 2026-11-15
+
+Team pages redesign. Works with API 0.25.x.
+
+**Added**
+- Team banner: Invite (with a join-request badge), Follow, Join for
+  groups, Share, a Settings gear, member count with avatars and your
+  role, a two-line description with "more", and "Invite-only — have a
+  code?" for signed-in outsiders.
+- One invite dialog from the banner, Roster, the feed and Settings:
+  a link made on open with Copy and Share, the rotating code, search
+  people (every kind, groups too) and join requests.
+- Feed side column: six members with roles, "All N members" and Invite.
+- Shared Loading, EmptyState and ErrorNote views; a visible focus ring.
+
+**Changed**
+- Team nav: six tabs, More ▾ and the gear, sticky below the top bar.
+  "Teams" shows only for organizations.
+- Playbook, Videos, Stats and Tournaments have their own URLs;
+  `/more?tab=…` and `/plays` redirect.
+
 ## 0.29.0 — 2026-11-15
 
 Review checklist fixes. Needs API 0.25.0 (confirming a score sends it).
