@@ -151,7 +151,9 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (_) => PostCommentRepositoryFirebase(),
   ),
   // Drafts belong to whoever is signed in, and go when they sign out.
+  // Made at start (not lazily on the first chat), so it sees every sign-out.
   Provider<MessageDraftRepository>(
+    lazy: false,
     create: (context) => MessageDraftRepositoryPrefs(
       SharedPreferencesService(),
       auth: context.read<AuthRepository>(),

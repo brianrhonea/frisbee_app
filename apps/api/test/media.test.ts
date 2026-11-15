@@ -526,6 +526,33 @@ describe("uploads API", () => {
       expect((await del(post.id)).statusCode).toBe(412);
     });
 
+    it("removes a file whose message was sent without it (removed while uploading)", async () => {
+      store.put("conversations/u1_u2/messages/m1", { authorId: "u1", text: "sent first", attachments: [] });
+      const { id, done } = await upload({ ...dm, contentType: "application/pdf", name: "late.pdf", size: pdf.length }, pdf);
+      expect((await del(id)).statusCode).toBe(204);
+      expect(storage.files.has(done!.json().path)).toBe(false);
+      // A room message names its files the same way.
+      store.put("teams/t1/chats/c1/messages/m3", { authorId: "p1", attachments: [] });
+      const room = await upload({ purpose: "chat", targetId: "teams/t1/chats/c1", itemId: "m3", contentType: "application/pdf", size: pdf.length }, pdf, "p1");
+      expect((await del(room.id, "p1")).statusCode).toBe(204);
+      expect(storage.files.has(room.done!.json().path)).toBe(false);
+    });
+
+    it("charges a retried complete once", async () => {
+      const res = await call("/v1/uploads", { ...dm, contentType: "application/pdf", size: pdf.length });
+      const { id } = res.json();
+      storage.files.set(`uploads/raw/u1/${id}`, { data: pdf });
+      // A first attempt that failed after charging (the copy, say) leaves it pending.
+      const copy = storage.copy.bind(storage);
+      storage.copy = async () => {
+        throw new Error("network");
+      };
+      expect((await call(`/v1/uploads/${id}/complete`)).statusCode).toBe(500);
+      storage.copy = copy;
+      expect((await call(`/v1/uploads/${id}/complete`)).statusCode).toBe(200);
+      expect(store.doc("uploadQuotas/u1")).toMatchObject({ files: 1, bytes: pdf.length });
+    });
+
     it("takes an MP4 or MOV with an unlisted brand as a video in chat, as the app does by its name", async () => {
       const xavc = Buffer.concat([ftyp("XAVC", "XAVC", "mp42"), Buffer.alloc(11 * MB)]);
       const byType = await upload({ ...dm, contentType: "video/mp4", name: "clip.mp4", size: 1000 }, xavc);

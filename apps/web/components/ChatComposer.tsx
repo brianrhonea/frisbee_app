@@ -2,7 +2,7 @@
 import { chatAttachmentsMax, chatReactionChoices, chatTextMax, formatFileSize } from "@stall10/shared";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
-import { loadDraft, saveDraft } from "@/lib/messages";
+import { loadDraft, saveDraft } from "@/lib/drafts";
 import { chatFileProblem, newId, removeUpload, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
 

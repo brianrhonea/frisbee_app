@@ -248,9 +248,10 @@ everything the app does on the website alone, styled like the website
     api 0.23.0). Both platforms: a conversation is started only by
     tapping Message (a `?to=` link shows the person and "Message
     <name>"); drafts are kept per member and cleared on sign-out.
-    Website only (the app writes chat files to Storage directly): a
-    daily chat-upload quota (200 files / 2 GB), and Remove in the
-    composer deletes the unsent file.
+    Website only: a daily chat-upload quota (200 files / 2 GB), and
+    Remove in the composer deletes the unsent file (the website uploads
+    as files are picked; the app uploads to Storage itself when the
+    message is sent, so it has no unsent files to delete).
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

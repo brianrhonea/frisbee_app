@@ -2,7 +2,7 @@
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { firebaseAuth } from "@/lib/firebase";
-import { clearDrafts } from "@/lib/messages";
+import { clearDrafts } from "@/lib/drafts";
 
 interface AuthState {
   /** undefined while Firebase restores the session; null when signed out. */

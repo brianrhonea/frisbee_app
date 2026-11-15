@@ -19,6 +19,7 @@ import type { Caller } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
+import { filesOf } from "../hub/uploads.js";
 import { can, isMember, mapOf, roleIn, strings } from "../teams/access.js";
 import { compressImage, type HeicDecoder, UnreadableImage } from "./image.js";
 import { sniffBytes, sniffChatMediaType, sniffMediaType } from "./sniff.js";
@@ -148,13 +149,20 @@ export class UploadService {
     return new Date(this.now()).toISOString().slice(0, 10);
   }
 
-  /** Adds [bytes] received to today's chat quota; false (nothing added) if it would pass it. */
-  private async chargeBytes(uid: string, bytes: number): Promise<boolean> {
+  /**
+   * Adds upload [id]'s [bytes] received to today's chat quota, once (a
+   * retried complete isn't charged again); false (nothing added) if it
+   * would pass it.
+   */
+  private async chargeBytes(uid: string, id: string, bytes: number): Promise<boolean> {
     const day = this.quotaDay();
     return this.store.transact(async (tx) => {
-      const used = usage(await tx.get(quotaPath(uid)), day);
+      const [upload, quota] = await Promise.all([tx.get(`uploads/${id}`), tx.get(quotaPath(uid))]);
+      if (upload?.chargedBytes === bytes) return true;
+      const used = usage(quota, day);
       if (used.bytes + bytes > chatUploadQuota.bytes) return false;
       tx.set(quotaPath(uid), { day, files: used.files, bytes: used.bytes + bytes, updatedAt: serverTime });
+      tx.update(`uploads/${id}`, { chargedBytes: bytes });
       return true;
     });
   }
@@ -213,7 +221,7 @@ export class UploadService {
     const stat = await this.storage.stat(rawPath);
     if (stat == null) throw new ApiError("failed_precondition", "The file hasn't finished uploading.");
     const { size, generation } = stat;
-    if (purpose === "chat" && !(await this.chargeBytes(caller.uid, size))) {
+    if (purpose === "chat" && !(await this.chargeBytes(caller.uid, id, size))) {
       const e = overQuota();
       await this.reject(id, rawPath, e.message);
       throw e;
@@ -344,9 +352,10 @@ export class UploadService {
 
   /**
    * `DELETE /v1/uploads/{id}`: a chat file taken out of the composer before
-   * sending. Only its owner may, and only while no message holds it (the
-   * message the file was uploaded for doesn't exist yet); its raw and
-   * stored files are deleted. A file already sent goes with its message.
+   * sending. Only its owner may, and only while the message it was
+   * uploaded for doesn't hold it (that message isn't sent, or was sent
+   * without it); its raw and stored files are deleted. A file already sent
+   * goes with its message.
    */
   async remove(caller: Caller, id: string): Promise<void> {
     const upload = await this.store.get(`uploads/${id}`);
@@ -357,7 +366,9 @@ export class UploadService {
     const removed = await this.store.transact(async (tx) => {
       const [now, sent] = await Promise.all([tx.get(`uploads/${id}`), tx.get(message)]);
       if (!now || now.status === "removed") return null;
-      if (sent) throw new ApiError("failed_precondition", "That file was sent. Delete the message to remove it.");
+      // The message may have gone without it (removed while still uploading).
+      const held = typeof now.path === "string" && filesOf(sent?.attachments).some((f) => f.path === now.path);
+      if (held) throw new ApiError("failed_precondition", "That file was sent. Delete the message to remove it.");
       tx.update(`uploads/${id}`, { status: nextStatus(now.status as UploadStatus, "removed"), updatedAt: serverTime });
       return now;
     });
