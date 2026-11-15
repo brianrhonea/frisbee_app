@@ -271,6 +271,20 @@ everything the app does on the website alone, styled like the website
     team event from My schedule (the app's editor offers the teams the
     member manages) stays on the team's page. The subscribe feed
     (`/v1/ical/:token.ics`) is calendars only on both platforms.
+12. Team pages and inviting: [x] one invite dialog on both, opened from
+    the team header (and, on the website, the roster, the feed's member
+    card and Settings): the link is made when it opens (a week by
+    default; a group's link is its page), Copy and Share; people search
+    for every kind; a group's join requests to approve or decline, with
+    a count badge on Invite; who was invited while it's open (neither
+    platform can list or cancel older pending invites: they're stored
+    under each invitee). Tests: app `test/ui/invites_test.dart`,
+    `test/ui/team_home_test.dart`. The rotating code to read out is in
+    the website's dialog and on the app's Members tab. [x] Members see
+    the member count; a team's outsiders are told it's invite-only and
+    can join with a code; only schools/clubs have a Teams section.
+    Website only (layout): six tabs, More ▾ and a Settings gear, with
+    Playbook, Videos, Stats and Tournaments at their own URLs.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 
