@@ -7,6 +7,23 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.25.1 — 2026-11-15
+
+Clean-up; no behaviour change for clients.
+
+**Changed**
+- One tournament engine: `groupEngine` in `@stall10/shared` is now a thin
+  adapter over `tournament_engine.ts` (about 550 duplicated lines gone).
+- One set of room and event access checks: media rooms and the home feed
+  use `hub/access.ts`; `audienceTier` (shared) is the one place a "stats"
+  member counts as a player.
+- Shared helpers replace copies: `parseBody`, `limited()`/`tooFast()`,
+  `clip`/`clipText`, `mapOf`/`isMap`, `storedId`/`isDocId`; `ChatAdmin` is
+  built once.
+- Removed unused shared exports and 27 unused request/input type aliases.
+- A test checks that the API's browse and Discord copies stay in step with
+  `firebase/functions`.
+
 ## 0.25.0 — 2026-11-15
 
 Review checklist fixes. Deploy with web 0.29.0: hosted game confirm now

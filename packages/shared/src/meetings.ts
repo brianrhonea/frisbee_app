@@ -6,6 +6,7 @@
 // in step, and in step with the meetings rules in firestore.rules.
 import { z } from "zod";
 import { isoDateTime } from "./dates.js";
+import { audienceTier } from "./membership.js";
 
 // ---- Who may see and join (model.ts) -------------------------------------
 
@@ -48,7 +49,7 @@ const own = (m: Record<string, unknown> | undefined, key: string): unknown =>
 export function meetingRoleOf(team: MeetingTeam, uid: string): string | undefined {
   const role = own(team.members, uid);
   if (typeof role !== "string") return undefined;
-  return role === "stats" ? "player" : role;
+  return audienceTier(role);
 }
 
 /**
@@ -68,11 +69,6 @@ export function canSeeMeeting(team: MeetingTeam, meeting: MeetingDoc, uid: strin
   const role = meetingRoleOf(team, uid);
   if (role === undefined) return false;
   return isMeetingAdmin(team, uid) || (meeting.inviteRoles ?? []).includes(role) || (meeting.inviteUsers ?? []).includes(uid);
-}
-
-/** Team members who can see [meeting] (invitees). */
-export function meetingInvitees(team: MeetingTeam, meeting: MeetingDoc): string[] {
-  return Object.keys(team.members ?? {}).filter((uid) => canSeeMeeting(team, meeting, uid));
 }
 
 export type MeetingJoinDecision = "ok" | "notMember" | "notInvited" | "missing" | "notStarted" | "ended" | "needsApproval";

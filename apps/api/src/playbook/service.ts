@@ -3,20 +3,13 @@
 // (savePlayRequestSchema), and updatedBy is the caller.
 import { type SavePlayInput, savePlayRequestSchema } from "@stall10/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import type { z } from "zod";
 import { type Caller, requireCaller } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import { type DocStore, serverTime, type Tx } from "../store.js";
 import { can, isMember } from "../teams/access.js";
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 const denied = () => new ApiError("permission_denied", "Only the team's admins can change the playbook.");
 
@@ -50,7 +43,7 @@ export class PlaybookService {
 
   async create(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
-    const play = parse(savePlayRequestSchema, body);
+    const play = parseBody(savePlayRequestSchema, body);
     const id = this.store.newId(`teams/${teamId}/plays`);
     await this.store.transact(async (tx) => {
       await this.editor(tx, teamId, caller);
@@ -62,7 +55,7 @@ export class PlaybookService {
   async save(caller: Caller, rawTeam: unknown, rawPlay: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const id = docIdParam(rawPlay);
-    const play = parse(savePlayRequestSchema, body);
+    const play = parseBody(savePlayRequestSchema, body);
     await this.store.transact(async (tx) => {
       await this.editor(tx, teamId, caller);
       if (!(await tx.get(`teams/${teamId}/plays/${id}`))) throw new ApiError("not_found", "That play doesn't exist.");
@@ -83,9 +76,7 @@ export class PlaybookService {
 export function playbookRoutes(app: FastifyInstance, plays: PlaybookService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest): Caller => {
     const c = requireCaller(req);
-    if (!limiter.admit(`write:${c.uid}`, hubLimits.write)) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `write:${c.uid}`, hubLimits.write);
     return c;
   };
   type T = { Params: { teamId: string } };

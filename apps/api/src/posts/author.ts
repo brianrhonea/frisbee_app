@@ -4,13 +4,13 @@ import type { Caller, UserLookup } from "../auth.js";
 import { ApiError } from "../errors.js";
 import type { DocStore } from "../store.js";
 import { tooFastMessage } from "../teams/service.js";
+import { clip } from "../teams/access.js";
 
 /** Longest author name on a post or comment (validString(authorName, 80)). */
 export const nameMax = 80;
 /** Longest author photo URL (validString(authorPhotoUrl, 2000)). */
 export const photoMax = 2000;
 
-export const clip = (s: string, max: number) => (s.length > max ? s.substring(0, max) : s);
 export const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
 export interface Author {

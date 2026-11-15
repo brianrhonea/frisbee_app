@@ -11,9 +11,9 @@ import {
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { z } from "zod";
 import { type Caller, requireCaller } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { docIdParam } from "../ids.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { MediaStorage } from "../media/storage.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { can, isMember, strings } from "../teams/access.js";
@@ -31,12 +31,6 @@ const p = {
 
 /** The room every team keeps (ChatRoom.generalId). */
 export const generalRoomId = "general";
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 const denied = () => new ApiError("permission_denied", "You can't manage this team's chats.");
 const noTeam = () => new ApiError("not_found", "That team doesn't exist.");
@@ -70,7 +64,7 @@ export class ChatAdmin {
 
   async createRoom(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
-    const req = parse(saveChatRoomRequestSchema, body);
+    const req = parseBody(saveChatRoomRequestSchema, body);
     const team = await this.manager(teamId, caller);
     const existing = await this.store.list(p.rooms(teamId), chatRoomLimits.rooms + 1);
     if (existing.length >= chatRoomLimits.rooms) throw new ApiError("failed_precondition", `A team can have ${chatRoomLimits.rooms} rooms.`);
@@ -96,7 +90,7 @@ export class ChatAdmin {
   async editRoom(caller: Caller, rawTeam: unknown, rawRoom: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const roomId = docIdParam(rawRoom);
-    const req = parse(saveChatRoomRequestSchema, body);
+    const req = parseBody(saveChatRoomRequestSchema, body);
     const team = await this.manager(teamId, caller);
     await this.store.transact(async (tx) => {
       const [t, room, folder] = await Promise.all([
@@ -128,7 +122,7 @@ export class ChatAdmin {
 
   async createFolder(caller: Caller, rawTeam: unknown, body: unknown): Promise<{ id: string }> {
     const teamId = docIdParam(rawTeam);
-    const req = parse(saveChatFolderRequestSchema, body);
+    const req = parseBody(saveChatFolderRequestSchema, body);
     const team = await this.manager(teamId, caller);
     const existing = await this.store.list(p.folders(teamId), chatRoomLimits.folders + 1);
     if (existing.length >= chatRoomLimits.folders) throw new ApiError("failed_precondition", `A team can have ${chatRoomLimits.folders} folders.`);
@@ -151,7 +145,7 @@ export class ChatAdmin {
   async editFolder(caller: Caller, rawTeam: unknown, rawFolder: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const folderId = docIdParam(rawFolder);
-    const req = parse(saveChatFolderRequestSchema, body);
+    const req = parseBody(saveChatFolderRequestSchema, body);
     const team = await this.manager(teamId, caller);
     await this.store.transact(async (tx) => {
       const [t, folder] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.folder(teamId, folderId))]);
@@ -179,7 +173,7 @@ export class ChatAdmin {
   /** Folder and room order, and each room's folder. Unknown ids are refused. */
   async arrange(caller: Caller, rawTeam: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
-    const req = parse(chatLayoutRequestSchema, body);
+    const req = parseBody(chatLayoutRequestSchema, body);
     await this.manager(teamId, caller);
     await this.store.transact(async (tx) => {
       const t = await tx.get(p.team(teamId));
@@ -204,9 +198,7 @@ export class ChatAdmin {
 export function chatAdminRoutes(app: FastifyInstance, chats: ChatAdmin, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest): Caller => {
     const c = requireCaller(req);
-    if (!limiter.admit(`write:${c.uid}`, hubLimits.write)) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `write:${c.uid}`, hubLimits.write);
     return c;
   };
   type T = { Params: { teamId: string } };

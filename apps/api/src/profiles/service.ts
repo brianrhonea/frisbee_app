@@ -13,10 +13,10 @@ import {
   usernameProblem,
   usernameTakenMessage,
 } from "@stall10/shared";
-import type { z } from "zod";
 import type { Caller, UserLookup } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { type Data, type DocStore, deleteField, serverTime } from "../store.js";
+import { clip } from "../teams/access.js";
 
 const p = {
   profile: (uid: string) => `profiles/${uid}`,
@@ -25,13 +25,6 @@ const p = {
   user: (uid: string) => `users/${uid}`,
 };
 
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
-
-const clip = (s: string, max: number) => (s.length > max ? s.substring(0, max) : s);
 const usernameOf = (profile: Data | null) => (typeof profile?.username === "string" ? profile.username : null);
 
 /**
@@ -74,7 +67,7 @@ export class ProfileService {
    * claim and the profile's username are written together.
    */
   async claimUsername(caller: Caller, body: unknown): Promise<{ username: string }> {
-    const handle = normalizeUsername(parse(claimUsernameRequestSchema, body).username);
+    const handle = normalizeUsername(parseBody(claimUsernameRequestSchema, body).username);
     const problem = usernameProblem(handle);
     if (problem) throw new ApiError("invalid_argument", `${problem}.`, { username: problem });
     const user = await this.users.lookup(caller.uid);
@@ -104,7 +97,7 @@ export class ProfileService {
 
   /** Saves what the player wrote about themselves, on the private doc if the profile is private. */
   async saveDetails(caller: Caller, body: unknown): Promise<void> {
-    const { tags, ...details } = parse(profileDetailsRequestSchema, body);
+    const { tags, ...details } = parseBody(profileDetailsRequestSchema, body);
     const who = await this.who(caller);
     await this.store.transact(async (tx) => {
       // Read in the transaction, so a privacy change can't slip between.
@@ -126,7 +119,7 @@ export class ProfileService {
    * it's already that way.
    */
   async setPrivate(caller: Caller, body: unknown): Promise<void> {
-    const { private: makePrivate } = parse(profilePrivacyRequestSchema, body);
+    const { private: makePrivate } = parseBody(profilePrivacyRequestSchema, body);
     const who = await this.who(caller);
     await this.store.transact(async (tx) => {
       const profile = (await tx.get(p.profile(caller.uid))) ?? {};
@@ -154,7 +147,7 @@ export class ProfileService {
    * republishes shown ones with its next summary.
    */
   async saveVisibility(caller: Caller, body: unknown): Promise<void> {
-    const { visibility, tags } = parse(profileVisibilityRequestSchema, body);
+    const { visibility, tags } = parseBody(profileVisibilityRequestSchema, body);
     const fields: Data = {
       visibility,
       tags,
@@ -180,7 +173,7 @@ export class ProfileService {
 
   /** Sets it on their own users doc, as the app's Settings does (merge). */
   async setMessagePolicy(caller: Caller, body: unknown): Promise<void> {
-    const { messagePolicy } = parse(messagePolicyRequestSchema, body);
+    const { messagePolicy } = parseBody(messagePolicyRequestSchema, body);
     await this.store.transact(async (tx) => {
       tx.merge(p.user(caller.uid), { messagePolicy });
     });

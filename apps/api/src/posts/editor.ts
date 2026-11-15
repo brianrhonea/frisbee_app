@@ -13,11 +13,11 @@ import {
 } from "@stall10/shared";
 import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
-import { docIdParam } from "../ids.js";
+import { docIdParam, isDocId } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { authorOf, checkNotMuted } from "./author.js";
-import { noPost, people, validId } from "./service.js";
+import { noPost, people } from "./service.js";
 import { sharedEvent } from "./shared_event.js";
 
 const p = {
@@ -206,9 +206,9 @@ export class PostEditor {
       const r = post.repostOf;
       const originalId = r && typeof r === "object" ? (r as Data).postId : null;
       const original =
-        validId(originalId) && id === repostId(originalId, caller.uid) ? await tx.get(p.post(originalId)) : null;
+        isDocId(originalId) && id === repostId(originalId, caller.uid) ? await tx.get(p.post(originalId)) : null;
       tx.delete(p.post(id));
-      if (original && validId(originalId)) {
+      if (original && isDocId(originalId)) {
         const before = people(original.repostedBy);
         if (before.includes(caller.uid)) {
           tx.update(p.post(originalId), { repostedBy: before.filter((u) => u !== caller.uid) });
