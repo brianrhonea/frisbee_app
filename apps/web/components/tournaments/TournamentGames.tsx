@@ -168,7 +168,7 @@ export function GameCard({ s, g }: { s: TournamentState; g: EngineGame }) {
             )}
             {action === "confirm" && r && (
               <>
-                <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={() => void run(`${url}/confirm`, "POST")}>
+                <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={() => void run(`${url}/confirm`, "POST", { scoreA: r.scoreA, scoreB: r.scoreB })}>
                   Confirm {r.scoreA}–{r.scoreB}
                 </button>
                 <button type="button" className="btn btn-small" onClick={() => setOpen("report")}>

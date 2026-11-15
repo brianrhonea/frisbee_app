@@ -724,12 +724,17 @@ export class TournamentService {
     return this.queries.ids(p.games(id, divId), listMax);
   }
 
-  /** confirm()'s checks: a report on [g], and the caller captains the other team. */
-  private confirmable(d: Data, g: EngineGame, uid: string) {
+  /**
+   * confirm()'s checks: a report on [g], the caller captains the other
+   * team, and [s] is the reported score (the rule's `d.scoreA ==
+   * g.report.scoreA`): a report filed again meanwhile isn't confirmed unseen.
+   */
+  private confirmable(d: Data, g: EngineGame, uid: string, s: { scoreA: number; scoreB: number }) {
     const r = g.report;
     if (g.status !== "reported" || !r) throw new ApiError("failed_precondition", "There's no score to confirm.");
     const other = r.byTeam === g.teamA ? g.teamB : g.teamA;
     if (!this.captainOf(d, other, uid)) throw new ApiError("permission_denied", "The other team's captain confirms the score.");
+    if (r.scoreA !== s.scoreA || r.scoreB !== s.scoreB) throw new ApiError("failed_precondition", "The reported score changed. Check it again.");
     return r;
   }
 
@@ -756,16 +761,20 @@ export class TournamentService {
     });
   }
 
-  /** confirm(): the other team's captain confirms a report; the teams move on (advance()). */
-  async confirm(caller: Caller, rawId: unknown, rawDiv: unknown, rawGame: unknown): Promise<void> {
+  /**
+   * confirm(): the other team's captain confirms a report; the teams move
+   * on (advance()). [body] is the score being confirmed ({scoreA, scoreB}).
+   */
+  async confirm(caller: Caller, rawId: unknown, rawDiv: unknown, rawGame: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const gameId = docIdParam(rawGame);
+    const s = parse(scoreRequestSchema, body);
     // Only the other captain gets as far as listing the games (checked again below).
     await this.visible(this.store, id, caller.uid);
     const [division, game] = await Promise.all([this.store.get(p.division(id, divId)), this.store.get(p.game(id, divId, gameId))]);
     if (!division || !game) throw new ApiError("not_found", "That game doesn't exist.");
-    this.confirmable(division, engineGame(gameId, game), caller.uid);
+    this.confirmable(division, engineGame(gameId, game), caller.uid, s);
     const ids = await this.gameIds(id, divId);
     await this.store.transact(async (tx) => {
       await this.visible(tx, id, caller.uid);
@@ -773,7 +782,7 @@ export class TournamentService {
       const games = await this.gamesIn(tx, id, divId, ids);
       const g = games.find((x) => x.id === gameId);
       if (!d || !g) throw new ApiError("not_found", "That game doesn't exist.");
-      const r = this.confirmable(d, g, caller.uid);
+      const r = this.confirmable(d, g, caller.uid, s);
       const done: EngineGame = { ...g, status: "done", scoreA: r.scoreA, scoreB: r.scoreB, report: null };
       tx.update(p.game(id, divId, gameId), { status: "done", scoreA: r.scoreA, scoreB: r.scoreB, report: null });
       for (const f of fillsAfter(done, games)) tx.update(p.game(id, divId, f.gameId), fillUpdate(f));

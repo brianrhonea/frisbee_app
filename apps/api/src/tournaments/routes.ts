@@ -67,7 +67,7 @@ export function tournamentRoutes(app: FastifyInstance, svc: TournamentService, l
     return reply.code(204).send();
   });
   app.post<G>(`${game}/confirm`, async (req, reply) => {
-    await svc.confirm(caller(req), req.params.id, req.params.divisionId, req.params.gameId);
+    await svc.confirm(caller(req), req.params.id, req.params.divisionId, req.params.gameId, req.body);
     return reply.code(204).send();
   });
   app.put<G>(`${game}/score`, async (req, reply) => {

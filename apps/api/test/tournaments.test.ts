@@ -341,9 +341,9 @@ describe("authorized before anything is listed", () => {
       ["PUT", `${d}/schedule`, { games }, "fan", 403],
       ["PUT", `${g}/score`, { scoreA: 11, scoreB: 5 }, "fan", 403],
       ["POST", `${d}/seed-bracket`, undefined, "fan", 403],
-      ["POST", `${g}/confirm`, undefined, "fan", 403],
+      ["POST", `${g}/confirm`, { scoreA: 11, scoreB: 5 }, "fan", 403],
       // The reporting captain can't confirm their own report.
-      ["POST", `${g}/confirm`, undefined, games[0].teamA === "red" ? "cap" : "bcap", 403],
+      ["POST", `${g}/confirm`, { scoreA: 11, scoreB: 5 }, games[0].teamA === "red" ? "cap" : "bcap", 403],
       ["PUT", `/v1/tournaments/${t.id}/entries/green`, { divisionId: t.div, captainIds: ["gcap"] }, "fan", 403],
     ] as const) {
       queried = [];
@@ -545,11 +545,16 @@ describe("scores (report, confirm, advance, managers)", () => {
 
   it("confirm(): only the other team's captain; the result moves the winner on", async () => {
     const b = await bracket();
-    expect(code(await call("POST", b.url("g001", "confirm"), undefined, "gcap"))).toBe("failed_precondition");
+    const seen = { scoreA: 15, scoreB: 10 };
+    expect(code(await call("POST", b.url("g001", "confirm"), seen, "gcap"))).toBe("failed_precondition");
     await call("POST", b.url("g001", "report"), { scoreA: 15, scoreB: 10 }, "bcap");
-    expect((await call("POST", b.url("g001", "confirm"), undefined, "bcap")).status).toBe(403);
-    expect((await call("POST", b.url("g001", "confirm"), undefined, "cap")).status).toBe(403);
-    expect((await call("POST", b.url("g001", "confirm"), undefined, "gcap")).status).toBe(204);
+    expect((await call("POST", b.url("g001", "confirm"), seen, "bcap")).status).toBe(403);
+    expect((await call("POST", b.url("g001", "confirm"), seen, "cap")).status).toBe(403);
+    // The score being confirmed is required and must be the one reported.
+    expect((await call("POST", b.url("g001", "confirm"), undefined, "gcap")).status).toBe(400);
+    expect(code(await call("POST", b.url("g001", "confirm"), { scoreA: 15, scoreB: 9 }, "gcap"))).toBe("failed_precondition");
+    expect(b.g("g001")).toMatchObject({ status: "reported" });
+    expect((await call("POST", b.url("g001", "confirm"), seen, "gcap")).status).toBe(204);
     expect(b.g("g001")).toMatchObject({ status: "done", scoreA: 15, scoreB: 10, report: null });
     expect(b.g("g002")).toMatchObject({ teamA: "red", teamB: "blue" });
     expect(code(await call("POST", b.url("g001", "report"), { scoreA: 1, scoreB: 15 }, "gcap"))).toBe("failed_precondition");
@@ -596,7 +601,7 @@ describe("the host's view keeps things in step (reconcile)", () => {
     expect((await call("POST", url, undefined, "cap")).status).toBe(403);
     expect((await call("POST", url)).json().changed).toEqual([]);
     await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/games/g001/report`, { scoreA: 15, scoreB: 9 }, "cap");
-    await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/games/g001/confirm`, undefined, "bcap");
+    await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/games/g001/confirm`, { scoreA: 15, scoreB: 9 }, "bcap");
     expect((await call("POST", url)).json().changed).toEqual(["live", "placements", "finished"]);
     expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)?.placements).toEqual(["red", "blue"]);
     expect(store.doc(`tournaments/${t.id}`)?.status).toBe("finished");
