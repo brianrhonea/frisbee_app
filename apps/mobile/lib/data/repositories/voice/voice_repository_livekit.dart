@@ -91,8 +91,11 @@ class VoiceRepositoryLiveKit extends VoiceRepository {
     if (isIn(channel.teamId, channel.roomId) && (connected || _connecting)) {
       return const Result.ok(null);
     }
-    await _hangUp();
+    // Bumped before the hang-up so a later join, made while this one waits,
+    // wins instead of being overwritten when this one resumes.
     final attempt = ++_attempt;
+    await _hangUp();
+    if (attempt != _attempt) return const Result.ok(null);
     _channel = channel;
     _connecting = true;
     _notice = null;
@@ -139,6 +142,8 @@ class VoiceRepositoryLiveKit extends VoiceRepository {
   }
 
   void _watch(VoiceChannel channel) {
+    _teamWatch?.cancel();
+    _roomWatch?.cancel();
     _teamWatch = _Watch(
       () => _teams.watchTeam(channel.teamId),
       onData: (_) => _check(),
@@ -159,11 +164,14 @@ class VoiceRepositoryLiveKit extends VoiceRepository {
     final uid = _uid;
     if (teamWatch == null || roomWatch == null || uid == null) return;
     if (!teamWatch.loaded || !roomWatch.loaded) return;
+    // A cached miss isn't a deletion or a removal; only once it's been seen.
     final team = teamWatch.value;
-    if (team == null) return _lostAccess();
+    if (team == null) {
+      if (teamWatch.everSeen) _lostAccess();
+      return;
+    }
     final room = roomWatch.value;
     if (room == null) {
-      // A cached miss isn't a deletion; only once it's been seen.
       if (roomWatch.everSeen) _drop('The voice channel closed.');
       return;
     }
@@ -255,7 +263,8 @@ class VoiceRepositoryLiveKit extends VoiceRepository {
 }
 
 /// A stream that keeps watching: permission-denied goes to [onDenied]; any
-/// other error resubscribes after a backoff of 1 s doubling to 30 s.
+/// other error, or the stream ending, resubscribes after a backoff of 1 s
+/// doubling to 30 s.
 class _Watch<T> {
   _Watch(this._open, {required this.onData, required this.onDenied}) {
     _start();
@@ -290,13 +299,18 @@ class _Watch<T> {
           return;
         }
         unawaited(_sub?.cancel());
-        _retry = Timer(
-          Duration(
-            milliseconds: math.min(30000, 1000 << math.min(5, _failures++)),
-          ),
-          _start,
-        );
+        _resubscribe();
       },
+      onDone: _resubscribe,
+    );
+  }
+
+  void _resubscribe() {
+    if (_closed || (_retry?.isActive ?? false)) return;
+    _sub = null;
+    _retry = Timer(
+      Duration(milliseconds: math.min(30000, 1000 << math.min(5, _failures++))),
+      _start,
     );
   }
 
