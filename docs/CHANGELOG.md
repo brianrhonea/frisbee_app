@@ -60,6 +60,8 @@ Plain-language notes for testers are in
   website): losing access to the channel or team drops the call, losing
   the right to talk mutes you, and signing out or switching accounts
   hangs up.
+- Message drafts are kept per user and cleared on sign-out (as on the
+  website).
 - Tests: shared test vectors (`packages/shared/fixtures`, written by
   `test/shared_fixtures`) check the tournament engine, stats, play
   animation, drafts, Discord import and calendar files against the

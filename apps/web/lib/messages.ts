@@ -171,39 +171,3 @@ export function useThreadScroll(body: RefObject<HTMLElement | null>, firstId: st
     prev.current = { first: firstId, last: lastId, height: el.scrollHeight };
   });
 }
-
-// ---- Drafts ------------------------------------------------------------------
-
-const draftsKey = "messageDrafts";
-/** Drafts kept, newest last; the oldest go past this (MessageDraftRepositoryPrefs.maxDrafts). */
-export const maxDrafts = 50;
-
-function readDrafts(): Record<string, string> {
-  try {
-    const raw = window.localStorage.getItem(draftsKey);
-    const map = raw ? (JSON.parse(raw) as unknown) : null;
-    if (!map || typeof map !== "object" || Array.isArray(map)) return {};
-    return Object.fromEntries(Object.entries(map).filter((e): e is [string, string] => typeof e[1] === "string"));
-  } catch {
-    return {};
-  }
-}
-
-/** What was left unsent in [key]'s composer (`dm_<id>`, `chat_<team>_<room>`, as the app keys them). */
-export function loadDraft(key: string): string {
-  return readDrafts()[key] ?? "";
-}
-
-/** Remembers [text] for [key] in this browser; blank forgets it. */
-export function saveDraft(key: string, text: string) {
-  const drafts = readDrafts();
-  delete drafts[key];
-  if (text.trim()) drafts[key] = text;
-  const keys = Object.keys(drafts);
-  for (const k of keys.slice(0, Math.max(0, keys.length - maxDrafts))) delete drafts[k];
-  try {
-    window.localStorage.setItem(draftsKey, JSON.stringify(drafts));
-  } catch {
-    // No storage (a private window, say): drafts just aren't kept.
-  }
-}

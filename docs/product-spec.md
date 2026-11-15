@@ -248,12 +248,18 @@ everything the app does on the website alone, styled like the website
     name and size); [x] older messages in DMs, team rooms and the call
     chat; [x] Message on player pages (`/messages?to=<uid>`); [x] unsent
     drafts per conversation and room (kept in the browser; web 0.25.0,
-    api 0.23.0).
+    api 0.23.0). Both platforms: a conversation is started only by
+    tapping Message (a `?to=` link shows the person and "Message
+    <name>"); drafts are kept per member and cleared on sign-out.
+    Website only: a daily chat-upload quota (200 files / 2 GB), and
+    Remove in the composer deletes the unsent file (the website uploads
+    as files are picked; the app uploads to Storage itself when the
+    message is sent, so it has no unsent files to delete).
 11. My schedule: [x] every team's events and meetings beside the
     member's calendars, merged soonest first, with the app's All / Team /
     Personal filter, team-name tags when on several teams, and Delete for
     event managers (live Firestore reads under the team schedule's
-    rules; the merge and the two-hour rule are in `@stall10/shared`
+    rules; the merge and the over rule are in `@stall10/shared`
     `schedule.ts`). The website keeps its upcoming list over the
     calendars' 92-day window (the app pages a week at a time). Not yet:
     home's Upcoming events card lists only team events from

@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.28.0 — 2026-11-15
+
+Needs API 0.24.0 (Remove calls `DELETE /v1/uploads/:id`).
+
+**Fixed** (security review of the messaging batch)
+- A `/messages?to=` link asks before starting a conversation ("Message
+  <name>"); it opens one without asking only if it already exists.
+- Remove in the composer deletes the unsent chat file.
+- Message drafts are kept per member and cleared on sign-out.
+
 ## 0.27.0 — 2026-11-15
 
 **Changed** (security review of Explore and calls)

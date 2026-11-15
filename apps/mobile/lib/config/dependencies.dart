@@ -150,8 +150,17 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<PostCommentRepository>(
     create: (_) => PostCommentRepositoryFirebase(),
   ),
+  // Drafts belong to whoever is signed in, and go when they sign out.
+  // Made at start (not lazily on the first chat), so it sees every sign-out.
   Provider<MessageDraftRepository>(
-    create: (_) => MessageDraftRepositoryPrefs(SharedPreferencesService()),
+    lazy: false,
+    create: (context) => MessageDraftRepositoryPrefs(
+      SharedPreferencesService(),
+      auth: context.read<AuthRepository>(),
+    ),
+    dispose: (_, drafts) {
+      if (drafts is MessageDraftRepositoryPrefs) drafts.dispose();
+    },
   ),
   ChangeNotifierProvider<PeopleRepository>(
     create: (_) => PeopleRepositoryFirebase(),

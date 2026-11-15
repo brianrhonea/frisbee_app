@@ -2,8 +2,8 @@
 import { chatAttachmentsMax, chatReactionChoices, chatTextMax, formatFileSize } from "@stall10/shared";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
-import { loadDraft, saveDraft } from "@/lib/messages";
-import { chatFileProblem, newId, uploadPhoto } from "@/lib/upload";
+import { loadDraft, saveDraft } from "@/lib/drafts";
+import { chatFileProblem, newId, removeUpload, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
 
 type Pending = { key: string; name: string; size: number; uploadId?: string; error?: string };
@@ -41,15 +41,26 @@ export function ChatComposer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  /** Files removed while still uploading: deleted once their upload finishes. */
+  const dropped = useRef(new Set<string>());
+  const uid = user?.uid;
 
-  // What was left unsent here last time (read after mounting: it's in this browser only).
+  // What this member left unsent here last time (read after mounting: it's in this browser only).
   useEffect(() => {
-    if (draftKey) setText(loadDraft(draftKey));
-  }, [draftKey]);
+    if (draftKey && uid) setText(loadDraft(uid, draftKey));
+  }, [draftKey, uid]);
 
   function edit(value: string) {
     setText(value);
-    if (draftKey) saveDraft(draftKey, value);
+    if (draftKey && uid) saveDraft(uid, draftKey, value);
+  }
+
+  // Remove: the file isn't sent, and the API deletes what it stored (as soon as it has it).
+  function removeFile(f: Pending) {
+    setFiles((fs) => fs.filter((x) => x.key !== f.key));
+    if (!user) return;
+    if (f.uploadId) void removeUpload(user, f.uploadId);
+    else if (!f.error) dropped.current.add(f.key);
   }
 
   function addFiles(list: File[]) {
@@ -64,7 +75,10 @@ export function ChatComposer({
       const key = newId();
       setFiles((fs) => [...fs, { key, name: file.name, size: file.size }]);
       uploadPhoto(user, file, { purpose: "chat", targetId: upload.targetId, itemId: messageId }).then(
-        (done) => setFiles((fs) => fs.map((f) => (f.key === key ? { ...f, uploadId: done.id } : f))),
+        (done) => {
+          if (dropped.current.delete(key)) return void removeUpload(user, done.id);
+          setFiles((fs) => fs.map((f) => (f.key === key ? { ...f, uploadId: done.id } : f)));
+        },
         (e: Error) => setFiles((fs) => fs.map((f) => (f.key === key ? { ...f, error: e.message } : f))),
       );
     }
@@ -116,7 +130,7 @@ export function ChatComposer({
           {files.map((f) => (
             <li key={f.key} className={f.error ? "failed" : ""}>
               📎 {f.name} <small className="muted">{formatFileSize(f.size)}</small> {f.error ? `— ${f.error}` : f.uploadId ? "" : "(uploading…)"}{" "}
-              <button type="button" className="text-btn" onClick={() => setFiles(files.filter((x) => x.key !== f.key))}>
+              <button type="button" className="text-btn" onClick={() => removeFile(f)}>
                 Remove
               </button>
             </li>

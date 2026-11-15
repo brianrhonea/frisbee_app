@@ -7,6 +7,26 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.24.0 — 2026-11-15
+
+**Added** (security review of the messaging batch)
+- A daily chat-upload quota per member: 200 files asked for and 2 GB
+  received per UTC day (`uploadQuotas/{uid}`; a retried complete is
+  charged once).
+- `DELETE /v1/uploads/:id`: the owner removes an unsent chat file (raw,
+  stored and thumbnail); refused once a message holds it.
+
+**Fixed**
+- Completing an upload checks and copies one generation of the raw file,
+  then re-checks the copy's size, so the bytes can't be swapped after the
+  check.
+- Direct-message uploads need the conversation to exist and list the
+  caller.
+- In chat, an MP4/MOV with an unlisted ftyp brand counts as video when
+  declared or named as one.
+- Upload names are cleaned of control and bidi characters, and `/` `\`
+  become `_`.
+
 ## 0.23.1 — 2026-11-15
 
 **Fixed** (shared test vectors with the app)

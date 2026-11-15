@@ -196,8 +196,28 @@ export function chatAttachmentMax(fileName: string, videoType: boolean): number 
   return videoType && chatVideoName.test(fileName) ? chatVideoMax : chatFileMax;
 }
 
+/**
+ * What one member may upload to chats in a UTC day through the API: files
+ * asked for, and bytes received. Kept in uploadQuotas/{uid}; a file removed
+ * from the composer still counts, so removing and re-adding doesn't reset it.
+ */
+export const chatUploadQuota = { files: 200, bytes: 2 * 1024 * MB } as const;
+
 /** Longest file name kept on a chat file. */
 export const chatFileNameMax = 120;
+
+/**
+ * A file name as people see it, safe to show: control characters and bidi
+ * controls (which can make "photo<U+202E>fdp.exe" read as "photoexe.pdf")
+ * removed, and path separators turned into "_". The upload schema applies
+ * it, so a stored `name` never has them.
+ */
+export function cleanFileName(name: string): string {
+  return name
+    .replace(/[\u0000-\u001f\u007f-\u009f؜‎‏‪-‮⁦-⁩]/g, "")
+    .replace(/[/\\]/g, "_")
+    .trim();
+}
 
 /**
  * [name] as a chat file's stored name: readable, with anything that would
@@ -228,7 +248,7 @@ export const createUploadRequestSchema = z
     contentType: z.string().min(1).max(160),
     size: z.number().int().positive(),
     /** The file's own name (`chat`): kept on the message, and decides the video limit as storage.rules does. */
-    name: z.string().trim().min(1).max(chatFileNameMax).optional(),
+    name: z.string().max(chatFileNameMax * 4).transform(cleanFileName).pipe(z.string().min(1).max(chatFileNameMax)).optional(),
     /** The team (teamImage, teamVideo) or chat (chat: `teams/{t}/chats/{r}` or `conversations/{c}`) it's for. */
     targetId: z.string().min(1).max(128).optional(),
     /**
@@ -295,9 +315,11 @@ export function uploadMax(purpose: UploadPurpose, contentType: string, name?: st
  * An upload's life (uploads/{id}.status): `pending` until the client says
  * it's uploaded, then `ready` (images, compressed in the request) or
  * `processing` (videos, until the transcode job ends in `ready` or
- * `failed`). A file that isn't what it claims is `failed`.
+ * `failed`). A file that isn't what it claims is `failed`. A chat file
+ * taken out of the composer before it's sent (`DELETE /v1/uploads/{id}`)
+ * is `removed`, and its stored files are deleted.
  */
-export const uploadStatuses = ["pending", "processing", "ready", "failed"] as const;
+export const uploadStatuses = ["pending", "processing", "ready", "failed", "removed"] as const;
 export type UploadStatus = (typeof uploadStatuses)[number];
 
 /** Answer to `POST /v1/uploads`: PUT the file to [uploadUrl] with [headers]. */
