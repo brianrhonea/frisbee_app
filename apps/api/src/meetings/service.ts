@@ -41,7 +41,7 @@ import { ApiError, parseBody } from "../errors.js";
 import { chatRole } from "../hub/access.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { Limit } from "../limits/model.js";
 import { authorOf, checkNotMuted } from "../posts/author.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
@@ -462,9 +462,7 @@ export function meetingRoutes(app: FastifyInstance, meetings: MeetingService, li
   const caller = (req: FastifyRequest, bucket: keyof typeof buckets): Caller => {
     const c = requireCaller(req);
     const key = bucket in meetingRateLimits ? `meeting-${bucket}:${c.uid}` : `${bucket}:${c.uid}`;
-    if (!limiter.admit(key, buckets[bucket])) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, key, buckets[bucket]);
     return c;
   };
   const noContent = async (reply: FastifyReply, work: () => Promise<void>) => {

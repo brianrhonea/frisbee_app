@@ -1,8 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
-import { ApiError } from "../errors.js";
 import { hubLimits } from "../hub/routes.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { ConversationService } from "./service.js";
 
 type Conv = { Params: { id: string } };
@@ -13,9 +12,7 @@ type Member = { Params: { id: string; uid: string } };
 export function conversationRoutes(app: FastifyInstance, convs: ConversationService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest, bucket: keyof typeof hubLimits): Caller => {
     const c = requireCaller(req);
-    if (!limiter.admit(`dm-${bucket}:${c.uid}`, hubLimits[bucket])) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `dm-${bucket}:${c.uid}`, hubLimits[bucket]);
     return c;
   };
   const done = <T>(reply: { code(n: number): { send(b?: unknown): T } }) => reply.code(204).send();

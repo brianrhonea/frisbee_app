@@ -4,8 +4,7 @@
 // the caller is on. Per member, per instance, like the write limits.
 import type { FastifyRequest } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
-import { ApiError } from "../errors.js";
-import type { MemoryRateLimiter } from "./memory.js";
+import { limited, type MemoryRateLimiter } from "./memory.js";
 import type { Limit } from "./model.js";
 
 export const readLimits = {
@@ -21,9 +20,7 @@ export type ReadBucket = keyof typeof readLimits;
 export function readCaller(limiter: MemoryRateLimiter | undefined) {
   return (req: FastifyRequest, bucket: ReadBucket): Caller => {
     const c = requireCaller(req);
-    if (limiter && !limiter.admit(`read-${bucket}:${c.uid}`, readLimits[bucket])) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `read-${bucket}:${c.uid}`, readLimits[bucket]);
     return c;
   };
 }

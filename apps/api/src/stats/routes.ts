@@ -2,8 +2,7 @@
 // their own bucket: a stats keeper tracking a game live saves often.
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
-import { ApiError } from "../errors.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { Limit } from "../limits/model.js";
 import type { StatsService } from "./service.js";
 
@@ -33,9 +32,7 @@ type PlayerP = { Params: { teamId: string; playerId: string } };
 export function statsRoutes(app: FastifyInstance, stats: StatsService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest): Caller => {
     const c = requireCaller(req);
-    if (!limiter.admit(`stats:${c.uid}`, statsLimits.write)) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `stats:${c.uid}`, statsLimits.write);
     return c;
   };
 

@@ -2,9 +2,8 @@
 // signed-in caller, under the hub's write limit.
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
-import { ApiError } from "../errors.js";
 import { hubLimits } from "../hub/routes.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { TournamentService } from "./service.js";
 
 /**
@@ -17,9 +16,7 @@ const scheduleBodyLimit = 2 * 1024 * 1024;
 export function tournamentRoutes(app: FastifyInstance, svc: TournamentService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest): Caller => {
     const c = requireCaller(req);
-    if (!limiter.admit(`write:${c.uid}`, hubLimits.write)) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `write:${c.uid}`, hubLimits.write);
     return c;
   };
   type T = { Params: { id: string } };

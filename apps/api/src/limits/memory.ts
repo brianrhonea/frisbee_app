@@ -1,3 +1,4 @@
+import { ApiError } from "../errors.js";
 import { count, type Counter, type Limit } from "./model.js";
 
 /**
@@ -25,4 +26,12 @@ export class MemoryRateLimiter {
   private sweep(now: number) {
     for (const [k, { counter, windowMs }] of this.counters) if (now - counter.start >= windowMs) this.counters.delete(k);
   }
+}
+
+/** The error for a caller over a per-instance limit. */
+export const tooFast = () => new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
+
+/** Counts [key] against [limit] on [limiter] (nothing without one); throws tooFast once it's over. */
+export function limited(limiter: MemoryRateLimiter | undefined, key: string, limit: Limit): void {
+  if (limiter && !limiter.admit(key, limit)) throw tooFast();
 }

@@ -23,7 +23,7 @@ import { type Caller, requireCaller } from "../auth.js";
 import { ApiError, parseBody } from "../errors.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { DocQueries } from "../queries.js";
 import { type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import { can, isGroup, mapOf, own, strings } from "../teams/access.js";
@@ -497,9 +497,7 @@ const draftBodyLimit = 512 * 1024;
 export function groupTournamentRoutes(app: FastifyInstance, svc: GroupTournamentService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest): Caller => {
     const c = requireCaller(req);
-    if (!limiter.admit(`write:${c.uid}`, hubLimits.write)) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `write:${c.uid}`, hubLimits.write);
     return c;
   };
   const base = "/v1/teams/:teamId/group-tournaments";

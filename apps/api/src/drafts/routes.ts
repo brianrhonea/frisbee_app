@@ -2,7 +2,7 @@ import { draftPaths } from "@stall10/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
 import { ApiError } from "../errors.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter, tooFast } from "../limits/memory.js";
 import { countFailedWrite } from "../limits/writes.js";
 import type { Limit } from "../limits/model.js";
 import type { DraftService } from "./service.js";
@@ -47,9 +47,7 @@ const r = {
 export function draftRoutes(app: FastifyInstance, drafts: DraftService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest, bucket: keyof typeof draftLimits): Caller => {
     const c = requireCaller(req);
-    if (!limiter.admit(`draft-${bucket}:${c.uid}`, draftLimits[bucket])) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `draft-${bucket}:${c.uid}`, draftLimits[bucket]);
     return c;
   };
   /** Runs an exempt draft write; a failure counts against the global write cap. */
@@ -58,7 +56,7 @@ export function draftRoutes(app: FastifyInstance, drafts: DraftService, limiter:
       await run();
     } catch (e) {
       if (!(e instanceof ApiError && e.code === "resource_exhausted") && !countFailedWrite(limiter, c.uid)) {
-        throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
+        throw tooFast();
       }
       throw e;
     }

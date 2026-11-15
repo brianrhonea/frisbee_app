@@ -40,7 +40,7 @@ import { ApiError, parseBody } from "../errors.js";
 import { accessFields, type ChatAdmin } from "../hub/rooms.js";
 import { hubLimits } from "../hub/routes.js";
 import { docIdParam } from "../ids.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { Limit } from "../limits/model.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { can, isOrg, isOwner, mapOf, strings } from "../teams/access.js";
@@ -322,9 +322,7 @@ export class DiscordService {
 export function discordRoutes(app: FastifyInstance, discord: DiscordService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest, bucket: keyof typeof discordRouteLimits): Caller => {
     const c = requireCaller(req);
-    if (!limiter.admit(`discord-${bucket}:${c.uid}`, discordRouteLimits[bucket])) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `discord-${bucket}:${c.uid}`, discordRouteLimits[bucket]);
     return c;
   };
   type T = { Params: { teamId: string } };

@@ -1,7 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { type Caller, requireCaller } from "../auth.js";
-import { ApiError } from "../errors.js";
-import type { MemoryRateLimiter } from "../limits/memory.js";
+import { limited, type MemoryRateLimiter } from "../limits/memory.js";
 import type { Limit } from "../limits/model.js";
 import type { HubService } from "./service.js";
 
@@ -23,9 +22,7 @@ export const hubLimits = {
 export function hubRoutes(app: FastifyInstance, hub: HubService, limiter: MemoryRateLimiter) {
   const caller = (req: FastifyRequest, bucket: keyof typeof hubLimits): Caller => {
     const c = requireCaller(req);
-    if (!limiter.admit(`${bucket}:${c.uid}`, hubLimits[bucket])) {
-      throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
-    }
+    limited(limiter, `${bucket}:${c.uid}`, hubLimits[bucket]);
     return c;
   };
 
