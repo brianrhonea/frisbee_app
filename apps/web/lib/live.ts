@@ -3,12 +3,13 @@ import {
   collection,
   doc,
   type DocumentData,
+  limit,
   onSnapshot,
   query,
   type QueryConstraint,
   Timestamp,
 } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { firestoreDb } from "./firebase";
 
 // Live reads from Firestore for the member area, as the app reads them: the
@@ -99,6 +100,41 @@ export function useLiveQuery<T = DocumentData>(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- [key] stands for constraints.
   }, [path, key]);
   return state;
+}
+
+/** A live query read a page at a time: [more] when a full page came back. */
+export interface LivePaged<T> extends Live<Doc<T>[]> {
+  more: boolean;
+  /** The bigger page is on its way (the last one still showing). */
+  loadingMore: boolean;
+  loadMore: () => void;
+}
+
+/**
+ * useLiveQuery with a limit: the first [pageSize] documents of the query,
+ * and [pageSize] more on each loadMore. What's showing stays while the
+ * bigger page loads. Back to one page when [path] or [key] changes.
+ */
+export function useLivePaged<T = DocumentData>(
+  path: string | null,
+  constraints: QueryConstraint[],
+  key: string,
+  pageSize: number,
+): LivePaged<T> {
+  const base = `${path ?? ""}|${key}`;
+  const [page, setPage] = useState({ base, n: pageSize });
+  const n = page.base === base ? page.n : pageSize;
+  const live = useLiveQuery<T>(path, [...constraints, limit(n)], `${key}|${n}`);
+  const last = useRef<{ base: string; data: Doc<T>[] } | null>(null);
+  if (live.data !== undefined) last.current = { base, data: live.data };
+  const data = live.data ?? (last.current?.base === base ? last.current.data : undefined);
+  return {
+    data,
+    error: live.error,
+    loadingMore: live.data === undefined && data !== undefined && !live.error,
+    more: live.data === undefined ? data !== undefined && !live.error : live.data.length >= n,
+    loadMore: () => setPage({ base, n: n + pageSize }),
+  };
 }
 
 /** Something to watch for changes: a document, or a query on a collection. */

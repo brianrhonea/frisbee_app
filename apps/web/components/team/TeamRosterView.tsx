@@ -1,6 +1,5 @@
 "use client";
-import { type RosterMember, rosterMax, type TeamRoster } from "@stall10/shared";
-import { limit } from "firebase/firestore";
+import type { RosterMember, TeamRoster } from "@stall10/shared";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { callApi, problem } from "@/lib/client";
@@ -28,13 +27,11 @@ export function TeamRosterView() {
   // Groups invite with their link in the app; teams invite by name here too.
   const canInvite = kind === "team" && viewer.state === "member" && viewer.can("manageMembers");
 
-  // Members refetch when the team or its roster changes (a join, a new
-  // number); outsiders can't read either, so theirs loads once.
+  // Members refetch when the team doc changes (someone joins, leaves or
+  // changes role); outsiders can't read it, so theirs loads once.
   const member = viewer.state === "member";
-  const signals: Signal[] | null = member
-    ? [{ doc: `teams/${teamId}` }, ...(kind === "team" ? [{ collection: `teams/${teamId}/roster`, constraints: [limit(rosterMax)] }] : [])]
-    : null;
-  const version = useChangeSignal(signals, member ? `${teamId}|${kind}` : "");
+  const signals: Signal[] | null = member ? [{ doc: `teams/${teamId}` }] : null;
+  const version = useChangeSignal(signals, member ? teamId : "");
 
   useEffect(() => {
     if (!user) return;
@@ -75,7 +72,8 @@ export function TeamRosterView() {
       </div>
     );
   }
-  if (error) return <p className="empty">{error}</p>;
+  // A failed refetch keeps the roster already showing.
+  if (error && !roster) return <p className="empty">{error}</p>;
   if (!roster) return <p className="muted" aria-busy="true">Loading the roster…</p>;
 
   const q = filter.trim().toLowerCase();

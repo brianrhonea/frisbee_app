@@ -142,11 +142,17 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   }, [state.ended, stage, hangUp]);
   // Signed out (here or in another tab), removed from the team, or no
   // longer invited: leave the call, so the mic and camera stop (as voice
-  // channels do).
-  const lostAccess = !member || (!!m && !canSee(m, member));
+  // channels do). A team doc that just failed to load isn't lost access.
+  const lostAccess = viewer.state === "visitor" || viewer.state === "outsider" || meeting.denied === true || (!!m && !!member && !canSee(m, member));
   useEffect(() => {
     if ((stage === "inCall" || stage === "joining") && lostAccess) void hangUp("You no longer have access to this meeting.");
   }, [lostAccess, stage, hangUp]);
+  // Another account signing in (in another tab) leaves the call too.
+  const joinedAs = useRef(uid);
+  useEffect(() => {
+    if (stage === "lobby" || stage === "left") joinedAs.current = uid;
+    else if (joinedAs.current !== uid) void hangUp(null);
+  }, [uid, stage, hangUp]);
 
   const join = useCallback(async () => {
     if (!user || stage !== "lobby") return;
