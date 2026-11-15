@@ -190,4 +190,9 @@ describe("state", () => {
   it("needs a signed-in caller", async () => {
     expect((await s.call("GET", "/v1/posts/state?ids=orig", undefined, null)).statusCode).toBe(401);
   });
+
+  it("caps each member's state reads (120 a minute)", async () => {
+    for (let i = 0; i < 120; i++) expect((await s.call("GET", "/v1/posts/state?ids=orig")).statusCode).toBe(200);
+    expect((await s.call("GET", "/v1/posts/state?ids=orig")).statusCode).toBe(429);
+  });
 });

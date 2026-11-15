@@ -167,8 +167,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const queries = deps.queries ?? listDocQueries(deps.store);
     teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media, queries));
     if (deps.personal) personalRoutes(app, new PersonalService(deps.store, deps.users, deps.personal, deps.now));
-    rosterRoutes(app, new RosterService(deps.store));
-    postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate);
+    const reads = deps.writeLimits !== false ? writes : undefined;
+    rosterRoutes(app, new RosterService(deps.store), reads);
+    postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate, reads);
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
     hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
@@ -186,6 +187,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {
         limiter: deps.browse?.limiter,
         publicUrl: deps.publicUrl,
+        reads,
       });
     }
     if (deps.media) {

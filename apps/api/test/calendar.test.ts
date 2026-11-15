@@ -128,6 +128,13 @@ describe("calendars", () => {
     expect((await s.call("GET", "/v1/me/calendars", undefined, null)).statusCode).toBe(401);
   });
 
+  it("caps each member's calendar and event list reads (60 a minute each)", async () => {
+    for (let i = 0; i < 60; i++) expect((await s.call("GET", "/v1/me/calendars")).statusCode).toBe(200);
+    expect((await s.call("GET", "/v1/me/calendars")).statusCode).toBe(429);
+    for (let i = 0; i < 60; i++) expect((await s.call("GET", `/v1/me/calendar-events?${week}`)).statusCode).toBe(200);
+    expect((await s.call("GET", `/v1/me/calendar-events?${week}`)).statusCode).toBe(429);
+  });
+
   it("makes, renames and deletes more, but never My calendar", async () => {
     const id = await newCalendar();
     expect((await s.call("PATCH", `/v1/calendars/${id}`, { name: "Track", color: "red" })).statusCode).toBe(204);

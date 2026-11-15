@@ -100,6 +100,12 @@ export class FakeStore implements DocStore {
     return d ? structuredClone(d) : null;
   }
 
+  getAllCalls = 0;
+  async getAll(paths: string[]) {
+    this.getAllCalls++;
+    return Promise.all(paths.map((p) => this.get(p)));
+  }
+
   async list(collection: string, limit: number) {
     const prefix = `${collection}/`;
     return [...this.docs.entries()]

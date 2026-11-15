@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requireCaller } from "../auth.js";
+import type { MemoryRateLimiter } from "../limits/memory.js";
+import { readCaller } from "../limits/reads.js";
 import { noRevalidate, type Revalidate, webTags } from "../web/revalidate.js";
 import type { PostEditor } from "./editor.js";
 import type { PostService } from "./service.js";
@@ -8,9 +10,10 @@ type Id = { Params: { id: string } };
 type CommentId = { Params: { id: string; commentId: string } };
 
 /** Liking and reposting players' posts, as the signed-in caller. */
-export function postRoutes(app: FastifyInstance, posts: PostService, revalidate: Revalidate = noRevalidate) {
+export function postRoutes(app: FastifyInstance, posts: PostService, revalidate: Revalidate = noRevalidate, limiter?: MemoryRateLimiter) {
+  const reader = readCaller(limiter);
   app.get<{ Querystring: { ids?: string } }>("/v1/posts/state", async (req, reply) => {
-    const states = await posts.states(requireCaller(req), req.query.ids);
+    const states = await posts.states(reader(req, "postStates"), req.query.ids);
     return reply.header("cache-control", "private, no-store").send(states);
   });
   app.put<Id>("/v1/posts/:id/like", async (req) => posts.setLiked(requireCaller(req), req.params.id, true));

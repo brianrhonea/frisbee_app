@@ -2,7 +2,9 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requireCaller } from "../auth.js";
 import { ApiError } from "../errors.js";
 import type { RateLimiter } from "../limits/limiter.js";
+import type { MemoryRateLimiter } from "../limits/memory.js";
 import type { Limit } from "../limits/model.js";
+import { readCaller } from "../limits/reads.js";
 import { feedHash, type CalendarService } from "./service.js";
 
 export interface CalendarOptions {
@@ -10,6 +12,8 @@ export interface CalendarOptions {
   limiter?: RateLimiter;
   /** The API's public address for feed links (PUBLIC_API_URL); else the request's own. */
   publicUrl?: string;
+  /** Per-caller read caps (readLimits) on the list routes. */
+  reads?: MemoryRateLimiter;
 }
 
 /**
@@ -26,9 +30,10 @@ export function calendarRoutes(app: FastifyInstance, calendar: CalendarService, 
   type Id = { Params: { id: string } };
   type IdUid = { Params: { id: string; uid: string } };
   type IdEvent = { Params: { id: string; eventId: string } };
+  const reader = readCaller(opts.reads);
 
   app.get("/v1/me/calendars", async (req, reply) =>
-    reply.header("cache-control", noStore).send(await calendar.list(requireCaller(req))),
+    reply.header("cache-control", noStore).send(await calendar.list(reader(req, "calendars"))),
   );
   app.post("/v1/me/calendars", async (req, reply) =>
     reply.status(201).send(await calendar.create(requireCaller(req), req.body)),
@@ -72,7 +77,7 @@ export function calendarRoutes(app: FastifyInstance, calendar: CalendarService, 
   });
 
   app.get<{ Querystring: { from?: string; to?: string } }>("/v1/me/calendar-events", async (req, reply) =>
-    reply.header("cache-control", noStore).send(await calendar.events(requireCaller(req), req.query.from, req.query.to)),
+    reply.header("cache-control", noStore).send(await calendar.events(reader(req, "calendarEvents"), req.query.from, req.query.to)),
   );
   app.post<Id>("/v1/calendars/:id/events", async (req, reply) =>
     reply.status(201).send(await calendar.addEvent(requireCaller(req), req.params.id, req.body)),
