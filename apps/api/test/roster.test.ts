@@ -95,6 +95,18 @@ describe("roster", () => {
     });
   });
 
+  it("reads the profile cards in one getAll", async () => {
+    expect((await s.get("/v1/teams/t1/roster")).statusCode).toBe(200);
+    expect(s.store.getAllCalls).toBe(1);
+  });
+
+  it("caps each member's roster reads (60 a minute)", async () => {
+    for (let i = 0; i < 60; i++) expect((await s.get("/v1/teams/t1/roster")).statusCode).toBe(200);
+    expect((await s.get("/v1/teams/t1/roster")).statusCode).toBe(429);
+    // Someone else's reads are their own.
+    expect((await s.get("/v1/teams/t1/roster", "pat")).statusCode).toBe(200);
+  });
+
   it("answers 404 for a missing team and 400 for a bad id", async () => {
     expect((await s.get("/v1/teams/nope/roster")).statusCode).toBe(404);
     expect((await s.get("/v1/teams/__x__/roster")).statusCode).toBe(400);

@@ -237,6 +237,19 @@ export class DraftService {
     return { uid: caller.uid, tournamentId, divisionId, tournament, division, manager: manages };
   }
 
+  /**
+   * [c] read again in a transaction: the event, the division and whether
+   * the caller still manages it, so a manager removed or a draft cancelled
+   * meanwhile counts (context() reads them first, outside it).
+   */
+  private async fresh(tx: Tx, c: Ctx): Promise<Ctx> {
+    const [tournament, division] = await Promise.all([tx.get(p.tournament(c.tournamentId)), tx.get(p.division(c.tournamentId, c.divisionId))]);
+    if (!tournament || !division) throw new ApiError("not_found", "That event or division doesn't exist.");
+    if (tournament.entryType !== "players" || tournament.draftMode !== "captains") throw fail("This event doesn't use a captains' draft.");
+    const { manages } = await this.manages((x) => tx.get(x), tournament, c.uid);
+    return { ...c, tournament, division, manager: manages };
+  }
+
   private requireManager(c: Ctx) {
     if (!c.manager) throw organizersOnly();
   }
@@ -290,7 +303,16 @@ export class DraftService {
     const signups = await this.queries.acceptedSignups(c.tournamentId, c.divisionId);
     const accepted = new Map(signups.map((s) => [s.id, s.data]));
     return this.store.transact(async (tx) => {
+      const now = await this.fresh(tx, c);
+      this.requireManager(now);
+      if (teamsCreated(draftedTeams(now.division.teams))) throw fail("The teams have already been created.");
       if (await tx.get(p.draft(c.tournamentId, c.divisionId))) throw fail("This division already has a draft. Cancel it to start over.");
+      // Each signup read again: one withdrawn or moved meanwhile isn't drafted.
+      for (const s of signups) {
+        const d = await tx.get(p.signup(c.tournamentId, s.id));
+        if (d?.status === "accepted" && d.divisionId === c.divisionId) accepted.set(s.id, d);
+        else accepted.delete(s.id);
+      }
       const captainIds = input.captainIds;
       const problem = startProblem({ captainIds, accepted: new Set(accepted.keys()), poolSize: accepted.size - captainIds.length });
       if (problem) throw fail(problem);
@@ -303,7 +325,7 @@ export class DraftService {
         pool: Object.fromEntries(players.map(([id, s]) => [id, clipName(s.name) || "Player"])),
         picks: [],
         pickSeconds: input.pickSeconds,
-        mixed: c.division.division === "mixed",
+        mixed: now.division.division === "mixed",
         turnStartedAt: serverTime,
         startedBy: c.uid,
       });
@@ -319,9 +341,10 @@ export class DraftService {
     const c = await this.context(caller, rawTournament, rawDivision);
     const { uid } = parse(draftPickRequestSchema, body);
     await this.store.transact(async (tx) => {
+      const now = await this.fresh(tx, c);
       const l = await this.load(tx, c);
       const clock = onTheClock(l.captainIds, l.picks, l.pool.length);
-      if (clock !== c.uid && !c.manager) throw new ApiError("permission_denied", "It's not your pick.");
+      if (clock !== c.uid && !now.manager) throw new ApiError("permission_denied", "It's not your pick.");
       const problem = pickProblem({ status: String(l.draft.status), captainIds: l.captainIds, picks: l.picks, pool: l.pool, uid });
       if (problem) throw fail(problem);
       this.recordPick(tx, c, l, uid);
@@ -334,6 +357,7 @@ export class DraftService {
     this.requireManager(c);
     const { action } = parse(draftControlRequestSchema, body);
     await this.store.transact(async (tx) => {
+      this.requireManager(await this.fresh(tx, c));
       const l = await this.load(tx, c);
       const draftPath = p.draft(c.tournamentId, c.divisionId);
       const status = String(l.draft.status);
@@ -375,6 +399,9 @@ export class DraftService {
     this.requireManager(c);
     await this.requireOpen(c);
     return this.store.transact(async (tx) => {
+      const now = await this.fresh(tx, c);
+      this.requireManager(now);
+      if (teamsCreated(draftedTeams(now.division.teams))) throw fail("The teams have already been created.");
       const l = await this.load(tx, c);
       if (l.draft.status === "finished") throw fail("The draft is already finished.");
       const teams = teamsFromDraft({
@@ -383,7 +410,7 @@ export class DraftService {
         names: Object.fromEntries(Object.entries(mapOf(l.draft.pool)).map(([k, v]) => [k, String(v)])),
       });
       const divisionPath = p.division(c.tournamentId, c.divisionId);
-      const division = (await tx.get(divisionPath)) ?? {};
+      const division = now.division;
       const before = Array.isArray(division.teams) ? division.teams.map((t) => String(mapOf(t).id ?? "")) : [];
       // Registered teams keep their seeds; only the drafted ones change.
       tx.update(divisionPath, { teams, ...withDrafted(division, before, teams) });
@@ -423,6 +450,11 @@ export class DraftService {
     // Real team ids become document paths, so each has to be one.
     const ids = drafted.map((t) => docIdParam(leagueTeamId(tournamentId, t.id)));
     const created = await this.store.transact(async (tx) => {
+      const now = await tx.get(p.tournament(tournamentId));
+      if (!now) throw new ApiError("not_found", "That league or division doesn't exist.");
+      if (!(await this.manages((x) => tx.get(x), now, caller.uid)).manages) {
+        throw new ApiError("permission_denied", "Only the league's organizers can create its teams.");
+      }
       const fresh = await tx.get(divisionPath);
       if (!fresh || JSON.stringify(draftedTeams(fresh.teams)) !== JSON.stringify(drafted)) {
         throw fail("The teams changed while they were being created. Try again.");

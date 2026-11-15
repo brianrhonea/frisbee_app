@@ -60,6 +60,19 @@ describe("deleting a team", () => {
     expect(await del("t1", { name: "Haze" })).toBe(204);
   });
 
+  it("waits while it hosts a tournament or league that hasn't finished; finished ones are kept", async () => {
+    store.put("tournaments/open", { hostId: "t1", kind: "tournament", status: "live" });
+    store.put("tournaments/elsewhere", { hostId: "t2", status: "live" });
+    expect(await del("t1", { name: "Haze" })).toBe(412);
+    // A league with no status reads as a draft: still unfinished.
+    store.put("tournaments/open", { hostId: "t1", kind: "tournament", status: "finished" });
+    store.put("tournaments/lg2", { hostId: "t1", kind: "league" });
+    expect(await del("t1", { name: "Haze" })).toBe(412);
+    store.docs.delete("tournaments/lg2");
+    expect(await del("t1", { name: "Haze" })).toBe(204);
+    expect(store.doc("tournaments/open")).toMatchObject({ status: "finished" });
+  });
+
   it("deletes everything under it and its files, and leaves its community's list", async () => {
     expect(await del("t1", { name: " haze " })).toBe(204);
     expect(teams.deleted).toEqual(["t1"]);

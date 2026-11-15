@@ -278,7 +278,8 @@ export class GroupTournamentService {
       if (published && teamIdsOf(existing.teams) !== d.teams.map((x) => x.id).sort().join("\n")) {
         throw new ApiError("failed_precondition", "The number of teams changed: publish the schedule again.");
       }
-      const status = published ? "scheduled" : "setup";
+      // A published one keeps its status: saving a finished one doesn't reopen it.
+      const status = !published ? "setup" : existing.status === "done" ? "done" : "scheduled";
       tx.update(p.tournament(teamId, id), tournamentFields(team, d, status));
       tx.set(p.listing(teamId, id), listingFields(teamId, id, d, status));
     });

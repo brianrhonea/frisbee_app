@@ -60,7 +60,8 @@ describe("preview (the callable's checks)", () => {
   it("is for the owner only (members[uid] == 'owner')", async () => {
     expect((await preview(undefined, "chats")).status).toBe(403);
     expect((await preview(undefined, "stranger")).status).toBe(403);
-    expect((await call("/v1/teams/nope/discord/preview", { link: "https://discord.new/abc123" })).status).toBe(403);
+    // A team that doesn't exist is not_found, as the import says it.
+    expect((await call("/v1/teams/nope/discord/preview", { link: "https://discord.new/abc123" })).status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -87,10 +88,13 @@ describe("preview (the callable's checks)", () => {
     expect((await preview()).status).toBe(404);
     fetchMock.mockResolvedValueOnce(new Response("{}", { status: 429 }));
     expect((await preview()).status).toBe(429);
+    // Discord failing or out of reach: unavailable (503), not our own error.
     fetchMock.mockResolvedValueOnce(new Response("{}", { status: 502 }));
-    expect((await preview()).status).toBe(500);
+    const failing = await preview();
+    expect(failing.status).toBe(503);
+    expect(failing.json().error.code).toBe("unavailable");
     fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
-    expect((await preview()).status).toBe(500);
+    expect((await preview()).status).toBe(503);
     fetchMock.mockResolvedValueOnce(new Response("not json", { status: 200 }));
     expect((await preview()).status).toBe(500);
   });
@@ -114,6 +118,26 @@ describe("apply: the team doc (setRoles)", () => {
     expect((await apply({ plan: p }, "chats")).status).toBe(403);
     expect((await apply({ plan: p }, "player")).status).toBe(403);
     expect((await apply({ plan: p }, "owner", "nope")).status).toBe(404);
+  });
+
+  it("two imports at once: the second, planned before the first wrote, adds nothing", async () => {
+    const p = await plan();
+    const before = (await store.list("teams/t1/chats", 100)).length;
+    const transact = store.transact.bind(store);
+    store.transact = async (fn) => {
+      store.transact = transact;
+      // The other import runs to the end between this one's look and its write.
+      expect((await apply({ plan: p })).status).toBe(200);
+      return transact(fn);
+    };
+    const second = await apply({ plan: p });
+    expect(second.status).toBe(412);
+    expect(second.json().error.message).toBe("This team's rooms were just imported. Preview the template again.");
+    expect((await store.list("teams/t1/chats", 100)).length).toBe(before + 7);
+    expect(store.doc("discordImports/t1")).toMatchObject({ seq: 1 });
+    // Asked again, it sees the first import's rooms and reuses them.
+    expect((await apply({ plan: p })).status).toBe(200);
+    expect((await store.list("teams/t1/chats", 100)).length).toBe(before + 7);
   });
 
   it("writes roles, memberRoles and memberPerms only, members untouched (changed().hasOnly)", async () => {

@@ -79,7 +79,7 @@ export class RosterService {
 
   /** Each person's public card, from their profile, or the team's copy of their name. */
   private async cards(uids: string[], names: Record<string, unknown>): Promise<Map<string, RosterPerson>> {
-    const profiles = await Promise.all(uids.map((uid) => this.store.get(`profiles/${uid}`)));
+    const profiles = await this.store.getAll(uids.map((uid) => `profiles/${uid}`));
     return new Map(
       uids.map((uid, i) => {
         const p = profiles[i] ?? {};

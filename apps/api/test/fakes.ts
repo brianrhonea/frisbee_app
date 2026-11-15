@@ -78,7 +78,7 @@ export class FakeTeamRepository implements TeamRepository {
 
 /**
  * Documents in memory, with transactions applied all at once at the end
- * (like Firestore's: reads first, then writes). serverTime is written as
+ * (like Firestore's: reads first, then writes; a read after a write throws). serverTime is written as
  * [now].
  */
 export class FakeStore implements DocStore {
@@ -98,6 +98,12 @@ export class FakeStore implements DocStore {
   async get(path: string) {
     const d = this.docs.get(path);
     return d ? structuredClone(d) : null;
+  }
+
+  getAllCalls = 0;
+  async getAll(paths: string[]) {
+    this.getAllCalls++;
+    return Promise.all(paths.map((p) => this.get(p)));
   }
 
   async list(collection: string, limit: number) {
@@ -147,7 +153,11 @@ export class FakeStore implements DocStore {
   async transact<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
     const writes: Array<() => void> = [];
     const tx: Tx = {
-      get: (path) => this.get(path),
+      // Firestore rejects a read after a write in the same transaction.
+      get: (path) => {
+        if (writes.length) return Promise.reject(new Error(`transaction read of ${path} after a write`));
+        return this.get(path);
+      },
       create: (path, data) =>
         writes.push(() => {
           if (this.docs.has(path)) throw new AlreadyExists(path);

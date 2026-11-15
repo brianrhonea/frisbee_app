@@ -29,6 +29,9 @@ class Repo implements MeRepository {
   async upcomingEvents() {
     return [];
   }
+  async startedEvents() {
+    return [];
+  }
   async followedUsers() {
     return this.follows;
   }
@@ -110,6 +113,28 @@ describe("home feed sources (HomeFeed)", () => {
     const ids = [...first.posts, ...second.posts].map((p: { id: string }) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.slice(0, 4)).toEqual(["m0", "t0", "m1", "t1"]);
+  });
+});
+
+describe("home feed paging when every source is short", () => {
+  it("three short sources merging past a page still give a cursor, and nothing is lost", async () => {
+    const t = setup();
+    t.repo.teams = [{ id: "t1", data: { name: "T1", memberIds: ["me"] } }];
+    t.repo.tournaments = ["tournament_host_x"];
+    t.repo.people.set("pub", { name: "Pub" });
+    for (let i = 0; i < 9; i++) {
+      t.repo.posts.push(post(`m${i}`, i * 3, { authorId: "me" }));
+      t.repo.posts.push(post(`t${i}`, i * 3 + 1, { authorId: "pub", tournamentKey: "tournament_host_x" }));
+      t.repo.posts.push(post(`e${i}`, i * 3 + 2, { authorId: "pub", kind: "event", event: { teamId: "t1", eventId: `e${i}` } }));
+    }
+    const first = (await t.home()).feed;
+    expect(first.posts).toHaveLength(20);
+    expect(first.next).not.toBeNull();
+    const second = (await t.home(first.next)).feed;
+    expect(second.posts).toHaveLength(7);
+    expect(second.next).toBeNull();
+    const ids = [...first.posts, ...second.posts].map((p: { id: string }) => p.id);
+    expect(new Set(ids).size).toBe(27);
   });
 });
 

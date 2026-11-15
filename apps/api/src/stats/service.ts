@@ -235,7 +235,16 @@ export class StatsService {
       const admin = can(team, caller.uid, "manageTeam") && adminSpotValid(spot) && (userId === null || strings(team.memberIds).includes(userId) || userId === was);
       const self = (was === null && userId === caller.uid) || (was === caller.uid && userId === null);
       if (!admin && !self) {
-        throw new ApiError("permission_denied", was === null ? "You can only claim a spot for yourself." : "This spot is linked to someone else.");
+        const manager = can(team, caller.uid, "manageTeam");
+        const message =
+          was !== null && was !== caller.uid && !manager
+            ? "This spot is linked to someone else."
+            : manager
+              ? "Only one of the team's members can be linked to a spot."
+              : was === caller.uid
+                ? "You can only unlink yourself from your spot."
+                : "You can only claim a spot for yourself.";
+        throw new ApiError("permission_denied", message);
       }
       tx.update(paths.player(teamId, id), { userId });
     });

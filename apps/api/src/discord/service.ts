@@ -69,6 +69,12 @@ const p = {
   rooms: (t: string) => `teams/${t}/chats`,
   folder: (t: string, f: string) => `teams/${t}/chatFolders/${f}`,
   folders: (t: string) => `teams/${t}/chatFolders`,
+  /**
+   * API-only (no rule lets clients near it): how many imports have written
+   * to a team. Each import's transaction reads and bumps it, so two at once
+   * can't both add rooms from the same look at what the team had.
+   */
+  mark: (t: string) => `discordImports/${t}`,
 };
 
 function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
@@ -79,7 +85,7 @@ function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
 
 const ownerOnly = () => new ApiError("permission_denied", "Only the owner can import from Discord.");
 const noTeam = () => new ApiError("not_found", "That team doesn't exist.");
-const unreachable = () => new ApiError("internal", "Couldn't reach Discord. Try again in a moment.");
+const unreachable = () => new ApiError("unavailable", "Couldn't reach Discord. Try again in a moment.");
 
 /** The response body as text, refusing more than [max] bytes. */
 async function readCapped(res: Response, max: number): Promise<string> {
@@ -117,6 +123,15 @@ function memberRolesOf(team: Data): Record<string, string[]> {
   return Object.fromEntries(Object.entries(mapOf(team.memberRoles)).map(([uid, ids]) => [uid, strings(ids)]));
 }
 
+interface Chats {
+  folders: ExistingFolder[];
+  rooms: ExistingRoom[];
+  /** discordImports/{teamId}'s count when they were read. */
+  seq: number;
+}
+
+const seqOf = (mark: Data | null) => (typeof mark?.seq === "number" ? mark.seq : 0);
+
 interface Applied {
   teamId: string;
   roles: number;
@@ -143,8 +158,9 @@ export class DiscordService {
     const code = templateCode(link);
     if (code === null) throw new ApiError("invalid_argument", "Paste a server template link, like https://discord.new/abc123.");
     const team = await this.store.get(p.team(teamId));
+    if (!team) throw noTeam();
     // The callable checks members[uid] == 'owner'.
-    if (!team || mapOf(team.members)[caller.uid] !== "owner") throw ownerOnly();
+    if (mapOf(team.members)[caller.uid] !== "owner") throw ownerOnly();
 
     let res: Response;
     try {
@@ -159,7 +175,7 @@ export class DiscordService {
     }
     if (res.status === 404) throw new ApiError("not_found", "Discord doesn't know that template. Check the link, or make a new one.");
     if (res.status === 429) throw new ApiError("resource_exhausted", "Discord is busy. Try again in a minute.");
-    if (!res.ok) throw new ApiError("internal", "Discord couldn't load that template.");
+    if (!res.ok) throw new ApiError("unavailable", "Discord couldn't load that template. Try again in a moment.");
     let text: string;
     try {
       text = await readCapped(res, discordTemplateBytesMax);
@@ -177,12 +193,14 @@ export class DiscordService {
     return mapTemplate(template as GuildTemplate);
   }
 
-  private async chatsOf(teamId: string) {
+  /** The team's folders and rooms, with the import count read first (write() checks it). */
+  private async chatsOf(teamId: string): Promise<Chats> {
+    const mark = await this.store.get(p.mark(teamId));
     const [folders, rooms] = await Promise.all([
       this.store.list(p.folders(teamId), chatRoomLimits.folders * 4),
       this.store.list(p.rooms(teamId), chatRoomLimits.rooms * 2),
     ]);
-    return { folders: existing(folders), rooms: existing(rooms) };
+    return { folders: existing(folders), rooms: existing(rooms), seq: seqOf(mark) };
   }
 
   /**
@@ -260,12 +278,14 @@ export class DiscordService {
   private async write(
     caller: Caller,
     teamId: string,
-    chats: { folders: ExistingFolder[]; rooms: ExistingRoom[] },
+    chats: Chats,
     compute: (team: Data) => { import: DiscordImport; orgRoles?: Record<string, string> } | null,
   ): Promise<Applied | null> {
     return this.store.transact(async (tx) => {
-      const team = await tx.get(p.team(teamId));
+      const [team, mark] = await Promise.all([tx.get(p.team(teamId)), tx.get(p.mark(teamId))]);
       if (!team) throw noTeam();
+      // Another import wrote since [chats] were read: its rooms aren't in them.
+      if (seqOf(mark) !== chats.seq) throw new ApiError("failed_precondition", "This team's rooms were just imported. Preview the template again.");
       // setRoles(): the owner. chats/chatFolders create: manageChats (the owner has it).
       if (!isOwner(team, caller.uid) || !can(team, caller.uid, "manageChats")) throw ownerOnly();
       const planned = compute(team);
@@ -279,6 +299,7 @@ export class DiscordService {
       const members = Object.keys(mapOf(team.members)).filter((u) => ids.has(u));
       const roles = rolesData(i.roles, cleanMemberRoles(memberRolesOf(team), i.roles, members));
       tx.update(p.team(teamId), { ...roles, ...(orgRoles && { orgRoles }) });
+      tx.set(p.mark(teamId), { seq: chats.seq + 1, updatedAt: serverTime });
       for (const f of i.folders) {
         tx.create(p.folder(teamId, docIdParam(f.id)), {
           name: f.name.trim(),

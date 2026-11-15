@@ -218,7 +218,7 @@ export const entryStatusRequestSchema = z.strictObject({
   status: z.enum(["accepted", "waitlisted", "declined", "withdrawn"]),
 });
 
-/** Scores a captain reports or the host sets. */
+/** Scores a captain reports, the other captain confirms (the score they saw) or the host sets. */
 export const scoreRequestSchema = z
   .strictObject({
     scoreA: z.number().int().min(0).max(tournamentLimits.maxScore),

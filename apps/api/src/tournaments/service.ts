@@ -314,7 +314,7 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const r = parse(saveTournamentRequestSchema, body);
     // Managers only get as far as the lists (checked again below).
-    await this.managed(this.store, id, caller.uid);
+    const first = await this.managed(this.store, id, caller.uid);
     const taking = ["status", "divisionId"];
     const [divRows, entries, signups] = await Promise.all([
       this.queries.fields(p.divisions(id), ["division"], 100),
@@ -325,13 +325,26 @@ export class TournamentService {
       ...entries.filter((e) => !["withdrawn", "declined"].includes(e.data.status as string)).map((e) => String(e.data.divisionId)),
       ...signups.filter((s) => !["withdrawn", "declined"].includes(s.data.status as string)).map((s) => String(s.data.divisionId)),
     ]);
-    // Closing an empty division also clears any games it had.
-    const gamesOf = new Map<string, string[]>();
-    for (const d of divRows) {
-      if (!r.divisions.includes(d.data.division as Division)) {
-        gamesOf.set(d.id, await this.queries.ids(p.games(id, d.id), 400));
+    // Closing an empty division also clears any games it had: drained a
+    // page at a time first (a transaction holds 500 writes), once the
+    // request is known to be valid, each page re-checking that the caller
+    // still manages it and the division is still empty.
+    const closing = divRows.filter((d) => !r.divisions.includes(d.data.division as Division)).map((d) => d.id);
+    if (closing.length) {
+      this.checkHosted(first.kind === "league" ? "league" : "tournament", first.entryType === "players" ? "players" : "teams", r);
+      for (const divId of closing) {
+        const d = await this.store.get(p.division(id, divId));
+        if (!d || divisionLocked(d, taken.has(divId))) continue;
+        await this.drain(p.games(id, divId), async (tx) => {
+          await this.managed(tx, id, caller.uid);
+          const now = await tx.get(p.division(id, divId));
+          if (now && divisionLocked(now, false)) throw new ApiError("failed_precondition", "A division you're closing just took teams. Try again.");
+        });
       }
     }
+    // Any game added since (a few at most) goes with the division.
+    const gamesOf = new Map<string, string[]>();
+    for (const divId of closing) gamesOf.set(divId, await this.queries.ids(p.games(id, divId), 100));
     await this.store.transact(async (tx) => {
       const t = await this.managed(tx, id, caller.uid);
       const hostId = safeId(t.hostId) as string;
@@ -354,7 +367,7 @@ export class TournamentService {
       const open = new Set<Division>();
       for (const divId of order) {
         const d = stored.get(divId) as Data;
-        const locked = strings(d.seeds).length > 0 || (Array.isArray(d.teams) && d.teams.length > 0) || taken.has(divId);
+        const locked = divisionLocked(d, taken.has(divId));
         const wanted = r.divisions.includes(d.division as Division);
         if (!wanted && !locked) {
           const draft = `tournaments/${id}/drafts/${divId}`;
@@ -724,12 +737,17 @@ export class TournamentService {
     return this.queries.ids(p.games(id, divId), listMax);
   }
 
-  /** confirm()'s checks: a report on [g], and the caller captains the other team. */
-  private confirmable(d: Data, g: EngineGame, uid: string) {
+  /**
+   * confirm()'s checks: a report on [g], the caller captains the other
+   * team, and [s] is the reported score (the rule's `d.scoreA ==
+   * g.report.scoreA`): a report filed again meanwhile isn't confirmed unseen.
+   */
+  private confirmable(d: Data, g: EngineGame, uid: string, s: { scoreA: number; scoreB: number }) {
     const r = g.report;
     if (g.status !== "reported" || !r) throw new ApiError("failed_precondition", "There's no score to confirm.");
     const other = r.byTeam === g.teamA ? g.teamB : g.teamA;
     if (!this.captainOf(d, other, uid)) throw new ApiError("permission_denied", "The other team's captain confirms the score.");
+    if (r.scoreA !== s.scoreA || r.scoreB !== s.scoreB) throw new ApiError("failed_precondition", "The reported score changed. Check it again.");
     return r;
   }
 
@@ -756,16 +774,20 @@ export class TournamentService {
     });
   }
 
-  /** confirm(): the other team's captain confirms a report; the teams move on (advance()). */
-  async confirm(caller: Caller, rawId: unknown, rawDiv: unknown, rawGame: unknown): Promise<void> {
+  /**
+   * confirm(): the other team's captain confirms a report; the teams move
+   * on (advance()). [body] is the score being confirmed ({scoreA, scoreB}).
+   */
+  async confirm(caller: Caller, rawId: unknown, rawDiv: unknown, rawGame: unknown, body: unknown): Promise<void> {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     const gameId = docIdParam(rawGame);
+    const s = parse(scoreRequestSchema, body);
     // Only the other captain gets as far as listing the games (checked again below).
     await this.visible(this.store, id, caller.uid);
     const [division, game] = await Promise.all([this.store.get(p.division(id, divId)), this.store.get(p.game(id, divId, gameId))]);
     if (!division || !game) throw new ApiError("not_found", "That game doesn't exist.");
-    this.confirmable(division, engineGame(gameId, game), caller.uid);
+    this.confirmable(division, engineGame(gameId, game), caller.uid, s);
     const ids = await this.gameIds(id, divId);
     await this.store.transact(async (tx) => {
       await this.visible(tx, id, caller.uid);
@@ -773,7 +795,7 @@ export class TournamentService {
       const games = await this.gamesIn(tx, id, divId, ids);
       const g = games.find((x) => x.id === gameId);
       if (!d || !g) throw new ApiError("not_found", "That game doesn't exist.");
-      const r = this.confirmable(d, g, caller.uid);
+      const r = this.confirmable(d, g, caller.uid, s);
       const done: EngineGame = { ...g, status: "done", scoreA: r.scoreA, scoreB: r.scoreB, report: null };
       tx.update(p.game(id, divId, gameId), { status: "done", scoreA: r.scoreA, scoreB: r.scoreB, report: null });
       for (const f of fillsAfter(done, games)) tx.update(p.game(id, divId, f.gameId), fillUpdate(f));
@@ -828,81 +850,159 @@ export class TournamentService {
     const id = docIdParam(rawId);
     const divId = docIdParam(rawDiv);
     // Managers only get as far as the lists (checked again below).
-    await this.managed(this.store, id, caller.uid);
-    if (!(await this.store.get(p.division(id, divId)))) throw noDivision();
-    const [ids, entryIds, divIds] = await Promise.all([this.gameIds(id, divId), this.queries.ids(p.entries(id), listMax), this.queries.ids(p.divisions(id), 100)]);
+    const tour = await this.managed(this.store, id, caller.uid);
+    const division = await this.store.get(p.division(id, divId));
+    if (!division) throw noDivision();
+    // A first look from small queries: the division's own entries and the
+    // games' engine fields. Most looks change nothing, and need no
+    // transaction; one that does reads again only what it may change.
+    const [gameRows, entryRows] = await Promise.all([
+      this.queries.fields(p.games(id, divId), engineGameFields, listMax),
+      this.queries.fields(p.entries(id), ["status", "divisionId", "captainIds"], listMax, { divisionId: divId }),
+    ]);
+    // A seed's entry may name another division now (moved, then withdrawn).
+    const entries = new Map(entryRows.map((e) => [e.id, e.data]));
+    const elsewhere = strings(division.seeds)
+      .map(safeId)
+      .filter((s): s is string => s !== null && !entries.has(s));
+    const moved = await this.store.getAll(elsewhere.map((s) => p.entry(id, s)));
+    elsewhere.forEach((s, i) => {
+      const e = moved[i];
+      if (e) entries.set(s, e);
+    });
+    const seen = reconcilePlan({
+      t: tour,
+      d: division,
+      divId,
+      games: gameRows.map((g) => engineGame(g.id, g.data)).sort((a, b) => a.order - b.order),
+      allGames: true,
+      entries,
+      others: null,
+    });
+    if (seen.changed.length === 0) return { changed: [] };
+    const placing = seen.changed.includes("placements");
+    // With no games (unpublished seeds), "every game" is none.
+    const full = placing || gameRows.length === 0;
+    // The games it may fill and the games they're filled from, a finished
+    // one if it goes live, or every game when recording places.
+    const fillIds = new Set(seen.fills.map((f) => f.gameId));
+    const reread = full
+      ? gameRows.map((g) => g.id)
+      : [
+          ...new Set([
+            ...seen.games.filter((g) => fillIds.has(g.id)).flatMap((g) => [g.id, sourceGame(g.sourceA), sourceGame(g.sourceB)]),
+            ...(seen.changed.includes("live") ? [seen.games.find(isDone)?.id] : []),
+          ]),
+        ].filter((x): x is string => !!x);
+    const divIds = placing ? await this.queries.ids(p.divisions(id), 100) : [];
     return this.store.transact(async (tx) => {
       const t = await this.managed(tx, id, caller.uid);
       const d = await tx.get(p.division(id, divId));
       if (!d) throw noDivision();
-      const others: Data[] = [];
-      for (const other of divIds) {
-        if (other === divId) continue;
-        const o = await tx.get(p.division(id, other));
-        if (o) others.push(o);
+      let others: Data[] | null = null;
+      if (placing) {
+        others = [];
+        for (const other of divIds) {
+          if (other === divId) continue;
+          const o = await tx.get(p.division(id, other));
+          if (o) others.push(o);
+        }
       }
+      // The division's entries and every seed's (a seed's entry may have moved).
       const entries = new Map<string, Data>();
-      for (const teamId of entryIds) {
+      for (const teamId of new Set([...entryRows.map((e) => e.id), ...strings(d.seeds).map(safeId).filter((s): s is string => s !== null)])) {
         const e = await tx.get(p.entry(id, teamId));
         if (e) entries.set(teamId, e);
       }
-      const games = await this.gamesIn(tx, id, divId, ids);
-      const changed: string[] = [];
-
-      const fills = pendingFills(games);
-      for (const f of fills) tx.update(p.game(id, divId, f.gameId), fillUpdate(f));
-      if (fills.length) changed.push("fills");
-
-      let status = statusOf(t);
-      if (status === "scheduled" && games.some(isDone)) {
-        status = "live";
-        changed.push("live");
+      const games = await this.gamesIn(tx, id, divId, reread);
+      const plan = reconcilePlan({ t, d, divId, games, allGames: full, entries, others });
+      for (const f of plan.fills) tx.update(p.game(id, divId, f.gameId), fillUpdate(f));
+      if (Object.keys(plan.change).length) {
+        checkDivision(divisionDoc(d, plan.change));
+        tx.update(p.division(id, divId), plan.change);
       }
-
-      const change: Data = {};
-      const seeds = strings(d.seeds);
-      if (games.length === 0) {
-        const gone = seeds.filter((s) => entries.get(s)?.status === "withdrawn");
-        if (gone.length) {
-          change.seeds = seeds.filter((s) => !gone.includes(s));
-          change.captains = Object.fromEntries(Object.entries(mapOf(d.captains)).filter(([k]) => !gone.includes(k)));
-          changed.push("withdrawn");
-        }
-      }
-      const captains = mapOf(change.captains ?? d.captains);
-      let synced = false;
-      for (const [teamId, e] of entries) {
-        if (e.status !== "accepted" || e.divisionId !== divId || !strings(change.seeds ?? d.seeds).includes(teamId)) continue;
-        const want = strings(e.captainIds);
-        const have = strings(captains[teamId]);
-        if (want.length !== have.length || want.some((u, i) => have[i] !== u)) {
-          captains[teamId] = want;
-          synced = true;
-        }
-      }
-      if (synced) {
-        change.captains = captains;
-        changed.push("captains");
-      }
-
-      if (strings(d.placements).length === 0 && fills.length === 0) {
-        const fmt = formatOf({ kind: t.kind as "league", season: (t.season as never) ?? null }, { settings: { format: mapOf(d.settings).format as TournamentFormat } });
-        const places = placementsOf(fmt, seeds, games);
-        if (places.length > 0 && gamesToPlay(games).length === 0) {
-          change.placements = places;
-          changed.push("placements");
-          if (others.every((o) => strings(o.placements).length > 0)) {
-            status = "finished";
-            changed.push("finished");
-          }
-        }
-      }
-      if (Object.keys(change).length) {
-        checkDivision(divisionDoc(d, change));
-        tx.update(p.division(id, divId), change);
-      }
-      if (status !== statusOf(t)) tx.update(p.tournament(id), { status });
-      return { changed };
+      if (plan.status !== statusOf(t)) tx.update(p.tournament(id), { status: plan.status });
+      return { changed: plan.changed };
     });
   }
+}
+
+/** A division that stays open: it has seeds or teams, or [taken] (people or teams signed up). */
+const divisionLocked = (d: Data, taken: boolean) => strings(d.seeds).length > 0 || (Array.isArray(d.teams) && d.teams.length > 0) || taken;
+
+/** The game fields engineGame reads (reconcile's first look). */
+const engineGameFields = [
+  "order", "stage", "round", "label", "pool", "field", "startsAt", "teamA", "teamB",
+  "sourceA", "sourceB", "status", "scoreA", "scoreB", "report", "ifNeeded", "place",
+] as const;
+
+/** The game a winner/loser slot is filled from. */
+const sourceGame = (s: EngineGame["sourceA"]) => (s && (s.type === "winner" || s.type === "loser") ? s.game : null);
+
+/**
+ * What reconcile changes, from what it read: [games] are every game of
+ * the division if [allGames], else only those it may fill (and their
+ * sources), so places aren't worked out; [others] are the other
+ * divisions, read only when recording places (null otherwise).
+ */
+function reconcilePlan(r: {
+  t: Data;
+  d: Data;
+  divId: string;
+  games: EngineGame[];
+  allGames: boolean;
+  entries: Map<string, Data>;
+  others: Data[] | null;
+}): { fills: ReturnType<typeof pendingFills>; status: HostedStatus; change: Data; changed: string[]; games: EngineGame[] } {
+  const { t, d, divId, games, entries } = r;
+  const changed: string[] = [];
+  const fills = pendingFills(games);
+  if (fills.length) changed.push("fills");
+
+  let status = statusOf(t);
+  if (status === "scheduled" && games.some(isDone)) {
+    status = "live";
+    changed.push("live");
+  }
+
+  const change: Data = {};
+  const seeds = strings(d.seeds);
+  if (r.allGames && games.length === 0) {
+    const gone = seeds.filter((s) => entries.get(s)?.status === "withdrawn");
+    if (gone.length) {
+      change.seeds = seeds.filter((s) => !gone.includes(s));
+      change.captains = Object.fromEntries(Object.entries(mapOf(d.captains)).filter(([k]) => !gone.includes(k)));
+      changed.push("withdrawn");
+    }
+  }
+  const captains = mapOf(change.captains ?? d.captains);
+  let synced = false;
+  for (const [teamId, e] of entries) {
+    if (e.status !== "accepted" || e.divisionId !== divId || !strings(change.seeds ?? d.seeds).includes(teamId)) continue;
+    const want = strings(e.captainIds);
+    const have = strings(captains[teamId]);
+    if (want.length !== have.length || want.some((u, i) => have[i] !== u)) {
+      captains[teamId] = want;
+      synced = true;
+    }
+  }
+  if (synced) {
+    change.captains = captains;
+    changed.push("captains");
+  }
+
+  if (r.allGames && strings(d.placements).length === 0 && fills.length === 0) {
+    const fmt = formatOf({ kind: t.kind as "league", season: (t.season as never) ?? null }, { settings: { format: mapOf(d.settings).format as TournamentFormat } });
+    const places = placementsOf(fmt, seeds, games);
+    if (places.length > 0 && gamesToPlay(games).length === 0) {
+      change.placements = places;
+      changed.push("placements");
+      // The first look doesn't read the other divisions: finishing is decided in the transaction.
+      if (r.others?.every((o) => strings(o.placements).length > 0)) {
+        status = "finished";
+        changed.push("finished");
+      }
+    }
+  }
+  return { fills, status, change, changed, games };
 }

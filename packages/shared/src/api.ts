@@ -11,6 +11,8 @@ export const apiErrorCodes = [
   "failed_precondition",
   "resource_exhausted",
   "internal",
+  /** A service the API depends on (Discord, say) can't be reached; try again later. */
+  "unavailable",
 ] as const;
 export type ApiErrorCode = (typeof apiErrorCodes)[number];
 
@@ -23,6 +25,7 @@ export const apiErrorStatus: Record<ApiErrorCode, number> = {
   failed_precondition: 412,
   resource_exhausted: 429,
   internal: 500,
+  unavailable: 503,
 };
 
 /** Every non-2xx response body. */

@@ -164,6 +164,13 @@ describe("save (allow update)", () => {
     expect((await call("PUT", `${base}/${id}`, draft({ name: "Renamed" }))).status).toBe(204);
     expect(store.doc(tPath(id))!.status).toBe("scheduled");
   });
+  it("saving a finished one keeps it finished", async () => {
+    const id = await published();
+    store.put(tPath(id), { ...store.doc(tPath(id))!, status: "done" });
+    expect((await call("PUT", `${base}/${id}`, draft({ name: "Renamed" }))).status).toBe(204);
+    expect(store.doc(tPath(id))).toMatchObject({ status: "done", name: "Renamed" });
+    expect(store.doc(`tournamentDirectory/g1_${id}`)!.status).toBe("done");
+  });
 });
 
 describe("publish (games: allow create, delete; tournament update)", () => {

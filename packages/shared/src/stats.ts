@@ -7,6 +7,7 @@
 // calculations, the tracker and its save scheduling are ports of the app's
 // models and GameTrackerViewModel, so the website and the app agree.
 import { z } from "zod";
+import { isoDateTime } from "./dates.js";
 
 // ---- Shapes ------------------------------------------------------------------
 
@@ -245,13 +246,8 @@ const refId = z
   .min(1)
   .max(statsLimits.refId)
   .refine((s) => !s.includes("/"), "Invalid id.");
-const firestoreMin = Date.UTC(1, 0, 1) - 0;
-const firestoreMax = Date.UTC(9999, 11, 31, 23, 59, 59, 999);
-/** An ISO date Firestore can store as a timestamp. */
-const isoDate = z.string().refine((s) => {
-  const t = Date.parse(s);
-  return !Number.isNaN(t) && t >= firestoreMin && t <= firestoreMax;
-}, "Give a date.");
+/** An ISO date (with Z or an offset) Firestore can store as a timestamp. */
+const isoDate = isoDateTime("Give a date.");
 
 export const statActionSchema = z
   .strictObject({
