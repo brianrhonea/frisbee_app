@@ -170,6 +170,7 @@ describe("apply: folders and rooms (validFolder, validRoom, validAccess)", () =>
       expect(Object.keys(r).sort()).toEqual(["createdAt", "createdBy", "folderId", "kind", "name", "position", "readRoles", "readUsers", "writeRoles", "writeUsers"]);
       expect(r.kind).toBe("text");
       expect(r.createdBy).toBe("owner");
+      expect(r.createdAt).toEqual(new Date(now));
     }
   });
 
@@ -255,6 +256,13 @@ describe("apply in a community with teams (the app's _apply order)", () => {
     expect(store.doc("teams/org/chats/old")).toBeUndefined();
     expect(store.doc("teams/org/chats/gen")).toBeDefined();
     expect(docsUnder("teams/theirs/chats/")).toHaveLength(0);
+  });
+
+  it("stays within 50 community role copies on a team (orgRoles.size() <= 50)", async () => {
+    const stale = Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`c${i}`, `gone${i}`]));
+    store.put("teams/woof", { ...store.doc("teams/woof")!, orgRoles: stale });
+    expect((await apply({ plan: await orgPlan() }, "owner", "org")).status).toBe(412);
+    expect(docsUnder("teams/woof/chats/")).toHaveLength(0);
   });
 
   it("keeps rooms for teams the caller doesn't own in the community", async () => {

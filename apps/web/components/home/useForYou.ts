@@ -157,7 +157,8 @@ export function useForYou(uid: string | undefined, myTeams: Array<{ id: string; 
     }
     return oldest;
   };
-  const usersOldest = users.next !== null ? oldestOf(users.posts) : null;
+  // The API filters a page after setting its cursor, so the cursor is how far it has read.
+  const usersOldest = users.next;
 
   const cutoff = useMemo(() => {
     let c: number | null = usersOldest;

@@ -100,6 +100,18 @@ describe("event posts (validSharedEvent, sharesOwnTeamEvent)", () => {
     expect((await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "gone", teamId: null } })).status).toBe(404);
   });
 
+  it("needs a start time, files an unknown type as other, and clips location and team name (validSharedEvent)", async () => {
+    store.put("users/me/events/nostart", { title: "When?" });
+    expect((await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "nostart", teamId: null } })).status).toBe(412);
+    store.put("teams/t1", { ...store.doc("teams/t1")!, name: "N".repeat(150) });
+    store.put("teams/t1/events/odd", { title: "Odd", type: "party", startsAt: new Date(now), location: "L".repeat(250) });
+    const res = await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "odd", teamId: "t1" } });
+    const ev = store.doc(`posts/${res.json().id}`)!.event as Record<string, string>;
+    expect(ev.type).toBe("other");
+    expect(ev.location).toHaveLength(200);
+    expect(ev.teamName).toHaveLength(100);
+  });
+
   it("is an event post only: no workout, photos or links with it (kind == 'event' && workout == null)", async () => {
     expect((await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "m1", teamId: null }, links: ["https://x.test"] })).status).toBe(400);
     expect((await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "m1", teamId: null }, workout: { activity: "run", durationMinutes: 10 } })).status).toBe(400);
