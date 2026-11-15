@@ -213,9 +213,12 @@ everything the app does on the website alone, styled like the website
    payments and posting event news from the website still to come). The draft callables'
    logic is ported into the API; the app keeps the callables until it
    switches.
-6. W7: [ ] team meetings and voice rooms (LiveKit web SDK, tokens from
-   the API; needs the LiveKit secrets on Cloud Run). Recording stays
-   deferred.
+6. W7: [x] team meetings and voice rooms (LiveKit web SDK, tokens from
+   the API; api 0.20.0, web 0.21.0; needs the LiveKit secrets on Cloud
+   Run). Recording stays deferred. Not yet on the website: device
+   pickers and camera preview, output volume, older call chat, a voice
+   call that stays up across pages, and meetings on the schedule (they
+   have their own tab).
 7. Posts: [ ] video in posts (waits on the transcode job); [ ] feed tabs;
    [ ] Discord import.
 

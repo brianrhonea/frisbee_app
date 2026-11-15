@@ -18,7 +18,7 @@ const rules: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [/^\/messages$/, () => "/messages"],
   [new RegExp(`^/my-events/${id}$`), () => "/schedule"],
   [new RegExp(`^/team-events/${id}/${id}$`), (m) => `/teams/${m[1]}/schedule?event=${encodeURIComponent(m[2]!)}`],
-  [new RegExp(`^/team-meetings/${id}/${id}(/room)?$`), (m) => `/teams/${m[1]}`],
+  [new RegExp(`^/team-meetings/${id}/${id}(/room)?$`), (m) => `/teams/${m[1]}/meetings/${encodeURIComponent(m[2]!)}${m[3] ?? ""}`],
   [/^\/teams$/, () => "/teams"],
   [new RegExp(`^/teams/${id}$`), (m) => `/teams/${m[1]}`],
   [new RegExp(`^/teams/${id}/chats/${id}$`), (m) => `/teams/${m[1]}/chat?room=${encodeURIComponent(m[2]!)}`],

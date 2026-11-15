@@ -7,6 +7,21 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.20.0 — 2026-11-14
+
+**Added**
+- Meeting and voice channel tokens:
+  `POST /v1/teams/:teamId/meetings/:meetingId/token` and
+  `POST /v1/teams/:teamId/voice-rooms/:roomId/token`, ports of the
+  `meetings-joinToken` and `meetings-voiceToken` callables (same checks,
+  grants, messages and 6 h lifetime), 30 a minute per caller. They answer
+  412 until `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` are
+  set (see DEPLOY.md).
+- Meetings (`/v1/teams/:teamId/meetings`): schedule, edit, cancel, RSVP,
+  start and end; join requests (ask, take back, let in or turn away);
+  watch together state (`playback/current`, 60 a minute); the call's chat.
+  Each ports the `match /meetings` rules.
+
 ## 0.19.0 — 2026-11-14
 
 **Added**

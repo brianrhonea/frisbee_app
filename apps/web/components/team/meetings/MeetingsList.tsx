@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
-import { MeetingAlerts } from "./MeetingAlerts";
 import { audienceLine, type Meeting, meetingHref, meetingsHref, roomHref, useTeamMeetings, whenLine } from "./model";
 import "./meetings.css";
 
@@ -38,7 +37,6 @@ export function MeetingsList() {
 
   return (
     <div className="stack meetings">
-      <MeetingAlerts />
       <div className="home-actions meetings-actions">
         {admin && (
           <Link className="btn btn-primary btn-small" href={`${meetingsHref(teamId)}/new`}>

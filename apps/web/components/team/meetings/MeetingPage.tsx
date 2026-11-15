@@ -8,7 +8,6 @@ import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "../../AuthProvider";
 import { type TeamDoc, useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
-import { MeetingAlerts } from "./MeetingAlerts";
 import { audienceLine, canSee, inviteTier, isEditorTier, type MeetingData, meetingApi, meetingHref, meetingsHref, needsApproval, roomHref, whenLine } from "./model";
 import "./meetings.css";
 
@@ -83,7 +82,6 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
 
   return (
     <div className="stack meeting-page">
-      <MeetingAlerts />
       {back}
       <section className="card">
         <div className="card-head">

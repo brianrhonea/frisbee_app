@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { type FormEvent, type ReactNode, useEffect } from "react";
 import { requestHomeRefresh } from "@/lib/homeRefresh";
 import { useAuth } from "./AuthProvider";
+import { MeetingAlerts } from "./team/meetings/MeetingAlerts";
 import { HeaderAuth } from "./HeaderAuth";
 import { BrandCard } from "./HomeCards";
 import { NavIcon, type NavIconName } from "./NavIcons";
@@ -209,6 +210,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
 
       <div className="frame-main">
         <main>{children}</main>
+        {user && <MeetingAlerts />}
         {footer}
       </div>
 

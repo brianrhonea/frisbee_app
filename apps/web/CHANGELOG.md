@@ -4,6 +4,22 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.21.0 — 2026-11-14
+
+Needs API 0.20.0, with the LiveKit settings for calls.
+
+**Added**
+- Meetings: a team's Meetings tab (live, upcoming, past); admins schedule
+  and edit them; each meeting's page with RSVPs; the room with a lobby,
+  camera, mic and screen share (asked for only on joining), people and
+  volumes, letting people in, the call's chat and end for everyone.
+- Watch together: admins play a team video (upload or YouTube) and
+  everyone's player follows, in step with the app.
+- "Meeting started" pop-ups on every page; meeting notifications open the
+  meeting.
+- Voice channels in team chat: join, mute, leave; members who can only
+  read a room listen.
+
 ## 0.20.0 — 2026-11-14
 
 Needs API 0.19.0.

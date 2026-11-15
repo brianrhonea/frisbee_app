@@ -49,7 +49,8 @@ describe("webRoute", () => {
     expect(webRoute("/teams/t1/events")).toBe("/teams/t1/schedule");
     expect(webRoute("/teams/t1/members")).toBe("/teams/t1/roster");
     expect(webRoute("/team-events/t1/e1")).toBe("/teams/t1/schedule?event=e1");
-    expect(webRoute("/team-meetings/t1/m1/room")).toBe("/teams/t1");
+    expect(webRoute("/team-meetings/t1/m1/room")).toBe("/teams/t1/meetings/m1/room");
+    expect(webRoute("/team-meetings/t1/m1")).toBe("/teams/t1/meetings/m1");
     expect(webRoute("/my-events/e1")).toBe("/schedule");
     expect(webRoute("/tournaments/t1/live-draft/d1")).toBe("/events");
     expect(webRoute("/somewhere/new")).toBe(appOnlyRoute);
