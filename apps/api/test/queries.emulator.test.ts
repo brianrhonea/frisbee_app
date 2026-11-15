@@ -45,4 +45,12 @@ describe("FirestoreDocQueries", () => {
     expect(rows[0].data).toEqual({ status: "accepted", startsAt: new Date(0) });
     expect(rows[1].data).toEqual({ status: "applied", startsAt: null });
   });
+
+  it("fields: with equality filters", async () => {
+    const rows = await q.fields(col, ["status"], 10, { tournamentId: "x", status: "accepted" });
+    expect(rows).toEqual([
+      { id: "a", data: { status: "accepted" } },
+      { id: "d", data: { status: "accepted" } },
+    ]);
+  });
 });

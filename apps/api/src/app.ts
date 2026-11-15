@@ -164,7 +164,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
     profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);
     accountRoutes(app, new AccountService(deps.store, deps.users, deps.media), revalidate);
-    teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media));
+    const queries = deps.queries ?? listDocQueries(deps.store);
+    teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media, queries));
     if (deps.personal) personalRoutes(app, new PersonalService(deps.store, deps.users, deps.personal, deps.now));
     rosterRoutes(app, new RosterService(deps.store));
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate);
@@ -175,7 +176,6 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     discordRoutes(app, new DiscordService(deps.store, new ChatAdmin(deps.store, deps.teams, deps.media)), writes);
     playbookRoutes(app, new PlaybookService(deps.store), writes);
     meetingRoutes(app, new MeetingService(deps.store, deps.users, deps.teams, deps.livekit, deps.now), writes);
-    const queries = deps.queries ?? listDocQueries(deps.store);
     videoRoutes(app, new VideoService(deps.store, deps.users, deps.media, queries), writes);
     draftRoutes(app, new DraftService(deps.store, deps.draftQueries ?? listDraftQueries(deps.store)), writes);
     statsRoutes(app, new StatsService(deps.store, queries), writes);

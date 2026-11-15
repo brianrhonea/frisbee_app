@@ -14,8 +14,8 @@ export type Where = Record<string, string | boolean>;
 export interface DocQueries {
   /** Ids of up to [limit] documents of [collection] matching [where], in id order. */
   ids(collection: string, limit: number, where?: Where): Promise<string[]>;
-  /** Up to [limit] documents of [collection], in id order, with only [fields]. */
-  fields(collection: string, fields: readonly string[], limit: number): Promise<Array<{ id: string; data: Data }>>;
+  /** Up to [limit] documents of [collection] matching [where], in id order, with only [fields]. */
+  fields(collection: string, fields: readonly string[], limit: number, where?: Where): Promise<Array<{ id: string; data: Data }>>;
 }
 
 export class FirestoreDocQueries implements DocQueries {
@@ -33,8 +33,8 @@ export class FirestoreDocQueries implements DocQueries {
     return snap.docs.map((d) => d.id);
   }
 
-  async fields(collection: string, fields: readonly string[], limit: number) {
-    const snap = await this.query(collection)
+  async fields(collection: string, fields: readonly string[], limit: number, where?: Where) {
+    const snap = await this.query(collection, where)
       .select(...fields)
       .limit(limit)
       .get();
@@ -53,9 +53,12 @@ export function listDocQueries(store: DocStore, cap = 5000): DocQueries {
         .slice(0, limit)
         .map((d) => d.id);
     },
-    async fields(collection, fields, limit) {
-      const all = await store.list(collection, limit);
-      return all.map((d) => ({ id: d.id, data: Object.fromEntries(fields.filter((f) => f in d.data).map((f) => [f, d.data[f]])) }));
+    async fields(collection, fields, limit, where = {}) {
+      const all = await store.list(collection, Object.keys(where).length ? cap : limit);
+      return all
+        .filter((d) => matches(d.data, where))
+        .slice(0, limit)
+        .map((d) => ({ id: d.id, data: Object.fromEntries(fields.filter((f) => f in d.data).map((f) => [f, d.data[f]])) }));
     },
   };
 }
