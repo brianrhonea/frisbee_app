@@ -172,6 +172,7 @@ export class UploadService {
     const parsed = createUploadRequestSchema.safeParse(body ?? {});
     if (!parsed.success) throw fromZod(parsed.error);
     const { purpose, contentType, size, targetId, itemId, name } = parsed.data;
+    if (purpose !== "chat" && isVideoType(contentType) && !this.opts.queue) throw new ApiError("failed_precondition", videosNotYet);
     await this.checkTarget(caller.uid, purpose, targetId);
     // The URL takes up to the limit for the declared kind (and, in chat, name).
     const maxBytes = uploadMax(purpose, contentType, name) ?? uploadLimits[purpose].image;
@@ -244,8 +245,14 @@ export class UploadService {
     }
 
     if (type != null && isVideoType(type)) {
+      if (!this.opts.queue) {
+        await this.reject(id, rawPath, videosNotYet);
+        throw new ApiError("failed_precondition", videosNotYet);
+      }
       const out = videoOutputs(folder, id);
-      await this.store.transact(async (tx) => {
+      const current = await this.store.transact(async (tx) => {
+        const now = await tx.get(`uploads/${id}`);
+        if (now?.status !== "pending") return now ?? {};
         tx.update(`uploads/${id}`, {
           status: nextStatus(status, "video_queued"),
           sniffedType: type,
@@ -260,8 +267,11 @@ export class UploadService {
           status: "queued",
           createdAt: serverTime,
         });
+        return null;
       });
-      await this.opts.queue?.enqueue(id);
+      // Another complete queued it, or it was removed meanwhile.
+      if (current) return answer(id, current);
+      await this.opts.queue.enqueue(id);
       return { id, status: "processing" };
     }
 
@@ -290,7 +300,30 @@ export class UploadService {
       height: image.height,
       updatedAt: serverTime,
     };
-    await this.store.transact(async (tx) => tx.update(`uploads/${id}`, done));
+    return this.finish(id, rawPath, done, [path, thumbPath]);
+  }
+
+  /**
+   * Saves [done] on upload [id] if it's still pending, in a transaction that
+   * reads it again: a DELETE /v1/uploads/:id or another complete may have
+   * run while this one compressed or copied. If one did, the files this
+   * complete [written] that the upload doesn't now name are deleted (a
+   * removed upload names none), and the upload is answered as it stands.
+   */
+  private async finish(id: string, rawPath: string, done: Data, written: string[]): Promise<CompleteUploadResponse> {
+    const current = await this.store.transact(async (tx) => {
+      const now = await tx.get(`uploads/${id}`);
+      if (now?.status !== "pending") return now ?? { status: "removed" };
+      tx.update(`uploads/${id}`, done);
+      return null;
+    });
+    if (current) {
+      const kept = current.status === "removed" ? [] : [current.path, current.thumbPath];
+      const orphans = written.filter((p) => !kept.includes(p));
+      await Promise.all(orphans.map((p) => this.storage.delete(p).catch(() => undefined)));
+      if (current.status === "removed") await this.storage.delete(rawPath).catch(() => undefined);
+      return answer(id, current);
+    }
     await this.storage.delete(rawPath).catch(() => undefined);
     return answer(id, done);
   }
@@ -345,9 +378,7 @@ export class UploadService {
       contentType,
       updatedAt: serverTime,
     };
-    await this.store.transact(async (tx) => tx.update(`uploads/${id}`, done));
-    await this.storage.delete(rawPath).catch(() => undefined);
-    return answer(id, done);
+    return this.finish(id, rawPath, done, [path]);
   }
 
   /**
@@ -377,13 +408,22 @@ export class UploadService {
     await Promise.all(paths.map((p) => this.storage.delete(p).catch(() => undefined)));
   }
 
+  /** Marks a still-pending upload failed with [error] (a removed one stays removed), and deletes its raw file. */
   private async reject(id: string, rawPath: string, error: string) {
-    await this.store.transact(async (tx) =>
-      tx.update(`uploads/${id}`, { status: nextStatus("pending", "rejected"), error, updatedAt: serverTime }),
-    );
+    await this.store.transact(async (tx) => {
+      const now = await tx.get(`uploads/${id}`);
+      if (now?.status !== "pending") return;
+      tx.update(`uploads/${id}`, { status: nextStatus("pending", "rejected"), error, updatedAt: serverTime });
+    });
     await this.storage.delete(rawPath).catch(() => undefined);
   }
 }
+
+/**
+ * Videos outside chat wait on the transcode job (ARCHITECTURE.md §10 item
+ * 4): until a queue is wired, they're refused rather than left processing.
+ */
+const videosNotYet = "Video uploads aren't available here yet.";
 
 const quotaPath = (uid: string) => `uploadQuotas/${uid}`;
 

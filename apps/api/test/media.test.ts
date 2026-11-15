@@ -336,6 +336,25 @@ describe("uploads API", () => {
     expect(queued).toEqual([id]);
   });
 
+  it("refuses videos outside chat while there's no transcode job, up front and by their bytes", async () => {
+    const bare = buildApp({ verifier: new FakeVerifier(), users: new FakeUsers(), teams: new FakeTeamRepository(), store, media: storage, now: () => now });
+    const post = (url: string, body: object = {}) => bare.inject({ method: "POST", url, payload: body, headers: { authorization: "Bearer token:u1" } });
+    const asked = await post("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "video/mp4", size: 1000 });
+    expect(asked.statusCode).toBe(412);
+    expect(asked.json().error.message).toBe("Video uploads aren't available here yet.");
+    // Declared a photo, actually a video.
+    const res = await post("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "image/jpeg", size: 1000 });
+    const { id } = res.json();
+    storage.files.set(`uploads/raw/u1/${id}`, { data: samples["video/mp4"] });
+    expect((await post(`/v1/uploads/${id}/complete`)).statusCode).toBe(412);
+    expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "failed" });
+    expect(store.doc(`transcodeJobs/${id}`)).toBeUndefined();
+    expect(storage.files.has(`uploads/raw/u1/${id}`)).toBe(false);
+    // Chat videos are stored as sent, so they still work.
+    const chat = await post("/v1/uploads", { purpose: "chat", targetId: "conversations/u1_u2", itemId: "m1", contentType: "video/mp4", name: "c.mp4", size: 1000 });
+    expect(chat.statusCode).toBe(201);
+  });
+
   describe("chat files and videos, stored as sent like the app's (storage.rules attachmentSizeOk)", () => {
     const MB = 1024 * 1024;
     const dm = { purpose: "chat", targetId: "conversations/u1_u2", itemId: "m1" };
@@ -551,6 +570,60 @@ describe("uploads API", () => {
       storage.copy = copy;
       expect((await call(`/v1/uploads/${id}/complete`)).statusCode).toBe(200);
       expect(store.doc("uploadQuotas/u1")).toMatchObject({ files: 1, bytes: pdf.length });
+    });
+
+    it("a file removed while its complete is saving it stays removed, and what was saved is deleted", async () => {
+      const res = await call("/v1/uploads", { ...dm, contentType: "application/pdf", name: "race.pdf", size: pdf.length });
+      const { id } = res.json();
+      storage.files.set(`uploads/raw/u1/${id}`, { data: pdf });
+      const copy = storage.copy.bind(storage);
+      storage.copy = async (...args: Parameters<typeof copy>) => {
+        await copy(...args);
+        expect((await del(id)).statusCode).toBe(204);
+      };
+      const done = await call(`/v1/uploads/${id}/complete`);
+      expect(done.json()).toMatchObject({ id, status: "removed" });
+      expect(done.json().path).toBeUndefined();
+      expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "removed" });
+      expect([...storage.files.keys()].filter((k) => k.includes(id))).toEqual([]);
+    });
+
+    it("a photo removed while it's being compressed leaves no files behind", async () => {
+      const data = await jpeg();
+      const res = await call("/v1/uploads", { ...dm, contentType: "image/jpeg", name: "p.jpg", size: data.length });
+      const { id } = res.json();
+      storage.files.set(`uploads/raw/u1/${id}`, { data });
+      const write = storage.write.bind(storage);
+      let removed = false;
+      storage.write = async (...args: Parameters<typeof write>) => {
+        await write(...args);
+        if (!removed) {
+          removed = true;
+          expect((await del(id)).statusCode).toBe(204);
+        }
+      };
+      expect((await call(`/v1/uploads/${id}/complete`)).json().status).toBe("removed");
+      expect(store.doc(`uploads/${id}`)).toMatchObject({ status: "removed" });
+      expect([...storage.files.keys()].filter((k) => k.includes(id))).toEqual([]);
+    });
+
+    it("two completes at once: the second answers what the first saved and keeps its files", async () => {
+      const res = await call("/v1/uploads", { ...dm, contentType: "application/pdf", name: "twice.pdf", size: pdf.length });
+      const { id } = res.json();
+      storage.files.set(`uploads/raw/u1/${id}`, { data: pdf });
+      const copy = storage.copy.bind(storage);
+      let first: Awaited<ReturnType<typeof call>> | null = null;
+      storage.copy = async (...args: Parameters<typeof copy>) => {
+        await copy(...args);
+        if (!first) {
+          storage.copy = copy;
+          first = await call(`/v1/uploads/${id}/complete`);
+        }
+      };
+      const second = await call(`/v1/uploads/${id}/complete`);
+      expect(first!.json()).toMatchObject({ status: "ready" });
+      expect(second.json()).toEqual(first!.json());
+      expect(storage.files.has(second.json().path)).toBe(true);
     });
 
     it("takes an MP4 or MOV with an unlisted brand as a video in chat, as the app does by its name", async () => {
