@@ -51,6 +51,7 @@ function Tabs({ moreTab }: { moreTab: string | null }) {
     ["", "Feed", true],
     ["/schedule", "Schedule", true],
     ["/chat", "Chat", member],
+    ["/meetings", "Meetings", member],
     ["/roster", kind === "team" ? "Roster" : "Members", true],
     ["/teams", "Teams", kind !== "team"],
   ];
