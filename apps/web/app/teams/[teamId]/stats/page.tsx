@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { TeamPart } from "@/components/team/TeamParts";
+import { loadTeam } from "@/lib/teamPage";
 
 type Props = { params: Promise<{ teamId: string }> };
 
-/** /teams/:id/stats has no page of its own: it's More's Stats tab. */
-export default async function TeamStatsIndex({ params }: Props) {
+export const metadata: Metadata = { title: "Stats" };
+
+/** A team's stats (members only). */
+export default async function TeamStatsPage({ params }: Props) {
   const { teamId } = await params;
-  redirect(`/teams/${encodeURIComponent(teamId)}/more?tab=stats`);
+  // Groups keep no playbook, videos or stats: their link opens the feed.
+  if (((await loadTeam(teamId)).team.kind ?? "team") !== "team") redirect(`/teams/${encodeURIComponent(teamId)}`);
+  return <TeamPart part="stats" />;
 }

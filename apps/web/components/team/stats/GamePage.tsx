@@ -107,7 +107,7 @@ function Game({ gameId }: { gameId: string }) {
                 className="btn btn-small btn-danger"
                 onClick={async () => {
                   if (await confirmAndDelete(user, apiUrl(teamId, `/stats-games/${encodeURIComponent(g.id)}`), deleteGameMessage(g), setDeleteError)) {
-                    router.push(t.tournament ? tournamentUrl(teamId, t.tournament.id) : `/teams/${encodeURIComponent(teamId)}/more?tab=stats`);
+                    router.push(t.tournament ? tournamentUrl(teamId, t.tournament.id) : `/teams/${encodeURIComponent(teamId)}/stats`);
                   }
                 }}
               >

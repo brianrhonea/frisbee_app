@@ -121,7 +121,7 @@ function Tournament({ tournamentId }: { tournamentId: string }) {
                   `Delete ${t.name}?\n\nThis permanently deletes the tournament, its roster and lines, and ${its.length === 1 ? "its game" : `all ${its.length} of its games`} with every stat in them.`,
                   setError,
                 );
-                if (ok) router.push(`/teams/${encodeURIComponent(teamId)}/more?tab=stats`);
+                if (ok) router.push(`/teams/${encodeURIComponent(teamId)}/stats`);
               }}
             >
               Delete tournament

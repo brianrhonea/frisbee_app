@@ -8,7 +8,7 @@ export type Folder = Doc<VideoFolderDoc>;
 export type VideoFilter = { kind: "all" } | { kind: "unsorted" } | { kind: "folder"; id: string };
 
 const teamPath = (teamId: string) => `/teams/${encodeURIComponent(teamId)}`;
-export const videosHref = (teamId: string) => `${teamPath(teamId)}/more?tab=videos`;
+export const videosHref = (teamId: string) => `${teamPath(teamId)}/videos`;
 export const videoHref = (teamId: string, id: string) => `${teamPath(teamId)}/videos/${encodeURIComponent(id)}`;
 export const videosApi = (teamId: string) => `/v1/teams/${encodeURIComponent(teamId)}/videos`;
 export const foldersApi = (teamId: string) => `/v1/teams/${encodeURIComponent(teamId)}/video-folders`;

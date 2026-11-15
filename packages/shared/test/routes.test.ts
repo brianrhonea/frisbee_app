@@ -56,6 +56,17 @@ describe("webRoute", () => {
     expect(webRoute("/my-events/e1")).toBe("/schedule");
     expect(webRoute("/team-meetings/t1/m1/edit")).toBe("/teams/t1/meetings/m1/edit");
     expect(webRoute("/teams/t1/plays/p1")).toBe("/teams/t1/plays/p1");
+    expect(webRoute("/teams/t1?section=playbook")).toBe("/teams/t1/playbook");
+    expect(webRoute("/teams/t1?section=videos")).toBe("/teams/t1/videos");
+    expect(webRoute("/teams/t1?section=stats")).toBe("/teams/t1/stats");
+    expect(webRoute("/teams/t1?section=tournaments")).toBe("/teams/t1/tournaments");
+    expect(webRoute("/teams/t1?section=events")).toBe("/teams/t1/schedule");
+    expect(webRoute("/teams/t1?section=members")).toBe("/teams/t1/roster");
+    expect(webRoute("/teams/t1?section=teams")).toBe("/teams/t1/teams");
+    // Only known sections: anything else (More, a stray value) opens the feed.
+    expect(webRoute("/teams/t1?section=more")).toBe("/teams/t1");
+    expect(webRoute("/teams/t1?section=..%2Fsettings")).toBe("/teams/t1");
+    expect(webRoute("/teams/t1?section=constructor")).toBe("/teams/t1");
     expect(webRoute("/team-videos/t1/v1")).toBe("/teams/t1/videos/v1");
     expect(webRoute("/teams/t1/stats/games/g1")).toBe("/teams/t1/stats/games/g1");
     expect(webRoute("/teams/t1/stats/tournaments/x1")).toBe("/teams/t1/stats/tournaments/x1");
@@ -101,6 +112,14 @@ describe("webRoute", () => {
     for (const r of [
       "/team-meetings/t1/m1/edit",
       "/teams/t1/plays/p1",
+      "/teams/t1?section=playbook",
+      "/teams/t1?section=videos",
+      "/teams/t1?section=stats",
+      "/teams/t1?section=tournaments",
+      "/teams/t1?section=events",
+      "/teams/t1?section=chat",
+      "/teams/t1?section=members",
+      "/teams/t1?section=teams",
       "/team-videos/t1/v1",
       "/teams/t1/stats/games/g1",
       "/teams/t1/stats/tournaments/x1",

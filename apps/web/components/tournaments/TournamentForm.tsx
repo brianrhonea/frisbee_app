@@ -641,7 +641,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
         <button type="submit" className="btn btn-primary" disabled={busy || !!problem}>
           {isNew ? "Create" : "Save"}
         </button>
-        <Link className="btn btn-quiet" href={tournamentId ? tournamentHref(tournamentId) : hostId ? `/teams/${encodeURIComponent(hostId)}/more?tab=tournaments` : "/tournaments"}>
+        <Link className="btn btn-quiet" href={tournamentId ? tournamentHref(tournamentId) : hostId ? `/teams/${encodeURIComponent(hostId)}/tournaments` : "/tournaments"}>
           Cancel
         </Link>
       </div>

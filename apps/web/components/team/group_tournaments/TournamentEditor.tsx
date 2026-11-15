@@ -41,7 +41,7 @@ export function TournamentEditorPage({ tournamentId, eventId }: { tournamentId: 
   // Bounded (ordering them would need an index): the events a tournament can be linked to.
   const events = useLiveQuery<TeamEventDoc>(organizer ? `teams/${teamId}/events` : null, [where("type", "==", "tournament"), limit(300)], "tournamentEvents");
   const back = (
-    <Link href={`/teams/${encodeURIComponent(teamId)}/more?tab=tournaments`} className="text-btn">
+    <Link href={`/teams/${encodeURIComponent(teamId)}/tournaments`} className="text-btn">
       ← Tournaments
     </Link>
   );

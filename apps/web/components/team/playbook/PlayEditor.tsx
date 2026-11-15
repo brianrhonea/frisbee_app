@@ -267,7 +267,7 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
     try {
       await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/plays/${encodeURIComponent(id)}`, { method: "DELETE" });
       setDirty(false);
-      router.push(`/teams/${encodeURIComponent(teamId)}/more?tab=playbook`);
+      router.push(`/teams/${encodeURIComponent(teamId)}/playbook`);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);

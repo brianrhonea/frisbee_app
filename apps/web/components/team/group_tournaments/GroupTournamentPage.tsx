@@ -105,7 +105,7 @@ export function GroupTournamentPage({ tournamentId }: { tournamentId: string }) 
   }
   if (!signedIn) return <MembersOnlySection what="tournaments" />;
   const back = (
-    <Link href={`/teams/${encodeURIComponent(teamId)}/more?tab=tournaments`} className="text-btn">
+    <Link href={`/teams/${encodeURIComponent(teamId)}/tournaments`} className="text-btn">
       ← Tournaments
     </Link>
   );
@@ -185,7 +185,7 @@ export function GroupTournamentPage({ tournamentId }: { tournamentId: string }) 
                 disabled={busy}
                 onClick={() => {
                   if (!user || !window.confirm(`Delete ${t.name || "this tournament"}? Its teams, schedule and scores are deleted for everyone.`)) return;
-                  void run(() => callApi(user, api, { method: "DELETE" })).then((ok) => ok && router.push(`/teams/${encodeURIComponent(teamId)}/more?tab=tournaments`));
+                  void run(() => callApi(user, api, { method: "DELETE" })).then((ok) => ok && router.push(`/teams/${encodeURIComponent(teamId)}/tournaments`));
                 }}
               >
                 Delete

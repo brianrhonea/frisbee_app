@@ -17,7 +17,7 @@ export function PlayPage({ playId }: { playId: string }) {
   const play = useLiveDoc<PlayDoc>(member && !isNew ? `teams/${teamId}/plays/${playId}` : null);
   const editor = member && viewer.can("manageTeam");
   const back = (
-    <Link href={`/teams/${encodeURIComponent(teamId)}/more?tab=playbook`} className="text-btn">
+    <Link href={`/teams/${encodeURIComponent(teamId)}/playbook`} className="text-btn">
       ← Playbook
     </Link>
   );

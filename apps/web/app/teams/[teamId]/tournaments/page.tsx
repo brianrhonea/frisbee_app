@@ -1,9 +1,9 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { TeamPart } from "@/components/team/TeamParts";
 
-type Props = { params: Promise<{ teamId: string }> };
+export const metadata: Metadata = { title: "Tournaments" };
 
-/** /teams/:id/tournaments has no page of its own: it's More's Tournaments tab. */
-export default async function TeamTournamentsIndex({ params }: Props) {
-  const { teamId } = await params;
-  redirect(`/teams/${encodeURIComponent(teamId)}/more?tab=tournaments`);
+/** A team or group's tournaments: the ones it hosts, and its own (group tournaments). */
+export default function TeamTournamentsPage() {
+  return <TeamPart part="tournaments" />;
 }

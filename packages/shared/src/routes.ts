@@ -12,6 +12,19 @@ const id = "([A-Za-z0-9_-][A-Za-z0-9_.-]*)";
 const enc = encodeURIComponent;
 type Query = Map<string, string>;
 type Rule = [RegExp, (m: RegExpMatchArray, q: Query) => string];
+
+/** The app's team sections (TeamSection.path) and the website's page for each. */
+const teamSections = new Map([
+  ["events", "/schedule"],
+  ["chat", "/chat"],
+  ["roster", "/roster"],
+  ["members", "/roster"],
+  ["teams", "/teams"],
+  ["playbook", "/playbook"],
+  ["videos", "/videos"],
+  ["stats", "/stats"],
+  ["tournaments", "/tournaments"],
+]);
 const rules: Rule[] = [
   [/^\/settings\/follow-requests$/, () => "/settings/requests"],
   [/^\/settings\/calendar$/, () => "/settings/calendar"],
@@ -25,7 +38,9 @@ const rules: Rule[] = [
   [new RegExp(`^/team-events/${id}/${id}$`), (m) => `/teams/${m[1]}/schedule?event=${enc(m[2]!)}`],
   [new RegExp(`^/team-meetings/${id}/${id}(/room|/edit)?$`), (m) => `/teams/${m[1]}/meetings/${enc(m[2]!)}${m[3] ?? ""}`],
   [/^\/teams$/, () => "/teams"],
-  [new RegExp(`^/teams/${id}$`), (m) => `/teams/${m[1]}`],
+  // A section of the team's page (?section=, Routes.teamSection in the
+  // app) is a page of its own on the website; unknown sections open the feed.
+  [new RegExp(`^/teams/${id}$`), (m, q) => `/teams/${m[1]}${teamSections.get(q.get("section") ?? "") ?? ""}`],
   [new RegExp(`^/teams/${id}/chats/${id}$`), (m) => `/teams/${m[1]}/chat?room=${enc(m[2]!)}`],
   [new RegExp(`^/teams/${id}/events$`), (m) => `/teams/${m[1]}/schedule`],
   [new RegExp(`^/teams/${id}/members$`), (m) => `/teams/${m[1]}/roster`],

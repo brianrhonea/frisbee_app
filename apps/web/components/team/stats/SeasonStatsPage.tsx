@@ -11,7 +11,7 @@ import "./stats.css";
 /** Back to the Stats tab. */
 export function BackToStats({ teamId, label = "Stats" }: { teamId: string; label?: string }) {
   return (
-    <Link href={`/teams/${encodeURIComponent(teamId)}/more?tab=stats`} className="text-btn">
+    <Link href={`/teams/${encodeURIComponent(teamId)}/stats`} className="text-btn">
       ← {label}
     </Link>
   );
