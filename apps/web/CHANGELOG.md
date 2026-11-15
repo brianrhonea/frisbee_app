@@ -4,6 +4,39 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.29.0 — 2026-11-15
+
+Review checklist fixes. Needs API 0.25.0 (confirming a score sends it).
+
+**Added**
+- Messages: search conversations by name, and "More conversations".
+- Team schedule: "Earlier events"; `?event=` opens past events too.
+- `/teams/:id/stats`, `/plays`, `/videos` and `/tournaments` open the
+  matching More tab.
+
+**Changed**
+- Confirming a reported score sends the score shown, so one changed
+  meanwhile isn't confirmed.
+- Dates follow your browser's language.
+- Logging in returns you to the page you were on.
+- Entry fees without payment instructions say paying on Stall 10 is
+  coming soon.
+- The pull timer, line picker and substitution card open as dialogs.
+- Lists that could grow without end are capped or paged.
+
+**Fixed**
+- A meeting call hangs up when you lose access, sign out, or switch
+  account.
+- The post and stats game pages show errors with Try again instead of
+  loading forever; "see replies in the app" shows to visitors only.
+- Players with the same name are drafted in a fixed order (by uid), as in
+  the app.
+
+**Removed**
+- Unused components, helpers, CSS and the `team-draft` redirect page;
+  duplicated helpers merged (dates, error text, my teams, dialogs, photo
+  attachments).
+
 ## 0.28.1 — 2026-11-15
 
 **Fixed**

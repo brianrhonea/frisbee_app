@@ -7,6 +7,37 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.25.0 — 2026-11-15
+
+Review checklist fixes. Deploy with web 0.29.0: hosted game confirm now
+needs the score in its body.
+
+**Changed**
+- Hosted game confirm requires the `{scoreA, scoreB}` being confirmed and
+  refuses (412) if the report changed meanwhile (the rules' check, ported).
+- A team that hosts an unfinished tournament or league can't be deleted
+  (412); finished ones stay, read-only.
+- Videos outside chat are refused until the transcode job ships (chat
+  videos still work).
+- Dates must carry Z or an offset (`isoDateTime` in `@stall10/shared`).
+- New `unavailable` (503) error code; Discord being unreachable uses it.
+  A missing team's Discord preview answers not_found.
+- Read rate limits per member: roster 60/min, post states 120/min,
+  calendars 60/min, calendar events 60/min. Roster cards use one batched
+  read.
+
+**Fixed**
+- The home feed no longer drops posts when every source is short.
+- Home upcoming events include ones under way and aren't emptied by the
+  audience filter.
+- Uploads: a delete during complete wins, and two completes can't both run.
+- Reconcile reads only the division's entries and the games it fills;
+  closing a division removes all its games.
+- Drafts and Discord imports re-check inside their transactions.
+- Saving a finished group tournament keeps it finished.
+- Roster-link refusals say why.
+- The test fake store refuses reads after writes, as Firestore does.
+
 ## 0.24.0 — 2026-11-15
 
 **Added** (security review of the messaging batch)

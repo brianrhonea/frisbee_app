@@ -60,6 +60,19 @@ Plain-language notes for testers are in
   website): losing access to the channel or team drops the call, losing
   the right to talk mutes you, and signing out or switching accounts
   hangs up.
+- New Community tab on Home (For you / Community / Your teams), as on the
+  website, from the API's members' feed.
+- Deleting a team asks you to type its name and goes through the API
+  (`DELETE /v1/teams/:id`, which also refuses while it hosts an unfinished
+  tournament or league).
+- Voice: switching channels quickly ends in the last one picked; voice no
+  longer drops while a team is still loading, and its watches reconnect.
+- Drafts typed right after sign-in no longer overwrite saved ones.
+- Players with the same name are drafted in a fixed order (by uid).
+- Removed code we no longer need: the old Flutter website, the
+  Windows/macOS leftovers (Windows Google sign-in, screen-source and
+  speaker pickers, the mouse-only message strip, WebView2 players) and
+  unused packages. iOS and Android work as before.
 - Cancelling Google or Apple sign-in (or the check before deleting the
   account) shows no error, as on the website; it used to show the raw
   Google exception or "Sign-in was cancelled.".
