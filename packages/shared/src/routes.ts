@@ -6,7 +6,9 @@
 /** Where the website sends people for something only the app has. */
 export const appOnlyRoute = "/get-the-app";
 
-const id = "([^/]+)";
+// A document id: letters, digits, _ - and inner dots only, so a stored
+// route can't climb out with `..`, a backslash or an escape (`%2e`).
+const id = "([A-Za-z0-9_-][A-Za-z0-9_.-]*)";
 const enc = encodeURIComponent;
 type Query = Map<string, string>;
 type Rule = [RegExp, (m: RegExpMatchArray, q: Query) => string];

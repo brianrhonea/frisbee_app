@@ -86,6 +86,13 @@ describe("event posts (validSharedEvent, sharesOwnTeamEvent)", () => {
     expect((await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "e1", teamId: "nope" } })).status).toBe(403);
   });
 
+  it("keeps a private group's events with its members (canShare in both apps)", async () => {
+    store.put("teams/t1", { ...store.doc("teams/t1")!, kind: "community", requiresApproval: true });
+    expect((await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "e1", teamId: "t1" } })).status).toBe(412);
+    store.put("teams/t1", { ...store.doc("teams/t1")!, requiresApproval: false });
+    expect((await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "e1", teamId: "t1" } })).status).toBe(201);
+  });
+
   it("shares an event from the caller's own schedule (teamId null), with no words needed", async () => {
     const res = await call("POST", "/v1/posts", { body: "", shareEvent: { eventId: "m1", teamId: null } });
     expect(res.status).toBe(201);

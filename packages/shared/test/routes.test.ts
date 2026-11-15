@@ -79,6 +79,13 @@ describe("webRoute", () => {
     expect(webRoute("//example.com/posts/p1")).toBeNull();
   });
 
+  it("never lets a stored id climb out of its page", () => {
+    for (const r of ["/posts/..", "/tournaments/.", "/group-tournaments/../x", "/posts/a\\..\\settings", "/posts/%2e%2e", "/teams/t1/plays/..%2f"]) {
+      expect(webRoute(r)).toBe(appOnlyRoute);
+    }
+    expect(webRoute("/posts/a.b")).toBe("/posts/a.b");
+  });
+
   it("covers every route the notification functions send, each to a page the website has", () => {
     const routes = functionRoutes();
     expect(routes.length).toBeGreaterThan(15);

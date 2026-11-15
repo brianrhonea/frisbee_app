@@ -51,8 +51,9 @@ function startOfToday() {
 }
 
 /**
- * A member's events from today on (or before today, newest first, for
- * [past]), live. An organization's events say who sees them, so a member
+ * A member's events that haven't finished (or have, newest first, for
+ * [past]), live: as the app's upcomingEvents, an event is over at its end,
+ * or two hours after it starts without one. An organization's events say who sees them, so a member
  * without manageEvents asks once per audience id, as the app does; teams
  * and groups show every event to every member. Null for non-members.
  */
@@ -63,13 +64,14 @@ export function useTeamEvents(teamId: string, viewer: TeamViewer, past = false) 
   // The audience + startsAt index is ascending only (firestore.indexes.json),
   // so an organization's past events come oldest first and are sorted here.
   const range: QueryConstraint[] = past
-    ? [where("startsAt", "<", today), orderBy("startsAt", scoped ? "asc" : "desc")]
+    ? [where("startsAt", "<", Timestamp.fromMillis(today.toMillis() + day)), orderBy("startsAt", scoped ? "asc" : "desc")]
     : [where("startsAt", ">=", today), orderBy("startsAt")];
   const queries = scoped ? member.audience.map((id) => [where("audience", "array-contains", id), ...range]) : [range];
   const key = `${past}|${scoped ? member.audience.join(",") : "all"}|${today.seconds}`;
   const live = useLiveQueries<TeamEventDoc>(member ? `teams/${teamId}/events` : null, queries, key);
+  const now = Date.now();
   const sorted = live.data
-    ?.slice()
+    ?.filter((e) => isOver(e.startsAt, e.endsAt, now) === past)
     .sort((a, b) => (a.startsAt ?? "").localeCompare(b.startsAt ?? "") * (past ? -1 : 1))
     .slice(0, past ? 50 : 200);
   return { ...live, data: sorted };
@@ -77,15 +79,23 @@ export function useTeamEvents(teamId: string, viewer: TeamViewer, past = false) 
 
 /**
  * The member's meetings for the schedule, as the app's team schedule lists
- * them beside events: not ended ones only, live or from today on for
- * upcoming, before today (newest first) for [past].
+ * them beside events: not ended ones only; live ones are upcoming, others
+ * are over at their end, or two hours after they start.
  */
 function scheduleMeetings(all: Meeting[] | undefined, past: boolean): Meeting[] {
-  const today = startOfToday().toMillis();
+  const now = Date.now();
   return (all ?? [])
     .filter((m) => m.status !== "ended" && !!m.startsAt)
-    .filter((m) => (past ? m.status !== "live" && Date.parse(m.startsAt!) < today : m.status === "live" || Date.parse(m.startsAt!) >= today))
+    .filter((m) => (m.status !== "live" && isOver(m.startsAt, m.endsAt, now)) === past)
     .sort((a, b) => a.startsAt!.localeCompare(b.startsAt!) * (past ? -1 : 1));
+}
+
+const day = 86_400_000;
+
+/** Whether an entry has finished by [now]: at its end, else two hours after it starts (TeamDetailViewModel.upcomingEvents). */
+function isOver(startsAt: string | null | undefined, endsAt: string | null | undefined, now: number): boolean {
+  const end = endsAt ? Date.parse(endsAt) : Date.parse(startsAt ?? "") + 2 * 3_600_000;
+  return Number.isFinite(end) && end < now;
 }
 
 type Entry = { kind: "event"; event: Doc<TeamEventDoc> } | { kind: "meeting"; meeting: Meeting };

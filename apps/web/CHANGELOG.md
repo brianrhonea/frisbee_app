@@ -4,6 +4,14 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.24.1 — 2026-11-15
+
+**Fixed**
+- The team schedule counts an event or meeting as upcoming until it
+  ends (or two hours after it starts, without an end), as the app does;
+  this morning's practice used to stay under Upcoming all day.
+- `/tournaments/:id?host=` ignores a host that isn't an id.
+
 ## 0.24.0 — 2026-11-15
 
 **Added**

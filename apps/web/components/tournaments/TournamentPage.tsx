@@ -38,7 +38,9 @@ export function TournamentPage({ tournamentId, fallbackHostId }: { tournamentId:
   const s = useTournament(tournamentId);
   const [tab, setTab] = useState<Tab>("overview");
   const router = useRouter();
-  const fallback = s.loaded && !s.t && fallbackHostId ? `/teams/${encodeURIComponent(fallbackHostId)}/tournaments/${encodeURIComponent(tournamentId)}` : null;
+  // Only a real id: `..` would otherwise climb out of /teams/.
+  const host = fallbackHostId && /^[A-Za-z0-9_-]{1,128}$/.test(fallbackHostId) ? fallbackHostId : undefined;
+  const fallback = s.loaded && !s.t && host ? `/teams/${encodeURIComponent(host)}/tournaments/${encodeURIComponent(tournamentId)}` : null;
   useEffect(() => {
     if (fallback) router.replace(fallback);
   }, [fallback, router]);

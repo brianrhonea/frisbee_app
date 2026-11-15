@@ -7,6 +7,16 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.22.1 — 2026-11-15
+
+**Fixed** (security review of the small-fixes batch)
+- Sharing a team event refuses a private group's events (412), as both
+  apps' editors already hide it; before, a schedule manager could post
+  one by calling the API directly.
+- `webRoute` (`@stall10/shared`) only maps id segments of letters,
+  digits, `_`, `-` and inner dots, so a stored notification route with
+  `..`, a backslash or `%2e` can't open another page of the site.
+
 ## 0.22.0 — 2026-11-15
 
 **Added**

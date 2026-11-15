@@ -8,6 +8,7 @@
 // teamId) is read only for someone who can edit that calendar, as the
 // calendar API checks: the rules never let clients read its events, so the
 // copy mustn't show them to anyone else.
+import { isPrivateGroup } from "../browse/model.js";
 import { teamEventTypes } from "@stall10/shared";
 import type { Caller } from "../auth.js";
 import { editableEventsPath } from "../calendar/service.js";
@@ -38,6 +39,10 @@ export async function sharedEvent(
     // sharesOwnTeamEvent: can(get(teamPath(e.teamId)).data, 'manageEvents').
     if (!team || !can(team, caller.uid, "manageEvents")) {
       throw new ApiError("permission_denied", "Only people who run this team's schedule can share its events.");
+    }
+    // A private group's events stay with its members (both apps hide sharing there).
+    if (isPrivateGroup(team)) {
+      throw new ApiError("failed_precondition", "Events of a group that approves who joins stay with its members.");
     }
     teamName = clip(team.name, 100) || null;
     event = await store.get(`teams/${teamId}/events/${eventId}`);
