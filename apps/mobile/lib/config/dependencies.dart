@@ -103,8 +103,7 @@ List<SingleChildWidget> get firebaseProviders => [
     ),
   ),
   Provider<CalendarRepository>(
-    create: (context) =>
-        CalendarRepositoryApi(api: context.read<ApiClient?>()),
+    create: (context) => CalendarRepositoryApi(api: context.read<ApiClient?>()),
   ),
   ChangeNotifierProvider<PersonalDetailsRepository>(
     create: (context) => PersonalDetailsRepositoryApi(
@@ -214,6 +213,9 @@ List<SingleChildWidget> get firebaseProviders => [
       functions: context.read(),
       media: context.read(),
       settings: context.read(),
+      teams: context.read(),
+      chats: context.read(),
+      auth: context.read(),
     ),
   ),
   Provider(create: (_) => PushService()),

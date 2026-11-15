@@ -8,12 +8,12 @@ import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../../AuthProvider";
 import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
-import { CallSession, deviceProblem, endNotices, useCall } from "./call";
+import { CallCancelled, CallSession, deviceProblem, endNotices, useCall } from "./call";
 import { CallStage, PeopleList, VideoView } from "./CallTiles";
 import { type DeviceKind, DeviceSettings, selectedDevice, useDevices, withDevice } from "./DeviceSettings";
 import { MeetingChat } from "./MeetingChat";
 import { canSee, type JoinRequestData, type MeetingData, meetingApi, meetingHref, needsApproval } from "./model";
-import { defaultSettings, loadSettings, type MeetingSettings, saveSettings } from "./settings";
+import { defaultSettings, loadSettings, type MeetingSettings, updateSettings, withPersonVolume } from "./settings";
 import { WatchTogether } from "./WatchTogether";
 import "./meetings.css";
 import "./devices.css";
@@ -43,16 +43,12 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   const [stage, setStage] = useState<Stage>("lobby");
   const [call, setCall] = useState<CallSession | null>(null);
   const state = useCall(call);
-  // Remembered on this browser (MeetingSettings): start-up mic and camera, devices and volumes.
+  // Remembered on this browser for this account (MeetingSettings): start-up mic and camera, devices and volumes.
+  const uid = user?.uid ?? null;
   const [settings, setSettings] = useState<MeetingSettings>(defaultSettings);
-  useEffect(() => setSettings(loadSettings()), []);
-  const update = useCallback((fn: (s: MeetingSettings) => MeetingSettings) => {
-    setSettings((cur) => {
-      const next = fn(cur);
-      saveSettings(next);
-      return next;
-    });
-  }, []);
+  useEffect(() => setSettings(loadSettings(uid)), [uid]);
+  // Read-merge-write on the saved copy, outside a state updater (which may run twice).
+  const update = useCallback((fn: (s: MeetingSettings) => MeetingSettings) => setSettings(updateSettings(uid, fn)), [uid]);
   const { devices, reload: reloadDevices, speaker } = useDevices();
   const [preview, setPreview] = useState<LocalVideoTrack | null>(null);
   const previewRef = useRef<LocalVideoTrack | null>(null);
@@ -65,6 +61,9 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   const callRef = useRef<CallSession | null>(null);
   // Bumped on hang-up and unmount: a connect that finishes after either is dropped.
   const generation = useRef(0);
+  // The call being joined, from the moment it exists: hanging up mid-join (or while
+  // the browser asks for the mic or camera) leaves it.
+  const joiningRef = useRef<CallSession | null>(null);
 
   let lobby: Lobby;
   if (!member || meeting.data === undefined) lobby = meeting.error ? "unavailable" : "loading";
@@ -77,11 +76,13 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   const hangUp = useCallback(async (why: string | null) => {
     generation.current += 1;
     const c = callRef.current;
+    const joining = joiningRef.current;
     callRef.current = null;
+    joiningRef.current = null;
     setCall(null);
     setStage("left");
     setNotice(why);
-    await c?.leave();
+    await Promise.all([c?.leave(), joining?.leave()]);
   }, []);
 
   // Leaving the page leaves the call; the camera and mic stop.
@@ -89,6 +90,7 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
     () => () => {
       generation.current += 1;
       void callRef.current?.leave();
+      void joiningRef.current?.leave();
     },
     [],
   );
@@ -102,7 +104,9 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   // browser asks for the camera here. It stops on joining, turning the
   // camera off, picking another camera and leaving the page.
   const previewCamera = selectedDevice(settings, devices, "videoinput");
-  const wantsPreview = !!member && stage === "lobby" && settings.cameraOn;
+  // Only where the lobby shows it: not while loading, or for a meeting that's gone, ended or not theirs.
+  const joinable = lobby !== "loading" && lobby !== "unavailable" && lobby !== "ended";
+  const wantsPreview = !!member && stage === "lobby" && joinable && settings.cameraOn;
   useEffect(() => {
     if (!wantsPreview) return;
     let live = true;
@@ -143,6 +147,7 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
     setError(null);
     setNotice(null);
     const mine = ++generation.current;
+    let session: CallSession | null = null;
     try {
       const access = await callApi<MeetingTokenResult>(user, `${meetingApi(teamId, meetingId)}/token`, { method: "POST" });
       if (mine !== generation.current) return;
@@ -157,7 +162,13 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
         videoInputId: selectedDevice(settings, devices, "videoinput"),
         audioOutputId: speaker ? selectedDevice(settings, devices, "audiooutput") : null,
         volumes: { output: settings.outputVolume, people: settings.participantVolumes },
+        onSession: (s) => {
+          session = s;
+          if (mine === generation.current) joiningRef.current = s;
+          else void s.leave();
+        },
       });
+      if (joiningRef.current === c) joiningRef.current = null;
       if (mine !== generation.current) {
         await c.leave();
         return;
@@ -167,7 +178,9 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
       setWantsIn(false);
       setStage("inCall");
     } catch (e) {
-      if (mine !== generation.current) return;
+      if (joiningRef.current === session) joiningRef.current = null;
+      void (session as CallSession | null)?.leave();
+      if (mine !== generation.current || e instanceof CallCancelled) return;
       setError(e instanceof ApiError ? e.message : "Couldn't connect to the call. Check your connection and try again.");
       setStage("lobby");
     }
@@ -186,7 +199,7 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
     call?.setOutputVolume(v);
   }
   function setPersonVolume(uid: string, v: number) {
-    update((s) => ({ ...s, participantVolumes: { ...s.participantVolumes, [uid]: v } }));
+    update((s) => withPersonVolume(s, uid, v));
     call?.setVolume(uid, v);
   }
   const deviceSettings = <DeviceSettings settings={settings} devices={devices} speaker={speaker} onDevice={pickDevice} onOutputVolume={setOutputVolume} />;

@@ -266,6 +266,9 @@ class FakeTeamRepository implements TeamRepository {
     _teamsController.add(null);
   }
 
+  /// Tells watchers [teams] changed, e.g. after editing a team directly.
+  void changed() => _emit();
+
   /// teamId → community id → waiting link request.
   final linkRequests = <String, Map<String, TeamLinkRequest>>{};
 

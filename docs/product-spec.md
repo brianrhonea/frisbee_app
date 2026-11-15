@@ -219,7 +219,10 @@ everything the app does on the website alone, styled like the website
    the browser can switch output), lobby camera preview, meeting
    volume, mute audio, per-person volume to 200%; [x] a voice call that
    stays up across pages, with a voice bar (web 0.24.0); [x] older call
-   chat (web 0.25.0). [x] Meetings on the team schedule
+   chat (web 0.25.0). [x] Both platforms re-check a voice channel while
+   connected: losing read access or the team drops it, losing write
+   access mutes and keeps listening, signing out hangs up (app
+   `test/data/voice_repository_test.dart`). [x] Meetings on the team schedule
    beside events, with New meeting (the website keeps its Meetings tab
    too; the app has none).
 7. Posts: [ ] video in posts (waits on the transcode job); [x] feed tabs;

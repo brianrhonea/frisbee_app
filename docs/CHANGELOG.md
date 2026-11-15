@@ -56,6 +56,10 @@ Plain-language notes for testers are in
   `shuffleWith`), the website's, so the same seed deals the same teams on
   both. Existing seeds deal differently than before; teams aren't
   redealt unless the host deals again.
+- Voice channels re-check your access while connected (as on the
+  website): losing access to the channel or team drops the call, losing
+  the right to talk mutes you, and signing out or switching accounts
+  hangs up.
 - Tests: shared test vectors (`packages/shared/fixtures`, written by
   `test/shared_fixtures`) check the tournament engine, stats, play
   animation, drafts, Discord import and calendar files against the

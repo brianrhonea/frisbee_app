@@ -4,6 +4,22 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.27.0 — 2026-11-15
+
+**Changed** (security review of Explore and calls)
+- Voice channels re-check your access while you're in them: losing
+  access to the channel or team disconnects, and losing the right to
+  talk mutes you and keeps you listening.
+- Leaving or losing access while joining a call (even during the
+  microphone prompt) always hangs up.
+- The lobby camera preview only runs when the meeting can be joined.
+- Per-person volume also covers screen-share sound, and no longer fails
+  above 100% in browsers without Web Audio.
+- Meeting and voice settings are kept per account, with at most 200
+  per-person volumes; saved devices that are unplugged fall back to the
+  default.
+- Explore's Search retries a failed search.
+
 ## 0.26.0 — 2026-11-15
 
 **Added**
