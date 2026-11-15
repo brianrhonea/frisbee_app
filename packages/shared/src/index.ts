@@ -19,3 +19,4 @@ export * from "./hub.js";
 export * from "./account.js";
 export * from "./playbook.js";
 export * from "./videos.js";
+export * from "./drafts.js";

@@ -30,6 +30,16 @@ export const routeWriteLimits: Record<string, Limit[]> = {
 const reads = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
+ * Live draft picks and the host's controls skip the any-write count: a
+ * host auto-picking a 200-player draft would pass 120 a minute. Their own
+ * bucket (draftLimits in drafts/routes.ts) bounds them instead.
+ */
+const ownBucket = new Set([
+  "POST /v1/tournaments/:tournamentId/divisions/:divisionId/draft/picks",
+  "POST /v1/tournaments/:tournamentId/divisions/:divisionId/draft/control",
+]);
+
+/**
  * Counts each signed-in caller's writes in memory (per instance, so the
  * real ceiling is the limit times the instances), after the auth hook has
  * read the caller. Visitors' writes fail their own sign-in check.
@@ -40,7 +50,7 @@ export function registerWriteLimits(app: FastifyInstance, limiter: MemoryRateLim
     const uid = req.caller.uid;
     const route = `${req.method} ${req.routeOptions.url ?? ""}`;
     const limits = routeWriteLimits[route] ?? [];
-    const ok = limiter.admit(`any:${uid}`, anyWriteLimit) && limits.every((limit, i) => limiter.admit(`${route}#${i}:${uid}`, limit));
+    const ok = (ownBucket.has(route) || limiter.admit(`any:${uid}`, anyWriteLimit)) && limits.every((limit, i) => limiter.admit(`${route}#${i}:${uid}`, limit));
     if (!ok) throw new ApiError("resource_exhausted", "You're doing that too fast. Wait a minute and try again.");
   });
 }

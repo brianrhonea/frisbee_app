@@ -7,6 +7,24 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.16.0 — 2026-11-14
+
+**Added**
+- Player signups: sign up, edit, sign back up, withdraw; the host's
+  accept, waitlist and decline, and marking a player's fee paid
+  (`/v1/tournaments/:id/signups/...`), ports of the signups and payments
+  rules.
+- Saving a division's drafted teams (`PUT .../divisions/:d/drafted-teams`):
+  the division rule plus the app's pre-save checks.
+- The captains' draft: start, pick, control (pause, resume, undo,
+  autopick, cancel) and finish, ports of the `startDraft`, `draftPick`,
+  `draftControl` and `finishDraft` callables; and creating a league's
+  teams from its drafted teams, a port of `createLeagueTeams`. The app
+  keeps the callables until it switches.
+- Draft writes have their own buckets (picks and controls 240 a minute,
+  signup decisions 120, other draft writes 30); picks and controls skip
+  the 120-a-minute any-write count so a host can auto-pick a full draft.
+
 ## 0.15.0 — 2026-11-14
 
 **Added**

@@ -4,6 +4,21 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.17.0 — 2026-11-14
+
+Needs API 0.16.0.
+
+**Added**
+- Players for player-entry tournaments and leagues: sign up with skill
+  and gender match, see your status and fee, withdraw. Hosts accept,
+  waitlist, decline and mark fees paid, with an unpaid filter.
+- A live captains' draft board: captains and time per pick, a pick clock,
+  every team side by side, the pool with "Best first" and gender filters,
+  and the host's pause, resume, undo, auto-pick, finish and cancel.
+- A team draft editor: deal balanced teams, shuffle, change the count,
+  move players, rename, set captains, save; leagues create their real
+  teams from it.
+
 ## 0.16.0 — 2026-11-14
 
 Needs API 0.15.0.
