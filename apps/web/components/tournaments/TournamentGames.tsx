@@ -15,7 +15,6 @@ import {
   laterGamesPlayed,
   ordinal,
   placementsOf,
-  planEndsAt,
   poolTeams,
   ScheduleError,
   type SchedulePlan,
@@ -220,7 +219,6 @@ function PublishCard({ s }: { s: TournamentState }) {
       })),
     });
   }
-  const end = plan ? planEndsAt(plan) : null;
   return (
     <section className="card">
       <h2 className="card-title">{s.published ? "Schedule published" : "Schedule"}</h2>
@@ -231,7 +229,6 @@ function PublishCard({ s }: { s: TournamentState }) {
           <br />
           <small className="muted">
             {plan.days.map((day) => `${day.startsAt.toLocaleDateString("en-US", { weekday: "short" })} ${timeLabel(day.startsAt)}–${timeLabel(day.endsAt)}`).join(" · ")}
-            {end ? "" : ""}
           </small>
         </p>
       ) : (

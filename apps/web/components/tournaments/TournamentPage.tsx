@@ -103,9 +103,11 @@ function useReconcile(s: TournamentState) {
       : "";
   useEffect(() => {
     if (!sig || !user || sig === last.current) return;
-    last.current = sig;
     const timer = setTimeout(() => {
-      void callApi(user, `${divisionPath(s.id, s.divisionId ?? "")}/reconcile`, { method: "POST" }).catch(() => undefined);
+      last.current = sig;
+      void callApi(user, `${divisionPath(s.id, s.divisionId ?? "")}/reconcile`, { method: "POST" }).catch(() => {
+        last.current = "";
+      });
     }, 800);
     return () => clearTimeout(timer);
   }, [sig, user, s.id, s.divisionId]);

@@ -197,13 +197,16 @@ export function HostedTournamentsSection({ teamId, kind, manager, member }: { te
           {(list.length > 0 || manager) && <h3 className="hosted-heading">Hosted here</h3>}
         </>
       )}
-      {manager && (
-        <div className="home-actions hosted-actions">
-          <Link className="btn btn-primary btn-small" href={`/tournaments/new?host=${encodeURIComponent(teamId)}`}>
+      <div className="home-actions hosted-actions">
+        {manager && (
+          <Link className="btn btn-primary btn-small" href="/tournaments/host">
             Host an event
           </Link>
-        </div>
-      )}
+        )}
+        <Link className="btn btn-small" href="/tournaments">
+          Find tournaments and leagues
+        </Link>
+      </div>
       <Filters counts={f.statusCounts} labels={hostedStatusLabels} value={f.status} onChange={f.setStatus} label="Status" />
       {hosted.error ? (
         <p className="form-error">{hosted.error}</p>
