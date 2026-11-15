@@ -404,6 +404,7 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 | 13 | Team videos | links, edit, move, remove; folders | `apps/api/src/videos` (the website uses it; the app still writes directly). Uploads from the website wait on the transcode job (item 4) | **In the API**, app not switched; uploads not yet |
 | 14 | Signups & drafts | player signups, drafted teams, captains' draft, league teams | `apps/api/src/drafts` (ports of the draft callables and `createLeagueTeams`; logic shared in `packages/shared/src/drafts.ts`, mirrored in `firebase/functions/src/tournaments/draft_model.ts` and `league.ts`, so change them together). The website uses it; the app keeps the callables and direct writes | **In the API**, app not switched |
 | 15 | Stats & roster players | stats games (live tracker), stats tournaments, roster spots and claims | `apps/api/src/stats` (own 90-a-minute bucket; tracker logic and `SaveQueue` in `packages/shared/src/stats_tracker.ts`). The website uses it; the app still writes directly | **In the API**, app not switched |
+| 16 | Group tournaments | create, publish, scores, bracket | `apps/api/src/group_tournaments` (engine in `packages/shared/src/group_tournaments.ts`, ported from the app's). The website uses it; the app still writes directly | **In the API**, app not switched |
 | 11 | Meetings & voice | LiveKit tokens (callable today) | | |
 | — | Stays on device | theme, workout recording, playbook drawing (until saved) | | n/a |
 

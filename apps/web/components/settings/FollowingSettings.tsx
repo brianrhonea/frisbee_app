@@ -26,6 +26,11 @@ const tabs = [
 function hrefOf(f: Follow): string {
   if (f.type === "user") return `/players/${encodeURIComponent(f.targetId)}`;
   if (f.type === "team") return `/teams/${encodeURIComponent(f.targetId)}`;
+  // Group tournaments store "{groupId}_{tournamentId}" with groupId beside it (Follow.fromMap).
+  if (f.type === "tournament" && f.groupId && f.targetId.startsWith(`${f.groupId}_`)) {
+    const id = f.targetId.slice(f.groupId.length + 1);
+    return `/teams/${encodeURIComponent(f.groupId)}/tournaments/${encodeURIComponent(id)}`;
+  }
   return "/events";
 }
 

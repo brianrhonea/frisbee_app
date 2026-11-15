@@ -4,6 +4,22 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.19.0 — 2026-11-14
+
+Needs API 0.18.0.
+
+**Added**
+- Communities' own tournaments: the Tournaments tab lists them (New
+  tournament for organizers); each has Schedule, Standings, Bracket and
+  Teams, a champion banner, your team's card, and Follow for outsiders.
+- Captains report and confirm (or dispute) scores; organizers set any
+  score and seed the bracket.
+- The editor: link a Tournament event, dates, day start times, format,
+  pools and rules, schedule preview, players from RSVPs, dealt teams,
+  captains, Save and Publish, and an announcement after the first publish.
+- A Tournament event shows "View …" or, for organizers, "Set up
+  tournament"; followed group tournaments open their page from Following.
+
 ## 0.18.0 — 2026-11-14
 
 Needs API 0.17.0.

@@ -206,10 +206,12 @@ everything the app does on the website alone, styled like the website
    api 0.15.0, web 0.16.0; uploading from the website waits on the
    transcode job); [x] workouts (both post typed-in workouts; GPS
    recording needs a phone's location, so it stays in the app).
-5. W5: [ ] hosted tournaments and leagues (find, host, register,
-   divisions, schedules, scores, standings); [ ] hat tournaments and
-   captains' drafts (the callables' logic ported into API services; the
-   app keeps the callables until it switches).
+5. W5: [x] communities' own tournaments (api 0.18.0, web 0.19.0);
+   [x] player signups and captains' drafts (api 0.16.0, web 0.17.0);
+   [ ] hosted tournaments and leagues (find, host, register,
+   divisions, schedules, scores, standings). The draft callables'
+   logic is ported into the API; the app keeps the callables until it
+   switches.
 6. W7: [ ] team meetings and voice rooms (LiveKit web SDK, tokens from
    the API; needs the LiveKit secrets on Cloud Run). Recording stays
    deferred.

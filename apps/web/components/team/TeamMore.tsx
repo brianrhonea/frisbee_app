@@ -1,24 +1,15 @@
 "use client";
 import { type PlayDoc, playCategoryLabels } from "@stall10/shared";
-import { orderBy, where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { LocalTime } from "../LocalTime";
-import { type Doc, useLiveQuery } from "@/lib/live";
+import { useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection, moreTabs } from "./TeamNav";
 import { PlayField } from "./playbook/PlayField";
+import { GroupTournamentsList } from "./group_tournaments/GroupTournamentsList";
 import { StatsHome } from "./stats/StatsHome";
 import { TeamVideos } from "./videos/TeamVideos";
 
-interface GroupTournament {
-  name?: string;
-  startsAt?: string;
-  endsOn?: string;
-  status?: string;
-  format?: string;
-  teams?: unknown[];
-}
 
 /**
  * The rest of the hub (spec §4, More): a team's playbook, videos, stats and
@@ -47,7 +38,7 @@ export function TeamMore() {
       {tab === "playbook" && <Playbook teamId={teamId} editor={viewer.can("manageTeam")} />}
       {tab === "videos" && <TeamVideos />}
       {tab === "stats" && <StatsHome />}
-      {tab === "tournaments" && <Tournaments teamId={teamId} manager={viewer.can("manageEvents")} uid={viewer.uid} />}
+      {tab === "tournaments" && <GroupTournamentsList />}
     </div>
   );
 }
@@ -92,44 +83,5 @@ function Playbook({ teamId, editor }: { teamId: string; editor: boolean }) {
         )}
       </Loading>
     </>
-  );
-}
-
-const statusLabels: Record<string, string> = { setup: "Setting up", live: "Live", done: "Finished", finished: "Finished" };
-
-/**
- * Tournaments the group hosts. The rules show event managers all of them
- * and everyone else the ones they play in, so others ask by participantIds
- * as the app does.
- */
-function Tournaments({ teamId, manager, uid }: { teamId: string; manager: boolean; uid: string }) {
-  const list = useLiveQuery<GroupTournament>(
-    `teams/${teamId}/groupTournaments`,
-    manager ? [] : [where("participantIds", "array-contains", uid)],
-    manager ? "all" : uid,
-  );
-  return (
-    <Loading live={list} empty={manager ? "No tournaments hosted here yet." : "No tournaments here that you're playing in."}>
-      {(rows: Array<Doc<GroupTournament>>) => (
-        <div className="stack">
-          {rows
-            .slice()
-            .sort((a, b) => (b.startsAt ?? "").localeCompare(a.startsAt ?? ""))
-            .map((t) => (
-              <div key={t.id} className="row-card">
-                <span>
-                  <b>{t.name || "Tournament"}</b>
-                  <small>
-                    <LocalTime iso={t.startsAt} style="date" />
-                    {t.teams?.length ? ` · ${t.teams.length} teams` : ""}
-                    {t.format ? ` · ${t.format}` : ""}
-                  </small>
-                </span>
-                {t.status && <span className="pill">{statusLabels[t.status] ?? t.status}</span>}
-              </div>
-            ))}
-        </div>
-      )}
-    </Loading>
   );
 }

@@ -7,6 +7,17 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.18.0 — 2026-11-14
+
+**Added**
+- Group tournaments (`/v1/teams/:teamId/group-tournaments`): create,
+  save, publish (the server builds the schedule with the app's engine,
+  ported to `packages/shared`), delete, report, confirm and set scores,
+  seed the bracket from pool standings, and catch up bracket moves.
+- Every conjunct of the `groupTournaments`, `games` and
+  `tournamentDirectory` rules is ported; the tournament's public listing
+  is kept in step.
+
 ## 0.17.0 — 2026-11-14
 
 **Added**

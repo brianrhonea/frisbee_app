@@ -10,7 +10,7 @@ import { EventItem } from "../EventItem";
 import { LocalTime } from "../LocalTime";
 import { downloadIcs } from "@/lib/calendar";
 import { callApi } from "@/lib/client";
-import { type Doc, useLiveQueries } from "@/lib/live";
+import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { TeamEventEditor } from "./TeamEventEditor";
 
@@ -277,6 +277,8 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
         </p>
       )}
 
+      <EventTournamentLink event={event} />
+
       {member && (
         <>
           <div className="segmented rsvp-buttons" role="group" aria-label="Your answer">
@@ -374,4 +376,52 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
       )}
     </article>
   );
+}
+
+/**
+ * The tournament played at this event, as the app's event detail shows
+ * it: a hosted tournament's page, a group's own tournament, or for a
+ * group's organizers "Set up tournament" on a Tournament event.
+ */
+function EventTournamentLink({ event }: { event: Doc<TeamEventDoc> }) {
+  const { teamId, kind, viewer } = useTeamHub();
+  const member = viewer.state === "member" ? viewer : null;
+  const group = kind !== "team";
+  const organizer = !!member && member.can("manageEvents");
+  // The rules show organizers every tournament and players the ones they're on.
+  const list = useLiveQuery<{ name?: string; eventId?: string }>(
+    member && group && !event.tournamentId ? `teams/${teamId}/groupTournaments` : null,
+    organizer ? [where("eventId", "==", event.id)] : member ? [where("participantIds", "array-contains", member.uid)] : [],
+    `event-tournament-${organizer}-${event.id}`,
+  );
+  const base = `/teams/${encodeURIComponent(teamId)}/tournaments`;
+  if (event.tournamentId) {
+    return (
+      <p className="home-actions">
+        <Link href={`/tournaments/${encodeURIComponent(event.tournamentId)}`} className="btn btn-primary btn-small">
+          Open tournament page
+        </Link>
+      </p>
+    );
+  }
+  const found = list.data?.find((t) => t.eventId === event.id);
+  if (found) {
+    return (
+      <p className="home-actions">
+        <Link href={`${base}/${encodeURIComponent(found.id)}`} className="btn btn-primary btn-small">
+          View {found.name || "tournament"}
+        </Link>
+      </p>
+    );
+  }
+  if (organizer && group && event.type === "tournament" && list.data) {
+    return (
+      <p className="home-actions">
+        <Link href={`${base}/new?event=${encodeURIComponent(event.id)}`} className="btn btn-small">
+          Set up tournament
+        </Link>
+      </p>
+    );
+  }
+  return null;
 }
