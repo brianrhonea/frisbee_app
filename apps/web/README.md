@@ -1,8 +1,8 @@
 # apps/web — Stall 10 website (phase 3)
 
-Next.js 16 (App Router) on Vercel. It replaces the Flutter web build that
-Firebase Hosting serves today (`firebase/scripts/build_site.sh`); every
-platform other than iOS and Android uses it.
+Next.js 16 (App Router) on Vercel. It replaced the Flutter web build that
+Firebase Hosting used to serve (Hosting now has only the static pages in
+`firebase/hosting/`); every platform other than iOS and Android uses it.
 
 ## What's here
 

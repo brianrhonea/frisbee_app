@@ -56,8 +56,8 @@ Stall10/                          (this repo)
 ├── firebase/                     Firebase project config
 │   ├── firebase.json .firebaserc firestore.rules firestore.indexes.json storage.rules
 │   ├── functions/                Cloud Functions (triggers, scheduled jobs, existing callables)
-│   ├── hosting/                  Static pages (/about, /privacy, invite fallbacks)
-│   ├── scripts/                  build_site.sh (today's website), monitoring/
+│   ├── hosting/                  Static pages (/about, /privacy, invite fallbacks), served by Hosting
+│   ├── scripts/                  build_site.sh (copies hosting/ into build/site), monitoring/
 │   └── docs/                     app-check, cloud-limits, monitoring, rollback
 ├── docs/                         Current-state architecture, user guide, changelog, iOS release
 ├── .github/workflows/            Backend deploy/rollback, Node CI
@@ -376,16 +376,24 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 |---|---|---|
 | **1. Monorepo** | Move the app to `apps/mobile`, Firebase to `firebase/`; fix CI (Codemagic, GitHub Actions), site build, docs | **Done** (`monorepo` branch) |
 | **2. API + iOS** | `apps/api` and `packages/shared`; migrate features from direct Firestore/Storage writes to the API one at a time (§10); media pipeline; deploy the API to Cloud Run; iOS releases on the new path | **Started**: API scaffold, team creation migrated |
-| **3. Website** | Build `apps/web` on Next.js against the API; move the domain from Firebase Hosting to Vercel; retire the Flutter web build (`firebase/scripts/build_site.sh`, `apps/mobile/web`, `lib/main_web.dart`, `lib/ui/web`) | **Started**: public site ported (feed, posts, profiles, teams, events, search, About/Help/legal, invite-link fallbacks, sign-in/sign-up); member area in progress, slice by slice (`docs/product-spec.md` §8.1, W1–W8); dev site on Vercel |
+| **3. Website** | Build `apps/web` on Next.js against the API; move the domain from Firebase Hosting to Vercel; retire the Flutter web build (`apps/mobile/web`, `lib/main_web.dart`, `lib/ui/web`, `lib/ui/browse`: removed; Hosting serves only the static pages) | **Started**: public site ported (feed, posts, profiles, teams, events, search, About/Help/legal, invite-link fallbacks, sign-in/sign-up); member area in progress, slice by slice (`docs/product-spec.md` §8.1, W1–W8); dev site on Vercel |
 
 **Transitional pieces** (kept on purpose until their phase):
-- `lib/main_web.dart`, `lib/ui/web`, `lib/ui/browse`,
-  `firebase/scripts/build_site.sh`: the old Flutter website.
-  `apps/mobile/web` was removed (2026-11-12), so it can't be built any
-  more; Firebase Hosting keeps serving the last deploy until the domain
-  moves to Vercel, and hosting deploys are skipped until then.
-- `apps/mobile/windows` and `macos` were removed (2026-11-12): run the
-  app on an Android emulator or an iOS/Android device.
+- The old Flutter website (`lib/main_web.dart`, `lib/routing/web_router.dart`,
+  `lib/ui/web`, `lib/ui/browse`, `lib/data/repositories/browse`) was
+  removed from the app (2026-11-15; `apps/mobile/web` went on
+  2026-11-12). `firebase/scripts/build_site.sh` now only copies
+  `firebase/hosting/` (static pages, invite fallbacks, `.well-known`) into
+  `build/site`; the website is `apps/web` on Vercel.
+- The `browse-*` Cloud Functions (`firebase/functions/src/browse`) were
+  called only by that Flutter site (`apps/web` reads `/v1/public/*`). The
+  last Hosting deploy may still serve it, so they stay until the next
+  hosting deploy replaces it with the static pages; then remove them from
+  `functions/src/index.ts`, `FUNCTION_GROUPS` and the deploy workflow's
+  default groups, and delete them (`firebase functions:delete`).
+- `apps/mobile/windows` and `macos` were removed (2026-11-12), and the
+  app's desktop code with them (2026-11-15): run the app on an Android
+  emulator or an iOS/Android device.
 - Cloud Functions callables (`account`, `api`, `browse`, `meetings`,
   `discord`, `tournaments`): fold into the API over phase 2.
 
@@ -413,7 +421,7 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 | 6 | Follows | follow, requests, accept | `apps/api/src/follows`, with notification read/clear (the website uses them; the app still writes directly). Unit tests with fakes; emulator tests pending | **In the API**, app not switched |
 | 7 | Events | team/personal events, RSVPs, polls; calendar sharing | `apps/api/src/calendar`: calendars (`calendars/{id}`: members and roles, pending invites; invitee copies in `users/{uid}/calendarInvites`), events on any calendar the caller can edit (`/v1/calendars/:id/events`, `validMine` ported; My calendar's stay in `users/{uid}/events`), and the ICS subscription feed (`/v1/ical/:token.ics`, token stored hashed). API-only: clients read only calendars they're on, never another calendar's events, and viewers get no notes. Unit and emulator tests; rules tests for `calendars`, `calendarInvites` and the feed records. The app still writes My calendar's events directly. Team events with their `publicEvents` copy, RSVPs, reactions and votes: `apps/api/src/hub` (the website uses them; the app still writes directly) | **Calendars, their events, team events and answers in the API**; app not switched |
 | 8 | Leagues & tournaments | hosted tournaments, leagues, signups, drafts | `apps/api/src/tournaments` (hosted events and leagues), with signups and drafts in item 14 and group tournaments in item 16. The website uses them; the app still writes directly and keeps the callables. Not yet: payments | **In the API**, app not switched |
-| 9 | Search & browse | `api-search`, `browse-*` callables → API GETs with caching | Website (phase 3) depends on these | |
+| 9 | Search & browse | `api-search`, `browse-*` callables → API GETs with caching | `apps/web` reads `/v1/public/*` (`apps/api/src/browse`); the `browse-*` callables only served the removed Flutter site (removable after the next hosting deploy, §9) | |
 | 10 | Chat & DMs | send, edit, react; rooms and folders | Writes via the API; reads stay Firestore listeners (§11.2). Team rooms: send, react, delete in `apps/api/src/hub`; DMs and groups (open, groups and members, send, react, delete, read, requests, archive, clear) in `apps/api/src/messages`. The website uses both; the app still writes directly. Rooms and folders (create, edit, access, arrange, delete): `apps/api/src/hub/rooms.ts`, and DM typing marks, for the website. Discord template import: `apps/api/src/discord` | **Team room messages and DMs in the API**, app not switched |
 | 12 | Playbook | save and delete plays | `apps/api/src/playbook` (the website uses it; the app still writes `teams/{id}/plays` directly) | **In the API**, app not switched |
 | 13 | Team videos | links, edit, move, remove; folders | `apps/api/src/videos` (the website uses it; the app still writes directly). Uploads from the website wait on the transcode job (item 4) | **In the API**, app not switched; uploads not yet |

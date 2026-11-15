@@ -39,8 +39,8 @@ import '../ui/personal/view_models/personal_prompt_viewmodel.dart';
 import '../ui/personal/widgets/personal_details_screen.dart';
 import '../ui/personal/widgets/personal_prompt_card.dart';
 
-// Pages that both the app's router (router.dart) and the website's
-// (web_router.dart) show, with their view models wired up once.
+// Pages the app's router (router.dart) shows, with their view models wired
+// up once.
 
 Widget signInPage() => ViewModelHost(
   create: (c) => SignInViewModel(authRepository: c.read()),

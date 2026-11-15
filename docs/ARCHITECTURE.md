@@ -32,17 +32,17 @@ and costs, `docs/cloud-limits.md`.
 ## 1. App overview
 
 Stall 10 is an ultimate frisbee app for teams, community groups, schools
-and clubs, and the players in them. It's one Flutter app for Android, iOS,
-macOS and Windows on a Firebase backend, plus a website: a static landing
-the same Flutter app compiled for web at `/`, X-style: visitors browse the
-public feed, search, profiles, team pages and events (through the `browse`
-functions), members also get their home feed; everything else says "get the
-app". Static pages (`/about`, `/privacy`, `/terms`…) sit beside it.
+and clubs, and the players in them. It's one Flutter app for Android and iOS on a
+Firebase backend, plus a website: `apps/web` (Next.js on Vercel, reading
+the API's `/v1/public/*` for signed-out visitors). Firebase Hosting serves
+only static pages (`/about`, `/privacy`, `/terms`…) and the invite
+fallbacks. (The Flutter app compiled for web, and the macOS and Windows
+builds, were removed in November 2026.)
 
 | | |
 |---|---|
 | **Client** | Flutter, following the official Flutter MVVM guide: services → repositories → view models (`ChangeNotifier` + `Command`) → widgets. DI with `provider` (no Riverpod); routing with `go_router`. |
-| **Backend** | Firebase: Auth, Cloud Firestore (app data), Cloud Storage (photos, files, videos), Cloud Messaging (push), Cloud Functions v2 (TypeScript), App Check, Hosting (landing page, web app, invite and join pages). |
+| **Backend** | Firebase: Auth, Cloud Firestore (app data), Cloud Storage (photos, files, videos), Cloud Messaging (push), Cloud Functions v2 (TypeScript), App Check, Hosting (static pages, invite and join pages). |
 | **Trust boundary** | Hybrid. Most reads and writes go straight from the app to Firestore and Storage, checked by `firestore.rules` and `storage.rules`. Cloud Functions sit beside the database for what rules can't do: rate limits and flood control, server-side search, third-party tokens (LiveKit), notifications, counters and cascades. |
 | **Third parties** | LiveKit Cloud (meetings and voice channels), YouTube (video embeds and oEmbed), OpenStreetMap and Nominatim (group maps), Discord server templates (import). |
 | **Environments** | `frisbee-app-brianrhonea-dev` (dev, default; TestFlight from `development`) and `frisbee-app-brianrhonea` (prod; App Store from `main`). |
@@ -52,10 +52,9 @@ app". Static pages (`/about`, `/privacy`, `/terms`…) sit beside it.
 ```
 lib/
   main.dart                 Firebase + App Check init, emulators, providers, MaterialApp.router
-  main_web.dart             The website's entry point: same providers, web router
   config/dependencies.dart  Every service and repository, provided app-wide
   routing/                  routes.dart (paths), router.dart (GoRouter tree, auth redirect),
-                            web_router.dart (the website's subset), route_builders.dart (shared pages)
+                            route_builders.dart (pages with their view models)
   domain/models/            Plain Dart models; no Firebase types
   domain/tournament_engine/ Pure-Dart bracket and schedule generation
   data/services/            Thin wrappers over platform, SDK and HTTP
@@ -67,9 +66,8 @@ lib/
 functions/src/              Cloud Functions, one folder per deploy group
   account/ api/ communities/ discord/ follows/ meetings/ notifications/
 functions/test/             Unit tests and rules tests (emulators)
-hosting/                    Landing page, join and invite pages (copied into build/site)
-web/                        Flutter web shell (index.html, manifest, icons)
-scripts/build_site.sh       Builds build/site: the web app at /, hosting/ pages beside it
+hosting/                    Static pages, join and invite pages (copied into build/site)
+scripts/build_site.sh       Builds build/site: a copy of hosting/
 scripts/monitoring/         Text-alert setup (Cloud Monitoring)
 .github/workflows/          Deploy and roll back the backend
 firestore.rules, storage.rules, firestore.indexes.json, firebase.json
@@ -777,8 +775,7 @@ Read live by every running app (`FeatureFlags`):
 - On device: `SharedStreams` (one listener per query, 5-minute grace) and
   the Firestore cache.
 - Hosting: images and CSS `max-age=86400, stale-while-revalidate=604800`;
-  HTML `max-age=300, s-maxage=3600` at the CDN; the web app's entry files
-  (`/index.html`, `main.dart.js`, `flutter_bootstrap.js`…) `no-cache`.
+  HTML `max-age=300, s-maxage=3600` at the CDN.
 - Storage uploads: `max-age=31536000, immutable`.
 
 ### Deploy, roll back, monitor

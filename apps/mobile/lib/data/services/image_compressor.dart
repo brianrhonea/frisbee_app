@@ -40,9 +40,7 @@ class ImageCompressor {
     final args = (name, bytes, maxDimension, jpegQuality);
     final ShrunkImage? result;
     try {
-      result = kIsWeb
-          ? await compute(_shrink, args)
-          : await Isolate.run(() => _shrink(args));
+      result = await Isolate.run(() => _shrink(args));
     } on Object {
       return original;
     }

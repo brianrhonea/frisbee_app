@@ -38,10 +38,6 @@ Widget syncedVideoPlayer(
         : _FilePlayer(url: fileUrl, onController: onController);
   }
   return switch (defaultTargetPlatform) {
-    _ when kIsWeb => _IframePlayer(
-      id: video.youtubeId,
-      onController: onController,
-    ),
     TargetPlatform.android || TargetPlatform.iOS || TargetPlatform.macOS =>
       _IframePlayer(id: video.youtubeId, onController: onController),
     TargetPlatform.windows => _WindowsPlayer(

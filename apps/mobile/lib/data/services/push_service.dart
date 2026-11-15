@@ -42,7 +42,7 @@ class PushService {
   /// Android tag, the Apple thread id) from the lock screen and
   /// notification shade, e.g. once the conversation has been read here.
   Future<void> clearDelivered(String collapseId) async {
-    if (kIsWeb || !isSupported) return;
+    if (!isSupported) return;
     try {
       await _channel.invokeMethod<void>('clearDelivered', collapseId);
     } on Exception catch (e) {

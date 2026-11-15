@@ -41,19 +41,11 @@ class CallableClient {
       ? Uri.parse('http://localhost:5001/$_projectId/$_region/$name')
       : Uri.parse('https://$_region-$_projectId.cloudfunctions.net/$name');
 
-  /// Calls function [name] with [data] and returns its result. With
-  /// [signedOut], calls without an account too (the website's `browse`
-  /// functions), still sending the user's token when there is one.
-  Future<Object?> call(
-    String name,
-    Map<String, Object?> data, {
-    bool signedOut = false,
-  }) async {
+  /// Calls function [name] with [data] and returns its result.
+  Future<Object?> call(String name, Map<String, Object?> data) async {
     final user = (_auth ?? FirebaseAuth.instance).currentUser;
-    if (user == null && !signedOut) {
-      throw const CallableException('Not signed in.');
-    }
-    final idToken = await user?.getIdToken();
+    if (user == null) throw const CallableException('Not signed in.');
+    final idToken = await user.getIdToken();
     final response = await _client.post(
       _endpoint(name),
       headers: {

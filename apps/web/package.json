@@ -2,7 +2,7 @@
   "name": "@stall10/web",
   "version": "0.28.1",
   "private": true,
-  "description": "Stall 10 website (phase 3): Next.js on Vercel; writes through apps/api, member reads from Firestore. Replaces the Flutter web build in firebase/hosting.",
+  "description": "Stall 10 website (phase 3): Next.js on Vercel; writes through apps/api, member reads from Firestore. Replaced the Flutter web build on Firebase Hosting.",
   "scripts": {
     "dev": "next dev",
     "build": "pnpm --filter @stall10/shared build && next build",

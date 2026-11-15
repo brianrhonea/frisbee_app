@@ -18,7 +18,6 @@ typedef YouTubePlayerBuilder = Widget Function(String youtubeId);
 /// and macOS, the same embed in an Edge WebView2 on Windows, and elsewhere
 /// the thumbnail with a link to YouTube.
 Widget youTubePlayer(String youtubeId) => switch (defaultTargetPlatform) {
-  _ when kIsWeb => _IframePlayer(youtubeId: youtubeId),
   TargetPlatform.android ||
   TargetPlatform.iOS ||
   TargetPlatform.macOS => _IframePlayer(youtubeId: youtubeId),
