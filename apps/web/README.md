@@ -152,4 +152,4 @@ changing them.
   `https://stall10.app`.
 - Add a firewall rate-limit rule for visitors (the API trusts this server
   through `WEB_SERVER_KEY`).
-- Keep store URLs in step: `lib/site.ts`, `apps/mobile/lib/config/store_links.dart`.
+- Keep store URLs in step: `lib/site.ts`, `content/about.html`, `firebase/hosting/about.html` and `join.html`.
