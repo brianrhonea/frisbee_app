@@ -23,8 +23,11 @@ export function VoiceRoom({ teamId, roomId, name, canSpeak }: { teamId: string; 
   const [notice, setNotice] = useState<string | null>(null);
   const [volumes, setVolumes] = useState<Record<string, number>>({});
   const ref = useRef<CallSession | null>(null);
+  // Bumped on leaving, a room switch and unmount: a connect that finishes after is dropped.
+  const generation = useRef(0);
 
   const leave = useCallback(async (why: string | null) => {
+    generation.current += 1;
     const c = ref.current;
     ref.current = null;
     setCall(null);
@@ -33,7 +36,13 @@ export function VoiceRoom({ teamId, roomId, name, canSpeak }: { teamId: string; 
   }, []);
 
   // Another room, or another page: this call ends.
-  useEffect(() => () => void ref.current?.leave(), []);
+  useEffect(
+    () => () => {
+      generation.current += 1;
+      void ref.current?.leave();
+    },
+    [],
+  );
   useEffect(() => {
     void leave(null);
     setNotice(null);
@@ -48,14 +57,21 @@ export function VoiceRoom({ teamId, roomId, name, canSpeak }: { teamId: string; 
     setJoining(true);
     setError(null);
     setNotice(null);
+    const mine = ++generation.current;
     try {
       const access = await callApi<VoiceTokenResult>(user, `/v1/teams/${encodeURIComponent(teamId)}/voice-rooms/${encodeURIComponent(roomId)}/token`, { method: "POST" });
+      if (mine !== generation.current) return;
       setSpeak(access.canSpeak);
       // Listeners join muted and are never asked for the mic.
       const c = await CallSession.connect({ url: access.url, token: access.token, micOn: access.canSpeak, cameraOn: false });
+      if (mine !== generation.current) {
+        await c.leave();
+        return;
+      }
       ref.current = c;
       setCall(c);
     } catch (e) {
+      if (mine !== generation.current) return;
       setError(e instanceof ApiError ? e.message : "Couldn't connect to the channel. Check your connection and try again.");
     } finally {
       setJoining(false);

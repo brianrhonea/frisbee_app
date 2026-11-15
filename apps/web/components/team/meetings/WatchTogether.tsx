@@ -36,7 +36,7 @@ type Video = Doc<TeamVideoDoc>;
  * a seek when it's more than 1.5 s off. While it plays, the presenter
  * rewrites the state every 10 s so viewers correct for buffering.
  */
-export function WatchTogether({ teamId, meetingId, canControl }: { teamId: string; meetingId: string; canControl: boolean }) {
+export function WatchTogether({ teamId, meetingId, canControl, stage }: { teamId: string; meetingId: string; canControl: boolean; stage: boolean }) {
   const { user } = useAuth();
   const playback = useLiveDoc<MeetingPlaybackDoc>(`teams/${teamId}/meetings/${meetingId}/playback/current`);
   const videos = useLiveQuery<TeamVideoDoc>(`teams/${teamId}/videos`, [], "watch-videos");
@@ -150,11 +150,17 @@ export function WatchTogether({ teamId, meetingId, canControl }: { teamId: strin
     }
   }
 
+  // On the stage (always mounted in the call, so everyone follows and the
+  // presenter's heartbeat keeps going): the player while something plays.
+  // In the side panel: the admins' picker, or a pointer to the stage.
+  if (stage && (!p || playback.error)) return null;
   if (playback.error) return <p className="muted small">Watch together isn&apos;t available until you&apos;re in the call.</p>;
-  if (!p) {
+  if (!stage) {
+    if (p) return <p className="muted small">{video?.title || "A team video"} is playing for everyone above.</p>;
     if (!canControl) return <p className="muted small">When an admin plays a team video, it plays here for everyone.</p>;
     return <VideoPicker videos={videos.data ?? []} onPick={(id) => void write({ videoId: id, playing: false, positionMs: 0 })} error={error} />;
   }
+  if (!p) return null;
 
   const duration = status?.durationMs ?? null;
   const position = scrub ?? status?.positionMs ?? playbackPositionAt(p, Date.now());

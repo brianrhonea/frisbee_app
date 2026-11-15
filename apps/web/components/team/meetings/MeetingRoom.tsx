@@ -66,6 +66,8 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   const [panel, setPanel] = useState<"people" | "chat" | "watch">("people");
   const [volumes, setVolumes] = useState<Record<string, number>>({});
   const callRef = useRef<CallSession | null>(null);
+  // Bumped on hang-up and unmount: a connect that finishes after either is dropped.
+  const generation = useRef(0);
 
   let lobby: Lobby;
   if (!member || meeting.data === undefined) lobby = meeting.error ? "unavailable" : "loading";
@@ -76,6 +78,7 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   else lobby = myRequest.data?.status === "admitted" ? "canJoin" : myRequest.data?.status === "pending" ? "waitingForApproval" : "canAsk";
 
   const hangUp = useCallback(async (why: string | null) => {
+    generation.current += 1;
     const c = callRef.current;
     callRef.current = null;
     setCall(null);
@@ -87,6 +90,7 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
   // Leaving the page leaves the call; the camera and mic stop.
   useEffect(
     () => () => {
+      generation.current += 1;
       void callRef.current?.leave();
     },
     [],
@@ -105,14 +109,21 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
     setStage("joining");
     setError(null);
     setNotice(null);
+    const mine = ++generation.current;
     try {
       const access = await callApi<MeetingTokenResult>(user, `${meetingApi(teamId, meetingId)}/token`, { method: "POST" });
+      if (mine !== generation.current) return;
       const c = await CallSession.connect({ url: access.url, token: access.token, micOn: prefs.micOn, cameraOn: prefs.cameraOn });
+      if (mine !== generation.current) {
+        await c.leave();
+        return;
+      }
       callRef.current = c;
       setCall(c);
       setWantsIn(false);
       setStage("inCall");
     } catch (e) {
+      if (mine !== generation.current) return;
       setError(e instanceof ApiError ? e.message : "Couldn't connect to the call. Check your connection and try again.");
       setStage("lobby");
     }
@@ -188,7 +199,10 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
         </header>
         {admin && pending.length > 0 && <Requests pending={pending} busy={busy} onDecide={decide} />}
         <div className="call-body">
-          <CallStage people={state.people} />
+          <div className="call-stage-wrap">
+            <WatchTogether teamId={teamId} meetingId={meetingId} canControl={admin} stage />
+            <CallStage people={state.people} />
+          </div>
           <aside className="card call-side">
             <div className="segmented" role="tablist" aria-label="Panel">
               {(
@@ -205,7 +219,7 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
             </div>
             {panel === "people" && <PeopleList call={call} people={state.people} volumes={volumes} onVolume={(uid, v) => setVolumes({ ...volumes, [uid]: v })} />}
             {panel === "chat" && <MeetingChat teamId={teamId} meetingId={meetingId} canModerate={admin} />}
-            {panel === "watch" && <WatchTogether teamId={teamId} meetingId={meetingId} canControl={admin} />}
+            {panel === "watch" && <WatchTogether teamId={teamId} meetingId={meetingId} canControl={admin} stage={false} />}
           </aside>
         </div>
         {state.notice && (

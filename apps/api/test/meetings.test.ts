@@ -615,3 +615,28 @@ describe("voice token (meetings-voiceToken)", () => {
     expect((await s.call("POST", V("lounge"), undefined, "player")).status).toBe(412);
   });
 });
+
+describe("signedIn(): every route", () => {
+  it("answers 401 without a caller", async () => {
+    putMeeting("m1", { status: "live" });
+    const routes: Array<["POST" | "PATCH" | "PUT" | "DELETE", string, object?]> = [
+      ["POST", M, meeting],
+      ["PATCH", `${M}/m1`, meeting],
+      ["DELETE", `${M}/m1`],
+      ["PUT", `${M}/m1/rsvp`, { answer: "attending" }],
+      ["POST", `${M}/m1/start`],
+      ["POST", `${M}/m1/end`],
+      ["PUT", `${M}/m1/requests/player`],
+      ["PUT", `${M}/m1/requests/player/decision`, { admit: true }],
+      ["DELETE", `${M}/m1/requests/player`],
+      ["PUT", `${M}/m1/playback`, { videoId: "v1", playing: true, positionMs: 0 }],
+      ["DELETE", `${M}/m1/playback`],
+      ["POST", `${M}/m1/messages`, { text: "hi" }],
+      ["DELETE", `${M}/m1/messages/x`],
+      ["POST", `${M}/m1/token`],
+      ["POST", "/v1/teams/t1/voice-rooms/lounge/token"],
+    ];
+    for (const [method, url, body] of routes) expect((await s.call(method, url, body, null)).status, `${method} ${url}`).toBe(401);
+    expect(s.store.doc("teams/t1/meetings/m1")?.status).toBe("live");
+  });
+});

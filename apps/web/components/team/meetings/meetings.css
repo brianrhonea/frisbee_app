@@ -27,7 +27,7 @@
 .call-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .call-head .card-title { margin: 0; }
 .call-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 12px; align-items: start; }
-.call-stage { display: grid; gap: 10px; }
+.call-stage-wrap, .call-stage { display: grid; gap: 10px; min-width: 0; }
 .call-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .call-stage.sharing .call-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 .call-tile, .call-screen {

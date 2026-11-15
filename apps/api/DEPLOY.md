@@ -369,9 +369,10 @@ up here yet."; every other route, including scheduling meetings, works
 without them. Never put the values in the repo, `service.yaml` or a
 workflow: they live in Secret Manager.
 
-`firebase functions:secrets:set LIVEKIT_API_KEY` (and so on) already
-stored them in each project's Secret Manager under those same names, for
-the functions. Check, then let `api-runtime` read them:
+`firebase functions:secrets:set LIVEKIT_API_KEY` (and so on) stores them
+in the project's Secret Manager under those same names, so a project whose
+meetings functions are deployed should have them already (not checked for
+dev; prod isn't set up yet). Check, then let `api-runtime` read them:
 
 ```sh
 gcloud secrets list --project="$PROJECT" --filter="name~LIVEKIT"
