@@ -14,7 +14,7 @@ import {
   groupTournamentLimits,
   tournamentFollowKey,
 } from "@stall10/shared";
-import { where } from "firebase/firestore";
+import { limit, where } from "firebase/firestore";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -37,7 +37,8 @@ export function TournamentEditorPage({ tournamentId, eventId }: { tournamentId: 
   const member = viewer.state === "member" ? viewer : null;
   const organizer = member?.can("manageEvents") ?? false;
   const doc = useLiveDoc<GroupTournamentDoc>(organizer && tournamentId ? `teams/${teamId}/groupTournaments/${tournamentId}` : null);
-  const events = useLiveQuery<TeamEventDoc>(organizer ? `teams/${teamId}/events` : null, [where("type", "==", "tournament")], "tournamentEvents");
+  // Bounded (ordering them would need an index): the events a tournament can be linked to.
+  const events = useLiveQuery<TeamEventDoc>(organizer ? `teams/${teamId}/events` : null, [where("type", "==", "tournament"), limit(300)], "tournamentEvents");
   const back = (
     <Link href={`/teams/${encodeURIComponent(teamId)}/more?tab=tournaments`} className="text-btn">
       ← Tournaments

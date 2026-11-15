@@ -92,13 +92,16 @@ export function useTournamentBase(tournamentId: string, uid: string | null) {
   return { tournament, divisions: { ...divisions, data: divisions.data ? list : undefined }, manager, managerKnown };
 }
 
+// Bounded well past any real event: drafts and the signup list need every signup read.
+const signupsCap = 2000;
+
 /** Everyone's signups (managers), or just the caller's own. */
 export function useSignups(tournamentId: string, manager: boolean) {
-  return useLiveQuery<PlayerSignupDoc>(manager ? `${t(tournamentId)}/signups` : null, [], `signups:${tournamentId}`);
+  return useLiveQuery<PlayerSignupDoc>(manager ? `${t(tournamentId)}/signups` : null, [limit(signupsCap)], `signups:${tournamentId}`);
 }
 export const useMySignup = (tournamentId: string, uid: string | null) => useLiveDoc<PlayerSignupDoc>(uid ? `${t(tournamentId)}/signups/${uid}` : null);
 export function usePayments(tournamentId: string, manager: boolean) {
-  return useLiveQuery<PaymentDoc>(manager ? `${t(tournamentId)}/payments` : null, [], `payments:${tournamentId}`);
+  return useLiveQuery<PaymentDoc>(manager ? `${t(tournamentId)}/payments` : null, [limit(signupsCap)], `payments:${tournamentId}`);
 }
 export const useMyPayment = (tournamentId: string, uid: string | null) => useLiveDoc<PaymentDoc>(uid ? `${t(tournamentId)}/payments/${uid}` : null);
 

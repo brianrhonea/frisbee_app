@@ -3,6 +3,7 @@
 // (statsGames by date, statsTournaments by startDate, the roster), and who
 // may do what, as the app's view models decide it.
 import {
+  rosterMax,
   sortPlayers,
   type StatsGame,
   type StatsPlayer,
@@ -17,6 +18,12 @@ import { useLiveQuery } from "@/lib/live";
 import type { TeamViewer } from "../TeamContext";
 
 type Member = Extract<TeamViewer, { state: "member" }>;
+
+// Bounded reads, well past any real team's: season totals and the game
+// and tournament pages add up everything read, so these must never cut a
+// real list short (the roster is capped at rosterMax by the API).
+const statsGamesCap = 2000;
+const statsTournamentsCap = 500;
 const editors = ["owner", "coach", "captain"];
 
 /**
@@ -44,21 +51,21 @@ export function statsAccess(viewer: TeamViewer) {
 }
 
 export function useStatsGames(teamId: string | null) {
-  const live = useLiveQuery(teamId ? `teams/${teamId}/statsGames` : null, [orderBy("date", "desc")], "statsGames");
+  const live = useLiveQuery(teamId ? `teams/${teamId}/statsGames` : null, [orderBy("date", "desc"), limit(statsGamesCap)], "statsGames");
   const data = useMemo(() => live.data?.map((d) => statsGameFrom(d.id, d)), [live.data]);
   return { data, error: live.error };
 }
 
 export function useStatsTournaments(teamId: string | null) {
-  const live = useLiveQuery(teamId ? `teams/${teamId}/statsTournaments` : null, [orderBy("startDate", "desc")], "statsTournaments");
+  const live = useLiveQuery(teamId ? `teams/${teamId}/statsTournaments` : null, [orderBy("startDate", "desc"), limit(statsTournamentsCap)], "statsTournaments");
   const data = useMemo(() => live.data?.map((d) => statsTournamentFrom(d.id, d)), [live.data]);
   return { data, error: live.error };
 }
 
 /** The roster, by number then name; with the paid marks for admins (rosterStatus is theirs only). */
 export function useStatsPlayers(teamId: string | null, withStatus = false) {
-  const roster = useLiveQuery(teamId ? `teams/${teamId}/roster` : null, [], "roster");
-  const status = useLiveQuery<{ paid?: boolean }>(teamId && withStatus ? `teams/${teamId}/rosterStatus` : null, [], "rosterStatus");
+  const roster = useLiveQuery(teamId ? `teams/${teamId}/roster` : null, [limit(rosterMax)], "roster");
+  const status = useLiveQuery<{ paid?: boolean }>(teamId && withStatus ? `teams/${teamId}/rosterStatus` : null, [limit(rosterMax)], "rosterStatus");
   const data = useMemo(() => {
     if (!roster.data) return undefined;
     const paid = new Map((status.data ?? []).map((s) => [s.id, s]));

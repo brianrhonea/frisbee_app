@@ -1,5 +1,6 @@
 "use client";
 import { type MeetingPlaybackDoc, type MeetingPlaybackRequest, playbackPositionAt, type TeamVideoDoc, watchTogether } from "@stall10/shared";
+import { limit, orderBy } from "firebase/firestore";
 import { getDownloadURL, ref } from "firebase/storage";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
@@ -7,6 +8,9 @@ import { firebaseStorage } from "@/lib/firebase";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../../AuthProvider";
 import { meetingApi } from "./model";
+
+/** How many of the newest team videos the picker lists. */
+const pickerCap = 100;
 
 /** What a player reports when asked (PlayerStatus). */
 interface PlayerStatus {
@@ -41,9 +45,11 @@ type Video = Doc<TeamVideoDoc>;
 export function WatchTogether({ teamId, meetingId, canControl, stage, volume = 1 }: { teamId: string; meetingId: string; canControl: boolean; stage: boolean; volume?: number }) {
   const { user } = useAuth();
   const playback = useLiveDoc<MeetingPlaybackDoc>(`teams/${teamId}/meetings/${meetingId}/playback/current`);
-  const videos = useLiveQuery<TeamVideoDoc>(`teams/${teamId}/videos`, [], "watch-videos");
   const p = playback.data ?? null;
-  const video = p ? (videos.data ?? []).find((v) => v.id === p.videoId) : undefined;
+  // The one playing, by id; the picker lists the newest (only presenters pick, with nothing playing).
+  const current = useLiveDoc<TeamVideoDoc>(p?.videoId ? `teams/${teamId}/videos/${p.videoId}` : null);
+  const videos = useLiveQuery<TeamVideoDoc>(canControl && !p && !stage ? `teams/${teamId}/videos` : null, [orderBy("createdAt", "desc"), limit(pickerCap)], "watch-videos");
+  const video = p ? (current.data ?? undefined) : undefined;
   const controlling = canControl && !!p && p.presenterId === user?.uid;
   const player = useRef<SyncedPlayer | null>(null);
   const lastWrite = useRef(0);

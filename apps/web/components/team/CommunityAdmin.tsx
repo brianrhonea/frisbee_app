@@ -6,7 +6,7 @@ import {
   type SearchPage,
   teamLimits,
 } from "@stall10/shared";
-import { orderBy } from "firebase/firestore";
+import { limit, orderBy } from "firebase/firestore";
 import { type FormEvent, useState } from "react";
 import { callApi } from "@/lib/client";
 import { useLiveQuery } from "@/lib/live";
@@ -73,7 +73,7 @@ function RolePicker({ value, onChange }: { value: string[]; onChange: (v: string
  */
 export function CommunityAdmin() {
   const { teamId: orgId, viewer } = useTeamHub();
-  const requests = useLiveQuery<LinkRequest>(`teams/${orgId}/linkRequests`, [orderBy("createdAt", "desc")], orgId);
+  const requests = useLiveQuery<LinkRequest>(`teams/${orgId}/linkRequests`, [orderBy("createdAt", "desc"), limit(100)], orgId);
   const { call, busy, error } = useCall();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
