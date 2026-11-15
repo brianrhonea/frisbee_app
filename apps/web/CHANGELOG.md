@@ -4,6 +4,21 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.18.0 — 2026-11-14
+
+Needs API 0.17.0.
+
+**Added**
+- Stats tab: season record, top +/-, tournament folders and games; stat
+  keepers create games and tournaments, optionally linked to a schedule
+  event.
+- Live game tracker: point by point and play by play, with pull timer,
+  subs, timeouts, game point, end or resume, undo and keyboard shortcuts.
+  Plays save every few seconds and milestones at once, as in the app.
+- Game lines (build, edit, import), the point log with halftime and
+  timeouts, and the box score; tournament pages (games by round, roster,
+  shared lines, stats); the season stats table; the roster players page.
+
 ## 0.17.0 — 2026-11-14
 
 Needs API 0.16.0.

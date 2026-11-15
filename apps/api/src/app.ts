@@ -9,6 +9,8 @@ import { VideoService, videoRoutes } from "./videos/service.js";
 import { type DraftQueries, listDraftQueries } from "./drafts/repository.js";
 import { draftRoutes } from "./drafts/routes.js";
 import { DraftService } from "./drafts/service.js";
+import { statsRoutes } from "./stats/routes.js";
+import { StatsService } from "./stats/service.js";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
@@ -162,6 +164,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     playbookRoutes(app, new PlaybookService(deps.store), writes);
     videoRoutes(app, new VideoService(deps.store, deps.users, deps.media), writes);
     draftRoutes(app, new DraftService(deps.store, deps.draftQueries ?? listDraftQueries(deps.store)), writes);
+    statsRoutes(app, new StatsService(deps.store), writes);
     conversationRoutes(app, new ConversationService(deps.store, deps.users, deps.media, deps.now), writes);
     if (deps.calendar) {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {

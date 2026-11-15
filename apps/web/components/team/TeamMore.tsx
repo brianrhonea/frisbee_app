@@ -8,15 +8,9 @@ import { type Doc, useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection, moreTabs } from "./TeamNav";
 import { PlayField } from "./playbook/PlayField";
+import { StatsHome } from "./stats/StatsHome";
 import { TeamVideos } from "./videos/TeamVideos";
 
-interface StatsGame {
-  opponent?: string;
-  date?: string;
-  gameTo?: number;
-  finished?: boolean;
-  points?: Array<{ result?: string }>;
-}
 interface GroupTournament {
   name?: string;
   startsAt?: string;
@@ -52,7 +46,7 @@ export function TeamMore() {
       )}
       {tab === "playbook" && <Playbook teamId={teamId} editor={viewer.can("manageTeam")} />}
       {tab === "videos" && <TeamVideos />}
-      {tab === "stats" && <Stats teamId={teamId} />}
+      {tab === "stats" && <StatsHome />}
       {tab === "tournaments" && <Tournaments teamId={teamId} manager={viewer.can("manageEvents")} uid={viewer.uid} />}
     </div>
   );
@@ -98,72 +92,6 @@ function Playbook({ teamId, editor }: { teamId: string; editor: boolean }) {
         )}
       </Loading>
     </>
-  );
-}
-
-function score(g: StatsGame) {
-  const points = g.points ?? [];
-  return { us: points.filter((p) => p.result === "weScored").length, them: points.filter((p) => p.result === "theyScored").length };
-}
-
-function Stats({ teamId }: { teamId: string }) {
-  const games = useLiveQuery<StatsGame>(`teams/${teamId}/statsGames`, [orderBy("date", "desc")], "statsGames");
-  return (
-    <Loading live={games} empty="No games tracked yet. Keep stats in the app.">
-      {(rows) => {
-        const results = rows.filter((g) => g.finished).map(score);
-        const wins = results.filter((r) => r.us > r.them).length;
-        return (
-          <div className="stack">
-            <div className="tiles">
-              <div className="tile">
-                <b>{rows.length}</b>
-                <small>Games</small>
-              </div>
-              <div className="tile">
-                <b>
-                  {wins}–{results.length - wins}
-                </b>
-                <small>Record</small>
-              </div>
-              <div className="tile">
-                <b>{results.reduce((n, r) => n + r.us - r.them, 0)}</b>
-                <small>Point diff.</small>
-              </div>
-            </div>
-            <div className="card table-scroll">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Opponent</th>
-                    <th className="num">Score</th>
-                    <th>Result</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((g) => {
-                    const s = score(g);
-                    return (
-                      <tr key={g.id}>
-                        <td>
-                          <LocalTime iso={g.date} style="date" />
-                        </td>
-                        <td>{g.opponent || "Opponent"}</td>
-                        <td className="num">
-                          {s.us}–{s.them}
-                        </td>
-                        <td>{!g.finished ? <span className="pill">Live</span> : s.us > s.them ? "Win" : s.us < s.them ? "Loss" : "Tie"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      }}
-    </Loading>
   );
 }
 

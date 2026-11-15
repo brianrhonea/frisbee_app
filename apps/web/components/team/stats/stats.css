@@ -1,0 +1,128 @@
+/* Team stats: the tracker, game rows, tables. Built on app.css tokens. */
+.st-game-row { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 0 10px 0 0; }
+.st-game-link { flex: 1; display: flex; align-items: center; gap: 12px; padding: 10px 12px; color: inherit; text-decoration: none; min-width: 0; }
+.st-game-link > span:first-child { flex: 1; display: grid; min-width: 0; }
+.st-game-link:hover b { text-decoration: underline; }
+.st-score { font-weight: 700; font-variant-numeric: tabular-nums; }
+.st-badge { font-size: 0.75rem; font-weight: 800; padding: 2px 6px; border-radius: 6px; }
+.st-win { color: #1b8a3a; background: rgb(27 138 58 / 0.15); }
+.st-loss { color: var(--danger); background: color-mix(in srgb, var(--danger) 15%, transparent); }
+.st-live { color: var(--amber); background: color-mix(in srgb, var(--amber) 18%, transparent); }
+.st-danger { color: var(--danger); }
+.st-pos { color: #1b8a3a; }
+.st-neg { color: var(--danger); }
+.st-rounds { counter-reset: round; }
+.st-rounds > li { counter-increment: round; }
+.st-rounds > li::before { content: "R" counter(round); color: var(--muted); font-size: 0.85rem; padding-left: 12px; min-width: 28px; }
+
+.st-season-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.st-season-head > div { display: grid; }
+.st-record { font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+.st-leaders { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.st-leaders li span { display: inline-block; min-width: 40%; }
+.st-leaders li small { margin-right: 12px; }
+
+.st-new, .st-subcard { display: grid; gap: 12px; }
+.st-subcard { border-color: var(--accent); }
+.st-eff { grid-template-columns: repeat(2, 1fr); }
+.st-eff .tile small { white-space: normal; }
+.st-sheet th, .st-sheet td { white-space: nowrap; }
+.st-pin { position: sticky; left: 0; background: var(--card); z-index: 1; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.st-sort { border: 0; background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
+.st-sheet td.st-pos, .st-sheet td.st-neg { font-weight: 700; }
+
+.st-game-head { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 12px; }
+.st-game-head .card-title, .st-game-head p { margin: 0; }
+.st-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.st-row > .st-big { flex: 1 1 0; }
+.st-big { min-height: 56px; font-weight: 700; justify-content: center; text-align: center; }
+.st-wide { width: 100%; justify-content: center; }
+.st-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.st-center { text-align: center; }
+.st-plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+ul.st-chips.st-plain { display: flex; }
+
+.st-scoreboard { display: grid; gap: 10px; }
+.st-score-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; text-align: center; gap: 8px; }
+.st-team { display: grid; justify-items: center; min-width: 0; }
+.st-team b { font-size: 2.6rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.st-mid { display: grid; gap: 4px; justify-items: center; }
+.st-sides { display: flex; }
+.st-sides button { flex: 1; }
+.st-banner { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--field); }
+.st-armed { background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+.st-chain { margin: 6px 0 0; overflow-x: auto; white-space: nowrap; }
+.st-linebar b { flex: 1; }
+
+.st-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.st-tile {
+  position: relative; display: grid; gap: 4px; justify-items: center; align-content: center; min-height: 96px; padding: 10px 6px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--field); color: var(--ink); font: inherit; cursor: pointer;
+  touch-action: manipulation;
+}
+.st-tile b { font-size: 1.5rem; font-weight: 800; }
+.st-tile span { font-size: 0.9rem; line-height: 1.15; overflow: hidden; text-align: center; overflow-wrap: anywhere; }
+.st-tile:hover { border-color: var(--accent); }
+.st-tile.holding { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.st-tile.idle { opacity: 0.55; }
+.st-key { position: absolute; top: 6px; left: 8px; font-size: 0.7rem; opacity: 0.6; }
+.st-dock { position: sticky; bottom: 8px; z-index: 2; display: grid; gap: 8px; box-shadow: var(--shadow); }
+.st-undo .btn { flex: none; }
+.st-count { font-size: 1.4rem; }
+.st-good { border-color: #1b8a3a; color: #1b8a3a; }
+.st-bad { border-color: var(--danger); color: var(--danger); }
+.st-good.solid { background: #1b8a3a; color: #fff; }
+.st-bad.solid { background: var(--danger); color: #fff; }
+.st-big.armed { border-width: 3px; }
+
+.st-chips, .st-chooser { display: flex; flex-wrap: wrap; gap: 6px; }
+.st-chip {
+  border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; font-size: 0.9rem;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer; touch-action: manipulation;
+}
+li.st-chip { cursor: default; }
+.st-chip b { color: var(--muted); margin-right: 2px; }
+.st-chip.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.st-chip.on b { color: inherit; }
+.st-chip:disabled { opacity: 0.45; cursor: default; }
+.st-paid { cursor: pointer; border: 1px solid var(--line); }
+.st-paid.on { background: var(--accent-soft); }
+.st-actions { white-space: nowrap; text-align: right; }
+.st-actions .text-btn + .text-btn { margin-left: 10px; }
+
+.st-clock { margin: 0; text-align: center; font-size: 3rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.st-clock.running { color: var(--accent); }
+.st-timeout-team { flex: 1; display: grid; justify-items: center; gap: 4px; }
+.st-dots { display: flex; gap: 4px; }
+.st-dots i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); }
+.st-dots i.on { background: var(--accent); }
+
+.st-point summary { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+.st-point summary::-webkit-details-marker { display: none; }
+.st-point summary > span:nth-child(2) { flex: 1; display: grid; }
+.st-side { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--accent-soft); }
+.st-side-defense { background: var(--field); border: 1px solid var(--line); }
+.st-plays { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.st-play { display: flex; gap: 10px; align-items: baseline; }
+.st-tag { flex: none; width: 96px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; padding: 3px 6px; border-radius: 6px; background: var(--field); }
+.st-tag-goal { color: #1b8a3a; background: rgb(27 138 58 / 0.12); }
+.st-tag-bad { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.st-tag-d { color: #3f51b5; background: rgb(63 81 181 / 0.12); }
+.st-tag-beat { color: #c75000; background: rgb(199 80 0 / 0.12); }
+.st-tag-catch { color: var(--accent); background: var(--accent-soft); }
+.st-tag-pull, .st-tag-timeout { color: var(--amber); background: color-mix(in srgb, var(--amber) 14%, transparent); }
+.st-tag-muted { color: var(--muted); }
+.st-possession { list-style: none; font-style: italic; padding-left: 4px; }
+.st-halftime { text-align: center; font-weight: 800; color: var(--accent); margin: 4px 0; }
+.st-keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; margin: 0; }
+.st-keys div { display: flex; gap: 8px; align-items: baseline; }
+.st-keys dt { margin: 0; }
+.st-keys dd { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.st-game kbd, .st-keys kbd { font: inherit; font-size: 0.8em; padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--field); }
+
+@media (max-width: 560px) {
+  .st-team b { font-size: 2rem; }
+  .st-grid { grid-template-columns: repeat(4, 1fr); }
+  .st-tile { min-height: 84px; }
+  .st-key { display: none; }
+}

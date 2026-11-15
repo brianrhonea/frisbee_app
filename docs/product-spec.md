@@ -200,7 +200,8 @@ everything the app does on the website alone, styled like the website
 3. Messages: [x] typing indicators and read receipts (api 0.13.0, web
    0.14.0). The app has no message editing and keeps team rooms out of
    its inbox, so neither is needed.
-4. W6: [ ] stats (games, live stat entry, season tables); [x] playbook
+4. W6: [x] stats (games, live stat entry, season tables, roster
+   players; api 0.17.0, web 0.18.0); [x] playbook
    (play editor on a field, drag to draw; api 0.14.0, web 0.15.0); [x] videos (library, links, folders, player;
    api 0.15.0, web 0.16.0; uploading from the website waits on the
    transcode job); [x] workouts (both post typed-in workouts; GPS

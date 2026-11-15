@@ -7,6 +7,19 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.17.0 — 2026-11-14
+
+**Added**
+- Team stats: create, save whole and delete stats games
+  (`/v1/teams/:teamId/stats-games`) and stats tournaments
+  (`.../stats-tournaments`); deleting a tournament deletes its games.
+- Roster spots (`.../roster-players`): admins add, edit (with the paid
+  mark) and remove them; members claim or let go of their own spot
+  (`PUT .../roster-players/:id/link`).
+- Every conjunct of the statsGames, statsTournaments, roster and
+  rosterStatus rules is ported, with bounds on nested game shapes and
+  size. Stats writes have their own limit of 90 a minute per member.
+
 ## 0.16.0 — 2026-11-14
 
 **Added**
