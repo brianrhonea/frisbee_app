@@ -124,6 +124,24 @@ describe("messages", () => {
     expect(s.store.doc("conversations/amy_ben")?.lastMessage).toBe("📷 Photo");
   });
 
+  it("keeps a file's own name and size on the message", async () => {
+    s.store.put("uploads/u3", {
+      uid: "amy",
+      purpose: "chat",
+      targetId: "conversations/amy_ben",
+      itemId: "m2",
+      status: "ready",
+      path: "conversations/amy_ben/amy/m2/u3-Line calls.pdf",
+      name: "Line calls.pdf",
+      contentType: "application/pdf",
+      actualSize: 2048,
+    });
+    expect((await s.call("POST", "/v1/conversations/amy_ben/messages", { id: "m2", uploadIds: ["u3"] })).statusCode).toBe(201);
+    expect(s.store.doc("conversations/amy_ben/messages/m2")?.attachments).toEqual([
+      { path: "conversations/amy_ben/amy/m2/u3-Line calls.pdf", name: "Line calls.pdf", contentType: "application/pdf", size: 2048 },
+    ]);
+  });
+
   it("reacts as the caller and deletes only their own", async () => {
     s.store.put("conversations/amy_ben/messages/m1", { authorId: "ben", text: "yo" });
     expect((await s.call("PUT", "/v1/conversations/amy_ben/messages/m1/reaction", { emoji: "🔥" })).statusCode).toBe(204);

@@ -8,6 +8,7 @@ import { useAuth } from "./AuthProvider";
 import { FollowButton } from "./FollowButton";
 import { ForVisitors } from "./ForVisitors";
 import { LocalTime } from "./LocalTime";
+import { MessageButton } from "./MessageButton";
 import { PostCard } from "./PostCard";
 import { DashboardLayout, ProfileCard, StatTiles, TeamList } from "./ProfileDashboard";
 
@@ -87,11 +88,18 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
   const first = name.split(" ")[0];
   const seasons = Object.entries(profile.stats ?? {}).sort(([a], [b]) => b.localeCompare(a));
   const follow = <FollowButton targetId={uid} isPrivate={profile.private === true} signUpNext={`/players/${uid}`} />;
+  // Follow and Message, as the app's profile header has them.
+  const actions = (
+    <>
+      {follow}
+      <MessageButton uid={uid} />
+    </>
+  );
 
   if (locked) {
     return (
       <div className="page page-wide">
-        <DashboardLayout side={<ProfileCard profile={profile} actions={follow} />}>
+        <DashboardLayout side={<ProfileCard profile={profile} actions={actions} />}>
           <div className="card">
             <h2 className="card-title">This profile is private</h2>
             <p className="muted small">
@@ -106,7 +114,7 @@ function PlayerView({ uid, page, locked }: { uid: string; page: ProfilePage; loc
 
   const side = (
     <>
-      <ProfileCard profile={profile} actions={follow} />
+      <ProfileCard profile={profile} actions={actions} />
       {profile.visibility?.stats !== false && <StatTiles stats={profile.stats} />}
       {profile.visibility?.teams !== false && (
         <TeamList teams={(profile.teams ?? []).map((t) => ({ id: t.id, name: t.name, subtitle: t.subtitle }))} />

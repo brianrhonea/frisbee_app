@@ -1,13 +1,18 @@
 import {
   type AcceptedImageType,
+  chatDocumentTypes,
+  chatFileMax,
   type CompleteUploadResponse,
   type CreateUploadResponse,
   createUploadRequestSchema,
   isImageType,
   isVideoType,
+  safeFileName,
   type UploadPurpose,
   type UploadStatus,
   uploadLimits,
+  uploadMax,
+  videoFileName,
 } from "@stall10/shared";
 import type { Caller } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
@@ -64,7 +69,8 @@ const denied = (m: string) => new ApiError("permission_denied", m);
  * records uploads/{id} and returns a signed URL to uploads/raw/{uid}/{id}.
  * On complete, the API checks the file it got (owner, real size, real type
  * by its bytes), then compresses an image in the request or queues a video
- * for transcoding.
+ * for transcoding. Chat videos and files are stored as sent instead, as the
+ * app stores them, so they play and open in every client.
  */
 export class UploadService {
   constructor(
@@ -138,11 +144,10 @@ export class UploadService {
   async create(caller: Caller, body: unknown): Promise<CreateUploadResponse> {
     const parsed = createUploadRequestSchema.safeParse(body ?? {});
     if (!parsed.success) throw fromZod(parsed.error);
-    const { purpose, contentType, size, targetId, itemId } = parsed.data;
+    const { purpose, contentType, size, targetId, itemId, name } = parsed.data;
     await this.checkTarget(caller.uid, purpose, targetId);
-    const limits = uploadLimits[purpose];
-    // The URL takes up to the purpose's largest limit for the declared kind.
-    const maxBytes = (isImageType(contentType) ? limits.image : limits.video) ?? limits.image;
+    // The URL takes up to the limit for the declared kind (and, in chat, name).
+    const maxBytes = uploadMax(purpose, contentType, name) ?? uploadLimits[purpose].image;
     const id = this.store.newId("uploads");
     const folder = mediaFolder(caller.uid, purpose, targetId, itemId, id);
     const rawPath = `uploads/raw/${caller.uid}/${id}`;
@@ -156,6 +161,7 @@ export class UploadService {
         size,
         targetId: targetId ?? null,
         itemId: itemId ?? null,
+        ...(name && { name }),
         folder,
         status: "pending" satisfies UploadStatus,
         rawPath,
@@ -179,6 +185,7 @@ export class UploadService {
     const size = await this.storage.size(rawPath);
     if (size == null) throw new ApiError("failed_precondition", "The file hasn't finished uploading.");
     const type = sniffMediaType(await this.storage.read(rawPath, sniffBytes));
+    if (purpose === "chat" && (type == null || isVideoType(type))) return this.keepAsSent(id, upload, type, size);
     const limits = uploadLimits[purpose];
     const max = type == null ? null : isImageType(type) ? limits.image : limits.video;
     let problem: string | null = null;
@@ -235,6 +242,41 @@ export class UploadService {
       contentType: image.contentType,
       width: image.width,
       height: image.height,
+      updatedAt: serverTime,
+    };
+    await this.store.transact(async (tx) => tx.update(`uploads/${id}`, done));
+    await this.storage.delete(rawPath).catch(() => undefined);
+    return answer(id, done);
+  }
+
+  /**
+   * A chat video or file, stored as sent beside the message's other files
+   * ({folder}/{id}-{name}), as the app's AttachmentStorage stores them. A
+   * video's type is the one its bytes show; any other file keeps a
+   * declared document type, else application/octet-stream, so nothing is
+   * stored as a photo, video or page it isn't. The limit is storage.rules'
+   * attachmentSizeOk: 10 MB, or 100 MB for a video named like one.
+   */
+  private async keepAsSent(id: string, upload: Data, type: ReturnType<typeof sniffMediaType>, size: number): Promise<CompleteUploadResponse> {
+    const rawPath = String(upload.rawPath);
+    const declared = String(upload.contentType ?? "");
+    const video = type != null && isVideoType(type);
+    const contentType = video ? type : chatDocumentTypes.includes(declared) ? declared : "application/octet-stream";
+    const name = typeof upload.name === "string" && upload.name ? upload.name : video ? videoFileName(type, id) : id;
+    const max = video ? (uploadMax("chat", type, name) ?? chatFileMax) : chatFileMax;
+    if (size > max) {
+      const problem = `That file is too big. The most is ${Math.round(max / MB)} MB.`;
+      await this.reject(id, rawPath, problem);
+      throw new ApiError("invalid_argument", problem);
+    }
+    const path = `${String(upload.folder)}/${id}-${safeFileName(name)}`;
+    await this.storage.copy(rawPath, path, contentType);
+    const done: Data = {
+      status: nextStatus("pending", "file_saved"),
+      sniffedType: type,
+      actualSize: size,
+      path,
+      contentType,
       updatedAt: serverTime,
     };
     await this.store.transact(async (tx) => tx.update(`uploads/${id}`, done));

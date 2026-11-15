@@ -271,6 +271,13 @@ which fails when the current version has no entry.
   match today's `storage.rules`: 10 MB images, 100 MB post/chat video,
   500 MB team film.
 
+  Chat is the exception, as in the app: a message takes any file.
+  Photos are compressed as above; videos (typed by their bytes) and
+  other files are stored as sent at `{folder}/{uploadId}-{name}`, with a
+  document type from the app's list or `application/octet-stream`, under
+  `attachmentSizeOk`'s limits (10 MB, or 100 MB for a video named like
+  one). They don't wait on the transcode job.
+
   **Where files live** (decided 2026-11-11): the project's Firebase
   Storage bucket, in the folders the app already uses. Documents keep
   referencing a file by its `path` (e.g. a post's `images[].path`), and

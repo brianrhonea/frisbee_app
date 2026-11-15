@@ -1,14 +1,16 @@
 "use client";
 import { MuteButton } from "../MuteButton";
-import { limit, orderBy, where } from "firebase/firestore";
+import { where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Avatar } from "../Avatar";
 import { LocalTime } from "../LocalTime";
-import { MemberImage } from "../MemberImage";
+import { ChatAttachment, type ChatFile } from "../ChatAttachment";
+import { loadAtTop, OlderMessages } from "../OlderMessages";
 import { ChatComposer, MessageActions } from "../ChatComposer";
 import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
+import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
@@ -16,22 +18,18 @@ import { VoiceRoom } from "./meetings/VoiceRoom";
 
 type Room = ManagedRoom;
 type Folder = ManagedFolder;
-interface Attachment {
-  path: string;
-  name?: string;
-  contentType?: string;
-}
 interface Message {
   authorId?: string;
   authorName?: string;
   text?: string;
-  attachments?: Attachment[];
+  attachments?: ChatFile[];
   createdAt?: string;
   replyTo?: { authorName?: string; text?: string };
   reactions?: Record<string, string>;
 }
 
-const messageLimit = 60;
+/** Messages per page, live and older (MessageThreadViewModel.pageSize). */
+const pageSize = 50;
 const byPosition = (a: { position?: number; name?: string }, b: { position?: number; name?: string }) =>
   (a.position ?? 0) - (b.position ?? 0) || (a.name ?? "").localeCompare(b.name ?? "");
 
@@ -115,6 +113,7 @@ export function TeamChat() {
             />
           ) : (
             <Thread
+              key={open.id}
               teamId={teamId}
               roomId={open.id}
               name={open.name ?? "Room"}
@@ -152,19 +151,11 @@ function Thread({
 }) {
   const [replyTo, setReplyTo] = useState<Doc<Message> | null>(null);
   const base = `/v1/teams/${encodeURIComponent(teamId)}/chats/${encodeURIComponent(roomId)}/messages`;
-  const messages = useLiveQuery<Message>(
-    `teams/${teamId}/chats/${roomId}/messages`,
-    [orderBy("createdAt", "desc"), limit(messageLimit)],
-    roomId,
-  );
+  const messages = usePagedMessages<Message>(`teams/${teamId}/chats/${roomId}/messages`, pageSize);
   const body = useRef<HTMLDivElement>(null);
-  const count = messages.data?.length ?? 0;
-  // Newest at the bottom, in view, without scrolling the page.
-  useEffect(() => {
-    if (body.current) body.current.scrollTop = body.current.scrollHeight;
-  }, [count, roomId]);
-
-  const list = (messages.data ?? []).slice().reverse();
+  const list = messages.list ?? [];
+  // Newest at the bottom, in view, without scrolling the page; older pages keep the reader's place.
+  useThreadScroll(body, list[0]?.id, list[list.length - 1]?.id);
   return (
     <div className="card thread">
       <header className="thread-head">
@@ -173,10 +164,11 @@ function Thread({
           <MuteButton target={{ teamId, roomId }} />
         </span>
       </header>
-      <div className="thread-body" aria-live="polite" ref={body}>
+      <div className="thread-body" aria-live="polite" ref={body} onScroll={loadAtTop(messages)}>
+        <OlderMessages paged={messages} />
         {messages.error ? (
           <p className="form-error">{messages.error}</p>
-        ) : !messages.data ? (
+        ) : !messages.list ? (
           <p className="muted" aria-busy="true">Loading messages…</p>
         ) : list.length === 0 ? (
           <p className="empty">No messages yet.</p>
@@ -202,15 +194,9 @@ function Thread({
                     </p>
                   )}
                   {m.text && <p className="message-text">{m.text}</p>}
-                  {(m.attachments ?? []).map((a) =>
-                    a.contentType?.startsWith("image/") ? (
-                      <span key={a.path} className="message-image">
-                        <MemberImage path={a.path} url="" alt={a.name ?? ""} />
-                      </span>
-                    ) : (
-                      <p key={a.path} className="muted small">📎 {a.name ?? "Attachment"}</p>
-                    ),
-                  )}
+                  {(m.attachments ?? []).map((a) => (
+                    <ChatAttachment key={a.path} file={a} />
+                  ))}
                   {reactions.length > 0 && (
                     <p className="message-reactions">
                       {reactions.map(([e, n]) => (
@@ -226,6 +212,7 @@ function Thread({
                   mine={m.reactions?.[me] ?? null}
                   canDelete={m.authorId === me || canModerate}
                   onReply={canWrite ? () => setReplyTo(m) : undefined}
+                  onDeleted={() => messages.removed(m.id)}
                 />
               </div>
             );
@@ -239,6 +226,7 @@ function Thread({
           placeholder={`Message #${name}`}
           replyTo={replyTo ? { id: replyTo.id, authorName: replyTo.authorName, text: replyTo.text } : null}
           onClearReply={() => setReplyTo(null)}
+          draftKey={`chat_${teamId}_${roomId}`}
         />
       ) : (
         <footer className="thread-foot muted small">You can read this room but not post in it.</footer>

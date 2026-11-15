@@ -7,7 +7,8 @@ import { Avatar } from "../Avatar";
 
 /**
  * Find people by name and invite them to [teamId] (`POST
- * /v1/teams/:id/invites`); they accept from their Teams tab. For the
+ * /v1/teams/:id/invites`); they accept from their Teams page (or the home
+ * page's Invitations) on the website, or the Teams tab in the app. For the
  * team's member managers, and a community's for the teams it links.
  */
 export function InvitePeople({ teamId, teamName, onClose }: { teamId: string; teamName: string; onClose: () => void }) {
@@ -70,7 +71,7 @@ export function InvitePeople({ teamId, teamName, onClose }: { teamId: string; te
       />
       {error && <p className="form-error">{error}</p>}
       {results === null ? (
-        <p className="muted small">They get an invite to accept from their Teams tab.</p>
+        <p className="muted small">They get an invite to accept from Teams, on the website or in the app.</p>
       ) : results.length === 0 ? (
         <p className="muted small">No one by that name.</p>
       ) : (

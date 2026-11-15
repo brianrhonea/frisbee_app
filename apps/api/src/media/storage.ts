@@ -29,6 +29,8 @@ export interface MediaStorage {
   /** The first [bytes] bytes, or the whole object without a limit. */
   read(path: string, bytes?: number): Promise<Buffer>;
   write(path: string, data: Buffer, contentType: string): Promise<void>;
+  /** Copies [from] to [to] in the bucket (no download), saved as [contentType]. */
+  copy(from: string, to: string, contentType: string): Promise<void>;
   downloadTo(path: string, file: string): Promise<void>;
   uploadFrom(file: string, path: string, contentType: string): Promise<void>;
   delete(path: string): Promise<void>;
@@ -88,6 +90,10 @@ export class FirebaseMediaStorage implements MediaStorage {
 
   async write(path: string, data: Buffer, contentType: string) {
     await this.bucket.file(path).save(data, { contentType, resumable: false, metadata: { cacheControl: mediaCacheControl } });
+  }
+
+  async copy(from: string, to: string, contentType: string) {
+    await this.bucket.file(from).copy(this.bucket.file(to), { contentType, metadata: { cacheControl: mediaCacheControl } });
   }
 
   async downloadTo(path: string, file: string) {

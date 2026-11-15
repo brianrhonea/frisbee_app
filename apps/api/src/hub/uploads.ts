@@ -56,7 +56,8 @@ export async function uploadedFiles(
     }
     return {
       path: u.path,
-      name: u.path.split("/").pop() ?? unique[i]!,
+      // A chat file keeps the name it was sent with, as the app's do.
+      name: typeof u.name === "string" && u.name ? u.name : (u.path.split("/").pop() ?? unique[i]!),
       contentType,
       size: typeof u.actualSize === "number" ? u.actualSize : 0,
     };

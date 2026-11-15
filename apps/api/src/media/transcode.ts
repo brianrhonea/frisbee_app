@@ -66,10 +66,10 @@ export function posterArgs(input: string, output: string): string[] {
 }
 
 /** What happens to an upload. */
-export type UploadEvent = "image_saved" | "video_queued" | "transcoded" | "rejected" | "failed";
+export type UploadEvent = "image_saved" | "file_saved" | "video_queued" | "transcoded" | "rejected" | "failed";
 
 const transitions: Record<UploadStatus, Partial<Record<UploadEvent, UploadStatus>>> = {
-  pending: { image_saved: "ready", video_queued: "processing", rejected: "failed", failed: "failed" },
+  pending: { image_saved: "ready", file_saved: "ready", video_queued: "processing", rejected: "failed", failed: "failed" },
   processing: { transcoded: "ready", failed: "failed" },
   ready: {},
   failed: {},

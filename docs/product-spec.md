@@ -216,11 +216,17 @@ everything the app does on the website alone, styled like the website
 6. W7: [x] team meetings and voice rooms (LiveKit web SDK, tokens from
    the API; api 0.20.0, web 0.21.0; needs the LiveKit secrets on Cloud
    Run). Recording stays deferred. Not yet on the website: device
-   pickers and camera preview, output volume, older call chat, a voice
+   pickers and camera preview, output volume, a voice
    call that stays up across pages, and meetings on the schedule (they
    have their own tab).
 7. Posts: [ ] video in posts (waits on the transcode job); [x] feed tabs;
    [x] Discord import (api 0.21.0, web 0.22.0).
+8. Messaging: [x] accepting and declining team invites (Teams page and
+   home); [x] any file in team chat and DMs (videos and files stored as
+   sent, as the app stores them; videos play, files download with their
+   name and size); [x] older messages in DMs, team rooms and the call
+   chat; [x] Message on player pages (`/messages?to=<uid>`); [x] unsent
+   drafts per conversation and room (kept in the browser).
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 
