@@ -11,10 +11,12 @@ import {
   type DraftPlayer,
   draftTeamOf,
   groupEngine,
+  leagueTeamName,
   movePlayer,
   onTheClock,
   pickProblem,
   seededRandom,
+  signupOrder,
   snakeIndex,
   startProblem,
   teamsFromDraft,
@@ -63,6 +65,12 @@ describe("team building matches the app (fixtures/drafts/team_builder.json)", ()
   });
 });
 
+describe("the signup order matches the app (fixtures/drafts/signup_order.json)", () => {
+  it.each(fixture<{ signups: Array<{ uid: string; name: string }>; expected: string[] }>("drafts/signup_order.json").cases)("by name", (c) => {
+    expect([...c.signups].sort(signupOrder).map((s) => s.uid)).toEqual(c.expected);
+  });
+});
+
 describe("the snake order matches the app (fixtures/drafts/snake_order.json)", () => {
   type Pick = { uid: string; captainId: string };
   it.each(
@@ -90,7 +98,9 @@ describe("live draft rules match the server (fixtures/drafts/live_draft.json)", 
           ? startProblem({ captainIds: c.captainIds, accepted: new Set<string>(c.accepted), poolSize: c.poolSize })
           : c.kind === "pickProblem"
             ? pickProblem({ status: c.status, captainIds: c.captainIds, picks: c.picks, pool: pool(c.pool), uid: c.uid })
-            : teamsFromDraft({ captains: c.captains, picks: c.picks, names: c.names, teamNames: c.teamNames });
+            : c.kind === "leagueTeamName"
+              ? leagueTeamName(c.team, c.league)
+              : teamsFromDraft({ captains: c.captains, picks: c.picks, names: c.names, teamNames: c.teamNames });
     expect(got).toEqual(c.expected);
   });
 });

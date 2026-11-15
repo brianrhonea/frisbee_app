@@ -8,6 +8,7 @@ import {
   genderMatchLabels,
   movePlayer,
   registeredSeeds,
+  signupOrder,
   suggestedTeamCount,
   teamsCreated,
 } from "@stall10/shared";
@@ -55,7 +56,8 @@ function Editor({ user, tournamentId, tournament, division: d }: { user: User; t
   const created = teamsCreated(saved);
   const mixed = d.division === "mixed";
   const fromCaptains = tournament.draftMode === "captains" && saved.length > 0;
-  const players = signups.filter((s) => s.divisionId === d.id && s.status === "accepted");
+  // In the app's order (by name), which the balanced draft deals from.
+  const players = signups.filter((s) => s.divisionId === d.id && s.status === "accepted").sort(signupOrder);
   const accepted = new Set(players.map((p) => p.id));
   const placed = new Set(current.flatMap((t) => t.playerIds));
   const unassigned = players.filter((p) => !placed.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));

@@ -237,7 +237,7 @@ void main() {
     final crowded = <String, Object?>{
       'roles': {
         for (var i = 0; i < CustomRole.maxRoles - 2; i++)
-          'old$i': _role(i == 5 ? 'CAPTAINS' : 'Old $i', i),
+          'old$i': _role(i == 5 ? '  CAPTAINS ' : 'Old $i', i),
       },
     };
     final cases =

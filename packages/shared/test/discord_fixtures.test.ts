@@ -12,6 +12,7 @@ import {
   importIsEmpty,
   planFor,
   planImport,
+  rolesData,
   splitPlan,
   splitTeams,
   teamChatImport,
@@ -25,7 +26,12 @@ const ids = () => {
   return () => `n${++n}`;
 };
 
-const importJson = (i: DiscordImport) => ({ ...i, isEmpty: importIsEmpty(i) });
+/**
+ * The import with its roles as they're written: the app's fixture has
+ * CustomRole.toMap, which trims names, and the API writes them through
+ * rolesData, which does too.
+ */
+const importJson = (i: DiscordImport) => ({ ...i, roles: rolesData(i.roles, {}).roles, isEmpty: importIsEmpty(i) });
 
 describe("importing a plan matches the app (fixtures/discord/import.json)", () => {
   it.each(

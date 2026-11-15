@@ -1,13 +1,28 @@
 {
-  "about": "Hand-written, not generated: the captains' live draft rules exist only on the server (firebase/functions/src/tournaments/draft_model.ts, the original, and its port in packages/shared/src/drafts.ts); the app only reads the board. Both copies are checked against these cases. autoPick: the best player left (ties to the lower uid), in a mixed division the best of the gender match the team has fewer of (mmp when even). startProblem and pickProblem: the message, or null. teamsFromDraft: each captain first, then their picks; a captain's team name, or 'Team <captain name>' cut to 80 characters.",
+  "about": "Hand-written, not generated: the captains' live draft rules exist only on the server (firebase/functions/src/tournaments/draft_model.ts, the original, and its port in packages/shared/src/drafts.ts); the app only reads the board. Both copies are checked against these cases. autoPick: the best player left (ties to the lower uid), in a mixed division the best of the gender match the team has fewer of (mmp when even). startProblem and pickProblem: the message, or null. leagueTeamName: '<team> - <league>' within 80 characters, the league cut to 30 and the team to what's left, both trimmed. teamsFromDraft: each captain first, then their picks; a captain's team name, or 'Team <captain name>' cut to 80 characters.",
   "cases": [
     {
       "name": "best player left; a tie goes to the lower uid",
       "kind": "autoPick",
       "left": [
-        { "uid": "a", "name": "A", "skill": 3, "gender": null },
-        { "uid": "c", "name": "C", "skill": 5, "gender": null },
-        { "uid": "b", "name": "B", "skill": 5, "gender": null }
+        {
+          "uid": "a",
+          "name": "A",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "c",
+          "name": "C",
+          "skill": 5,
+          "gender": null
+        },
+        {
+          "uid": "b",
+          "name": "B",
+          "skill": 5,
+          "gender": null
+        }
       ],
       "team": [],
       "mixed": false,
@@ -17,10 +32,27 @@
       "name": "not mixed: gender doesn't matter",
       "kind": "autoPick",
       "left": [
-        { "uid": "a", "name": "A", "skill": 2, "gender": "wmp" },
-        { "uid": "b", "name": "B", "skill": 4, "gender": "mmp" }
+        {
+          "uid": "a",
+          "name": "A",
+          "skill": 2,
+          "gender": "wmp"
+        },
+        {
+          "uid": "b",
+          "name": "B",
+          "skill": 4,
+          "gender": "mmp"
+        }
       ],
-      "team": [{ "uid": "x", "name": "X", "skill": 3, "gender": "mmp" }],
+      "team": [
+        {
+          "uid": "x",
+          "name": "X",
+          "skill": 3,
+          "gender": "mmp"
+        }
+      ],
       "mixed": false,
       "expected": "b"
     },
@@ -28,11 +60,33 @@
       "name": "mixed: the gender match the team has fewer of",
       "kind": "autoPick",
       "left": [
-        { "uid": "a", "name": "A", "skill": 5, "gender": "mmp" },
-        { "uid": "b", "name": "B", "skill": 2, "gender": "wmp" },
-        { "uid": "c", "name": "C", "skill": 3, "gender": "wmp" }
+        {
+          "uid": "a",
+          "name": "A",
+          "skill": 5,
+          "gender": "mmp"
+        },
+        {
+          "uid": "b",
+          "name": "B",
+          "skill": 2,
+          "gender": "wmp"
+        },
+        {
+          "uid": "c",
+          "name": "C",
+          "skill": 3,
+          "gender": "wmp"
+        }
       ],
-      "team": [{ "uid": "x", "name": "X", "skill": 3, "gender": "mmp" }],
+      "team": [
+        {
+          "uid": "x",
+          "name": "X",
+          "skill": 3,
+          "gender": "mmp"
+        }
+      ],
       "mixed": true,
       "expected": "c"
     },
@@ -40,8 +94,18 @@
       "name": "mixed and even: mmp first",
       "kind": "autoPick",
       "left": [
-        { "uid": "a", "name": "A", "skill": 2, "gender": "mmp" },
-        { "uid": "b", "name": "B", "skill": 5, "gender": "wmp" }
+        {
+          "uid": "a",
+          "name": "A",
+          "skill": 2,
+          "gender": "mmp"
+        },
+        {
+          "uid": "b",
+          "name": "B",
+          "skill": 5,
+          "gender": "wmp"
+        }
       ],
       "team": [],
       "mixed": true,
@@ -51,12 +115,32 @@
       "name": "mixed: players with no gender match don't count",
       "kind": "autoPick",
       "left": [
-        { "uid": "a", "name": "A", "skill": 1, "gender": "mmp" },
-        { "uid": "b", "name": "B", "skill": 5, "gender": "wmp" }
+        {
+          "uid": "a",
+          "name": "A",
+          "skill": 1,
+          "gender": "mmp"
+        },
+        {
+          "uid": "b",
+          "name": "B",
+          "skill": 5,
+          "gender": "wmp"
+        }
       ],
       "team": [
-        { "uid": "x", "name": "X", "skill": 3, "gender": null },
-        { "uid": "y", "name": "Y", "skill": 3, "gender": "wmp" }
+        {
+          "uid": "x",
+          "name": "X",
+          "skill": 3,
+          "gender": null
+        },
+        {
+          "uid": "y",
+          "name": "Y",
+          "skill": 3,
+          "gender": "wmp"
+        }
       ],
       "mixed": true,
       "expected": "a"
@@ -65,10 +149,27 @@
       "name": "mixed: nobody of the wanted match left, so the best of the rest",
       "kind": "autoPick",
       "left": [
-        { "uid": "a", "name": "A", "skill": 4, "gender": "mmp" },
-        { "uid": "b", "name": "B", "skill": 5, "gender": null }
+        {
+          "uid": "a",
+          "name": "A",
+          "skill": 4,
+          "gender": "mmp"
+        },
+        {
+          "uid": "b",
+          "name": "B",
+          "skill": 5,
+          "gender": null
+        }
       ],
-      "team": [{ "uid": "x", "name": "X", "skill": 3, "gender": "mmp" }],
+      "team": [
+        {
+          "uid": "x",
+          "name": "X",
+          "skill": 3,
+          "gender": "mmp"
+        }
+      ],
       "mixed": true,
       "expected": "b"
     },
@@ -83,56 +184,127 @@
     {
       "name": "a captain listed twice",
       "kind": "startProblem",
-      "captainIds": ["a", "a"],
-      "accepted": ["a", "b"],
+      "captainIds": [
+        "a",
+        "a"
+      ],
+      "accepted": [
+        "a",
+        "b"
+      ],
       "poolSize": 4,
       "expected": "A captain is listed twice."
     },
     {
       "name": "one captain",
       "kind": "startProblem",
-      "captainIds": ["a"],
-      "accepted": ["a"],
+      "captainIds": [
+        "a"
+      ],
+      "accepted": [
+        "a"
+      ],
       "poolSize": 4,
       "expected": "Pick at least 2 captains."
     },
     {
       "name": "seventeen captains",
       "kind": "startProblem",
-      "captainIds": ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "c13", "c14", "c15", "c16", "c17"],
-      "accepted": ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "c13", "c14", "c15", "c16", "c17"],
+      "captainIds": [
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5",
+        "c6",
+        "c7",
+        "c8",
+        "c9",
+        "c10",
+        "c11",
+        "c12",
+        "c13",
+        "c14",
+        "c15",
+        "c16",
+        "c17"
+      ],
+      "accepted": [
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5",
+        "c6",
+        "c7",
+        "c8",
+        "c9",
+        "c10",
+        "c11",
+        "c12",
+        "c13",
+        "c14",
+        "c15",
+        "c16",
+        "c17"
+      ],
       "poolSize": 40,
       "expected": "A draft takes at most 16 captains."
     },
     {
       "name": "a captain who isn't accepted",
       "kind": "startProblem",
-      "captainIds": ["a", "z"],
-      "accepted": ["a", "b"],
+      "captainIds": [
+        "a",
+        "z"
+      ],
+      "accepted": [
+        "a",
+        "b"
+      ],
       "poolSize": 4,
       "expected": "Every captain has to be an accepted player."
     },
     {
       "name": "fewer players than captains",
       "kind": "startProblem",
-      "captainIds": ["a", "b"],
-      "accepted": ["a", "b"],
+      "captainIds": [
+        "a",
+        "b"
+      ],
+      "accepted": [
+        "a",
+        "b"
+      ],
       "poolSize": 1,
       "expected": "There aren't enough players for every captain to pick."
     },
     {
       "name": "too many players",
       "kind": "startProblem",
-      "captainIds": ["a", "b"],
-      "accepted": ["a", "b"],
+      "captainIds": [
+        "a",
+        "b"
+      ],
+      "accepted": [
+        "a",
+        "b"
+      ],
       "poolSize": 201,
       "expected": "A draft takes at most 200 players."
     },
     {
       "name": "ready to start",
       "kind": "startProblem",
-      "captainIds": ["a", "b"],
-      "accepted": ["a", "b", "c"],
+      "captainIds": [
+        "a",
+        "b"
+      ],
+      "accepted": [
+        "a",
+        "b",
+        "c"
+      ],
       "poolSize": 2,
       "expected": null
     },
@@ -140,9 +312,15 @@
       "name": "paused",
       "kind": "pickProblem",
       "status": "paused",
-      "captainIds": ["a", "b"],
+      "captainIds": [
+        "a",
+        "b"
+      ],
       "picks": [],
-      "pool": ["p1", "p2"],
+      "pool": [
+        "p1",
+        "p2"
+      ],
       "uid": "p1",
       "expected": "The draft is paused."
     },
@@ -150,9 +328,15 @@
       "name": "finished",
       "kind": "pickProblem",
       "status": "done",
-      "captainIds": ["a", "b"],
+      "captainIds": [
+        "a",
+        "b"
+      ],
       "picks": [],
-      "pool": ["p1", "p2"],
+      "pool": [
+        "p1",
+        "p2"
+      ],
       "uid": "p1",
       "expected": "The draft isn't running."
     },
@@ -160,9 +344,15 @@
       "name": "not in the pool",
       "kind": "pickProblem",
       "status": "live",
-      "captainIds": ["a", "b"],
+      "captainIds": [
+        "a",
+        "b"
+      ],
       "picks": [],
-      "pool": ["p1", "p2"],
+      "pool": [
+        "p1",
+        "p2"
+      ],
       "uid": "p9",
       "expected": "That player isn't in the draft."
     },
@@ -170,9 +360,20 @@
       "name": "already picked",
       "kind": "pickProblem",
       "status": "live",
-      "captainIds": ["a", "b"],
-      "picks": [{ "uid": "p1", "captainId": "a" }],
-      "pool": ["p1", "p2"],
+      "captainIds": [
+        "a",
+        "b"
+      ],
+      "picks": [
+        {
+          "uid": "p1",
+          "captainId": "a"
+        }
+      ],
+      "pool": [
+        "p1",
+        "p2"
+      ],
       "uid": "p1",
       "expected": "That player has already been picked."
     },
@@ -180,9 +381,19 @@
       "name": "every pick made",
       "kind": "pickProblem",
       "status": "live",
-      "captainIds": ["a", "b"],
-      "picks": [{ "uid": "gone", "captainId": "a" }],
-      "pool": ["p1"],
+      "captainIds": [
+        "a",
+        "b"
+      ],
+      "picks": [
+        {
+          "uid": "gone",
+          "captainId": "a"
+        }
+      ],
+      "pool": [
+        "p1"
+      ],
       "uid": "p1",
       "expected": "Every player has been picked."
     },
@@ -190,9 +401,20 @@
       "name": "a good pick",
       "kind": "pickProblem",
       "status": "live",
-      "captainIds": ["a", "b"],
-      "picks": [{ "uid": "p1", "captainId": "a" }],
-      "pool": ["p1", "p2"],
+      "captainIds": [
+        "a",
+        "b"
+      ],
+      "picks": [
+        {
+          "uid": "p1",
+          "captainId": "a"
+        }
+      ],
+      "pool": [
+        "p1",
+        "p2"
+      ],
       "uid": "p2",
       "expected": null
     },
@@ -200,40 +422,95 @@
       "name": "teams from the picks",
       "kind": "teamsFromDraft",
       "captains": [
-        { "uid": "c1", "name": "Ann" },
-        { "uid": "c2", "name": "Bo" },
-        { "uid": "c3", "name": "A captain with a very long name that goes well past what a team name can hold, really" }
+        {
+          "uid": "c1",
+          "name": "Ann"
+        },
+        {
+          "uid": "c2",
+          "name": "Bo"
+        },
+        {
+          "uid": "c3",
+          "name": "A captain with a very long name that goes well past what a team name can hold, really"
+        }
       ],
       "picks": [
-        { "uid": "p1", "captainId": "c1" },
-        { "uid": "p2", "captainId": "c2" },
-        { "uid": "p3", "captainId": "c3" },
-        { "uid": "p4", "captainId": "c3" },
-        { "uid": "p5", "captainId": "c2" },
-        { "uid": "p6", "captainId": "c1" }
+        {
+          "uid": "p1",
+          "captainId": "c1"
+        },
+        {
+          "uid": "p2",
+          "captainId": "c2"
+        },
+        {
+          "uid": "p3",
+          "captainId": "c3"
+        },
+        {
+          "uid": "p4",
+          "captainId": "c3"
+        },
+        {
+          "uid": "p5",
+          "captainId": "c2"
+        },
+        {
+          "uid": "p6",
+          "captainId": "c1"
+        }
       ],
-      "names": { "p1": "P One", "p2": "P Two", "p3": "P Three", "p4": "P Four", "p5": "P Five" },
-      "teamNames": { "c2": "Bo's Best" },
+      "names": {
+        "p1": "P One",
+        "p2": "P Two",
+        "p3": "P Three",
+        "p4": "P Four",
+        "p5": "P Five"
+      },
+      "teamNames": {
+        "c2": "Bo's Best"
+      },
       "expected": [
         {
           "id": "team1",
           "name": "Team Ann",
           "captainId": "c1",
-          "playerIds": ["c1", "p1", "p6"],
-          "playerNames": { "c1": "Ann", "p1": "P One", "p6": "Player" }
+          "playerIds": [
+            "c1",
+            "p1",
+            "p6"
+          ],
+          "playerNames": {
+            "c1": "Ann",
+            "p1": "P One",
+            "p6": "Player"
+          }
         },
         {
           "id": "team2",
           "name": "Bo's Best",
           "captainId": "c2",
-          "playerIds": ["c2", "p2", "p5"],
-          "playerNames": { "c2": "Bo", "p2": "P Two", "p5": "P Five" }
+          "playerIds": [
+            "c2",
+            "p2",
+            "p5"
+          ],
+          "playerNames": {
+            "c2": "Bo",
+            "p2": "P Two",
+            "p5": "P Five"
+          }
         },
         {
           "id": "team3",
           "name": "Team A captain with a very long name that goes well past what a team name can ho",
           "captainId": "c3",
-          "playerIds": ["c3", "p3", "p4"],
+          "playerIds": [
+            "c3",
+            "p3",
+            "p4"
+          ],
           "playerNames": {
             "c3": "A captain with a very long name that goes well past what a team name can hold, really",
             "p3": "P Three",
@@ -241,6 +518,34 @@
           }
         }
       ]
+    },
+    {
+      "name": "team and league",
+      "kind": "leagueTeamName",
+      "team": "Reds",
+      "league": "Thursday Night",
+      "expected": "Reds - Thursday Night"
+    },
+    {
+      "name": "trimmed",
+      "kind": "leagueTeamName",
+      "team": "  Reds ",
+      "league": " Thursday Night  ",
+      "expected": "Reds - Thursday Night"
+    },
+    {
+      "name": "the league cut to 30 characters",
+      "kind": "leagueTeamName",
+      "team": "Reds",
+      "league": "A league with a name much longer than thirty characters",
+      "expected": "Reds - A league with a name much long"
+    },
+    {
+      "name": "the team cut to fit 80",
+      "kind": "leagueTeamName",
+      "team": "The Very Long Team Name That Keeps Going On And On Past The Limit Of Eighty Characters",
+      "league": "Thursday Night",
+      "expected": "The Very Long Team Name That Keeps Going On And On Past The Lim - Thursday Night"
     }
   ]
 }

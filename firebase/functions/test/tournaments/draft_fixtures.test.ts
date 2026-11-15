@@ -14,6 +14,7 @@ import {
   startProblem,
   teamsFromDraft,
 } from "../../src/tournaments/draft_model";
+import { leagueTeamName } from "../../src/tournaments/league";
 
 const fixtures = join(__dirname, "../../../../packages/shared/fixtures/drafts");
 const cases = <C>(file: string): C[] => JSON.parse(readFileSync(join(fixtures, file), "utf8")).cases;
@@ -41,7 +42,9 @@ describe("live draft rules (live_draft.json)", () => {
           ? startProblem({ captainIds: c.captainIds, accepted: new Set<string>(c.accepted), poolSize: c.poolSize })
           : c.kind === "pickProblem"
             ? pickProblem({ status: c.status, captainIds: c.captainIds, picks: c.picks, pool: pool(c.pool), uid: c.uid })
-            : teamsFromDraft({ captains: c.captains, picks: c.picks, names: c.names, teamNames: c.teamNames });
+            : c.kind === "leagueTeamName"
+              ? leagueTeamName(c.team, c.league)
+              : teamsFromDraft({ captains: c.captains, picks: c.picks, names: c.names, teamNames: c.teamNames });
     expect(got).toEqual(c.expected);
   });
 });

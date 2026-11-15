@@ -2,6 +2,7 @@
 // packages/shared/test/stats_fixtures.test.ts against stats.ts. See
 // fixture_file.dart.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/roster_player.dart';
 import 'package:frisbee_app/domain/models/stats.dart';
 import 'package:frisbee_app/domain/tournament_engine/seeded_random.dart';
 
@@ -367,6 +368,39 @@ void main() {
         {
           'games': [for (final g in all) g.id],
           'sheet': _sheet(StatSheet.fromGames(all)),
+        },
+      ],
+    );
+  });
+
+  test('roster order (stats/roster_order.json)', () {
+    final players = [
+      for (final (i, (name, number)) in [
+        ('bob', 7),
+        ('Alice', null),
+        ('alice', null),
+        ('Émile', 3),
+        ('Zed', 3),
+        ('Ann', 0),
+        ('Cy', 99),
+        ('Dee', null),
+      ].indexed)
+        RosterPlayer(id: 'p$i', name: name, number: number),
+    ];
+    checkFixture(
+      'stats/roster_order.json',
+      'RosterPlayer.compareRoster (sortPlayers): by number, no number last, '
+          'then name.',
+      [
+        {
+          'players': [
+            for (final p in players)
+              {'id': p.id, 'name': p.name, 'number': p.number},
+          ],
+          'expected': [
+            for (final p in [...players]..sort(RosterPlayer.compareRoster))
+              p.id,
+          ],
         },
       ],
     );

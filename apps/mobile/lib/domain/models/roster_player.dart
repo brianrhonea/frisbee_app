@@ -19,6 +19,13 @@ class RosterPlayer {
     this.paid = false,
   });
 
+  /// Roster order: by number (no number last), then name. The website
+  /// sorts the same way (sortPlayers in packages/shared/src/stats.ts).
+  static int compareRoster(RosterPlayer a, RosterPlayer b) {
+    final byNumber = (a.number ?? 1000).compareTo(b.number ?? 1000);
+    return byNumber != 0 ? byNumber : a.name.compareTo(b.name);
+  }
+
   final String id;
   final String name;
   final int? number;

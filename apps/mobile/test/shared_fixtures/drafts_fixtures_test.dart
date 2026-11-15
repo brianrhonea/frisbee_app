@@ -213,6 +213,42 @@ void main() {
     );
   });
 
+  test('signup order (drafts/signup_order.json)', () {
+    final names = [
+      'bob',
+      'Alice',
+      'alice b',
+      'Émile',
+      'Zoe',
+      'zed',
+      '_x',
+      'Aaron-Lee',
+      'aaron lee',
+      '9 Lives',
+      '',
+    ];
+    final signups = [
+      for (final (i, n) in names.indexed)
+        PlayerSignup(uid: 'u$i', name: n, divisionId: 'open'),
+    ];
+    checkFixture(
+      'drafts/signup_order.json',
+      'PlayerSignup.compareByName (signupOrder): the order players are '
+          'listed and drafted in.',
+      [
+        {
+          'signups': [
+            for (final s in signups) {'uid': s.uid, 'name': s.name},
+          ],
+          'expected': [
+            for (final s in [...signups]..sort(PlayerSignup.compareByName))
+              s.uid,
+          ],
+        },
+      ],
+    );
+  });
+
   test('snake order (drafts/snake_order.json)', () {
     checkFixture(
       'drafts/snake_order.json',
