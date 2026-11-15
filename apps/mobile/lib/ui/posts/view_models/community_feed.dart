@@ -42,11 +42,12 @@ class CommunityFeed extends ChangeNotifier {
   /// Whether this build has a community feed at all.
   bool get available => _posts.hasCommunityFeed;
 
-  /// The first page has loaded, posts and all (or failed).
-  bool get loaded => _loaded && _waiting == 0;
+  /// Something to show: the first page has loaded, posts and all (or
+  /// failed). Stays true while older pages load under it.
+  bool get loaded => _loaded && !(_waiting > 0 && posts.isEmpty);
 
-  /// A page is loading.
-  bool get loading => _loading;
+  /// A page is loading, from the API or its posts from Firestore.
+  bool get loading => _loading || _waiting > 0;
 
   /// The last page failed to load; [loadMore] (or [refresh]) tries again.
   bool get error => _error;

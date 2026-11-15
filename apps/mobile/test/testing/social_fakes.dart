@@ -262,9 +262,15 @@ class FakeUserPostRepository implements UserPostRepository {
     return Result.ok(communityPages[before] ?? (ids: const [], next: null));
   }
 
+  /// Holds watchPostsByIds' first snapshot until completed, as Firestore
+  /// takes a moment.
+  Completer<void>? idsGate;
+
   @override
-  Stream<List<UserPost>> watchPostsByIds(List<String> ids) =>
-      _watch((p) => ids.contains(p.id), ids.length);
+  Stream<List<UserPost>> watchPostsByIds(List<String> ids) async* {
+    await idsGate?.future;
+    yield* _watch((p) => ids.contains(p.id), ids.length);
+  }
 
   @override
   Stream<UserPost?> watchPost(String id) async* {

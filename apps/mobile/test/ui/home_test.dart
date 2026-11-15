@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/ui/posts/view_models/home_feed.dart';
@@ -384,6 +386,30 @@ void main() {
         expect(vm.community.hasMore, isFalse);
         await vm.community.loadMore();
         expect(userPosts.communityRequests, [null, 300, 200]);
+      });
+
+      test('older posts load under the ones shown, not over them', () async {
+        final vm = await load();
+        userPosts.posts.addAll([
+          userPost('a', 'zed', DateTime(2026, 10, 28, 8)),
+          userPost('b', 'sam', DateTime(2026, 10, 27)),
+        ]);
+        userPosts.communityPages.addAll({
+          null: (ids: ['a'], next: 100),
+          100: (ids: ['b'], next: null),
+        });
+        vm.openCommunity();
+        await pumpEventQueue();
+        userPosts.idsGate = Completer<void>();
+        await vm.community.loadMore();
+        // The page is in, its posts not yet: still showing, and loading.
+        expect(vm.community.loaded, isTrue);
+        expect(vm.community.loading, isTrue);
+        expect(vm.communityPosts.map((p) => p.id), ['a']);
+        userPosts.idsGate!.complete();
+        await pumpEventQueue();
+        expect(vm.community.loading, isFalse);
+        expect(vm.communityPosts.map((p) => p.id), ['a', 'b']);
       });
 
       test('a failed page keeps the posts and is tried again', () async {

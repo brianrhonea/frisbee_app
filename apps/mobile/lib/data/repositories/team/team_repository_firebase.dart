@@ -48,8 +48,9 @@ class InviteCodeExpiredException implements Exception {
 /// Writes are validated by `firestore.rules`, except creating a team,
 /// which goes through the Stall 10 API ([ApiClient], `POST /v1/teams`) when
 /// the build has one and the `use_api_teams` flag is on, and membership and
-/// management (joining, invites, roles, details, invite codes and
-/// communities), which go through it when `use_api_membership` is on. The
+/// management (joining, invites, roles, details, invite codes,
+/// communities and deleting a team), which go through it when
+/// `use_api_membership` is on. The
 /// API checks what the rules did; the direct writes stay as the fallback.
 class TeamRepositoryFirebase implements TeamRepository {
   TeamRepositoryFirebase({
