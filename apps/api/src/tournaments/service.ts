@@ -860,13 +860,23 @@ export class TournamentService {
       this.queries.fields(p.games(id, divId), engineGameFields, listMax),
       this.queries.fields(p.entries(id), ["status", "divisionId", "captainIds"], listMax, { divisionId: divId }),
     ]);
+    // A seed's entry may name another division now (moved, then withdrawn).
+    const entries = new Map(entryRows.map((e) => [e.id, e.data]));
+    const elsewhere = strings(division.seeds)
+      .map(safeId)
+      .filter((s): s is string => s !== null && !entries.has(s));
+    const moved = await this.store.getAll(elsewhere.map((s) => p.entry(id, s)));
+    elsewhere.forEach((s, i) => {
+      const e = moved[i];
+      if (e) entries.set(s, e);
+    });
     const seen = reconcilePlan({
       t: tour,
       d: division,
       divId,
       games: gameRows.map((g) => engineGame(g.id, g.data)).sort((a, b) => a.order - b.order),
       allGames: true,
-      entries: new Map(entryRows.map((e) => [e.id, e.data])),
+      entries,
       others: null,
     });
     if (seen.changed.length === 0) return { changed: [] };
@@ -900,7 +910,7 @@ export class TournamentService {
       }
       // The division's entries and every seed's (a seed's entry may have moved).
       const entries = new Map<string, Data>();
-      for (const teamId of new Set([...entryRows.map((e) => e.id), ...strings(d.seeds)])) {
+      for (const teamId of new Set([...entryRows.map((e) => e.id), ...strings(d.seeds).map(safeId).filter((s): s is string => s !== null)])) {
         const e = await tx.get(p.entry(id, teamId));
         if (e) entries.set(teamId, e);
       }

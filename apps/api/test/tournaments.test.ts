@@ -581,6 +581,7 @@ describe("scores (report, confirm, advance, managers)", () => {
     // The score being confirmed is required and must be the one reported.
     expect((await call("POST", b.url("g001", "confirm"), undefined, "gcap")).status).toBe(400);
     expect(code(await call("POST", b.url("g001", "confirm"), { scoreA: 15, scoreB: 9 }, "gcap"))).toBe("failed_precondition");
+    expect(code(await call("POST", b.url("g001", "confirm"), { scoreA: 14, scoreB: 10 }, "gcap"))).toBe("failed_precondition");
     expect(b.g("g001")).toMatchObject({ status: "reported" });
     expect((await call("POST", b.url("g001", "confirm"), seen, "gcap")).status).toBe(204);
     expect(b.g("g001")).toMatchObject({ status: "done", scoreA: 15, scoreB: 10, report: null });
@@ -660,6 +661,14 @@ describe("the host's view keeps things in step (reconcile)", () => {
     expect(txs).toBe(1);
     expect(reads.filter((r) => r.startsWith(games)).sort()).toEqual([`${games}/g001`, `${games}/g002`]);
     expect(reads).not.toContain(`tournaments/${t.id}/entries/elsewhere`);
+  });
+
+  it("drops a seed whose entry moved to another division and withdrew", async () => {
+    const t = await accepted([["red", "cap"], ["blue", "bcap"]]);
+    store.put(`tournaments/${t.id}/entries/red`, { ...(store.doc(`tournaments/${t.id}/entries/red`) as object), divisionId: "elsewhere", status: "withdrawn" });
+    const res = await call("POST", `/v1/tournaments/${t.id}/divisions/${t.div}/reconcile`);
+    expect(res.json().changed).toEqual(["withdrawn"]);
+    expect(store.doc(`tournaments/${t.id}/divisions/${t.div}`)).toMatchObject({ seeds: ["blue"] });
   });
 
   it("drops withdrawn teams from unpublished seeds and copies captains from entries", async () => {

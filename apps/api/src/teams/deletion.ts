@@ -47,6 +47,10 @@ export class TeamDeletion {
   async deleteTeam(caller: Caller, rawTeam: unknown, body: unknown): Promise<void> {
     const teamId = docIdParam(rawTeam);
     const typed = typeof (body as { name?: unknown } | null)?.name === "string" ? String((body as { name: string }).name).trim() : null;
+    // Only the owner gets as far as the query (checked again below).
+    const first = await this.store.get(`teams/${teamId}`);
+    if (!first) throw new ApiError("not_found", "That team doesn't exist.");
+    if (first.ownerId !== caller.uid) throw new ApiError("permission_denied", "Only the owner can delete it.");
     // Hosted events (tournaments and leagues) can't be read in the
     // transaction; one made while it's being deleted fails without its host.
     const hosted = await this.queries.fields("tournaments", ["status"], hostedReadLimit, { hostId: teamId });

@@ -172,8 +172,8 @@ export class UploadService {
     const parsed = createUploadRequestSchema.safeParse(body ?? {});
     if (!parsed.success) throw fromZod(parsed.error);
     const { purpose, contentType, size, targetId, itemId, name } = parsed.data;
-    if (purpose !== "chat" && isVideoType(contentType) && !this.opts.queue) throw new ApiError("failed_precondition", videosNotYet);
     await this.checkTarget(caller.uid, purpose, targetId);
+    if (purpose !== "chat" && isVideoType(contentType) && !this.opts.queue) throw new ApiError("failed_precondition", videosNotYet);
     // The URL takes up to the limit for the declared kind (and, in chat, name).
     const maxBytes = uploadMax(purpose, contentType, name) ?? uploadLimits[purpose].image;
     const id = this.store.newId("uploads");

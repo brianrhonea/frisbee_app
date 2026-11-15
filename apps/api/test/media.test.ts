@@ -342,6 +342,9 @@ describe("uploads API", () => {
     const asked = await post("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "video/mp4", size: 1000 });
     expect(asked.statusCode).toBe(412);
     expect(asked.json().error.message).toBe("Video uploads aren't available here yet.");
+    // Who may upload is checked first.
+    const film = { purpose: "teamVideo", itemId: "i1", contentType: "video/mp4", size: 1000, targetId: "t1" };
+    expect((await bare.inject({ method: "POST", url: "/v1/uploads", payload: film, headers: { authorization: "Bearer token:p1" } })).statusCode).toBe(403);
     // Declared a photo, actually a video.
     const res = await post("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "image/jpeg", size: 1000 });
     const { id } = res.json();
