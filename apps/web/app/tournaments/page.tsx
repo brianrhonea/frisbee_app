@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { TournamentsForEveryone } from "@/components/tournaments/PublicTournament";
 import { loadTournaments } from "@/lib/tournamentPage";
 
+// Rendered per request (the API answer itself is cached for a minute), so
+// an API outage during a build or revalidation can't be baked into the page.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Tournaments and leagues",
   description: "Tournaments, hat tournaments and leagues hosted on Stall 10: schedules, scores and standings.",
