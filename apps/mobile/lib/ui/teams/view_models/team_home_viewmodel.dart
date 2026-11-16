@@ -284,6 +284,16 @@ class TeamHomeViewModel extends ChangeNotifier {
   /// A private group the user isn't in: only its listing is visible.
   bool get isPrivateToMe => !isMember && (summary?.isPrivateGroup ?? false);
 
+  /// A youth team the user isn't on: its roster is for its members only
+  /// (the API refuses anyone else), so the page says so in its place.
+  bool get youthRosterPrivate {
+    final s = summary;
+    return !isMember &&
+        s != null &&
+        !s.isCommunity &&
+        s.level == CompetitionLevel.youth;
+  }
+
   /// The user asked to join this group and is waiting for approval.
   bool get requestPending => _requestPending;
 

@@ -183,8 +183,11 @@ sequenceDiagram
   /v1/teams/:id/members/:uid/role`; `PUT .../stat-keeper`; `POST
   /v1/teams/:id/owner`; `PUT /v1/teams/:id/roles`.
 - Roster: `GET /v1/teams/:id/roster` → `TeamRoster` (any signed-in
-  caller; a private group's only to its members), with a community's
-  linked teams in `teams`.
+  caller; a private group's only to its members; a youth team's only to
+  its members and the member managers of the school or club community
+  that accepted it, as `communityInvites()` in the rules), with a
+  community's linked teams in `teams`. The app reads `roster/*` from
+  Firestore, which the rules already keep to members.
 - Communities: `PUT|DELETE /v1/teams/:id/community`; `POST
   /v1/teams/:org/link-requests/:team/accept`; `DELETE
   /v1/teams/:org/link-requests/:team`; `PUT|DELETE
@@ -212,7 +215,16 @@ sequenceDiagram
   `rosterIsPublic` in `packages/shared/src/team.ts` passes for both the
   team doc and its listing; else 404), `/events`. Members only (a token,
   never cached): `/players/:uid`, `/search`. Visitors get one page
-  (`next: null`); paging is for members.
+  (`next: null`); paging is for members. Visitors are limited by
+  `req.ip` (`browse/admit.ts`; TRUST_PROXY_HOPS decides which
+  X-Forwarded-For hops count), never the client-written first hop.
+  On top of `browse/model.ts` (a copy of the functions' file),
+  `browse/visibility.ts` decides: a private host by listing or team doc
+  (read with a field mask; either missing, or the two disagreeing,
+  counts as private), youth teams' card only, drafted league teams'
+  neutral name, and photo URLs pinned to the project's buckets and
+  `lh3.googleusercontent.com`. Team posts carry no `authorId`, and
+  `authorName` only for public profiles.
 - Public tournaments (no token; `apps/api/src/tournaments/public_*.ts`):
   `GET /v1/public/tournaments` (upcoming and running published events,
   as Find tournaments lists them), `/v1/public/tournaments/:id?division=`
@@ -221,7 +233,9 @@ sequenceDiagram
   tournament's public listing). Drafts (the rules' `visible()`) and
   private groups' events are 404; answers are built field by field
   with no uids, captains, signups, fee instructions or player names.
-  Same visitor limit as browse, `public, max-age=30`.
+  Same visitor limit as browse, `public, max-age=30`, and cached in
+  each instance for 30s (`ttl_cache.ts`: at most 200 events, games by
+  the division they resolve to, so `?division=` can't multiply reads).
 - Members' views of others (never cached): `GET /v1/players/:uid` → the
   page as the caller may see it (a private profile in full for people it
   approved, else `locked`); `GET /v1/posts/:id` → one post if the caller

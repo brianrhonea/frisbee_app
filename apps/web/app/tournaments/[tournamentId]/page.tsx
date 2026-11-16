@@ -10,9 +10,10 @@ type Props = { params: Promise<{ tournamentId: string }>; searchParams: Promise<
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined;
 
-export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { tournamentId } = await params;
-  const page = await loadTournament(tournamentId, first((await searchParams).division));
+  // The overview only: the same for every division.
+  const page = await loadTournament(tournamentId);
   if (!page) return { title: "Tournament" };
   const t = page.tournament;
   const day = t.startsOn ? formatDate(t.startsOn, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }, serverLocale) : "";

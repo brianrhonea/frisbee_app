@@ -11,6 +11,9 @@ import { ErrorNote, Loading } from "../StatusViews";
 import { InviteButton } from "./InviteDialog";
 import { useTeamHub } from "./TeamContext";
 
+/** In place of a youth team's roster for anyone who isn't on it (the app says the same). */
+export const youthRosterNote = "Rosters of youth teams are private: only members see them.";
+
 const positionLabels: Record<string, string> = { handler: "Handler", cutter: "Cutter", hybrid: "Hybrid" };
 
 /**
@@ -26,6 +29,8 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
   const { user } = useAuth();
   const [roster, setRoster] = useState<TeamRoster | null>(null);
   const [error, setError] = useState("");
+  // A youth team's roster is its members' (and its school or club's admins'): the API refuses anyone else.
+  const [youthPrivate, setYouthPrivate] = useState(false);
   const [filter, setFilter] = useState("");
 
   // Members refetch when the team doc changes (someone joins, leaves or
@@ -38,6 +43,7 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
     if (!user) return;
     let live = true;
     setError("");
+    setYouthPrivate(false);
     // A moment's wait: subscribing fires every signal at once.
     const timer = setTimeout(() => {
       callApi<TeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`).then(
@@ -45,7 +51,9 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
           if (live) setRoster(r);
         },
         (e) => {
-          if (live) setError(problem(e, "Couldn't load the roster. Try again."));
+          if (!live) return;
+          if (youth && !member && (e as { status?: number }).status === 403) setYouthPrivate(true);
+          else setError(problem(e, "Couldn't load the roster. Try again."));
         },
       );
     }, 150);
@@ -53,7 +61,7 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
       live = false;
       clearTimeout(timer);
     };
-  }, [user, teamId, version]);
+  }, [user, teamId, version, youth, member]);
   // Another team, or another account: don't show the last one's roster.
   useEffect(() => setRoster(null), [user, teamId]);
 
@@ -66,7 +74,7 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
           {kind !== "team"
             ? "Only members see who's in this group."
             : youth
-              ? "Rosters of youth teams are private: only members see them."
+              ? youthRosterNote
               : "Only members see this team's roster."}{" "}
           Log in or sign up free.
         </p>
@@ -78,6 +86,13 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
             Sign up
           </Link>
         </div>
+      </div>
+    );
+  }
+  if (youthPrivate && !roster) {
+    return (
+      <div className="card hub-empty">
+        <p>{youthRosterNote}</p>
       </div>
     );
   }

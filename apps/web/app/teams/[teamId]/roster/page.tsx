@@ -6,7 +6,8 @@ import { loadTeam } from "@/lib/teamPage";
 
 type Props = { params: Promise<{ teamId: string }> };
 
-export const metadata: Metadata = { title: "Roster" };
+// Players' names stay out of search engines, even on a public roster.
+export const metadata: Metadata = { title: "Roster", robots: { index: false } };
 
 /**
  * The roster. An adult team's (rosterIsPublic) is rendered on the server

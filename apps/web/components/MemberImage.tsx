@@ -51,6 +51,7 @@ export function MemberImage({ path, url, alt }: { path: string; url: string; alt
       src={src}
       alt={alt}
       loading="lazy"
+      referrerPolicy="no-referrer"
       onError={() => {
         if (src === url) setNeedsStorage(true);
         else setFailed(true);

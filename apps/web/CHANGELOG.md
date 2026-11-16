@@ -22,6 +22,21 @@ More for signed-out visitors (parents, friends, colleagues). Needs API
   news; server-rendered, live events refresh every minute. Entering,
   signing up and following ask them to sign up or log in, then return.
 - Group tournaments show visitors their public listing.
+- The tournament form says the location and About are public.
+
+**Changed** (visitor routes review)
+- A youth team shows visitors its card only, with "Youth teams share
+  their posts and schedule with members only." Signed-in people who
+  aren't on it still see its public posts and events (read live, as the
+  app does).
+- Signed-in people who aren't on a youth team see "Rosters of youth
+  teams are private: only members see them." in place of its roster.
+- Team posts and the tournament News tab show visitors the author only
+  when the author's profile is public.
+- A tournament page asks the API for another division only when it's
+  one of the event's (an unknown `?division=` shows the first).
+- Roster pages aren't indexed by search engines; avatars and post
+  photos load with `referrerPolicy="no-referrer"`.
 
 **Changed**
 - Visitor prompts and home copy say what's open without an account.

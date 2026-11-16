@@ -24,13 +24,46 @@ Public reads for signed-out website visitors. Deploy before web 0.31.0.
   and leagues (overview, divisions, accepted teams, one division's
   schedule and scores) and a group tournament's listing. Drafts and
   private groups' events are 404. No captains, signups, fee
-  instructions or player names; a drafted team named after a player
-  shows as "Team N". Cached publicly for 30 seconds.
+  instructions or player names; drafted teams always show as "Team N".
+  Cached publicly for 30 seconds, and in each instance for 30 seconds
+  (at most 200 events, the games by the division they resolve to).
 
 **Changed**
 - `GET /v1/public/events` is public (no token, limited by IP, publicly
   cacheable). Its tournament listings carry only their seven public
   fields.
+- Youth teams' rosters (`GET /v1/teams/:id/roster`) are for their members
+  and the member managers of the school or club community that accepted
+  them; anyone else gets 403 "Rosters of youth teams are private: only
+  members see them." Adult teams are unchanged.
+- League teams drafted from a youth division are youth teams (team and
+  listing `level: "youth"`), as in the functions' copy.
+
+**Security** (visitor routes review)
+- Visitors are limited by `req.ip` (only the trusted proxy hops,
+  TRUST_PROXY_HOPS), never the X-Forwarded-For first hop a client
+  writes, so a spoofed header gets no fresh bucket and can't spend or
+  mute another address's.
+- A youth team shows visitors its card only: no posts, events or
+  location on its page, in `/v1/public/events` or in the finder.
+- Public team posts no longer carry `authorId`; `authorName` only when
+  the author's profile is public (one batched read).
+- Private-group checks read the team doc too (kind, requiresApproval,
+  level; a field mask): a missing team doc, or one that disagrees with
+  its listing, counts as private.
+- Visitor photo URLs only from this project's Storage buckets
+  (STORAGE_BUCKET, `<project>.firebasestorage.app`,
+  `<project>.appspot.com`) or `lh3.googleusercontent.com`.
+- A league's drafted teams (`league_…`) are out of the finder, show as
+  "League team" on their page and in events, and their public roster is
+  404; so is the roster of a team in a league's youth division. Entrants
+  that are drafted teams show as "Team N" (or "Team N (drafted)" beside a
+  real team of that name).
+- A public roster spot linked to a private profile, or one that hides
+  its teams, shows as "Player" with its number and position only.
+- `firebase/scripts/backfill-youth-league-teams.mjs` (dry run by
+  default) sets `level: "youth"` on existing youth league teams and their
+  listings.
 
 ## 0.25.1 — 2026-11-15
 
