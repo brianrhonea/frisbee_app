@@ -104,6 +104,7 @@ export function chooseRanking(keys: Iterable<string>, want: RankingWant = {}): R
   const pick =
     parsed.find((p) => (!level || p.level === level) && (!division || p.division === division)) ??
     (level ? parsed.find((p) => p.level === level) : undefined) ??
+    (division ? parsed.find((p) => p.division === division) : undefined) ??
     parsed[0]!;
   const all = ordered.map((k) => parseRankingKey(k)!);
   return {

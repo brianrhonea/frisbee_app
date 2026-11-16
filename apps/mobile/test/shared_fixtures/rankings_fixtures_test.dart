@@ -49,6 +49,11 @@ final _cases = <Map<String, Object?>>[
     'query': {'level': 'pickup', 'division': 'mixed'},
   },
   {
+    'name': 'a level without data: the division asked for elsewhere',
+    'keys': ['club-mixed', 'college-open'],
+    'query': {'level': 'league', 'division': 'open'},
+  },
+  {
     'name': 'youth is never a level, even with data',
     'keys': [..._all, 'youth-mixed', 'youth-open'],
     'query': {'level': 'youth', 'division': 'open'},

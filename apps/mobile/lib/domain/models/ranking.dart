@@ -198,6 +198,7 @@ class RankingChoice {
             )
             .firstOrNull ??
         (l == null ? null : parsed.where((p) => p.level == l).firstOrNull) ??
+        (d == null ? null : parsed.where((p) => p.division == d).firstOrNull) ??
         parsed.first;
     final all = [for (final k in ordered) parseKey(k)!];
     return RankingChoice(

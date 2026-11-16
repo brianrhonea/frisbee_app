@@ -226,6 +226,33 @@
       }
     },
     {
+      "name": "a level without data: the division asked for elsewhere",
+      "keys": [
+        "club-mixed",
+        "college-open"
+      ],
+      "query": {
+        "level": "league",
+        "division": "open"
+      },
+      "want": {
+        "level": "league",
+        "division": "open"
+      },
+      "choice": {
+        "key": "college-open",
+        "level": "college",
+        "division": "open",
+        "levels": [
+          "club",
+          "college"
+        ],
+        "divisions": [
+          "open"
+        ]
+      }
+    },
+    {
       "name": "youth is never a level, even with data",
       "keys": [
         "club-mixed",

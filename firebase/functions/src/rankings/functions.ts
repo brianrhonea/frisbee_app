@@ -142,7 +142,8 @@ const readBatch = 300;
 async function youthTeams(teamIds: string[]): Promise<Set<string>> {
   const db = getFirestore();
   const youth = new Set<string>();
-  const valid = teamIds.filter((id) => id && !id.includes("/"));
+  // Only well-formed ids (as the API's validId): a bad one can't fail the rebuild.
+  const valid = teamIds.filter((id) => /^[A-Za-z0-9_-]{1,128}$/.test(id));
   for (let i = 0; i < valid.length; i += readBatch) {
     const ids = valid.slice(i, i + readBatch);
     const refs = ids.flatMap((id) => [db.doc(`teams/${id}`), db.doc(`teamDirectory/${id}`)]);
