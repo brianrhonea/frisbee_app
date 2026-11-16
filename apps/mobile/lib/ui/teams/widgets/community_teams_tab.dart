@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/personal_details.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
@@ -427,7 +428,7 @@ class _AccessPickerState extends State<_AccessPicker> {
       children: [
         Text(
           'Members with any of these roles join the team. Give out roles '
-          'from Members.',
+          'from Members. $clubRolesNotice',
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: 8),
@@ -571,6 +572,13 @@ class _NewTeamDialogState extends State<_NewTeamDialog> {
                     ],
                     onChanged: (v) => setState(() => _division = v!),
                   ),
+                  if (org?.level == CompetitionLevel.club) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      clubTooYoungMessage,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ],
               )
             : _AccessPicker(

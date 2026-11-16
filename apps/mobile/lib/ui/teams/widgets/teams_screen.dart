@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/personal_details.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
@@ -112,6 +113,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
                 busy: vm.acceptInvite.running || vm.declineInvite.running,
                 onAccept: () => vm.acceptInvite.execute(i),
                 onDecline: () => vm.declineInvite.execute(i),
+                club: vm.isClubInvite(i),
               ),
           ];
           if (vm.all.isEmpty && invites.isEmpty) {
@@ -410,10 +412,14 @@ class _InviteTile extends StatelessWidget {
     required this.busy,
     required this.onAccept,
     required this.onDecline,
+    this.club = false,
   });
 
   final TeamInvite invite;
   final bool busy;
+
+  /// A club team: says it's for players 16 and over.
+  final bool club;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
 
@@ -439,6 +445,11 @@ class _InviteTile extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   Text(from, style: Theme.of(context).textTheme.bodySmall),
+                  if (club)
+                    Text(
+                      clubTooYoungMessage,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                 ],
               ),
             ),

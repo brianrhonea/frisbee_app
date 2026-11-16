@@ -72,6 +72,42 @@ String? birthDateProblem(DateTime? birth, DateTime today) {
   return null;
 }
 
+/// Club teams ([Team.isClubTeam]) take players this age and over.
+const clubMinimumAge = 16;
+
+/// Why someone too young can't join a club team; also shown up front.
+const clubTooYoungMessage =
+    'Club teams are for players $clubMinimumAge and over.';
+
+/// Why someone with no date of birth on file can't join a club team yet.
+const clubNeedsBirthDateMessage =
+    'Add your date of birth in About you to join a club team.';
+
+/// What an admin sees when the person they're adding can't join a club
+/// team.
+String clubCantJoinMessage(String name) =>
+    "$name can't join a club team: club teams are for players "
+    '$clubMinimumAge and over.';
+
+/// Why someone born on [birth] can't join a club team on [today], or null:
+/// [clubMinimumAge] or over that day, counted as [ageOn] counts. The API
+/// checks this when anyone joins; the app only explains it.
+String? clubJoinProblem(DateTime? birth, DateTime today) {
+  if (birth == null) return clubNeedsBirthDateMessage;
+  return ageOn(birth, today) >= clubMinimumAge ? null : clubTooYoungMessage;
+}
+
+/// Community roles add their holders to the community's teams, but not to
+/// club teams: nothing but the API can check an age, so players join those
+/// with an invite.
+const clubRolesNotice =
+    "Club teams (16 and over) don't take anyone from roles: invite their "
+    'players instead.';
+
+/// Whether someone born on [birth] may join a club team on [today].
+bool canJoinClubTeam(DateTime? birth, DateTime today) =>
+    clubJoinProblem(birth, today) == null;
+
 /// 7 to 15 digits, with an optional leading + and the usual separators.
 String? phoneProblem(String input) {
   final s = input.trim();

@@ -230,6 +230,10 @@ class FakeTeamRepository implements TeamRepository {
   /// Set to fail minting, e.g. for someone the rules would refuse.
   Exception? mintError;
 
+  /// Set to fail joining (code, link or invite), as the API refuses
+  /// someone, e.g. under 16 for a club team.
+  Exception? joinError;
+
   var _minted = 0;
 
   /// The team [code] joins, or an error if it's unknown or expired.
@@ -613,6 +617,7 @@ class FakeTeamRepository implements TeamRepository {
 
   @override
   Future<Result<void>> acceptInvite(TeamInvite invite, AppUser user) async {
+    if (joinError case final e?) return Result.error(e);
     if (!teams.containsKey(invite.teamId)) {
       return Result.error(Exception('Team not found'));
     }
@@ -636,6 +641,7 @@ class FakeTeamRepository implements TeamRepository {
   @override
   Future<Result<String>> joinTeam(String inviteCode, AppUser user) async {
     joinedCode = inviteCode;
+    if (joinError case final e?) return Result.error(e);
     final found = _teamForCode(inviteCode);
     if (found case Error(:final error)) return Result.error(error);
     final team = teams[(found as Ok<String>).value];

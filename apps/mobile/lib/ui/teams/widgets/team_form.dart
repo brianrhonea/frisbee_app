@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../domain/models/personal_details.dart';
 import '../../../domain/models/team.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../groups/widgets/location_picker_dialog.dart';
@@ -45,6 +46,17 @@ class _TeamFormState extends State<TeamForm> {
   late GroupLocation? _location = widget.initial?.location;
 
   bool get _isGroup => _kind.isGroupLike;
+
+  /// The club age rule, under Level while club is picked. A team moved to
+  /// club keeps everyone on it; only new players must be 16 or over.
+  String? get _clubNotice {
+    if (_isGroup || _level != CompetitionLevel.club) return null;
+    final wasClub = widget.initial?.level == CompetitionLevel.club;
+    return _editing && !wasClub
+        ? '$clubTooYoungMessage People already on the team stay on it.'
+        : clubTooYoungMessage;
+  }
+
   bool get _isOrg => _kind == TeamKind.organization;
 
   @override
@@ -151,7 +163,11 @@ class _TeamFormState extends State<TeamForm> {
             const SizedBox(height: 16),
             DropdownButtonFormField<CompetitionLevel>(
               initialValue: _level,
-              decoration: const InputDecoration(labelText: 'Level'),
+              decoration: InputDecoration(
+                labelText: 'Level',
+                helperText: _clubNotice,
+                helperMaxLines: 2,
+              ),
               items: [
                 for (final l in CompetitionLevel.values)
                   DropdownMenuItem(value: l, child: Text(l.label)),

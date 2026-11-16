@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/personal_details.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
@@ -101,6 +102,14 @@ class _JoinLinkScreenState extends State<JoinLinkScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(color: c.muted),
                   ),
+                  if (vm.isClubTeam && !vm.alreadyMember) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      clubTooYoungMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: c.muted),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
