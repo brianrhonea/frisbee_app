@@ -69,6 +69,27 @@ export class PersonalService {
     return { details: record as PersonalDetails, email };
   }
 
+  /** Replaces their details. Under 13 is refused and nothing is saved. */
+  async save(caller: Caller, body: unknown): Promise<void> {
+    const r = personalDetailsSchema.safeParse(body ?? {});
+    if (!r.success) throw fromZod(r.error);
+    const details = r.data;
+    const today = this.today();
+    const problem = personalDetailsProblem(details, today);
+    if (problem?.message === tooYoungMessage) {
+      throw new ApiError("failed_precondition", tooYoungMessage, { birthDate: tooYoungMessage });
+    }
+    if (problem) throw new ApiError("invalid_argument", problem.message, { [problem.field]: problem.message });
+    // Adults' guardians aren't kept.
+    const record: PersonalDetails =
+      ageOn(details.birthDate, today) >= adultAge ? { ...details, guardian: undefined } : details;
+    const path = personalPath(caller.uid);
+    const sealed = await this.cipher.seal(Buffer.from(JSON.stringify(record), "utf8"), path);
+    await this.store.transact(async (tx) => {
+      tx.set(path, { ciphertext: sealed.ciphertext, key: sealed.key, format, updatedAt: serverTime });
+    });
+  }
+
   /**
    * Keeps the email sign-up form's birthday until "About you" is filled
    * in, encrypted like the full details, so it isn't asked again after a
@@ -94,27 +115,6 @@ export class PersonalService {
         throw new ApiError("already_exists", "Your details are already saved. Change them in Settings.");
       }
       tx.set(path, { ciphertext: sealed.ciphertext, key: sealed.key, format, [birthDateOnly]: true, updatedAt: serverTime });
-    });
-  }
-
-  /** Replaces their details. Under 13 is refused and nothing is saved. */
-  async save(caller: Caller, body: unknown): Promise<void> {
-    const r = personalDetailsSchema.safeParse(body ?? {});
-    if (!r.success) throw fromZod(r.error);
-    const details = r.data;
-    const today = this.today();
-    const problem = personalDetailsProblem(details, today);
-    if (problem?.message === tooYoungMessage) {
-      throw new ApiError("failed_precondition", tooYoungMessage, { birthDate: tooYoungMessage });
-    }
-    if (problem) throw new ApiError("invalid_argument", problem.message, { [problem.field]: problem.message });
-    // Adults' guardians aren't kept.
-    const record: PersonalDetails =
-      ageOn(details.birthDate, today) >= adultAge ? { ...details, guardian: undefined } : details;
-    const path = personalPath(caller.uid);
-    const sealed = await this.cipher.seal(Buffer.from(JSON.stringify(record), "utf8"), path);
-    await this.store.transact(async (tx) => {
-      tx.set(path, { ciphertext: sealed.ciphertext, key: sealed.key, format, updatedAt: serverTime });
     });
   }
 
