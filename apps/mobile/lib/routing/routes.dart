@@ -57,11 +57,13 @@ abstract final class Routes {
 
   static const explorePath = '/explore';
 
-  /// Stall 10's team rankings; [key] ("club-mixed") picks the division.
+  /// Stall 10's rankings, as the website links them: [query] is
+  /// `{level: club, division: mixed}` for a team ranking, or
+  /// `{kind: players}`. The old `?d=club-mixed` still opens.
   static const rankingsPath = '/rankings';
-  static String rankings([String? key]) => Uri(
+  static String rankings([Map<String, String>? query]) => Uri(
     path: rankingsPath,
-    queryParameters: key == null ? null : {'d': key},
+    queryParameters: query == null || query.isEmpty ? null : query,
   ).toString();
 
   /// Everything the user follows, with each bell.

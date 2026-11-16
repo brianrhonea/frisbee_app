@@ -71,19 +71,31 @@ void main() {
   final collegeWomen = ranking(CompetitionLevel.college, Division.women, [
     ('w1', 'Fury'),
   ]);
+  final collegeOpen = ranking(CompetitionLevel.college, Division.open, [
+    ('co1', 'Pleasure'),
+  ]);
+  final youthMixed = ranking(CompetitionLevel.youth, Division.mixed, [
+    for (var i = 0; i < 12; i++) ('y$i', 'Youth $i'),
+  ]);
 
   ExploreViewModel build({
     FakeRankingRepository? rankings,
     FakeHostedTournamentRepository? tournaments,
     FakeTeamRepository? teams,
-    String? initialRanking,
+    bool rankingsPage = false,
+    RankingKind kind = RankingKind.teams,
+    String? level,
+    String? division,
   }) {
     final vm = ExploreViewModel(
       tournamentRepository: tournaments ?? FakeHostedTournamentRepository(),
       rankingRepository: rankings ?? FakeRankingRepository(),
       teamRepository: teams,
       authRepository: FakeAuthRepository(user: testUser),
-      initialRanking: initialRanking,
+      rankingsPage: rankingsPage,
+      kind: kind,
+      level: level,
+      division: division,
     );
     addTearDown(vm.dispose);
     return vm;
@@ -121,9 +133,107 @@ void main() {
     test('a linked division wins over the default', () async {
       final repo = FakeRankingRepository()
         ..initialRankings = [clubOpen, clubMixed];
-      final vm = build(rankings: repo, initialRanking: 'club-mixed');
+      final vm = build(rankings: repo, level: 'club', division: 'mixed');
       await pumpEventQueue();
       expect(vm.ranking?.key, 'club-mixed');
+      expect(vm.rankingLink, {'level': 'club', 'division': 'mixed'});
+    });
+
+    test('never shows a youth ranking, even the biggest or linked', () async {
+      final repo = FakeRankingRepository()
+        ..initialRankings = [youthMixed, clubOpen];
+      final preview = build(rankings: repo);
+      final page = build(
+        rankings: repo,
+        rankingsPage: true,
+        level: 'youth',
+        division: 'mixed',
+      );
+      await pumpEventQueue();
+      expect(preview.rankings.map((r) => r.key), ['club-open']);
+      expect(preview.ranking?.key, 'club-open');
+      expect(page.ranking?.key, 'club-open');
+      expect(page.rankingChoice?.levels, [CompetitionLevel.club]);
+
+      final onlyYouth = FakeRankingRepository()..initialRankings = [youthMixed];
+      final none = build(rankings: onlyYouth, rankingsPage: true);
+      await pumpEventQueue();
+      expect(none.ranking, isNull);
+    });
+  });
+
+  group('Rankings page filters', () {
+    test('opens on Club Mixed, as the website does, else the first', () async {
+      final repo = FakeRankingRepository()
+        ..initialRankings = [collegeWomen, clubOpen, clubMixed];
+      final teams = FakeTeamRepository()
+        ..teams['w1'] = Team(
+          id: 'w1',
+          name: 'Fury',
+          division: Division.women,
+          level: CompetitionLevel.college,
+          ownerId: testUser.uid,
+          members: {testUser.uid: TeamRole.owner},
+        );
+      final vm = build(rankings: repo, teams: teams, rankingsPage: true);
+      await pumpEventQueue();
+      expect(vm.ranking?.key, 'club-mixed', reason: 'not the biggest or mine');
+
+      final noMixed = FakeRankingRepository()
+        ..initialRankings = [collegeWomen, clubOpen];
+      final other = build(rankings: noMixed, rankingsPage: true);
+      await pumpEventQueue();
+      expect(other.ranking?.key, 'club-open');
+    });
+
+    test('offer only levels and divisions with rankings', () async {
+      final repo = FakeRankingRepository()
+        ..initialRankings = [collegeWomen, collegeOpen, clubOpen, clubMixed];
+      final vm = build(rankings: repo, rankingsPage: true);
+      await pumpEventQueue();
+      final choice = vm.rankingChoice!;
+      expect(choice.levels, [CompetitionLevel.club, CompetitionLevel.college]);
+      expect(choice.divisions, [Division.mixed, Division.open]);
+      expect(
+        (choice.level, choice.division),
+        (CompetitionLevel.club, Division.mixed),
+      );
+    });
+
+    test('a level keeps the division if it has one, else its first', () async {
+      final repo = FakeRankingRepository()
+        ..initialRankings = [collegeWomen, collegeOpen, clubOpen, clubMixed];
+      final vm = build(rankings: repo, rankingsPage: true);
+      await pumpEventQueue();
+      vm.pickDivision(Division.open);
+      expect(vm.ranking?.key, 'club-open');
+      vm.pickLevel(CompetitionLevel.college);
+      expect(vm.ranking?.key, 'college-open', reason: 'kept Open');
+      expect(vm.rankingChoice?.divisions, [Division.open, Division.women]);
+      vm.pickDivision(Division.women);
+      expect(vm.ranking?.key, 'college-women');
+      vm.pickLevel(CompetitionLevel.club);
+      expect(vm.ranking?.key, 'club-mixed', reason: 'no Club Women');
+      expect(vm.rankingLink, {'level': 'club', 'division': 'mixed'});
+    });
+
+    test('reads the old ?d= and ?division= keys', () {
+      expect(RankingChoice.wantFromQuery(d: 'college-women'), (
+        level: 'college',
+        division: 'women',
+      ));
+      expect(RankingChoice.wantFromQuery(division: 'club-open'), (
+        level: 'club',
+        division: 'open',
+      ));
+      expect(RankingChoice.wantFromQuery(d: 'youth-mixed'), (
+        level: null,
+        division: null,
+      ));
+      expect(RankingChoice.wantFromQuery(level: 'pickup', division: 'open'), (
+        level: 'pickup',
+        division: 'open',
+      ));
     });
 
     test('has no ranking until one exists', () async {
@@ -240,6 +350,43 @@ void main() {
     expect(find.text('1500'), findsOneWidget);
   });
 
+  testWidgets('the Rankings page filters by Level and Division, never Youth', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final rankings = FakeRankingRepository()
+      ..initialRankings = [clubMixed, clubOpen, collegeWomen, youthMixed];
+    final vm = build(rankings: rankings, rankingsPage: true);
+    await tester.pumpWidget(MaterialApp(home: RankingsScreen(viewModel: vm)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Level'), findsOneWidget);
+    expect(find.text('Division'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Club'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'College'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Youth'), findsNothing);
+    expect(find.widgetWithText(ChoiceChip, 'Mixed'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Open'), findsOneWidget);
+    expect(find.text('Club Mixed'), findsOneWidget);
+    expect(find.text('Seattle Mixtape'), findsOneWidget);
+    expect(find.textContaining('Youth'), findsOneWidget);
+    expect(find.textContaining("Youth teams aren't ranked."), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Club Open'), findsOneWidget);
+    expect(find.text('Open 0'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'College'));
+    await tester.pumpAndSettle();
+    expect(find.text('College Women'), findsOneWidget);
+    expect(find.text('Fury'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Women'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Open'), findsNothing);
+  });
+
   testWidgets('Rankings switches to players and marks the user', (
     tester,
   ) async {
@@ -276,10 +423,10 @@ void main() {
   });
 
   test('a players link opens on players', () async {
-    final vm = build(initialRanking: ExploreViewModel.playersKey);
+    final vm = build(kind: RankingKind.players, rankingsPage: true);
     await pumpEventQueue();
     expect(vm.kind, RankingKind.players);
-    expect(vm.rankingLink, 'players');
+    expect(vm.rankingLink, {'kind': 'players'});
     expect(vm.playersLoaded, isTrue);
   });
 }

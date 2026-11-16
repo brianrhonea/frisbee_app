@@ -97,6 +97,27 @@ export function playerInput(uid: string, profile: Data): PlayerInput | null {
   };
 }
 
+/** Youth team roles that are adults running the team; everyone else on a youth team is left out. */
+const youthTeamAdults = new Set(["owner", "coach"]);
+
+/**
+ * The people on youth teams who are never rated: everyone on a youth
+ * team ([teams]: team docs with `kind`, `level`, `members`, `memberIds`)
+ * but its owner and coaches. We don't show anything about youth players.
+ * A profile's season totals don't say which team they came from, so
+ * being on a youth team now is what counts.
+ */
+export function youthPlayerUids(teams: Data[]): Set<string> {
+  const out = new Set<string>();
+  for (const t of teams) {
+    if (!((t.kind === undefined || t.kind === "team") && t.level === "youth")) continue;
+    const members = (t.members && typeof t.members === "object" ? t.members : {}) as Data;
+    const ids = new Set([...Object.keys(members), ...(Array.isArray(t.memberIds) ? t.memberIds.map(String) : [])]);
+    for (const uid of ids) if (!youthTeamAdults.has(String(members[uid] ?? ""))) out.add(uid);
+  }
+  return out;
+}
+
 /** Production for [t]: see the file comment. */
 export function production(t: SeasonTotals): number {
   // Catches include goals; don't count a goal's catch twice.

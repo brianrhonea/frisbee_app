@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Explore } from "@/components/explore/Explore";
 import { type ExploreFilter, exploreFilters } from "@/components/explore/filters";
+import { ForVisitors } from "@/components/ForVisitors";
 import { MembersOnly } from "@/components/MembersOnly";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Explore",
@@ -29,6 +31,12 @@ export default async function ExplorePage({ searchParams }: Props) {
       <MembersOnly next={next} what="Sign up free or log in to search for players, teams, pickup groups and tournaments.">
         <Explore initialQuery={q} initialFilter={only} />
       </MembersOnly>
+      <ForVisitors>
+        <p className="muted">
+          No account needed for the <Link href="/rankings">team rankings</Link> or{" "}
+          <Link href="/tournaments">tournaments and leagues</Link>.
+        </p>
+      </ForVisitors>
     </div>
   );
 }

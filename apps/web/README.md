@@ -18,6 +18,7 @@ Firebase Hosting used to serve (Hosting now has only the static pages in
 | `/messages` | Members: direct and group conversations |
 | `/events` | Everyone: upcoming public events and tournaments (`GET /v1/public/events`; visitors read it without a token) |
 | `/explore?q=` | Members: player and team search |
+| `/rankings?level=&division=` | Everyone: team rankings by Level (Club, College, League, Pickup; never youth) and Division (`GET /v1/public/rankings`, server-rendered for visitors; members read them live). The old `?division=club-mixed` still works. `?kind=players`: members' player ratings |
 | `/about`, `/help`, `/terms`, `/privacy`, `/cookies`, `/delete-account` | Static pages ported from `firebase/hosting` (`content/*.html`, served by `app/[slug]`) |
 | `/join/[code]`, `/g/[id]`, `/p/[id]` | Invite and share link fallbacks; `public/.well-known` opens them in the app |
 | `/sign-in`, `/sign-up` | Firebase Auth (email/password, Google). Sign-up asks the date of birth first (13 and over) |

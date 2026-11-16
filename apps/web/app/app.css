@@ -984,11 +984,9 @@ a.play-card:hover { border-color: var(--accent); }
 
 /* Rankings */
 .segmented { justify-self: start; }
-.rankings-pick { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-.rankings-pick select {
-  padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line);
-  background: var(--field); color: var(--ink); font: inherit;
-}
+.rankings-filters { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; }
+.rankings-filter { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rankings-filter-label { font-weight: 600; font-size: 0.9rem; color: var(--muted); }
 .rankings-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .rankings-table th {
   text-align: left; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase;

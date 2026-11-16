@@ -31,3 +31,4 @@ export * from "./public_tournaments.js";
 export * from "./meetings.js";
 export * from "./discord.js";
 export * from "./schedule.js";
+export * from "./rankings.js";

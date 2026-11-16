@@ -18,6 +18,9 @@ import { StatsService } from "./stats/service.js";
 import { GroupTournamentService, groupTournamentRoutes } from "./group_tournaments/service.js";
 import { tournamentRoutes } from "./tournaments/routes.js";
 import { TournamentService } from "./tournaments/service.js";
+import type { PublicRankingRepository } from "./rankings/public_repository.js";
+import { publicRankingRoutes } from "./rankings/public_routes.js";
+import { PublicRankingService } from "./rankings/public_service.js";
 import type { PublicTournamentRepository } from "./tournaments/public_repository.js";
 import { publicTournamentRoutes } from "./tournaments/public_routes.js";
 import { PublicTournamentService } from "./tournaments/public_service.js";
@@ -82,6 +85,8 @@ export interface AppDeps {
   };
   /** Visitors' tournament pages (`/v1/public/tournaments*`), limited by [browse]'s limiter; off without both. */
   publicTournaments?: PublicTournamentRepository;
+  /** Visitors' team rankings (`/v1/public/rankings`), limited by [browse]'s limiter; off without both. */
+  publicRankings?: PublicRankingRepository;
   /** Transactional document access; enables the membership, profile and post routes. */
   store?: DocStore;
   /** The draft operations' queries; with [store], else they list documents (tests). */
@@ -178,6 +183,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   }
   if (deps.browse && deps.publicTournaments) {
     publicTournamentRoutes(app, new PublicTournamentService(deps.publicTournaments, deps.now), deps.browse);
+  }
+  if (deps.browse && deps.publicRankings) {
+    publicRankingRoutes(app, new PublicRankingService(deps.publicRankings, deps.now), deps.browse);
   }
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now, undefined, clubAges));

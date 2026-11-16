@@ -8,6 +8,7 @@ import {
   ratePlayers,
   recentTotals,
   type SeasonTotals,
+  youthPlayerUids,
   seasonTotals,
 } from "../../src/rankings/players";
 
@@ -100,5 +101,18 @@ describe("ratePlayers", () => {
       { uid: "a", name: "A", username: null, photoUrl: null, rating: 71.6, games: 12, points: 90, goals: 9, assists: 4, blocks: 2, turnovers: 3 },
     ]);
     expect(doc).toMatchObject({ minGames: 10, players: [{ uid: "a", rank: 1, rating: 72 }] });
+  });
+});
+
+describe("youth players", () => {
+  it("leaves out everyone on a youth team but its owner and coaches", () => {
+    const uids = youthPlayerUids([
+      { level: "youth", members: { o: "owner", c: "coach", p: "player", k: "captain", s: "stats" }, memberIds: ["o", "c", "p", "k", "s", "n"] },
+      { kind: "team", level: "youth", members: { q: "player" } },
+      // Not youth teams: nobody left out.
+      { level: "club", members: { adult: "player" } },
+      { kind: "community", level: "youth", members: { member: "player" } },
+    ]);
+    expect([...uids].sort()).toEqual(["k", "n", "p", "q", "s"]);
   });
 });

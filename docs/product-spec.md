@@ -262,6 +262,25 @@ everything the app does on the website alone, styled like the website
    and the Jump in shortcuts (web 0.24.0). Not yet: player rows show
    only @username (the app adds team, school and hometown; the public
    search returns neither).
+   [x] Rankings filters (both platforms): the Rankings page picks a
+   team ranking with two filters, Level (Club, College, League, Pickup;
+   never Youth) and Division (Mixed, Open, Women, Masters), showing
+   only levels with a ranking and the divisions ranked at the level
+   picked. Opens on Club Mixed, else the first ranking (by level, then
+   division); a level keeps the division picked if it has one, else
+   takes its first. The website keeps them in the URL
+   (`/rankings?level=club&division=mixed`; the old
+   `?division=club-mixed` still opens), and so does the app's route
+   (also the old `?d=`). The note under the table says "Youth teams
+   aren't ranked." and under player ratings "Players on youth teams
+   aren't rated." Explore's preview (both) still opens on the
+   member's team's division, else the biggest. Logic in
+   `@stall10/shared` `rankings.ts`, mirrored by the app's
+   `RankingChoice`, checked on the shared vectors
+   `fixtures/rankings/choice.json`. Tests: shared
+   `test/rankings_fixtures.test.ts`; app `test/ui/explore_test.dart`,
+   `test/data/ranking_repository_test.dart`,
+   `test/shared_fixtures/rankings_fixtures_test.dart`.
 10. Messaging: [x] accepting and declining team invites (Teams page and
     home); [x] any file in team chat and DMs (videos and files stored as
     sent, as the app stores them; videos play, files download with their
@@ -318,7 +337,8 @@ everything the app does on the website alone, styled like the website
     community feed's first page, a team finder on Teams (`GET
     /v1/public/teams?q=`: listings only, never players; the top bar's
     search lands there), and team and group pages with public posts and
-    events. A youth team (`isYouthTeam` on its team doc or its listing)
+    events, and team rankings (`/rankings`, below). A youth team
+    (`isYouthTeam` on its team doc or its listing)
     shows visitors its card only (name, city, description, division and
     level; no posts, events or location, in the finder and Events too),
     with "Youth teams share their posts and schedule with members only."
@@ -334,8 +354,8 @@ everything the app does on the website alone, styled like the website
     with its number and position only. A league's drafted teams
     (`league_…`) are out of the finder, show as "League team" and have
     no public roster; nor does a team in a league's youth division.
-    Players, search, Explore, messages and My schedule stay
-    members-only. Signed in: a youth team's roster (`GET
+    Players (and player ratings), search, Explore, messages and My
+    schedule stay members-only. Signed in: a youth team's roster (`GET
     /v1/teams/:id/roster`) is only for its members and the member
     managers of the school or club community that accepted it; everyone
     else sees "Rosters of youth teams are private: only members see
@@ -345,6 +365,17 @@ everything the app does on the website alone, styled like the website
     `test/browse.emulator.test.ts`; shared
     `test/team_roster_public.test.ts`; app `test/ui/team_home_test.dart`
     (the youth roster note).
+    [x] Rankings: visitors see the team rankings at `/rankings`,
+    server-rendered from `GET /v1/public/rankings` (rank, team, rating,
+    wins and losses; teams link to their public pages); the Players tab
+    asks them to sign up. Youth is never ranked, for anyone: the
+    `rankings` functions skip youth divisions and youth teams (by team
+    doc or listing) in adult divisions, delete stale `rankings/youth-*`
+    docs, and rate nobody on a youth team but its owner and coaches;
+    the API also drops youth keys, youth and private-group teams, and
+    drafted league teams, and the members' live reads (app and website)
+    drop youth keys. Tests: API `test/public_rankings.test.ts` (and the
+    emulator test); functions `test/rankings`.
 15. Visitors: tournaments (website only; the app needs an account).
     [x] Signed-out visitors (parents, friends) browse `/tournaments` and
     follow any published tournament's or league's page: overview,

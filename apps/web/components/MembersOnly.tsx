@@ -29,7 +29,7 @@ function JoinPrompt({ next, what }: { next: string; what?: string }) {
       <b>Join Stall 10 to see this</b>
       <p className="muted">
         {what ?? "Sign up free or log in to see this page."} Without an account you can find teams and see their
-        pages, browse events, tournaments and the community, and learn to play.
+        pages, browse events, tournaments, team rankings and the community, and learn to play.
       </p>
       <div className="home-actions">
         <Link className="btn btn-primary btn-small" href={`/sign-up${q}`}>
