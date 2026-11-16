@@ -34,10 +34,14 @@ class AppLogo extends StatelessWidget {
 
 /// Logo followed by the app name, in [color] (default: the page's ink).
 class AppWordmark extends StatelessWidget {
-  const AppWordmark({super.key, this.size = 28, this.color});
+  const AppWordmark({super.key, this.size = 28, this.color, this.logo = true});
 
   final double size;
   final Color? color;
+
+  /// Whether the disc logo comes before the name; off in the phone's top
+  /// bar, which shows just "Stall 10", as the website does.
+  final bool logo;
 
   @override
   Widget build(BuildContext context) {
@@ -45,8 +49,7 @@ class AppWordmark extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AppLogo(size: size),
-        SizedBox(width: size * 0.32),
+        if (logo) ...[AppLogo(size: size), SizedBox(width: size * 0.32)],
         Text(
           appName,
           style: TextStyle(

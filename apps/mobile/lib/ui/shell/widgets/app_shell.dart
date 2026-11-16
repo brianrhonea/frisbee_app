@@ -7,7 +7,6 @@ import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/app_search_field.dart';
 import '../../core/ui/brand.dart';
-import '../../core/ui/disc_icon.dart';
 import '../../core/ui/key_hint.dart';
 import '../../core/ui/layout.dart';
 import '../../core/ui/scroll_to_top.dart';
@@ -744,8 +743,8 @@ class SearchField extends StatelessWidget {
   );
 }
 
-/// The notifications button: a flying disc, with a dot when there are
-/// unread notifications.
+/// The notifications button: a bell, as on the website, with a dot when
+/// there are unread notifications.
 class NotificationsButton extends StatelessWidget {
   const NotificationsButton({super.key, required this.count, this.color});
 
@@ -759,12 +758,12 @@ class NotificationsButton extends StatelessWidget {
     icon: Badge(
       isLabelVisible: count > 0,
       smallSize: 8,
-      child: DiscIcon(color: color),
+      child: Icon(Icons.notifications_none_rounded, color: color),
     ),
   );
 }
 
-/// The phone's top bar on top-level pages: the wordmark on green, with
+/// The phone's top bar on top-level pages: "Stall 10" (no logo) on the bar, with
 /// search (Explore) and notifications.
 class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
   const MobileTopBar({super.key, this.search = true});
@@ -789,7 +788,7 @@ class MobileTopBar extends StatelessWidget implements PreferredSizeWidget {
       titleSpacing: avatar == null ? 16 : 0,
       title: InkWell(
         onTap: () => context.go(Routes.home),
-        child: AppWordmark(size: 28, color: c.onSidebar),
+        child: AppWordmark(size: 28, color: c.onSidebar, logo: false),
       ),
       actions: [
         if (search)

@@ -17,6 +17,10 @@ Firebase project; App Store builds come from `main` and use production.
   community feed. Other tabs ask you to sign up or log in, then bring
   you back.
 
+**The top bar**
+- On phones the top bar shows just "Stall 10", as the website does,
+  and notifications are a bell instead of the flying disc.
+
 **Home**
 - The Your teams tab shows your teams' posts.
 - A strip of your teams sits under the composer, with New / Join.
