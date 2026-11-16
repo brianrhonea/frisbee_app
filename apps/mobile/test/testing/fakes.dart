@@ -2564,8 +2564,30 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
   Future<void> refreshStatus() async {}
 
   @override
-  Future<Result<({PersonalDetails? details, String? email})>> load() async =>
-      Result.ok((details: details, email: email));
+  Future<Result<PersonalDetailsLoad>> load() async {
+    if (failLoad) return Result.error(Exception('offline'));
+    return Result.ok((
+      details: details,
+      email: email,
+      signUpBirthDate: details == null ? savedSignUpBirthDate : null,
+    ));
+  }
+
+  /// The birthday kept by [saveSignUpBirthDate], as the API holds it.
+  DateTime? savedSignUpBirthDate;
+
+  /// Makes [load] fail, as offline.
+  bool failLoad = false;
+
+  @override
+  Future<Result<void>> saveSignUpBirthDate(DateTime birthDate) async {
+    if (refuseTooYoung) return const Result.error(TooYoungException());
+    if (details != null) {
+      return Result.error(Exception('Your details are already saved.'));
+    }
+    savedSignUpBirthDate = birthDate;
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<void>> save(PersonalDetails d) async {

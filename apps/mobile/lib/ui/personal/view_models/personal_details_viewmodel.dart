@@ -40,7 +40,8 @@ class PersonalDetailsViewModel extends ChangeNotifier {
   PersonalDetails? get details => _details;
   String? get email => _email ?? _auth.currentUser?.email;
 
-  /// The sign-up form's birthday, when there are no details yet.
+  /// The sign-up form's birthday, when there are no details yet: the copy
+  /// saved at sign-up, else the one still in memory.
   DateTime? get prefillBirthDate => _prefillBirthDate;
 
   /// Where the legal name starts: the first and last name just typed
@@ -55,15 +56,17 @@ class PersonalDetailsViewModel extends ChangeNotifier {
   Future<Result<void>> _load() async {
     _prefillBirthDate = _personal.takeSignUpBirthDate();
     _prefillTypedName = _personal.takeSignUpName();
-    if (finishing) {
-      // A new account has none yet; nothing to fetch (or decrypt).
-      notifyListeners();
-      return const Result.ok(null);
-    }
     final result = await _personal.load();
     if (result case Ok(:final value)) {
       _details = value.details;
       _email = value.email;
+      _prefillBirthDate = value.signUpBirthDate ?? _prefillBirthDate;
+      notifyListeners();
+      return const Result.ok(null);
+    }
+    if (finishing) {
+      // Finishing sign-up never waits on this (offline, or no API): the
+      // form starts from what's in memory.
       notifyListeners();
       return const Result.ok(null);
     }
