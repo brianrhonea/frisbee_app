@@ -3,7 +3,8 @@ import '../../../domain/models/ranking.dart';
 /// Stall 10's team rankings and recent tournament results. Read-only:
 /// the `rankings` Cloud Functions build them from public tournaments.
 abstract class RankingRepository {
-  /// Every division that has ranked teams.
+  /// Every division that has ranked teams. Never youth: a youth (or
+  /// unknown) ranking still stored is left out.
   Stream<List<DivisionRanking>> watchRankings();
 
   /// Recently finished public tournaments, newest first.

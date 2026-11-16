@@ -236,6 +236,20 @@ sequenceDiagram
   Same visitor limit as browse, `public, max-age=30`, and cached in
   each instance for 30s (`ttl_cache.ts`: at most 200 events, games by
   the division they resolve to, so `?division=` can't multiply reads).
+- Public rankings (no token; `apps/api/src/rankings/public_*.ts`):
+  `GET /v1/public/rankings` → `PublicRankings` (`packages/shared`
+  `rankings.ts`): every team ranking by level then division, each with
+  `key`, `level`, `division`, `minGames`, `updatedAt` and `teams`
+  (`rank`, `teamId`, `name`, `rating`, `wins`, `losses`), built field by
+  field. Never youth: only `rankedLevels` keys (club, college, league,
+  pickup) whose doc agrees with its id, and no team whose listing or
+  team doc is youth (`isYouthHost`), a private group or mismatched
+  (`isPrivateHost`), or a drafted league team; the rest are numbered
+  again. Same visitor limit as browse, `public, max-age=60,
+  s-maxage=300`, and cached in each instance for 5 minutes (one answer
+  reads the ranked teams' listings and team docs, field-masked). The
+  `rankings` functions don't rank youth either; members read
+  `rankings/*` from Firestore (rules: signed in) and drop youth keys.
 - Members' views of others (never cached): `GET /v1/players/:uid` → the
   page as the caller may see it (a private profile in full for people it
   approved, else `locked`); `GET /v1/posts/:id` → one post if the caller

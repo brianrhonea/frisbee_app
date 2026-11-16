@@ -127,9 +127,7 @@ class RankingChoice {
 
   /// A ranking key's level and division, or null for anything not ranked
   /// (youth, unknown, malformed).
-  static ({CompetitionLevel level, Division division})? parseKey(
-    String? key,
-  ) {
+  static ({CompetitionLevel level, Division division})? parseKey(String? key) {
     final parts = key?.split('-') ?? const [];
     if (parts.length != 2) return null;
     final level = rankedLevels.where((l) => l.name == parts[0]).firstOrNull;
@@ -162,7 +160,8 @@ class RankingChoice {
     String? division,
     String? d,
   }) {
-    final legacy = d ?? (division != null && division.contains('-') ? division : null);
+    final legacy =
+        d ?? (division != null && division.contains('-') ? division : null);
     if (legacy != null && level == null) {
       final p = parseKey(legacy);
       return (level: p?.level.name, division: p?.division.name);
@@ -194,7 +193,8 @@ class RankingChoice {
     final pick =
         parsed
             .where(
-              (p) => (l == null || p.level == l) && (d == null || p.division == d),
+              (p) =>
+                  (l == null || p.level == l) && (d == null || p.division == d),
             )
             .firstOrNull ??
         (l == null ? null : parsed.where((p) => p.level == l).firstOrNull) ??

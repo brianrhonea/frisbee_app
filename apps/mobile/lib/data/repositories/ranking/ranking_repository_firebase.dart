@@ -19,9 +19,14 @@ class RankingRepositoryFirebase implements RankingRepository {
       .map(
         (snap) => [
           for (final d in snap.docs)
-            DivisionRanking.fromMap(plainData(d.data())),
+            ?_shown(d.id, DivisionRanking.fromMap(plainData(d.data()))),
         ],
       );
+
+  /// [r] if it's shown: a ranked key (never youth, nothing unknown) that
+  /// says the same as its doc id.
+  static DivisionRanking? _shown(String id, DivisionRanking r) =>
+      RankingChoice.parseKey(id) != null && r.key == id ? r : null;
 
   @override
   Stream<List<TournamentResult>> watchRecentResults() => _db
