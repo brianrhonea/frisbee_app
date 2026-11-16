@@ -123,7 +123,8 @@ export function teamDoc(args: {
   return {
     name: leagueTeamName(team.name, String(tournament.name ?? "League")),
     division: division.division ?? "mixed",
-    level: "league",
+    // A youth division's teams stay youth teams (private rosters, card-only pages).
+    level: division.level === "youth" ? "youth" : "league",
     city,
     ownerId: captain,
     members: { [captain]: "owner", ...Object.fromEntries(players.map((p) => [p, "player"])) },

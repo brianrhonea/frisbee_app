@@ -23,10 +23,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FollowButton } from "@/components/FollowButton";
 import { callApi } from "@/lib/client";
+import { useRenderZone } from "@/lib/renderZone";
 import type { Doc } from "@/lib/live";
 import { SignupsSlot } from "./SignupsSlot";
 import { DivisionPicker, NoDivisions, ResultsTab, ScheduleTab } from "./TournamentGames";
 import { TournamentNews } from "./TournamentNews";
+import { JoinToTakePart, PublicNews } from "./VisitorParts";
 import { datesLabel, StatusBadge } from "./TournamentLists";
 import { type MyTeam, type TournamentState, divisionPath, tournamentPath, useAction, useTournament } from "./useTournament";
 import "./tournaments.css";
@@ -36,7 +38,6 @@ type Tab = "overview" | "players" | "teams" | "schedule" | "results" | "news";
 /** [fallbackHostId] (a group, from ?host=) opens that group's tournament [tournamentId] when no hosted one has the id, as the app does. */
 export function TournamentPage({ tournamentId, fallbackHostId }: { tournamentId: string; fallbackHostId?: string }) {
   const s = useTournament(tournamentId);
-  const [tab, setTab] = useState<Tab>("overview");
   const router = useRouter();
   // Only a real id: `..` would otherwise climb out of /teams/.
   const host = fallbackHostId && /^[A-Za-z0-9_-]{1,128}$/.test(fallbackHostId) ? fallbackHostId : undefined;
@@ -47,11 +48,25 @@ export function TournamentPage({ tournamentId, fallbackHostId }: { tournamentId:
   useReconcile(s);
   if (!s.loaded || fallback) return <p className="muted" aria-busy="true">Loading…</p>;
   if (!s.t) return <p className="empty">This event isn&apos;t here: it may have been removed, or it hasn&apos;t been published yet.</p>;
+  return <TournamentView s={s} />;
+}
+
+/**
+ * The page itself, for a member's live state or a visitor's read-only one
+ * (s.visitor: no Players or News tabs, and a sign-up prompt in place of
+ * Follow, entering a team and signing up).
+ */
+export function TournamentView({ s }: { s: TournamentState }) {
+  const [tab, setTab] = useState<Tab>("overview");
+  const zone = useRenderZone();
+  const tournamentId = s.id;
   const t = s.t;
+  if (!t) return null;
   const league = t.kind === "league";
   const tabs: Array<[Tab, string]> = [
     ["overview", "Overview"],
-    ...(takesPlayers(t) ? ([["players", "Players"]] as Array<[Tab, string]>) : []),
+    // Who signed up is for members (and only the host sees the list).
+    ...(takesPlayers(t) && !s.visitor ? ([["players", "Players"]] as Array<[Tab, string]>) : []),
     ...(takesTeams(t) ? ([["teams", "Teams"]] as Array<[Tab, string]>) : []),
     ["schedule", "Schedule"],
     ["results", league ? "Standings" : "Results"],
@@ -67,16 +82,17 @@ export function TournamentPage({ tournamentId, fallbackHostId }: { tournamentId:
           </small>
           <h1>{t.name}</h1>
           <p className="muted">
-            {datesLabel(t.startsOn, t.endsOn)}
+            {datesLabel(t.startsOn, t.endsOn, zone)}
             {t.location ? ` · ${t.location}` : ""}
           </p>
           <StatusBadge status={t.status} />
         </div>
         <div className="home-actions">
-          {t.status !== "draft" && <FollowButton type="tournament" targetId={tournamentId} groupId={t.hostId} />}
+          {t.status !== "draft" && !s.visitor && <FollowButton type="tournament" targetId={tournamentId} groupId={t.hostId} />}
           {s.manager && <ManagerMenu s={s} />}
         </div>
       </header>
+      {s.visitor && <JoinToTakePart next={s.visitorNext ?? `/tournaments/${encodeURIComponent(tournamentId)}`} />}
       <nav className="segmented hosted-tabs" aria-label="Sections">
         {tabs.map(([k, label]) => (
           <button key={k} type="button" className={k === current ? "on" : ""} onClick={() => setTab(k)}>
@@ -91,7 +107,7 @@ export function TournamentPage({ tournamentId, fallbackHostId }: { tournamentId:
       {current === "teams" && <TeamsTab s={s} />}
       {current === "schedule" && <ScheduleTab s={s} />}
       {current === "results" && <ResultsTab s={s} />}
-      {current === "news" && <TournamentNews s={s} />}
+      {current === "news" && (s.visitor ? <PublicNews s={s} /> : <TournamentNews s={s} />)}
     </div>
   );
 }
@@ -183,11 +199,12 @@ function HostChecklist({ s }: { s: TournamentState }) {
 function Overview({ s }: { s: TournamentState }) {
   const t = s.t!;
   const fee = spotFee(t);
+  const zone = useRenderZone();
   const { busy, error, run } = useAction();
   return (
     <div className="stack">
       {s.manager && <HostChecklist s={s} />}
-      {!s.manager && takesTeams(t) && <YourTeams s={s} />}
+      {!s.manager && !s.visitor && takesTeams(t) && <YourTeams s={s} />}
       {t.description && (
         <section className="card">
           <p className="hosted-description">{t.description}</p>
@@ -197,7 +214,7 @@ function Overview({ s }: { s: TournamentState }) {
         <h2 className="card-title">Details</h2>
         <dl className="hosted-facts">
           <dt>When</dt>
-          <dd>{datesLabel(t.startsOn, t.endsOn)}</dd>
+          <dd>{datesLabel(t.startsOn, t.endsOn, zone)}</dd>
           {t.location && (
             <>
               <dt>Where</dt>
@@ -471,7 +488,7 @@ function TeamsTab({ s }: { s: TournamentState }) {
   return (
     <div className="stack">
       <DivisionPicker s={s} />
-      {!s.manager && <YourTeams s={s} />}
+      {!s.manager && !s.visitor && <YourTeams s={s} />}
       <section className="card">
         <h2 className="card-title">
           {d.seeds.length} of {d.maxTeams} teams

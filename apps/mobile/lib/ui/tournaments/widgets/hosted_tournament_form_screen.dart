@@ -13,6 +13,13 @@ import 'event_format_section.dart';
 const _currencies = ['USD', 'CAD', 'EUR', 'GBP', 'AUD', 'MXN'];
 
 /// Hosting a tournament, or editing its details.
+
+/// Under the location and About (the website says the same): published
+/// events are on the public website.
+const publicDetailsHint =
+    "The location and About are public: anyone can see them once it's "
+    'published, even without an account.';
+
 class HostedTournamentFormScreen extends StatefulWidget {
   const HostedTournamentFormScreen({super.key, required this.viewModel});
 
@@ -439,6 +446,8 @@ class _HostedTournamentFormScreenState
                     labelText: 'About',
                     hintText: 'Format, parking, food, contacts…',
                     alignLabelWithHint: true,
+                    helperText: publicDetailsHint,
+                    helperMaxLines: 3,
                   ),
                   onChanged: (v) => vm.description = v,
                 ),

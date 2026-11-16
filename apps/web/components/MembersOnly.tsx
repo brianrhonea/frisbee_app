@@ -6,7 +6,9 @@ import { useAuth } from "./AuthProvider";
 
 /**
  * Its children for signed-in members; a sign-up / log-in prompt for
- * visitors, who see only team and community pages. Children never render
+ * visitors, who see teams' public pages and the team finder, events,
+ * tournaments, the community feed and Learn, but not players, search,
+ * messages or anything of their own. Children never render
  * for visitors, so gated pages must fetch their data here, in the browser,
  * with the member's token (not on the server, where it would ship in the
  * page to everyone). Signing in comes back to [next], or this page.
@@ -26,8 +28,8 @@ function JoinPrompt({ next, what }: { next: string; what?: string }) {
     <div className="card join-prompt">
       <b>Join Stall 10 to see this</b>
       <p className="muted">
-        {what ?? "Sign up free or log in to see this page."} Without an account you can browse team and community
-        pages.
+        {what ?? "Sign up free or log in to see this page."} Without an account you can find teams and see their
+        pages, browse events, tournaments and the community, and learn to play.
       </p>
       <div className="home-actions">
         <Link className="btn btn-primary btn-small" href={`/sign-up${q}`}>

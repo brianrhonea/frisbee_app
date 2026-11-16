@@ -126,3 +126,22 @@ export function InviteOnlyHint() {
     </div>
   );
 }
+
+/**
+ * The hub's name: the public listing's, or for members the team doc's
+ * (a drafted league team's real name is hidden from everyone else).
+ */
+export function TeamName() {
+  const { name } = useTeamHub();
+  return <h1>{name}</h1>;
+}
+
+/**
+ * The listing's address, or for members the team doc's (the public page
+ * leaves a youth team's out).
+ */
+export function TeamAddress({ address }: { address?: string }) {
+  const { viewer } = useTeamHub();
+  const shown = viewer.state === "member" ? (viewer.team.location?.address ?? address) : address;
+  return shown ? <p className="muted small">{shown}</p> : null;
+}

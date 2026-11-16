@@ -3,6 +3,7 @@ import {
   type GroupGame,
   type GroupTournamentDoc,
   type GroupTournamentListing,
+  type PublicGroupTournament,
   groupEngine,
   groupFormatHasBracket,
   groupFormatHasPools,
@@ -18,9 +19,12 @@ import { useAuth } from "../../AuthProvider";
 import { Dialog } from "@/components/Dialog";
 import { FollowButton } from "../../FollowButton";
 import { callApi } from "@/lib/client";
+import { formatDateTime } from "@/lib/dates";
+import { localeFor, useRenderZone } from "@/lib/renderZone";
 import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
+import { JoinToTakePart } from "../../tournaments/VisitorParts";
 import {
   type GroupTournamentView,
   gameDay,
@@ -46,7 +50,7 @@ type Action = "report" | "confirm" | "awaiting";
  * who can't see it get its public listing and a Follow button
  * (GroupTournamentScreen in the app).
  */
-export function GroupTournamentPage({ tournamentId }: { tournamentId: string }) {
+export function GroupTournamentPage({ tournamentId, publicListing }: { tournamentId: string; publicListing?: PublicGroupTournament | null }) {
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
   const router = useRouter();
@@ -96,6 +100,15 @@ export function GroupTournamentPage({ tournamentId }: { tournamentId: string }) 
     void callApi(user, `${api}/advance`, { method: "POST" }).catch(() => undefined);
   }, [user, pendingKey, organizer, myTeam, api]);
 
+  // Visitors (and the server's render) get the public listing, as outsiders do, unless the group is private.
+  if (!signedIn && publicListing) {
+    const back = (
+      <Link href={`/teams/${encodeURIComponent(teamId)}/tournaments`} className="text-btn">
+        ← Tournaments
+      </Link>
+    );
+    return <PublicTournament teamId={teamId} listing={publicListing} back={back} visitorNext={`/teams/${encodeURIComponent(teamId)}/tournaments/${encodeURIComponent(tournamentId)}`} />;
+  }
   if (viewer.state === "loading" || (signedIn && doc.data === undefined && !doc.error)) {
     return (
       <p className="muted" aria-busy="true">
@@ -608,8 +621,13 @@ function ScoreForm({
 }
 
 /** What someone outside the tournament sees: when, how it's played, and Follow. */
-function PublicTournament({ teamId, listing, back }: { teamId: string; listing: GroupTournamentListing; back: React.ReactNode }) {
-  const when = listing.endsOn ? `${gameDay(listing.startsAt)} to ${gameDay(listing.endsOn)}` : `${gameDay(listing.startsAt)} at ${gameTime(listing.startsAt)}`;
+/** The public listing; [visitorNext] (signed out) swaps Follow for a sign-up prompt that comes back there. */
+function PublicTournament({ teamId, listing, back, visitorNext }: { teamId: string; listing: GroupTournamentListing; back: React.ReactNode; visitorNext?: string }) {
+  // Server-rendered for visitors: UTC until the page hydrates (useRenderZone).
+  const zone = useRenderZone();
+  const f = (iso: string, o: Intl.DateTimeFormatOptions) => formatDateTime(iso, { ...o, timeZone: zone }, localeFor(zone));
+  const day = (iso: string) => f(iso, { weekday: "long", month: "short", day: "numeric" });
+  const when = listing.endsOn ? `${day(listing.startsAt)} to ${day(listing.endsOn)}` : `${day(listing.startsAt)} at ${f(listing.startsAt, { hour: "numeric", minute: "2-digit" })}`;
   const status = listing.status === "scheduled" ? "Schedule published" : listing.status === "done" ? "Finished" : "Teams are being picked";
   return (
     <div className="stack">
@@ -620,10 +638,16 @@ function PublicTournament({ teamId, listing, back }: { teamId: string; listing: 
         <p>
           {groupTournamentFormatInfo[listing.format]?.label ?? "Tournament"} <span className="muted small">· {status}</span>
         </p>
-        <div>
-          <FollowButton type="tournament" targetId={listing.tournamentId} groupId={teamId} />
-        </div>
-        <p className="muted small">Follow to see its updates on Home. To play, join the group and sign up there.</p>
+        {visitorNext ? (
+          <JoinToTakePart next={visitorNext} />
+        ) : (
+          <>
+            <div>
+              <FollowButton type="tournament" targetId={listing.tournamentId} groupId={teamId} />
+            </div>
+            <p className="muted small">Follow to see its updates on Home. To play, join the group and sign up there.</p>
+          </>
+        )}
         <div>
           <Link className="btn btn-small" href={`/teams/${encodeURIComponent(teamId)}`}>
             Open the group

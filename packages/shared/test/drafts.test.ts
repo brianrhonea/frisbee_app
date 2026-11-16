@@ -216,6 +216,12 @@ describe("the new team", () => {
       e: "Player",
     });
   });
+  it("stays a youth team when drafted from a youth division, team doc and listing alike", () => {
+    const doc = leagueTeamDoc({ team: red, tournamentId: "t1", tournament: league, division: { ...division, level: "youth" }, city: "", createdAt: 1 });
+    expect(doc.level).toBe("youth");
+    expect(leagueDirectoryDoc(doc).level).toBe("youth");
+    expect(leagueTeamDoc({ team: red, tournamentId: "t1", tournament: league, division: { ...division, level: "club" }, city: "", createdAt: 1 }).level).toBe("league");
+  });
   it("is listed in the team directory with search keywords", () => {
     const listing = leagueDirectoryDoc(leagueTeamDoc({ team: red, tournamentId: "t1", tournament: league, division, city: "Denver", createdAt: 1 }));
     expect(listing).toMatchObject({ name: "Reds - Thursday Night", division: "mixed", level: "league", city: "Denver" });

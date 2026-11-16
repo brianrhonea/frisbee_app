@@ -296,7 +296,61 @@ everything the app does on the website alone, styled like the website
     invitations (the website's does). Website only (layout): feeds load
     as you scroll (the app keeps "Show older posts"), and a floating
     Post button on phones.
-14. Sign-up with Google or Apple: [x] "Your name and username" on both
+14. Visitors (signed out): [x] website only; the app has no signed-out
+    mode, so this isn't a parity gap. Visitors see Learn (rendered on
+    the server), Events (`GET /v1/public/events`), tournaments, the
+    community feed's first page, a team finder on Teams (`GET
+    /v1/public/teams?q=`: listings only, never players; the top bar's
+    search lands there), and team and group pages with public posts and
+    events. A youth team (`isYouthTeam` on its team doc or its listing)
+    shows visitors its card only (name, city, description, division and
+    level; no posts, events or location, in the finder and Events too),
+    with "Youth teams share their posts and schedule with members only."
+    Signed-in people who aren't on it see its public posts and events,
+    in the app and on the website. A team's roster is public only for an
+    adult team: `rosterIsPublic` in `@stall10/shared` (kind team, level
+    club, college, league or pickup; youth, no level and every group
+    stay private), checked by the API on the team doc and its listing
+    (`GET /v1/public/teams/:id/roster`: players' names, numbers and
+    positions, plus a public profile's username and photo; no ids, no
+    members list, no links to players' pages). A spot linked to a
+    private profile, or one that hides its teams, shows as "Player"
+    with its number and position only. A league's drafted teams
+    (`league_…`) are out of the finder, show as "League team" and have
+    no public roster; nor does a team in a league's youth division.
+    Players, search, Explore, messages and My schedule stay
+    members-only. Signed in: a youth team's roster (`GET
+    /v1/teams/:id/roster`) is only for its members and the member
+    managers of the school or club community that accepted it; everyone
+    else sees "Rosters of youth teams are private: only members see
+    them." in its place, in the app and on the website. Adult teams'
+    rosters stay open to anyone signed in. Tests: API
+    `test/browse.test.ts`, `test/roster.test.ts`,
+    `test/browse.emulator.test.ts`; shared
+    `test/team_roster_public.test.ts`; app `test/ui/team_home_test.dart`
+    (the youth roster note).
+15. Visitors: tournaments (website only; the app needs an account).
+    [x] Signed-out visitors (parents, friends) browse `/tournaments` and
+    follow any published tournament's or league's page: overview,
+    divisions, the accepted teams, the schedule, scores, standings,
+    brackets and the host's news, server-rendered from
+    `GET /v1/public/tournaments` and `/v1/public/tournaments/:id`
+    (another division with `?division=`; live events reread every
+    minute). [x] A community group's tournament shows outsiders' public
+    listing (`/v1/public/group-tournaments/:groupId/:id`). Hidden from
+    visitors: drafts (the rules' `visible()`), private groups' events,
+    who signed up and the draft, captains, fee instructions and other
+    payment details, and player names (drafted teams always show as
+    "Team N"). The tournament form (app and website) says "The location
+    and About are public: anyone can see them once it's published, even
+    without an account." Entering a team, signing up,
+    following and the sub-pages (signups, drafts, editing, hosting) need
+    an account: visitors get "Sign up free or log in", which comes back
+    to the page. Tests: API `test/public_tournaments.test.ts` (and the
+    emulator test); app `test/ui/host_event_test.dart` (the form's
+    hint). Not yet: a group's Tournaments tab and a host's
+    hosted list for visitors.
+16. Sign-up with Google or Apple: [x] "Your name and username" on both
     (website `UsernameStep` in `PersonalGate` and the Home card; app
     `ChooseUsernameScreen`): first and last name, prefilled by splitting
     the provider's name (`splitDisplayName` / `PersonName.split`; an

@@ -4,6 +4,49 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.31.0 — 2026-11-15
+
+More for signed-out visitors (parents, friends, colleagues). Needs API
+0.26.0.
+
+**Added**
+- Learn is open to everyone and rendered on the server.
+- Events and the Upcoming events card are open to everyone (My schedule
+  stays for members).
+- Teams has "Find a team or group" for everyone; for visitors the top
+  bar's search goes there.
+- Visitors see an adult team's roster (names, numbers, positions).
+  Youth teams' rosters and groups' members stay private, with a note.
+- Visitors can browse Tournaments and leagues and follow a published
+  event's overview, teams, schedule, scores, standings, bracket and
+  news; server-rendered, live events refresh every minute. Entering,
+  signing up and following ask them to sign up or log in, then return.
+- Group tournaments show visitors their public listing.
+- The tournament form says the location and About are public.
+
+**Changed** (visitor routes review)
+- A youth team shows visitors its card only, with "Youth teams share
+  their posts and schedule with members only." Signed-in people who
+  aren't on it still see its public posts and events (read live, as the
+  app does).
+- Signed-in people who aren't on a youth team see "Rosters of youth
+  teams are private: only members see them." in place of its roster.
+- Team posts and the tournament News tab show visitors the author only
+  when the author's profile is public.
+- A tournament page asks the API for another division only when it's
+  one of the event's (an unknown `?division=` shows the first).
+- Roster pages aren't indexed by search engines; avatars and post
+  photos load with `referrerPolicy="no-referrer"`.
+- Members see their own team's real name and address in the hub's
+  banner (the public page hides a drafted league team's name and a
+  youth team's address). Signed in, Find a team uses the members'
+  search, so it lists every team as the app's search does.
+
+**Changed**
+- Visitor prompts and home copy say what's open without an account.
+- Server-rendered tournament dates show in UTC until the page loads,
+  then in the viewer's time zone.
+
 ## 0.30.1 — 2026-11-15
 
 **Changed**

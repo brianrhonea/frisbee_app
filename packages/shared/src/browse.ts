@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 // Responses of the API's public routes (`GET /v1/public/...`): what anyone,
 // signed in or not, may see. Built by apps/api/src/browse from the same
 // allow-lists as the `browse` Cloud Functions. Dates are ISO 8601 strings.
@@ -197,4 +199,45 @@ export type SearchKind = "players" | "teams";
 export interface SearchPage {
   players: PublicProfile[];
   teams: PublicListing[];
+}
+
+/** Longest query `GET /v1/public/teams?q=` takes. */
+export const teamSearchMaxLength = 100;
+
+/** Query of `GET /v1/public/teams`: the team finder's words (empty finds nothing). */
+export const teamSearchQuerySchema = z.object({
+  q: z.string().max(teamSearchMaxLength, "Use a shorter search.").optional(),
+});
+
+/**
+ * `GET /v1/public/teams?q=`: teams, groups and schools or clubs by name,
+ * for anyone (the website's team finder). Listings only, as their public
+ * pages show them; never players.
+ */
+export interface TeamSearchPage {
+  teams: PublicListing[];
+}
+
+/**
+ * A player on a public roster (`GET /v1/public/teams/:id/roster`): the
+ * roster's name, number and position. A player linked to a public profile
+ * also shows its username and picture; a private profile, or one that
+ * hides its teams, nothing more.
+ * No ids: visitors can't open players' pages.
+ */
+export interface PublicRosterPlayer {
+  name: string;
+  number?: number;
+  position?: "handler" | "cutter" | "hybrid";
+  username?: string;
+  photoUrl?: string;
+}
+
+/**
+ * An adult team's roster as anyone may see it (rosterIsPublic in
+ * team.ts): its players only, not the members list, in the roster's order
+ * (by number, then name).
+ */
+export interface PublicRoster {
+  players: PublicRosterPlayer[];
 }

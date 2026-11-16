@@ -16,7 +16,7 @@ import { membersInOrder } from "./TeamBanner";
 import { useTeamHub } from "./TeamContext";
 import { type TeamPostView, TeamPostCard } from "./TeamPostCard";
 import { TeamPostComposer } from "./TeamPostComposer";
-import { useTeamEvents } from "./TeamSchedule";
+import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamSchedule";
 
 const postLimit = 30;
 
@@ -26,17 +26,21 @@ const postLimit = 30;
  * them.
  */
 export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTeamPost[]; publicEvents: PublicEvent[] }) {
-  const { teamId, name, privateGroup, viewer } = useTeamHub();
+  const { teamId, name, privateGroup, youth, viewer } = useTeamHub();
   const member = viewer.state === "member";
+  const outsiderYouth = youth && viewer.state === "outsider";
+  const outsider = useYouthOutsiderPublic(teamId, outsiderYouth, { posts: true, eventLimit: 4 });
   const live = useLiveQuery<TeamPostView>(
     member ? `teams/${teamId}/posts` : null,
     [orderBy("createdAt", "desc"), limit(postLimit)],
     "feed",
   );
   const events = useTeamEvents(teamId, viewer);
-  const posts: TeamPostView[] = member ? (live.data ?? []) : publicPosts;
-  const upcoming = (member ? (events.data ?? []) : publicEvents).slice(0, 4);
+  const posts: TeamPostView[] = member ? (live.data ?? []) : outsiderYouth ? (outsider.posts.data ?? []) : publicPosts;
+  const upcoming = (member ? (events.data ?? []) : outsiderYouth ? (outsider.events.data ?? []) : publicEvents).slice(0, 4);
   const hidden = !member && privateGroup;
+  // Signed out: a youth team's card only.
+  const youthHidden = youth && viewer.state === "visitor";
   const admin = viewer.state === "member" && viewer.can("manageTeam");
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -50,6 +54,12 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
           <ErrorNote>{live.error}</ErrorNote>
         ) : hidden ? (
           <EmptyState>Only members see this group&apos;s posts and events.</EmptyState>
+        ) : youthHidden ? (
+          <EmptyState>{youthVisitorNote}</EmptyState>
+        ) : outsiderYouth && outsider.posts.error ? (
+          <ErrorNote>{outsider.posts.error}</ErrorNote>
+        ) : outsiderYouth && !outsider.posts.data ? (
+          <Loading label="Loading posts…" />
         ) : posts.length === 0 ? (
           <EmptyState>{member ? "No posts yet." : "No public posts yet."}</EmptyState>
         ) : (
@@ -69,7 +79,7 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
         )}
       </section>
       <aside className="stack">
-        {!hidden && (
+        {!hidden && !youthHidden && (
           <div className="card">
             <h2 className="card-title">Coming up</h2>
             {upcoming.length === 0 ? (

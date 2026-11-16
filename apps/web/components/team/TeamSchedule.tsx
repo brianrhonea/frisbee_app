@@ -1,5 +1,5 @@
 "use client";
-import type { PublicEvent } from "@stall10/shared";
+import type { PublicEvent, PublicTeamPost } from "@stall10/shared";
 import { limit, orderBy, type QueryConstraint, Timestamp, where } from "firebase/firestore";
 import { eventReactions, scheduleEntryOver } from "@stall10/shared";
 import Link from "next/link";
@@ -124,15 +124,42 @@ export function scheduleMeetings(all: Meeting[] | undefined, past: boolean): Mee
 
 const day = 86_400_000;
 
+/** What visitors see in place of a youth team's posts and schedule (the app says the same). */
+export const youthVisitorNote = "Youth teams share their posts and schedule with members only.";
+
+/**
+ * A youth team's public posts (the feed's; [eventLimit] events only, for
+ * the schedule) and upcoming public events for someone signed in who isn't
+ * on it, read live as the app reads them: the server-rendered public page
+ * leaves them out, since visitors get a youth team's card only.
+ */
+export function useYouthOutsiderPublic(teamId: string, on: boolean, opts: { posts: boolean; eventLimit: number }) {
+  const [since] = useState(() => Timestamp.fromMillis(Date.now()));
+  const posts = useLiveQuery<PublicTeamPost>(
+    on && opts.posts ? `teams/${teamId}/posts` : null,
+    [where("public", "==", true), orderBy("createdAt", "desc"), limit(30)],
+    "public-feed",
+  );
+  const events = useLiveQuery<PublicEvent>(
+    on ? `teams/${teamId}/publicEvents` : null,
+    [where("startsAt", ">=", since), orderBy("startsAt"), limit(opts.eventLimit)],
+    `public-events-${opts.eventLimit}`,
+  );
+  return { posts, events };
+}
+
 type Entry = { kind: "event"; event: Doc<TeamEventDoc> } | { kind: "meeting"; meeting: Meeting };
 const entryStart = (x: Entry) => (x.kind === "event" ? x.event.startsAt : x.meeting.startsAt) ?? "";
 
 /** The schedule: events and meetings down the left, the open event (?event=) beside them; a meeting opens its own page. */
 export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) {
-  const { teamId, kind, privateGroup, viewer } = useTeamHub();
+  const { teamId, kind, privateGroup, youth, viewer } = useTeamHub();
   const params = useSearchParams();
   const pathname = usePathname();
   const past = params.get("when") === "past";
+  // A youth team's upcoming public events, live, for someone signed in who isn't on it.
+  const outsiderYouth = youth && viewer.state === "outsider";
+  const outsider = useYouthOutsiderPublic(teamId, outsiderYouth && !past, { posts: false, eventLimit: upcomingEventCap });
   // Pages of the past shown; back to one on switching tabs.
   const [pastPages, setPastPages] = useState({ past, n: 1 });
   const pages = pastPages.past === past ? pastPages.n : 1;
@@ -151,8 +178,10 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   if (!member && privateGroup) {
     return <EmptyState>Only members see this group&apos;s events.</EmptyState>;
   }
+  // Signed out: a youth team's card only.
+  if (youth && viewer.state === "visitor") return <EmptyState>{youthVisitorNote}</EmptyState>;
   if (live.error) return <p className="form-error">{live.error}</p>;
-  const events: Array<Doc<TeamEventDoc>> = member ? (live.data ?? []) : publicEvents;
+  const events: Array<Doc<TeamEventDoc>> = member ? (live.data ?? []) : outsiderYouth ? ((past ? [] : outsider.events.data) ?? []) : publicEvents;
   if (member && !live.data) return <Loading label="Loading the schedule…" />;
 
   const entries: Entry[] = [

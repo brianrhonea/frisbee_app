@@ -638,6 +638,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 main: [
                   _about(summary),
                   if (!vm.isMember) _joinCard(summary),
+                  if (vm.youthRosterPrivate) const YouthRosterNote(),
                   if (vm.contentError != null)
                     Text(
                       errorMessage(vm.contentError),
@@ -656,6 +657,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 narrow: [
                   _about(summary),
                   if (!vm.isMember) _joinCard(summary),
+                  if (vm.youthRosterPrivate) const YouthRosterNote(),
                   ..._events(context),
                   ..._tournaments(context),
                   if (team != null) _MembersCard(team: team),
@@ -1891,6 +1893,26 @@ class _JoinCard extends StatelessWidget {
 }
 
 /// Join (or ask to join) a community group.
+/// In place of a youth team's roster for anyone who isn't on it (the
+/// website says the same).
+class YouthRosterNote extends StatelessWidget {
+  const YouthRosterNote({super.key});
+
+  static const text =
+      'Rosters of youth teams are private: only members see them.';
+
+  @override
+  Widget build(BuildContext context) => const SectionCard(
+    child: Row(
+      children: [
+        Icon(Icons.shield_outlined),
+        SizedBox(width: 12),
+        Expanded(child: Text(text)),
+      ],
+    ),
+  );
+}
+
 class _GroupJoinCard extends StatelessWidget {
   const _GroupJoinCard({
     required this.requiresApproval,
