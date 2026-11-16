@@ -173,4 +173,81 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Notifications'), findsOneWidget);
   });
+
+  testWidgets('a tapped push opens its page; back goes to where it belongs, '
+      'not where the app was left', (tester) async {
+    final root = GlobalKey<NavigatorState>();
+    final router = GoRouter(
+      navigatorKey: root,
+      initialLocation: '/home',
+      routes: [
+        GoRoute(
+          path: '/notifications',
+          builder: (_, _) => const Text('Notifications'),
+        ),
+        GoRoute(
+          path: '/posts/:id',
+          builder: (_, s) => Text('Post ${s.pathParameters['id']}'),
+        ),
+        StatefulShellRoute.indexedStack(
+          builder: (_, _, shell) => shell,
+          branches: [
+            StatefulShellBranch(
+              routes: [
+                GoRoute(path: '/home', builder: (_, _) => const Text('Home')),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/messages',
+                  builder: (_, _) => const Text('Inbox'),
+                  routes: [
+                    GoRoute(
+                      path: ':id',
+                      parentNavigatorKey: root,
+                      builder: (_, s) => Text('Chat ${s.pathParameters['id']}'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+
+    // Left on Notifications; a message's push: back goes to Messages.
+    router.push('/notifications');
+    await tester.pumpAndSettle();
+    router.openFromOutside('/messages/a');
+    await tester.pumpAndSettle();
+    expect(find.text('Chat a'), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Inbox'), findsOneWidget);
+
+    // A post's push, from a conversation: back goes to Home.
+    router.go('/messages/a');
+    await tester.pumpAndSettle();
+    router.openFromOutside('/posts/p');
+    await tester.pumpAndSettle();
+    expect(find.text('Post p'), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Home'), findsOneWidget);
+  });
+
+  test('pages over the tabs belong under a tab or their team', () {
+    expect(pushParent('/posts/p'), '/home');
+    expect(pushParent('/team-events/t/e'), '/teams/t?section=events');
+    expect(pushParent('/team-meetings/t/m/room'), '/teams/t?section=events');
+    expect(pushParent('/my-events/e'), '/schedule');
+    expect(pushParent('/tournaments/x'), '/schedule');
+    expect(pushParent('/group-tournaments/g/x'), '/teams/g');
+    expect(pushParent('/messages/a'), isNull);
+    expect(pushParent('/teams/t/chats/r'), isNull);
+  });
 }

@@ -600,25 +600,33 @@ class _WorkoutFieldsState extends State<_WorkoutFields> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _minutes,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      labelText: 'Minutes',
+                  child: WorkoutField(
+                    label: 'Minutes',
+                    child: TextField(
+                      controller: _minutes,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        hintText: 'e.g. 45',
+                        suffixText: 'min',
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: TextField(
-                    controller: _distance,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      labelText: '${vm.unit.label} (optional)',
+                  child: WorkoutField(
+                    label: 'Distance (optional)',
+                    child: TextField(
+                      controller: _distance,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: 'e.g. 3.1',
+                        suffixText: vm.unit.label,
+                      ),
                     ),
                   ),
                 ),
@@ -630,11 +638,14 @@ class _WorkoutFieldsState extends State<_WorkoutFields> {
             child: EffortRow(effort: w.effort, onChanged: vm.setEffort),
           ),
           for (final (i, e) in w.exercises.indexed)
-            _ExerciseFields(
-              key: ObjectKey(e),
-              index: i,
-              draft: e,
-              viewModel: vm,
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _ExerciseFields(
+                key: ObjectKey(e),
+                index: i,
+                draft: e,
+                viewModel: vm,
+              ),
             ),
           if (vm.canAddExercise)
             Align(
@@ -698,55 +709,31 @@ class _ExerciseFieldsState extends State<_ExerciseFields> {
 
   @override
   Widget build(BuildContext context) {
-    InputDecoration label(String text) =>
-        InputDecoration(isDense: true, labelText: text, counterText: '');
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 4,
-            child: TextField(
-              controller: _name,
-              maxLength: WorkoutExercise.maxNameLength,
-              decoration: label('Exercise ${widget.index + 1}'),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            flex: 2,
-            child: TextField(
-              controller: _sets,
-              keyboardType: TextInputType.number,
-              decoration: label('Sets'),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            flex: 2,
-            child: TextField(
-              controller: _reps,
-              keyboardType: TextInputType.number,
-              decoration: label('Reps'),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            flex: 3,
-            child: TextField(
-              controller: _weight,
-              maxLength: WorkoutExercise.maxWeightLength,
-              decoration: label('Weight'),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Remove exercise',
-            visualDensity: VisualDensity.compact,
-            onPressed: () => vm.removeExercise(e),
-            icon: const Icon(Icons.close, size: 18),
-          ),
-        ],
+    InputDecoration hint(String text) =>
+        InputDecoration(isDense: true, hintText: text, counterText: '');
+    return ExerciseCard(
+      index: widget.index,
+      onRemove: () => vm.removeExercise(e),
+      name: TextField(
+        controller: _name,
+        maxLength: WorkoutExercise.maxNameLength,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: hint(ExerciseHints.name),
+      ),
+      sets: TextField(
+        controller: _sets,
+        keyboardType: TextInputType.number,
+        decoration: hint(ExerciseHints.sets),
+      ),
+      reps: TextField(
+        controller: _reps,
+        keyboardType: TextInputType.number,
+        decoration: hint(ExerciseHints.reps),
+      ),
+      weight: TextField(
+        controller: _weight,
+        maxLength: WorkoutExercise.maxWeightLength,
+        decoration: hint(ExerciseHints.weight),
       ),
     );
   }

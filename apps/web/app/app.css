@@ -1025,7 +1025,15 @@ a.play-card:hover { border-color: var(--accent); }
 .workout-distance { display: flex; gap: 6px; }
 .workout-distance select { width: auto; }
 .workout-exercises { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
-.workout-exercises li { display: grid; grid-template-columns: minmax(0, 3fr) repeat(2, minmax(0, 1fr)) minmax(0, 1.4fr) auto; gap: 6px; align-items: center; }
+/* One card per exercise: its number, the name across, then sets, reps and
+   weight, each named above its box (placeholders vanish once typed in). */
+.workout-exercises li {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr); gap: 6px 8px;
+  border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px 10px;
+}
+.exercise-head { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; font-size: 0.86rem; }
+.exercise-name { grid-column: 1 / -1; }
+.workout-exercises label { display: grid; gap: 4px; font-size: 0.82rem; color: var(--muted); font-weight: 600; }
 .exercise-remove { border: 0; background: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; padding: 0 4px; }
 .exercise-remove:hover { color: var(--ink); }
 .workout-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }

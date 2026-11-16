@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -598,19 +599,17 @@ class _MessageList extends StatelessWidget {
 }
 
 /// Drag a message's bubble to the right to reply to it, as in most
-/// messaging apps. Dragged to the left, it shows every message's time
-/// instead, as the rest of the thread does ([_RevealTimes]).
+/// messaging apps. A drag to the left isn't this widget's: the thread
+/// scrolls and shows the times ([_RevealTimes]).
 class _SwipeToReply extends StatefulWidget {
   const _SwipeToReply({
     required this.enabled,
     required this.onReply,
-    required this.reveal,
     required this.child,
   });
 
   final bool enabled;
   final VoidCallback onReply;
-  final _TimeReveal reveal;
   final Widget child;
 
   @override
@@ -623,19 +622,7 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
   double _dx = 0;
   bool _armed = false;
 
-  /// Which way this drag went first: right replies, left shows the times.
-  /// Null until it has moved.
-  bool? _replying;
-
   void _update(DragUpdateDetails d) {
-    if (_replying == null) {
-      if (d.delta.dx == 0) return;
-      _replying = d.delta.dx > 0;
-    }
-    if (_replying == false) {
-      widget.reveal.drag(d.delta.dx);
-      return;
-    }
     final dx = (_dx + d.delta.dx).clamp(0.0, _max);
     final armed = dx >= _trigger;
     if (armed && !_armed) HapticFeedback.selectionClick();
@@ -646,12 +633,6 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
   }
 
   void _end([DragEndDetails? _]) {
-    final replying = _replying;
-    _replying = null;
-    if (replying == false) {
-      widget.reveal.release();
-      return;
-    }
     if (_armed) widget.onReply();
     setState(() {
       _dx = 0;
@@ -664,11 +645,17 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
     if (!widget.enabled) return widget.child;
     final c = AppColors.of(context);
     // The whole message counts, even beside short text in a feed row.
-    return GestureDetector(
+    return RawGestureDetector(
       behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: _update,
-      onHorizontalDragEnd: _end,
-      onHorizontalDragCancel: _end,
+      gestures: {
+        _RightSwipe: GestureRecognizerFactoryWithHandlers<_RightSwipe>(
+          () => _RightSwipe(debugOwner: this),
+          (r) => r
+            ..onUpdate = _update
+            ..onEnd = _end
+            ..onCancel = _end,
+        ),
+      },
       child: Stack(
         alignment: Alignment.centerLeft,
         fit: StackFit.passthrough,
@@ -699,6 +686,48 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
   }
 }
 
+/// A horizontal drag that only claims drags to the right. One that sets
+/// off to the left gives way at once, so the thread keeps scrolling while
+/// it shows the times ([_RevealTimes]).
+class _RightSwipe extends HorizontalDragGestureRecognizer {
+  _RightSwipe({super.debugOwner});
+
+  final _travel = <int, double>{};
+  bool _won = false;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    _travel[event.pointer] = 0;
+    super.addAllowedPointer(event);
+  }
+
+  @override
+  void acceptGesture(int pointer) {
+    _won = true;
+    super.acceptGesture(pointer);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (!_won && event is PointerMoveEvent) {
+      final dx = (_travel[event.pointer] ?? 0) + event.delta.dx;
+      _travel[event.pointer] = dx;
+      if (dx < -kTouchSlop / 3) {
+        resolvePointer(event.pointer, GestureDisposition.rejected);
+        return;
+      }
+    }
+    super.handleEvent(event);
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {
+    _won = false;
+    _travel.clear();
+    super.didStopTrackingLastPointer(pointer);
+  }
+}
+
 /// How far every message's time is pulled in from the right: 0 hidden,
 /// 1 shown. Dragging the thread left pulls them in; letting go slides
 /// them away again, as on a phone's messages app.
@@ -722,21 +751,63 @@ class _TimeReveal {
   void dispose() => controller.dispose();
 }
 
-/// The whole thread: a drag to the left that doesn't start on a bubble
-/// (bubbles handle their own, [_SwipeToReply]) shows the times.
-class _RevealTimes extends StatelessWidget {
+/// The whole thread: a drag to the left, from anywhere (a bubble too),
+/// shows the times until let go. It watches the finger rather than
+/// competing for it, so the thread still scrolls up and down meanwhile,
+/// as on a phone's messages app.
+class _RevealTimes extends StatefulWidget {
   const _RevealTimes({required this.reveal, required this.child});
 
   final _TimeReveal reveal;
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  State<_RevealTimes> createState() => _RevealTimesState();
+}
+
+class _RevealTimesState extends State<_RevealTimes> {
+  /// The finger being followed, and how far it has gone since it touched.
+  int? _pointer;
+  Offset _moved = Offset.zero;
+
+  /// Pulled left far enough, more across than down: showing the times.
+  bool _revealing = false;
+
+  void _down(PointerDownEvent e) {
+    if (_pointer != null) return;
+    _pointer = e.pointer;
+    _moved = Offset.zero;
+    _revealing = false;
+  }
+
+  void _move(PointerMoveEvent e) {
+    if (e.pointer != _pointer) return;
+    if (_revealing) {
+      widget.reveal.drag(e.delta.dx);
+      return;
+    }
+    _moved += e.delta;
+    if (_moved.dx < -kTouchSlop && _moved.dx.abs() > _moved.dy.abs()) {
+      _revealing = true;
+      widget.reveal.drag(_moved.dx + kTouchSlop);
+    }
+  }
+
+  void _up(PointerEvent e) {
+    if (e.pointer != _pointer) return;
+    _pointer = null;
+    if (_revealing) widget.reveal.release();
+    _revealing = false;
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
     behavior: HitTestBehavior.translucent,
-    onHorizontalDragUpdate: (d) => reveal.drag(d.delta.dx),
-    onHorizontalDragEnd: (_) => reveal.release(),
-    onHorizontalDragCancel: reveal.release,
-    child: child,
+    onPointerDown: _down,
+    onPointerMove: _move,
+    onPointerUp: _up,
+    onPointerCancel: _up,
+    child: widget.child,
   );
 }
 
@@ -1111,7 +1182,6 @@ class _FeedRow extends StatelessWidget {
               child: _SwipeToReply(
                 enabled: canSwipeReply,
                 onReply: () => actions.onReply(m),
-                reveal: actions.reveal,
                 child: body,
               ),
             ),
@@ -1236,7 +1306,6 @@ class _BubbleRow extends StatelessWidget {
               child: _SwipeToReply(
                 enabled: canSwipeReply,
                 onReply: () => actions.onReply(m),
-                reveal: actions.reveal,
                 child: bubble,
               ),
             );

@@ -594,42 +594,48 @@ class _PostComposerState extends State<PostComposer> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: TextFormField(
-                controller: _minutes,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Minutes',
-                  prefixIcon: Icon(Icons.timer_outlined),
+              child: WorkoutField(
+                label: 'Minutes',
+                child: TextFormField(
+                  controller: _minutes,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    hintText: 'e.g. 45',
+                    suffixText: 'min',
+                  ),
+                  validator: (v) {
+                    final n = int.tryParse(v?.trim() ?? '');
+                    return n == null || n < 1 || n > Workout.maxMinutes
+                        ? 'How long, in minutes'
+                        : null;
+                  },
                 ),
-                validator: (v) {
-                  final n = int.tryParse(v?.trim() ?? '');
-                  return n == null || n < 1 || n > Workout.maxMinutes
-                      ? 'How long, in minutes'
-                      : null;
-                },
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: TextFormField(
-                controller: _distance,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+              child: WorkoutField(
+                label: 'Distance (optional)',
+                child: TextFormField(
+                  controller: _distance,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'e.g. 3.1',
+                    suffixText: _unit.label,
+                  ),
+                  validator: (v) {
+                    final t = v?.trim().replaceAll(',', '.') ?? '';
+                    if (t.isEmpty) return null;
+                    final d = double.tryParse(t);
+                    return d == null ||
+                            d <= 0 ||
+                            d * _unit.meters > Workout.maxDistanceKm * 1000
+                        ? 'Enter a distance in ${_unit.label}'
+                        : null;
+                  },
                 ),
-                decoration: InputDecoration(
-                  labelText: 'Distance, ${_unit.label} (optional)',
-                  prefixIcon: const Icon(Icons.straighten),
-                ),
-                validator: (v) {
-                  final t = v?.trim().replaceAll(',', '.') ?? '';
-                  if (t.isEmpty) return null;
-                  final d = double.tryParse(t);
-                  return d == null ||
-                          d <= 0 ||
-                          d * _unit.meters > Workout.maxDistanceKm * 1000
-                      ? 'Enter a distance in ${_unit.label}'
-                      : null;
-                },
               ),
             ),
           ],
@@ -653,66 +659,42 @@ class _PostComposerState extends State<PostComposer> {
           ],
         ),
       for (final (i, r) in _exercises.indexed)
-        Padding(
+        ExerciseCard(
           key: ObjectKey(r),
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 4,
-                child: TextFormField(
-                  controller: r.name,
-                  maxLength: WorkoutExercise.maxNameLength,
-                  decoration: InputDecoration(
-                    labelText: 'Exercise ${i + 1}',
-                    counterText: '',
-                  ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) && !r.isBlank
-                      ? 'Name it'
-                      : null,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                flex: 2,
-                child: _NumberField(
-                  controller: r.sets,
-                  label: 'Sets',
-                  max: 100,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                flex: 2,
-                child: _NumberField(
-                  controller: r.reps,
-                  label: 'Reps',
-                  max: 1000,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                flex: 3,
-                child: TextFormField(
-                  controller: r.weight,
-                  maxLength: WorkoutExercise.maxWeightLength,
-                  decoration: const InputDecoration(
-                    labelText: 'Weight',
-                    counterText: '',
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Remove exercise',
-                onPressed: () => _edit(() {
-                  _exercises.remove(r);
-                  r.dispose();
-                }),
-                icon: const Icon(Icons.close),
-              ),
-            ],
+          index: i,
+          onRemove: () => _edit(() {
+            _exercises.remove(r);
+            r.dispose();
+          }),
+          name: TextFormField(
+            controller: r.name,
+            maxLength: WorkoutExercise.maxNameLength,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              hintText: ExerciseHints.name,
+              counterText: '',
+            ),
+            validator: (v) => (v == null || v.trim().isEmpty) && !r.isBlank
+                ? 'Name it'
+                : null,
+          ),
+          sets: _NumberField(
+            controller: r.sets,
+            hint: ExerciseHints.sets,
+            max: 100,
+          ),
+          reps: _NumberField(
+            controller: r.reps,
+            hint: ExerciseHints.reps,
+            max: 1000,
+          ),
+          weight: TextFormField(
+            controller: r.weight,
+            maxLength: WorkoutExercise.maxWeightLength,
+            decoration: const InputDecoration(
+              hintText: ExerciseHints.weight,
+              counterText: '',
+            ),
           ),
         ),
       const SizedBox(height: 8),
@@ -723,19 +705,19 @@ class _PostComposerState extends State<PostComposer> {
 class _NumberField extends StatelessWidget {
   const _NumberField({
     required this.controller,
-    required this.label,
+    required this.hint,
     required this.max,
   });
 
   final TextEditingController controller;
-  final String label;
+  final String hint;
   final int max;
 
   @override
   Widget build(BuildContext context) => TextFormField(
     controller: controller,
     keyboardType: TextInputType.number,
-    decoration: InputDecoration(labelText: label),
+    decoration: InputDecoration(hintText: hint),
     validator: (v) {
       final t = v?.trim() ?? '';
       if (t.isEmpty) return null;

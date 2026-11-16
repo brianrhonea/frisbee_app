@@ -39,6 +39,50 @@ extension OpenLink on GoRouter {
   }
 }
 
+extension OpenFromOutside on GoRouter {
+  /// Opens a notification tapped outside the app (a push), with back
+  /// going to the page it belongs under, not wherever the app was left:
+  /// a conversation over Messages, a team chat over its team, a post over
+  /// Home.
+  ///
+  /// Pages that sit under a tab or another page are opened with `go`,
+  /// which builds that page beneath them. Pages that open over the tabs
+  /// on their own (a post, a team's event or meeting, a tournament) are
+  /// pushed over the tab they belong to ([pushParent]).
+  void openFromOutside(String location) {
+    final parent = pushParent(location);
+    if (parent == null) {
+      go(location);
+      return;
+    }
+    // Over the parent page, in one step, whatever was open before.
+    routeInformationProvider.push<Object?>(
+      location,
+      base: configuration.findMatch(Uri.parse(parent)),
+    );
+  }
+}
+
+final _overTabs = RegExp(
+  r'^/(posts|team-events|team-meetings|my-events|tournaments|group-tournaments)'
+  r'(?:/([^/?#]+))?',
+);
+
+/// The page a notification's page opened over the tabs belongs under, or
+/// null when go_router already builds one beneath it.
+String? pushParent(String location) {
+  final m = _overTabs.firstMatch(location);
+  if (m == null) return null;
+  final id = m.group(2);
+  return switch (m.group(1)) {
+    'posts' => Routes.home,
+    'team-events' || 'team-meetings' when id != null => Routes.teamEvents(id),
+    'group-tournaments' when id != null => Routes.team(id),
+    'my-events' || 'tournaments' => Routes.schedule,
+    _ => null,
+  };
+}
+
 /// Opens [location] from a page, keeping back to it where go_router can.
 ///
 /// From a page inside a tab, everything is pushed. A profile opened from

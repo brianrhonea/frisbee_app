@@ -557,15 +557,15 @@ function WorkoutFields({
         </label>
         <label>
           Minutes
-          <input inputMode="numeric" value={draft.minutes} placeholder="45" onChange={(e) => set({ minutes: digits(e.target.value, 4) })} />
+          <input inputMode="numeric" value={draft.minutes} placeholder="e.g. 45" onChange={(e) => set({ minutes: digits(e.target.value, 4) })} />
         </label>
         <label>
-          Distance
+          Distance (optional)
           <span className="workout-distance">
             <input
               inputMode="decimal"
               value={draft.distance}
-              placeholder="Optional"
+              placeholder="e.g. 3.1"
               onChange={(e) => set({ distance: e.target.value.replace(/[^\d.]/g, "").slice(0, 7) })}
             />
             <select aria-label="Unit" value={draft.unit} onChange={(e) => set({ unit: e.target.value as "km" | "mi" })}>
@@ -590,18 +590,37 @@ function WorkoutFields({
         <ul className="workout-exercises">
           {draft.exercises.map((x, i) => (
             <li key={i}>
-              <input aria-label="Exercise" placeholder="Exercise" value={x.name} maxLength={60} onChange={(e) => setExercise(i, { name: e.target.value })} />
-              <input aria-label="Sets" placeholder="Sets" inputMode="numeric" value={x.sets} onChange={(e) => setExercise(i, { sets: digits(e.target.value, 3) })} />
-              <input aria-label="Reps" placeholder="Reps" inputMode="numeric" value={x.reps} onChange={(e) => setExercise(i, { reps: digits(e.target.value, 4) })} />
-              <input aria-label="Weight" placeholder="Weight" value={x.weight} maxLength={20} onChange={(e) => setExercise(i, { weight: e.target.value })} />
-              <button
-                type="button"
-                className="exercise-remove"
-                aria-label="Remove exercise"
-                onClick={() => set({ exercises: draft.exercises.filter((_, j) => j !== i) })}
-              >
-                ×
-              </button>
+              <span className="exercise-head">
+                <b>Exercise {i + 1}</b>
+                <button
+                  type="button"
+                  className="exercise-remove"
+                  aria-label={`Remove exercise ${i + 1}`}
+                  onClick={() => set({ exercises: draft.exercises.filter((_, j) => j !== i) })}
+                >
+                  ×
+                </button>
+              </span>
+              <input
+                className="exercise-name"
+                aria-label={`Exercise ${i + 1}`}
+                placeholder="What you did, e.g. Squats"
+                value={x.name}
+                maxLength={60}
+                onChange={(e) => setExercise(i, { name: e.target.value })}
+              />
+              <label>
+                Sets
+                <input inputMode="numeric" placeholder="e.g. 3" value={x.sets} onChange={(e) => setExercise(i, { sets: digits(e.target.value, 3) })} />
+              </label>
+              <label>
+                Reps
+                <input inputMode="numeric" placeholder="e.g. 10" value={x.reps} onChange={(e) => setExercise(i, { reps: digits(e.target.value, 4) })} />
+              </label>
+              <label>
+                Weight
+                <input placeholder="e.g. 135 lb" value={x.weight} maxLength={20} onChange={(e) => setExercise(i, { weight: e.target.value })} />
+              </label>
             </li>
           ))}
         </ul>

@@ -152,7 +152,7 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
     _pendingRoute = null;
     // After the redirect away from the splash page has settled.
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _router.openLink(route),
+      (_) => _router.openFromOutside(route),
     );
   }
 

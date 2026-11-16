@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.36.0 — 2026-11-16
+
+Works with API 0.28.0 (no API change).
+
+**Changed**
+- Workout exercises are cards: "Exercise 1" with remove, the name across,
+  then Sets, Reps and Weight each named above its box (placeholders alone
+  disappeared once typed in, and the one-line row was cramped on a phone).
+  Minutes and Distance show examples; Distance says it's optional.
+
 ## 0.35.0 — 2026-11-16
 
 Works with API 0.28.0 (no API change).

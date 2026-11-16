@@ -116,3 +116,132 @@ class EffortRow extends StatelessWidget {
     );
   }
 }
+
+/// A workout box with what it's for written above it, always shown: a
+/// label inside a short box on a phone is cut off or gone once typed in.
+class WorkoutField extends StatelessWidget {
+  const WorkoutField({super.key, required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return MergeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 4),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: c.muted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// One exercise as its own small card: "Exercise 1" and a remove button,
+/// the name across the full width, then sets, reps and weight, each with
+/// its name above it.
+class ExerciseCard extends StatelessWidget {
+  const ExerciseCard({
+    super.key,
+    required this.index,
+    required this.name,
+    required this.sets,
+    required this.reps,
+    required this.weight,
+    required this.onRemove,
+  });
+
+  final int index;
+  final Widget name;
+  final Widget sets;
+  final Widget reps;
+  final Widget weight;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(10, 2, 2, 10),
+      decoration: BoxDecoration(
+        border: Border.all(color: c.border),
+        borderRadius: BorderRadius.circular(controlRadius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Exercise ${index + 1}',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Remove exercise',
+                visualDensity: VisualDensity.compact,
+                iconSize: 18,
+                onPressed: onRemove,
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                name,
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: WorkoutField(label: 'Sets', child: sets),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: WorkoutField(label: 'Reps', child: reps),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 3,
+                      child: WorkoutField(label: 'Weight', child: weight),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Hints for an exercise's boxes, so an empty box shows what goes in it.
+abstract final class ExerciseHints {
+  static const name = 'What you did, e.g. Squats';
+  static const sets = 'e.g. 3';
+  static const reps = 'e.g. 10';
+  static const weight = 'e.g. 135 lb';
+}

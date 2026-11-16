@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.26  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.25  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.24  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.23  | 2026-11-14 | `feature/web-parity`                    |                     |
@@ -39,6 +40,24 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.26 — Clearer workout boxes, scroll while showing times, push back
+
+- Workouts (both composers): every box has its name above it, always
+  shown (`WorkoutField`), with an example inside (`e.g. 45`, `min`, the
+  distance unit). Each exercise is its own card (`ExerciseCard`):
+  "Exercise 1" and remove, the name across the full width, then Sets,
+  Reps and Weight, each named. Before, small boxes on a phone had their
+  labels cut off or hidden once typed in.
+- Messages: the thread keeps scrolling up and down while dragging left
+  to show the times. `_RevealTimes` follows the finger with a `Listener`
+  instead of taking the drag, and a bubble's swipe to reply (`_RightSwipe`)
+  gives way as soon as a drag sets off left.
+- A notification tapped outside the app (push) opens its page with back
+  going where the page belongs, not where the app was left
+  (`openFromOutside`): a conversation over Messages, a team chat over its
+  team (`go`), a post over Home, a team event or meeting over the team's
+  events, a tournament or your own event over Events (`pushParent`).
 
 ## 0.0.25 — Message times, notifications stay, follow requests in Notifications
 
