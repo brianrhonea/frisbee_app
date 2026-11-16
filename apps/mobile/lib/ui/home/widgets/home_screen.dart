@@ -23,8 +23,8 @@ import '../../teams/widgets/join_team_dialog.dart';
 import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/home_viewmodel.dart';
 import 'home_cards.dart';
+import '../../posts/widgets/inline_composer.dart';
 import '../../posts/widgets/post_composer.dart';
-import '../../workouts/widgets/record_button.dart';
 import '../../core/ui/skeleton.dart';
 
 enum _Tab {
@@ -58,6 +58,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   HomeViewModel get vm => widget.viewModel;
   var _tab = _Tab.forYou;
+  final _composerKey = GlobalKey();
 
   late final List<Command<void>> _commands = [
     vm.savePost,
@@ -121,45 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (code != null) vm.joinTeam.execute(code);
   }
 
-  /// Asks which of [teams] to use when there's more than one.
-  Future<Team?> _pickTeam(List<Team> teams, String title) async {
-    if (teams.length == 1) return teams.single;
-    return showDialog<Team>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: Text(title),
-        children: [
-          for (final t in teams)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, t),
-              child: Row(
-                children: [
-                  TeamBadge(size: 30, community: t.isCommunity),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(t.name)),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _compose() async {
-    final team = await _pickTeam(vm.postableTeams, 'Post to');
-    if (team == null || !mounted) return;
-    final draft = await showDialog<PostDraft>(
-      context: context,
-      builder: (_) => PostEditorDialog(
-        pickImages: vm.pickImages,
-        canUseCamera: vm.canUseCamera,
-        loadImage: vm.imageData,
-        allowPublic: !team.isPrivateGroup,
-      ),
-    );
-    if (draft != null) vm.savePost.execute((teamId: team.id, draft: draft));
-  }
-
   Future<void> _edit(TeamPostItem p) async {
     final draft = await showDialog<PostDraft>(
       context: context,
@@ -183,8 +145,6 @@ class _HomeScreenState extends State<HomeScreen> {
       onUndo: () => vm.removals.undo(item),
     );
   }
-
-  void _newPost() => showPostComposer(context);
 
   /// A team event for a team the user runs, or a personal one.
   Future<void> _newEvent() async {
@@ -288,14 +248,13 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> _main() => switch (_tab) {
     _Tab.forYou => [
       ?widget.prompt,
-      _Composer(
+      // Kept across rebuilds (cards appearing above it on phones); the
+      // draft itself is in the view model.
+      InlineComposer(
+        key: _composerKey,
+        viewModel: vm.composer,
         name: vm.user?.label ?? '',
         photoUrl: vm.user?.photoUrl,
-        onPost: _newPost,
-        onWorkout: () => showPostComposer(context, workout: true),
-        onTeamPost: vm.postableTeams.isEmpty || vm.savePost.running
-            ? null
-            : _compose,
       ),
       if (vm.teamsLoaded)
         TeamStrip(
@@ -549,101 +508,6 @@ class _TabRow extends StatelessWidget {
 }
 
 // Feed -----------------------------------------------------------------------
-
-class _Composer extends StatelessWidget {
-  const _Composer({
-    required this.name,
-    required this.photoUrl,
-    required this.onPost,
-    required this.onWorkout,
-    required this.onTeamPost,
-  });
-
-  final String name;
-  final String? photoUrl;
-  final VoidCallback onPost;
-  final VoidCallback onWorkout;
-
-  /// Posts to one of the user's teams; null if they run none.
-  final VoidCallback? onTeamPost;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final post = onPost;
-    final compact = TextButton.styleFrom(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      visualDensity: VisualDensity.compact,
-      textStyle: const TextStyle(
-        fontFamily: appFont,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-    return Card(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-            child: Row(
-              children: [
-                PersonAvatar(name: name, photoUrl: photoUrl, radius: 18),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(controlRadius),
-                    onTap: post,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Text(
-                        "What's happening on your sideline?",
-                        style: TextStyle(color: c.muted, fontSize: 13.5),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: c.border),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            // Wraps on phones, where the buttons don't fit on one line. The
-            // card's full width, so every row starts at its left edge (a
-            // centred wrap left the second row out of line).
-            child: SizedBox(
-              width: double.infinity,
-              child: Wrap(
-                children: [
-                  TextButton.icon(
-                    style: compact,
-                    onPressed: post,
-                    icon: const Icon(Icons.image_outlined, size: 18),
-                    label: const Text('Photo'),
-                  ),
-                  TextButton.icon(
-                    style: compact,
-                    onPressed: onWorkout,
-                    icon: const Icon(Icons.directions_run, size: 18),
-                    label: const Text('Workout'),
-                  ),
-                  RecordWorkoutButton(style: compact),
-                  if (onTeamPost case final teamPost?)
-                    TextButton.icon(
-                      style: compact,
-                      onPressed: teamPost,
-                      icon: const Icon(Icons.campaign_outlined, size: 18),
-                      label: const Text('Team post'),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 /// A line under a feed: where it ends, or that a page failed, with
 /// [action] (a label and what it does) beside it.

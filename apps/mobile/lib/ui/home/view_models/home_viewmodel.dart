@@ -22,6 +22,7 @@ import '../../../utils/result.dart';
 import '../../../domain/models/user_post.dart';
 import '../../posts/view_models/community_feed.dart';
 import '../../posts/view_models/home_feed.dart';
+import '../../posts/view_models/inline_composer_viewmodel.dart';
 import '../../posts/view_models/post_actions.dart';
 import '../../schedule/view_models/my_schedule.dart';
 import '../../teams/view_models/team_home_viewmodel.dart' show pickPostImages;
@@ -84,6 +85,14 @@ class HomeViewModel extends ChangeNotifier {
       teamPostRepository: teamPostRepository,
       userPostRepository: userPostRepository,
     )..addListener(_onPosts);
+    composer = InlineComposerViewModel(
+      authRepository: authRepository,
+      userPostRepository: userPostRepository,
+      teamPostRepository: teamPostRepository,
+      followRepository: followRepository,
+      filePicker: filePicker,
+      audiences: () => postableTeams,
+    );
     community = CommunityFeed(userPostRepository: userPostRepository)
       ..addListener(_onPosts);
     _feed = MySchedule(
@@ -112,7 +121,11 @@ class HomeViewModel extends ChangeNotifier {
   /// Joins by invite code; result value is the team id.
   late final Command1<String, String> joinTeam;
 
-  /// Creates or edits a post on one of the user's teams.
+  /// The composer at the top of For you: a post to Everyone or, for a
+  /// team the user manages, a team post, written in place.
+  late final InlineComposerViewModel composer;
+
+  /// Edits a post on one of the user's teams.
   late final Command1<void, FeedPostDraft> savePost;
   late final Command1<void, TeamPostItem> deletePost;
 
@@ -394,6 +407,7 @@ class HomeViewModel extends ChangeNotifier {
       ..removeListener(_onPosts)
       ..dispose();
     joinTeam.dispose();
+    composer.dispose();
     savePost.dispose();
     deletePost.dispose();
     deleteUserPost.dispose();

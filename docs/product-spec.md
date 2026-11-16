@@ -299,14 +299,32 @@ everything the app does on the website alone, styled like the website
     the website's dialog and on the app's Members tab. [x] Members see
     the member count; a team's outsiders are told it's invite-only and
     can join with a code; only schools/clubs have a Teams section.
+    [x] Follow on the team header only for people not on the team (a
+    member's feed already has every post; web `showsFollow`, app
+    `TeamHomeViewModel.follow`). Note: team-post pushes go to followers
+    with notifications on, so a member who doesn't follow gets none.
+    [x] One Settings gear for members (beside the tabs on the website).
     Website only (layout): six tabs, More ▾ and a Settings gear, with
-    Playbook, Videos, Stats and Tournaments at their own URLs.
-13. Home: [x] post to Everyone or a team you manage from Home (one
-    composer with an audience chip on the website; "Team post" in the
-    app); [x] the Your teams tab is a feed of your teams' posts; [x] a
-    team strip with New / Join under the composer; [x] a Get started
-    checklist on an empty For you feed (same four steps on both:
-    username, join with a code, find a team, follow people); [x] Needs
+    Playbook, Videos, Stats and Tournaments at their own URLs; the
+    feed's roster card for people not on the team (`rosterCardText`:
+    visitors only for a public adult roster, "See who's on the team.";
+    none for a youth team or private group).
+13. Home: [x] post to Everyone or a team you manage from Home in one
+    inline composer on both (type and Post; Photo, Link and Workout open
+    inside the box; a "To" chip for teams you manage, whose posts add
+    Title, Where and Public, no Public for a private group, no Workout or
+    tournament tag; a link typed but not added counts on Post; app
+    `InlineComposerViewModel`, `test/ui/inline_composer_test.dart`). The
+    app also has Take photo and Record; editing posts keeps the
+    full-screen editor. Differences left: the app's link check
+    (`TeamPost.normalizeLink`) is stricter than the website's, and the
+    app types distances in the country's unit where the website has a
+    km/mi picker. [x] the Your teams tab is a feed of your teams' posts;
+    [x] a team strip with New / Join under the composer; [x] a Get
+    started checklist on an empty For you feed (same four steps on both:
+    username, join or create a team (done once on any team; "Join or
+    create" opens the create-or-join choice), find a team, follow
+    people); [x] Needs
     you: join requests for groups you approve. Tests: app
     `test/ui/home_test.dart`. Not yet: the app's Home doesn't list
     invitations (the website's does). Website only (layout): feeds load
