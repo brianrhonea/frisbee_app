@@ -1,5 +1,5 @@
 "use client";
-import { minimumAge, nameMissing, type PersonalDetailsStatus } from "@stall10/shared";
+import { minimumAge, nameMissing, type PersonalDetailsResponse, type PersonalDetailsStatus } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -174,10 +174,25 @@ function NameStep({ user, needsUsername, onDone }: { user: User; needsUsername: 
 
 /** The sign-up form's last step, until it's done. */
 function FinishSignUp({ user, onDone, onTooYoung }: { user: User; onDone: () => void; onTooYoung: () => void }) {
-  const [birthDate] = useState(() => signupDraft.takeBirthDate());
+  const [draftBirthDate] = useState(() => signupDraft.takeBirthDate());
   // The first and last name just typed (sign-up or the name step), else
   // the account's name split.
   const [name] = useState(() => signupDraft.takeName());
+  // The birthday saved at sign-up (PUT /v1/me/personal/birth-date), so it
+  // isn't asked again after a reload or on another device; else the one
+  // still in memory. The form starts once this has answered (or failed).
+  const [saved, setSaved] = useState<{ birthDate?: string } | null>(null);
+  useEffect(() => {
+    let live = true;
+    callApi<PersonalDetailsResponse>(user, "/v1/me/personal").then(
+      (r) => live && setSaved({ birthDate: r.signUpBirthDate ?? r.details?.birthDate }),
+      () => live && setSaved({}),
+    );
+    return () => {
+      live = false;
+    };
+  }, [user]);
+  const birthDate = saved?.birthDate ?? draftBirthDate;
   return (
     <div className="page">
       <div className="card personal-finish">
@@ -186,15 +201,19 @@ function FinishSignUp({ user, onDone, onTooYoung }: { user: User; onDone: () => 
           <h1>About you</h1>
           <p>The last step. Like a club membership, Stall 10 needs a few details about you. Your profile shows only your name and username.</p>
         </header>
-        <PersonalDetailsForm
-          user={user}
-          email={user.email}
-          initial={null}
-          prefill={{ name: user.displayName, first: name?.first, last: name?.last, birthDate }}
-          submitLabel="Continue"
-          onSaved={onDone}
-          onTooYoung={onTooYoung}
-        />
+        {saved ? (
+          <PersonalDetailsForm
+            user={user}
+            email={user.email}
+            initial={null}
+            prefill={{ name: user.displayName, first: name?.first, last: name?.last, birthDate }}
+            submitLabel="Continue"
+            onSaved={onDone}
+            onTooYoung={onTooYoung}
+          />
+        ) : (
+          <p className="muted">Loading…</p>
+        )}
       </div>
     </div>
   );

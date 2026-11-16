@@ -9,7 +9,14 @@ import {
   signInWithPopup,
   updateProfile,
 } from "firebase/auth";
-import { joinPersonName, passwordMaxLength, passwordMinLength, passwordProblem, personNameLimits } from "@stall10/shared";
+import {
+  joinPersonName,
+  passwordMaxLength,
+  passwordMinLength,
+  passwordProblem,
+  personNameLimits,
+  type SignUpBirthDateInput,
+} from "@stall10/shared";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
@@ -161,6 +168,12 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         // Taken in the meantime, or the API is down: the next step asks again.
         if (!(err instanceof ApiError)) throw err;
       }
+      // Kept (encrypted) so "About you" has it after a reload or on another
+      // device. Never holds up sign-up: if it fails (offline, an API without
+      // an encryption key, or under 13 by the server's date), the in-memory
+      // copy still fills the form, and its full save checks the age again.
+      const body: SignUpBirthDateInput = { birthDate };
+      await callApi(cred.user, "/v1/me/personal/birth-date", { method: "PUT", body }).catch(() => {});
     });
   }
 
