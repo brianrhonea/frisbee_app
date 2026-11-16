@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/personal/personal_repository.dart';
+import '../../../domain/models/person_name.dart';
 import '../../../domain/models/personal_details.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
@@ -33,39 +34,39 @@ class PersonalDetailsViewModel extends ChangeNotifier {
   PersonalDetails? _details;
   String? _email;
   DateTime? _prefillBirthDate;
+  ({String first, String last})? _prefillTypedName;
   bool _tooYoung = false;
 
   PersonalDetails? get details => _details;
   String? get email => _email ?? _auth.currentUser?.email;
 
-  /// The sign-up form's birthday, when there are no details yet.
+  /// The sign-up form's birthday, when there are no details yet: the copy
+  /// saved at sign-up, else the one still in memory.
   DateTime? get prefillBirthDate => _prefillBirthDate;
 
-  /// Their profile name, split, to start the legal name from.
-  ({String first, String last}) get prefillName {
-    final parts = (_auth.currentUser?.displayName ?? '').trim().split(
-      RegExp(r'\s+'),
-    );
-    return (
-      first: parts.first,
-      last: parts.length > 1 ? parts.sublist(1).join(' ') : '',
-    );
-  }
+  /// Where the legal name starts: the first and last name just typed
+  /// (sign-up, or "Your name and username"), else their profile name
+  /// split. The legal name stays separate and private.
+  ({String first, String last}) get prefillName =>
+      _prefillTypedName ?? PersonName.split(_auth.currentUser?.displayName);
 
   /// Refused for being under 13; the account is being (or has been) removed.
   bool get tooYoung => _tooYoung;
 
   Future<Result<void>> _load() async {
     _prefillBirthDate = _personal.takeSignUpBirthDate();
-    if (finishing) {
-      // A new account has none yet; nothing to fetch (or decrypt).
-      notifyListeners();
-      return const Result.ok(null);
-    }
+    _prefillTypedName = _personal.takeSignUpName();
     final result = await _personal.load();
     if (result case Ok(:final value)) {
       _details = value.details;
       _email = value.email;
+      _prefillBirthDate = value.signUpBirthDate ?? _prefillBirthDate;
+      notifyListeners();
+      return const Result.ok(null);
+    }
+    if (finishing) {
+      // Finishing sign-up never waits on this (offline, or no API): the
+      // form starts from what's in memory.
       notifyListeners();
       return const Result.ok(null);
     }

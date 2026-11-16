@@ -95,6 +95,71 @@ describe("roster", () => {
     });
   });
 
+  it("keeps a youth team's roster to its members and its school or club's member managers", async () => {
+    s.store.put("teams/y1", {
+      name: "Juniors",
+      level: "youth",
+      memberIds: ["olive", "pat"],
+      members: { olive: "owner", pat: "player" },
+      orgId: "school",
+      orgLinked: true,
+    });
+    s.store.put("teams/y1/roster/a", { name: "Kid Player", number: 4, position: "cutter" });
+    s.store.put("teams/school", {
+      name: "Austin High",
+      kind: "organization",
+      memberIds: ["admin", "helper", "parent"],
+      members: { admin: "owner", helper: "player", parent: "player" },
+      memberPerms: { helper: ["manageMembers"] },
+      linkedTeams: { y1: { name: "Juniors" } },
+    });
+    for (const uid of ["visitor", "parent"]) {
+      const res = await s.get("/v1/teams/y1/roster", uid);
+      expect(res.statusCode, uid).toBe(403);
+      expect(res.json().error.message).toBe("Rosters of youth teams are private: only members see them.");
+      expect(res.body).not.toContain("Kid Player");
+    }
+    for (const uid of ["pat", "admin", "helper"]) {
+      const res = await s.get("/v1/teams/y1/roster", uid);
+      expect(res.statusCode, uid).toBe(200);
+      expect(res.json().players[0].name).toBe("Kid Player");
+    }
+    // A community that hasn't accepted the team (or doesn't list it) doesn't open it.
+    s.store.put("teams/y2", { name: "Juniors 2", level: "youth", memberIds: ["olive"], members: { olive: "owner" }, orgId: "school", orgLinked: false });
+    s.store.put("teams/y3", { name: "Juniors 3", level: "youth", memberIds: ["olive"], members: { olive: "owner" }, orgId: "school", orgLinked: true });
+    for (const id of ["y2", "y3"]) expect((await s.get(`/v1/teams/${id}/roster`, "admin")).statusCode, id).toBe(403);
+    // Adult teams are unchanged: anyone signed in.
+    expect((await s.get("/v1/teams/t1/roster", "visitor")).statusCode).toBe(200);
+  });
+
+  it("keeps a team in a youth league division to its members, whatever its level says", async () => {
+    s.store.put("tournaments/lg", { name: "Junior League", divisions: [{ id: "d1", level: "youth", division: "mixed" }] });
+    s.store.put("teams/lt", { name: "Team 1", level: "league", leagueId: "lg", memberIds: ["pat"], members: { pat: "owner" } });
+    s.store.put("tournaments/lg/entries/lt", { divisionId: "d1", teamName: "Team 1" });
+    s.store.put("teams/lt/roster/a", { name: "Kid Player", number: 4 });
+    const res = await s.get("/v1/teams/lt/roster", "visitor");
+    expect(res.statusCode).toBe(403);
+    expect(res.body).not.toContain("Kid Player");
+    expect((await s.get("/v1/teams/lt/roster", "pat")).statusCode).toBe(200);
+    // An adult division of the same kind of league stays open to anyone signed in.
+    s.store.put("tournaments/al", { name: "Adult League", divisions: [{ id: "d1", level: "club", division: "mixed" }] });
+    s.store.put("teams/at", { name: "Team 2", level: "league", leagueId: "al", memberIds: ["pat"], members: { pat: "owner" } });
+    s.store.put("tournaments/al/entries/at", { divisionId: "d1", teamName: "Team 2" });
+    expect((await s.get("/v1/teams/at/roster", "visitor")).statusCode).toBe(200);
+  });
+
+  it("reads the profile cards in one getAll", async () => {
+    expect((await s.get("/v1/teams/t1/roster")).statusCode).toBe(200);
+    expect(s.store.getAllCalls).toBe(1);
+  });
+
+  it("caps each member's roster reads (60 a minute)", async () => {
+    for (let i = 0; i < 60; i++) expect((await s.get("/v1/teams/t1/roster")).statusCode).toBe(200);
+    expect((await s.get("/v1/teams/t1/roster")).statusCode).toBe(429);
+    // Someone else's reads are their own.
+    expect((await s.get("/v1/teams/t1/roster", "pat")).statusCode).toBe(200);
+  });
+
   it("answers 404 for a missing team and 400 for a bad id", async () => {
     expect((await s.get("/v1/teams/nope/roster")).statusCode).toBe(404);
     expect((await s.get("/v1/teams/__x__/roster")).statusCode).toBe(400);

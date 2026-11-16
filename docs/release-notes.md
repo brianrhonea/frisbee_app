@@ -10,6 +10,60 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.23
+
+**The website, signed out**
+- Without an account the website shows team and community pages and the
+  community feed. Other tabs ask you to sign up or log in, then bring
+  you back.
+
+**Your birthday is remembered**
+- After signing up with email, "About you" remembers your date of birth
+  after the app restarts or on another device.
+
+**Posting from Home**
+- Tap the post box and type: Post sends it. Photo, Link and Workout open
+  inside the same box instead of a popup, and "To" lets you post to a
+  team you manage.
+
+**Explore**
+- The filters sit on one row that scrolls sideways.
+
+**Rankings**
+- Rankings have Level and Division filters, as on the website. Youth
+  teams aren't ranked and players on youth teams aren't rated.
+
+**Club teams are 16 and over**
+- Club teams are now for players 16 and over. Add your date of birth in
+  About you to join one. Anyone already on a club team stays on it.
+
+**Youth teams**
+- A youth team's roster is only for its members (and its school or
+  club's admins). Others see "Rosters of youth teams are private: only
+  members see them."
+- The tournament form says the location and About are public.
+
+**Signing up with Google or Apple**
+- We now ask your first and last name along with your username, so your
+  profile, posts and rosters show the name you choose, even if Apple hid
+  it. "About you" starts from that name.
+
+**The top bar**
+- On phones the top bar shows just "Stall 10", as the website does,
+  and notifications are a bell instead of the flying disc.
+
+**Home**
+- The Your teams tab shows your teams' posts.
+- A strip of your teams sits under the composer, with New / Join.
+- An empty feed shows a Get started checklist.
+- A Needs you card lists join requests waiting for you.
+
+**Inviting people**
+- The invite dialog makes a link as soon as it opens, and again when
+  you pick another length. It also lists join requests to approve or
+  decline, and the people you've just invited.
+- The Invite button shows how many join requests are waiting.
+
 ## 0.0.22
 
 **A new icon**

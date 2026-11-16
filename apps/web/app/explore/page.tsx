@@ -1,88 +1,42 @@
-import type { SearchPage } from "@stall10/shared";
 import type { Metadata } from "next";
+import { Explore } from "@/components/explore/Explore";
+import { type ExploreFilter, exploreFilters } from "@/components/explore/filters";
+import { ForVisitors } from "@/components/ForVisitors";
+import { MembersOnly } from "@/components/MembersOnly";
 import Link from "next/link";
-import { Avatar } from "@/components/Avatar";
-import { ListingCard } from "@/components/ListingCard";
-import { getPublic, tags } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Explore",
-  description: "Search for ultimate players, teams and pickup groups on Stall 10.",
+  description: "Search for ultimate players, teams, pickup groups and tournaments on Stall 10.",
 };
 
-type Props = { searchParams: Promise<{ q?: string | string[] }> };
+type Props = { searchParams: Promise<{ q?: string | string[]; only?: string | string[] }> };
 
-export default async function Explore({ searchParams }: Props) {
-  const raw = (await searchParams).q;
-  const q = (Array.isArray(raw) ? raw[0] : raw)?.trim().slice(0, 100) ?? "";
-  const results = q ? await getPublic<SearchPage>("/v1/public/search", { q }, { tags: [tags.search] }) : null;
+const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+
+/** Members only: search runs in the browser with their token. */
+export default async function ExplorePage({ searchParams }: Props) {
+  const params = await searchParams;
+  const q = first(params.q)?.trim().slice(0, 100) ?? "";
+  const raw = first(params.only);
+  const only = exploreFilters.includes(raw as ExploreFilter) ? (raw as ExploreFilter) : null;
+  const query = new URLSearchParams({ ...(q && { q }), ...(only && { only }) }).toString();
+  const next = query ? `/explore?${query}` : "/explore";
   return (
     <div className="page">
       <div className="page-head">
         <h1>Explore</h1>
-        <p>Find players, teams and pickup groups.</p>
+        <p>Find your next point. Players, teams, pickup groups and tournaments.</p>
       </div>
-      <form className="search-form" action="/explore" method="get" role="search">
-        <label className="visually-hidden" htmlFor="q">
-          Search Stall 10
-        </label>
-        <input id="q" name="q" type="search" defaultValue={q} placeholder="Search players and teams" autoComplete="off" />
-        <button className="btn btn-primary" type="submit">
-          Search
-        </button>
-      </form>
-      {!results && (
-        <>
-          <h2 className="section-title">Browse</h2>
-          <div className="stack">
-            <Link className="row-card" href="/rankings">
-              <span>
-                <b>Team rankings</b>
-                <small>Teams by division, from public tournaments</small>
-              </span>
-            </Link>
-            <Link className="row-card" href="/rankings?kind=players">
-              <span>
-                <b>Player ratings</b>
-                <small>From stats logged with the game tracker</small>
-              </span>
-            </Link>
-          </div>
-        </>
-      )}
-      {results &&
-        (results.players.length === 0 && results.teams.length === 0 ? (
-          <p className="empty">Nothing matches &ldquo;{q}&rdquo;.</p>
-        ) : (
-          <>
-            {results.teams.length > 0 && (
-              <>
-                <h2 className="section-title">Teams and groups</h2>
-                <div className="stack">
-                  {results.teams.map((t) => (
-                    <ListingCard key={t.id} team={t} />
-                  ))}
-                </div>
-              </>
-            )}
-            {results.players.length > 0 && (
-              <>
-                <h2 className="section-title">Players</h2>
-                <div className="stack">
-                  {results.players.map((p) => (
-                    <Link key={p.id} className="row-card" href={`/players/${encodeURIComponent(p.id)}`}>
-                      <Avatar name={p.name} url={p.photoUrl} />
-                      <span>
-                        <b>{p.name || "Player"}</b>
-                        {p.username && <small>@{p.username}</small>}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        ))}
+      <MembersOnly next={next} what="Sign up free or log in to search for players, teams, pickup groups and tournaments.">
+        <Explore initialQuery={q} initialFilter={only} />
+      </MembersOnly>
+      <ForVisitors>
+        <p className="muted">
+          No account needed for the <Link href="/rankings">team rankings</Link> or{" "}
+          <Link href="/tournaments">tournaments and leagues</Link>.
+        </p>
+      </ForVisitors>
     </div>
   );
 }

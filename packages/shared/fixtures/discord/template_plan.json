@@ -1,0 +1,164 @@
+{
+  "about": "What mapTemplate (apps/api/src/discord/template.ts and firebase/functions/src/discord/template.ts) gives for template_synthetic.json, a made-up Discord server template. Both parsers are checked against it, and the app reads it as the plan its Discord import fixtures start from (import.json).",
+  "plan": {
+    "serverName": "Rockets Ultimate",
+    "roles": [
+      {
+        "key": "4",
+        "name": "Admin",
+        "color": 4293348412,
+        "position": 0,
+        "perms": [
+          "manageTeam",
+          "manageMembers",
+          "manageChats",
+          "manageEvents",
+          "moderate"
+        ]
+      },
+      {
+        "key": "3",
+        "name": "Captains",
+        "color": 4281637083,
+        "position": 1,
+        "perms": [
+          "manageMembers",
+          "manageChats",
+          "manageEvents"
+        ]
+      },
+      {
+        "key": "2",
+        "name": "Moderator",
+        "color": 4288371126,
+        "position": 2,
+        "perms": [
+          "moderate"
+        ]
+      },
+      {
+        "key": "1",
+        "name": "Handlers",
+        "color": 0,
+        "position": 3,
+        "perms": []
+      }
+    ],
+    "folders": [
+      {
+        "key": "10",
+        "name": "Info",
+        "position": 0,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "4",
+          "3"
+        ]
+      },
+      {
+        "key": "20",
+        "name": "Team",
+        "position": 1,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ]
+      }
+    ],
+    "rooms": [
+      {
+        "name": "announcements",
+        "folderKey": "10",
+        "position": 0,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "4",
+          "3"
+        ]
+      },
+      {
+        "name": "general",
+        "folderKey": "20",
+        "position": 0,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ]
+      },
+      {
+        "name": "rules",
+        "folderKey": "10",
+        "position": 1,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "4"
+        ]
+      },
+      {
+        "name": "handlers-only",
+        "folderKey": "20",
+        "position": 1,
+        "readRoles": [
+          "4",
+          "1"
+        ],
+        "writeRoles": [
+          "4",
+          "1"
+        ]
+      },
+      {
+        "name": "captains",
+        "folderKey": "20",
+        "position": 2,
+        "readRoles": [
+          "4",
+          "3"
+        ],
+        "writeRoles": [
+          "4",
+          "3"
+        ]
+      },
+      {
+        "name": "off-topic",
+        "folderKey": null,
+        "position": 0,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ]
+      },
+      {
+        "name": "drills",
+        "folderKey": "20",
+        "position": 3,
+        "readRoles": [
+          "everyone"
+        ],
+        "writeRoles": [
+          "everyone"
+        ]
+      }
+    ],
+    "skipped": [
+      {
+        "name": "Practice voice",
+        "reason": "Voice channel"
+      }
+    ],
+    "skippedRoles": []
+  }
+}

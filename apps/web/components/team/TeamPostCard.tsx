@@ -1,14 +1,30 @@
 import type { PublicTeamPost } from "@stall10/shared";
+import type { ReactNode } from "react";
 import { LocalTime } from "../LocalTime";
 import { MemberImage } from "../MemberImage";
 
 /** A team post as the browser reads it: the public shape, plus the member-only flag. */
-export type TeamPostView = PublicTeamPost & { public?: boolean; images?: Array<{ path: string; name?: string; url?: string }> };
+export type TeamPostView = PublicTeamPost & {
+  public?: boolean;
+  images?: Array<{ path: string; name?: string; url?: string }>;
+  location?: string;
+};
 
 const isWebLink = (url: string) => /^https?:\/\//i.test(url);
 
 /** A team's post or announcement (TeamPost in the app). */
-export function TeamPostCard({ post, teamName, showAudience }: { post: TeamPostView; teamName: string; showAudience?: boolean }) {
+export function TeamPostCard({
+  post,
+  teamName,
+  showAudience,
+  actions,
+}: {
+  post: TeamPostView;
+  teamName: string;
+  showAudience?: boolean;
+  /** Edit and delete, for the team's admins. */
+  actions?: ReactNode;
+}) {
   const images = post.images ?? [];
   const links = (post.links ?? []).filter(isWebLink);
   return (
@@ -22,6 +38,7 @@ export function TeamPostCard({ post, teamName, showAudience }: { post: TeamPostV
           </span>
         </div>
         {showAudience && post.public !== true && <span className="post-tag">Members only</span>}
+        {actions}
       </header>
       {post.location && <p className="muted small" style={{ margin: "4px 0 0" }}>{post.location}</p>}
       {post.body && <p className="post-body">{post.body}</p>}

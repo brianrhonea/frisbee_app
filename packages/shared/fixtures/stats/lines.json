@@ -1,0 +1,300 @@
+{
+  "about": "LineSource.from(tournaments, games) and LineSource.forEvent for each event id.",
+  "cases": [
+    {
+      "tournaments": [
+        {
+          "id": "t1",
+          "name": "Spring Fling",
+          "startDate": "2026-04-11T00:00:00.000",
+          "location": "",
+          "eventId": "e1",
+          "roster": [],
+          "lines": [
+            {
+              "id": "l1",
+              "name": "O-line",
+              "players": [
+                "a",
+                "b",
+                "c"
+              ],
+              "side": "offense"
+            },
+            {
+              "id": "l2",
+              "name": "D-line",
+              "players": [
+                "d",
+                "e",
+                "f"
+              ],
+              "side": "defense"
+            }
+          ]
+        },
+        {
+          "id": "t2",
+          "name": "No lines",
+          "startDate": "2026-06-01T00:00:00.000",
+          "location": "",
+          "eventId": null,
+          "roster": [],
+          "lines": []
+        },
+        {
+          "id": "t3",
+          "name": "Summer",
+          "startDate": "2026-07-04T00:00:00.000",
+          "location": "",
+          "eventId": null,
+          "roster": [],
+          "lines": [
+            {
+              "id": "l3",
+              "name": "Any",
+              "players": [
+                "a",
+                "d"
+              ],
+              "side": null
+            }
+          ]
+        }
+      ],
+      "games": [
+        {
+          "id": "g1",
+          "opponent": "Rivals",
+          "date": "2026-05-02T09:00:00.000",
+          "gameTo": 15,
+          "tournamentId": null,
+          "eventId": "e1",
+          "points": [],
+          "finished": false,
+          "lines": [
+            {
+              "id": "x1",
+              "name": "O-line",
+              "players": [
+                "c",
+                "a",
+                "b"
+              ],
+              "side": "offense"
+            },
+            {
+              "id": "x2",
+              "name": "O-line",
+              "players": [
+                "a",
+                "b",
+                "c"
+              ],
+              "side": null
+            }
+          ],
+          "timeoutsPerHalf": 2,
+          "timeouts": []
+        },
+        {
+          "id": "g2",
+          "opponent": "In a tournament",
+          "date": "2026-05-03T00:00:00.000",
+          "gameTo": 15,
+          "tournamentId": "t1",
+          "eventId": "e1",
+          "points": [],
+          "finished": false,
+          "lines": [
+            {
+              "id": "x3",
+              "name": "Skip me",
+              "players": [
+                "z"
+              ],
+              "side": null
+            }
+          ],
+          "timeoutsPerHalf": 2,
+          "timeouts": []
+        },
+        {
+          "id": "g3",
+          "opponent": "No lines",
+          "date": "2026-08-01T00:00:00.000",
+          "gameTo": 15,
+          "tournamentId": null,
+          "eventId": null,
+          "points": [],
+          "finished": false,
+          "lines": [],
+          "timeoutsPerHalf": 2,
+          "timeouts": []
+        },
+        {
+          "id": "g4",
+          "opponent": "Scrimmage",
+          "date": "2026-04-11T18:00:00.000",
+          "gameTo": 15,
+          "tournamentId": null,
+          "eventId": "e2",
+          "points": [],
+          "finished": false,
+          "lines": [
+            {
+              "id": "x4",
+              "name": "Mixed",
+              "players": [
+                "a",
+                "e"
+              ],
+              "side": null
+            }
+          ],
+          "timeoutsPerHalf": 2,
+          "timeouts": []
+        }
+      ],
+      "sources": [
+        {
+          "id": "t3",
+          "name": "Summer",
+          "eventId": null,
+          "lines": [
+            {
+              "id": "l3",
+              "name": "Any",
+              "players": [
+                "a",
+                "d"
+              ],
+              "side": null
+            }
+          ]
+        },
+        {
+          "id": "g1",
+          "name": "vs Rivals",
+          "eventId": "e1",
+          "lines": [
+            {
+              "id": "x1",
+              "name": "O-line",
+              "players": [
+                "c",
+                "a",
+                "b"
+              ],
+              "side": "offense"
+            },
+            {
+              "id": "x2",
+              "name": "O-line",
+              "players": [
+                "a",
+                "b",
+                "c"
+              ],
+              "side": null
+            }
+          ]
+        },
+        {
+          "id": "g4",
+          "name": "vs Scrimmage",
+          "eventId": "e2",
+          "lines": [
+            {
+              "id": "x4",
+              "name": "Mixed",
+              "players": [
+                "a",
+                "e"
+              ],
+              "side": null
+            }
+          ]
+        },
+        {
+          "id": "t1",
+          "name": "Spring Fling",
+          "eventId": "e1",
+          "lines": [
+            {
+              "id": "l1",
+              "name": "O-line",
+              "players": [
+                "a",
+                "b",
+                "c"
+              ],
+              "side": "offense"
+            },
+            {
+              "id": "l2",
+              "name": "D-line",
+              "players": [
+                "d",
+                "e",
+                "f"
+              ],
+              "side": "defense"
+            }
+          ]
+        }
+      ],
+      "forEvent": {
+        "e1": [
+          {
+            "id": "x1",
+            "name": "O-line",
+            "players": [
+              "c",
+              "a",
+              "b"
+            ],
+            "side": "offense"
+          },
+          {
+            "id": "x2",
+            "name": "O-line",
+            "players": [
+              "a",
+              "b",
+              "c"
+            ],
+            "side": null
+          },
+          {
+            "id": "l2",
+            "name": "D-line",
+            "players": [
+              "d",
+              "e",
+              "f"
+            ],
+            "side": "defense"
+          }
+        ],
+        "e2": [
+          {
+            "id": "x4",
+            "name": "Mixed",
+            "players": [
+              "a",
+              "e"
+            ],
+            "side": null
+          }
+        ],
+        "e3": []
+      },
+      "keys": [
+        "O-line|offense|a,b,c",
+        "D-line|defense|d,e,f",
+        "Any|null|a,d"
+      ]
+    }
+  ]
+}

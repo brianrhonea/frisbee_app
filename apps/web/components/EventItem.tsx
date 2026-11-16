@@ -1,10 +1,12 @@
 "use client";
 import { type ReactNode, useEffect, useState } from "react";
+import { formatDate, serverLocale } from "@/lib/dates";
 
 function parts(d: Date, timeZone?: string) {
   return {
-    month: d.toLocaleDateString("en-US", { month: "short", timeZone }),
-    day: d.toLocaleDateString("en-US", { day: "numeric", timeZone }),
+    // The server's UTC copy has a fixed locale, so the browser's first render matches it.
+    month: formatDate(d, { month: "short", timeZone }, timeZone ? serverLocale : undefined),
+    day: formatDate(d, { day: "numeric", timeZone }, timeZone ? serverLocale : undefined),
   };
 }
 

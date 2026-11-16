@@ -20,6 +20,11 @@ import '../../../domain/models/follow.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
 
+/// Whether [typed] confirms deleting a team called [name]: the same name,
+/// ignoring case and spaces at the ends, as the API checks.
+bool deleteNameMatches(String name, String typed) =>
+    typed.trim().toLowerCase() == name.trim().toLowerCase();
+
 /// Backs the team home page. Members get the team summary, upcoming
 /// events and every post; anyone else who finds the team gets its public
 /// page: directory listing, public events and public posts.
@@ -49,7 +54,7 @@ class TeamHomeViewModel extends ChangeNotifier {
     );
     updateTeam = Command1<void, Team>(_teams.updateTeam);
     leaveTeam = Command0<void>(() => _teams.removeMember(teamId, uid));
-    deleteTeam = Command0<void>(_deleteTeam);
+    deleteTeam = Command1<void, String>(_deleteTeam);
     savePost = Command1<void, PostDraft>(_savePost);
     deletePost = Command1<void, String>((id) => _posts.deletePost(teamId, id));
     joinTeam = Command1<String, String>(_joinTeam);
@@ -135,8 +140,34 @@ class TeamHomeViewModel extends ChangeNotifier {
     _watchListings();
     _watchContent();
     _watchRequest();
+    _watchJoinRequests();
     _publishListing();
     notifyListeners();
+  }
+
+  StreamSubscription<List<GroupJoinRequest>>? _joinRequestsSub;
+  int _joinRequestCount = 0;
+
+  /// How many people are asking to join, for the Invite button's badge:
+  /// a group that approves members, to members who manage members.
+  int get joinRequestCount => _joinRequestCount;
+
+  void _watchJoinRequests() {
+    final team = _team;
+    final want =
+        team != null &&
+        team.isCommunity &&
+        team.requiresApproval &&
+        canManageMembers;
+    if (want == (_joinRequestsSub != null)) return;
+    _joinRequestsSub?.cancel();
+    _joinRequestsSub = null;
+    _joinRequestCount = 0;
+    if (!want) return;
+    _joinRequestsSub = _teams.watchJoinRequests(teamId).listen((r) {
+      _joinRequestCount = r.length;
+      notifyListeners();
+    }, onError: (Object _) {});
   }
 
   void _watchListings() {
@@ -253,6 +284,16 @@ class TeamHomeViewModel extends ChangeNotifier {
   /// A private group the user isn't in: only its listing is visible.
   bool get isPrivateToMe => !isMember && (summary?.isPrivateGroup ?? false);
 
+  /// A youth team the user isn't on: its roster is for its members only
+  /// (the API refuses anyone else), so the page says so in its place.
+  bool get youthRosterPrivate {
+    final s = summary;
+    return !isMember &&
+        s != null &&
+        !s.isCommunity &&
+        s.level == CompetitionLevel.youth;
+  }
+
   /// The user asked to join this group and is waiting for approval.
   bool get requestPending => _requestPending;
 
@@ -301,7 +342,9 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   late final Command1<void, Team> updateTeam;
   late final Command0<void> leaveTeam;
-  late final Command0<void> deleteTeam;
+
+  /// Deletes the team; the argument is the name the owner typed.
+  late final Command1<void, String> deleteTeam;
 
   /// Creates or edits a post, uploading its new photos.
   late final Command1<void, PostDraft> savePost;
@@ -328,19 +371,23 @@ class TeamHomeViewModel extends ChangeNotifier {
     return result;
   }
 
-  Future<Result<void>> _deleteTeam() async {
+  Future<Result<void>> _deleteTeam(String typedName) async {
     final t = _team;
     if (t == null) return Result.error(Exception('Team not loaded'));
-    // The screen asks first; rules refuse it too.
+    // The screen asks first; the API (or rules) refuse it too.
     if (t.members.length > 1) {
       return Result.error(
         Exception('Remove the other members or transfer ownership first.'),
       );
     }
+    if (!deleteNameMatches(t.name, typedName)) {
+      return Result.error(Exception('Type the name exactly to delete it.'));
+    }
     _deleteProgress = (done: 0, total: 1, step: 'Getting ready');
     notifyListeners();
     final result = await _teams.deleteTeam(
       t,
+      name: typedName,
       onProgress: (p) {
         _deleteProgress = p;
         notifyListeners();
@@ -390,6 +437,7 @@ class TeamHomeViewModel extends ChangeNotifier {
     _listingSub.cancel();
     _listingsSub?.cancel();
     _requestSub?.cancel();
+    _joinRequestsSub?.cancel();
     _teamSub?.cancel();
     _eventsSub?.cancel();
     _postsSub?.cancel();

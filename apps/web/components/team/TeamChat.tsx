@@ -1,41 +1,36 @@
 "use client";
-import { limit, orderBy, where } from "firebase/firestore";
+import { MuteButton } from "../MuteButton";
+import { where } from "firebase/firestore";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRef, useState } from "react";
 import { Avatar } from "../Avatar";
 import { LocalTime } from "../LocalTime";
-import { MemberImage } from "../MemberImage";
-import { useLiveQueries, useLiveQuery } from "@/lib/live";
+import { ChatAttachment, type ChatFile } from "../ChatAttachment";
+import { loadAtTop, OlderMessages } from "../OlderMessages";
+import { ChatComposer, MessageActions } from "../ChatComposer";
+import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
+import { usePagedMessages, useThreadScroll } from "@/lib/messages";
+import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
+import { VoiceRoom } from "./meetings/VoiceRoom";
+import { EmptyState, Loading } from "../StatusViews";
 
-interface Room {
-  name?: string;
-  kind?: "text" | "voice";
-  folderId?: string | null;
-  position?: number;
-}
-interface Folder {
-  name?: string;
-  position?: number;
-}
-interface Attachment {
-  path: string;
-  name?: string;
-  contentType?: string;
-}
+type Room = ManagedRoom;
+type Folder = ManagedFolder;
 interface Message {
   authorId?: string;
   authorName?: string;
   text?: string;
-  attachments?: Attachment[];
+  attachments?: ChatFile[];
   createdAt?: string;
   replyTo?: { authorName?: string; text?: string };
   reactions?: Record<string, string>;
 }
 
-const messageLimit = 60;
+/** Messages per page, live and older (MessageThreadViewModel.pageSize). */
+const pageSize = 50;
 const byPosition = (a: { position?: number; name?: string }, b: { position?: number; name?: string }) =>
   (a.position ?? 0) - (b.position ?? 0) || (a.name ?? "").localeCompare(b.name ?? "");
 
@@ -49,6 +44,7 @@ export function TeamChat() {
   const { teamId, viewer } = useTeamHub();
   const params = useSearchParams();
   const pathname = usePathname();
+  const router = useRouter();
   const member = viewer.state === "member" ? viewer : null;
   const all = member?.can("manageChats") ?? false;
   const queries = !member
@@ -61,8 +57,9 @@ export function TeamChat() {
 
   if (!member) return <MembersOnlySection what="chat" />;
   if (rooms.error) return <p className="form-error">{rooms.error}</p>;
-  if (!rooms.data) return <p className="muted" aria-busy="true">Loading chat…</p>;
+  if (!rooms.data) return <Loading label="Loading chat…" />;
 
+  const managing = all && params.get("manage") === "1";
   const sorted = rooms.data.slice().sort(byPosition);
   const openId = params.get("room") ?? sorted.find((r) => r.kind !== "voice")?.id;
   const open = sorted.find((r) => r.id === openId);
@@ -77,7 +74,12 @@ export function TeamChat() {
   return (
     <div className="hub-split chat-split">
       <nav className="hub-list chat-rooms" aria-label="Rooms">
-        {groups.length === 0 && <p className="empty">No rooms you can read.</p>}
+        {all && (
+          <Link className={`btn btn-small chat-manage-link${managing ? " active" : ""}`} href={managing ? pathname : `${pathname}?manage=1`} scroll={false}>
+            {managing ? "Back to chat" : "Manage rooms"}
+          </Link>
+        )}
+        {groups.length === 0 && <EmptyState>No rooms you can read.</EmptyState>}
         {groups.map((g) => (
           <div key={g.id || "top"}>
             {g.name && <h3 className="chat-folder">{g.name}</h3>}
@@ -99,49 +101,78 @@ export function TeamChat() {
         ))}
       </nav>
       <section className="hub-detail chat-thread">
-        {open ? (
+        {managing ? (
+          <ChatManager rooms={sorted} folders={folders.data ?? []} onDone={() => router.replace(pathname, { scroll: false })} />
+        ) : open ? (
           open.kind === "voice" ? (
-            <div className="card hub-empty">
-              <h2>{open.name}</h2>
-              <p className="muted">Voice rooms open in the app for now.</p>
-            </div>
+            <VoiceRoom
+              key={open.id}
+              teamId={teamId}
+              roomId={open.id}
+              name={open.name ?? "Voice"}
+              canSpeak={member.tier === "owner" || member.audience.some((a) => open.writeRoles?.includes(a)) || (open.writeUsers ?? []).includes(member.uid)}
+            />
           ) : (
-            <Thread teamId={teamId} roomId={open.id} name={open.name ?? "Room"} me={member.uid} />
+            <Thread
+              key={open.id}
+              teamId={teamId}
+              roomId={open.id}
+              name={open.name ?? "Room"}
+              me={member.uid}
+              canWrite={
+                member.tier === "owner" ||
+                member.audience.some((a) => open.writeRoles?.includes(a)) ||
+                (open.writeUsers ?? []).includes(member.uid)
+              }
+              canModerate={member.tier === "owner" || member.can("moderate") || member.can("manageChats")}
+            />
           )
         ) : (
-          <p className="empty">Pick a room.</p>
+          <EmptyState>Pick a room.</EmptyState>
         )}
       </section>
     </div>
   );
 }
 
-function Thread({ teamId, roomId, name, me }: { teamId: string; roomId: string; name: string; me: string }) {
-  const messages = useLiveQuery<Message>(
-    `teams/${teamId}/chats/${roomId}/messages`,
-    [orderBy("createdAt", "desc"), limit(messageLimit)],
-    roomId,
-  );
+function Thread({
+  teamId,
+  roomId,
+  name,
+  me,
+  canWrite,
+  canModerate,
+}: {
+  teamId: string;
+  roomId: string;
+  name: string;
+  me: string;
+  canWrite: boolean;
+  canModerate: boolean;
+}) {
+  const [replyTo, setReplyTo] = useState<Doc<Message> | null>(null);
+  const base = `/v1/teams/${encodeURIComponent(teamId)}/chats/${encodeURIComponent(roomId)}/messages`;
+  const messages = usePagedMessages<Message>(`teams/${teamId}/chats/${roomId}/messages`, pageSize);
   const body = useRef<HTMLDivElement>(null);
-  const count = messages.data?.length ?? 0;
-  // Newest at the bottom, in view, without scrolling the page.
-  useEffect(() => {
-    if (body.current) body.current.scrollTop = body.current.scrollHeight;
-  }, [count, roomId]);
-
-  const list = (messages.data ?? []).slice().reverse();
+  const list = messages.list ?? [];
+  // Newest at the bottom, in view, without scrolling the page; older pages keep the reader's place.
+  useThreadScroll(body, list[0]?.id, list[list.length - 1]?.id);
   return (
     <div className="card thread">
       <header className="thread-head">
         <h2># {name}</h2>
+        <span className="post-admin">
+          <MuteButton target={{ teamId, roomId }} />
+        </span>
       </header>
-      <div className="thread-body" aria-live="polite" ref={body}>
+      <div className="thread-body" aria-live="polite" ref={body} onScroll={loadAtTop(messages)}>
+        <OlderMessages paged={messages} />
         {messages.error ? (
           <p className="form-error">{messages.error}</p>
-        ) : !messages.data ? (
-          <p className="muted" aria-busy="true">Loading messages…</p>
+        ) : !messages.list ? (
+          <Loading label="Loading messages…" />
         ) : list.length === 0 ? (
-          <p className="empty">No messages yet.</p>
+          <EmptyState>No messages yet.</EmptyState>
         ) : (
           list.map((m, i) => {
             const prev = list[i - 1];
@@ -164,31 +195,43 @@ function Thread({ teamId, roomId, name, me }: { teamId: string; roomId: string; 
                     </p>
                   )}
                   {m.text && <p className="message-text">{m.text}</p>}
-                  {(m.attachments ?? []).map((a) =>
-                    a.contentType?.startsWith("image/") ? (
-                      <span key={a.path} className="message-image">
-                        <MemberImage path={a.path} url="" alt={a.name ?? ""} />
-                      </span>
-                    ) : (
-                      <p key={a.path} className="muted small">📎 {a.name ?? "Attachment"}</p>
-                    ),
-                  )}
+                  {(m.attachments ?? []).map((a) => (
+                    <ChatAttachment key={a.path} file={a} />
+                  ))}
                   {reactions.length > 0 && (
                     <p className="message-reactions">
                       {reactions.map(([e, n]) => (
-                        <span key={e}>
+                        <span key={e} className={m.reactions?.[me] === e ? "mine" : ""}>
                           {e} {n}
                         </span>
                       ))}
                     </p>
                   )}
                 </div>
+                <MessageActions
+                  path={`${base}/${encodeURIComponent(m.id)}`}
+                  mine={m.reactions?.[me] ?? null}
+                  canDelete={m.authorId === me || canModerate}
+                  onReply={canWrite ? () => setReplyTo(m) : undefined}
+                  onDeleted={() => messages.removed(m.id)}
+                />
               </div>
             );
           })
         )}
       </div>
-      <footer className="thread-foot muted small">Sending from the website comes with the Messages slice; reply in the app for now.</footer>
+      {canWrite ? (
+        <ChatComposer
+          path={base}
+          upload={{ targetId: `teams/${teamId}/chats/${roomId}` }}
+          placeholder={`Message #${name}`}
+          replyTo={replyTo ? { id: replyTo.id, authorName: replyTo.authorName, text: replyTo.text } : null}
+          onClearReply={() => setReplyTo(null)}
+          draftKey={`chat_${teamId}_${roomId}`}
+        />
+      ) : (
+        <footer className="thread-foot muted small">You can read this room but not post in it.</footer>
+      )}
     </div>
   );
 }

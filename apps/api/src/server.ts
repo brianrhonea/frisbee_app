@@ -7,6 +7,7 @@ import { getAppCheck } from "firebase-admin/app-check";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { FirestoreBrowseRepository } from "./browse/repository.js";
+import { photoBuckets } from "./browse/visibility.js";
 import { FirestoreRateLimiter } from "./limits/limiter.js";
 import { FirestoreCalendarRepository } from "./calendar/repository.js";
 import { FirestoreMeRepository } from "./me/repository.js";
@@ -16,12 +17,17 @@ import { cloudLoggingOptions } from "./logging.js";
 import { closeOnSignals } from "./shutdown.js";
 import { getStorage } from "firebase-admin/storage";
 import { FirestoreDocStore } from "./firestore_store.js";
+import { FirestoreDraftQueries } from "./drafts/repository.js";
+import { FirestoreDocQueries } from "./queries.js";
+import { FirestorePublicRankingRepository } from "./rankings/public_repository.js";
+import { FirestorePublicTournamentRepository } from "./tournaments/public_repository.js";
 import { ffmpegHeicDecoder } from "./media/image.js";
 import { FirebaseMediaStorage } from "./media/storage.js";
 import { FirestoreTeamRepository } from "./teams/repository.js";
 import { LocalCipher, type PersonalCipher } from "./personal/cipher.js";
 import { KmsCipher } from "./personal/kms.js";
 import { webRevalidator } from "./web/revalidate.js";
+import { livekitFromEnv } from "./meetings/livekit.js";
 
 const projectId = process.env.FIREBASE_PROJECT_ID ?? "frisbee-app-brianrhonea-dev";
 const firebase = initializeApp({ projectId });
@@ -72,6 +78,12 @@ const app = buildApp({
         return null;
       }
     },
+    async update(uid, changes) {
+      await auth.updateUser(uid, {
+        ...(changes.name !== undefined && { displayName: changes.name }),
+        ...(changes.photoUrl !== undefined && { photoURL: changes.photoUrl }),
+      });
+    },
   },
   teams: new FirestoreTeamRepository(db),
   me: { repo: new FirestoreMeRepository(db), imageUrl },
@@ -87,14 +99,20 @@ const app = buildApp({
     limiter: new FirestoreRateLimiter(db),
     imageUrl,
     webServerKey,
+    photoBuckets: photoBuckets(projectId, process.env.STORAGE_BUCKET),
   },
+  publicTournaments: new FirestorePublicTournamentRepository(db),
+  publicRankings: new FirestorePublicRankingRepository(db),
   store: new FirestoreDocStore(db),
+  draftQueries: new FirestoreDraftQueries(db),
+  queries: new FirestoreDocQueries(db),
   // Uploads need the bucket named (STORAGE_BUCKET, e.g. <project>.firebasestorage.app).
   media: process.env.STORAGE_BUCKET
     ? new FirebaseMediaStorage(getStorage(firebase).bucket(process.env.STORAGE_BUCKET))
     : undefined,
   heic: ffmpegHeicDecoder(),
   personal: personalCipher(),
+  livekit: livekitFromEnv(),
 });
 
 /**

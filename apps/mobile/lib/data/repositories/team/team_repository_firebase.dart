@@ -48,8 +48,9 @@ class InviteCodeExpiredException implements Exception {
 /// Writes are validated by `firestore.rules`, except creating a team,
 /// which goes through the Stall 10 API ([ApiClient], `POST /v1/teams`) when
 /// the build has one and the `use_api_teams` flag is on, and membership and
-/// management (joining, invites, roles, details, invite codes and
-/// communities), which go through it when `use_api_membership` is on. The
+/// management (joining, invites, roles, details, invite codes,
+/// communities and deleting a team), which go through it when
+/// `use_api_membership` is on. The
 /// API checks what the rules did; the direct writes stay as the fallback.
 class TeamRepositoryFirebase implements TeamRepository {
   TeamRepositoryFirebase({
@@ -812,8 +813,26 @@ class TeamRepositoryFirebase implements TeamRepository {
   @override
   Future<Result<void>> deleteTeam(
     Team team, {
+    required String name,
     void Function(DeleteProgress progress)? onProgress,
   }) => guard(() async {
+    // The API (`DELETE /v1/teams/:id`) re-checks the rules (sole owner, no
+    // unfinished league), checks the typed name, and deletes everything
+    // under the team, its files and its community links in one go.
+    if (_membersApi case final api?) {
+      // One request with no steps to report: total 0 shows it as going.
+      onProgress?.call((done: 0, total: 0, step: 'Deleting everything'));
+      await api.delete(
+        '/v1/teams/${team.id}',
+        {'name': name.trim()},
+        // A big team takes a while; a 20 s timeout would say it failed
+        // while the server carried on deleting it.
+        const Duration(minutes: 3),
+      );
+      onProgress?.call((done: 1, total: 1, step: 'Deleted'));
+      return;
+    }
+    // Flag off (or no API in this build): the direct cascade.
     final ref = _teams.doc(team.id);
     const subs = [
       'roster',
@@ -963,10 +982,7 @@ class TeamRepositoryFirebase implements TeamRepository {
   }
 
   static List<RosterPlayer> _sorted(List<RosterPlayer> players) =>
-      players..sort((a, b) {
-        final byNumber = (a.number ?? 1000).compareTo(b.number ?? 1000);
-        return byNumber != 0 ? byNumber : a.name.compareTo(b.name);
-      });
+      players..sort(RosterPlayer.compareRoster);
 
   static Map<String, dynamic>? _legacyStatus(Map<String, dynamic> data) =>
       _legacyStatusKeys.any(data.containsKey)

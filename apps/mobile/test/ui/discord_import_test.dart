@@ -8,9 +8,9 @@ import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
 
-/// What `discord-previewTemplate` returns for
-/// functions/test/fixtures/discord_template_synthetic.json (see
-/// functions/test/discord/template.test.ts).
+/// A trimmed copy of what the preview returns for the shared made-up
+/// template (packages/shared/fixtures/discord/template_plan.json, which
+/// test/shared_fixtures/discord_fixtures_test.dart uses in full).
 final planMap = <String, dynamic>{
   'serverName': 'Rockets Ultimate',
   'roles': [
@@ -349,7 +349,12 @@ void main() {
       // An earlier import put everything in the community chat.
       chats.folders['fT'] = const ChatFolder(id: 'fT', name: 'Team');
       chats.teamOf['f:fT'] = 'org';
-      for (final (id, name) in [('old', 'handlers-only'), ('gen', 'general')]) {
+      // General keeps its place even when named like a room that moves.
+      for (final (id, name) in [
+        ('old', 'handlers-only'),
+        ('gen', 'general'),
+        (ChatRoom.generalId, 'Handlers-Only'),
+      ]) {
         chats.rooms[id] = ChatRoom(id: id, name: name, folderId: 'fT');
         chats.teamOf['r:$id'] = 'org';
       }

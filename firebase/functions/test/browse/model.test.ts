@@ -89,7 +89,7 @@ describe("profiles", () => {
   const profile = {
     name: "Pat",
     username: "pat",
-    photoUrl: "https://x/p.png",
+    photoUrl: "https://firebasestorage.googleapis.com/v0/b/b/o/p.png",
     bio: "Handler",
     keywords: ["pat"],
     tags: ["denver"],
@@ -117,13 +117,19 @@ describe("profiles", () => {
   it("never show search keywords or tags", () => {
     expect(profileView(profile)).not.toHaveProperty("keywords");
     expect(profileView(profile)).not.toHaveProperty("tags");
-    expect(searchProfileView(profile)).toEqual({ name: "Pat", photoUrl: "https://x/p.png", username: "pat" });
+    expect(searchProfileView(profile)).toEqual({ name: "Pat", photoUrl: "https://firebasestorage.googleapis.com/v0/b/b/o/p.png", username: "pat" });
+  });
+
+  it("only pass on pictures from Firebase Storage or Google", () => {
+    const odd = { name: "Pat", photoUrl: "https://tracker.example/p.png", headerUrl: "http://firebasestorage.googleapis.com/x", private: true };
+    expect(profileView(odd)).toEqual({ name: "Pat", private: true });
+    expect(searchProfileView({ name: "Pat", photoUrl: "https://lh3.googleusercontent.com/a/x" })).toEqual({ name: "Pat", photoUrl: "https://lh3.googleusercontent.com/a/x" });
   });
 
   it("show only the card when private", () => {
     expect(profileView({ ...profile, private: true })).toEqual({
       name: "Pat",
-      photoUrl: "https://x/p.png",
+      photoUrl: "https://firebasestorage.googleapis.com/v0/b/b/o/p.png",
       username: "pat",
       private: true,
     });
@@ -137,6 +143,8 @@ describe("teams", () => {
     expect(isPrivateGroup({ kind: "community", requiresApproval: true })).toBe(true);
     expect(isPrivateGroup({ kind: "community", requiresApproval: false })).toBe(false);
     expect(isPrivateGroup({ kind: "team", requiresApproval: true })).toBe(false);
+    expect(isPrivateGroup({ kind: "organization", requiresApproval: true })).toBe(true);
+    expect(isPrivateGroup({ kind: "organization", requiresApproval: false })).toBe(false);
   });
 
   it("listings, events and posts show only allowed fields", () => {

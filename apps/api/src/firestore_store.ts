@@ -2,7 +2,7 @@ import { FieldValue, type Firestore, Timestamp, type Transaction } from "firebas
 import { AlreadyExists, type Data, type DocStore, deleteField, serverTime, type Tx } from "./store.js";
 
 /** Timestamps → Date, recursively, so services see plain data. */
-function fromFirestore(v: unknown): unknown {
+export function fromFirestore(v: unknown): unknown {
   if (v instanceof Timestamp) return v.toDate();
   if (Array.isArray(v)) return v.map(fromFirestore);
   if (v && typeof v === "object" && Object.getPrototypeOf(v) === Object.prototype) {
@@ -33,6 +33,16 @@ export class FirestoreDocStore implements DocStore {
   async get(path: string): Promise<Data | null> {
     const snap = await this.db.doc(path).get();
     return snap.exists ? (fromFirestore(snap.data()) as Data) : null;
+  }
+
+  async getAll(paths: string[]): Promise<Array<Data | null>> {
+    const out: Array<Data | null> = [];
+    // A few hundred documents a call keeps each request small.
+    for (let i = 0; i < paths.length; i += 300) {
+      const snaps = await this.db.getAll(...paths.slice(i, i + 300).map((p) => this.db.doc(p)));
+      out.push(...snaps.map((s) => (s.exists ? (fromFirestore(s.data()) as Data) : null)));
+    }
+    return out;
   }
 
   async list(collection: string, limit: number): Promise<Array<{ id: string; data: Data }>> {

@@ -63,7 +63,10 @@ class _DeleteAccountDialogState extends State<DeleteAccountDialog> {
       listenable: vm.deleteAccount,
       builder: (context, _) {
         final running = vm.deleteAccount.running;
-        final error = vm.deleteAccount.error ? vm.deleteAccount.result : null;
+        // Closing the Google or Apple window just stops; it isn't an error.
+        final failed = vm.deleteAccount.error &&
+            !isSignInCancelled(vm.deleteAccount.result);
+        final error = failed ? vm.deleteAccount.result : null;
         return AlertDialog(
           title: const Text('Delete your account?'),
           content: SizedBox(

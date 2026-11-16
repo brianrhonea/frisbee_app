@@ -300,6 +300,30 @@ void main() {
       },
     );
 
+    testWidgets('the form says the location and About are public', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      teams.teams['club'] = team('club', TeamKind.organization, 'me');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: HostedTournamentFormScreen(viewModel: newLeague()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          "The location and About are public: anyone can see them once it's "
+          'published, even without an account.',
+        ),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox());
+    });
+
     testWidgets('the form lays out at phone width', (tester) async {
       tester.view.physicalSize = const Size(390, 2400);
       tester.view.devicePixelRatio = 1;

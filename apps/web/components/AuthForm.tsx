@@ -9,6 +9,14 @@ import {
   signInWithPopup,
   updateProfile,
 } from "firebase/auth";
+import {
+  joinPersonName,
+  passwordMaxLength,
+  passwordMinLength,
+  passwordProblem,
+  personNameLimits,
+  type SignUpBirthDateInput,
+} from "@stall10/shared";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
@@ -16,12 +24,16 @@ import { authConfigured, emailForUsername, firebaseAuth } from "@/lib/firebase";
 import { ApiError, callApi } from "@/lib/client";
 import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
+import { isSignInCancelled, popupBlockedMessage } from "@/lib/auth_errors";
+import { PasswordHints } from "./PasswordHints";
 import { localToday, signUpBirthDateProblem } from "./PersonalDetailsForm";
 import { SignUpSteps } from "./SignUpSteps";
 import { suggestUsername, UsernameField, useUsernameCheck } from "./UsernameField";
 
 /** Firebase's error codes in words. */
 function message(e: unknown): string {
+  // Closing or cancelling the Google or Apple window isn't an error.
+  if (isSignInCancelled(e)) return "";
   const code = e instanceof FirebaseError ? e.code : "";
   // Username sign-in (account-signInEmail) words its own failures.
   // The Functions SDK adds the HTTP status (" [401]"); people don't need it.
@@ -36,14 +48,13 @@ function message(e: unknown): string {
     case "auth/email-already-in-use":
       return "There's already an account with that email. Log in instead.";
     case "auth/weak-password":
-      return "Use a password of at least 6 characters.";
+      return "That password is too weak. Use 8+ characters with a letter and a number.";
     case "auth/invalid-email":
       return "Enter the email address of your account.";
     case "auth/too-many-requests":
       return "Too many tries. Wait a minute and try again.";
-    case "auth/popup-closed-by-user":
-    case "auth/cancelled-popup-request":
-      return "";
+    case "auth/popup-blocked":
+      return popupBlockedMessage;
     case "auth/unauthorized-domain":
       return "Signing in isn't set up for this web address yet.";
     case "auth/operation-not-allowed":
@@ -55,9 +66,16 @@ function message(e: unknown): string {
 
 /** Only same-site paths, so a link can't send people elsewhere after signing in. */
 function safeNext(next: string | null): string {
-  // Not "//host" or "/\host" (browsers treat both as another site), and
-  // no backslashes anywhere.
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/";
+  // Not "//host", "/\host" or "/<tab>/host" (browsers drop tabs and new
+  // lines, so that is "//host" too): only a path that resolves here.
+  if (!next || !next.startsWith("/") || /[\u0000-\u001f\\]/.test(next)) return "/";
+  try {
+    const here = "https://here.invalid"; // also renders on the server
+    const url = new URL(next, here);
+    return url.origin === here ? url.pathname + url.search + url.hash : "/";
+  } catch {
+    return "/";
+  }
 }
 
 
@@ -66,7 +84,8 @@ function safeNext(next: string | null): string {
  * SignUpScreen): name, a username they can change (suggested from the name
  * until they edit it), birthday, email and password. Under 13 is refused
  * before any account exists. Google and Apple skip the form; PersonalGate
- * then asks their username and, like everyone, the details ("About you").
+ * then asks their name and username ("Your name and username") and, like
+ * everyone, the details ("About you").
  */
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const router = useRouter();
@@ -83,7 +102,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const signUp = mode === "sign-up";
-  const shownUsername = usernameEdited ? username : suggestUsername(`${first} ${last}`);
+  const shownUsername = usernameEdited ? username : suggestUsername(joinPersonName(first, last));
   const check = useUsernameCheck(signUp ? shownUsername : "", null);
 
   // Not while sign-up is still claiming the username.
@@ -136,17 +155,25 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     const ageProblem = signUpBirthDateProblem(birthDate);
     if (ageProblem) return fail(ageProblem, "su-birth");
     if (!email.trim().includes("@")) return fail("Enter your email address.", "su-email");
-    if (password.length < 6) return fail("Use a password of at least 6 characters.", "su-password");
+    const passwordIssue = passwordProblem(password);
+    if (passwordIssue) return fail(passwordIssue, "su-password");
     signupDraft.setBirthDate(birthDate);
+    signupDraft.setName(first, last);
     void run(async () => {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      await updateProfile(cred.user, { displayName: `${first.trim()} ${last.trim()}` });
+      await updateProfile(cred.user, { displayName: joinPersonName(first, last) });
       try {
         await callApi(cred.user, "/v1/me/username", { method: "POST", body: { username: check.handle } });
       } catch (err) {
         // Taken in the meantime, or the API is down: the next step asks again.
         if (!(err instanceof ApiError)) throw err;
       }
+      // Kept (encrypted) so "About you" has it after a reload or on another
+      // device. Never holds up sign-up: if it fails (offline, an API without
+      // an encryption key, or under 13 by the server's date), the in-memory
+      // copy still fills the form, and its full save checks the age again.
+      const body: SignUpBirthDateInput = { birthDate };
+      await callApi(cred.user, "/v1/me/personal/birth-date", { method: "PUT", body }).catch(() => {});
     });
   }
 
@@ -272,11 +299,11 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         <div className="form-grid">
           <label>
             First name
-            <input id="su-first" value={first} onChange={(e) => setFirst(e.target.value)} autoComplete="given-name" maxLength={30} />
+            <input id="su-first" value={first} onChange={(e) => setFirst(e.target.value)} autoComplete="given-name" maxLength={personNameLimits.first} />
           </label>
           <label>
             Last name
-            <input id="su-last" value={last} onChange={(e) => setLast(e.target.value)} autoComplete="family-name" maxLength={30} />
+            <input id="su-last" value={last} onChange={(e) => setLast(e.target.value)} autoComplete="family-name" maxLength={personNameLimits.last} />
           </label>
         </div>
         <UsernameField
@@ -323,12 +350,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           <input
             id="su-password"
             type="password"
-            minLength={6}
+            minLength={passwordMinLength}
+            maxLength={passwordMaxLength}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
           />
-          <small className="muted">At least 6 characters.</small>
+          <PasswordHints password={password} />
         </label>
         {alerts}
         <button className="btn btn-primary" type="submit" disabled={busy}>

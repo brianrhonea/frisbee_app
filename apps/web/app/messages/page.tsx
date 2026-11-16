@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
-import { GetTheApp } from "@/components/GetTheApp";
+import { Suspense } from "react";
+import { Messages } from "@/components/Messages";
+import { MembersOnly } from "@/components/MembersOnly";
 
 export const metadata: Metadata = { title: "Messages" };
 
-/** The Messages tab: messages are app-only until the website gets them. */
-export default function Messages() {
+/** The Messages tab: direct and group conversations beside the open one. */
+export default function MessagesPage() {
   return (
-    <GetTheApp title="Messages are in the app">
-      <p className="lead">Direct messages and team chat are in the Stall 10 app for now. They&apos;re coming to the web.</p>
-    </GetTheApp>
+    <div className="page page-wide">
+      <header className="page-head">
+        <h1>Messages</h1>
+      </header>
+      <MembersOnly next="/messages" what="Sign up free or log in to message players and groups.">
+        <Suspense>
+          <Messages />
+        </Suspense>
+      </MembersOnly>
+    </div>
   );
 }

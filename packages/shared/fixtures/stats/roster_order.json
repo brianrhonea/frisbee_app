@@ -1,0 +1,59 @@
+{
+  "about": "RosterPlayer.compareRoster (sortPlayers): by number, no number last, then name.",
+  "cases": [
+    {
+      "players": [
+        {
+          "id": "p0",
+          "name": "bob",
+          "number": 7
+        },
+        {
+          "id": "p1",
+          "name": "Alice",
+          "number": null
+        },
+        {
+          "id": "p2",
+          "name": "alice",
+          "number": null
+        },
+        {
+          "id": "p3",
+          "name": "Émile",
+          "number": 3
+        },
+        {
+          "id": "p4",
+          "name": "Zed",
+          "number": 3
+        },
+        {
+          "id": "p5",
+          "name": "Ann",
+          "number": 0
+        },
+        {
+          "id": "p6",
+          "name": "Cy",
+          "number": 99
+        },
+        {
+          "id": "p7",
+          "name": "Dee",
+          "number": null
+        }
+      ],
+      "expected": [
+        "p5",
+        "p4",
+        "p3",
+        "p0",
+        "p6",
+        "p1",
+        "p7",
+        "p2"
+      ]
+    }
+  ]
+}

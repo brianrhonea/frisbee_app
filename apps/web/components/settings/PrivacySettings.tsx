@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { MessagePolicySettings } from "./MessagePolicySettings";
+import { ReadReceiptsSetting } from "./ReadReceiptsSetting";
 import { searchTagsFor, useMyProfile } from "./useMyProfile";
 
 const sections = [
@@ -29,7 +30,7 @@ export function PrivacySettings() {
     try {
       await callApi(me, path, { method: "PUT", body });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't save. Try again.");
+      setError(problem(e, "Couldn't save. Try again."));
     } finally {
       setBusy(false);
     }
@@ -56,6 +57,7 @@ export function PrivacySettings() {
         </label>
       </div>
       <MessagePolicySettings />
+      <ReadReceiptsSetting />
       <div className="card">
         <h2 className="card-title">Show on my profile</h2>
         {sections.map(([key, label, hint]) => (

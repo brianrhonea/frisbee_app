@@ -8,14 +8,13 @@ import {
 } from "@stall10/shared";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { postState } from "@/lib/postState";
 import { useAuth } from "./AuthProvider";
 import { NavIcon } from "./NavIcons";
 import { postUrl, ShareButton } from "./ShareButton";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 
 /**
  * A post's likes, reposts and comments. Members like and repost here (a

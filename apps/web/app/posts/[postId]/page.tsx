@@ -4,7 +4,6 @@ import Link from "next/link";
 import { cache } from "react";
 import { LivePost } from "@/components/PostPage";
 import { getPublicOrNull, tags } from "@/lib/api";
-import { appScheme } from "@/lib/site";
 
 type Props = { params: Promise<{ postId: string }> };
 
@@ -40,12 +39,6 @@ export default async function PostRoute({ params }: Props) {
         </Link>
       </p>
       <LivePost postId={postId} initial={post} />
-      <div className="cta-card">
-        <p>See the replies in the Stall 10 app.</p>
-        <a className="btn btn-primary btn-small" href={`${appScheme}://open/p/${encodeURIComponent(postId)}`}>
-          Open in the app
-        </a>
-      </div>
     </div>
   );
 }

@@ -89,3 +89,27 @@ export function icsCalendar(a: { name: string; events: IcsEvent[]; now?: string;
   ];
   return `${lines.map(icsFold).join("\r\n")}\r\n`;
 }
+
+/**
+ * "Add to calendar": one event as a file, exactly as the app writes it
+ * (Ics.event in apps/mobile/lib/utils/ics.dart): no calendar name, so
+ * calendar apps add it to an existing calendar, and stamped [now].
+ */
+export function icsEvent(e: Omit<IcsEvent, "updatedAt">, now: string = new Date().toISOString()): string {
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Stall 10//Calendar//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    ...eventLines({ ...e, updatedAt: null }, now),
+    "END:VCALENDAR",
+  ];
+  return `${lines.map(icsFold).join("\r\n")}\r\n`;
+}
+
+/** A file name for [title]: "Track session.ics" (Ics.fileName). */
+export function icsFileName(title: string): string {
+  const clean = title.replace(/[^\w -]+/g, "").trim();
+  return `${clean.slice(0, 60) || "event"}.ics`;
+}

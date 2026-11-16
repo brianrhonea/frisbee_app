@@ -5,6 +5,7 @@ import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/data/services/push_service.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
+import 'package:frisbee_app/ui/core/ui/brand.dart';
 import 'package:frisbee_app/ui/core/ui/disc_icon.dart';
 import 'package:frisbee_app/ui/notifications/view_models/notification_settings_viewmodel.dart';
 import 'package:frisbee_app/ui/notifications/view_models/notifications_viewmodel.dart';
@@ -180,16 +181,27 @@ void main() {
       expect(row.height, lessThan(64));
     });
 
-    testWidgets('the top bar button is a disc, with an unread dot', (
+    testWidgets('the top bar button is a bell, with an unread dot', (
       tester,
     ) async {
       await tester.pumpWidget(
         const MaterialApp(home: Scaffold(body: NotificationsButton(count: 2))),
       );
       expect(find.byTooltip('Notifications'), findsOneWidget);
-      expect(find.byType(DiscIcon), findsOneWidget);
-      expect(find.byIcon(Icons.notifications_none_rounded), findsNothing);
+      expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
+      expect(find.byType(DiscIcon), findsNothing);
       expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
+    });
+
+    testWidgets('the phone top bar shows the name without the logo', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(appBar: MobileTopBar())),
+      );
+      expect(find.text('Stall 10'), findsOneWidget);
+      expect(find.byType(AppLogo), findsNothing);
+      expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
     });
 
     testWidgets('tapping an entry opens it and clears it', (tester) async {

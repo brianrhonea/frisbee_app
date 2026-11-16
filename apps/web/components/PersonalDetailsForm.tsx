@@ -11,11 +11,12 @@ import {
   personalDetailsProblem,
   personalDetailsSchema,
   personalLimits,
+  splitDisplayName,
   tooYoungMessage,
 } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import { type FormEvent, useMemo, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { ApiError, callApi, problem } from "@/lib/client";
 
 /** Countries offered first; any other ISO code can be typed under "Other". */
 const countryCodes = [
@@ -57,11 +58,15 @@ type Form = {
   gPhone: string;
 };
 
-function initialForm(d: PersonalDetails | null, prefill: { name?: string | null; birthDate?: string }): Form {
-  const [first = "", ...rest] = (prefill.name ?? "").trim().split(/\s+/);
+/** Where a new form starts: the names just typed, else the profile name split. */
+type Prefill = { name?: string | null; first?: string; last?: string; birthDate?: string };
+
+function initialForm(d: PersonalDetails | null, prefill: Prefill): Form {
+  const split = splitDisplayName(prefill.name);
+  const typed = prefill.first || prefill.last;
   return {
-    legalFirstName: d?.legalFirstName ?? first,
-    legalLastName: d?.legalLastName ?? rest.join(" "),
+    legalFirstName: d?.legalFirstName ?? (typed ? (prefill.first ?? "") : split.first),
+    legalLastName: d?.legalLastName ?? (typed ? (prefill.last ?? "") : split.last),
     birthDate: d?.birthDate ?? prefill.birthDate ?? "",
     phone: d?.phone ?? "",
     gender: d?.gender ?? "",
@@ -110,7 +115,7 @@ export function PersonalDetailsForm({
   user: User;
   email: string | null;
   initial: PersonalDetails | null;
-  prefill?: { name?: string | null; birthDate?: string };
+  prefill?: Prefill;
   submitLabel?: string;
   onSaved?: () => void;
   /** The API refused them for being under 13. */
@@ -176,8 +181,8 @@ export function PersonalDetailsForm({
       for (const i of parsed.error.issues) fields[i.path.join(".") || "_"] ??= i.message;
       return showErrors(fields);
     }
-    const problem = personalDetailsProblem(parsed.data, today);
-    if (problem) return showErrors({ [problem.field]: problem.message });
+    const wrong = personalDetailsProblem(parsed.data, today);
+    if (wrong) return showErrors({ [wrong.field]: wrong.message });
     setBusy(true);
     try {
       await callApi(user, "/v1/me/personal", { method: "PUT", body: body() });
@@ -188,7 +193,7 @@ export function PersonalDetailsForm({
         if (onTooYoung) return onTooYoung();
       }
       if (err instanceof ApiError && err.fields) showErrors(err.fields);
-      else setErrors({ _: err instanceof ApiError ? err.message : "Couldn't save. Try again." });
+      else setErrors({ _: problem(err, "Couldn't save. Try again.") });
     } finally {
       setBusy(false);
     }

@@ -20,6 +20,8 @@ export type OrgDoc = {
 
 export type TeamDoc = {
   kind?: string;
+  /** Competition level; "club" (or none) on a team makes it a club team. */
+  level?: string;
   ownerId?: string;
   members?: Record<string, string>;
   memberIds?: string[];
@@ -38,6 +40,16 @@ export type TeamDoc = {
 };
 
 export const isOrg = (d: { kind?: string } | undefined): boolean => d?.kind === "organization";
+
+/**
+ * A club team (isClubTeam in packages/shared/src/team.ts): a team at the
+ * club level. They're for players 16 and over, and only the API can read
+ * a date of birth (it's encrypted with a key these functions don't have),
+ * so the community never adds anyone to one: its people join with an
+ * invite or code, where the API checks their age.
+ */
+export const isClubTeam = (t: { kind?: string; level?: string } | undefined): boolean =>
+  !!t && (t.kind == null || t.kind === "team") && (t.level == null || t.level === "club");
 
 /** Community members holding any of [roles]. */
 export function holders(org: OrgDoc | undefined, roles: string[] | undefined): Set<string> {
@@ -89,7 +101,8 @@ export function planOrgChange(before: OrgDoc | undefined, after: OrgDoc | undefi
 /**
  * The team doc update that adds [add] (as players, unless already on the
  * team) and removes [remove] (only those the community added, never the
- * owner), or null if nothing changes.
+ * owner), or null if nothing changes. A club team gains no one this way
+ * (see [isClubTeam]); removing still works.
  */
 export function membershipUpdate(
   team: TeamDoc,
@@ -106,7 +119,7 @@ export function membershipUpdate(
   const orgMembers = new Set(team.orgMembers ?? []);
   let changed = false;
 
-  for (const uid of add) {
+  for (const uid of isClubTeam(team) ? [] : add) {
     if (memberIds.includes(uid)) continue;
     members[uid] = "player";
     memberIds.push(uid);

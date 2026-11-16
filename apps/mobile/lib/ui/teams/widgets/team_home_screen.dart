@@ -290,20 +290,14 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           );
         }
       case _MenuAction.delete:
-        if (await confirmDialog(
-          context,
-          title: 'Delete ${team.name}?',
-          message: team.isCommunity
-              ? 'This permanently deletes the group, its events, '
-                    'tournaments, chat and posts.'
-              : 'This permanently deletes the team, its roster, events, '
-                    'posts and playbook.',
-          confirmLabel: 'Delete',
-          destructive: true,
-        )) {
-          if (!mounted) return;
+        // As on the website: they type the name to confirm.
+        final typed = await showDialog<String>(
+          context: context,
+          builder: (_) => _DeleteTeamDialog(team: team),
+        );
+        if (typed != null && mounted) {
           _showDeleting(team.name);
-          vm.deleteTeam.execute();
+          vm.deleteTeam.execute(typed);
         }
     }
   }
@@ -644,6 +638,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 main: [
                   _about(summary),
                   if (!vm.isMember) _joinCard(summary),
+                  if (vm.youthRosterPrivate) const YouthRosterNote(),
                   if (vm.contentError != null)
                     Text(
                       errorMessage(vm.contentError),
@@ -662,6 +657,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 narrow: [
                   _about(summary),
                   if (!vm.isMember) _joinCard(summary),
+                  if (vm.youthRosterPrivate) const YouthRosterNote(),
                   ..._events(context),
                   ..._tournaments(context),
                   if (team != null) _MembersCard(team: team),
@@ -1203,7 +1199,7 @@ FollowControl? _followOf(TeamHomeViewModel vm) => switch (vm.follow) {
 };
 
 /// The buttons under the team's name: its community, [follow], Message and
-/// Invite.
+/// Invite (with a badge counting join requests).
 List<Widget> _teamActions(
   BuildContext context,
   TeamHomeViewModel vm,
@@ -1227,7 +1223,16 @@ List<Widget> _teamActions(
   if (vm.team case final team? when vm.canManageMembers)
     FilledButton.icon(
       onPressed: () => showInviteMembers(context, team),
-      icon: const Icon(Icons.person_add_alt, size: 18),
+      // The badge counts people asking to join; they're in the dialog too.
+      // On the icon, so the button keeps its size in the phone's row.
+      icon: Badge(
+        isLabelVisible: vm.joinRequestCount > 0,
+        label: Text(
+          vm.joinRequestCount > 99 ? '99+' : '${vm.joinRequestCount}',
+          semanticsLabel: '${vm.joinRequestCount} asking to join',
+        ),
+        child: const Icon(Icons.person_add_alt, size: 18),
+      ),
       label: Text(summary.isCommunity ? 'Invite members' : 'Invite players'),
     ),
 ];
@@ -1888,6 +1893,26 @@ class _JoinCard extends StatelessWidget {
 }
 
 /// Join (or ask to join) a community group.
+/// In place of a youth team's roster for anyone who isn't on it (the
+/// website says the same).
+class YouthRosterNote extends StatelessWidget {
+  const YouthRosterNote({super.key});
+
+  static const text =
+      'Rosters of youth teams are private: only members see them.';
+
+  @override
+  Widget build(BuildContext context) => const SectionCard(
+    child: Row(
+      children: [
+        Icon(Icons.shield_outlined),
+        SizedBox(width: 12),
+        Expanded(child: Text(text)),
+      ],
+    ),
+  );
+}
+
 class _GroupJoinCard extends StatelessWidget {
   const _GroupJoinCard({
     required this.requiresApproval,
@@ -2051,4 +2076,83 @@ class _DeletingDialog extends StatelessWidget {
       );
     },
   );
+}
+
+/// Asks the owner to type [team]'s name before deleting it; pops with what
+/// they typed once it matches.
+class _DeleteTeamDialog extends StatefulWidget {
+  const _DeleteTeamDialog({required this.team});
+
+  final Team team;
+
+  @override
+  State<_DeleteTeamDialog> createState() => _DeleteTeamDialogState();
+}
+
+class _DeleteTeamDialogState extends State<_DeleteTeamDialog> {
+  final _name = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  bool get _matches => deleteNameMatches(widget.team.name, _name.text);
+
+  void _confirm() {
+    if (_matches) Navigator.pop(context, _name.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final team = widget.team;
+    final scheme = Theme.of(context).colorScheme;
+    return AlertDialog(
+      scrollable: true,
+      title: Text('Delete ${team.name}?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            team.isCommunity
+                ? 'This permanently deletes the ${team.kind.noun}, its '
+                      'events, tournaments, chat and posts, for everyone. '
+                      "It can't be undone."
+                : 'This permanently deletes the team, its roster, events, '
+                      "posts and playbook, for everyone. It can't be undone.",
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _name,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              labelText: 'Type ${team.name} to confirm',
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _confirm(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.error,
+            foregroundColor: scheme.onError,
+          ),
+          onPressed: _matches ? _confirm : null,
+          child: const Text('Delete'),
+        ),
+      ],
+    );
+  }
 }

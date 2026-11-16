@@ -109,34 +109,47 @@ see `docs/ios-release.md`. Pushes that don't touch `apps/mobile/` or
 
 ## Website
 
-Today: Firebase Hosting serves `firebase/build/site` (gitignored), built by
-`firebase/scripts/build_site.sh` (firebase.json predeploy): the Flutter web
-app (`apps/mobile/lib/main_web.dart`, `lib/routing/web_router.dart`,
-`lib/ui/web/`, `lib/ui/browse/`) at `/`, and the static pages in
-`firebase/hosting/` (`/about`, `/help`, `/terms`, `/privacy`, `/cookies`,
-invite fallbacks) beside it. Signed-out visitors browse the community
-feed, search, public profiles, team pages and events through the `browse`
-Cloud Functions (allow-listed public fields, rate-limited per hashed IP;
-Firestore rules stay sign-in-only), and liking, following or joining asks
-them to sign up. Members get their home feed and the app's screens; other
-paths show "get the app". The legal pages are drafts: fill in the
-[bracketed] details and get them reviewed before launch.
+The website is `apps/web` (Next.js on Vercel; see `apps/web/README.md`).
+Signed-out visitors read the public pages through the API's
+`/v1/public/*`; members use the member area. Its env lives in the
+gitignored `apps/web/.env.local` (template `.env.example`). The old
+Flutter web site (`lib/main_web.dart`, `lib/ui/web`, `lib/ui/browse`) was
+removed from the app.
+
+Firebase Hosting now serves only static pages: `firebase/build/site`
+(gitignored), copied from `firebase/hosting/` by
+`firebase/scripts/build_site.sh` (firebase.json predeploy): `/about`,
+`/help`, `/terms`, `/privacy`, `/cookies`, `/delete-account`, the invite
+fallbacks (`/join/…`, `/g/…`, `/p/…`) and `.well-known/`. Nothing is
+compiled, so hosting deploys need no API key. The legal pages are drafts:
+fill in the [bracketed] details and get them reviewed before launch.
 
 ```
-cd apps/mobile && flutter run -d chrome -t lib/main_web.dart --dart-define-from-file=secrets.local.json
 bash firebase/scripts/build_site.sh && cd firebase && firebase emulators:start --only hosting
 ```
 
-Phase 3 replaces it with `apps/web` (Next.js on Vercel; see
-`apps/web/README.md`): the public pages are ported and read through the
-API's `/v1/public/*`; the member area is next. Its env lives in the
-gitignored `apps/web/.env.local` (template `.env.example`). Store URLs are
-placeholders in `apps/mobile/lib/config/store_links.dart`,
-`apps/web/lib/site.ts` and `firebase/hosting/about.html` / `join.html`
-(and `apps/web/content/about.html`); keep them in step. The
-deploy workflow builds the site from the `FIREBASE_WEB_API_KEY_DEV` /
-`_PROD` repository secrets and skips hosting without them. The web API key
-ends up in public JS (normal for Firebase web), so never commit `build/`.
+Store URLs are placeholders in `apps/web/lib/site.ts` and
+`firebase/hosting/about.html` / `join.html` (and
+`apps/web/content/about.html`); keep them in step. Never commit `build/`.
+
+## Platform parity: web and mobile are the same product
+
+The website (`apps/web`) and the app (`apps/mobile`) must have exactly the
+same features and behaviour; only the design differs. Someone who only
+ever uses one of them must be able to do everything.
+
+- Any feature change on one platform (new feature, changed behaviour,
+  rule, limit, validation, wording of what happens) is made on the other
+  platform in the same piece of work. Don't finish a change on only one.
+- Keep each platform's own design: the app follows its Flutter design
+  decisions, the website its web design (`apps/web/app/app.css` tokens and
+  components). Don't copy one platform's look onto the other.
+- Shared behaviour lives in one place where possible: API endpoints and
+  `packages/shared` schemas and limits both platforms use.
+- Checks cover both: when a feature has tests on one platform, add the
+  matching tests on the other, and keep `docs/product-spec.md` §8.1's
+  parity checklist up to date.
+- Bump both platforms' versions and changelogs when both change.
 
 ## Architecture
 
@@ -188,3 +201,11 @@ cd firebase/functions && npm run test:server   # callables against the emulator
 After changing what a new team starts with or the team-name rules, refresh
 the shared fixtures (`flutter test test/data/shared_fixtures_test.dart
 --dart-define=UPDATE_FIXTURES=true` in `apps/mobile`) and rerun `pnpm test`.
+
+The app also writes cross-language test vectors to
+`packages/shared/fixtures/<area>/` (tournament engine, stats, playbook,
+drafts, Discord, calendar files), which the TypeScript ports are tested
+against. After changing any of that logic on either side, refresh them
+(`flutter test test/shared_fixtures --dart-define=UPDATE_FIXTURES=true` in
+`apps/mobile`), review the diff, and rerun `pnpm test` and the functions
+tests.

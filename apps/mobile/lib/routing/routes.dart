@@ -2,18 +2,6 @@ import '../domain/models/schedule_entry.dart';
 import '../domain/models/team_event.dart';
 
 abstract final class Routes {
-  // The website's own pages (web_router.dart). The rest of its paths are
-  // the app's, so links work in both.
-
-  /// Everyone's newest public posts; where signed-out visitors land.
-  static const community = '/community';
-
-  /// Public team events and group tournaments still to come.
-  static const upcomingEvents = '/events';
-
-  /// Download links for the apps.
-  static const getTheApp = '/get-the-app';
-
   static const signIn = '/sign-in';
   static const signUp = '/sign-up';
 
@@ -69,11 +57,13 @@ abstract final class Routes {
 
   static const explorePath = '/explore';
 
-  /// Stall 10's team rankings; [key] ("club-mixed") picks the division.
+  /// Stall 10's rankings, as the website links them: [query] is
+  /// `{level: club, division: mixed}` for a team ranking, or
+  /// `{kind: players}`. The old `?d=club-mixed` still opens.
   static const rankingsPath = '/rankings';
-  static String rankings([String? key]) => Uri(
+  static String rankings([Map<String, String>? query]) => Uri(
     path: rankingsPath,
-    queryParameters: key == null ? null : {'d': key},
+    queryParameters: query == null || query.isEmpty ? null : query,
   ).toString();
 
   /// Everything the user follows, with each bell.

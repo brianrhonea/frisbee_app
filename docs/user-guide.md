@@ -8,12 +8,18 @@ version 0.0.12. What changed in each version is in
 ## Getting started
 
 1. **Sign up** with your first and last name, a **username**, your email
-   and a password (twice), or with Google or Apple. (Google and Apple
-   aren't available on Windows.)
+   and a password (twice), or with Google or Apple.
    - Your **username** is how people find and message you, as @name. It's
      3–20 lowercase letters, numbers, `_` or `.`, and only one person can
-     have each; the form tells you as you type if it's taken. Signing up
-     with Google or Apple asks you to pick one before you start.
+     have each; the form tells you as you type if it's taken.
+   - Signing up with **Google or Apple** first asks **Your name and
+     username**: your first and last name (filled in from Google or
+     Apple when they share it; Apple lets you hide it), which is the name
+     on your profile, posts and team rosters, and a username suggested
+     from your name until you change it.
+   - Then **About you**: your legal name (started from the name you just
+     gave), date of birth, gender, phone and address, and a parent or
+     guardian under 18. Only you see these.
    - **Passwords** need at least 8 characters with a letter and a number,
      and can't be a common password. The bar under the box shows how
      strong it is; the eye shows what you typed.
@@ -26,6 +32,11 @@ version 0.0.12. What changed in each version is in
    - **Invite link**: tap a link someone sent you (in Messages, WhatsApp,
      email or a Stall 10 message). It opens Stall 10 and shows the team;
      tap **Join**. Links expire (1 hour to 30 days, the sender picks).
+   - **Club teams are for players 16 and over.** To join one, or start
+     one, you need to be 16 that day, with your date of birth in
+     **About you**. Other levels and groups are open to
+     everyone. Anyone can be invited to a club team; accepting checks
+     your age, and the invite waits until you can.
    - **Create team**: you become its owner. Show the invite code or share
      an invite link from the team's **Members** page.
    Sign in later with your email **or** your @username.
@@ -160,8 +171,8 @@ open, new ones also pop up as a small bubble at the top.
 Notifications):
 
 - **This device**: tap **Turn on** to get push notifications on your phone,
-  tablet or Mac, even when Stall 10 is closed. Windows has no push, but
-  everything still shows under the 🔔.
+  or tablet, even when Stall 10 is closed. Everything also shows under
+  the 🔔.
 - **Notify me about**: turn each kind on or off for all your teams. Your
   choices apply on every device you use.
 - **Teams**: change any kind for one team, for example reminders only for
@@ -336,7 +347,8 @@ with a men's team and a women's team. Start one from Teams → **New** →
   onto it (say Woof Captain, Woof Coach, Woof Player for Woof). People
   with one of those roles join the team automatically, and leave it when
   the role is taken away. Teams show **Joining…** for a moment while
-  that happens.
+  that happens. Club teams (16 and over) don't take anyone from roles:
+  invite their players instead.
 - **Events**: a community event can be for everyone or only some roles
   (**Who sees it** in the event editor).
 - **Discord import**: importing a server into the community sorts its
@@ -454,7 +466,7 @@ but only to the people invited.
   in the lobby and in the call, and tap **Admit** or **Deny**.
 - **In the call** you'll see everyone's camera, or their photo when it's
   off; a green border shows who's talking. The buttons along the bottom:
-  mic, camera, mute all sound, share screen (Windows, Mac and Android),
+  mic, camera, mute all sound, share screen (Android),
   chat, settings and **Leave**. Admins can also **End for everyone**.
 - **Chat** lets you type instead of unmuting. Only people in the call can
   read it.

@@ -5,6 +5,13 @@ import { type Data, type Doc, plain } from "../browse/repository.js";
 const inLimit = 30;
 
 /**
+ * Follows read per feed: the follows rule has no count cap, so a feed
+ * never reads more than this many of each kind (and so runs at most
+ * followReadLimit / 30 queries a source).
+ */
+export const followReadLimit = 300;
+
+/**
  * Raw reads for the caller's own dashboard. Every read is one the caller
  * may make under firestore.rules (the service checks the rest); values come
  * back with Timestamps as ISO strings.
@@ -15,8 +22,10 @@ export interface MeRepository {
   privateDetails(uid: string): Promise<Data | null>;
   /** Teams listing [uid] in memberIds (rules: members read their teams). */
   teamsOf(uid: string, limit: number): Promise<Doc[]>;
-  /** A team's events from [now], soonest first. */
+  /** A team's events starting at or after [now] ms, soonest first. */
   upcomingEvents(teamId: string, now: number, limit: number): Promise<Doc[]>;
+  /** A team's events that started in [since, now) ms, latest first (some may be under way). */
+  startedEvents(teamId: string, since: number, now: number, limit: number): Promise<Doc[]>;
   /** Ids of the people [uid] follows (users/{uid}/follows, type user). */
   followedUsers(uid: string): Promise<string[]>;
   /** Newest posts by [authors] before [before] ms if given, merged. */
@@ -25,6 +34,18 @@ export interface MeRepository {
   post(id: string): Promise<Doc | null>;
   /** Several profiles by uid (missing ones left out). */
   profiles(ids: string[]): Promise<Map<string, Data>>;
+  /**
+   * The follow keys of the tournaments [uid] follows (users/{uid}/follows,
+   * type tournament). Optional: without it the home feed leaves out posts
+   * tagged with followed tournaments.
+   */
+  followedTournaments?(uid: string): Promise<string[]>;
+  /**
+   * Newest posts whose [field] is one of [values] (the app's HomeFeed
+   * sources: tournamentKey, or event.teamId for events shared from the
+   * caller's teams), before [before] ms if given, merged.
+   */
+  postsWhereIn?(field: "tournamentKey" | "event.teamId", values: string[], before: number | null, limit: number): Promise<Doc[]>;
 }
 
 const doc = (d: { id: string; data: () => Data | undefined }): Doc => ({ id: d.id, data: plain(d.data() ?? {}) as Data });
@@ -60,8 +81,19 @@ export class FirestoreMeRepository implements MeRepository {
     return snap.docs.map(doc);
   }
 
+  async startedEvents(teamId: string, since: number, now: number, limit: number) {
+    const snap = await this.db
+      .collection(`teams/${teamId}/events`)
+      .where("startsAt", ">=", Timestamp.fromMillis(since))
+      .where("startsAt", "<", Timestamp.fromMillis(now))
+      .orderBy("startsAt", "desc")
+      .limit(limit)
+      .get();
+    return snap.docs.map(doc);
+  }
+
   async followedUsers(uid: string) {
-    const snap = await this.db.collection(`users/${uid}/follows`).where("type", "==", "user").get();
+    const snap = await this.db.collection(`users/${uid}/follows`).where("type", "==", "user").limit(followReadLimit).get();
     return snap.docs.map((d) => d.get("targetId")).filter((id): id is string => typeof id === "string" && id !== "");
   }
 
@@ -77,14 +109,23 @@ export class FirestoreMeRepository implements MeRepository {
     return new Map(snaps.filter((s) => s.exists).map((s) => [s.id, plain(s.data()) as Data]));
   }
 
-  async postsBy(authors: string[], before: number | null, limit: number) {
-    const unique = [...new Set(authors)];
+  async followedTournaments(uid: string) {
+    const snap = await this.db.collection(`users/${uid}/follows`).where("type", "==", "tournament").limit(followReadLimit).get();
+    return snap.docs.map((d) => d.get("key") ?? d.id).filter((k): k is string => typeof k === "string" && k.startsWith("tournament_"));
+  }
+
+  postsBy(authors: string[], before: number | null, limit: number) {
+    return this.postsWhereIn("authorId", authors, before, limit);
+  }
+
+  // Indexes: posts (authorId | tournamentKey | event.teamId, createdAt desc), as the app's feed uses.
+  async postsWhereIn(field: "authorId" | "tournamentKey" | "event.teamId", values: string[], before: number | null, limit: number) {
+    const unique = [...new Set(values)];
     const chunks: string[][] = [];
     for (let i = 0; i < unique.length; i += inLimit) chunks.push(unique.slice(i, i + inLimit));
-    // Index: posts (authorId, createdAt desc), as the app's feed uses.
     const snaps = await Promise.all(
       chunks.map((ids) => {
-        let q = this.db.collection("posts").where("authorId", "in", ids).orderBy("createdAt", "desc");
+        let q = this.db.collection("posts").where(field, "in", ids).orderBy("createdAt", "desc");
         if (before) q = q.startAfter(Timestamp.fromMillis(before));
         return q.limit(limit).get();
       }),

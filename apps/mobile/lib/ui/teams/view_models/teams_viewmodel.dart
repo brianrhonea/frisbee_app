@@ -30,6 +30,34 @@ class TeamsViewModel extends ChangeNotifier {
   /// Invitations from owners and organizers, newest first.
   List<TeamInvite> get invites => _invites;
 
+  /// Listings of invited teams, to tell club teams (16 and over) apart.
+  final _inviteListings = <String, StreamSubscription<TeamListing?>>{};
+  final _clubInvites = <String>{};
+
+  /// Whether [invite] is to a club team, which is for players 16 and over
+  /// (shown on the invite; the API checks their age when they accept).
+  bool isClubInvite(TeamInvite invite) => _clubInvites.contains(invite.teamId);
+
+  void _watchInviteListings() {
+    final ids = {
+      for (final i in _invites)
+        if (!i.isCommunity) i.teamId,
+    };
+    for (final id in _inviteListings.keys.toList()) {
+      if (ids.contains(id)) continue;
+      _inviteListings.remove(id)?.cancel();
+      _clubInvites.remove(id);
+    }
+    for (final id in ids) {
+      _inviteListings[id] ??= _teams.watchListing(id).listen((l) {
+        final club = l?.isClubTeam ?? false;
+        if (club == _clubInvites.contains(id)) return;
+        club ? _clubInvites.add(id) : _clubInvites.remove(id);
+        notifyListeners();
+      }, onError: (Object _) {});
+    }
+  }
+
   /// Joins the invite's team; result value is the team id.
   late final Command1<String, TeamInvite> acceptInvite;
 
@@ -87,6 +115,7 @@ class TeamsViewModel extends ChangeNotifier {
     _invitesSub?.cancel();
     _invitesSub = _teams.watchMyInvites(user.uid).listen((invites) {
       _invites = invites;
+      _watchInviteListings();
       notifyListeners();
     }, onError: (Object _) {});
     _loading = true;
@@ -136,6 +165,9 @@ class TeamsViewModel extends ChangeNotifier {
   void dispose() {
     _sub?.cancel();
     _invitesSub?.cancel();
+    for (final s in _inviteListings.values) {
+      s.cancel();
+    }
     super.dispose();
   }
 }

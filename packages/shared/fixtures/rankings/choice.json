@@ -1,0 +1,458 @@
+{
+  "about": "RankingChoice.wantFromQuery(query) then RankingChoice.choose(keys, want): the Rankings page's Level and Division filters, their options and default. Youth is never ranked.",
+  "cases": [
+    {
+      "name": "nothing ranked",
+      "keys": [],
+      "query": {},
+      "want": {
+        "level": null,
+        "division": null
+      },
+      "choice": null
+    },
+    {
+      "name": "the default is Club Mixed",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open"
+      ],
+      "query": {},
+      "want": {
+        "level": null,
+        "division": null
+      },
+      "choice": {
+        "key": "club-mixed",
+        "level": "club",
+        "division": "mixed",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "mixed",
+          "open"
+        ]
+      }
+    },
+    {
+      "name": "without Club Mixed, the first by level then division",
+      "keys": [
+        "pickup-open",
+        "college-women",
+        "club-open"
+      ],
+      "query": {},
+      "want": {
+        "level": null,
+        "division": null
+      },
+      "choice": {
+        "key": "club-open",
+        "level": "club",
+        "division": "open",
+        "levels": [
+          "club",
+          "college",
+          "pickup"
+        ],
+        "divisions": [
+          "open"
+        ]
+      }
+    },
+    {
+      "name": "a level and division with data",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open"
+      ],
+      "query": {
+        "level": "college",
+        "division": "women"
+      },
+      "want": {
+        "level": "college",
+        "division": "women"
+      },
+      "choice": {
+        "key": "college-women",
+        "level": "college",
+        "division": "women",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "women"
+        ]
+      }
+    },
+    {
+      "name": "a level whose division has no data: its first division",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open"
+      ],
+      "query": {
+        "level": "college",
+        "division": "mixed"
+      },
+      "want": {
+        "level": "college",
+        "division": "mixed"
+      },
+      "choice": {
+        "key": "college-women",
+        "level": "college",
+        "division": "women",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "women"
+        ]
+      }
+    },
+    {
+      "name": "a level alone",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open"
+      ],
+      "query": {
+        "level": "pickup"
+      },
+      "want": {
+        "level": "pickup",
+        "division": null
+      },
+      "choice": {
+        "key": "pickup-open",
+        "level": "pickup",
+        "division": "open",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "open"
+        ]
+      }
+    },
+    {
+      "name": "a division alone: the first level that has it",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open"
+      ],
+      "query": {
+        "division": "women"
+      },
+      "want": {
+        "level": null,
+        "division": "women"
+      },
+      "choice": {
+        "key": "college-women",
+        "level": "college",
+        "division": "women",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "women"
+        ]
+      }
+    },
+    {
+      "name": "a level that lacks the division asked for keeps the level",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open"
+      ],
+      "query": {
+        "level": "pickup",
+        "division": "mixed"
+      },
+      "want": {
+        "level": "pickup",
+        "division": "mixed"
+      },
+      "choice": {
+        "key": "pickup-open",
+        "level": "pickup",
+        "division": "open",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "open"
+        ]
+      }
+    },
+    {
+      "name": "a level without data: the division asked for elsewhere",
+      "keys": [
+        "club-mixed",
+        "college-open"
+      ],
+      "query": {
+        "level": "league",
+        "division": "open"
+      },
+      "want": {
+        "level": "league",
+        "division": "open"
+      },
+      "choice": {
+        "key": "college-open",
+        "level": "college",
+        "division": "open",
+        "levels": [
+          "club",
+          "college"
+        ],
+        "divisions": [
+          "open"
+        ]
+      }
+    },
+    {
+      "name": "youth is never a level, even with data",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open",
+        "youth-mixed",
+        "youth-open"
+      ],
+      "query": {
+        "level": "youth",
+        "division": "open"
+      },
+      "want": {
+        "level": "youth",
+        "division": "open"
+      },
+      "choice": {
+        "key": "club-open",
+        "level": "club",
+        "division": "open",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "mixed",
+          "open"
+        ]
+      }
+    },
+    {
+      "name": "only youth: nothing ranked",
+      "keys": [
+        "youth-mixed"
+      ],
+      "query": {},
+      "want": {
+        "level": null,
+        "division": null
+      },
+      "choice": null
+    },
+    {
+      "name": "unknown and malformed keys are left out",
+      "keys": [
+        "elite-mixed",
+        "club-coed",
+        "club",
+        "club-mixed-x",
+        "league-open"
+      ],
+      "query": {
+        "level": "elite"
+      },
+      "want": {
+        "level": "elite",
+        "division": null
+      },
+      "choice": {
+        "key": "league-open",
+        "level": "league",
+        "division": "open",
+        "levels": [
+          "league"
+        ],
+        "divisions": [
+          "open"
+        ]
+      }
+    },
+    {
+      "name": "the old ?division=<key> link",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open"
+      ],
+      "query": {
+        "division": "college-women"
+      },
+      "want": {
+        "level": "college",
+        "division": "women"
+      },
+      "choice": {
+        "key": "college-women",
+        "level": "college",
+        "division": "women",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "women"
+        ]
+      }
+    },
+    {
+      "name": "the app's old ?d=<key> link",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open"
+      ],
+      "query": {
+        "d": "league-mixed"
+      },
+      "want": {
+        "level": "league",
+        "division": "mixed"
+      },
+      "choice": {
+        "key": "league-mixed",
+        "level": "league",
+        "division": "mixed",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "mixed"
+        ]
+      }
+    },
+    {
+      "name": "an old youth key reads as nothing asked for",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open",
+        "youth-open"
+      ],
+      "query": {
+        "division": "youth-open"
+      },
+      "want": {
+        "level": null,
+        "division": null
+      },
+      "choice": {
+        "key": "club-mixed",
+        "level": "club",
+        "division": "mixed",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "mixed",
+          "open"
+        ]
+      }
+    },
+    {
+      "name": "a level wins over an old key",
+      "keys": [
+        "club-mixed",
+        "club-open",
+        "college-women",
+        "league-mixed",
+        "pickup-open"
+      ],
+      "query": {
+        "level": "pickup",
+        "division": "club-mixed"
+      },
+      "want": {
+        "level": "pickup",
+        "division": null
+      },
+      "choice": {
+        "key": "pickup-open",
+        "level": "pickup",
+        "division": "open",
+        "levels": [
+          "club",
+          "college",
+          "league",
+          "pickup"
+        ],
+        "divisions": [
+          "open"
+        ]
+      }
+    }
+  ]
+}

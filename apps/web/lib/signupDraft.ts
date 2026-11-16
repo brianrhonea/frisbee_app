@@ -1,10 +1,14 @@
 "use client";
 /**
- * The birthday typed on /sign-up's first step, held in memory only (never
- * in browser storage) until the details form picks it up, so it isn't
- * asked twice. Gone on reload, when the form simply asks again.
+ * What sign-up's first step took (the birthday on /sign-up, and the first
+ * and last name from /sign-up or "Your name and username"), held in memory
+ * only (never in browser storage) until the details form picks them up,
+ * so they aren't asked twice. Gone on reload: the birthday then comes from
+ * the copy sign-up saved (encrypted) through `PUT /v1/me/personal/birth-date`,
+ * the name from the account's display name.
  */
 let birthDate: string | undefined;
+let name: { first: string; last: string } | undefined;
 
 export const signupDraft = {
   setBirthDate(value: string) {
@@ -14,6 +18,15 @@ export const signupDraft = {
   takeBirthDate(): string | undefined {
     const v = birthDate;
     birthDate = undefined;
+    return v;
+  },
+  setName(first: string, last: string) {
+    name = { first: first.trim(), last: last.trim() };
+  },
+  /** Read once. */
+  takeName(): { first: string; last: string } | undefined {
+    const v = name;
+    name = undefined;
     return v;
   },
 };

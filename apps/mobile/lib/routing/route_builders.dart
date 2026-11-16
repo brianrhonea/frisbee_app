@@ -18,6 +18,7 @@ import '../ui/home/view_models/home_viewmodel.dart';
 import '../ui/home/widgets/home_screen.dart';
 import '../ui/posts/view_models/post_detail_viewmodel.dart';
 import '../ui/posts/widgets/post_detail_screen.dart';
+import '../domain/models/ranking.dart';
 import '../ui/explore/view_models/explore_viewmodel.dart';
 import '../ui/explore/view_models/player_search_viewmodel.dart';
 import '../ui/explore/widgets/rankings_screen.dart';
@@ -39,8 +40,8 @@ import '../ui/personal/view_models/personal_prompt_viewmodel.dart';
 import '../ui/personal/widgets/personal_details_screen.dart';
 import '../ui/personal/widgets/personal_prompt_card.dart';
 
-// Pages that both the app's router (router.dart) and the website's
-// (web_router.dart) show, with their view models wired up once.
+// Pages the app's router (router.dart) shows, with their view models wired
+// up once.
 
 Widget signInPage() => ViewModelHost(
   create: (c) => SignInViewModel(authRepository: c.read()),
@@ -65,7 +66,10 @@ Widget personalDetailsPage({bool finishing = false}) => ViewModelHost(
 );
 
 Widget chooseUsernamePage() => ViewModelHost(
-  create: (c) => ChooseUsernameViewModel(authRepository: c.read()),
+  create: (c) => ChooseUsernameViewModel(
+    authRepository: c.read(),
+    personalRepository: c.read(),
+  ),
   builder: (_, vm) => ChooseUsernameScreen(viewModel: vm),
 );
 
@@ -90,20 +94,43 @@ Widget explorePage(GoRouterState state) => ViewModelHost(
   ),
 );
 
-ExploreViewModel exploreViewModel(BuildContext c, {String? ranking}) =>
-    ExploreViewModel(
-      tournamentRepository: c.read(),
-      rankingRepository: c.read(),
-      teamRepository: c.read(),
-      authRepository: c.read(),
-      initialRanking: ranking,
-    );
+ExploreViewModel exploreViewModel(
+  BuildContext c, {
+  bool rankingsPage = false,
+  RankingKind kind = RankingKind.teams,
+  String? level,
+  String? division,
+}) => ExploreViewModel(
+  tournamentRepository: c.read(),
+  rankingRepository: c.read(),
+  teamRepository: c.read(),
+  authRepository: c.read(),
+  rankingsPage: rankingsPage,
+  kind: kind,
+  level: level,
+  division: division,
+);
 
-/// Every division's ranking; `?d=club-mixed` opens on one.
+/// Team rankings by Level and Division (`?level=club&division=mixed`, as
+/// the website links them; the old `?d=club-mixed` and
+/// `?division=club-mixed` still work), or players (`?kind=players`, or the
+/// old `?d=players`).
 Widget rankingsPage(GoRouterState state) {
-  final key = state.uri.queryParameters['d'];
+  final q = state.uri.queryParameters;
+  final players = q['kind'] == 'players' || q['d'] == 'players';
+  final want = RankingChoice.wantFromQuery(
+    level: q['level'],
+    division: q['division'],
+    d: players ? null : q['d'],
+  );
   return ViewModelHost(
-    create: (c) => exploreViewModel(c, ranking: key),
+    create: (c) => exploreViewModel(
+      c,
+      rankingsPage: true,
+      kind: players ? RankingKind.players : RankingKind.teams,
+      level: want.level,
+      division: want.division,
+    ),
     builder: (_, vm) => RankingsScreen(viewModel: vm),
   );
 }

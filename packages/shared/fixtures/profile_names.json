@@ -124,5 +124,105 @@
       "normalized": "ok.name_1",
       "problem": null
     }
+  ],
+  "displayNames": [
+    {
+      "name": null,
+      "first": "",
+      "last": "",
+      "missing": true,
+      "suggestion": ""
+    },
+    {
+      "name": "",
+      "first": "",
+      "last": "",
+      "missing": true,
+      "suggestion": ""
+    },
+    {
+      "name": "   ",
+      "first": "",
+      "last": "",
+      "missing": true,
+      "suggestion": ""
+    },
+    {
+      "name": "Pat Lee",
+      "first": "Pat",
+      "last": "Lee",
+      "missing": false,
+      "suggestion": "pat.lee"
+    },
+    {
+      "name": "  Pat   Lee  ",
+      "first": "Pat",
+      "last": "Lee",
+      "missing": false,
+      "suggestion": "pat.lee"
+    },
+    {
+      "name": "Mary Ann Smith",
+      "first": "Mary",
+      "last": "Ann Smith",
+      "missing": false,
+      "suggestion": "mary.ann.smith"
+    },
+    {
+      "name": "Cher",
+      "first": "Cher",
+      "last": "",
+      "missing": false,
+      "suggestion": "cher"
+    },
+    {
+      "name": "Ana María López",
+      "first": "Ana",
+      "last": "María López",
+      "missing": false,
+      "suggestion": "ana.mar.a.l.pez"
+    },
+    {
+      "name": "pat@privaterelay.appleid.com",
+      "first": "",
+      "last": "",
+      "missing": true,
+      "suggestion": "pat.privaterelay.app"
+    },
+    {
+      "name": "Bartholomew-Maximilian-Fitzgerald-Wolfe Jr",
+      "first": "Bartholomew-Maximilian-Fitzger",
+      "last": "Jr",
+      "missing": false,
+      "suggestion": "bartholomew.maximili"
+    },
+    {
+      "name": "X Averyveryverylongsurnamethatgoesonandon",
+      "first": "X",
+      "last": "Averyveryverylongsurnamethatgo",
+      "missing": false,
+      "suggestion": "x.averyveryverylongs"
+    },
+    {
+      "name": "李 小龙",
+      "first": "李",
+      "last": "小龙",
+      "missing": false,
+      "suggestion": ""
+    },
+    {
+      "name": "O'Brien, Seán",
+      "first": "O'Brien,",
+      "last": "Seán",
+      "missing": false,
+      "suggestion": "o.brien.se.n"
+    },
+    {
+      "name": "admin",
+      "first": "admin",
+      "last": "",
+      "missing": false,
+      "suggestion": ""
+    }
   ]
 }

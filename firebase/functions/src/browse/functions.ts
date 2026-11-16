@@ -1,5 +1,6 @@
-// Read-only pages for signed-out visitors to the website, exported as the
-// `browse` group:
+// Read-only pages for the website's visitors, exported as the `browse`
+// group. Signed-out visitors get the community feed, posts and team pages;
+// profiles, events and search need a sign-in.
 //   firebase deploy --only functions:browse
 //
 // firestore.rules keep every read to signed-in users; these callables are
@@ -58,6 +59,15 @@ async function admit(req: CallableRequest): Promise<void> {
   }
 }
 
+/**
+ * Profiles, events and search are for signed-in members: visitors see only
+ * the community feed, posts and team pages (as on the Next.js website).
+ */
+async function admitMember(req: CallableRequest): Promise<void> {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in to see this.");
+  await admit(req);
+}
+
 const input = (req: CallableRequest): Data => (req.data && typeof req.data === "object" ? (req.data as Data) : {});
 
 /** Profiles by id, for checking who's private. */
@@ -110,7 +120,7 @@ export const post = onCall(options, async (req) => {
 
 /** A player's profile and, unless it's private, their newest posts. */
 export const profile = onCall(options, async (req) => {
-  await admit(req);
+  await admitMember(req);
   const { uid, before } = input(req);
   if (!validId(uid)) throw new HttpsError("invalid-argument", "No such player.");
   const db = getFirestore();
@@ -163,7 +173,7 @@ export const team = onCall(options, async (req) => {
  * private group, with each team's listing, and group tournaments.
  */
 export const events = onCall(options, async (req) => {
-  await admit(req);
+  await admitMember(req);
   const db = getFirestore();
   const now = Timestamp.now();
   const [eventSnap, tournamentSnap] = await Promise.all([
@@ -204,7 +214,7 @@ export const events = onCall(options, async (req) => {
  * profiles show only their card, as they do in the app.
  */
 export const search = onCall(options, async (req) => {
-  await admit(req);
+  await admitMember(req);
   const { kind, key: rawKey } = input(req);
   const key = searchKey(rawKey);
   if ((kind !== "players" && kind !== "teams") || !key) {

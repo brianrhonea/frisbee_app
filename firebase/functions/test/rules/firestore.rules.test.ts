@@ -67,10 +67,12 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const fs = ctx.firestore();
+    // College, so the direct joins below work: club teams (16 and over)
+    // are joined through the API only ("club teams" below).
     await setDoc(doc(fs, "teams", TEAM), {
       name: "Team",
       division: "mixed",
-      level: "club",
+      level: "college",
       city: "",
       ownerId: OWNER,
       members: {
@@ -103,6 +105,36 @@ describe("team create", () => {
 
   it("allows creating a team, with no invite code", async () => {
     await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam()));
+  });
+
+  it("refuses a league team's id, for teams and groups alike: only the server makes those", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "tournaments", "t1"), { hostId: "host1", teamEntry: true, status: "registration" }),
+    );
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "league_t1_team1"), newTeam()));
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "league_t1_team1"), newTeam({ leagueId: "t1" })));
+    await assertFails(
+      setDoc(doc(db(OUTSIDER), "teams", "league_t1_team2"), newTeam({ kind: "community", description: "", requiresApproval: false, location: null })),
+    );
+    // Nor can anyone forge the server's league host mark.
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t3"), newTeam({ leagueId: "t1", leagueHostId: "host1" })));
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "t3"), newTeam({ leagueId: "t1" })));
+    await assertSucceeds(
+      setDoc(doc(db(OUTSIDER), "teams", "t4"), newTeam({ kind: "community", description: "", requiresApproval: false, location: null })),
+    );
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "myleague_team"), newTeam()));
+  });
+
+  it("refuses starting a club team directly: the API checks the creator is 16 or over", async () => {
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam({ level: "club" })));
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam({ level: "club", orgId: "org1", orgName: "Org" })));
+    for (const level of ["college", "youth", "pickup"]) {
+      await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", `t-${level}`), newTeam({ level })));
+    }
+    // Groups at the club level aren't club teams.
+    await assertSucceeds(
+      setDoc(doc(db(OUTSIDER), "teams", "g1"), newTeam({ level: "club", kind: "community", description: "", requiresApproval: false, location: null })),
+    );
   });
 
   it("rejects a team that keeps an invite code on the team doc", async () => {
@@ -184,6 +216,8 @@ describe("a league's team", () => {
     await assertSucceeds(getDoc(doc(db(MATE), "teams", LEAGUE)));
     await assertFails(updateDoc(doc(db(MATE), "teams", LEAGUE), { name: "Mine" }));
     await assertFails(updateDoc(ref, { leagueId: "other" }));
+    // leagueHostId is the server's mark (createLeagueTeams checks it): never a client's.
+    await assertFails(updateDoc(ref, { leagueHostId: "other" }));
     await assertFails(updateDoc(ref, { ownerId: MATE }));
   });
 
@@ -277,6 +311,46 @@ describe("join", () => {
     });
     await assertFails(join("OLD234"));
     await assertFails(join("OLD777"));
+  });
+});
+
+describe("club teams (16 and over): joined through the API only", () => {
+  const joinUpdate = {
+    [`members.${OUTSIDER}`]: "player",
+    [`memberNames.${OUTSIDER}`]: "New Player",
+    memberIds: arrayUnion(OUTSIDER),
+  };
+  const toClub = (extra: Record<string, unknown> = { level: "club" }) =>
+    env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), "teams", TEAM), extra));
+  const invitePath = ["users", OUTSIDER, "teamInvites", TEAM] as const;
+
+  it("refuses joining one directly with a live code or link", async () => {
+    await toClub();
+    const fs = db(OUTSIDER);
+    await assertFails(
+      writeBatch(fs).set(doc(fs, "teams", TEAM, "joins", OUTSIDER), { code: CODE }).update(doc(fs, "teams", TEAM), joinUpdate).commit(),
+    );
+    // A team with no level reads as club, as the app reads it.
+    await toClub({ level: deleteField() });
+    await assertFails(
+      writeBatch(fs).set(doc(fs, "teams", TEAM, "joins", OUTSIDER), { code: CODE }).update(doc(fs, "teams", TEAM), joinUpdate).commit(),
+    );
+  });
+
+  it("invites still go out (ages are private), but accepting one directly is refused", async () => {
+    await toClub();
+    await assertSucceeds(
+      setDoc(doc(db(CAPTAIN), ...invitePath), { teamName: "Team", kind: "team", invitedBy: CAPTAIN, invitedByName: "K", createdAt: serverTimestamp() }),
+    );
+    const fs = db(OUTSIDER);
+    await assertFails(writeBatch(fs).update(doc(fs, "teams", TEAM), joinUpdate).delete(doc(fs, ...invitePath)).commit());
+    // Declining still works.
+    await assertSucceeds(deleteDoc(doc(fs, ...invitePath)));
+  });
+
+  it("changing a team's level to club is allowed, and its members stay", async () => {
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { name: "Team", level: "club", city: "" }));
+    await assertSucceeds(getDoc(doc(db(PLAYER), "teams", TEAM)));
   });
 });
 
@@ -1559,7 +1633,7 @@ describe("team directory", () => {
   const listing = (extra: Record<string, unknown> = {}) => ({
     name: "Team",
     division: "mixed",
-    level: "club",
+    level: "college",
     city: "",
     keywords: ["t", "te", "tea", "team"],
     ...extra,
@@ -1775,7 +1849,7 @@ describe("chat", () => {
     const fs = db(OUTSIDER);
     const batch = writeBatch(fs);
     batch.set(doc(fs, "teams", "t2"), {
-      name: "New", division: "mixed", level: "club", city: "",
+      name: "New", division: "mixed", level: "college", city: "",
       ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" }, memberIds: [OUTSIDER],
       memberNames: { [OUTSIDER]: "X" }, createdAt: serverTimestamp(),
     });
@@ -1792,7 +1866,7 @@ describe("chat", () => {
     const fs = db(OUTSIDER);
     const batch = writeBatch(fs);
     batch.set(doc(fs, "teams", "t3"), {
-      name: "New", division: "mixed", level: "club", city: "",
+      name: "New", division: "mixed", level: "college", city: "",
       ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" }, memberIds: [OUTSIDER],
       memberNames: { [OUTSIDER]: "X" }, createdAt: serverTimestamp(),
     });

@@ -1,0 +1,37 @@
+{
+  "about": "Ics.event(event, uid, description, now) for one event (the event notes are its description), and Ics.fileName(title).",
+  "cases": [
+    {
+      "name": "an hour by default; no location or notes",
+      "uid": "e1@stall10.app",
+      "title": "Track session",
+      "startsAt": "2026-11-15T17:00:00.000Z",
+      "now": "2026-11-13T12:00:00.000Z",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Stall 10//Calendar//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:e1@stall10.app\r\nDTSTAMP:20261113T120000Z\r\nDTSTART:20261115T170000Z\r\nDTEND:20261115T180000Z\r\nSUMMARY:Track session\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "fileName": "Track session.ics"
+    },
+    {
+      "name": "escaped text, an end and a location",
+      "uid": "team1/e2,x;y@stall10.app",
+      "title": "Track; easy, then \\ hills",
+      "startsAt": "2026-11-15T17:00:00.000Z",
+      "endsAt": "2026-11-15T19:30:00.000Z",
+      "location": "Track, lane 1",
+      "description": "Bring water.\nSpikes optional.\r\nCarpool: Main St.",
+      "now": "2026-11-13T12:00:00.000Z",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Stall 10//Calendar//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:team1/e2\\,x\\;y@stall10.app\r\nDTSTAMP:20261113T120000Z\r\nDTSTART:20261115T170000Z\r\nDTEND:20261115T193000Z\r\nSUMMARY:Track\\; easy\\, then \\\\ hills\r\nLOCATION:Track\\, lane 1\r\nDESCRIPTION:Bring water.\\nSpikes optional.\\nCarpool: Main St.\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "fileName": "Track easy then  hills.ics"
+    },
+    {
+      "name": "long lines fold at 75 octets without splitting characters",
+      "uid": "e3@stall10.app",
+      "title": "Hat tournament éééééééééééééééééééééééééééééééééééééééé 🥏 finals",
+      "startsAt": "2026-07-04T23:30:00.000Z",
+      "location": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "description": "Long notes Long notes Long notes Long notes Long notes Long notes Long notes Long notes Long notes Long notes Long notes Long notes with an emoji 🥏 near the end of a line.",
+      "now": "2026-11-13T12:00:00.000Z",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Stall 10//Calendar//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:e3@stall10.app\r\nDTSTAMP:20261113T120000Z\r\nDTSTART:20260704T233000Z\r\nDTEND:20260705T003000Z\r\nSUMMARY:Hat tournament éééééééééééééééééééééééééé\r\n éééééééééééééé 🥏 finals\r\nLOCATION:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\r\n AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\r\n AAAAAAAAAAAAAAAAAAAA\r\nDESCRIPTION:Long notes Long notes Long notes Long notes Long notes Long not\r\n es Long notes Long notes Long notes Long notes Long notes Long notes with \r\n an emoji 🥏 near the end of a line.\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "fileName": "Hat tournament   finals.ics"
+    }
+  ]
+}

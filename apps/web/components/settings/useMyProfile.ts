@@ -4,10 +4,11 @@ import { useAuth } from "../AuthProvider";
 import { useLiveDoc } from "@/lib/live";
 
 /** The parts of profiles/{uid} (and private/details) settings edit. */
-export interface MyProfile {
+interface MyProfile {
   name?: string;
   username?: string;
   photoUrl?: string | null;
+  headerUrl?: string | null;
   private?: boolean;
   bio?: string;
   pronouns?: string;

@@ -13,6 +13,14 @@ export interface TeamRepository {
   listingsWithKeywords(keywords: string[], limit: number): Promise<NameListing[]>;
   /** Writes every document of a new team at once; returns its id. */
   createTeam(input: CreateTeamInput, owner: Owner): Promise<string>;
+  /**
+   * Deletes teams/{id} with every subcollection under it (chat, events,
+   * posts, plays, stats, videos, meetings, tournaments), its directory
+   * listing and its tournaments' listings.
+   */
+  deleteTeamTree(teamId: string): Promise<void>;
+  /** Deletes the document at [path] and every subcollection under it. */
+  deleteTree(path: string): Promise<void>;
 }
 
 const teamKinds: readonly TeamKind[] = ["team", "community", "organization"];
@@ -47,6 +55,17 @@ export class FirestoreTeamRepository implements TeamRepository {
         division: d.get("division") ?? "mixed",
       };
     });
+  }
+
+  async deleteTree(path: string): Promise<void> {
+    await this.db.recursiveDelete(this.db.doc(path));
+  }
+
+  async deleteTeamTree(teamId: string): Promise<void> {
+    const listings = await this.db.collection("tournamentDirectory").where("groupId", "==", teamId).get();
+    await Promise.all(listings.docs.map((d) => d.ref.delete()));
+    await this.db.recursiveDelete(this.db.doc(`teams/${teamId}`));
+    await this.db.doc(`teamDirectory/${teamId}`).delete();
   }
 
   async createTeam(input: CreateTeamInput, owner: Owner): Promise<string> {

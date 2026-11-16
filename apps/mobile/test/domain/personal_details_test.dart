@@ -22,6 +22,23 @@ void main() {
     expect(birthDateProblem(DateTime(1890), today), isNotNull);
   });
 
+  test('club teams take players from their 16th birthday, as the API', () {
+    expect(canJoinClubTeam(DateTime(2010, 11, 20), today), isTrue);
+    expect(clubJoinProblem(DateTime(2010, 11, 20), today), isNull);
+    expect(clubJoinProblem(DateTime(2010, 11, 21), today), clubTooYoungMessage);
+    expect(clubJoinProblem(null, today), clubNeedsBirthDateMessage);
+    expect(canJoinClubTeam(DateTime(1990, 5, 1), today), isTrue);
+    expect(
+      canJoinClubTeam(DateTime(2008, 2, 29), DateTime(2024, 2, 28)),
+      isFalse,
+    );
+    expect(
+      canJoinClubTeam(DateTime(2008, 2, 29), DateTime(2024, 2, 29)),
+      isTrue,
+    );
+    expect(clubMinimumAge, 16);
+  });
+
   test('phone numbers', () {
     expect(phoneProblem('+1 (555) 010-2030'), isNull);
     expect(phoneProblem('555 0102'), isNull);

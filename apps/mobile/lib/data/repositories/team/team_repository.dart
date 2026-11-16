@@ -122,10 +122,12 @@ abstract class TeamRepository {
   /// repeat, so a failed run is finished the next time.
   Future<Result<void>> migrateTiersToRoles(Team team);
 
-  /// Deletes the team and everything in it. It takes a while (each
-  /// collection goes in turn), so [onProgress] hears each step.
+  /// Deletes the team and everything in it, for its sole owner. [name] is
+  /// what they typed to confirm it (the API checks it matches the team's
+  /// name). It takes a while, so [onProgress] hears each step.
   Future<Result<void>> deleteTeam(
     Team team, {
+    required String name,
     void Function(DeleteProgress progress)? onProgress,
   });
 

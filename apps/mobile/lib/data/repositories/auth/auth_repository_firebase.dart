@@ -6,6 +6,7 @@ import 'package:logging/logging.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/direct_message.dart';
+import '../../../domain/models/person_name.dart';
 import '../../../domain/models/username.dart';
 import '../../../utils/password_policy.dart';
 import '../../../utils/result.dart';
@@ -74,6 +75,12 @@ class AuthRepositoryFirebase extends AuthRepository {
       !_profileUnknown &&
       !_claiming &&
       _username == null;
+
+  @override
+  bool get needsName =>
+      _currentUser != null &&
+      !_claiming &&
+      PersonName.missing(_currentUser!.displayName);
 
   CollectionReference<Map<String, dynamic>> get _profiles =>
       _firestore.collection('profiles');
@@ -213,7 +220,7 @@ class AuthRepositoryFirebase extends AuthRepository {
       final user = await _authService.signUpWithEmail(
         email.trim(),
         password,
-        '$first $last'.trim(),
+        PersonName.join(first, last),
       );
       _onUserChanged(user);
       // Private: only they read users/{uid}.
@@ -314,6 +321,30 @@ class AuthRepositoryFirebase extends AuthRepository {
   @override
   Future<Result<void>> updateDisplayName(String name) =>
       guard(() => _authService.updateDisplayName(name.trim()));
+
+  @override
+  Future<Result<void>> saveName({
+    required String firstName,
+    required String lastName,
+  }) => guard(() async {
+    final first = firstName.trim();
+    final last = lastName.trim();
+    if (first.isEmpty || last.isEmpty) {
+      throw ArgumentError('Enter your first and last name');
+    }
+    final uid = _currentUser?.uid;
+    if (uid == null) throw StateError('Not signed in');
+    await _authService.updateDisplayName(PersonName.join(first, last));
+    // Now, so a username claimed next carries the new name (the change
+    // listener catches up later).
+    final user = _authService.currentUser;
+    if (user != null) _onUserChanged(user);
+    // Private: only they read users/{uid}.
+    await _firestore.collection('users').doc(uid).set({
+      'firstName': first,
+      'lastName': last,
+    }, SetOptions(merge: true));
+  });
 
   @override
   Future<Result<void>> updatePhotoUrl(String? url) =>

@@ -90,12 +90,42 @@ export function isPrivateProfile(profile: Data | undefined): boolean {
 }
 
 /**
+ * A picture URL visitors' browsers may load: Firebase Storage or Google's
+ * profile photos only, so a profile can't make every visitor fetch from a
+ * server of its owner's choosing (the rules let owners store any string).
+ */
+export function imageUrl(v: unknown): string | undefined {
+  if (typeof v !== "string" || v.length > 2000) return undefined;
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "https:") return undefined;
+    const ok = u.hostname === "firebasestorage.googleapis.com" || u.hostname === "storage.googleapis.com" || u.hostname.endsWith(".googleusercontent.com");
+    return ok ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A profile's name, pictures (checked by imageUrl) and username. */
+function cardOf(profile: Data, fields: string[]): Data {
+  const card = pick(profile, fields);
+  for (const k of ["photoUrl", "headerUrl"]) {
+    if (k in card) {
+      const url = imageUrl(card[k]);
+      if (url) card[k] = url;
+      else delete card[k];
+    }
+  }
+  return card;
+}
+
+/**
  * A profile as visitors see it. A private one shows only who it is, as
  * the app does for people who don't follow them. Teams, stats and games
  * follow the player's own visibility settings.
  */
 export function profileView(profile: Data): Data {
-  const card = pick(profile, ["name", "photoUrl", "username"]);
+  const card = cardOf(profile, ["name", "photoUrl", "headerUrl", "username"]);
   if (profile.private === true) return { ...card, private: true };
   const visibility = (profile.visibility ?? {}) as Data;
   const shows = (k: string) => visibility[k] !== false;
@@ -132,7 +162,10 @@ export function listingView(listing: Data): Data {
  * (`showsPublic` in firestore.rules).
  */
 export function isPrivateGroup(listing: Data | undefined): boolean {
-  return !listing || (listing.kind === "community" && listing.requiresApproval === true);
+  // Groups and school/club communities that approve who joins (as the rules treat them).
+  return (
+    !listing || ((listing.kind === "community" || listing.kind === "organization") && listing.requiresApproval === true)
+  );
 }
 
 /** A team's public event, as `TeamEvent.toPublicMap` writes it. */
@@ -154,5 +187,5 @@ export function teamPostView(post: Data): Data {
 
 /** A profile in search results: the card, as private profiles show it. */
 export function searchProfileView(profile: Data): Data {
-  return { ...pick(profile, ["name", "photoUrl", "username"]), ...(profile.private === true ? { private: true } : {}) };
+  return { ...cardOf(profile, ["name", "photoUrl", "username"]), ...(profile.private === true ? { private: true } : {}) };
 }

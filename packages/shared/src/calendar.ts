@@ -96,14 +96,12 @@ export const calendarRequestSchema = z.strictObject({
   name: z.string().trim().min(1, "Give the calendar a name.").max(calendarNameMax, `Keep names under ${calendarNameMax} characters.`),
   color: z.enum(calendarColors).default("green"),
 });
-export type CalendarRequest = z.input<typeof calendarRequestSchema>;
 export const calendarPatchSchema = calendarRequestSchema.partial();
 
 const uid = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 
 /** `POST /v1/calendars/:id/invites`: invite someone, or change a pending invite's role. */
 export const calendarInviteRequestSchema = z.strictObject({ uid, role: z.enum(shareRoles).default("view") });
-export type CalendarInviteRequest = z.input<typeof calendarInviteRequestSchema>;
 
 /** `PATCH /v1/calendars/:id/members/:uid`. */
 export const calendarRoleRequestSchema = z.strictObject({ role: z.enum(shareRoles) });
@@ -142,7 +140,6 @@ export const calendarEventSchema = z
     message: "It can't end before it starts.",
     path: ["endsAt"],
   });
-export type CalendarEventRequest = z.input<typeof calendarEventSchema>;
 
 /** After `POST /v1/calendars/:id/events`. */
 export interface CalendarEventResult {

@@ -2,12 +2,21 @@
 import type { PublicEvent, PublicTeamPost } from "@stall10/shared";
 import { limit, orderBy } from "firebase/firestore";
 import Link from "next/link";
+import { useState } from "react";
+import { callApi } from "@/lib/client";
+import { useAuth } from "../AuthProvider";
 import { EventItem } from "../EventItem";
 import { LocalTime } from "../LocalTime";
+import { roleLabel } from "../ProfileDashboard";
 import { useLiveQuery } from "@/lib/live";
-import { useTeamHub } from "./TeamContext";
+import { EmptyState, ErrorNote, Loading } from "../StatusViews";
+import { Avatar } from "../Avatar";
+import { InviteButton } from "./InviteDialog";
+import { membersInOrder } from "./TeamBanner";
+import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { type TeamPostView, TeamPostCard } from "./TeamPostCard";
-import { useTeamEvents } from "./TeamSchedule";
+import { TeamPostComposer } from "./TeamPostComposer";
+import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamSchedule";
 
 const postLimit = 30;
 
@@ -17,36 +26,60 @@ const postLimit = 30;
  * them.
  */
 export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTeamPost[]; publicEvents: PublicEvent[] }) {
-  const { teamId, name, privateGroup, viewer } = useTeamHub();
+  const { teamId, name, privateGroup, youth, viewer } = useTeamHub();
   const member = viewer.state === "member";
+  const outsiderYouth = youth && viewer.state === "outsider";
+  const outsider = useYouthOutsiderPublic(teamId, outsiderYouth, { posts: true, eventLimit: 4 });
   const live = useLiveQuery<TeamPostView>(
     member ? `teams/${teamId}/posts` : null,
     [orderBy("createdAt", "desc"), limit(postLimit)],
     "feed",
   );
   const events = useTeamEvents(teamId, viewer);
-  const posts: TeamPostView[] = member ? (live.data ?? []) : publicPosts;
-  const upcoming = (member ? (events.data ?? []) : publicEvents).slice(0, 4);
+  const posts: TeamPostView[] = member ? (live.data ?? []) : outsiderYouth ? (outsider.posts.data ?? []) : publicPosts;
+  const upcoming = (member ? (events.data ?? []) : outsiderYouth ? (outsider.events.data ?? []) : publicEvents).slice(0, 4);
   const hidden = !member && privateGroup;
+  // Signed out: a youth team's card only.
+  const youthHidden = youth && viewer.state === "visitor";
+  const admin = viewer.state === "member" && viewer.can("manageTeam");
+  const [editing, setEditing] = useState<string | null>(null);
 
   return (
     <div className="hub-feed">
       <section className="stack">
+        {admin && <TeamPostComposer teamId={teamId} />}
         {viewer.state === "loading" || (member && !live.data && !live.error) ? (
-          <p className="muted" aria-busy="true">Loading posts…</p>
+          <Loading label="Loading posts…" />
         ) : live.error ? (
-          <p className="form-error">{live.error}</p>
+          <ErrorNote>{live.error}</ErrorNote>
         ) : hidden ? (
-          <p className="empty">Only members see this group&apos;s posts and events.</p>
+          <EmptyState>Only members see this group&apos;s posts and events.</EmptyState>
+        ) : youthHidden ? (
+          <EmptyState>{youthVisitorNote}</EmptyState>
+        ) : outsiderYouth && outsider.posts.error ? (
+          <ErrorNote>{outsider.posts.error}</ErrorNote>
+        ) : outsiderYouth && !outsider.posts.data ? (
+          <Loading label="Loading posts…" />
         ) : posts.length === 0 ? (
-          <p className="empty">{member ? "No posts yet." : "No public posts yet."}</p>
+          <EmptyState>{member ? "No posts yet." : "No public posts yet."}</EmptyState>
         ) : (
-          posts.map((p) => <TeamPostCard key={p.id} post={p} teamName={name} showAudience={member} />)
+          posts.map((p) =>
+            editing === p.id ? (
+              <TeamPostComposer key={p.id} teamId={teamId} post={p} onDone={() => setEditing(null)} />
+            ) : (
+              <TeamPostCard
+                key={p.id}
+                post={p}
+                teamName={name}
+                showAudience={member}
+                actions={admin ? <PostAdminActions teamId={teamId} postId={p.id} onEdit={() => setEditing(p.id)} /> : undefined}
+              />
+            ),
+          )
         )}
-        {member && <p className="muted small">Posting to the team comes to the website next; post from the app for now.</p>}
       </section>
       <aside className="stack">
-        {!hidden && (
+        {!hidden && !youthHidden && (
           <div className="card">
             <h2 className="card-title">Coming up</h2>
             {upcoming.length === 0 ? (
@@ -70,14 +103,107 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
             </p>
           </div>
         )}
-        <div className="card">
-          <h2 className="card-title">People</h2>
-          <p className="muted small">See who&apos;s on the roster and open their profiles.</p>
-          <Link className="btn btn-small" href={`/teams/${teamId}/roster`}>
-            Open the roster
-          </Link>
-        </div>
+        <MemberPreview />
       </aside>
     </div>
+  );
+}
+
+/**
+ * What the roster card says to someone not on the team, or null when they
+ * can't open it: visitors see only an adult team's roster (rosterIsPublic),
+ * without links to profiles; signed-in outsiders see any roster but a
+ * private group's or a youth team's (the API refuses those), with links.
+ */
+export function rosterCardText(v: {
+  state: TeamViewer["state"];
+  privateGroup: boolean;
+  youth: boolean;
+  publicRoster: boolean;
+}): string | null {
+  switch (v.state) {
+    case "visitor":
+      return v.publicRoster ? "See who's on the team." : null;
+    case "outsider":
+    case "error":
+      return v.privateGroup || v.youth ? null : "See who's on it and open their profiles.";
+    default:
+      return null;
+  }
+}
+
+/**
+ * The side column's people: for members, the first few with their role,
+ * all of them on the roster, and Invite for member managers; for everyone
+ * else who may open it, a link to the roster (rosterCardText).
+ */
+function MemberPreview() {
+  const { teamId, kind, privateGroup, youth, publicRoster, viewer } = useTeamHub();
+  const roster = `/teams/${teamId}/roster`;
+  if (viewer.state !== "member") {
+    const text = rosterCardText({ state: viewer.state, privateGroup, youth, publicRoster });
+    if (!text) return null;
+    return (
+      <div className="card">
+        <h2 className="card-title">{kind === "team" ? "Roster" : "Members"}</h2>
+        <p className="muted small">{text}</p>
+        <Link className="btn btn-small" href={roster}>
+          Open the {kind === "team" ? "roster" : "members"}
+        </Link>
+      </div>
+    );
+  }
+  const people = membersInOrder(viewer.team);
+  return (
+    <div className="card member-preview">
+      <h2 className="card-title">{kind === "team" ? "The team" : "Members"}</h2>
+      <ul className="member-preview-list">
+        {people.slice(0, 6).map((p) => (
+          <li key={p.uid}>
+            <Link className="person" href={`/players/${p.uid}`}>
+              <Avatar name={p.name} size={32} />
+              <span>
+                {p.name}
+                {p.tier !== "player" && <small className="muted"> {roleLabel(p.tier, kind)}</small>}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="member-preview-actions">
+        <Link href={roster} className="small">
+          All {people.length} {people.length === 1 ? "member" : "members"}
+        </Link>
+        <InviteButton />
+      </div>
+    </div>
+  );
+}
+
+/** Edit and delete on a team post, for its admins. */
+function PostAdminActions({ teamId, postId, onEdit }: { teamId: string; postId: string; onEdit: () => void }) {
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function remove() {
+    if (!user || !window.confirm("Delete this post? This can't be undone.")) return;
+    setBusy(true);
+    try {
+      await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/posts/${encodeURIComponent(postId)}`, { method: "DELETE" });
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <span className="post-admin">
+      <button type="button" className="text-btn" onClick={onEdit} disabled={busy}>
+        Edit
+      </button>
+      <button type="button" className="text-btn danger" onClick={() => void remove()} disabled={busy}>
+        Delete
+      </button>
+      {error && <span className="form-error">{error}</span>}
+    </span>
   );
 }

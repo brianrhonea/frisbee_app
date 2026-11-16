@@ -29,6 +29,8 @@ beforeAll(async () => {
   b.set(db.doc("teams/meT2"), { name: "Not mine", kind: "team", memberIds: ["otherU"], members: { otherU: "owner" } });
   b.set(db.doc("teams/meT1/events/soon"), { title: "Practice", startsAt: ts(3_600_000) });
   b.set(db.doc("teams/meT1/events/gone"), { title: "Old", startsAt: ts(-3_600_000) });
+  b.set(db.doc("teams/meT1/events/onNow"), { title: "Tournament", startsAt: ts(-86_400_000), endsAt: ts(86_400_000) });
+  b.set(db.doc("teams/meT1/events/lastWeek"), { title: "Long ago", startsAt: ts(-8 * 86_400_000), endsAt: ts(86_400_000) });
   b.set(db.doc("teams/meT2/events/hidden"), { title: "Theirs", startsAt: ts(3_600_000) });
   for (let i = 0; i < 22; i++) {
     b.set(db.doc(`posts/me${i}`), { authorId: i % 2 ? "friendU" : "meU", body: `post ${i}`, createdAt: ts(-(i + 1) * 60_000) });
@@ -49,7 +51,8 @@ describe("dashboard on the emulator", () => {
     const body = res.json();
     expect(body.profile).toMatchObject({ id: "meU", username: "meu", needsUsername: false });
     expect(body.teams.map((t: { id: string }) => t.id)).toEqual(["meT1"]);
-    expect(body.events.map((e: { id: string }) => e.id)).toEqual(["soon"]);
+    // Under way (started yesterday, ends tomorrow) first; ended and too-old ones left out.
+    expect(body.events.map((e: { id: string }) => e.id)).toEqual(["onNow", "soon"]);
     const ids = body.feed.posts.map((p: { id: string }) => p.id);
     expect(ids).toHaveLength(20);
     expect(ids[0]).toBe("me0");

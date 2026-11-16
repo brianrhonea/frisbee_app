@@ -1,0 +1,3 @@
+/* "Share with my followers" on a new event (ShareEvent.tsx). */
+.share-event { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; }
+.share-event textarea { resize: vertical; }

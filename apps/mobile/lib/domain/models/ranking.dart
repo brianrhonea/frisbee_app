@@ -59,6 +59,10 @@ class DivisionRanking {
   /// "club-mixed", the doc id.
   String get key => keyFor(level, division);
 
+  /// Whether this is a ranking anyone may see: never youth (see
+  /// [rankedLevels]).
+  bool get isRanked => rankedLevels.contains(level);
+
   /// "Club Mixed".
   String get label => '${level.label} ${division.label}';
 
@@ -79,6 +83,137 @@ class DivisionRanking {
     minGames: (map['minGames'] as num?)?.toInt() ?? 5,
     updatedAt: parseDate(map['updatedAt']),
   );
+}
+
+/// The levels that are ranked, in the Level filter's order. Listed on
+/// purpose rather than "every level but youth", so a level added later
+/// isn't ranked (or shown) until it's added here. Youth is never ranked:
+/// the `rankings` Cloud Functions skip youth divisions and youth teams,
+/// and readers leave out a youth ranking too. Mirrors `rankedLevels` in
+/// packages/shared/src/rankings.ts.
+const rankedLevels = [
+  CompetitionLevel.club,
+  CompetitionLevel.college,
+  CompetitionLevel.league,
+  CompetitionLevel.pickup,
+];
+
+/// The Rankings page's two filters, Level and Division, and what they're
+/// set to. Mirrors `chooseRanking` in packages/shared/src/rankings.ts,
+/// checked against the shared vectors in
+/// packages/shared/fixtures/rankings.
+class RankingChoice {
+  const RankingChoice({
+    required this.level,
+    required this.division,
+    required this.levels,
+    required this.divisions,
+  });
+
+  final CompetitionLevel level;
+  final Division division;
+
+  /// Levels with any ranking, in order: the Level filter's options.
+  final List<CompetitionLevel> levels;
+
+  /// Divisions ranked at [level], in order: the Division filter's options.
+  final List<Division> divisions;
+
+  String get key => DivisionRanking.keyFor(level, division);
+
+  /// The ranking shown when nothing (or nothing with data) is asked for,
+  /// if it has data.
+  static const defaultKey = 'club-mixed';
+
+  /// A ranking key's level and division, or null for anything not ranked
+  /// (youth, unknown, malformed).
+  static ({CompetitionLevel level, Division division})? parseKey(String? key) {
+    final parts = key?.split('-') ?? const [];
+    if (parts.length != 2) return null;
+    final level = rankedLevels.where((l) => l.name == parts[0]).firstOrNull;
+    final division = Division.values
+        .where((d) => d.name == parts[1])
+        .firstOrNull;
+    return level == null || division == null
+        ? null
+        : (level: level, division: division);
+  }
+
+  /// The ranked keys among [keys], each once, by level then division.
+  static List<String> orderedKeys(Iterable<String> keys) {
+    int order(String k) {
+      final p = parseKey(k)!;
+      return rankedLevels.indexOf(p.level) * 10 + p.division.index;
+    }
+
+    return {
+      for (final k in keys)
+        if (parseKey(k) != null) k,
+    }.toList()..sort((a, b) => order(a).compareTo(order(b)));
+  }
+
+  /// Reads the page's link: `?level=club&division=mixed`, or the old
+  /// `?d=club-mixed` / `?division=club-mixed` (a key, used when no level
+  /// is given). A youth or unknown key reads as nothing asked for.
+  static ({String? level, String? division}) wantFromQuery({
+    String? level,
+    String? division,
+    String? d,
+  }) {
+    final legacy =
+        d ?? (division != null && division.contains('-') ? division : null);
+    if (legacy != null && level == null) {
+      final p = parseKey(legacy);
+      return (level: p?.level.name, division: p?.division.name);
+    }
+    return (
+      level: level,
+      division: division != null && division.contains('-') ? null : division,
+    );
+  }
+
+  /// Which ranking the filters show, given the [keys] that have data, or
+  /// null when none does: the [level] and [division] asked for if that
+  /// ranking has data; else [level] at its first division with data; else
+  /// [division] at the first level that has it; else Club Mixed, else the
+  /// first ranking.
+  static RankingChoice? choose(
+    Iterable<String> keys, {
+    String? level,
+    String? division,
+  }) {
+    final ordered = orderedKeys(keys);
+    if (ordered.isEmpty) return null;
+    final prefer = ordered.contains(defaultKey)
+        ? [defaultKey, ...ordered.where((k) => k != defaultKey)]
+        : ordered;
+    final parsed = [for (final k in prefer) parseKey(k)!];
+    final l = rankedLevels.where((x) => x.name == level).firstOrNull;
+    final d = Division.values.where((x) => x.name == division).firstOrNull;
+    final pick =
+        parsed
+            .where(
+              (p) =>
+                  (l == null || p.level == l) && (d == null || p.division == d),
+            )
+            .firstOrNull ??
+        (l == null ? null : parsed.where((p) => p.level == l).firstOrNull) ??
+        (d == null ? null : parsed.where((p) => p.division == d).firstOrNull) ??
+        parsed.first;
+    final all = [for (final k in ordered) parseKey(k)!];
+    return RankingChoice(
+      level: pick.level,
+      division: pick.division,
+      levels: [
+        for (final x in rankedLevels)
+          if (all.any((p) => p.level == x)) x,
+      ],
+      divisions: [
+        for (final x in Division.values)
+          if (all.any((p) => p.level == pick.level && p.division == x)) x,
+      ],
+    );
+  }
 }
 
 /// A team that placed in a [TournamentResult] division.

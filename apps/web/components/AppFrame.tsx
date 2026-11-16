@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type FormEvent, type ReactNode, useEffect } from "react";
-import { requestHomeRefresh } from "@/lib/homeRefresh";
+import { newPostBox, requestHomeRefresh } from "@/lib/homeRefresh";
 import { useAuth } from "./AuthProvider";
+import { MeetingAlerts } from "./team/meetings/MeetingAlerts";
 import { HeaderAuth } from "./HeaderAuth";
 import { BrandCard } from "./HomeCards";
 import { NavIcon, type NavIconName } from "./NavIcons";
@@ -11,17 +12,21 @@ import { useUnreadCount } from "./Notifications";
 import { SideTeams } from "./SideTeams";
 import { ThemeToggle } from "./ThemeToggle";
 import { UpcomingAside } from "./UpcomingAside";
+import { VoiceBar } from "./voice/VoiceBar";
+import { isTyping } from "@/lib/text";
 
 type Tab = { href: string; label: string; icon: NavIconName; also?: string[] };
 
-/** The five tabs, as in the app (docs/product-spec.md §3). */
+/**
+ * Six tabs: the app's five (docs/product-spec.md §3) and Learn.
+ */
 const tabs: Tab[] = [
   // The community feed and posts are Home's (its Community tab).
   { href: "/", label: "Home", icon: "home", also: ["/community", "/posts"] },
   { href: "/explore", label: "Explore", icon: "explore", also: ["/players", "/rankings"] },
   { href: "/teams", label: "Teams", icon: "teams" },
   { href: "/messages", label: "Messages", icon: "messages" },
-  { href: "/events", label: "Events", icon: "events", also: ["/schedule"] },
+  { href: "/events", label: "Events", icon: "events", also: ["/schedule", "/tournaments"] },
   { href: "/learn", label: "Learn", icon: "learn" },
 ];
 
@@ -34,21 +39,19 @@ const secondary = [
 
 /** Focuses Home's composer, or goes Home to write a post. */
 function compose(router: ReturnType<typeof useRouter>) {
-  const composer = document.querySelector<HTMLTextAreaElement>(".composer textarea");
+  const composer = document.querySelector<HTMLTextAreaElement>(newPostBox);
   if (composer) {
     composer.scrollIntoView({ block: "center", behavior: "smooth" });
     composer.focus({ preventScroll: true });
   } else router.push("/#compose");
 }
 
-/** Pages that read best at full width, without the right column. */
-const fullWidth = ["/sign-in", "/sign-up", "/about", "/get-the-app", "/join", "/g", "/p"];
+/** Pages with a composer of their own at the foot, where a floating Post button would cover it. */
+const ownComposer = ["/messages", "/posts"];
+const isChat = (path: string) => /^\/teams\/[^/]+\/(chat|meetings)/.test(path);
 
-/** Typing in a field, where single-key shortcuts mustn't fire. */
-function typing(target: EventTarget | null) {
-  const el = target as HTMLElement | null;
-  return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
-}
+/** Pages that read best at full width, without the right column. */
+const fullWidth = ["/sign-in", "/sign-up", "/about", "/get-the-app", "/join", "/g", "/p", "/messages"];
 
 /**
  * Site-wide keys: `n` writes a post (Home's composer), `/` searches
@@ -60,7 +63,7 @@ function useShortcuts(signedIn: boolean) {
     let pendingG = 0;
     const go: Record<string, string> = { h: "/", e: "/explore", v: "/events", t: "/teams", m: "/messages", n: "/notifications" };
     function onKey(e: KeyboardEvent) {
-      if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
       if (pendingG && Date.now() - pendingG < 1200 && go[e.key]) {
         pendingG = 0;
         e.preventDefault();
@@ -70,7 +73,8 @@ function useShortcuts(signedIn: boolean) {
       pendingG = e.key === "g" ? Date.now() : 0;
       if (e.key === "/") {
         e.preventDefault();
-        const search = document.querySelector<HTMLInputElement>("input[type=search]");
+        // The site search: the top bar's, or Explore's own (never a list's filter box).
+        const search = document.querySelector<HTMLInputElement>(".top-search input, input#q");
         if (search) search.focus();
         else router.push("/explore");
       } else if (e.key === "n" && signedIn) {
@@ -105,12 +109,16 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   const search = !under(path, "/explore");
   const unread = useUnreadCount();
   useShortcuts(!!user);
+  // Phones' floating Post button, on pages without a composer of their own at the foot.
+  const fab = !!user && !ownComposer.some((p) => under(path, p)) && !isChat(path);
   const badge = unread > 0 ? <span className="count-badge">{unread > 99 ? "99+" : unread}</span> : null;
 
   function onSearch(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const q = String(new FormData(e.currentTarget).get("q") ?? "").trim();
-    router.push(q ? `/explore?q=${encodeURIComponent(q)}` : "/explore");
+    // Visitors can't search players (Explore is members-only): they find teams and groups.
+    const where = user ? "/explore" : "/teams";
+    router.push(q ? `${where}?q=${encodeURIComponent(q)}` : user ? where : `${where}#find`);
   }
 
   const tabLinks = (className: string) =>
@@ -133,7 +141,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
     });
 
   return (
-    <div className={aside ? "frame with-aside" : "frame"}>
+    <div className={`frame${aside ? " with-aside" : ""}${fab ? " has-fab" : ""}`}>
       <header className="top-bar">
         <div className="top-brand">
           <Link className="brand wordmark" href="/" aria-label="Stall 10 home">
@@ -147,7 +155,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
             <input
               type="search"
               name="q"
-              placeholder="Search players, teams and upcoming events"
+              placeholder={user === null ? "Search teams and groups" : "Search players, teams and upcoming events"}
               aria-label="Search Stall 10"
               enterKeyHint="search"
             />
@@ -157,7 +165,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
         )}
         <div className="header-actions">
           {search && (
-            <Link href="/explore" className="icon-btn top-search-icon" aria-label="Search">
+            <Link href={user === null ? "/teams#find" : "/explore"} className="icon-btn top-search-icon" aria-label="Search">
               <NavIcon name="search" size={22} />
             </Link>
           )}
@@ -207,8 +215,18 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
         </div>
       </aside>
 
+      {/* Phones, where the side nav (and its Create a post) is hidden. */}
+      {fab && (
+        <button type="button" className="fab-post" onClick={() => compose(router)}>
+          <NavIcon name="plus" size={20} />
+          <span>Post</span>
+        </button>
+      )}
+
       <div className="frame-main">
         <main>{children}</main>
+        {user && <VoiceBar />}
+        {user && <MeetingAlerts />}
         {footer}
       </div>
 

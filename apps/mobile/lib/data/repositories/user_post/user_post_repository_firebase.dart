@@ -7,19 +7,28 @@ import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/user_post.dart';
 import '../../../utils/result.dart';
+import '../../services/api_client.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import 'user_post_repository.dart';
 
+/// Reads and writes `posts` in Firestore; the community feed comes from
+/// the Stall 10 API ([ApiClient], `GET /v1/feed`), which leaves out private
+/// profiles' posts as the website's does.
 class UserPostRepositoryFirebase implements UserPostRepository {
   UserPostRepositoryFirebase({
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
+    ApiClient? api,
   }) : _files = attachments,
-       _db = firestore ?? FirebaseFirestore.instance;
+       _db = firestore ?? FirebaseFirestore.instance,
+       _api = api;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
+
+  /// The Stall 10 API, when this build has one.
+  final ApiClient? _api;
 
   /// Firestore takes at most 30 values in an `in` filter.
   static const inLimit = 30;
@@ -82,6 +91,51 @@ class UserPostRepositoryFirebase implements UserPostRepository {
       ..sort(UserPost.newestFirst);
     return all.take(limit).toList();
   });
+
+  @override
+  bool get hasCommunityFeed => _api != null;
+
+  @override
+  Future<Result<CommunityFeedPage>> fetchCommunityPage({int? before}) =>
+      guard(() async {
+        final api = _api;
+        if (api == null) {
+          throw const ApiException(
+            'unavailable',
+            "The community feed isn't available in this build.",
+          );
+        }
+        final page = await api.send(
+          'GET',
+          before == null ? '/v1/feed' : '/v1/feed?before=$before',
+        );
+        final next = page['next'];
+        return (
+          ids: [
+            for (final p in (page['posts'] as List?) ?? const [])
+              if (p is Map && p['id'] is String) p['id'] as String,
+          ],
+          next: next is num ? next.toInt() : null,
+        );
+      });
+
+  @override
+  Stream<List<UserPost>> watchPostsByIds(List<String> ids) {
+    final unique = ids.toSet().toList();
+    if (unique.isEmpty) return Stream.value(const []);
+    final queries = [
+      for (var i = 0; i < unique.length; i += inLimit)
+        _posts
+            .where(
+              FieldPath.documentId,
+              whereIn: unique.skip(i).take(inLimit).toList(),
+            )
+            .snapshots()
+            .map((s) => _list(s)..sort(UserPost.newestFirst)),
+    ];
+    if (queries.length == 1) return queries.single;
+    return _combine(queries, unique.length);
+  }
 
   /// Newest [limit] posts whose [field] is one of [values], querying in
   /// chunks of [inLimit] and merging.

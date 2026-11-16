@@ -22,6 +22,7 @@ import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/data/services/image_compressor.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/data/services/account_service.dart';
+import 'package:frisbee_app/domain/models/person_name.dart';
 import 'package:frisbee_app/domain/models/username.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
@@ -127,6 +128,29 @@ class FakeAuthRepository extends AuthRepository {
   bool get needsUsername => _user != null && usernameMissing;
 
   @override
+  bool get needsName => _user != null && PersonName.missing(_user!.displayName);
+
+  /// What [saveName] was given.
+  ({String first, String last})? savedName;
+
+  @override
+  Future<Result<void>> saveName({
+    required String firstName,
+    required String lastName,
+  }) => _run(() {
+    savedName = (first: firstName.trim(), last: lastName.trim());
+    setUser(
+      AppUser(
+        uid: _user!.uid,
+        email: _user!.email,
+        displayName: PersonName.join(firstName, lastName),
+        photoUrl: _user!.photoUrl,
+        username: _user!.username,
+      ),
+    );
+  });
+
+  @override
   Future<Result<bool>> isUsernameAvailable(String username) async {
     final name = Username.normalize(username);
     return Result.ok(
@@ -162,7 +186,13 @@ class FakeAuthRepository extends AuthRepository {
   @override
   Future<Result<void>> updateDisplayName(String name) => _run(
     () => setUser(
-      AppUser(uid: _user!.uid, email: _user!.email, displayName: name),
+      AppUser(
+        uid: _user!.uid,
+        email: _user!.email,
+        displayName: name,
+        photoUrl: _user!.photoUrl,
+        username: _user!.username,
+      ),
     ),
   );
 
@@ -230,6 +260,10 @@ class FakeTeamRepository implements TeamRepository {
   /// Set to fail minting, e.g. for someone the rules would refuse.
   Exception? mintError;
 
+  /// Set to fail joining (code, link or invite), as the API refuses
+  /// someone, e.g. under 16 for a club team.
+  Exception? joinError;
+
   var _minted = 0;
 
   /// The team [code] joins, or an error if it's unknown or expired.
@@ -265,6 +299,9 @@ class FakeTeamRepository implements TeamRepository {
     _syncCommunities();
     _teamsController.add(null);
   }
+
+  /// Tells watchers [teams] changed, e.g. after editing a team directly.
+  void changed() => _emit();
 
   /// teamId → community id → waiting link request.
   final linkRequests = <String, Map<String, TeamLinkRequest>>{};
@@ -610,6 +647,7 @@ class FakeTeamRepository implements TeamRepository {
 
   @override
   Future<Result<void>> acceptInvite(TeamInvite invite, AppUser user) async {
+    if (joinError case final e?) return Result.error(e);
     if (!teams.containsKey(invite.teamId)) {
       return Result.error(Exception('Team not found'));
     }
@@ -633,6 +671,7 @@ class FakeTeamRepository implements TeamRepository {
   @override
   Future<Result<String>> joinTeam(String inviteCode, AppUser user) async {
     joinedCode = inviteCode;
+    if (joinError case final e?) return Result.error(e);
     final found = _teamForCode(inviteCode);
     if (found case Error(:final error)) return Result.error(error);
     final team = teams[(found as Ok<String>).value];
@@ -841,8 +880,11 @@ class FakeTeamRepository implements TeamRepository {
   @override
   Future<Result<void>> deleteTeam(
     Team team, {
+    required String name,
     void Function(DeleteProgress progress)? onProgress,
   }) async {
+    deletedWithName = name;
+    if (deleteError case final e?) return Result.error(e);
     for (var i = 0; i < 3; i++) {
       onProgress?.call((done: i, total: 3, step: 'Deleting step $i'));
       await deleteGate?.future;
@@ -855,6 +897,12 @@ class FakeTeamRepository implements TeamRepository {
   /// Holds deleteTeam at each step until completed, for tests that watch
   /// its progress.
   Completer<void>? deleteGate;
+
+  /// What deleteTeam was last called with as the typed name.
+  String? deletedWithName;
+
+  /// deleteTeam fails with this (as the API refuses it) when set.
+  Exception? deleteError;
 
   final _rosterChanges = StreamController<void>.broadcast();
 
@@ -2522,8 +2570,30 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
   Future<void> refreshStatus() async {}
 
   @override
-  Future<Result<({PersonalDetails? details, String? email})>> load() async =>
-      Result.ok((details: details, email: email));
+  Future<Result<PersonalDetailsLoad>> load() async {
+    if (failLoad) return Result.error(Exception('offline'));
+    return Result.ok((
+      details: details,
+      email: email,
+      signUpBirthDate: details == null ? savedSignUpBirthDate : null,
+    ));
+  }
+
+  /// The birthday kept by [saveSignUpBirthDate], as the API holds it.
+  DateTime? savedSignUpBirthDate;
+
+  /// Makes [load] fail, as offline.
+  bool failLoad = false;
+
+  @override
+  Future<Result<void>> saveSignUpBirthDate(DateTime birthDate) async {
+    if (refuseTooYoung) return const Result.error(TooYoungException());
+    if (details != null) {
+      return Result.error(Exception('Your details are already saved.'));
+    }
+    savedSignUpBirthDate = birthDate;
+    return const Result.ok(null);
+  }
 
   @override
   Future<Result<void>> save(PersonalDetails d) async {
@@ -2548,6 +2618,18 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
 
   @override
   set signUpBirthDate(DateTime? value) => _birth = value;
+
+  ({String first, String last})? _name;
+
+  @override
+  ({String first, String last})? takeSignUpName() {
+    final n = _name;
+    _name = null;
+    return n;
+  }
+
+  @override
+  set signUpName(({String first, String last})? value) => _name = value;
 }
 
 /// Calendars in memory, like the API: [calendarList] the user is on (their

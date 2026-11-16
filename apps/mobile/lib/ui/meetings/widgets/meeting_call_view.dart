@@ -102,18 +102,8 @@ class _MeetingCallViewState extends State<MeetingCallView> {
     if (mounted) _setChat(false);
   }
 
-  Future<void> _toggleScreenShare() async {
-    if (vm.screenSharing) {
-      vm.setScreenSharing.execute((on: false, sourceId: null));
-      return;
-    }
-    String? source;
-    if (vm.picksScreenSource) {
-      source = await vm.pickScreenSource(context);
-      if (source == null) return;
-    }
-    vm.setScreenSharing.execute((on: true, sourceId: source));
-  }
+  void _toggleScreenShare() =>
+      vm.setScreenSharing.execute((on: !vm.screenSharing, sourceId: null));
 
   void _showSettings() => showModalBottomSheet<void>(
     context: context,

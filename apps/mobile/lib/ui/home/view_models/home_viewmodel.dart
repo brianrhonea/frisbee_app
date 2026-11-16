@@ -19,13 +19,32 @@ import '../../../domain/models/team_post.dart';
 import '../../../utils/command.dart';
 import '../../../utils/pending_removals.dart';
 import '../../../utils/result.dart';
+import '../../../domain/models/user_post.dart';
+import '../../posts/view_models/community_feed.dart';
 import '../../posts/view_models/home_feed.dart';
+import '../../posts/view_models/inline_composer_viewmodel.dart';
 import '../../posts/view_models/post_actions.dart';
 import '../../schedule/view_models/my_schedule.dart';
 import '../../teams/view_models/team_home_viewmodel.dart' show pickPostImages;
 
 /// A post to save on [teamId]'s page.
 typedef FeedPostDraft = ({String teamId, PostDraft draft});
+
+/// The new-member checklist on an empty For you feed, in order (the
+/// website's onboardingSteps: same steps, same rules).
+enum OnboardingStep {
+  username('Pick a username'),
+  join('Join or create a team'),
+  find('Find a team or group near you'),
+  follow('Follow people');
+
+  const OnboardingStep(this.label);
+
+  final String label;
+}
+
+/// A group the user approves members for, with people asking to join.
+typedef PendingRequests = ({Team team, int count});
 
 /// The community feed: the user's own posts and those of the people,
 /// teams and tournaments they follow, every post of their teams and
@@ -44,6 +63,7 @@ class HomeViewModel extends ChangeNotifier {
     DateTime Function()? clock,
   }) : _auth = authRepository,
        _teamRepo = teamRepository,
+       _follows = followRepository,
        _posts = teamPostRepository,
        _userPosts = userPostRepository,
        _picker = filePicker,
@@ -65,6 +85,16 @@ class HomeViewModel extends ChangeNotifier {
       teamPostRepository: teamPostRepository,
       userPostRepository: userPostRepository,
     )..addListener(_onPosts);
+    composer = InlineComposerViewModel(
+      authRepository: authRepository,
+      userPostRepository: userPostRepository,
+      teamPostRepository: teamPostRepository,
+      followRepository: followRepository,
+      filePicker: filePicker,
+      audiences: () => postableTeams,
+    );
+    community = CommunityFeed(userPostRepository: userPostRepository)
+      ..addListener(_onPosts);
     _feed = MySchedule(
       teamRepository: teamRepository,
       eventRepository: eventRepository,
@@ -77,6 +107,7 @@ class HomeViewModel extends ChangeNotifier {
 
   final AuthRepository _auth;
   final TeamRepository _teamRepo;
+  final FollowRepository _follows;
   final TeamPostRepository _posts;
   final UserPostRepository _userPosts;
   final FilePickerService _picker;
@@ -90,7 +121,11 @@ class HomeViewModel extends ChangeNotifier {
   /// Joins by invite code; result value is the team id.
   late final Command1<String, String> joinTeam;
 
-  /// Creates or edits a post on one of the user's teams.
+  /// The composer at the top of For you: a post to Everyone or, for a
+  /// team the user manages, a team post, written in place.
+  late final InlineComposerViewModel composer;
+
+  /// Edits a post on one of the user's teams.
   late final Command1<void, FeedPostDraft> savePost;
   late final Command1<void, TeamPostItem> deletePost;
 
@@ -135,10 +170,61 @@ class HomeViewModel extends ChangeNotifier {
 
   bool canEdit(Team team) => team.canEdit(_uid);
 
+  /// The strip under the composer, by name. As on the Teams tab, a team
+  /// one of the user's communities lists is reached through the community.
+  List<Team> get stripTeams => [
+    for (final t in teams)
+      if (!(t.inCommunity &&
+          teams.any((c) => c.id == t.orgId && c.linkedTeams.containsKey(t.id))))
+        t,
+  ]..sort((a, b) => a.name.compareTo(b.name));
+
   /// Teams the user may post on: those they own, coach or captain.
   List<Team> get postableTeams => teams.where(canEdit).toList();
 
-  void _onFeed() => notifyListeners();
+  void _onFeed() {
+    _watchJoinRequests();
+    notifyListeners();
+  }
+
+  // Needs you ---------------------------------------------------------------
+
+  /// Groups watched for join requests at most (one listener each).
+  static const needsYouGroups = 10;
+
+  final _requestSubs = <String, StreamSubscription<List<GroupJoinRequest>>>{};
+  final _requestCounts = <String, int>{};
+
+  /// Groups that approve who joins and the user may approve for (Manage
+  /// members), by name: the only ones with join requests, and the rules
+  /// let these members read them.
+  List<Team> get _approvingGroups => ([
+    for (final t in teams)
+      if (t.isPrivateGroup && t.has(_uid, TeamPermission.manageMembers)) t,
+  ]..sort((a, b) => a.name.compareTo(b.name))).take(needsYouGroups).toList();
+
+  void _watchJoinRequests() {
+    final wanted = {for (final t in _approvingGroups) t.id};
+    for (final id in _requestSubs.keys.toList()) {
+      if (!wanted.contains(id)) {
+        _requestSubs.remove(id)?.cancel();
+        _requestCounts.remove(id);
+      }
+    }
+    for (final id in wanted) {
+      _requestSubs[id] ??= _teamRepo.watchJoinRequests(id).listen((r) {
+        _requestCounts[id] = r.length;
+        notifyListeners();
+      }, onError: (Object _) => _requestCounts.remove(id));
+    }
+  }
+
+  /// "Needs you": the groups with people asking to join, by name.
+  List<PendingRequests> get needsYou => [
+    for (final t in _approvingGroups)
+      if ((_requestCounts[t.id] ?? 0) > 0)
+        (team: t, count: _requestCounts[t.id]!),
+  ];
 
   Future<Result<String>> _joinTeam(String code) async {
     final user = _auth.currentUser;
@@ -157,11 +243,83 @@ class HomeViewModel extends ChangeNotifier {
   bool get loadingMorePosts => feed.loadingMore;
   void loadMorePosts() => feed.loadMore();
 
-  /// Back to the newest posts (Home tapped again, or pulled down).
-  Future<void> refreshFeed() => feed.refresh();
+  /// Back to the newest posts (Home tapped again, or pulled down), in the
+  /// community feed too once it's been opened.
+  Future<void> refreshFeed() async {
+    await Future.wait([
+      feed.refresh(),
+      community.refresh(),
+      ?_teamFeed?.refresh(),
+    ]);
+  }
+
+  // Community --------------------------------------------------------------
+
+  /// Every public profile's posts, as the website's Community tab shows.
+  late final CommunityFeed community;
+
+  /// Whether Home has a Community tab (builds with the API).
+  bool get hasCommunity => community.available;
+
+  /// Opens the Community tab: its first page loads the first time.
+  void openCommunity() => community.start();
+
+  /// The community's posts, less any being deleted.
+  List<UserPost> get communityPosts => [
+    for (final p in community.posts)
+      if (!removals.isPending(UserPostItem(p))) p,
+  ];
 
   /// Whether the user follows anything yet, for the empty feed's advice.
   bool get followsAnything => feed.follows.isNotEmpty;
+
+  /// No username yet (the router asks for one first, so rarely).
+  bool get needsUsername => _auth.needsUsername;
+
+  /// The checklist's steps and whether each is done: a username; joining
+  /// or creating a team and finding one are done once on any team (by
+  /// code, by finding it or by creating it); following once following
+  /// anything.
+  List<(OnboardingStep, bool)> get onboarding => [
+    (OnboardingStep.username, !needsUsername),
+    (OnboardingStep.join, teams.isNotEmpty),
+    (OnboardingStep.find, teams.isNotEmpty),
+    (OnboardingStep.follow, followsAnything),
+  ];
+
+  /// The checklist shows on an empty For you feed until every step is done.
+  bool get showOnboarding =>
+      postsLoaded &&
+      teamsLoaded &&
+      posts.isEmpty &&
+      onboarding.any((s) => !s.$2);
+
+  // Your teams -------------------------------------------------------------
+
+  HomeFeed? _teamFeed;
+
+  /// The "Your teams" tab: every post of the user's teams and groups,
+  /// opened the first time the tab is.
+  HomeFeed? get teamFeed => _teamFeed;
+
+  void openTeams() {
+    if (_teamFeed != null) return;
+    _teamFeed = HomeFeed(
+      uid: _uid,
+      followRepository: _follows,
+      teamRepository: _teamRepo,
+      teamPostRepository: _posts,
+      userPostRepository: _userPosts,
+      teamsOnly: true,
+    )..addListener(notifyListeners);
+    notifyListeners();
+  }
+
+  bool get teamPostsLoaded => _teamFeed?.loaded ?? false;
+
+  /// The tab's posts, less any being deleted.
+  List<FeedItem> get teamPosts =>
+      removals.visible(_teamFeed?.items ?? const []);
 
   /// The team behind [item] if the user is on it.
   Team? teamOf(TeamPostItem item) =>
@@ -220,6 +378,7 @@ class HomeViewModel extends ChangeNotifier {
     actions.track([
       for (final item in feed.items)
         if (item case UserPostItem(:final post)) post,
+      ...community.posts,
     ]);
     notifyListeners();
   }
@@ -235,10 +394,20 @@ class HomeViewModel extends ChangeNotifier {
     _feed
       ..removeListener(_onFeed)
       ..dispose();
+    for (final sub in _requestSubs.values) {
+      sub.cancel();
+    }
+    _teamFeed
+      ?..removeListener(notifyListeners)
+      ..dispose();
     feed
       ..removeListener(_onPosts)
       ..dispose();
+    community
+      ..removeListener(_onPosts)
+      ..dispose();
     joinTeam.dispose();
+    composer.dispose();
     savePost.dispose();
     deletePost.dispose();
     deleteUserPost.dispose();

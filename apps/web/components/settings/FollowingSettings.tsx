@@ -3,9 +3,10 @@ import { orderBy } from "firebase/firestore";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { callApi } from "@/lib/client";
-import { type Doc, useLiveQuery } from "@/lib/live";
+import { type Doc, useLivePaged } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
+import { LoadMore } from "../LoadMore";
 
 /** A follow as stored (Follow in the app). */
 interface Follow {
@@ -26,17 +27,21 @@ const tabs = [
 function hrefOf(f: Follow): string {
   if (f.type === "user") return `/players/${encodeURIComponent(f.targetId)}`;
   if (f.type === "team") return `/teams/${encodeURIComponent(f.targetId)}`;
+  // Group tournaments store "{groupId}_{tournamentId}" with groupId beside it (Follow.fromMap).
+  if (f.type === "tournament" && f.groupId && f.targetId.startsWith(`${f.groupId}_`)) {
+    const id = f.targetId.slice(f.groupId.length + 1);
+    return `/teams/${encodeURIComponent(f.groupId)}/tournaments/${encodeURIComponent(id)}`;
+  }
+  if (f.type === "tournament") return `/tournaments/${encodeURIComponent(f.targetId)}`;
   return "/events";
 }
 
 /** Everything the member follows, as a table: filter, find, notifications, unfollow. */
 export function FollowingSettings() {
   const { user } = useAuth();
-  const { data, error } = useLiveQuery<Follow>(
-    user ? `users/${user.uid}/follows` : null,
-    [orderBy("createdAt", "desc")],
-    "follows",
-  );
+  // The newest follows first, a page at a time; Find and the counts cover the pages loaded.
+  const paged = useLivePaged<Follow>(user ? `users/${user.uid}/follows` : null, [orderBy("createdAt", "desc")], "follows", 200);
+  const { data, error } = paged;
   const [tab, setTab] = useState<Follow["type"]>("user");
   const [find, setFind] = useState("");
   const list = useMemo(() => {
@@ -108,6 +113,7 @@ export function FollowingSettings() {
           </tbody>
         </table>
       )}
+      <LoadMore paged={paged} label="Show more follows" />
     </div>
   );
 }

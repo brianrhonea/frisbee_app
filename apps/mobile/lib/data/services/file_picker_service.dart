@@ -53,12 +53,10 @@ class FilePickerService {
   /// a phone's full-quality recording under maxVideoBytes.
   static const maxVideoLength = Duration(seconds: 30);
 
-  /// Whether this device can take photos and videos here (phones; desktop
-  /// and web pick files instead).
+  /// Whether this device can take photos and videos here (phones).
   bool get canUseCamera =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.android);
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.android;
 
   /// Opens the camera for a photo; null when cancelled. Throws
   /// [AccessDeniedException] if camera access was refused.
@@ -104,7 +102,7 @@ class FilePickerService {
     name: x.name,
     size: await x.length(),
     read: x.readAsBytes,
-    path: kIsWeb ? null : x.path,
+    path: x.path,
   );
 
   /// Shrinks picked photos before they're attached, unless the

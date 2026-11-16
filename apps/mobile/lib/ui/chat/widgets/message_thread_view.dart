@@ -25,8 +25,8 @@ import '../../core/ui/skeleton.dart';
 /// Messages with a composer below, for a team room or a direct message.
 /// Shows [readOnlyNotice] in place of the composer when the user can't post.
 ///
-/// Long-press a message (right-click, or hover, with a mouse) to react,
-/// reply, copy or delete it; swipe one to the right to reply.
+/// Long-press (or right-click) a message to react, reply, copy or delete
+/// it; swipe one to the right to reply.
 class MessageThreadView extends StatefulWidget {
   const MessageThreadView({
     super.key,
@@ -657,9 +657,8 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
   }
 }
 
-/// A message's text, with tappable links. Selectable with a mouse; on a
-/// touch screen a long-press opens the message's actions instead (Copy
-/// is one).
+/// A message's text, with tappable links. A long-press opens the
+/// message's actions (Copy is one).
 class _MessageText extends StatelessWidget {
   const _MessageText({required this.text, required this.style});
 
@@ -668,16 +667,8 @@ class _MessageText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      LinkifiedText(text, style: style, selectable: _usesMouse(context));
+      LinkifiedText(text, style: style, selectable: false);
 }
-
-/// Whether the device is driven by a pointer rather than touch.
-bool _usesMouse(BuildContext context) => switch (Theme.of(context).platform) {
-  TargetPlatform.windows ||
-  TargetPlatform.macOS ||
-  TargetPlatform.linux => true,
-  _ => false,
-};
 
 /// The quote above a reply: who it answers and what they said.
 class _ReplyQuote extends StatelessWidget {
@@ -829,75 +820,31 @@ class _Attachments extends StatelessWidget {
   );
 }
 
-/// Hover, long-press and right-click handling shared by both row styles.
-///
-/// With a mouse (Windows, macOS, Linux) every message carries a small
-/// react / reply strip at its end, faint until hovered; [builder] places
-/// it. On touch screens there's none: tap and hold opens the actions.
-class _Hoverable extends StatefulWidget {
-  const _Hoverable({
+/// Long-press (or right-click) handling shared by both row styles: opens
+/// the message's actions.
+class _Pressable extends StatelessWidget {
+  const _Pressable({
     required this.message,
     required this.actions,
-    required this.canReply,
-    required this.myReaction,
-    required this.builder,
+    required this.child,
   });
 
   final ChatMessage message;
   final _RowActions actions;
-  final bool canReply;
-
-  /// The user's reaction to it, highlighted in the picker.
-  final String? myReaction;
-
-  /// Builds the row; `strip` is null on touch screens, or while sending.
-  final Widget Function(BuildContext context, bool hover, Widget? strip)
-  builder;
+  final Widget child;
 
   @override
-  State<_Hoverable> createState() => _HoverableState();
-}
-
-class _HoverableState extends State<_Hoverable> {
-  bool _hover = false;
-
-  /// Kept lit while the emoji picker is open.
-  bool _picking = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = widget.message;
-    final a = widget.actions;
-    final react = a.onReact;
-    final strip =
-        _usesMouse(context) &&
-            m.createdAt != null &&
-            (react != null || widget.canReply)
-        ? _MessageStrip(
-            lit: _hover || _picking,
-            current: widget.myReaction,
-            onReact: react == null ? null : (e) => react(m, e),
-            onReply: widget.canReply ? () => a.onReply(m) : null,
-            onPicking: (open) => setState(() => _picking = open),
-          )
-        : null;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onLongPress: () => a.onActions(m),
-        onSecondaryTap: () => a.onActions(m),
-        child: widget.builder(context, _hover, strip),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onLongPress: () => actions.onActions(message),
+    onSecondaryTap: () => actions.onActions(message),
+    child: child,
+  );
 }
 
 /// One message, Discord style: everyone's on the left. The first of a run
 /// shows the author's photo, name and time (tap either for their
-/// profile); the rest of the run sits under it, with the time in the
-/// gutter on hover.
+/// profile); the rest of the run sits under it.
 class _FeedRow extends StatelessWidget {
   const _FeedRow({
     required this.message,
@@ -929,125 +876,95 @@ class _FeedRow extends StatelessWidget {
     final vm = viewModel;
     final name = m.authorName.isEmpty ? 'Member' : m.authorName;
     final canOpen = vm.opensProfiles && m.authorId.isNotEmpty;
-    return _Hoverable(
-      message: m,
-      actions: actions,
-      canReply: vm.canWrite && vm.canReact,
-      myReaction: m.reactionOf(vm.uid),
-      builder: (context, hover, strip) {
-        final body = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (m.replyTo case final r?) _ReplyQuote(reply: r, onBubble: false),
-            if (showAuthor)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.end,
-                  spacing: 8,
-                  children: [
-                    Semantics(
-                      button: canOpen,
-                      label: canOpen ? "$name's profile" : null,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(4),
-                        onTap: canOpen
-                            ? () => actions.onProfile(m.authorId)
-                            : null,
-                        child: Text(
-                          name,
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                            color: nameColor ?? c.ink,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (vm.usernameOf(m.authorId) case final handle?)
-                      Text(
-                        '@$handle',
-                        style: TextStyle(fontSize: 12.5, color: c.muted),
-                      ),
-                    Text(
-                      time == null ? 'Sending…' : _stamp(time),
-                      style: TextStyle(fontSize: 11.5, color: c.muted),
-                    ),
-                  ],
-                ),
-              ),
-            if (m.text.isNotEmpty)
-              _MessageText(
-                text: m.text,
-                style: TextStyle(
-                  color: time == null ? c.muted : c.ink,
-                  fontSize: 14.5,
-                  height: 1.375,
-                ),
-              ),
-            _Attachments(message: m, viewModel: vm, videoPlayer: videoPlayer),
-            _ReactionChips(message: m, uid: vm.uid, onReact: actions.onReact),
-          ],
-        );
-        final gutter = SizedBox(
-          width: _gutter,
-          child: showAuthor
-              ? Align(
-                  alignment: Alignment.topLeft,
-                  child: Padding(
-                    // Lines the photo's middle up between the name and
-                    // the first line under it.
-                    padding: EdgeInsets.only(
-                      left: 16,
-                      top: m.replyTo == null ? 2 : 46,
-                    ),
-                    child: GestureDetector(
-                      onTap: canOpen
-                          ? () => actions.onProfile(m.authorId)
-                          : null,
-                      child: UserAvatar(
-                        uid: m.authorId,
-                        name: m.authorName,
-                        radius: _avatar,
-                      ),
-                    ),
-                  ),
-                )
-              : hover && time != null
-              ? Padding(
-                  padding: const EdgeInsets.only(top: 4, right: 4),
-                  child: Text(
-                    DateFormat.jm().format(time),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 10, color: c.muted),
-                  ),
-                )
-              : null,
-        );
-        return Padding(
-          padding: EdgeInsets.only(top: showAuthor ? 14 : 0),
-          child: Container(
-            color: hover ? c.ink.withValues(alpha: 0.04) : null,
-            padding: const EdgeInsets.fromLTRB(0, 2, 16, 2),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (m.replyTo case final r?) _ReplyQuote(reply: r, onBubble: false),
+        if (showAuthor)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.end,
+              spacing: 8,
               children: [
-                gutter,
-                Expanded(child: body),
-                if (strip != null)
-                  Padding(
-                    // Level with the message's first line.
-                    padding: EdgeInsets.only(
-                      left: 8,
-                      top: showAuthor && m.replyTo == null ? 20 : 0,
+                Semantics(
+                  button: canOpen,
+                  label: canOpen ? "$name's profile" : null,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(4),
+                    onTap: canOpen ? () => actions.onProfile(m.authorId) : null,
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: nameColor ?? c.ink,
+                      ),
                     ),
-                    child: strip,
                   ),
+                ),
+                if (vm.usernameOf(m.authorId) case final handle?)
+                  Text(
+                    '@$handle',
+                    style: TextStyle(fontSize: 12.5, color: c.muted),
+                  ),
+                Text(
+                  time == null ? 'Sending…' : _stamp(time),
+                  style: TextStyle(fontSize: 11.5, color: c.muted),
+                ),
               ],
             ),
           ),
-        );
-      },
+        if (m.text.isNotEmpty)
+          _MessageText(
+            text: m.text,
+            style: TextStyle(
+              color: time == null ? c.muted : c.ink,
+              fontSize: 14.5,
+              height: 1.375,
+            ),
+          ),
+        _Attachments(message: m, viewModel: vm, videoPlayer: videoPlayer),
+        _ReactionChips(message: m, uid: vm.uid, onReact: actions.onReact),
+      ],
+    );
+    final gutter = SizedBox(
+      width: _gutter,
+      child: showAuthor
+          ? Align(
+              alignment: Alignment.topLeft,
+              child: Padding(
+                // Lines the photo's middle up between the name and
+                // the first line under it.
+                padding: EdgeInsets.only(
+                  left: 16,
+                  top: m.replyTo == null ? 2 : 46,
+                ),
+                child: GestureDetector(
+                  onTap: canOpen ? () => actions.onProfile(m.authorId) : null,
+                  child: UserAvatar(
+                    uid: m.authorId,
+                    name: m.authorName,
+                    radius: _avatar,
+                  ),
+                ),
+              ),
+            )
+          : null,
+    );
+    return _Pressable(
+      message: m,
+      actions: actions,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(0, showAuthor ? 16 : 2, 16, 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            gutter,
+            Expanded(child: body),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1104,12 +1021,10 @@ class _BubbleRow extends StatelessWidget {
       topRight: mine && !startsRun ? small : big,
       bottomRight: mine && !endsRun ? small : big,
     );
-    return _Hoverable(
+    return _Pressable(
       message: m,
       actions: actions,
-      canReply: vm.canWrite && vm.canReact,
-      myReaction: m.reactionOf(vm.uid),
-      builder: (context, hover, strip) => Padding(
+      child: Padding(
         padding: EdgeInsets.fromLTRB(16, startsRun ? 8 : 2, 16, 0),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -1125,31 +1040,23 @@ class _BubbleRow extends StatelessWidget {
                   if (m.replyTo case final r?)
                     _ReplyQuote(reply: r, onBubble: false),
                   if (m.text.isNotEmpty)
-                    // The time on hover. Not on touch screens: a Tooltip
-                    // there claims the long-press the actions sheet needs.
-                    _HoverTime(
-                      enabled: _usesMouse(context),
-                      message: sending
-                          ? 'Sending…'
-                          : DateFormat.jm().format(m.createdAt!),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: fill,
-                          borderRadius: radius,
-                          border: mine ? null : Border.all(color: c.border),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: fill,
+                        borderRadius: radius,
+                        border: mine ? null : Border.all(color: c.border),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 13,
+                          vertical: 8,
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 13,
-                            vertical: 8,
-                          ),
-                          child: _MessageText(
-                            text: m.text,
-                            style: TextStyle(
-                              color: sending ? ink.withValues(alpha: 0.7) : ink,
-                              fontSize: 15,
-                              height: 1.3,
-                            ),
+                        child: _MessageText(
+                          text: m.text,
+                          style: TextStyle(
+                            color: sending ? ink.withValues(alpha: 0.7) : ink,
+                            fontSize: 15,
+                            height: 1.3,
                           ),
                         ),
                       ),
@@ -1167,48 +1074,15 @@ class _BubbleRow extends StatelessWidget {
                 ],
               ),
             );
-            // The strip sits at the bubble's end, toward the middle:
-            // after theirs, before the user's own.
             return Align(
               alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-              child: strip == null
-                  ? bubble
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (mine) ...[strip, const SizedBox(width: 6)],
-                        Flexible(child: bubble),
-                        if (!mine) ...[const SizedBox(width: 6), strip],
-                      ],
-                    ),
+              child: bubble,
             );
           },
         ),
       ),
     );
   }
-}
-
-/// A [Tooltip] when [enabled], else just [child].
-class _HoverTime extends StatelessWidget {
-  const _HoverTime({
-    required this.enabled,
-    required this.message,
-    required this.child,
-  });
-
-  final bool enabled;
-  final String message;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => enabled
-      ? Tooltip(
-          message: message,
-          waitDuration: const Duration(milliseconds: 600),
-          child: child,
-        )
-      : child;
 }
 
 /// The time, centered, over a message that came a while after the last.
@@ -1262,133 +1136,6 @@ class _DayDivider extends StatelessWidget {
           ),
           Expanded(child: Divider(color: c.border, height: 1)),
         ],
-      ),
-    );
-  }
-}
-
-/// React and Reply, at the end of a message when there's a mouse. Faint
-/// until the message is hovered ([lit]); React opens the emoji in a row.
-class _MessageStrip extends StatefulWidget {
-  const _MessageStrip({
-    required this.lit,
-    required this.current,
-    required this.onReact,
-    required this.onReply,
-    required this.onPicking,
-  });
-
-  final bool lit;
-  final String? current;
-  final ValueChanged<String>? onReact;
-  final VoidCallback? onReply;
-  final ValueChanged<bool> onPicking;
-
-  @override
-  State<_MessageStrip> createState() => _MessageStripState();
-}
-
-class _MessageStripState extends State<_MessageStrip> {
-  final _menu = MenuController();
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final react = widget.onReact;
-    final reply = widget.onReply;
-    return AnimatedOpacity(
-      opacity: widget.lit ? 1 : 0.35,
-      duration: const Duration(milliseconds: 120),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (react != null)
-            MenuAnchor(
-              controller: _menu,
-              onOpen: () => widget.onPicking(true),
-              onClose: () => widget.onPicking(false),
-              alignmentOffset: const Offset(0, 4),
-              style: MenuStyle(
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 4),
-                ),
-                shape: WidgetStatePropertyAll(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    side: BorderSide(color: c.border),
-                  ),
-                ),
-              ),
-              menuChildren: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final e in quickReactions)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: InkResponse(
-                          radius: 20,
-                          onTap: () {
-                            _menu.close();
-                            react(e);
-                          },
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            alignment: Alignment.center,
-                            decoration: e == widget.current
-                                ? BoxDecoration(
-                                    color: c.accentSoft,
-                                    shape: BoxShape.circle,
-                                  )
-                                : null,
-                            child: Text(
-                              e,
-                              style: const TextStyle(fontSize: 21),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-              builder: (context, menu, _) => _StripButton(
-                tooltip: 'React',
-                icon: Icons.add_reaction_outlined,
-                onTap: () => menu.isOpen ? menu.close() : menu.open(),
-              ),
-            ),
-          if (reply != null)
-            _StripButton(tooltip: 'Reply', icon: Icons.reply, onTap: reply),
-        ],
-      ),
-    );
-  }
-}
-
-class _StripButton extends StatelessWidget {
-  const _StripButton({
-    required this.tooltip,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    return Tooltip(
-      message: tooltip,
-      child: InkResponse(
-        onTap: onTap,
-        radius: 16,
-        child: SizedBox.square(
-          dimension: 28,
-          child: Icon(icon, size: 17, color: c.muted),
-        ),
       ),
     );
   }

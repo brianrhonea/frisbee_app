@@ -1,0 +1,54 @@
+/* Hosted tournaments and leagues: lists, the form, the event page, games
+   and results. Uses the site's tokens from app.css. */
+
+.hosted-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+.hosted-toolbar input[type="search"] { flex: 1 1 220px; min-width: 0; }
+.hosted-filters, .hosted-divisions, .hosted-tabs { flex-wrap: wrap; }
+.hosted-tabs { overflow-x: auto; }
+.hosted-official { color: var(--accent); font-weight: 600; font-size: 0.85em; }
+.hosted-status.hosted-registration, .hosted-status.hosted-live, .pill.hosted-live { background: var(--accent-soft); color: var(--accent); }
+.hosted-status.hosted-draft { border: 1px dashed var(--line); }
+.hosted-actions { margin-top: 10px; }
+.hosted-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.hosted-page h1 { margin: 2px 0 4px; }
+.hosted-head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-start; }
+.hosted-description { white-space: pre-wrap; margin: 0; }
+.hosted-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; }
+.hosted-facts dt { color: var(--muted); }
+.hosted-facts dd { margin: 0; overflow-wrap: anywhere; }
+.hosted-checklist { margin: 0 0 12px; padding-left: 20px; }
+.hosted-checklist li { color: var(--muted); }
+.hosted-checklist li.done { color: var(--ink); }
+.hosted-checklist li.done::marker { content: "✓  "; color: var(--accent); }
+.hosted-division-row, .hosted-entry { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
+.hosted-entry > form { flex-basis: 100%; }
+.hosted-captains { border: 1px solid var(--line); border-radius: var(--radius, 10px); padding: 8px 12px; display: grid; gap: 4px; }
+.hosted-seeds { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.hosted-seeds li, .hosted-page .row-card { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+.hosted-slot-links { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+
+.hosted-heading { font-size: 1rem; margin: 8px 0 4px; }
+.hosted-day { margin: 12px 0 2px; font-size: 0.95rem; }
+.hosted-game-row { gap: 6px; }
+.hosted-game { border: 1px solid var(--line); border-radius: var(--radius, 10px); background: var(--card); padding: 10px 12px; display: grid; gap: 6px; }
+.hosted-game-you { border-color: var(--accent); }
+.hosted-game-skipped { opacity: 0.6; }
+.hosted-game-head { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+.hosted-game-teams { display: grid; grid-template-columns: minmax(0, 1fr) 3ch; gap: 2px 8px; }
+.hosted-game-teams b { text-align: right; }
+.hosted-winner { font-weight: 700; }
+.hosted-game-actions { margin: 0; }
+.hosted-score-form input { max-width: 7rem; }
+
+.hosted-champion { display: grid; gap: 2px; text-align: center; }
+.hosted-champion b { font-size: 1.3rem; }
+.hosted-table-wrap { overflow-x: auto; }
+.hosted-bracket { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.hosted-bracket-col { flex: 0 0 220px; display: grid; gap: 8px; align-content: start; }
+
+@media (max-width: 560px) {
+  .hosted-facts { grid-template-columns: minmax(0, 1fr); }
+  .hosted-facts dt { margin-top: 6px; }
+  .hosted-bracket-col { flex-basis: 78vw; }
+}

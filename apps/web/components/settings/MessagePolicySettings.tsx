@@ -1,7 +1,7 @@
 "use client";
 import { type MessagePolicy, messagePolicies, messagePolicyLabels, type MessagePolicyResponse } from "@stall10/shared";
 import { useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 
 /** Who can start a conversation with them (`/v1/me/message-policy`), as in the app's Settings. */
@@ -30,7 +30,7 @@ export function MessagePolicySettings() {
       await callApi(me, "/v1/me/message-policy", { method: "PUT", body: { messagePolicy: next } });
     } catch (e) {
       setPolicy(before);
-      setError(e instanceof ApiError ? e.message : "Couldn't save. Try again.");
+      setError(problem(e, "Couldn't save. Try again."));
     } finally {
       setBusy(false);
     }

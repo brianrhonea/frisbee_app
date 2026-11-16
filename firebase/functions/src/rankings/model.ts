@@ -187,6 +187,34 @@ export function rate(games: RankedGame[], now: Date, rounds = 2000): TeamRating[
 /** The ranking doc id for a division: "club-mixed". */
 export const rankingKey = (level: string, division: string): string => `${level}-${division}`;
 
+/**
+ * The levels that are ranked (a copy of `rankedLevels` in
+ * packages/shared/src/rankings.ts). Youth is never ranked: we don't show
+ * anything about youth players, and a ranking of youth teams is about
+ * them. Listed on purpose, so a level added later isn't ranked until it's
+ * added here.
+ */
+export const rankedLevels = ["club", "college", "league", "pickup"] as const;
+export const rankingDivisions = ["mixed", "open", "women", "masters"] as const;
+
+/** Whether a ranking key ("club-mixed") is one we rank: never youth, nor an unknown level or division. */
+export function isRankedKey(key: string): boolean {
+  const [level, division, ...rest] = key.split("-");
+  return (
+    rest.length === 0 &&
+    (rankedLevels as readonly string[]).includes(level) &&
+    (rankingDivisions as readonly string[]).includes(division ?? "")
+  );
+}
+
+/**
+ * A youth team, by its team doc or its directory listing (a copy of
+ * `isYouthTeam` in packages/shared/src/team.ts): a team (no kind, or
+ * "team") at the youth level. Never ranked, even in an adult division.
+ */
+export const isYouthTeam = (team: Data | null | undefined): boolean =>
+  !!team && (team.kind === undefined || team.kind === "team") && team.level === "youth";
+
 /** Whether a tournament's games count toward rankings. */
 export function countsForRankings(t: Data): boolean {
   return (
@@ -209,9 +237,11 @@ export function rankingDoc(
   division: string,
   ratings: TeamRating[],
   names: Map<string, string>,
+  /** Teams never listed (youth teams); the rest are numbered without gaps. */
+  hidden: ReadonlySet<string> = new Set(),
 ): Data {
   const teams = ratings
-    .filter((r) => r.games >= minGames)
+    .filter((r) => r.games >= minGames && !hidden.has(r.teamId))
     .slice(0, maxRanked)
     .map((r, i) => ({
       rank: i + 1,
@@ -222,6 +252,30 @@ export function rankingDoc(
       losses: r.losses,
     }));
   return { level, division, teams, minGames };
+}
+
+/**
+ * What a rebuild writes: a ranking for every ranked key with at least one
+ * ranked team (youth keys, unknown keys and [youthTeams] left out), and a
+ * delete for every [existing] doc it doesn't write, so stale youth (or
+ * emptied) rankings go away. A youth team's games still count for its
+ * adult opponents' ratings; it just isn't listed.
+ */
+export function rankingWrites(
+  games: Map<string, RankedGame[]>,
+  names: Map<string, string>,
+  youthTeams: ReadonlySet<string>,
+  existing: Iterable<string>,
+  now: Date,
+): { set: Map<string, Data>; remove: string[] } {
+  const set = new Map<string, Data>();
+  for (const [key, list] of games) {
+    if (!isRankedKey(key)) continue;
+    const [level, division] = key.split("-");
+    const doc = rankingDoc(level, division, rate(list, now), names, youthTeams);
+    if ((doc.teams as unknown[]).length > 0) set.set(key, doc);
+  }
+  return { set, remove: [...existing].filter((id) => !set.has(id)) };
 }
 
 /** A finished tournament's results for Explore: each division's top two. */
@@ -257,4 +311,23 @@ export function divisionResult(div: Data, names: Map<string, string>): DivisionR
     champion: team(places[0]),
     runnerUp: team(places[1]),
   };
+}
+
+/**
+ * A finished tournament's division results as Explore's Recent results
+ * show them: never youth. A youth division (or an unknown level) is left
+ * out, and a youth team never shows as champion or runner-up (a division
+ * whose champion is a youth team is left out).
+ */
+export function publicResults(
+  divisions: Array<{ key: string; result: DivisionResult }>,
+  youth: Set<string>,
+): DivisionResult[] {
+  const out: DivisionResult[] = [];
+  for (const { key, result } of divisions) {
+    if (!isRankedKey(key) || !result.champion || youth.has(result.champion.teamId)) continue;
+    const runnerUp = result.runnerUp && youth.has(result.runnerUp.teamId) ? null : result.runnerUp;
+    out.push({ ...result, runnerUp });
+  }
+  return out;
 }

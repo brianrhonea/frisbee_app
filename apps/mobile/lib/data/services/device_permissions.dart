@@ -40,9 +40,8 @@ class DevicePermissions {
   const DevicePermissions();
 
   bool get supported =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.android);
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.android;
 
   static Permission _permission(DeviceAccess a) => switch (a) {
     DeviceAccess.photos => Permission.photos,

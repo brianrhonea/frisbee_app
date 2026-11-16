@@ -2,71 +2,146 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../../services/shared_preferences_service.dart';
+import '../auth/auth_repository.dart';
 
 /// Unsent text in message composers, by thread, so leaving a conversation
-/// and coming back doesn't lose what was typed.
+/// and coming back doesn't lose what was typed. Drafts belong to whoever
+/// is signed in, and are forgotten when they sign out.
 abstract class MessageDraftRepository {
-  /// What was left in [key]'s composer; empty for nothing.
+  /// What the signed-in user left in [key]'s composer; empty for nothing.
   String draft(String key);
 
   /// Remembers [text] for [key]; empty forgets it.
   void save(String key, String text);
 }
 
-/// Drafts in memory, kept on the device between runs. They're loaded
-/// once at start, which is long done by the time anyone opens a chat.
+/// Drafts in memory, kept on the device between runs under the signed-in
+/// user's own key (`messageDrafts_<uid>`, as the website keeps them). They
+/// load when that user signs in, which is long done by the time anyone
+/// opens a chat. Signing out drops them from memory and the device, so the
+/// next person on this phone never sees them.
 class MessageDraftRepositoryPrefs implements MessageDraftRepository {
-  MessageDraftRepositoryPrefs(this._prefs) {
-    unawaited(_load());
+  MessageDraftRepositoryPrefs(
+    this._prefs, {
+    required AuthRepository auth,
+    Duration writeDelay = const Duration(milliseconds: 500),
+  }) : _auth = auth,
+       _writeDelay = writeDelay {
+    _auth.addListener(_onAuthChanged);
+    _onAuthChanged();
   }
 
   final SharedPreferencesService _prefs;
+  final AuthRepository _auth;
+  final Duration _writeDelay;
   final _drafts = <String, String>{};
+  String? _uid;
   Timer? _write;
 
-  static const _key = 'messageDrafts';
+  /// The signed-in user's stored drafts loading; writes wait for it, so a
+  /// save made first doesn't overwrite what's stored.
+  Future<void>? _loading;
+  var _loaded = false;
+
+  /// Keys saved (or cleared) since sign-in; the load doesn't bring them back.
+  final _touched = <String>{};
+
+  /// Where [uid]'s drafts are kept (messageDraftsKey in packages/shared).
+  static String keyFor(String uid) => 'messageDrafts_$uid';
+
+  /// The key every user's drafts once shared; removed when found.
+  static const legacyKey = 'messageDrafts';
 
   /// Drafts kept, newest last; the oldest go past this.
   static const maxDrafts = 50;
 
-  Future<void> _load() async {
+  void _onAuthChanged() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == _uid) return;
+    final previous = _uid;
+    _uid = uid;
+    // Nothing of the last user's carries over, not even a pending write.
+    _write?.cancel();
+    _write = null;
+    _drafts.clear();
+    _touched.clear();
+    _loaded = false;
+    _loading = null;
+    if (previous != null) {
+      unawaited(_prefs.remove(keyFor(previous)).catchError((Object _) {}));
+    }
+    if (uid != null) _loading = _load(uid);
+  }
+
+  Future<void> _load(String uid) async {
     try {
-      final raw = await _prefs.getString(_key);
-      if (raw == null) return;
+      // Drafts from before they were kept per user can't be told apart.
+      unawaited(_prefs.remove(legacyKey).catchError((Object _) {}));
+      final raw = await _prefs.getString(keyFor(uid));
+      // Signed out (or someone else signed in) meanwhile: not theirs.
+      if (raw == null || _uid != uid) return;
       final map = jsonDecode(raw);
       if (map is! Map) return;
-      for (final e in map.entries) {
-        // Anything typed since start wins over what was stored.
-        if (e.value is String) _drafts.putIfAbsent('${e.key}', () => e.value);
-      }
+      final stored = <String, String>{
+        for (final e in map.entries)
+          // Anything typed or cleared since sign-in wins over what was stored.
+          if (e.value is String && !_touched.contains('${e.key}'))
+            '${e.key}': e.value as String,
+      };
+      // Stored drafts are older than anything typed since, so go first.
+      final typed = Map.of(_drafts);
+      _drafts
+        ..clear()
+        ..addAll(stored)
+        ..addAll(typed);
+      _trim();
     } on Object {
       // A bad entry just means no drafts.
+    } finally {
+      if (_uid == uid) _loaded = true;
+    }
+  }
+
+  void _trim() {
+    while (_drafts.length > maxDrafts) {
+      _drafts.remove(_drafts.keys.first);
     }
   }
 
   @override
-  String draft(String key) => _drafts[key] ?? '';
+  String draft(String key) => _uid == null ? '' : _drafts[key] ?? '';
 
   @override
   void save(String key, String text) {
+    final uid = _uid;
+    if (uid == null) return;
+    _touched.add(key);
     if (text.trim().isEmpty) {
-      if (_drafts.remove(key) == null) return;
+      // Before the load, a stored draft for [key] may still need clearing.
+      if (_drafts.remove(key) == null && _loaded) return;
     } else {
       // Re-inserted at the end, so the map runs oldest to newest.
       _drafts
         ..remove(key)
         ..[key] = text;
-      while (_drafts.length > maxDrafts) {
-        _drafts.remove(_drafts.keys.first);
-      }
+      _trim();
     }
-    // Typing saves a lot; write once it settles.
+    // Typing saves a lot; write once it settles, and after the load.
+    final loading = _loading;
     _write?.cancel();
-    _write = Timer(const Duration(milliseconds: 500), () {
-      unawaited(
-        _prefs.setString(_key, jsonEncode(_drafts)).catchError((Object _) {}),
-      );
+    _write = Timer(_writeDelay, () async {
+      await loading;
+      if (_uid != uid) return;
+      await _prefs
+          .setString(keyFor(uid), jsonEncode(_drafts))
+          .catchError((Object _) {});
     });
+  }
+
+  /// Stops following sign-ins and drops any pending write.
+  void dispose() {
+    _auth.removeListener(_onAuthChanged);
+    _write?.cancel();
   }
 }
 

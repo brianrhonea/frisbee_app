@@ -7,6 +7,7 @@ import {
 } from "@stall10/shared";
 import { type Caller, callerLabel, type UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
+import { ClubAgeGate } from "./club_age.js";
 import type { TeamRepository } from "./repository.js";
 
 /** How many listings the name check looks through, as the app does. */
@@ -23,13 +24,16 @@ export function tooFastMessage(until: number, now: number): string {
  * check on a team create is checked here: the body's shape and limits
  * (schema), the owner (the caller, never the body), the flood mute
  * (notMuted), a league spot only in a league taking teams (validLeagueRef),
- * plus the unique-name check the app runs before writing.
+ * plus the unique-name check the app runs before writing, and the club
+ * age rule (16 and over) for the creator of a club team.
  */
 export class TeamService {
   constructor(
     private readonly repo: TeamRepository,
     private readonly users: UserLookup,
     private readonly now: () => number = Date.now,
+    /** Club teams' age rule: the creator is a club team's first member. */
+    private readonly clubAges: ClubAgeGate = new ClubAgeGate(undefined, now),
   ) {}
 
   async createTeam(caller: Caller, body: unknown): Promise<string> {
@@ -56,6 +60,8 @@ export class TeamService {
     if (clash) {
       throw new ApiError("already_exists", nameTakenMessage(clash.name, input.kind, input.division));
     }
+
+    await this.clubAges.check({ kind: input.kind, level: input.level }, caller.uid);
 
     const label = callerLabel({ uid: caller.uid, ...(user ?? { name: caller.name, email: caller.email }) });
     return this.repo.createTeam(input, { uid: caller.uid, label });

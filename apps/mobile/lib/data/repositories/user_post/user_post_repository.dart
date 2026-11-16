@@ -42,6 +42,19 @@ abstract class UserPostRepository {
   /// Null once deleted.
   Stream<UserPost?> watchPost(String id);
 
+  /// Whether this build can read the community feed (it needs the API).
+  bool get hasCommunityFeed;
+
+  /// One page of the community feed, the website's Community tab
+  /// (`GET /v1/feed`): the newest posts by public profiles, newest first,
+  /// [before] a cursor from the last page (null for the newest). A page
+  /// can be short, even empty, with more after it.
+  Future<Result<CommunityFeedPage>> fetchCommunityPage({int? before});
+
+  /// The posts with these [ids], newest first, kept up to date; deleted
+  /// ones are left out.
+  Stream<List<UserPost>> watchPostsByIds(List<String> ids);
+
   /// Creates the post when [UserPost.isNew], otherwise updates it. Uploads
   /// [UserPostDraft.newImages] and deletes photos dropped from it. Returns
   /// the post id.
@@ -63,6 +76,10 @@ abstract class UserPostRepository {
 
   Future<Result<Uint8List>> downloadImage(ChatAttachment image);
 }
+
+/// A page of the community feed: its posts' ids, newest first, and the
+/// cursor for the page after (null at the end).
+typedef CommunityFeedPage = ({List<String> ids, int? next});
 
 /// Which posts [UserPostRepository.fetchPostsBefore] pages through; the
 /// same sets as watchPostsByAuthors, watchPostsForTournaments and

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
+import '../testing/mock_stats_repository.dart';
 import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
 import 'package:frisbee_app/domain/models/stats.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';

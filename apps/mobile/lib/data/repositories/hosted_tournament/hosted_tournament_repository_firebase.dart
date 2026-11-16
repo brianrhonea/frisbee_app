@@ -218,7 +218,7 @@ class HostedTournamentRepositoryFirebase implements HostedTournamentRepository {
         (snap) => [
           for (final d in snap.docs)
             PlayerSignup.fromMap(d.id, plainData(d.data())),
-        ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())),
+        ]..sort(PlayerSignup.compareByName),
       );
 
   @override

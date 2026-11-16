@@ -255,6 +255,10 @@ void main() {
           },
         ),
       ),
+      'deleteTeam': (
+        () => repo().deleteTeam(team, name: ' the haze '),
+        (method: 'DELETE', path: '/v1/teams/t1', body: {'name': 'the haze'}),
+      ),
       'unlinkTeam': (
         () => repo().unlinkTeam('org1', 't1'),
         (method: 'DELETE', path: '/v1/teams/org1/linked-teams/t1', body: null),
@@ -349,6 +353,22 @@ void main() {
         'u1': 'owner',
         'u2': 'player',
       });
+    });
+
+    test('deleteTeam with the flag off deletes it directly', () async {
+      final pickup = Team.fromMap('t1', {
+        'name': 'Pickup',
+        'kind': 'community',
+        'ownerId': 'u1',
+        'members': {'u1': 'owner'},
+        'memberIds': ['u1'],
+      });
+      final r = await repo(
+        flags: FeatureFlags.fixed({'use_api_membership': false}),
+      ).deleteTeam(pickup, name: 'Pickup');
+      expect(r, isA<Ok<void>>());
+      expect(sent, isEmpty);
+      expect((await db.doc('teams/t1').get()).exists, isFalse);
     });
 
     test('so do builds without an API', () async {

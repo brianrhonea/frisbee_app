@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/team/team_repository_firebase.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/model_utils.dart';
+import 'package:frisbee_app/domain/models/person_name.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_name.dart';
 import 'package:frisbee_app/domain/models/username.dart';
@@ -189,6 +190,25 @@ const _usernames = [
   'ok.name_1',
 ];
 
+/// Display names from Google, Apple or a profile: split for the name
+/// boxes and turned into a username suggestion.
+const _displayNames = <String?>[
+  null,
+  '',
+  '   ',
+  'Pat Lee',
+  '  Pat   Lee  ',
+  'Mary Ann Smith',
+  'Cher',
+  'Ana María López',
+  'pat@privaterelay.appleid.com',
+  'Bartholomew-Maximilian-Fitzgerald-Wolfe Jr',
+  'X Averyveryverylongsurnamethatgoesonandon',
+  '李 小龙',
+  "O'Brien, Seán",
+  'admin',
+];
+
 const _names = [
   'TX B.Q.Q.',
   'Texas BQQ',
@@ -264,9 +284,9 @@ void main() {
   test('a team made in a community matches packages/shared/fixtures', () {
     final c = _communityTeamCase;
     final org = c['org']! as Map<String, Object?>;
-    final team = _newTeam(c['request']! as Map<String, Object?>).inCommunity(
-      Team.fromMap(org['id']! as String, {'name': org['name']}),
-    );
+    final team = _newTeam(
+      c['request']! as Map<String, Object?>,
+    ).inCommunity(Team.fromMap(org['id']! as String, {'name': org['name']}));
     _check('team_community_create.json', {
       ...c,
       'docs': newTeamDocs(
@@ -324,6 +344,16 @@ void main() {
             'input': u,
             'normalized': Username.normalize(u),
             'problem': Username.problem(u),
+          },
+      ],
+      'displayNames': [
+        for (final n in _displayNames)
+          {
+            'name': n,
+            'first': PersonName.split(n).first,
+            'last': PersonName.split(n).last,
+            'missing': PersonName.missing(n),
+            'suggestion': Username.suggest(n),
           },
       ],
     });

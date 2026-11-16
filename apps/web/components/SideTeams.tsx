@@ -1,17 +1,19 @@
 "use client";
-import { where } from "firebase/firestore";
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { type Doc, useLiveQuery } from "@/lib/live";
+import { type Doc } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
 import { NavIcon } from "./NavIcons";
+import { initials } from "@/lib/text";
+import { useMyTeams } from "./useMyTeams";
+import { StartOrJoinButton } from "./home/StartOrJoin";
 
 /** Teams listed before "See all". */
 const shown = 5;
 
 /** Tile colours, picked by the team's id so a team keeps its colour. */
 const tints = ["#5348b2", "#b7791f", "#2c6fb7", "#2f8f6b", "#a8407a", "#c2622d"];
-function tint(id: string) {
+export function tint(id: string) {
   let h = 0;
   for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return tints[h % tints.length]!;
@@ -25,48 +27,44 @@ function compact(n: number) {
   return n < 1000 ? String(n) : `${(n / 1000).toFixed(n < 10_000 ? 1 : 0).replace(/\.0$/, "")}k`;
 }
 
-/** "Seattle Ultimate" → "SU"; one word → its first two letters. */
-function initials(name: string) {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length > 1) return words.slice(0, 3).map((w) => w[0]).join("").toUpperCase();
-  return (words[0] ?? "?").slice(0, 2).toUpperCase();
-}
-
 interface Space {
   name?: string;
   kind?: string;
   members?: Record<string, string>;
-  orgId?: string;
+  orgId?: string | null;
   orgLinked?: boolean;
   linkedTeams?: Record<string, unknown>;
 }
 
 /**
- * The member's teams and groups ("Your spaces"), each labelled with its
- * kind: in the sidebar, or [inline] at the foot of Home where there's no
- * sidebar list (tablets and phones). As on the Teams page (MyTeams), a team
- * one of their communities lists is left out: it's reached through the
- * community.
+ * The teams and groups to list, by name: as on the Teams page (MyTeams), a
+ * team one of their communities lists is left out (it's reached through
+ * the community).
  */
-export function SideTeams({ inline = false }: { inline?: boolean }) {
-  const { user } = useAuth();
-  const live = useLiveQuery<Space>(
-    user ? "teams" : null,
-    user ? [where("memberIds", "array-contains", user.uid)] : [],
-    user?.uid ?? "",
-  );
-  if (!user || !live.data?.length) return null;
-  const communities = live.data.filter((t) => t.kind && t.kind !== "team");
-  const viaCommunity = (t: Doc<Space>) =>
+export function spacesOf<T extends Space>(all: Doc<T>[]): Doc<T>[] {
+  const communities = all.filter((t) => t.kind && t.kind !== "team");
+  const viaCommunity = (t: Doc<T>) =>
     t.orgLinked === true && communities.some((c) => c.id === t.orgId && Object.hasOwn(c.linkedTeams ?? {}, t.id));
-  const teams = live.data.filter((t) => !viaCommunity(t)).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+  return all.filter((t) => !viaCommunity(t)).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+}
+
+/**
+ * The member's teams and groups ("Your spaces") in the sidebar, each
+ * labelled with its kind; "+" creates or joins one. (Home lists them in
+ * its team strip where there's no sidebar list.)
+ */
+export function SideTeams() {
+  const { user } = useAuth();
+  const live = useMyTeams<Space>(user?.uid);
+  if (!user || !live.data?.length) return null;
+  const teams = spacesOf(live.data);
   return (
-    <nav className={inline ? "side-teams inline" : "side-teams"} aria-label="Your spaces">
+    <nav className="side-teams" aria-label="Your spaces">
       <div className="side-label-row">
         <h2 className="side-label">Your spaces</h2>
-        <Link href="/teams" className="side-add" aria-label="All your teams and groups">
+        <StartOrJoinButton className="side-add" label="Create or join a team or group">
           <NavIcon name="plus" size={16} />
-        </Link>
+        </StartOrJoinButton>
       </div>
       <div className="side-team-list">
         {teams.slice(0, shown).map((t) => {

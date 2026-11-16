@@ -1,8 +1,30 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../domain/models/username.dart';
 import '../../../utils/result.dart';
+
+/// Whether [error] (a [Result] error or an exception) is the person closing
+/// or cancelling a Google or Apple sign-in. That isn't a failure: callers
+/// show nothing (the website ignores the same cases).
+bool isSignInCancelled(Object? error) {
+  final e = error is Error ? error.error : error;
+  return switch (e) {
+    GoogleSignInException(code: GoogleSignInExceptionCode.canceled) => true,
+    FirebaseAuthException(
+      code: 'canceled' ||
+          'cancelled' ||
+          'popup-closed-by-user' ||
+          'cancelled-popup-request' ||
+          'user-cancelled' ||
+          'web-context-canceled' ||
+          'web-context-cancelled',
+    ) =>
+      true,
+    _ => false,
+  };
+}
 
 /// User-facing text for an error [Result] or exception.
 String errorMessage(Object? error) {
@@ -24,8 +46,9 @@ String errorMessage(Object? error) {
       'That email address looks invalid.',
     FirebaseAuthException(code: 'requires-recent-login') =>
       'Please sign out and sign in again, then retry.',
-    FirebaseAuthException(code: 'popup-closed-by-user' || 'canceled') =>
-      'Sign-in was cancelled.',
+    _ when isSignInCancelled(e) => 'Sign-in was cancelled.',
+    GoogleSignInException() =>
+      "Couldn't sign in with Google. Try again.",
     FirebaseAuthException(:final message?) => message,
     FirebaseException(code: 'permission-denied' || 'unauthorized') =>
       "You don't have permission to do that.",
@@ -37,7 +60,9 @@ String errorMessage(Object? error) {
   };
 }
 
+/// Shows [error] in a snack bar; a cancelled sign-in shows nothing.
 void showErrorSnackBar(BuildContext context, Object? error) {
+  if (isSignInCancelled(error)) return;
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(errorMessage(error))));

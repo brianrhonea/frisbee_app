@@ -6,11 +6,12 @@
 # Release tags from before the move (rollbacks) have them at the repo root;
 # the Layout step picks the right paths for whichever commit is checked out.
 #
-# Hosting includes the website's Flutter web app (scripts/build_site.sh,
-# run by firebase.json's predeploy). It needs the Firebase web API key as the
-# repository secret FIREBASE_WEB_API_KEY_DEV / _PROD (the
-# FIREBASE_WINDOWS_API_KEY value from that project's secrets file); without
-# it, hosting is skipped with a warning and the rest still deploys.
+# Hosting serves only the static pages and invite-link fallbacks in
+# firebase/hosting (scripts/build_site.sh copies them; the website is
+# apps/web on Vercel). Older commits whose build_site.sh still builds the
+# Flutter web app (rollbacks) need the Firebase web API key as the
+# repository secret FIREBASE_WEB_API_KEY_DEV / _PROD and apps/mobile/web;
+# without them, hosting is skipped with a warning and the rest still deploys.
 #
 # Change the groups with the repository variable FUNCTION_GROUPS
 # (Settings → Secrets and variables → Actions → Variables), e.g. "account,api,browse,communities,discord,follows,meetings,notifications,tournaments".
@@ -52,7 +53,7 @@ jobs:
       contents: write # to push the release tag
     env:
       PROJECT: ${{ inputs.environment }}
-      GROUPS: ${{ vars.FUNCTION_GROUPS || 'account,api,browse,communities,discord,follows,meetings,notifications,tournaments' }}
+      GROUPS: ${{ vars.FUNCTION_GROUPS || 'account,api,browse,communities,discord,follows,meetings,notifications,rankings,tournaments' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,6 +69,11 @@ jobs:
             echo "FB_DIR=." >> "$GITHUB_ENV"
             echo "MOBILE_DIR=." >> "$GITHUB_ENV"
           fi
+          # Older commits build the Flutter web app into hosting.
+          fb_dir=$([ -f firebase/firebase.json ] && echo firebase || echo .)
+          if grep -qs "flutter build web" "$fb_dir/scripts/build_site.sh"; then
+            echo "FLUTTER_SITE=true" >> "$GITHUB_ENV"
+          fi
 
       - uses: actions/setup-node@v4
         with:
@@ -82,9 +88,9 @@ jobs:
           npm run build
           npm test
 
-      # For the website (scripts/build_site.sh); older commits don't have it.
+      # For older commits' Flutter web build (scripts/build_site.sh).
       - name: Set up Flutter
-        if: hashFiles('scripts/build_site.sh', 'firebase/scripts/build_site.sh') != ''
+        if: env.FLUTTER_SITE == 'true'
         uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -102,7 +108,8 @@ jobs:
         run: |
           cd "$FB_DIR"
           targets="firestore:rules,firestore:indexes,storage"
-          if [ ! -f scripts/build_site.sh ]; then
+          if [ "$FLUTTER_SITE" != true ]; then
+            # Static pages only (or a commit from before build_site.sh).
             targets="$targets,hosting"
           elif [ ! -d "$GITHUB_WORKSPACE/$MOBILE_DIR/web" ]; then
             # The Flutter web target is gone; the site moves to Vercel (apps/web).

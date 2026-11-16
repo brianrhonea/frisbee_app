@@ -4,6 +4,499 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.33.0 — 2026-11-16
+
+Needs API 0.28.0.
+
+**Added**
+- Rankings are public: visitors see team rankings with Level (Club,
+  College, League, Pickup) and Division (Mixed, Open, Women, Masters)
+  filters kept in the address; old `?division=` links still work. The
+  Players tab asks visitors to sign up. Youth is never shown.
+- Explore points visitors to rankings and tournaments.
+
+**Changed**
+- A team's own members aren't offered Follow on its banner, and members
+  see one Settings gear (beside the tabs).
+- The team feed's roster card tells visitors only what they can do ("See
+  who's on the team.") and is hidden where the roster is members-only.
+- Get started: "Join or create a team", ticked once you're on any team,
+  opens the create-or-join choice.
+- The composer adds a link you typed but didn't add when you post; both
+  composers check links with the app's rule (`normalizeLink`), including
+  the team page's; Escape in the link field drops what was typed.
+- If the team picked in "To" leaves your list before you post, the post
+  isn't sent (it used to go to Everyone).
+
+## 0.32.0 — 2026-11-15
+
+Needs API 0.27.0.
+
+**Added**
+- "Club teams are for players 16 and over" when creating a club team,
+  moving a team to club, making a community's team, and on invite links
+  and club team invites. A refused join shows why where it failed.
+- The community role picker notes that club teams take no one from roles.
+- After signing up with email, "About you" remembers your date of birth
+  even if you leave and come back later or use another device (saved
+  right after the account is made; it never holds up sign-up). Settings
+  → Personal details starts from it too.
+
+## 0.31.0 — 2026-11-15
+
+More for signed-out visitors (parents, friends, colleagues). Needs API
+0.26.0.
+
+**Added**
+- Learn is open to everyone and rendered on the server.
+- Events and the Upcoming events card are open to everyone (My schedule
+  stays for members).
+- Teams has "Find a team or group" for everyone; for visitors the top
+  bar's search goes there.
+- Visitors see an adult team's roster (names, numbers, positions).
+  Youth teams' rosters and groups' members stay private, with a note.
+- Visitors can browse Tournaments and leagues and follow a published
+  event's overview, teams, schedule, scores, standings, bracket and
+  news; server-rendered, live events refresh every minute. Entering,
+  signing up and following ask them to sign up or log in, then return.
+- Group tournaments show visitors their public listing.
+- The tournament form says the location and About are public.
+
+**Changed** (visitor routes review)
+- A youth team shows visitors its card only, with "Youth teams share
+  their posts and schedule with members only." Signed-in people who
+  aren't on it still see its public posts and events (read live, as the
+  app does).
+- Signed-in people who aren't on a youth team see "Rosters of youth
+  teams are private: only members see them." in place of its roster.
+- Team posts and the tournament News tab show visitors the author only
+  when the author's profile is public.
+- A tournament page asks the API for another division only when it's
+  one of the event's (an unknown `?division=` shows the first).
+- Roster pages aren't indexed by search engines; avatars and post
+  photos load with `referrerPolicy="no-referrer"`.
+- Members see their own team's real name and address in the hub's
+  banner (the public page hides a drafted league team's name and a
+  youth team's address). Signed in, Find a team uses the members'
+  search, so it lists every team as the app's search does.
+
+**Changed**
+- Visitor prompts and home copy say what's open without an account.
+- Server-rendered tournament dates show in UTC until the page loads,
+  then in the viewer's time zone.
+
+## 0.30.1 — 2026-11-15
+
+**Changed**
+- Signing up with Google or Apple asks "Your name and username": first
+  and last name (filled in from Google or Apple when they share it) are
+  the name on your profile, posts and rosters; the username is suggested
+  from them until you change it.
+- New accounts with no name (Apple can hide it) are asked for one before
+  anything else; the Home username card asks it too.
+- "About you" starts your legal name from the first and last name you
+  just typed.
+
+## 0.30.0 — 2026-11-15
+
+Home and team pages redesign. Works with API 0.25.x.
+
+**Added**
+- Home leads with a greeting and one composer: "To: Everyone" or a team
+  you manage (team posts get Title, Where and Public).
+- Team strip with New / Join; "+" by Your spaces creates or joins.
+- The Your teams tab is a feed of your teams' posts; feeds load as you
+  scroll ("Older posts" as a fallback).
+- Get started checklist on an empty For you feed; a Needs you card for
+  join requests; Invitations and the next event above the feed on
+  phones; a floating Post button on phones.
+- Feed tabs work with the arrow keys (ARIA tabs).
+- Team banner: Invite (with a join-request badge), Follow, Join for
+  groups, Share, a Settings gear, member count with avatars and your
+  role, a two-line description with "more", and "Invite-only — have a
+  code?" for signed-in outsiders.
+- One invite dialog from the banner, Roster, the feed and Settings:
+  a link made on open with Copy and Share, the rotating code, search
+  people (every kind, groups too) and join requests.
+- Feed side column: six members with roles, "All N members" and Invite.
+- Shared Loading, EmptyState and ErrorNote views; a visible focus ring.
+
+**Changed**
+- Team nav: six tabs, More ▾ and the gear, sticky below the top bar.
+  "Teams" shows only for organizations.
+- Playbook, Videos, Stats and Tournaments have their own URLs;
+  `/more?tab=…` and `/plays` redirect.
+
+## 0.29.0 — 2026-11-15
+
+Review checklist fixes. Needs API 0.25.0 (confirming a score sends it).
+
+**Added**
+- Messages: search conversations by name, and "More conversations".
+- Team schedule: "Earlier events"; `?event=` opens past events too.
+- `/teams/:id/stats`, `/plays`, `/videos` and `/tournaments` open the
+  matching More tab.
+
+**Changed**
+- Confirming a reported score sends the score shown, so one changed
+  meanwhile isn't confirmed.
+- Dates follow your browser's language.
+- Logging in returns you to the page you were on.
+- Entry fees without payment instructions say paying on Stall 10 is
+  coming soon.
+- The pull timer, line picker and substitution card open as dialogs.
+- Lists that could grow without end are capped or paged.
+
+**Fixed**
+- A meeting call hangs up when you lose access, sign out, or switch
+  account.
+- The post and stats game pages show errors with Try again instead of
+  loading forever; "see replies in the app" shows to visitors only.
+- Players with the same name are drafted in a fixed order (by uid), as in
+  the app.
+
+**Removed**
+- Unused components, helpers, CSS and the `team-draft` redirect page;
+  duplicated helpers merged (dates, error text, my teams, dialogs, photo
+  attachments).
+
+## 0.28.1 — 2026-11-15
+
+**Fixed**
+- Cancelling or closing the Google or Apple sign-in window (sign-in,
+  sign-up, and confirming it's you before deleting the account) shows no
+  error; a blocked pop-up says to allow pop-ups. As in the app.
+
+## 0.28.0 — 2026-11-15
+
+Needs API 0.24.0 (Remove calls `DELETE /v1/uploads/:id`).
+
+**Fixed** (security review of the messaging batch)
+- A `/messages?to=` link asks before starting a conversation ("Message
+  <name>"); it opens one without asking only if it already exists.
+- Remove in the composer deletes the unsent chat file.
+- Message drafts are kept per member and cleared on sign-out.
+
+## 0.27.0 — 2026-11-15
+
+**Changed** (security review of Explore and calls)
+- Voice channels re-check your access while you're in them: losing
+  access to the channel or team disconnects, and losing the right to
+  talk mutes you and keeps you listening.
+- Leaving or losing access while joining a call (even during the
+  microphone prompt) always hangs up.
+- The lobby camera preview only runs when the meeting can be joined.
+- Per-person volume also covers screen-share sound, and no longer fails
+  above 100% in browsers without Web Audio.
+- Meeting and voice settings are kept per account, with at most 200
+  per-person volumes; saved devices that are unplugged fall back to the
+  default.
+- Explore's Search retries a failed search.
+
+## 0.26.0 — 2026-11-15
+
+**Added**
+- My schedule shows every team's upcoming events and meetings beside your
+  calendars, soonest first, with the app's All / Team / Personal filter,
+  team-name tags when you're on several teams, and Delete for event
+  managers.
+
+**Changed**
+- My schedule drops an entry at its end, or once it starts without one,
+  as the app does (calendar entries used to have an hour's grace).
+
+## 0.25.1 — 2026-11-15
+
+**Fixed** (shared test vectors with the app)
+- The balanced draft deals players in the app's order with the app's
+  seeded shuffle, so the same seed gives the same teams on both.
+- "Add to calendar" downloads the same file as the app (no calendar
+  name, so it adds to an existing calendar).
+- The stats roster is ordered like the app's; play animation positions
+  match the app exactly.
+
+## 0.25.0 — 2026-11-15
+
+Needs API 0.23.0 (chat uploads send the file's `name`).
+
+**Added**
+- Accept or decline team invites on Teams and the home page.
+- Send any file in team chat and messages; videos play and files
+  download with their name and size.
+- Load older messages in conversations, team rooms and call chat.
+- A Message button on player pages, and `/messages?to=` links.
+- Unsent messages are kept as drafts per conversation and room (in this
+  browser).
+
+## 0.24.1 — 2026-11-15
+
+**Fixed**
+- The team schedule counts an event or meeting as upcoming until it
+  ends (or two hours after it starts, without an end), as the app does;
+  this morning's practice used to stay under Upcoming all day.
+- `/tournaments/:id?host=` ignores a host that isn't an id.
+
+## 0.24.0 — 2026-11-15
+
+**Added**
+- Explore searches tournaments as well as players, teams and groups,
+  with the app's All / Players / Teams / Groups / Tournaments filters.
+  Below search: upcoming tournaments and leagues, recent results, a
+  rankings preview and shortcuts, as in the app.
+- A voice channel call stays connected as you move around the site. A
+  voice bar on every page shows the channel, with mute and disconnect;
+  leaving the team or losing access to the room disconnects.
+- Meetings: pick your microphone, camera and speaker (where the browser
+  allows), preview your camera in the lobby, set the meeting volume,
+  mute audio, and turn each person up to 200%. Choices are remembered
+  on this browser; the meeting volume also applies to watch together.
+
+## 0.23.0 — 2026-11-15
+
+Needs API 0.22.0 (sharing calendar events sends `calendarId`).
+
+**Added**
+- Notifications open the matching page for tournaments, signups, drafts,
+  plays, videos, stats games, group tournaments and meetings.
+- Change password in Settings → Account (email accounts), with the app's
+  password rules, checklist and strength meter.
+- The theme toggle has a System choice beside Light and Dark.
+- The team schedule lists meetings beside events, with "New meeting".
+- "Share with my followers" on new events in My schedule.
+
+**Changed**
+- Draft URLs match the app: `draft/:div` is the host's balanced draft and
+  `live-draft/:div` the captains' draft; old `team-draft/` links redirect.
+- `/tournaments/:id?host=` falls back to that group's tournament.
+- Sign-up needs 8+ characters with a letter and a number, as in the app
+  (it was 6+).
+
+## 0.22.0 — 2026-11-14
+
+Needs API 0.21.0.
+
+**Added**
+- Home has For you, Community and Your teams tabs (in the URL). For you
+  shows your teams' posts, followed teams' public posts, followed
+  tournaments' news, and tagged and shared-event posts; a Team post
+  button sits under the composer.
+- Hosts post news on a tournament or league's News tab.
+- Import from Discord in team Settings (owners): preview roles, folders
+  and rooms, and sort rooms into a community's teams.
+- Posts can be tagged with a tournament you follow; a new team event can
+  be shared with your followers; a group tournament's announcement is
+  tagged with it.
+
+## 0.21.0 — 2026-11-14
+
+Needs API 0.20.0, with the LiveKit settings for calls.
+
+**Added**
+- Meetings: a team's Meetings tab (live, upcoming, past); admins schedule
+  and edit them; each meeting's page with RSVPs; the room with a lobby,
+  camera, mic and screen share (asked for only on joining), people and
+  volumes, letting people in, the call's chat and end for everyone.
+- Watch together: admins play a team video (upload or YouTube) and
+  everyone's player follows, in step with the app.
+- "Meeting started" pop-ups on every page; meeting notifications open the
+  meeting.
+- Voice channels in team chat: join, mute, leave; members who can only
+  read a room listen.
+
+## 0.20.0 — 2026-11-14
+
+Needs API 0.19.0.
+
+**Added**
+- Tournaments and leagues: find upcoming events (from Explore too); host
+  one (tournament, hat or league) with format, divisions, who can play
+  and fees; edit or delete it; the host's checklist to publish, open and
+  close registration.
+- Teams apply, accept invites, pick captains, withdraw or reserve a
+  spot; hosts accept, waitlist or decline teams, invite teams and seed
+  them.
+- Schedules by day and league week; report, confirm and correct scores;
+  pool and league standings, brackets and final places; event news.
+- Player-entry events show signups on the event's Players tab, with
+  links to each division's draft board and team editor.
+- A team's Tournaments tab lists what it hosts and plays in; followed
+  tournaments open their page.
+
+## 0.19.0 — 2026-11-14
+
+Needs API 0.18.0.
+
+**Added**
+- Communities' own tournaments: the Tournaments tab lists them (New
+  tournament for organizers); each has Schedule, Standings, Bracket and
+  Teams, a champion banner, your team's card, and Follow for outsiders.
+- Captains report and confirm (or dispute) scores; organizers set any
+  score and seed the bracket.
+- The editor: link a Tournament event, dates, day start times, format,
+  pools and rules, schedule preview, players from RSVPs, dealt teams,
+  captains, Save and Publish, and an announcement after the first publish.
+- A Tournament event shows "View …" or, for organizers, "Set up
+  tournament"; followed group tournaments open their page from Following.
+
+## 0.18.0 — 2026-11-14
+
+Needs API 0.17.0.
+
+**Added**
+- Stats tab: season record, top +/-, tournament folders and games; stat
+  keepers create games and tournaments, optionally linked to a schedule
+  event.
+- Live game tracker: point by point and play by play, with pull timer,
+  subs, timeouts, game point, end or resume, undo and keyboard shortcuts.
+  Plays save every few seconds and milestones at once, as in the app.
+- Game lines (build, edit, import), the point log with halftime and
+  timeouts, and the box score; tournament pages (games by round, roster,
+  shared lines, stats); the season stats table; the roster players page.
+
+## 0.17.0 — 2026-11-14
+
+Needs API 0.16.0.
+
+**Added**
+- Players for player-entry tournaments and leagues: sign up with skill
+  and gender match, see your status and fee, withdraw. Hosts accept,
+  waitlist, decline and mark fees paid, with an unpaid filter.
+- A live captains' draft board: captains and time per pick, a pick clock,
+  every team side by side, the pool with "Best first" and gender filters,
+  and the host's pause, resume, undo, auto-pick, finish and cancel.
+- A team draft editor: deal balanced teams, shuffle, change the count,
+  move players, rename, set captains, save; leagues create their real
+  teams from it.
+
+## 0.16.0 — 2026-11-14
+
+Needs API 0.15.0.
+
+**Added**
+- Team videos: admins add YouTube links (checked with YouTube, title
+  filled in), edit, move between folders and remove videos, and create,
+  rename and delete folders.
+- Folder filters (All, each folder, Unsorted) with counts, and the 5 GB
+  upload-space bar for admins.
+- Each video has its own page; uploaded videos now play on the website.
+  Uploading files from the website waits on the video transcode job.
+
+## 0.15.1 — 2026-11-14
+
+Needs API 0.14.1.
+
+**Fixed**
+- Deleting a team says when others are still on it and waits until
+  they're removed or it's handed over, as the API now requires.
+
+## 0.15.0 — 2026-11-14
+
+Needs API 0.14.0.
+
+**Added**
+- Playbook editor: admins add and edit plays on a field (players,
+  defenders, disc, cones, cuts and throws), add steps where dragging a
+  piece records its path, add step captions, undo and redo, and play the
+  animation. Members open any play to watch it. Plays in the Playbook tab
+  link to their page, and the tab has a "New play" button for admins.
+
+## 0.14.0 — 2026-11-14
+
+Needs API 0.13.0.
+
+**Added**
+- "… is typing" in direct and group conversations, and your own typing
+  shown to others (sent at most every few seconds, cleared when you stop).
+- Settings → Privacy: **Read receipts**.
+
+## 0.13.0 — 2026-11-14
+
+Team admin on the website. Needs API 0.12.0.
+
+**Added**
+- Team Settings → **Roles** (owners): custom roles with a name, color,
+  permissions and members, reordered with ↑/↓; and **Keeps stats** per
+  member on teams.
+- **School or club** in a team's Settings: ask a community to list the
+  team, cancel the request, or leave.
+- A community's **Teams** tab for its admins: add a team, accept or
+  decline teams asking to join, pick which community roles join each team,
+  and take teams out.
+- **Manage rooms** in team chat (members who manage chats): new rooms,
+  voice rooms and folders, rename, who can see and post (Everyone, roles,
+  single members), move between folders, reorder and delete.
+- **Delete** a team, group or community (owners, typing its name).
+
+**Fixed**
+- The event editor read a community's roles as a list; they're a map, so
+  it broke for communities with roles.
+
+## 0.12.0 — 2026-11-14
+
+The website is becoming a full way to use Stall 10 on its own. Needs API
+0.11.0.
+
+**Added**
+- Settings → Profile: change your **name, profile picture and header
+  photo** (a wide banner on your profile card).
+- Settings → **Notifications**: what to be notified about, for every team
+  and per team, with "Use my defaults".
+- **Mute** in a team chat room or conversation header.
+- Profile cards show the player's header photo.
+
+## 0.11.0 — 2026-11-14
+
+Website parity (`docs/product-spec.md` §8.1). Needs API 0.10.0.
+
+**Added**
+- **Team posts** from the hub's Feed, for the team's admins: a title,
+  words, a place, links, up to four photos (picked, dragged in or
+  pasted) and whether it shows on the public page. Edit and delete in
+  place.
+- **Team events**: members who manage events add, edit and delete them
+  from Schedule (type, when, where, notes, a poll, public or not, and
+  who sees it in a school or club community).
+- **RSVPs, reactions and polls**: Going, Maybe or Can't go on every
+  event, then react and vote while going.
+- **Send in team chat**: Enter sends (Shift+Enter for a new line),
+  attach photos, reply to a message, react, and delete your own (or
+  any, for moderators). Rooms you can only read say so.
+
+- **Messages** (`/messages`): the inbox, Message requests and Archived
+  beside the open conversation (`?c=`), live. Start a conversation from
+  a person search (it lands as a request when they don't follow you),
+  make a group of up to 10, rename it, add people who follow you, leave
+  or (its creator) remove people. Send with photos, reply, react, delete
+  your own, accept or delete requests, archive, and delete a
+  conversation for yourself. "Seen" shows when they've read your last
+  message. `j`/`k` move through the list, `Esc` closes.
+- **Create** a team, group or school/club community (`/teams/new`), and
+  **join with a code** from Teams, or straight from an invite link
+  (`/join/<code>`) when signed in.
+- A hub **Settings** tab for members: edit details (name, level, city,
+  and for groups the description and approval), make invite links or a
+  45-second code, approve or decline people asking to join, change
+  members' roles and remove them, hand the team to another member
+  (owners), and leave. Custom roles are still edited in the app.
+- Notification links open the conversation, chat room or event itself
+  (`webRoute`), not just its tab.
+
+**Changed**
+- Signed-out visitors see only team and community pages (and the
+  community feed and posts). Explore, Events, player profiles, Learn,
+  Rankings, Schedule, Messages, Notifications, Settings and the Teams
+  tab ask them to sign up or log in (`JoinPrompt`), then return there.
+  These pages now load in the browser with the member's token, so none
+  of their data is in the page sent to visitors; Home's visitor preview
+  and the right column no longer show events.
+
+**Fixed**
+- The sign-in `?next=` link only returns to a page on this site: a path
+  with a tab or new line (`/%09/other.site`) could send people elsewhere
+  after logging in.
+- Learn's guide is a client component (`components/LearnGuide.tsx`), so its
+  words are no longer in the page HTML sent to visitors.
+
 ## 0.10.1 — 2026-11-14
 
 **Changed**

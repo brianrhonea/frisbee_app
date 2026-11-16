@@ -13,11 +13,12 @@ import {
 } from "@stall10/shared";
 import type { Caller, UserLookup } from "../auth.js";
 import { ApiError, fromZod } from "../errors.js";
-import { docIdParam } from "../ids.js";
+import { docIdParam, isDocId } from "../ids.js";
 import type { MediaStorage } from "../media/storage.js";
 import { type Data, type DocStore, serverTime } from "../store.js";
 import { authorOf, checkNotMuted } from "./author.js";
-import { noPost, people, validId } from "./service.js";
+import { noPost, people } from "./service.js";
+import { sharedEvent } from "./shared_event.js";
 
 const p = {
   post: (id: string) => `posts/${id}`,
@@ -71,8 +72,9 @@ function imagesOf(v: unknown): PostImage[] {
  * the author edits or deletes a post, and only text posts take new photos.
  * Photos come from the caller's finished `post` uploads for this post id,
  * never from paths the client names. A new post may be a workout (typed
- * in; GPS routes are recorded in the app). Event posts are still made in
- * the app; here their words, links and photos change, never the workout.
+ * in; GPS routes are recorded in the app), or share an event
+ * (shared_event.ts); edits change words, links and photos, never the
+ * workout or the event.
  */
 export class PostEditor {
   constructor(
@@ -117,22 +119,26 @@ export class PostEditor {
     const images = await this.uploadedImages(caller, id, req.uploadIds);
     const words = req.body.trim();
     const workout = req.workout ? workoutRecord(req.workout) : null;
-    if (!workout && !words && images.length === 0) {
+    if (req.shareEvent && (workout || images.length || req.links.length)) {
+      throw new ApiError("invalid_argument", "An event post has only words with the event.");
+    }
+    const event = req.shareEvent ? await sharedEvent(this.store, caller, req.shareEvent) : null;
+    if (!workout && !event && !words && images.length === 0) {
       throw new ApiError("invalid_argument", "Write something or add a photo.");
     }
     const me = await authorOf(this.store, this.users, caller);
     await this.store.transact(async (tx) => {
       if (await tx.get(p.post(id))) throw new ApiError("already_exists", "That post already exists.");
       tx.create(p.post(id), {
-        kind: workout ? "workout" : "text",
+        kind: workout ? "workout" : event ? "event" : "text",
         body: words,
         links: req.links,
         images,
         workout,
-        event: null,
+        event,
         repostOf: null,
-        tournamentKey: null,
-        tournamentName: null,
+        tournamentKey: req.tournament?.key ?? null,
+        tournamentName: req.tournament ? req.tournament.name || null : null,
         authorId: caller.uid,
         authorName: me.name,
         authorPhotoUrl: me.photoUrl,
@@ -163,7 +169,7 @@ export class PostEditor {
     }
     const words = req.body.trim();
     if (kind === "repost") {
-      if (req.links.length || req.uploadIds.length) {
+      if (req.links.length || req.uploadIds.length || req.tournament) {
         throw new ApiError("invalid_argument", "A repost only has a note.");
       }
     } else if (kind === "text" && !words && images.length === 0) {
@@ -171,6 +177,11 @@ export class PostEditor {
     }
     const update: Data =
       kind === "repost" ? { body: words, updatedAt: serverTime } : { body: words, links: req.links, images, updatedAt: serverTime };
+    // The tag: absent keeps it; null clears it (validUserPost: null or valid).
+    if (kind !== "repost" && req.tournament !== undefined) {
+      update.tournamentKey = req.tournament?.key ?? null;
+      update.tournamentName = req.tournament ? req.tournament.name || null : null;
+    }
     await this.store.transact(async (tx) => {
       const now = await tx.get(p.post(id));
       if (!now || now.authorId !== caller.uid) throw noPost();
@@ -195,9 +206,9 @@ export class PostEditor {
       const r = post.repostOf;
       const originalId = r && typeof r === "object" ? (r as Data).postId : null;
       const original =
-        validId(originalId) && id === repostId(originalId, caller.uid) ? await tx.get(p.post(originalId)) : null;
+        isDocId(originalId) && id === repostId(originalId, caller.uid) ? await tx.get(p.post(originalId)) : null;
       tx.delete(p.post(id));
-      if (original && validId(originalId)) {
+      if (original && isDocId(originalId)) {
         const before = people(original.repostedBy);
         if (before.includes(caller.uid)) {
           tx.update(p.post(originalId), { repostedBy: before.filter((u) => u !== caller.uid) });

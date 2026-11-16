@@ -48,6 +48,10 @@ class JoinLinkViewModel extends ChangeNotifier {
   /// "a team".
   String? get teamName => _listing?.name;
 
+  /// A club team, for players 16 and over: the screen says so before they
+  /// join (the API checks their age when they do).
+  bool get isClubTeam => _listing?.isClubTeam ?? false;
+
   bool _member = false;
 
   /// The user is on the team already, so there's nothing to join.

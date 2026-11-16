@@ -27,6 +27,12 @@ export class FakeUsers implements UserLookup {
   async lookup(uid: string) {
     return this.records.get(uid) ?? null;
   }
+  async update(uid: string, changes: { name?: string; photoUrl?: string | null }) {
+    const r = { ...this.records.get(uid) };
+    if (changes.name !== undefined) r.name = changes.name;
+    if (changes.photoUrl !== undefined) r.photoUrl = changes.photoUrl ?? undefined;
+    this.records.set(uid, r);
+  }
 }
 
 export class FakeTeamRepository implements TeamRepository {
@@ -34,6 +40,22 @@ export class FakeTeamRepository implements TeamRepository {
   leagues = new Map<string, boolean>();
   listings: Array<NameListing & { keywords: string[] }> = [];
   created: Array<{ id: string; input: CreateTeamInput; owner: Owner }> = [];
+  /** The store deleteTeamTree clears, when a test gives one. */
+  store?: FakeStore;
+  deleted: string[] = [];
+
+  async deleteTree(path: string) {
+    if (!this.store) return;
+    for (const k of [...this.store.docs.keys()]) if (k === path || k.startsWith(`${path}/`)) this.store.docs.delete(k);
+  }
+
+  async deleteTeamTree(teamId: string) {
+    this.deleted.push(teamId);
+    if (!this.store) return;
+    for (const k of [...this.store.docs.keys()]) {
+      if (k === `teams/${teamId}` || k.startsWith(`teams/${teamId}/`) || k === `teamDirectory/${teamId}`) this.store.docs.delete(k);
+    }
+  }
 
   async mutedUntil(uid: string) {
     return this.muted.get(uid) ?? null;
@@ -56,7 +78,7 @@ export class FakeTeamRepository implements TeamRepository {
 
 /**
  * Documents in memory, with transactions applied all at once at the end
- * (like Firestore's: reads first, then writes). serverTime is written as
+ * (like Firestore's: reads first, then writes; a read after a write throws). serverTime is written as
  * [now].
  */
 export class FakeStore implements DocStore {
@@ -76,6 +98,12 @@ export class FakeStore implements DocStore {
   async get(path: string) {
     const d = this.docs.get(path);
     return d ? structuredClone(d) : null;
+  }
+
+  getAllCalls = 0;
+  async getAll(paths: string[]) {
+    this.getAllCalls++;
+    return Promise.all(paths.map((p) => this.get(p)));
   }
 
   async list(collection: string, limit: number) {
@@ -110,10 +138,26 @@ export class FakeStore implements DocStore {
     return out;
   }
 
+  /** set(..., {merge: true}): nested maps merge key by key, as Firestore does; arrays and other values replace. */
+  private deepMerge(d: Data, data: Data): Data {
+    const out = { ...d };
+    const isMap = (v: unknown): v is Data => !!v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date) && !Buffer.isBuffer(v);
+    for (const [k, v] of Object.entries(data)) {
+      if (v === deleteField) delete out[k];
+      else if (isMap(v) && isMap(out[k])) out[k] = this.deepMerge(out[k] as Data, v);
+      else out[k] = this.stamp(v);
+    }
+    return out;
+  }
+
   async transact<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
     const writes: Array<() => void> = [];
     const tx: Tx = {
-      get: (path) => this.get(path),
+      // Firestore rejects a read after a write in the same transaction.
+      get: (path) => {
+        if (writes.length) return Promise.reject(new Error(`transaction read of ${path} after a write`));
+        return this.get(path);
+      },
       create: (path, data) =>
         writes.push(() => {
           if (this.docs.has(path)) throw new AlreadyExists(path);
@@ -126,7 +170,7 @@ export class FakeStore implements DocStore {
           if (!d) throw new Error(`update of missing ${path}`);
           this.docs.set(path, this.apply(d, data));
         }),
-      merge: (path, data) => writes.push(() => this.docs.set(path, this.apply(this.docs.get(path) ?? {}, data))),
+      merge: (path, data) => writes.push(() => this.docs.set(path, this.deepMerge(this.docs.get(path) ?? {}, data))),
       delete: (path) => writes.push(() => this.docs.delete(path)),
     };
     const result = await fn(tx);
@@ -151,16 +195,32 @@ export class FakeMediaStorage implements MediaStorage {
     this.signed.push({ path, contentType, maxBytes, expiresAt });
     return { url: `signed:${path}`, headers: { "content-type": contentType, "x-goog-content-length-range": `0,${maxBytes}` } };
   }
-  async size(path: string) {
-    return this.files.get(path)?.data.length ?? null;
+  /** Each stored entry is one generation: setting a path again makes a new one. */
+  private generations = new WeakMap<object, string>();
+  private nextGeneration = 1;
+  /** Runs just before a copy (a test re-PUTs the raw file here). */
+  beforeCopy?: () => void;
+
+  private generationOf(entry: object) {
+    let g = this.generations.get(entry);
+    if (!g) this.generations.set(entry, (g = String(this.nextGeneration++)));
+    return g;
   }
-  async read(path: string, bytes?: number) {
+  async stat(path: string) {
     const f = this.files.get(path);
-    if (!f) throw new Error(`no ${path}`);
+    return f ? { size: f.data.length, generation: this.generationOf(f) } : null;
+  }
+  async read(path: string, bytes?: number, generation?: string) {
+    const f = this.files.get(path);
+    if (!f || (generation && this.generationOf(f) !== generation)) throw Object.assign(new Error(`no ${path}`), { code: 404 });
     return bytes ? f.data.subarray(0, bytes) : f.data;
   }
   async write(path: string, data: Buffer, contentType: string) {
     this.files.set(path, { data, contentType });
+  }
+  async copy(from: string, to: string, contentType: string, generation?: string) {
+    this.beforeCopy?.();
+    this.files.set(to, { data: await this.read(from, undefined, generation), contentType });
   }
   async downloadTo(path: string, file: string) {
     await writeFile(file, await this.read(path));
@@ -170,6 +230,12 @@ export class FakeMediaStorage implements MediaStorage {
   }
   async delete(path: string) {
     this.files.delete(path);
+  }
+  async deletePrefix(prefix: string) {
+    for (const k of [...this.files.keys()]) if (k.startsWith(prefix)) this.files.delete(k);
+  }
+  async downloadUrl(path: string) {
+    return `https://dl.test/v0/b/bucket/o/${encodeURIComponent(path)}?alt=media&token=t`;
   }
 }
 
@@ -192,4 +258,14 @@ export class FakeCipher implements PersonalCipher {
     if (!raw.startsWith(`${context}|`)) throw new Error("wrong context");
     return Buffer.from(raw.slice(context.length + 1), "utf8");
   }
+}
+
+/**
+ * Seeds [uid]'s personal details with just a date of birth, sealed as the
+ * API stores them (personalDetails/{uid}), for the club age rule.
+ */
+export async function seedBirthDate(store: FakeStore, cipher: PersonalCipher, uid: string, birthDate: string) {
+  const path = `personalDetails/${uid}`;
+  const sealed = await cipher.seal(Buffer.from(JSON.stringify({ birthDate }), "utf8"), path);
+  store.put(path, { ciphertext: sealed.ciphertext, key: sealed.key, format: 1 });
 }

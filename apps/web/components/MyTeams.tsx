@@ -1,12 +1,13 @@
 "use client";
-import { where } from "firebase/firestore";
+import { JoinWithCode } from "./CreateTeam";
 import Link from "next/link";
 import { useState } from "react";
-import { type Doc, useLiveQuery } from "@/lib/live";
+import { type Doc } from "@/lib/live";
 import { divisionLabels, listingSubtitle } from "@/lib/site";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { roleLabel, TeamList } from "./ProfileDashboard";
+import { useMyTeams } from "./useMyTeams";
 
 interface MyTeam {
   name?: string;
@@ -33,19 +34,22 @@ const byName = (a: { name?: string }, b: { name?: string }) => (a.name ?? "").lo
  */
 export function MyTeams() {
   const { user } = useAuth();
-  const live = useLiveQuery<MyTeam>(user ? "teams" : null, user ? [where("memberIds", "array-contains", user.uid)] : [], user?.uid ?? "");
+  const live = useMyTeams<MyTeam>(user?.uid);
 
   if (user === undefined) return null;
   if (!user) {
     return (
       <div className="card">
-        <p>Join teams and pickup groups to see their schedules, chat and posts in one place.</p>
+        <p>
+          Sign up free to create a team or join one, and see your teams&apos; schedules, chat and posts in one place.
+          To look at a team without joining, find it below.
+        </p>
         <div className="home-actions">
           <Link className="btn btn-primary btn-small" href="/sign-up?next=/teams">
             Sign up free
           </Link>
-          <Link className="btn btn-small" href="/explore">
-            Find a team
+          <Link className="btn btn-small" href="/sign-in?next=/teams">
+            Log in
           </Link>
         </div>
       </div>
@@ -64,15 +68,19 @@ export function MyTeams() {
 
   if (all.length === 0) {
     return (
-      <div className="card">
-        <p className="muted small">
-          No teams yet. <Link href="/explore">Find a team or group</Link>, or start one in the app.
-        </p>
+      <div className="stack">
+        <div className="card">
+          <p className="muted small">
+            No teams yet. <Link href="/explore">Find a team or group</Link>, or start one below.
+          </p>
+        </div>
+        <StartOrJoin />
       </div>
     );
   }
   return (
     <div className="stack">
+      <StartOrJoin />
       {teams.length > 0 && (
         <TeamList
           title="Your teams"
@@ -136,5 +144,29 @@ function CommunityRow({ community: c, role, isOn }: { community: Doc<MyTeam>; ro
         </button>
       )}
     </li>
+  );
+}
+
+/** Start a team, group or community, or join one with a code. */
+function StartOrJoin() {
+  const [joining, setJoining] = useState(false);
+  return (
+    <div className="stack">
+      <div className="home-actions">
+        <Link className="btn btn-primary btn-small" href="/teams/new">
+          Create a team
+        </Link>
+        <Link className="btn btn-small" href="/teams/new?kind=community">
+          Start a group
+        </Link>
+        <Link className="btn btn-small" href="/teams/new?kind=organization">
+          Start a school or club
+        </Link>
+        <button type="button" className="btn btn-small" onClick={() => setJoining(!joining)} aria-expanded={joining}>
+          Join with a code
+        </button>
+      </div>
+      {joining && <JoinWithCode />}
+    </div>
   );
 }

@@ -4,14 +4,27 @@ import { ApiError } from "../errors.js";
 import { eventView, isPrivateProfile, parseBefore, postAuthors, postView, profileView, validId } from "../browse/model.js";
 import type { Data, Doc } from "../browse/repository.js";
 import { nextCursor, originalsOf, withOriginal } from "../browse/reposts.js";
-import { can, isOrg, kindOf, mapOf, roleIn, strings } from "../teams/access.js";
+import { seesEvent as seesTeamEvent } from "../hub/access.js";
+import { isMember, kindOf, mapOf, roleIn } from "../teams/access.js";
 import type { MeRepository } from "./repository.js";
 
 /** Teams read for the dashboard (the app's home shows them all; few have more). */
 export const teamLimit = 30;
-/** Events looked at per team, and shown in all. */
+/**
+ * Events shown per team and in all. Each team's events are over-read
+ * (eventReadPerTeam started recently, and as many upcoming) because the
+ * audience filter and the end check apply after the reads: a community
+ * member may see only a few of a team's events.
+ */
 export const eventsPerTeam = 5;
+export const eventReadPerTeam = 25;
 export const eventLimit = 10;
+/**
+ * How far back events are read so ones under way still show (a
+ * tournament can run for days). An event is under way until its end, or
+ * its start when it has none, as the app's My schedule (`upcoming`).
+ */
+export const eventLookbackMs = 3 * 86_400_000;
 export const feedPageSize = 20;
 
 /**
@@ -20,13 +33,12 @@ export const feedPageSize = 20;
  * managers and to the event's audience ('everyone', the caller's role, one
  * of their custom roles; `inAudience` checks the first 10 custom roles).
  */
-export function seesEvent(team: Data, uid: string, event: Data): boolean {
-  if (!strings(team.memberIds).includes(uid)) return false;
-  if (!isOrg(team) || can(team, uid, "manageEvents")) return true;
-  const audience = strings(event.audience);
-  const role = roleIn(team, uid) === "stats" ? "player" : roleIn(team, uid);
-  const mine = strings(mapOf(team.memberRoles)[uid]).slice(0, 10);
-  return audience.includes("everyone") || audience.includes(role) || mine.some((r) => audience.includes(r));
+export const seesEvent = (team: Data, uid: string, event: Data): boolean => isMember(team, uid) && seesTeamEvent(team, uid, event);
+
+/** The event hasn't ended at [now]: its end (or start, without one) is not before it. */
+export function notEnded(event: Data, now: number): boolean {
+  const end = Date.parse(String(event.endsAt ?? event.startsAt ?? ""));
+  return Number.isFinite(end) && end >= now;
 }
 
 /** The caller's own dashboard: profile, teams, upcoming events and feed. */
@@ -40,13 +52,15 @@ export class MeService {
 
   async home(caller: Caller, before: unknown): Promise<MeHome> {
     const uid = caller.uid;
-    const [profile, hidden, teams, followed] = await Promise.all([
+    const [profile, hidden, teams, followed, tournaments] = await Promise.all([
       this.repo.profile(uid),
       this.repo.privateDetails(uid),
       this.repo.teamsOf(uid, teamLimit),
       this.repo.followedUsers(uid),
+      this.repo.followedTournaments?.(uid) ?? Promise.resolve([] as string[]),
     ]);
-    const [events, feed] = await Promise.all([this.events(uid, teams), this.feed([uid, ...followed], parseBefore(before))]);
+    const sources = { authors: [uid, ...followed], tournaments, teamIds: teams.map((t) => t.id), followed };
+    const [events, feed] = await Promise.all([this.events(uid, teams), this.feed(uid, sources, parseBefore(before))]);
     return {
       profile: this.ownProfile(uid, caller, profile, hidden),
       teams: teams.map((t) => this.team(t, uid)).sort((a, b) => a.name.localeCompare(b.name)),
@@ -80,9 +94,14 @@ export class MeService {
     const now = this.now();
     const lists = await Promise.all(
       teams.map(async (t) => {
-        const docs = await this.repo.upcomingEvents(t.id, now, eventsPerTeam);
-        return docs
-          .filter((e) => seesEvent(t.data, uid, e.data))
+        // Two reads, so events that ended recently can't use up the upcoming ones' share.
+        const [started, upcoming] = await Promise.all([
+          this.repo.startedEvents(t.id, now - eventLookbackMs, now, eventReadPerTeam),
+          this.repo.upcomingEvents(t.id, now, eventReadPerTeam),
+        ]);
+        return [...started.reverse(), ...upcoming]
+          .filter((e) => notEnded(e.data, now) && seesEvent(t.data, uid, e.data))
+          .slice(0, eventsPerTeam)
           .map((e) => {
             const rsvp = mapOf(e.data.rsvps)[uid];
             return {
@@ -109,16 +128,35 @@ export class MeService {
     });
   }
 
-  /** Posts are readable by anyone signed in (firestore.rules), so no privacy filter here. */
-  private async feed(authors: string[], before: number | null) {
-    const docs = await this.repo.postsBy(authors, before, feedPageSize);
-    const show = (d: Doc) => {
-      const view = postView(d.data);
-      return { ...view, id: d.id, images: this.images(view.images) } as PublicPost;
-    };
-    const originals = await originalsOf(docs, (id) => this.repo.post(id));
-    const posts = docs.map((d) => withOriginal(show(d), d, originals, show));
-    return { posts, next: nextCursor(docs, feedPageSize) };
+  /**
+   * The players' posts in the app's home feed (HomeFeed): the caller's own
+   * and those of people they follow, posts tagged with tournaments they
+   * follow, and events shared from their teams' schedules by anyone
+   * (reposts of those reach the reposter's followers, not the team again).
+   * Team posts are read live by the website. The last two sources reach
+   * strangers' posts, so the privacy filter applies (visiblePosts). Each
+   * source reads a page after [before]; the merged page is exact.
+   */
+  private async feed(viewer: string, src: { authors: string[]; tournaments: string[]; teamIds: string[]; followed: string[] }, before: number | null) {
+    const where = this.repo.postsWhereIn?.bind(this.repo);
+    const [byAuthors, tagged, shared] = await Promise.all([
+      this.repo.postsBy(src.authors, before, feedPageSize),
+      where && src.tournaments.length ? where("tournamentKey", src.tournaments, before, feedPageSize) : Promise.resolve([] as Doc[]),
+      where && src.teamIds.length ? where("event.teamId", src.teamIds, before, feedPageSize) : Promise.resolve([] as Doc[]),
+    ]);
+    const byId = new Map<string, Doc>();
+    for (const d of [...byAuthors, ...tagged, ...shared.filter((d) => !d.data.repostOf)]) byId.set(d.id, d);
+    const merged = [...byId.values()].sort((a, b) => String(b.data.createdAt ?? "").localeCompare(String(a.data.createdAt ?? "")));
+    const docs = merged.slice(0, feedPageSize);
+    // More follow when the merge was cut (short sources can add up past a
+    // page), or when a source with a full page may hold more.
+    const more = merged.length > feedPageSize || [byAuthors, tagged, shared].some((d) => d.length >= feedPageSize);
+    // Every post is checked, the caller's and followed people's too: a
+    // repost's original by a private author they don't follow stays hidden
+    // (posts are readable by anyone signed in, so privacy is kept here).
+    const views = new Map((await this.visiblePosts(viewer, docs, new Set(src.followed))).map((v) => [v.id, v]));
+    const posts = docs.flatMap((d) => (views.has(d.id) ? [views.get(d.id)!] : []));
+    return { posts, next: more ? nextCursor(docs, feedPageSize) : null };
   }
 
   /**

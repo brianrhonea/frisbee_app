@@ -1,0 +1,14 @@
+/* Chat attachments (ChatAttachment) and the "Load older messages" pager. */
+.message-video { display: block; margin-top: 6px; max-width: 360px; }
+.message-video video { display: block; width: 100%; max-height: 360px; border-radius: 10px; background: #000; }
+.message-file {
+  display: inline-flex; align-items: center; gap: 10px; margin-top: 6px; max-width: 100%;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--field); color: var(--ink); text-decoration: none;
+}
+a.message-file:hover { border-color: var(--muted); }
+.message-file-main { display: grid; min-width: 0; }
+.message-file-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.message-file-main small { color: var(--muted); font-size: 0.8rem; }
+.thread-older { text-align: center; margin: 0 0 8px; }
+.message-video small { display: block; margin-top: 2px; font-size: 0.8rem; }

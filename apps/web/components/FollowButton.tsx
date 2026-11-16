@@ -2,7 +2,7 @@
 import { type FollowResult, type FollowType, followKey } from "@stall10/shared";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useLiveDoc } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
 
@@ -70,7 +70,7 @@ export function FollowButton({
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+      setError(problem(e));
     } finally {
       setBusy(false);
     }

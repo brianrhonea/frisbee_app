@@ -27,7 +27,8 @@ export function ProfileCard({ profile, actions }: { profile: PublicProfile; acti
     profile.playingSince && `Playing since ${profile.playingSince}`,
   ].filter((f): f is string => Boolean(f));
   return (
-    <div className="card profile-card">
+    <div className={`card profile-card${profile.headerUrl ? " has-header" : ""}`}>
+      {profile.headerUrl && <div className="profile-header" style={{ backgroundImage: `url(${JSON.stringify(profile.headerUrl)})` }} />}
       <Avatar name={name} url={profile.photoUrl} size={96} />
       <h1>{name}</h1>
       {profile.username && <p className="muted handle">@{profile.username}</p>}
@@ -76,7 +77,7 @@ export function StatTiles({ stats }: { stats?: Record<string, StatTotals> }) {
   );
 }
 
-export interface TeamRow {
+interface TeamRow {
   id: string;
   name: string;
   subtitle?: string;

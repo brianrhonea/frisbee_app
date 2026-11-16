@@ -13,9 +13,11 @@ import {
   templateCode,
 } from "../../src/discord/template";
 
-const fixture = JSON.parse(
-  readFileSync(join(__dirname, "../fixtures/discord_template_synthetic.json"), "utf8"),
-) as GuildTemplate;
+// The shared made-up template, and what both parsers (this one and the
+// API's) give for it.
+const shared = join(__dirname, "../../../../packages/shared/fixtures/discord");
+const fixture = JSON.parse(readFileSync(join(shared, "template_synthetic.json"), "utf8")) as GuildTemplate;
+const sharedPlan = JSON.parse(readFileSync(join(shared, "template_plan.json"), "utf8")).plan;
 
 describe("templateCode", () => {
   it("reads codes from template links and bare codes", () => {
@@ -84,6 +86,10 @@ describe("channelPermissions", () => {
 
 describe("mapTemplate", () => {
   const plan = mapTemplate(fixture);
+
+  it("gives the shared plan (packages/shared/fixtures/discord/template_plan.json)", () => {
+    expect(plan).toEqual(sharedPlan);
+  });
 
   it("names the server", () => {
     expect(plan.serverName).toBe("Rockets Ultimate");

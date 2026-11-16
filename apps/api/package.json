@@ -1,6 +1,6 @@
 {
   "name": "@stall10/api",
-  "version": "0.9.2",
+  "version": "0.28.0",
   "private": true,
   "description": "Stall 10 API: the one backend apps/mobile and apps/web call. Validates requests and reads/writes Firebase with the Admin SDK.",
   "type": "module",
@@ -21,6 +21,7 @@
     "@stall10/shared": "workspace:*",
     "fastify": "^5.12.0",
     "firebase-admin": "^14.5.0",
+    "livekit-server-sdk": "2.19.2",
     "sharp": "^0.34.5",
     "zod": "^4.6.0"
   },

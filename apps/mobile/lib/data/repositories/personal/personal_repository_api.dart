@@ -59,18 +59,40 @@ class PersonalDetailsRepositoryApi extends PersonalDetailsRepository {
   }
 
   @override
-  Future<Result<({PersonalDetails? details, String? email})>> load() =>
+  Future<Result<PersonalDetailsLoad>> load() => guard(() async {
+    final api = _api;
+    if (api == null) throw const ApiException('unavailable', _noApi);
+    final json = await api.send('GET', '/v1/me/personal');
+    final details = json['details'];
+    return (
+      details: details is Map
+          ? PersonalDetails.fromMap(details.cast<String, Object?>())
+          : null,
+      email: json['email'] as String?,
+      signUpBirthDate: switch (json['signUpBirthDate']) {
+        final String s => parseIsoDate(s),
+        _ => null,
+      },
+    );
+  });
+
+  @override
+  Future<Result<void>> saveSignUpBirthDate(DateTime birthDate) =>
       guard(() async {
         final api = _api;
         if (api == null) throw const ApiException('unavailable', _noApi);
-        final json = await api.send('GET', '/v1/me/personal');
-        final details = json['details'];
-        return (
-          details: details is Map
-              ? PersonalDetails.fromMap(details.cast<String, Object?>())
-              : null,
-          email: json['email'] as String?,
-        );
+        try {
+          await api.put('/v1/me/personal/birth-date', {
+            'birthDate': isoDate(birthDate),
+          });
+        } on ApiException catch (e) {
+          if (e.code == 'failed_precondition' &&
+              e.fields.containsKey('birthDate')) {
+            throw const TooYoungException();
+          }
+          rethrow;
+        }
+        // The status is unchanged: the details aren't complete yet.
       });
 
   @override
@@ -104,6 +126,18 @@ class PersonalDetailsRepositoryApi extends PersonalDetailsRepository {
 
   @override
   set signUpBirthDate(DateTime? value) => _signUpBirthDate = value;
+
+  ({String first, String last})? _signUpName;
+
+  @override
+  ({String first, String last})? takeSignUpName() {
+    final n = _signUpName;
+    _signUpName = null;
+    return n;
+  }
+
+  @override
+  set signUpName(({String first, String last})? value) => _signUpName = value;
 
   @override
   void dispose() {

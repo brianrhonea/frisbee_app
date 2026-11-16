@@ -315,6 +315,11 @@ class Team {
   /// with approval, no roster or stats of its own.
   bool get isCommunity => kind.isGroupLike;
 
+  /// A club team: a team at the club level, for players 16 and over
+  /// (clubMinimumAge). Groups and other levels are open to everyone.
+  bool get isClubTeam =>
+      kind == TeamKind.team && level == CompetitionLevel.club;
+
   /// A group that needs approval to join. Its location, posts and events are
   /// for members only; search shows just its name, city and description.
   bool get isPrivateGroup => isCommunity && requiresApproval;
@@ -780,6 +785,11 @@ class TeamListing {
   final bool official;
 
   bool get isCommunity => kind.isGroupLike;
+
+  /// A club team: a team at the club level, for players 16 and over
+  /// (clubMinimumAge). Groups and other levels are open to everyone.
+  bool get isClubTeam =>
+      kind == TeamKind.team && level == CompetitionLevel.club;
 
   bool get isOrganization => kind == TeamKind.organization;
 

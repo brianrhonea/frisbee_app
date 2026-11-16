@@ -7,6 +7,500 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.28.0 — 2026-11-16
+
+Public rankings. Deploy before web 0.33.0 and with the `rankings`
+functions group.
+
+**Added**
+- `GET /v1/public/rankings`: team rankings for visitors, no token. Never
+  youth (no youth rankings, youth teams, private groups or drafted
+  league teams); rank, team, rating and record only. Visitor limit,
+  cached 5 minutes.
+
+**Changed**
+- `GET /v1/teams/:id/roster`: a team in a youth division of a league is
+  members-only too (and its school or club's member managers), whatever
+  level its team doc says.
+
+## 0.27.0 — 2026-11-15
+
+Club teams are for players 16 and over. Deploy with (or before) the new
+`firestore.rules`; needs `PERSONAL_DETAILS_KMS_KEY`.
+
+**Added**
+- Joining a club team (code, link or invite) or starting one
+  (`POST /v1/teams`, a team made inside a community) needs the player to
+  be 16 that day, read from their encrypted personal details
+  (`PersonalService.birthDate`, never returned). No date of birth on file
+  → 412 "Add your date of birth in About you to join a club team.";
+  under 16 → 412 "Club teams are for players 16 and over."; no
+  personal-details key → 503.
+- Invites can still be sent to anyone; people already on a club team
+  stay. `clubMinimumAge`, `canJoinClubTeam` and `isClubTeam` (a team
+  with level club, or no level) are in `@stall10/shared`.
+- `PUT /v1/me/personal/birth-date` keeps an email sign-up's birthday,
+  encrypted like the rest of the personal details, until "About you" is
+  saved: under 13 refused, never completes the details, refused (409)
+  once they're saved, 5 a minute / 20 a day. `GET /v1/me/personal`
+  returns it as `signUpBirthDate` until the details are given; it counts
+  as "on file" for the club rule.
+
+## 0.26.0 — 2026-11-15
+
+Public reads for signed-out website visitors. Deploy before web 0.31.0.
+
+**Added**
+- `GET /v1/public/teams?q=`: a team finder that returns team and group
+  listings by name, never players.
+- `GET /v1/public/teams/:id/roster`: an adult team's roster for anyone
+  (names, numbers and positions, plus a public profile's username and
+  photo). Youth teams, teams without a level and groups answer 404.
+  `rosterIsPublic` in `@stall10/shared` decides, checked on both the
+  team and its listing.
+- `GET /v1/public/tournaments`, `/v1/public/tournaments/:id?division=`
+  and `/v1/public/group-tournaments/:groupId/:id`: published tournaments
+  and leagues (overview, divisions, accepted teams, one division's
+  schedule and scores) and a group tournament's listing. Drafts and
+  private groups' events are 404. No captains, signups, fee
+  instructions or player names; drafted teams always show as "Team N".
+  Cached publicly for 30 seconds, and in each instance for 30 seconds
+  (at most 200 events, the games by the division they resolve to).
+
+**Changed**
+- `GET /v1/public/events` is public (no token, limited by IP, publicly
+  cacheable). Its tournament listings carry only their seven public
+  fields.
+- Youth teams' rosters (`GET /v1/teams/:id/roster`) are for their members
+  and the member managers of the school or club community that accepted
+  them; anyone else gets 403 "Rosters of youth teams are private: only
+  members see them." Adult teams are unchanged.
+- League teams drafted from a youth division are youth teams (team and
+  listing `level: "youth"`), as in the functions' copy.
+
+**Security** (visitor routes review)
+- Visitors are limited by `req.ip` (only the trusted proxy hops,
+  TRUST_PROXY_HOPS), never the X-Forwarded-For first hop a client
+  writes, so a spoofed header gets no fresh bucket and can't spend or
+  mute another address's.
+- A youth team shows visitors its card only: no posts, events or
+  location on its page, in `/v1/public/events` or in the finder.
+- Public team posts no longer carry `authorId`; `authorName` only when
+  the author's profile is public (one batched read).
+- Private-group checks read the team doc too (kind, requiresApproval,
+  level; a field mask): a missing team doc, or one that disagrees with
+  its listing, counts as private.
+- Visitor photo URLs only from this project's Storage buckets
+  (STORAGE_BUCKET, `<project>.firebasestorage.app`,
+  `<project>.appspot.com`) or `lh3.googleusercontent.com`.
+- A league's drafted teams (`league_…`) are out of the finder, show as
+  "League team" on their page and in events, and their public roster is
+  404; so is the roster of a team in a league's youth division. Entrants
+  that are drafted teams show as "Team N" (or "Team N (drafted)" beside a
+  real team of that name).
+- A public roster spot linked to a private profile, or one that hides
+  its teams, shows as "Player" with its number and position only.
+- `firebase/scripts/backfill-youth-league-teams.mjs` (dry run by
+  default) sets `level: "youth"` on existing youth league teams and their
+  listings.
+
+## 0.25.1 — 2026-11-15
+
+Clean-up; no behaviour change for clients.
+
+**Changed**
+- One tournament engine: `groupEngine` in `@stall10/shared` is now a thin
+  adapter over `tournament_engine.ts` (about 550 duplicated lines gone).
+- One set of room and event access checks: media rooms and the home feed
+  use `hub/access.ts`; `audienceTier` (shared) is the one place a "stats"
+  member counts as a player.
+- Shared helpers replace copies: `parseBody`, `limited()`/`tooFast()`,
+  `clip`/`clipText`, `mapOf`/`isMap`, `storedId`/`isDocId`; `ChatAdmin` is
+  built once.
+- Removed unused shared exports and 27 unused request/input type aliases.
+- A test checks that the API's browse and Discord copies stay in step with
+  `firebase/functions`.
+
+## 0.25.0 — 2026-11-15
+
+Review checklist fixes. Deploy with web 0.29.0: hosted game confirm now
+needs the score in its body.
+
+**Changed**
+- Hosted game confirm requires the `{scoreA, scoreB}` being confirmed and
+  refuses (412) if the report changed meanwhile (the rules' check, ported).
+- A team that hosts an unfinished tournament or league can't be deleted
+  (412); finished ones stay, read-only.
+- Videos outside chat are refused until the transcode job ships (chat
+  videos still work).
+- Dates must carry Z or an offset (`isoDateTime` in `@stall10/shared`).
+- New `unavailable` (503) error code; Discord being unreachable uses it.
+  A missing team's Discord preview answers not_found.
+- Read rate limits per member: roster 60/min, post states 120/min,
+  calendars 60/min, calendar events 60/min. Roster cards use one batched
+  read.
+
+**Fixed**
+- The home feed no longer drops posts when every source is short.
+- Home upcoming events include ones under way and aren't emptied by the
+  audience filter.
+- Uploads: a delete during complete wins, and two completes can't both run.
+- Reconcile reads only the division's entries and the games it fills;
+  closing a division removes all its games.
+- Drafts and Discord imports re-check inside their transactions.
+- Saving a finished group tournament keeps it finished.
+- Roster-link refusals say why.
+- The test fake store refuses reads after writes, as Firestore does.
+
+## 0.24.0 — 2026-11-15
+
+**Added** (security review of the messaging batch)
+- A daily chat-upload quota per member: 200 files asked for and 2 GB
+  received per UTC day (`uploadQuotas/{uid}`; a retried complete is
+  charged once).
+- `DELETE /v1/uploads/:id`: the owner removes an unsent chat file (raw,
+  stored and thumbnail); refused once a message holds it.
+
+**Fixed**
+- Completing an upload checks and copies one generation of the raw file,
+  then re-checks the copy's size, so the bytes can't be swapped after the
+  check.
+- Direct-message uploads need the conversation to exist and list the
+  caller.
+- In chat, an MP4/MOV with an unlisted ftyp brand counts as video when
+  declared or named as one.
+- Upload names are cleaned of control and bidi characters, and `/` `\`
+  become `_`.
+
+## 0.23.1 — 2026-11-15
+
+**Fixed** (shared test vectors with the app)
+- Discord import into a community's teams orders community roles tied on
+  position by name as the app does (which new role id goes to which role).
+- The roster's players are ordered as the app orders them: by number (none
+  counts as 1000), then name compared exactly.
+- Tests read the shared Discord template (`packages/shared/fixtures`) and
+  check the whole parsed plan.
+
+## 0.23.0 — 2026-11-15
+
+**Changed**
+- Chat uploads (`/v1/uploads`, team rooms and DMs) take any file, as the
+  app does: the app's document types or `application/octet-stream`
+  (never HTML, SVG or script), with the file's `name` kept. Chat videos
+  and files are stored as sent at the app's paths
+  (`{folder}/{uploadId}-{safeName}`, so storage.rules still apply),
+  within its limits (10 MB, or 100 MB for a video), and no longer wait on
+  the transcode job. Chat photos are still compressed. Anything whose
+  bytes don't confirm a photo or video is stored as
+  `application/octet-stream`.
+
+## 0.22.1 — 2026-11-15
+
+**Fixed** (security review of the small-fixes batch)
+- Sharing a team event refuses a private group's events (412), as both
+  apps' editors already hide it; before, a schedule manager could post
+  one by calling the API directly.
+- `webRoute` (`@stall10/shared`) only maps id segments of letters,
+  digits, `_`, `-` and inner dots, so a stored notification route with
+  `..`, a backslash or `%2e` can't open another page of the site.
+
+## 0.22.0 — 2026-11-15
+
+**Added**
+- `POST /v1/posts` `shareEvent` takes an optional `calendarId`, so My
+  calendar and shared-calendar events can be shared with followers, as
+  in the app. Only the calendar's owner and editors share; viewers get
+  403, non-members and pending invitees 404; it can't be sent with
+  `teamId`. The stored copy keeps `validSharedEvent`'s keys.
+- `@stall10/shared`: the app's password policy (`password.ts`) and app
+  routes for tournaments, drafts, plays, videos, stats and meetings in
+  `webRoute`.
+
+## 0.21.1 — 2026-11-15
+
+**Fixed** (security review of the meetings and posts slices)
+- `GET /v1/me/home`: every feed post goes through the privacy check,
+  including the caller's own and followed people's, so a followed
+  person's repost of a private stranger's post no longer shows it.
+- The home feed reads at most 300 followed people and 300 followed
+  tournaments (`followReadLimit`), and `/v1/me/home` (60/min),
+  `/v1/players/:uid` and `/v1/posts/:id` (120/min) are rate-limited per
+  member.
+- Discord import: plan keys can't be `__proto__`, `constructor` or other
+  Object.prototype names, and key lookups only read own properties.
+- Discord import: moving rooms to linked teams never deletes the
+  community's General room (it used to fail partway after the import).
+- Meeting and voice tokens are sent with `cache-control: no-store`.
+
+## 0.21.0 — 2026-11-14
+
+**Added**
+- Team posts take a `tournamentKey` for one of the team's tournaments or
+  leagues, so hosts post event news.
+- Discord import: `POST /v1/teams/:id/discord/preview` (a port of the
+  `discord-previewTemplate` callable: owner only, discord.com only, 10 s
+  timeout, no redirects, 2 MB cap) and `POST /v1/teams/:id/discord/import`
+  (the roles, folders and rooms the app adds, including community splits
+  with role copies; the server re-runs the mapping on the stored team).
+- `/v1/me/home` adds posts tagged with followed tournaments and events
+  shared from the member's teams.
+- `POST`/`PATCH /v1/posts` take an "At a tournament" tag, and `POST` can
+  share a team event or one from your own schedule (details copied from
+  the stored event).
+
+## 0.20.1 — 2026-11-14
+
+**Fixed** (security review of 0.14.0–0.19.0)
+- League teams: a team already at a league team's id is kept only if the
+  league made it (league, host and captain match); otherwise creating
+  teams fails with 412. The rules now refuse client-made team ids that
+  start with `league_`, and drafted-team ids can't start with it either.
+  The `createLeagueTeams` callable has the same check.
+- Deleting a stats tournament or a video folder, and reading group or
+  hosted tournament games, query only ids or the fields needed
+  (`DocQueries`), with no caps on how many there are.
+- Hosted and group tournament operations check permission before reading
+  games, entries or divisions; group `advance` refuses people not playing.
+- Publishing a schedule is limited to 5 a minute and 50 a day, reconcile
+  to 20 a minute, and failed draft picks and controls count toward the
+  any-write limit.
+- Group tournament listings must belong to the same group and tournament;
+  delete removes only the tournament's own listing.
+- Deleting a tournament removes every subcollection, however large,
+  checking permission on each batch; removing a division deletes all its
+  games.
+- Stats games up to the 900 KB limit and hosted schedules up to 2,100
+  games are accepted (per-route body limits).
+- Playbook permission checks run inside the write transaction; failed
+  video file deletes are logged.
+
+## 0.20.0 — 2026-11-14
+
+**Added**
+- Meeting and voice channel tokens:
+  `POST /v1/teams/:teamId/meetings/:meetingId/token` and
+  `POST /v1/teams/:teamId/voice-rooms/:roomId/token`, ports of the
+  `meetings-joinToken` and `meetings-voiceToken` callables (same checks,
+  grants, messages and 6 h lifetime), 30 a minute per caller. They answer
+  412 until `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` are
+  set (see DEPLOY.md).
+- Meetings (`/v1/teams/:teamId/meetings`): schedule, edit, cancel, RSVP,
+  start and end; join requests (ask, take back, let in or turn away);
+  watch together state (`playback/current`, 60 a minute); the call's chat.
+  Each ports the `match /meetings` rules.
+
+## 0.19.0 — 2026-11-14
+
+**Added**
+- Hosted tournaments and leagues (`/v1/tournaments`): create, edit,
+  publish and delete events; status steps; divisions; seeds; team
+  entries with the host's approval, invites and captains; publishing the
+  schedule; captains report and confirm scores and the host sets final
+  scores; seeding the bracket; and a host-only reconcile (bracket
+  catch-up, going live, final places, withdrawn teams, captains).
+- Every conjunct of the tournament rules is ported, with one test each;
+  the scheduling engine is shared (`packages/shared/src/tournament_engine.ts`).
+
+## 0.18.0 — 2026-11-14
+
+**Added**
+- Group tournaments (`/v1/teams/:teamId/group-tournaments`): create,
+  save, publish (the server builds the schedule with the app's engine,
+  ported to `packages/shared`), delete, report, confirm and set scores,
+  seed the bracket from pool standings, and catch up bracket moves.
+- Every conjunct of the `groupTournaments`, `games` and
+  `tournamentDirectory` rules is ported; the tournament's public listing
+  is kept in step.
+
+## 0.17.0 — 2026-11-14
+
+**Added**
+- Team stats: create, save whole and delete stats games
+  (`/v1/teams/:teamId/stats-games`) and stats tournaments
+  (`.../stats-tournaments`); deleting a tournament deletes its games.
+- Roster spots (`.../roster-players`): admins add, edit (with the paid
+  mark) and remove them; members claim or let go of their own spot
+  (`PUT .../roster-players/:id/link`).
+- Every conjunct of the statsGames, statsTournaments, roster and
+  rosterStatus rules is ported, with bounds on nested game shapes and
+  size. Stats writes have their own limit of 90 a minute per member.
+
+## 0.16.0 — 2026-11-14
+
+**Added**
+- Player signups: sign up, edit, sign back up, withdraw; the host's
+  accept, waitlist and decline, and marking a player's fee paid
+  (`/v1/tournaments/:id/signups/...`), ports of the signups and payments
+  rules.
+- Saving a division's drafted teams (`PUT .../divisions/:d/drafted-teams`):
+  the division rule plus the app's pre-save checks.
+- The captains' draft: start, pick, control (pause, resume, undo,
+  autopick, cancel) and finish, ports of the `startDraft`, `draftPick`,
+  `draftControl` and `finishDraft` callables; and creating a league's
+  teams from its drafted teams, a port of `createLeagueTeams`. The app
+  keeps the callables until it switches.
+- Draft writes have their own buckets (picks and controls 240 a minute,
+  signup decisions 120, other draft writes 30); picks and controls skip
+  the 120-a-minute any-write count so a host can auto-pick a full draft.
+
+## 0.15.0 — 2026-11-14
+
+**Added**
+- Team videos: `POST/PATCH/DELETE /v1/teams/:teamId/videos[/:videoId]`
+  add YouTube videos, edit them, move them between folders and remove
+  them (an uploaded video's file is deleted too, only from its own
+  folder).
+- Video folders: `POST/PATCH/DELETE /v1/teams/:teamId/video-folders[/:folderId]`;
+  deleting a folder moves its videos to Unsorted first, as the app does.
+- The `videos` and `videoFolders` rules are ported whole (`validVideo`,
+  `validFile` on the resulting document), on the hub write limit.
+
+## 0.14.1 — 2026-11-14
+
+**Fixed** (security review of 0.11.0–0.13.0)
+- `DELETE /v1/teams/:teamId` now checks everything the rule checks:
+  `ownerId` must be the caller (a `members` entry of "owner" is no longer
+  enough), the owner must be the only member (412 until the others are
+  removed or it's handed over), and a team that plays in an unfinished
+  league can't be deleted. Stored community and linked-team ids are
+  checked before they're used in paths.
+- Notification settings: at most 200 teams with their own settings (the
+  rules' cap); resetting a team now really removes its settings (it used
+  a merge, which kept the key).
+- `PUT /v1/me/identity` refuses one upload for both pictures, and an
+  unreadable old picture URL no longer fails the request after saving.
+- Visitors' profile views only pass on pictures from Firebase Storage or
+  Google, so a profile can't point visitors' browsers at another server.
+- Chat folder ids refuse `.`, `..` and Firestore's reserved names; failed
+  file clean-ups after deleting a team or room are logged.
+- Test fakes: `merge` now merges nested maps as Firestore does.
+
+## 0.14.0 — 2026-11-14
+
+**Added**
+- Team playbooks: `POST /v1/teams/:teamId/plays`, `PUT` and `DELETE
+  /v1/teams/:teamId/plays/:playId` (`apps/api/src/playbook`), the plays
+  rule ported. Members who manage the team save whole plays, checked by
+  `savePlayRequestSchema` (pieces, arrows, steps, their limits, and steps
+  only moving pieces on the field); `updatedBy` is the caller.
+
+## 0.13.0 — 2026-11-14
+
+**Added**
+- `PUT /v1/conversations/:id/typing`: a participant marks or clears their
+  typing (`conversations/{id}/typing/{uid}`, as the typing rule).
+- `PUT /v1/me/read-receipts`: `users/{uid}.readReceipts`.
+
+## 0.12.0 — 2026-11-14
+
+Team admin for the website on its own.
+
+**Added**
+- Chat rooms and folders (`src/hub/rooms.ts`, ports of the `chats` and
+  `chatFolders` rules, manageChats): `POST|PATCH|DELETE
+  /v1/teams/:teamId/chat-rooms[/:roomId]`, `POST|PATCH|DELETE
+  .../chat-folders[/:folderId]` and `PUT .../chat-layout` (order and
+  folders). Access lists are capped as the rules cap them, writers must
+  be readers, and single members must be on the team. A room's kind never
+  changes; General can't be deleted; a deleted room takes its messages
+  and files, and only someone who can read it may delete it. A deleted
+  folder's rooms move out of it.
+- `DELETE /v1/teams/:teamId`: the owner deletes a team, group or
+  community, typing its name (checked here too). As the app's deleteTeam:
+  `deletingAt` first, then every document under the team
+  (`recursiveDelete`), its Storage folder, its directory listing and its
+  tournaments' listings. It also leaves its community's list, and a
+  deleted community's teams are freed.
+
+## 0.11.0 — 2026-11-14
+
+The member's own account, for the website on its own.
+
+**Added**
+- `PUT /v1/me/identity`: change your name, profile picture and header
+  photo (`src/account`). The name and picture go on the Auth record (what
+  the app reads), `users/{uid}` and the profile's directory fields with
+  fresh search keywords; the header on the profile. Pictures are the
+  caller's own finished `avatar` uploads, given a lasting download URL
+  (`MediaStorage.downloadUrl`); replaced or removed ones are deleted, and
+  only from the caller's own `users/{uid}/profile/` folder.
+- Notification settings (`users/{uid}/settings/notifications`, as the
+  app's NotificationPreferences): `PUT /v1/me/notification-settings/category`
+  (a kind for every team, or a per-team kind for one team), `DELETE
+  .../teams/:teamId` (back to the defaults), `PUT .../mute` (one team chat
+  room or conversation; at most 500).
+- Player profiles' card includes `headerUrl` (shown even when private, as
+  in the app), here and in the `browse` functions.
+
+## 0.10.0 — 2026-11-14
+
+Website parity (`docs/product-spec.md` §8.1) and visitors limited to team
+and community pages. Needs the `browse` functions from the same change
+for the Flutter web site.
+
+**Added**
+- Team hub writes (`src/hub`), each re-checking its Firestore rule in a
+  transaction, with zod schemas in `packages/shared/src/hub.ts`:
+  - Team posts: `POST /v1/teams/:teamId/posts`, `PATCH|DELETE
+    .../posts/:postId` (manageTeam; words or a photo, 5 links, 4 photos
+    from the caller's `teamImage` uploads for this team and post).
+  - Team events: `POST /v1/teams/:teamId/events`, `PATCH|DELETE
+    .../events/:eventId` (manageEvents; validEvent, a community's
+    audience, the `publicEvents` copy kept in step, votes reset when the
+    poll changes; a hosted tournament's event keeps its link).
+  - Answers: `PUT .../events/:eventId/rsvp`, `/reaction`, `/votes`
+    (members who see the event change only their own entries; reactions
+    and votes only while going; votes must be poll options).
+  - Team chat: `POST /v1/teams/:teamId/chats/:roomId/messages` (members who
+    may write in the room, not muted; attachments from the caller's
+    `chat` uploads for this room and message; a reply's quote is copied
+    from the room by the server), `PUT .../messages/:id/reaction` (one of
+    the offered emoji, as the caller) and `DELETE .../messages/:id`
+    (authors, the owner, and moderators or chat managers who can read the
+    room).
+- Direct and group messages (`src/messages`, schemas in
+  `packages/shared/src/messages.ts`), porting the conversations rules:
+  `POST /v1/conversations` (straight to their inbox if they follow you,
+  else a request where their message policy allows one, else refused),
+  `POST /v1/conversations/groups`, `PATCH /v1/conversations/:id` (rename),
+  `POST|DELETE .../members` (only people who follow the adder and take
+  messages, up to 10; leave, or the creator takes someone out),
+  `POST .../messages` (with the inbox preview and the sender's read time;
+  not while a request waits on the sender; attachments from `chat`
+  uploads for this conversation and message), `PUT|DELETE
+  .../messages/:id` (react; authors delete), `POST .../read` (their read
+  time, and the shared receipt unless turned off or a request waits on
+  them), `PUT .../request` (accept or decline), `PUT .../archive` and
+  `POST .../clear`. Outsiders get 404 for every conversation.
+- A per-member, per-instance write limit on those routes
+  (`MemoryRateLimiter`: 30 posts/events, 60 messages and 120 answers a
+  minute), a first step on security review S9.
+- Author names on these writes never fall back to an email (review S2).
+
+**Changed**
+- `GET /v1/public/players/:uid`, `/v1/public/events` and
+  `/v1/public/search` need a signed-in caller (401 otherwise, even with
+  the website's server key) and App Check like other member routes, are
+  limited per uid in memory (so heavy browsing can't trip the shared
+  mute on chat and posts), and answer `cache-control: private, no-store`.
+  The feed, posts and team pages stay open to visitors.
+- Every signed-in write is rate limited per caller (120 a minute, in
+  memory per instance; `src/limits/writes.ts`), with tighter limits on
+  joining by code, invites, join requests, new teams, uploads and new
+  conversations or groups (also a best-effort daily cap, reset when an
+  instance restarts) (security review S9). `buildApp({ writeLimits: false })`
+  turns them off for tests.
+
+**Fixed**
+- A school or club community that approves who joins is a private group
+  on public pages, like a group: its posts and events no longer show to
+  visitors (security review S6).
+- Editing a community event without an `audience` keeps its audience
+  instead of opening it to everyone.
+- Deleting a team chat message as a non-member says only that the room
+  isn't found, whether or not the message exists.
+
 ## 0.9.2 — 2026-11-14
 
 **Fixed**

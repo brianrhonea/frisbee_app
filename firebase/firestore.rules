@@ -142,6 +142,13 @@ service cloud.firestore {
     // A school or club community: its teams (linkedTeams) are full teams
     // that asked to join (their orgId), and its events say who sees them.
     function isOrg(t) { return t.get('kind', 'team') == 'organization'; }
+    // A club team (isClubTeam in packages/shared/src/team.ts) is for
+    // players 16 and over. Their date of birth is encrypted where these
+    // rules can't read it, so nobody joins or starts one directly: the API
+    // checks their age (apps/api/src/teams/club_age.ts).
+    function isClubTeam(t) {
+      return !isGroup(t) && t.get('level', 'club') == 'club';
+    }
     // A group that needs approval is private: outsiders see its name, city
     // and description in search, never its location, posts or events.
     function isPrivateGroup(t) {
@@ -401,9 +408,17 @@ service cloud.firestore {
     match /teams/{teamId} {
       allow read: if signedIn() && isMember(resource.data);
 
+      // League teams' ids (league_{tournamentId}_{draftId}) are guessable,
+      // and only the server makes those teams (createLeagueTeams).
+      function serverOnlyId() {
+        return teamId.matches('league_.*');
+      }
+
       // Creator becomes sole owner. Invite codes are minted later, and
       // only for as long as an admin shows or shares one (inviteCodes).
-      allow create: if signedIn() && notMuted()
+      // Club teams are started through the API (isClubTeam).
+      allow create: if signedIn() && notMuted() && !serverOnlyId()
+        && !isClubTeam(request.resource.data)
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
              'memberIds', 'memberNames', 'createdAt', 'orgId', 'orgName',
@@ -418,7 +433,7 @@ service cloud.firestore {
 
       // A community group: same owner checks, plus its group fields, and
       // no invite code since anyone can find and join it.
-      allow create: if signedIn() && notMuted()
+      allow create: if signedIn() && notMuted() && !serverOnlyId()
         && request.resource.data.keys().hasOnly([
              'name', 'division', 'level', 'city', 'ownerId', 'members',
              'memberIds', 'memberNames', 'createdAt', 'kind', 'description',
@@ -528,9 +543,11 @@ service cloud.firestore {
       }
 
       // Someone an owner or organizer invited joins as a player, with no
-      // code, deleting the invite in the same batch.
+      // code, deleting the invite in the same batch. Not a club team: the
+      // API checks their age (isClubTeam).
       function acceptInvite() {
-        return addsOnly(uid())
+        return !isClubTeam(resource.data)
+          && addsOnly(uid())
           && exists(teamInvitePath(uid(), teamId))
           && !existsAfter(teamInvitePath(uid(), teamId));
       }
@@ -693,11 +710,12 @@ service cloud.firestore {
 
       // Non-member joins as a player by proving they know a live invite
       // code or link token for this team, written to joins/{uid} in the
-      // same batch.
+      // same batch. Not a club team: the API checks their age (isClubTeam).
       function join() {
         let diff = request.resource.data.members.diff(resource.data.members);
         let invite = get(codePath(getAfter(joinPath(teamId, uid())).data.code)).data;
         return !isMember(resource.data)
+          && !isClubTeam(resource.data)
           && changed().hasOnly(['members', 'memberIds', 'memberNames'])
           && invite.teamId == teamId
           && liveCode(invite)

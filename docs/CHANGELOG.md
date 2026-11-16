@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.23  | 2026-11-14 | `feature/web-parity`                    |                     |
 | 0.0.22  | 2026-11-14 | `feature/web-redesign`                  |                     |
 | 0.0.21  | 2026-11-14 | `feature/web-redesign`                  | `848021e`           |
 | 0.0.20  | 2026-11-13 | `feature/core-parity`                   |                     |
@@ -36,6 +37,78 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.23 — Visitors see only team and community pages
+
+- Flutter web (`web_router.dart`): signed-out visitors keep the community
+  feed and team/community pages; Explore, Events, the Teams tab, player
+  profiles, Schedule, Rankings, Learn, Messages, Notifications and
+  Settings send them to sign in (`?from=` brings them back), as on the
+  Next.js website.
+- `browse` functions: `profile`, `events` and `search` need a signed-in
+  caller (`unauthenticated` otherwise); `feed`, `post` and `team` stay
+  open. School/club communities that approve members are private groups
+  on public pages, like groups (review S6).
+- The native app is unchanged: it already needs a sign-in.
+- Discord import: moving rooms to linked teams never moves the
+  community's General room (as on the website).
+- Balanced draft: a seeded mulberry32 shuffle (`SeededRandom`,
+  `shuffleWith`), the website's, so the same seed deals the same teams on
+  both. Existing seeds deal differently than before; teams aren't
+  redealt unless the host deals again.
+- Voice channels re-check your access while connected (as on the
+  website): losing access to the channel or team drops the call, losing
+  the right to talk mutes you, and signing out or switching accounts
+  hangs up.
+- New Community tab on Home (For you / Community / Your teams), as on the
+  website, from the API's members' feed.
+- Deleting a team asks you to type its name and goes through the API
+  (`DELETE /v1/teams/:id`, which also refuses while it hosts an unfinished
+  tournament or league).
+- Voice: switching channels quickly ends in the last one picked; voice no
+  longer drops while a team is still loading, and its watches reconnect.
+- Drafts typed right after sign-in no longer overwrite saved ones.
+- Players with the same name are drafted in a fixed order (by uid).
+- A youth team's page says "Rosters of youth teams are private: only
+  members see them." to anyone who isn't on it (as on the website; the
+  API refuses them its roster).
+- The tournament form says the location and About are public.
+- Removed code we no longer need: the old Flutter website, the
+  Windows/macOS leftovers (Windows Google sign-in, screen-source and
+  speaker pickers, the mouse-only message strip, WebView2 players) and
+  unused packages. iOS and Android work as before.
+- Cancelling Google or Apple sign-in (or the check before deleting the
+  account) shows no error, as on the website; it used to show the raw
+  Google exception or "Sign-in was cancelled.".
+- Message drafts are kept per user and cleared on sign-out (as on the
+  website).
+- Home: the Your teams tab is your teams' posts, a team strip with
+  New / Join, a Get started checklist and a Needs you card; the invite
+  dialog makes its link on open and lists join requests.
+- Phone top bar: "Stall 10" without the logo, and a bell for
+  notifications.
+- Google and Apple sign-ups are asked "Your name and username"; "About
+  you" starts the legal name from it.
+- Email sign-up saves the birthday (encrypted, through the API) so
+  "About you" fills it in after a restart or on another device.
+- Club teams are for players 16 and over: creating, joining and
+  accepting an invite go through the API, which checks the date of
+  birth; the rules refuse direct writes for club teams.
+- Rankings: Level and Division filters (as on the website), opening on
+  Club Mixed; youth is never ranked or rated.
+- Home's post box is an inline composer (`InlineComposerViewModel`):
+  type and tap Post; Photo, Link and Workout open inside the box, and
+  "To" posts to Everyone or a team you manage (replaces the Team post
+  button and the editor popup on Home). Nothing can change while it
+  posts, and if the team picked leaves your list the post isn't sent
+  (never to Everyone instead). Links keep a lower-case scheme.
+- Explore's filter chips sit on one row that scrolls sideways.
+- Get started: "Join or create a team"; the create-or-join dialog no
+  longer overflows on narrow phones.
+- Tests: shared test vectors (`packages/shared/fixtures`, written by
+  `test/shared_fixtures`) check the tournament engine, stats, play
+  animation, drafts, Discord import and calendar files against the
+  website's code.
 
 ## 0.0.22 — An indigo logo
 

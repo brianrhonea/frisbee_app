@@ -2,7 +2,7 @@ import Link from "next/link";
 import { appScheme } from "@/lib/site";
 import { StoreBadges } from "./StoreBadges";
 
-export type LinkKind = "join" | "g" | "p";
+type LinkKind = "join" | "g" | "p";
 
 const valid = /^[A-Za-z0-9_-]{1,200}$/;
 
@@ -41,6 +41,11 @@ export function OpenInApp({ kind, id }: { kind: LinkKind; id: string }) {
       {kind === "p" && (
         <p>
           <Link href={`/posts/${encodeURIComponent(id)}`}>See the post on the web</Link>
+        </p>
+      )}
+      {kind === "g" && (
+        <p>
+          <Link href={`/teams/${encodeURIComponent(id)}`}>See the group on the web</Link>
         </p>
       )}
       <p className="muted">No app yet?</p>

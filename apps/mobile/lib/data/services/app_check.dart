@@ -9,8 +9,7 @@ final _log = Logger('AppCheck');
 /// and fake traffic once enforcement is on (firebase/docs/app-check.md).
 abstract final class AppCheck {
   /// A debug token registered in the Firebase console, from
-  /// `APP_CHECK_DEBUG_TOKEN` in secrets.local.json. Debug builds and
-  /// Windows (which has no device attestation) use it.
+  /// `APP_CHECK_DEBUG_TOKEN` in secrets.local.json. Debug builds use it.
   static const _debugToken = String.fromEnvironment('APP_CHECK_DEBUG_TOKEN');
 
   static bool _active = false;
@@ -18,10 +17,6 @@ abstract final class AppCheck {
   /// Starts App Check. Call once, right after Firebase.initializeApp.
   static Future<void> activate() async {
     final token = _debugToken.isEmpty ? null : _debugToken;
-    final windows = defaultTargetPlatform == TargetPlatform.windows;
-    // Windows can only use a debug token; without one, stay off rather than
-    // fail every request.
-    if (kIsWeb || (windows && token == null)) return;
     try {
       await FirebaseAppCheck.instance.activate(
         providerAndroid: kDebugMode
@@ -30,7 +25,6 @@ abstract final class AppCheck {
         providerApple: kDebugMode
             ? AppleDebugProvider(debugToken: token)
             : const AppleAppAttestWithDeviceCheckFallbackProvider(),
-        providerWindows: WindowsDebugProvider(debugToken: token),
       );
       _active = true;
     } on Object catch (e) {

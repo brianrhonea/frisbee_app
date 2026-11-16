@@ -5,7 +5,11 @@ import {
   dateWeight,
   differential,
   divisionResult,
+  isRankedKey,
+  isYouthTeam,
+  publicResults,
   rankingDoc,
+  rankingWrites,
   type RankedGame,
   rate,
   scoreWeight,
@@ -138,5 +142,100 @@ describe("stored docs", () => {
       runnerUp: { teamId: "b", name: "Truck Stop" },
     });
     expect(divisionResult({ level: "college", division: "women" }, names).champion).toBeNull();
+  });
+});
+
+describe("youth is never ranked", () => {
+  // Six teams, each playing every other once: everyone has 5 games.
+  const roundRobin = (ids: string[]): RankedGame[] =>
+    ids.flatMap((a, i) => ids.slice(i + 1).map((b, j) => game(a, 13, b, 8 + ((i + j) % 4))));
+  const teams = ["a", "b", "c", "d", "e", "f"];
+  const names = new Map(teams.map((t) => [t, t.toUpperCase()]));
+
+  it("ranks only club, college, league and pickup divisions", () => {
+    expect(isRankedKey("club-mixed")).toBe(true);
+    expect(isRankedKey("pickup-masters")).toBe(true);
+    expect(isRankedKey("youth-mixed")).toBe(false);
+    expect(isRankedKey("youth-open")).toBe(false);
+    expect(isRankedKey("elite-mixed")).toBe(false);
+    expect(isRankedKey("club-coed")).toBe(false);
+    expect(isRankedKey("club-mixed-x")).toBe(false);
+  });
+
+  it("knows a youth team by its team doc or listing", () => {
+    expect(isYouthTeam({ level: "youth" })).toBe(true);
+    expect(isYouthTeam({ kind: "team", level: "youth" })).toBe(true);
+    expect(isYouthTeam({ level: "club" })).toBe(false);
+    expect(isYouthTeam({ kind: "community", level: "youth" })).toBe(false);
+    expect(isYouthTeam(undefined)).toBe(false);
+  });
+
+  it("writes no youth division, and deletes youth rankings left from before", () => {
+    const games = new Map([
+      ["club-mixed", roundRobin(teams)],
+      ["youth-mixed", roundRobin(teams)],
+      ["youth-open", roundRobin(teams)],
+    ]);
+    const { set, remove } = rankingWrites(games, names, new Set(), ["club-mixed", "youth-mixed", "youth-girls", "college-open"], now);
+    expect([...set.keys()]).toEqual(["club-mixed"]);
+    expect(remove.sort()).toEqual(["college-open", "youth-girls", "youth-mixed"]);
+  });
+
+  it("leaves a youth team out of an adult division, numbering the rest without gaps", () => {
+    const games = new Map([["club-mixed", roundRobin(teams)]]);
+    const all = rankingWrites(games, names, new Set(), [], now).set.get("club-mixed")!;
+    const { set } = rankingWrites(games, names, new Set(["c"]), [], now);
+    const doc = set.get("club-mixed")!;
+    const listed = doc.teams as { rank: number; teamId: string; rating: number }[];
+    expect(listed.map((t) => t.teamId)).not.toContain("c");
+    expect(listed.map((t) => t.rank)).toEqual([1, 2, 3, 4, 5]);
+    // Its games still count for its opponents: their ratings don't move.
+    const before = new Map((all.teams as { teamId: string; rating: number }[]).map((t) => [t.teamId, t.rating]));
+    for (const t of listed) expect(t.rating).toBe(before.get(t.teamId));
+  });
+
+  it("drops a division whose only ranked teams are youth teams", () => {
+    const games = new Map([["club-open", roundRobin(teams)]]);
+    const { set, remove } = rankingWrites(games, names, new Set(teams), ["club-open"], now);
+    expect(set.size).toBe(0);
+    expect(remove).toEqual(["club-open"]);
+  });
+});
+
+describe("publicResults (Explore's Recent results)", () => {
+  const team = (teamId: string, name = teamId) => ({ teamId, name });
+  const result = (champion: string | null, runnerUp: string | null = null) => ({
+    label: "x",
+    champion: champion ? team(champion) : null,
+    runnerUp: runnerUp ? team(runnerUp) : null,
+  });
+
+  it("leaves out youth and unknown divisions", () => {
+    const shown = publicResults(
+      [
+        { key: "club-mixed", result: result("a", "b") },
+        { key: "youth-open", result: result("c", "d") },
+        { key: "elite-open", result: result("e") },
+      ],
+      new Set(),
+    );
+    expect(shown.map((r) => r.champion?.teamId)).toEqual(["a"]);
+  });
+
+  it("never names a youth team", () => {
+    const shown = publicResults(
+      [
+        { key: "club-mixed", result: result("y1", "a") },
+        { key: "club-open", result: result("b", "y2") },
+      ],
+      new Set(["y1", "y2"]),
+    );
+    expect(shown).toHaveLength(1);
+    expect(shown[0]!.champion?.teamId).toBe("b");
+    expect(shown[0]!.runnerUp).toBeNull();
+  });
+
+  it("leaves out divisions without a champion", () => {
+    expect(publicResults([{ key: "club-mixed", result: result(null) }], new Set())).toEqual([]);
   });
 });

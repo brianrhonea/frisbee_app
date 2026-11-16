@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:frisbee_app/data/services/api_client.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
@@ -259,6 +260,10 @@ void main() {
   test('links are normalized to web addresses', () {
     expect(TeamPost.normalizeLink('example.com/a'), 'https://example.com/a');
     expect(TeamPost.normalizeLink(' http://x.org '), 'http://x.org');
+    expect(
+      TeamPost.normalizeLink('Https://X.org/Path'),
+      'https://X.org/Path',
+    );
     expect(TeamPost.normalizeLink('ftp://x.org'), isNull);
     expect(TeamPost.normalizeLink('javascript:alert(1)'), isNull);
     expect(TeamPost.normalizeLink('not a link'), isNull);
@@ -383,7 +388,7 @@ void main() {
       expect(teams.teams, contains('t1'), reason: 'not deleted');
 
       // The view model refuses too, whatever the screen does.
-      await vm.deleteTeam.execute();
+      await vm.deleteTeam.execute('Team');
       await tester.pump();
       expect(
         find.textContaining('transfer ownership first'),
@@ -406,6 +411,17 @@ void main() {
       expect(find.text('Delete Team?'), findsOneWidget);
       expect(find.textContaining("Can't delete"), findsNothing);
 
+      // As on the website, the name has to be typed first.
+      FilledButton deleteButton() =>
+          tester.widget(find.widgetWithText(FilledButton, 'Delete'));
+      expect(deleteButton().onPressed, isNull);
+      await tester.enterText(find.byType(TextField), 'Tea');
+      await tester.pump();
+      expect(deleteButton().onPressed, isNull);
+      await tester.enterText(find.byType(TextField), ' team ');
+      await tester.pump();
+      expect(deleteButton().onPressed, isNotNull, reason: 'any case');
+
       // While it deletes, a dialog nobody can dismiss shows how far it is.
       teams.deleteGate = Completer<void>();
       await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
@@ -418,6 +434,46 @@ void main() {
       await tester.pump();
       expect(find.text('Deleting Team'), findsOneWidget, reason: 'stays up');
       expect(teams.teams, contains('t1'), reason: 'still going');
+      expect(teams.deletedWithName, 'team');
+    });
+
+    testWidgets("the API's refusal is shown and the team stays", (
+      tester,
+    ) async {
+      addTeam({testUser.uid: TeamRole.owner});
+      teams.deleteError = const ApiException(
+        'failed_precondition',
+        "It plays in a league that hasn't finished, so it can't be deleted "
+            'yet.',
+      );
+      await pump(tester, homeVm());
+
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete team'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Team');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(
+        find.textContaining("league that hasn't finished"),
+        findsOneWidget,
+      );
+      expect(find.text('Deleting Team'), findsNothing);
+      expect(teams.teams, contains('t1'));
+    });
+
+    test('the view model refuses a name that does not match', () async {
+      addTeam({testUser.uid: TeamRole.owner});
+      final vm = homeVm();
+      await pumpEventQueue();
+      await vm.deleteTeam.execute('Other');
+      expect(vm.deleteTeam.error, isTrue);
+      expect(teams.deletedWithName, isNull);
+      expect(teams.teams, contains('t1'));
     });
 
     testWidgets('others get the public page and can join', (tester) async {
@@ -439,6 +495,69 @@ void main() {
           of: find.byType(BottomSheet),
           matching: find.text('Central Park'),
         ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets("a youth team's roster is private to outsiders", (
+      tester,
+    ) async {
+      final youth = Team(
+        id: 't1',
+        name: 'Juniors',
+        division: Division.mixed,
+        level: CompetitionLevel.youth,
+        ownerId: 'owner',
+        members: const {'owner': TeamRole.owner},
+      );
+      teams.teams[youth.id] = youth;
+      teams.listings[youth.id] = TeamListing.of(youth);
+      final vm = homeVm();
+      await pump(tester, vm);
+      expect(vm.youthRosterPrivate, isTrue);
+      expect(
+        find.text('Rosters of youth teams are private: only members see them.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets("members and adult teams' outsiders see no youth note", (
+      tester,
+    ) async {
+      addTeam({'owner': TeamRole.owner});
+      final outsider = homeVm();
+      await pump(tester, outsider);
+      expect(outsider.youthRosterPrivate, isFalse);
+      expect(find.text(YouthRosterNote.text), findsNothing);
+    });
+
+    testWidgets('a team says outsiders need an invite code', (tester) async {
+      addTeam({'owner': TeamRole.owner});
+      await pump(tester, homeVm());
+      expect(find.textContaining('invite code to join'), findsOneWidget);
+    });
+
+    testWidgets("Invite counts a group's join requests", (tester) async {
+      final group = Team(
+        id: 't1',
+        name: 'Friends',
+        division: Division.mixed,
+        level: CompetitionLevel.pickup,
+        ownerId: testUser.uid,
+        members: {testUser.uid: TeamRole.owner},
+        kind: TeamKind.community,
+        requiresApproval: true,
+      );
+      teams.teams['t1'] = group;
+      teams.listings['t1'] = TeamListing.of(group);
+      teams.joinRequests['t1'] = [
+        const GroupJoinRequest(uid: 'ann', name: 'Ann'),
+        const GroupJoinRequest(uid: 'bo', name: 'Bo'),
+      ];
+      await pump(tester, homeVm());
+      expect(find.text('Invite members'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(Badge), matching: find.text('2')),
         findsOneWidget,
       );
     });

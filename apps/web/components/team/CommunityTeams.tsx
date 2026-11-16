@@ -2,12 +2,14 @@
 import type { TeamRoster } from "@stall10/shared";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { divisionLabels } from "@/lib/site";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
+import { CommunityAdmin } from "./CommunityAdmin";
 import { InvitePeople } from "./InvitePeople";
 import { useTeamHub } from "./TeamContext";
+import { EmptyState, ErrorNote, Loading } from "../StatusViews";
 
 /**
  * A community's teams (`teams` in `GET /v1/teams/:id/roster`), for anyone
@@ -27,7 +29,7 @@ export function CommunityTeams() {
     setError("");
     callApi<TeamRoster>(user, `/v1/teams/${encodeURIComponent(teamId)}/roster`)
       .then((r) => setTeams(r.teams))
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Couldn't load the teams. Try again."));
+      .catch((e) => setError(problem(e, "Couldn't load the teams. Try again.")));
   }, [user, teamId]);
 
   if (user === undefined) return null;
@@ -43,12 +45,14 @@ export function CommunityTeams() {
       </div>
     );
   }
-  if (error) return <p className="empty">{error}</p>;
-  if (!teams) return <p className="muted" aria-busy="true">Loading the teams…</p>;
-  if (teams.length === 0) return <p className="empty">No teams here yet. Admins add them in the app.</p>;
+  if (error) return <ErrorNote>{error}</ErrorNote>;
+  if (!teams) return <Loading label="Loading the teams…" />;
+  const admin = viewer.state === "member" && viewer.can("manageTeam") && viewer.team.kind === "organization";
+  if (teams.length === 0 && !admin) return <EmptyState>No teams here yet.</EmptyState>;
 
   return (
     <div className="stack">
+      {admin && <CommunityAdmin />}
       {inviting && <InvitePeople teamId={inviting.id} teamName={inviting.name} onClose={() => setInviting(null)} />}
       <section className="card">
         <h2 className="card-title">

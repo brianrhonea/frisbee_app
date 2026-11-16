@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/ui/posts/view_models/home_feed.dart';
@@ -12,6 +14,9 @@ import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/home/view_models/home_viewmodel.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
+import 'package:frisbee_app/ui/posts/widgets/inline_composer.dart';
+import 'package:frisbee_app/ui/posts/widgets/post_composer.dart';
+import 'package:frisbee_app/ui/teams/widgets/team_post_widgets.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_editor_screen.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
@@ -337,6 +342,242 @@ void main() {
       expect(vm.canEditPost(pub), isFalse);
     });
 
+    group('the Community tab', () {
+      test("loads only once opened, in the API's order", () async {
+        final vm = await load();
+        userPosts.posts.addAll([
+          userPost('a', 'zed', DateTime(2026, 10, 28, 8)),
+          userPost('b', 'sam', DateTime(2026, 10, 28, 7)),
+        ]);
+        userPosts.communityPages[null] = (ids: ['a', 'b'], next: 100);
+        await pumpEventQueue();
+        expect(vm.hasCommunity, isTrue);
+        expect(userPosts.communityRequests, isEmpty, reason: 'lazy');
+        expect(vm.community.loaded, isFalse);
+
+        vm.openCommunity();
+        vm.openCommunity();
+        await pumpEventQueue();
+        expect(userPosts.communityRequests, [null], reason: 'once');
+        expect(vm.community.loaded, isTrue);
+        expect(vm.communityPosts.map((p) => p.id), ['a', 'b']);
+        expect(vm.community.hasMore, isTrue);
+      });
+
+      test('pages on past short pages, without repeats, to the end', () async {
+        final vm = await load();
+        userPosts.posts.addAll([
+          userPost('a', 'zed', DateTime(2026, 10, 28, 8)),
+          userPost('b', 'sam', DateTime(2026, 10, 28, 7)),
+          userPost('c', 'sam', DateTime(2026, 10, 27)),
+        ]);
+        userPosts.communityPages.addAll({
+          null: (ids: ['a'], next: 300),
+          // All private: an empty page, with more after it.
+          300: (ids: const [], next: 200),
+          200: (ids: ['a', 'b', 'c'], next: null),
+        });
+        vm.openCommunity();
+        await pumpEventQueue();
+        await vm.community.loadMore();
+        await pumpEventQueue();
+        expect(vm.communityPosts.map((p) => p.id), ['a']);
+        expect(vm.community.hasMore, isTrue, reason: 'not caught up yet');
+        await vm.community.loadMore();
+        await pumpEventQueue();
+        expect(vm.communityPosts.map((p) => p.id), ['a', 'b', 'c']);
+        expect(vm.community.hasMore, isFalse);
+        await vm.community.loadMore();
+        expect(userPosts.communityRequests, [null, 300, 200]);
+      });
+
+      test('older posts load under the ones shown, not over them', () async {
+        final vm = await load();
+        userPosts.posts.addAll([
+          userPost('a', 'zed', DateTime(2026, 10, 28, 8)),
+          userPost('b', 'sam', DateTime(2026, 10, 27)),
+        ]);
+        userPosts.communityPages.addAll({
+          null: (ids: ['a'], next: 100),
+          100: (ids: ['b'], next: null),
+        });
+        vm.openCommunity();
+        await pumpEventQueue();
+        userPosts.idsGate = Completer<void>();
+        await vm.community.loadMore();
+        // The page is in, its posts not yet: still showing, and loading.
+        expect(vm.community.loaded, isTrue);
+        expect(vm.community.loading, isTrue);
+        expect(vm.communityPosts.map((p) => p.id), ['a']);
+        userPosts.idsGate!.complete();
+        await pumpEventQueue();
+        expect(vm.community.loading, isFalse);
+        expect(vm.communityPosts.map((p) => p.id), ['a', 'b']);
+      });
+
+      test('a failed page keeps the posts and is tried again', () async {
+        final vm = await load();
+        userPosts.posts.add(userPost('a', 'zed', DateTime(2026, 10, 28)));
+        userPosts.communityPages[null] = (ids: ['a'], next: 100);
+        vm.openCommunity();
+        await pumpEventQueue();
+        userPosts.communityError = Exception('offline');
+        await vm.community.loadMore();
+        expect(vm.community.error, isTrue);
+        expect(vm.communityPosts.map((p) => p.id), ['a']);
+        userPosts.communityError = null;
+        await vm.community.loadMore();
+        expect(vm.community.error, isFalse);
+        expect(userPosts.communityRequests, [null, 100, 100]);
+      });
+
+      test('posts stay live: likes show and deleted ones go', () async {
+        final vm = await load();
+        userPosts.posts.addAll([
+          userPost('a', 'zed', DateTime(2026, 10, 28, 8)),
+          userPost('b', 'sam', DateTime(2026, 10, 28, 7)),
+        ]);
+        userPosts.communityPages[null] = (ids: ['a', 'b'], next: null);
+        vm.openCommunity();
+        await pumpEventQueue();
+        final a = vm.communityPosts.first;
+        expect(vm.actions.isLiked(a), isFalse);
+        await vm.actions.toggleLike.execute(a);
+        await pumpEventQueue();
+        expect(vm.actions.isLiked(vm.communityPosts.first), isTrue);
+
+        userPosts.posts.removeWhere((p) => p.id == 'b');
+        userPosts.changed();
+        await pumpEventQueue();
+        expect(vm.communityPosts.map((p) => p.id), ['a']);
+      });
+
+      test('refreshing Home reloads it once it has been opened', () async {
+        final vm = await load();
+        await vm.refreshFeed();
+        expect(userPosts.communityRequests, isEmpty);
+        vm.openCommunity();
+        await pumpEventQueue();
+        await vm.refreshFeed();
+        await pumpEventQueue();
+        expect(userPosts.communityRequests, [null, null]);
+      });
+
+      test("builds without the API don't have it", () async {
+        final vm = await load();
+        userPosts.hasCommunityFeed = false;
+        expect(vm.hasCommunity, isFalse);
+      });
+    });
+
+    test(
+      'the Your teams feed has only my teams\' posts, once opened',
+      () async {
+        final vm = await load();
+        userPosts.posts.add(
+          userPost('mine', testUser.uid, DateTime(2026, 10, 28)),
+        );
+        await follows.follow(
+          testUser.uid,
+          const FollowTarget.team('t7', 'Followed Club'),
+        );
+        posts.posts['t7'] = [
+          TeamPost(
+            id: 'q1',
+            body: 'Open tryouts',
+            isPublic: true,
+            createdAt: now,
+          ),
+        ];
+        await pumpEventQueue();
+        expect(vm.teamFeed, isNull, reason: 'not opened yet');
+        expect(vm.posts.map((i) => i.id), contains('team/t7/q1'));
+
+        vm.openTeams();
+        await pumpEventQueue();
+        expect(vm.teamPostsLoaded, isTrue);
+        expect(vm.teamPosts.map((i) => i.id), ['team/t1/p1']);
+      },
+    );
+
+    test(
+      'Needs you lists groups I approve with people asking to join',
+      () async {
+        final vm = await load();
+        teams.teams['g1'] = Team(
+          id: 'g1',
+          name: 'Lake Pickup',
+          division: Division.mixed,
+          level: CompetitionLevel.club,
+          ownerId: testUser.uid,
+          members: {testUser.uid: TeamRole.owner},
+          kind: TeamKind.community,
+          requiresApproval: true,
+        );
+        teams.joinRequests['g1'] = [
+          const GroupJoinRequest(uid: 'u2', name: 'Kai'),
+          const GroupJoinRequest(uid: 'u3', name: 'Rae'),
+        ];
+        // A plain team never has requests to approve.
+        teams.joinRequests['t1'] = [
+          const GroupJoinRequest(uid: 'u4', name: 'X'),
+        ];
+        teams.changed();
+        await pumpEventQueue();
+        expect(
+          [for (final r in vm.needsYou) (r.team.id, r.count)],
+          [('g1', 2)],
+        );
+
+        teams.joinRequests['g1'] = [];
+        teams.changed();
+        await pumpEventQueue();
+        expect(vm.needsYou, isEmpty);
+      },
+    );
+
+    test(
+      'the Get started checklist shows on an empty feed until done',
+      () async {
+        final vm = await load(withTeam: false);
+        expect(vm.showOnboarding, isTrue);
+        expect(
+          [
+            for (final (s, done) in vm.onboarding)
+              if (done) s,
+          ],
+          [OnboardingStep.username],
+        );
+
+        await follows.follow(
+          testUser.uid,
+          const FollowTarget.user('sam', 'Sam'),
+        );
+        teams.teams['t9'] = team('t9', 'Other', owner: 'u9');
+        teams.changed();
+        await pumpEventQueue();
+        expect(vm.onboarding.every((s) => s.$2), isTrue);
+        expect(vm.showOnboarding, isFalse);
+      },
+    );
+
+    test(
+      'creating a team ticks "Join or create a team", as joining does',
+      () async {
+        final vm = await load(withTeam: false);
+        bool joinDone() =>
+            vm.onboarding.firstWhere((s) => s.$1 == OnboardingStep.join).$2;
+        expect(joinDone(), isFalse);
+        expect(OnboardingStep.join.label, 'Join or create a team');
+
+        // A team the user created (owns), never joined with a code.
+        teams.teams['mine'] = team('mine', 'Mine', owner: testUser.uid);
+        teams.changed();
+        await pumpEventQueue();
+        expect(joinDone(), isTrue);
+      },
+    );
+
     test('joins a team by invite code', () async {
       final vm = await load(withTeam: false);
       teams.teams['t9'] = team('t9', 'Other', owner: 'u9');
@@ -380,18 +621,83 @@ void main() {
       expect(find.text('Theo Brooks'), findsOneWidget);
       expect(find.textContaining('Northside Flyers ·'), findsOneWidget);
 
+      // The team strip under the composer.
+      expect(find.text('Northside Flyers'), findsOneWidget);
+      expect(find.text('New / Join'), findsOneWidget);
+
       await tester.ensureVisible(find.text('Your teams'));
       await tester.pump();
       await tester.tap(find.text('Your teams'));
       await tester.pump();
-      expect(find.text('Northside Flyers'), findsOneWidget);
-      expect(
-        find.text('Next: Thursday practice · Thu, Oct 29'),
-        findsOneWidget,
-      );
+      await tester.pump();
+      // The Your teams tab is the teams' posts, not a list of them.
+      expect(find.text('Next stop: the postseason'), findsOneWidget);
+      expect(find.text('New / Join'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('Home writes posts in place, and keeps the draft across tabs', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final vm = await tester.runAsync(() => load());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: HomeScreen(viewModel: vm!),
+      ),
+    );
+    await tester.pump();
+
+    // The box is the composer: no popup, and the user's team is a "To".
+    expect(find.byType(InlineComposer), findsOneWidget);
+    expect(find.text('Team post'), findsNothing);
+    expect(find.text('Everyone'), findsOneWidget);
+    final box = find.descendant(
+      of: find.byType(InlineComposer),
+      matching: find.byType(TextField),
+    );
+    await tester.tap(box);
+    await tester.pump();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(Dialog), findsNothing);
+    for (final tool in ['Link', 'Workout']) {
+      await tester.tap(find.text(tool));
+      await tester.pumpAndSettle();
+    }
+    expect(find.byType(PostComposer), findsNothing);
+    expect(find.byType(PostEditorDialog), findsNothing);
+    expect(find.text('Minutes'), findsOneWidget, reason: 'opened in place');
+    vm.composer
+      ..toggleWorkout()
+      ..closeLink();
+    await tester.pumpAndSettle();
+    expect(find.text('Minutes'), findsNothing);
+    await tester.enterText(box.first, 'Half a thought');
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Your teams'));
+    await tester.tap(find.text('Your teams'));
+    await tester.pump();
+    expect(find.byType(InlineComposer), findsNothing);
+    expect(vm.composer.body, 'Half a thought');
+    await tester.ensureVisible(find.text('For you'));
+    await tester.tap(find.text('For you'));
+    await tester.pumpAndSettle();
+    expect(find.text('Half a thought'), findsOneWidget);
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Post'));
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Post'));
+    await tester.pump();
+    await tester.pump();
+    expect(userPosts.posts.single.body, 'Half a thought');
+    expect(find.text('Half a thought'), findsWidgets, reason: 'in the feed');
+    expect(vm.composer.body, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('community feed shows a side column at desktop width', (
     tester,
@@ -420,6 +726,61 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the Community tab lists public posts to like and page', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final vm = await tester.runAsync(() async {
+      final vm = await load();
+      userPosts.posts.add(
+        UserPost(
+          id: 'z1',
+          authorId: 'zed',
+          authorName: 'Zed Park',
+          body: 'Pickup at the lake, all welcome',
+          createdAt: now.subtract(const Duration(hours: 2)),
+        ),
+      );
+      userPosts.communityPages[null] = (ids: ['z1'], next: 50);
+      return vm;
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: HomeScreen(viewModel: vm!),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Pickup at the lake, all welcome'), findsNothing);
+
+    await tester.tap(find.text('Community'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Pickup at the lake, all welcome'), findsOneWidget);
+    expect(find.text('Zed Park'), findsOneWidget);
+    // Not the For you tab: no composer.
+    expect(find.text("What's happening on your sideline?"), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.favorite_border));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byIcon(Icons.favorite), findsOneWidget, reason: 'liked');
+
+    await tester.scrollUntilVisible(
+      find.text('Show older posts'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Show older posts'));
+    await tester.pump();
+    await tester.pump();
+    expect(userPosts.communityRequests, [null, 50]);
+    expect(find.text("You're all caught up."), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('community feed offers to join a team', (tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
@@ -433,12 +794,28 @@ void main() {
     );
     await tester.pump();
 
-    await tester.ensureVisible(find.text('Join with code'));
+    // An empty feed: the checklist, which covers joining.
+    await tester.ensureVisible(find.text('Get started'));
     await tester.pumpAndSettle();
-    expect(find.text('Join your team.'), findsOneWidget);
-    await tester.tap(find.text('Join with code'));
+    expect(find.text('1 of 4 done'), findsOneWidget);
+    expect(find.text('Join your team.'), findsNothing);
+    expect(find.text('Join or create a team'), findsOneWidget);
+    await tester.tap(find.text('Join or create'));
+    await tester.pumpAndSettle();
+    // Every way onto a team: a code, creating one, or finding a group.
+    expect(find.text('Create a team or group'), findsOneWidget);
+    await tester.tap(find.text('Join with a code'));
     await tester.pumpAndSettle();
     expect(find.text('Invite code'), findsOneWidget);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+
+    // The Your teams tab, with no team yet: the join card.
+    await tester.ensureVisible(find.text('Your teams'));
+    await tester.tap(find.text('Your teams'));
+    await tester.pumpAndSettle();
+    expect(find.text('Join your team.'), findsOneWidget);
+    expect(find.text('Join with code'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

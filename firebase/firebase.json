@@ -28,10 +28,6 @@
       {
         "source": "/p/**",
         "destination": "/join.html"
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
       }
     ],
     "headers": [
@@ -59,15 +55,6 @@
           {
             "key": "Cache-Control",
             "value": "public, max-age=300, s-maxage=3600"
-          }
-        ]
-      },
-      {
-        "source": "/@(index.html|flutter_bootstrap.js|flutter_service_worker.js|main.dart.js|version.json|manifest.json)",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache"
           }
         ]
       }

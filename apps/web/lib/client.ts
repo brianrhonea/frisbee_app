@@ -17,14 +17,12 @@ export class ApiError extends Error {
   }
 }
 
-/** GETs a public API route (`/v1/public/...`) from the browser; null if it fails. */
-export async function getPublicInBrowser<T>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(new URL(path, base));
-    return res.ok ? ((await res.json()) as T) : null;
-  } catch {
-    return null;
-  }
+/**
+ * The text to show for a failed call: the API's own message, or [fallback]
+ * for anything else (a thrown bug, a Firestore error).
+ */
+export function problem(e: unknown, fallback = "Something went wrong. Try again."): string {
+  return e instanceof ApiError ? e.message : fallback;
 }
 
 /**
@@ -52,5 +50,26 @@ export async function callApi<T>(user: User, path: string, init: { method?: stri
     throw new ApiError(body?.error.message ?? "Something went wrong. Try again.", res.status, body?.error.code, body?.error.fields);
   }
   if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
+/**
+ * GETs a public route (`/v1/public/...`) from the browser: as [user] when
+ * signed in (members are limited by uid, in the API's memory), else with
+ * no token, as a visitor (limited by IP). The answers don't depend on who
+ * asks; only the limit does.
+ */
+export async function getPublicApi<T>(user: User | null, path: string): Promise<T> {
+  if (user) return callApi<T>(user, path);
+  let res: Response;
+  try {
+    res = await fetch(new URL(path, base), { cache: "no-store" });
+  } catch {
+    throw new ApiError("Couldn't reach Stall 10. Check your connection and try again.", 0);
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as ApiErrorBody | null;
+    throw new ApiError(body?.error.message ?? "Something went wrong. Try again.", res.status, body?.error.code, body?.error.fields);
+  }
   return (await res.json()) as T;
 }

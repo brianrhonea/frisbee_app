@@ -28,3 +28,95 @@ export const messagePolicyRequestSchema = z.strictObject({ messagePolicy: z.enum
 export interface MessagePolicyResponse {
   messagePolicy: MessagePolicy;
 }
+
+// Conversations from the website (ARCHITECTURE.md §10 item 10): ports of
+// the conversations rules. Reads stay Firestore listeners.
+
+/** Most people in a group conversation (Conversation.maxGroupSize). */
+export const groupSizeMax = 10;
+/** Longest group name (validString(name, 60)). */
+export const groupNameMax = 60;
+
+/** A direct conversation's id: the two uids, sorted, joined by "_" (Conversation.idFor). */
+export const directConversationId = (a: string, b: string) => (a < b ? `${a}_${b}` : `${b}_${a}`);
+
+/** `POST /v1/conversations`: open (or start) a direct conversation with [with]. */
+export const openConversationRequestSchema = z.strictObject({ with: z.string().min(1).max(128) });
+
+/** After opening: "accepted" goes to their inbox; "request" waits in their Message requests. */
+export interface OpenConversationResult {
+  id: string;
+  status: "accepted" | "request" | "declined";
+}
+
+/** `POST /v1/conversations/groups`. */
+export const createGroupRequestSchema = z.strictObject({
+  name: z.string().trim().min(1, "Name the group.").max(groupNameMax, `Keep the name under ${groupNameMax} characters.`),
+  members: z.array(z.string().min(1).max(128)).max(groupSizeMax - 1).default([]),
+});
+
+/** `POST /v1/conversations/:id/members`. */
+export const addGroupMembersRequestSchema = z.strictObject({
+  members: z.array(z.string().min(1).max(128)).min(1).max(groupSizeMax - 1),
+});
+
+/** After creating a group or adding people: who couldn't be added (they don't follow you, or the group is full). */
+export interface GroupAddedResult {
+  id: string;
+  notAdded: string[];
+}
+
+/** `PATCH /v1/conversations/:id`: rename a group. */
+export const renameGroupRequestSchema = z.strictObject({
+  name: z.string().trim().min(1, "Name the group.").max(groupNameMax, `Keep the name under ${groupNameMax} characters.`),
+});
+
+/** `PUT /v1/conversations/:id/request`: whoever a request waits on answers it. */
+export const answerRequestSchema = z.strictObject({ accept: z.boolean() });
+
+/** `PUT /v1/conversations/:id/archive`. */
+export const archiveRequestSchema = z.strictObject({ archived: z.boolean() });
+
+/** `PUT /v1/conversations/:id/typing`: the caller started or stopped typing (conversations/{id}/typing/{uid}). */
+export const typingRequestSchema = z.strictObject({ typing: z.boolean() });
+
+/** How long a typing mark counts, if it's never cleared (the app's typing timeout). */
+export const typingFreshMs = 8_000;
+
+/** The inbox's one-line preview of a message (messagePreview in the app). */
+export function messagePreview(text: string, attachments: number, kind: { image?: boolean; video?: boolean } = {}): string {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (t) return t.length > 120 ? `${t.substring(0, 117)}…` : t;
+  if (attachments === 0) return "";
+  if (kind.image) return attachments === 1 ? "📷 Photo" : `📷 ${attachments} photos`;
+  if (kind.video) return attachments === 1 ? "🎬 Video" : `🎬 ${attachments} videos`;
+  return attachments === 1 ? "📎 File" : `📎 ${attachments} files`;
+}
+
+// ---- Drafts ------------------------------------------------------------------
+//
+// Unsent composer text is kept on the device, per member, as both the app
+// (MessageDraftRepositoryPrefs) and the website (lib/messages.ts) keep it,
+// and forgotten when that member signs out.
+
+/** Drafts kept per member; the oldest go past this. */
+export const messageDraftsMax = 50;
+
+/** Where one member's drafts are kept on a device (localStorage, SharedPreferences). */
+export const messageDraftsKey = (uid: string) => `messageDrafts_${uid}`;
+
+/** The key every member's drafts once shared; removed wherever it's found. */
+export const legacyMessageDraftsKey = "messageDrafts";
+
+/**
+ * [drafts] with [text] as [key]'s draft (moved to the end, newest last),
+ * or without it when [text] is blank, keeping the newest [max].
+ */
+export function withDraft(drafts: Record<string, string>, key: string, text: string, max = messageDraftsMax): Record<string, string> {
+  const next = { ...drafts };
+  delete next[key];
+  if (text.trim()) next[key] = text;
+  const keys = Object.keys(next);
+  for (const k of keys.slice(0, Math.max(0, keys.length - max))) delete next[k];
+  return next;
+}

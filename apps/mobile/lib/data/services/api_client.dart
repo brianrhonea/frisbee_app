@@ -58,8 +58,13 @@ class ApiClient {
   Future<Map<String, Object?>> patch(String path, Map<String, Object?> body) =>
       send('PATCH', path, body);
 
-  /// DELETEs [path] (no body); returns the decoded answer.
-  Future<Map<String, Object?>> delete(String path) => send('DELETE', path);
+  /// DELETEs [path], with [body] as JSON when given (most have none);
+  /// returns the decoded answer. [timeout] is for deletes that cascade.
+  Future<Map<String, Object?>> delete(
+    String path, [
+    Map<String, Object?>? body,
+    Duration timeout = _timeout,
+  ]) => send('DELETE', path, body, timeout);
 
   /// Sends [method] to [path], with [body] as JSON when given, and returns
   /// the decoded JSON answer or throws [ApiException].
@@ -67,6 +72,7 @@ class ApiClient {
     String method,
     String path, [
     Map<String, Object?>? body,
+    Duration timeout = _timeout,
   ]) async {
     final user = (_auth ?? FirebaseAuth.instance).currentUser;
     if (user == null) {
@@ -86,8 +92,8 @@ class ApiClient {
     final http.Response response;
     try {
       response = await http.Response.fromStream(
-        await _client.send(request).timeout(_timeout),
-      ).timeout(_timeout);
+        await _client.send(request).timeout(timeout),
+      ).timeout(timeout);
     } on Exception {
       throw const ApiException(
         'unavailable',

@@ -89,6 +89,62 @@ describe("uploads on the emulators", () => {
     expect((await db.doc(`uploads/${id}`).get()).get("status")).toBe("ready");
   });
 
+  it("copies a chat file into the message's folder as sent, in the bucket", async () => {
+    await db.doc("conversations/up-other_up-user").set({ participants: ["up-other", "up-user"], status: "accepted" });
+    const pdf = Buffer.from("%PDF-1.7 a small document");
+    const res = await call("/v1/uploads", {
+      purpose: "chat",
+      targetId: "conversations/up-other_up-user",
+      itemId: "m1",
+      contentType: "application/pdf",
+      name: "Line calls.pdf",
+      size: pdf.length,
+    });
+    expect(res.statusCode).toBe(201);
+    const { id } = res.json();
+    await bucket.file(`uploads/raw/up-user/${id}`).save(pdf, { contentType: "application/pdf", resumable: false });
+
+    const done = await call(`/v1/uploads/${id}/complete`);
+    const path = `conversations/up-other_up-user/up-user/m1/${id}-Line calls.pdf`;
+    expect(done.json()).toEqual({ id, status: "ready", path, contentType: "application/pdf" });
+    const [saved] = await bucket.file(path).download();
+    expect(saved.equals(pdf)).toBe(true);
+    const [meta] = await bucket.file(path).getMetadata();
+    expect(meta.contentType).toBe("application/pdf");
+    expect(meta.cacheControl).toBe("public, max-age=31536000, immutable");
+    expect((await bucket.file(`uploads/raw/up-user/${id}`).exists())[0]).toBe(false);
+  });
+
+  it("copies only the generation it checked, and removes an unsent file", async () => {
+    await db.doc("conversations/up-other_up-user").set({ participants: ["up-other", "up-user"], status: "accepted" });
+    const pdf = Buffer.from("%PDF-1.7 the checked document");
+    const body = { purpose: "chat", targetId: "conversations/up-other_up-user", itemId: "m2", contentType: "application/pdf", name: "a.pdf", size: pdf.length };
+    const raw = (id: string) => bucket.file(`uploads/raw/up-user/${id}`);
+    const media = new FirebaseMediaStorage(bucket);
+
+    // Writing the raw file again gives it a new generation. (The emulator
+    // ignores sourceGeneration on copy, so the pinned copy itself is
+    // covered by the fakes; complete also re-checks the copy's size.)
+    const first = (await call("/v1/uploads", body)).json().id as string;
+    await raw(first).save(pdf, { resumable: false });
+    const checked = (await media.stat(`uploads/raw/up-user/${first}`))!;
+    expect(checked.size).toBe(pdf.length);
+    expect(checked.generation).not.toBe("");
+    await raw(first).save(Buffer.from("<html>swapped</html>"), { resumable: false });
+    expect((await media.stat(`uploads/raw/up-user/${first}`))!.generation).not.toBe(checked.generation);
+
+    // Completed, then taken out of the composer.
+    const second = (await call("/v1/uploads", body)).json().id as string;
+    await raw(second).save(pdf, { resumable: false });
+    const done = await call(`/v1/uploads/${second}/complete`);
+    const path = done.json().path as string;
+    expect((await bucket.file(path).exists())[0]).toBe(true);
+    const removed = await app.inject({ method: "DELETE", url: `/v1/uploads/${second}`, headers: { authorization: `Bearer ${token}` } });
+    expect(removed.statusCode).toBe(204);
+    expect((await bucket.file(path).exists())[0]).toBe(false);
+    expect((await db.doc(`uploads/${second}`).get()).get("status")).toBe("removed");
+  });
+
   it("rejects a file whose bytes aren't media", async () => {
     const res = await call("/v1/uploads", { purpose: "post", itemId: "i1", contentType: "image/png", size: 20 });
     const { id } = res.json();

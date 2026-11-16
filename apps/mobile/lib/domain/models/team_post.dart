@@ -128,7 +128,8 @@ class TeamPost {
         withScheme.length > 500) {
       return null;
     }
-    return withScheme;
+    // The scheme in lower case ("Https://…" too), as the server's check wants.
+    return uri.scheme + withScheme.substring(uri.scheme.length);
   }
 }
 

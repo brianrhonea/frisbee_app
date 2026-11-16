@@ -16,7 +16,6 @@ export const postStateLimit = 50;
 export const repostRequestSchema = z.object({
   note: z.string().max(repostNoteMax, `Keep the note under ${repostNoteMax} characters.`).optional(),
 });
-export type RepostRequest = z.infer<typeof repostRequestSchema>;
 
 /** After `PUT|DELETE /v1/posts/:id/like`. */
 export interface LikeResult {
@@ -68,6 +67,23 @@ export interface PostImage {
   name: string;
   contentType: string;
   size: number;
+}
+
+/**
+ * [text] as an http(s) link, adding `https://` when no scheme is given;
+ * null if it isn't a usable web address (no spaces, http or https, a dot
+ * in the host, at most [postLinkMax] characters). The composers' check on
+ * both platforms (TeamPost.normalizeLink in the app).
+ */
+export function normalizeLink(text: string): string | null {
+  const t = text.trim();
+  if (!t || /\s/.test(t)) return null;
+  const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(t) ? t : `https://${t}`;
+  // The scheme and host (after any user info, before a port or path).
+  const m = /^(https?):\/\/(?:[^/?#@]*@)?([^/?#:]*)/i.exec(withScheme);
+  if (!m || !m[2].includes(".") || withScheme.length > postLinkMax) return null;
+  // The scheme in lower case ("Https://…" too), as the server's check wants.
+  return m[1].toLowerCase() + withScheme.slice(m[1].length);
 }
 
 const link = z
@@ -134,6 +150,19 @@ export const workoutSchema = z.strictObject({
 export type WorkoutInput = z.input<typeof workoutSchema>;
 export type WorkoutPost = z.output<typeof workoutSchema>;
 
+/** Longest tag key and name on a player's post (validUserPost). */
+export const postTournamentKeyMax = 300;
+export const postTournamentNameMax = 100;
+
+/** A post's tournament tag: validUserPost's tournamentKey ('tournament_.+', 300) and tournamentName (100). */
+export const postTournamentTagSchema = z.strictObject({
+  key: z
+    .string()
+    .max(postTournamentKeyMax)
+    .regex(/^tournament_.+$/s, "That isn't a tournament."),
+  name: z.string().trim().max(postTournamentNameMax, `Keep the tournament name under ${postTournamentNameMax} characters.`).default(""),
+});
+
 /**
  * `POST /v1/posts` (a new text post, or a workout post with [workout]) and `PATCH /v1/posts/:id` (the author
  * edits it). [uploadIds] are finished `post` uploads (`/v1/uploads`, with
@@ -156,8 +185,35 @@ export const savePostRequestSchema = z.strictObject({
   keepImages: z.array(z.string().max(1024)).max(postImagesMax).optional(),
   /** New posts only: makes it a workout post. Edits keep the workout as it is. */
   workout: workoutSchema.optional(),
+  /**
+   * "At a tournament": tags the post with a followed tournament (its follow
+   * key and name), so that tournament's followers see it. On an edit,
+   * absent keeps the tag and null removes it. Not on reposts.
+   */
+  tournament: postTournamentTagSchema.nullable().optional(),
+  /**
+   * New posts only: shares an event (the app's "post it on my profile" when
+   * saving one) from a team's schedule ([teamId], whose events the caller
+   * manages), from a calendar the caller can edit ([calendarId]; their own
+   * uid is My calendar), or from the caller's own (both null). The API
+   * copies its details from the stored event.
+   */
+  shareEvent: z
+    .strictObject({
+      eventId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+      teamId: z
+        .string()
+        .regex(/^[A-Za-z0-9_-]{1,128}$/)
+        .nullable(),
+      calendarId: z
+        .string()
+        .regex(/^[A-Za-z0-9_-]{1,128}$/)
+        .nullable()
+        .optional(),
+    })
+    .refine((e) => !(e.teamId && e.calendarId), { message: "Share a team's event or a calendar's, not both." })
+    .optional(),
 });
-export type SavePostRequest = z.input<typeof savePostRequestSchema>;
 
 /** After `POST /v1/posts` or `PATCH /v1/posts/:id`. */
 export interface SavePostResult {
@@ -177,11 +233,9 @@ export const commentRequestSchema = z.strictObject({
     .regex(/^[A-Za-z0-9_-]{1,128}$/)
     .optional(),
 });
-export type CommentRequest = z.input<typeof commentRequestSchema>;
 
 /** `PATCH /v1/posts/:id/comments/:commentId`: its author rewrites it. */
 export const editCommentRequestSchema = commentRequestSchema.pick({ body: true });
-export type EditCommentRequest = z.input<typeof editCommentRequestSchema>;
 
 /** After `POST /v1/posts/:id/comments`. */
 export interface CommentResult {

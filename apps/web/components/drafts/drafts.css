@@ -1,0 +1,73 @@
+/* Signups, the captains' draft board and the team draft editor
+   (components/drafts). Uses the site's tokens (site.css) and cards. */
+
+.drafts { display: grid; gap: 16px; }
+.drafts .segmented { justify-self: start; max-width: 100%; overflow-x: auto; }
+.draft-title { font-size: 1.25rem; margin: 0; }
+.draft-subtitle { font-size: 1rem; margin: 8px 0 0; }
+.draft-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.draft-head .card-title { margin: 0; }
+.card > .draft-head { margin-bottom: 12px; }
+
+.draft-status { margin-left: 8px; font-size: 0.8rem; vertical-align: middle; }
+.draft-status-accepted { background: var(--accent-soft); color: var(--accent); }
+.draft-status-waitlisted { background: var(--amber); color: var(--on-amber); }
+.draft-status-declined, .draft-status-withdrawn { color: var(--danger); }
+
+.draft-callout {
+  border: 1px solid var(--line);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.draft-callout p { margin: 0; }
+
+.draft-scroll { overflow-x: auto; }
+.draft-scroll select { height: 36px; }
+
+.draft-team-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.draft-team-list li { display: grid; gap: 2px; }
+
+/* The board: every team side by side on a wide screen. */
+.draft-board { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.draft-team { margin: 0; }
+.draft-team ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.draft-team.on-clock { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
+.draft-banner {
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: grid;
+  gap: 2px;
+  background: var(--field);
+  border: 1px solid var(--line);
+}
+.draft-banner b { font-size: 1.05rem; }
+.draft-banner-mine { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.draft-banner-live { background: var(--accent-soft); }
+.draft-banner-done { background: var(--amber); color: var(--on-amber); }
+.draft-controls { margin: 0; align-items: center; }
+
+.draft-pool, .draft-roster { list-style: none; margin: 0; padding: 0; display: grid; }
+.draft-pool li, .draft-roster li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.draft-pool li:last-child, .draft-roster li:last-child { border-bottom: 0; }
+.draft-roster select, .draft-pool select { max-width: 45%; height: 34px; }
+.draft-filters { margin: 0; align-items: center; }
+
+.draft-captain-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin: 12px 0; }
+.draft-setup-form { max-width: 320px; margin-top: 8px; }
+.draft-stepper { display: flex; align-items: center; gap: 10px; }
+
+@media (max-width: 560px) {
+  .draft-board { grid-template-columns: 1fr; }
+}

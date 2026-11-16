@@ -1,0 +1,3522 @@
+{
+  "about": "seasonNights and seasonFor, then byesIn for each week and the season played out as in schedules.json (format singleElim for the champion).",
+  "cases": [
+    {
+      "name": "six teams, eight weeks, four in the playoffs",
+      "teams": [
+        "t1",
+        "t2",
+        "t3",
+        "t4",
+        "t5",
+        "t6"
+      ],
+      "settings": {
+        "startsAt": "2027-06-02T18:30:00.000",
+        "fields": 2
+      },
+      "season": {
+        "weeks": 8,
+        "playoffWeeks": 2,
+        "playoffTeams": 4
+      },
+      "nights": [
+        "2027-06-02T18:30:00.000",
+        "2027-06-09T18:30:00.000",
+        "2027-06-16T18:30:00.000",
+        "2027-06-23T18:30:00.000",
+        "2027-06-30T18:30:00.000",
+        "2027-07-07T18:30:00.000",
+        "2027-07-14T18:30:00.000",
+        "2027-07-21T18:30:00.000"
+      ],
+      "plan": {
+        "games": [
+          {
+            "id": "g001",
+            "order": 0,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-02T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t6",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g002",
+            "order": 1,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-06-02T18:30:00.000",
+            "teamA": "t2",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g003",
+            "order": 2,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-02T19:20:00.000",
+            "teamA": "t3",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g004",
+            "order": 3,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-09T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g005",
+            "order": 4,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-06-09T18:30:00.000",
+            "teamA": "t6",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g006",
+            "order": 5,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-09T19:20:00.000",
+            "teamA": "t2",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g007",
+            "order": 6,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-16T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g008",
+            "order": 7,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-06-16T18:30:00.000",
+            "teamA": "t5",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g009",
+            "order": 8,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-16T19:20:00.000",
+            "teamA": "t6",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g010",
+            "order": 9,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-23T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g011",
+            "order": 10,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-06-23T18:30:00.000",
+            "teamA": "t4",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g012",
+            "order": 11,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-23T19:20:00.000",
+            "teamA": "t5",
+            "teamB": "t6",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g013",
+            "order": 12,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-30T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g014",
+            "order": 13,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-06-30T18:30:00.000",
+            "teamA": "t3",
+            "teamB": "t6",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g015",
+            "order": 14,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-30T19:20:00.000",
+            "teamA": "t4",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g016",
+            "order": 15,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-07-07T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t6",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g017",
+            "order": 16,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-07-07T18:30:00.000",
+            "teamA": "t2",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g018",
+            "order": 17,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-07-07T19:20:00.000",
+            "teamA": "t3",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g019",
+            "order": 18,
+            "stage": "winners",
+            "round": 1,
+            "label": "Semifinal",
+            "pool": null,
+            "field": 1,
+            "startsAt": "2027-07-14T18:30:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 1
+            },
+            "sourceB": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 4
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g020",
+            "order": 19,
+            "stage": "winners",
+            "round": 1,
+            "label": "Semifinal",
+            "pool": null,
+            "field": 2,
+            "startsAt": "2027-07-14T18:30:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 2
+            },
+            "sourceB": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 3
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g021",
+            "order": 20,
+            "stage": "winners",
+            "round": 2,
+            "label": "Final",
+            "pool": null,
+            "field": 1,
+            "startsAt": "2027-07-21T18:30:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "winner",
+              "game": "g019"
+            },
+            "sourceB": {
+              "type": "winner",
+              "game": "g020"
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          }
+        ],
+        "days": [
+          {
+            "startsAt": "2027-06-02T18:30:00.000",
+            "endsAt": "2027-06-02T20:00:00.000",
+            "games": 3
+          },
+          {
+            "startsAt": "2027-06-09T18:30:00.000",
+            "endsAt": "2027-06-09T20:00:00.000",
+            "games": 3
+          },
+          {
+            "startsAt": "2027-06-16T18:30:00.000",
+            "endsAt": "2027-06-16T20:00:00.000",
+            "games": 3
+          },
+          {
+            "startsAt": "2027-06-23T18:30:00.000",
+            "endsAt": "2027-06-23T20:00:00.000",
+            "games": 3
+          },
+          {
+            "startsAt": "2027-06-30T18:30:00.000",
+            "endsAt": "2027-06-30T20:00:00.000",
+            "games": 3
+          },
+          {
+            "startsAt": "2027-07-07T18:30:00.000",
+            "endsAt": "2027-07-07T20:00:00.000",
+            "games": 3
+          },
+          {
+            "startsAt": "2027-07-14T18:30:00.000",
+            "endsAt": "2027-07-14T19:10:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-07-21T18:30:00.000",
+            "endsAt": "2027-07-21T19:10:00.000",
+            "games": 1
+          }
+        ]
+      },
+      "byes": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [
+          "t1",
+          "t2",
+          "t3",
+          "t4",
+          "t5",
+          "t6"
+        ],
+        [
+          "t1",
+          "t2",
+          "t3",
+          "t4",
+          "t5",
+          "t6"
+        ]
+      ],
+      "playThrough": {
+        "awaitingSeedsAtStart": true,
+        "steps": [
+          {
+            "game": "g001",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": []
+          },
+          {
+            "game": "g002",
+            "scoreA": 13,
+            "scoreB": 5,
+            "fills": []
+          },
+          {
+            "game": "g003",
+            "scoreA": 10,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g004",
+            "scoreA": 13,
+            "scoreB": 3,
+            "fills": []
+          },
+          {
+            "game": "g005",
+            "scoreA": 8,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g006",
+            "scoreA": 1,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g007",
+            "scoreA": 13,
+            "scoreB": 6,
+            "fills": []
+          },
+          {
+            "game": "g008",
+            "scoreA": 11,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g009",
+            "scoreA": 13,
+            "scoreB": 4,
+            "fills": []
+          },
+          {
+            "game": "g010",
+            "scoreA": 13,
+            "scoreB": 9,
+            "fills": []
+          },
+          {
+            "game": "g011",
+            "scoreA": 2,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g012",
+            "scoreA": 7,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g013",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": []
+          },
+          {
+            "game": "g014",
+            "scoreA": 13,
+            "scoreB": 5,
+            "fills": []
+          },
+          {
+            "game": "g015",
+            "scoreA": 10,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g016",
+            "scoreA": 13,
+            "scoreB": 3,
+            "fills": []
+          },
+          {
+            "game": "g017",
+            "scoreA": 13,
+            "scoreB": 8,
+            "fills": []
+          },
+          {
+            "game": "g018",
+            "scoreA": 1,
+            "scoreB": 13,
+            "fills": [
+              {
+                "gameId": "g019",
+                "teamA": "t1",
+                "teamB": "t2"
+              },
+              {
+                "gameId": "g020",
+                "teamA": "t4",
+                "teamB": "t3"
+              }
+            ]
+          },
+          {
+            "game": "g019",
+            "scoreA": 13,
+            "scoreB": 6,
+            "fills": [
+              {
+                "gameId": "g021",
+                "teamA": "t1",
+                "teamB": null
+              }
+            ]
+          },
+          {
+            "game": "g020",
+            "scoreA": 11,
+            "scoreB": 13,
+            "fills": [
+              {
+                "gameId": "g021",
+                "teamA": null,
+                "teamB": "t3"
+              }
+            ]
+          },
+          {
+            "game": "g021",
+            "scoreA": 4,
+            "scoreB": 13,
+            "fills": []
+          }
+        ],
+        "poolTeams": {
+          "A": [
+            "t1",
+            "t6",
+            "t2",
+            "t5",
+            "t3",
+            "t4"
+          ]
+        },
+        "poolStandings": {
+          "A": [
+            "t1",
+            "t4",
+            "t3",
+            "t2",
+            "t6",
+            "t5"
+          ]
+        },
+        "gamesToPlay": [],
+        "skipped": [],
+        "laterGamesPlayed": [
+          "g019",
+          "g020"
+        ],
+        "pendingFills": [],
+        "champion": "t3",
+        "placements": [
+          "t3",
+          "t1",
+          "t2",
+          "t4",
+          "t5",
+          "t6"
+        ]
+      }
+    },
+    {
+      "name": "odd count has byes; no playoffs",
+      "teams": [
+        "t1",
+        "t2",
+        "t3",
+        "t4",
+        "t5"
+      ],
+      "settings": {
+        "startsAt": "2027-06-02T18:30:00.000",
+        "fields": 2
+      },
+      "season": {
+        "weeks": 6,
+        "playoffWeeks": 0,
+        "playoffTeams": 0
+      },
+      "nights": [
+        "2027-06-02T18:30:00.000",
+        "2027-06-09T18:30:00.000",
+        "2027-06-16T18:30:00.000",
+        "2027-06-23T18:30:00.000",
+        "2027-06-30T18:30:00.000",
+        "2027-07-07T18:30:00.000"
+      ],
+      "plan": {
+        "games": [
+          {
+            "id": "g001",
+            "order": 0,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-02T18:30:00.000",
+            "teamA": "t2",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g002",
+            "order": 1,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-06-02T18:30:00.000",
+            "teamA": "t3",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g003",
+            "order": 2,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-09T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g004",
+            "order": 3,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-06-09T18:30:00.000",
+            "teamA": "t2",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g005",
+            "order": 4,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-16T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g006",
+            "order": 5,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-06-16T18:30:00.000",
+            "teamA": "t5",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g007",
+            "order": 6,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-23T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g008",
+            "order": 7,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-06-23T18:30:00.000",
+            "teamA": "t4",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g009",
+            "order": 8,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-30T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g010",
+            "order": 9,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-06-30T18:30:00.000",
+            "teamA": "t4",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g011",
+            "order": 10,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-07-07T18:30:00.000",
+            "teamA": "t2",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g012",
+            "order": 11,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-07-07T18:30:00.000",
+            "teamA": "t3",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          }
+        ],
+        "days": [
+          {
+            "startsAt": "2027-06-02T18:30:00.000",
+            "endsAt": "2027-06-02T19:10:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-06-09T18:30:00.000",
+            "endsAt": "2027-06-09T19:10:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-06-16T18:30:00.000",
+            "endsAt": "2027-06-16T19:10:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-06-23T18:30:00.000",
+            "endsAt": "2027-06-23T19:10:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-06-30T18:30:00.000",
+            "endsAt": "2027-06-30T19:10:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-07-07T18:30:00.000",
+            "endsAt": "2027-07-07T19:10:00.000",
+            "games": 2
+          }
+        ]
+      },
+      "byes": [
+        [
+          "t1"
+        ],
+        [
+          "t4"
+        ],
+        [
+          "t2"
+        ],
+        [
+          "t5"
+        ],
+        [
+          "t3"
+        ],
+        [
+          "t1"
+        ]
+      ],
+      "playThrough": {
+        "awaitingSeedsAtStart": false,
+        "steps": [
+          {
+            "game": "g001",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": []
+          },
+          {
+            "game": "g002",
+            "scoreA": 13,
+            "scoreB": 5,
+            "fills": []
+          },
+          {
+            "game": "g003",
+            "scoreA": 10,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g004",
+            "scoreA": 13,
+            "scoreB": 3,
+            "fills": []
+          },
+          {
+            "game": "g005",
+            "scoreA": 13,
+            "scoreB": 8,
+            "fills": []
+          },
+          {
+            "game": "g006",
+            "scoreA": 13,
+            "scoreB": 1,
+            "fills": []
+          },
+          {
+            "game": "g007",
+            "scoreA": 13,
+            "scoreB": 6,
+            "fills": []
+          },
+          {
+            "game": "g008",
+            "scoreA": 11,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g009",
+            "scoreA": 4,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g010",
+            "scoreA": 13,
+            "scoreB": 9,
+            "fills": []
+          },
+          {
+            "game": "g011",
+            "scoreA": 13,
+            "scoreB": 2,
+            "fills": []
+          },
+          {
+            "game": "g012",
+            "scoreA": 7,
+            "scoreB": 13,
+            "fills": []
+          }
+        ],
+        "poolTeams": {
+          "A": [
+            "t2",
+            "t5",
+            "t3",
+            "t4",
+            "t1"
+          ]
+        },
+        "poolStandings": {
+          "A": [
+            "t2",
+            "t1",
+            "t4",
+            "t5",
+            "t3"
+          ]
+        },
+        "gamesToPlay": [],
+        "skipped": [],
+        "laterGamesPlayed": [],
+        "pendingFills": [],
+        "champion": null,
+        "placements": [
+          "t1",
+          "t2",
+          "t3",
+          "t4",
+          "t5"
+        ]
+      }
+    },
+    {
+      "name": "skip dates and two games a night",
+      "teams": [
+        "t1",
+        "t2",
+        "t3",
+        "t4"
+      ],
+      "settings": {
+        "startsAt": "2027-06-02T18:30:00.000",
+        "fields": 1,
+        "gameMinutes": 30,
+        "breakMinutes": 5
+      },
+      "season": {
+        "weeks": 5,
+        "playoffWeeks": 1,
+        "playoffTeams": 2,
+        "gamesPerNight": 2,
+        "skipDates": [
+          "2027-06-16T00:00:00.000",
+          "2027-06-30T00:00:00.000"
+        ]
+      },
+      "nights": [
+        "2027-06-02T18:30:00.000",
+        "2027-06-09T18:30:00.000",
+        "2027-06-23T18:30:00.000",
+        "2027-07-07T18:30:00.000",
+        "2027-07-14T18:30:00.000"
+      ],
+      "plan": {
+        "games": [
+          {
+            "id": "g001",
+            "order": 0,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-02T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g002",
+            "order": 1,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-02T19:05:00.000",
+            "teamA": "t2",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g003",
+            "order": 2,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-02T19:40:00.000",
+            "teamA": "t1",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g004",
+            "order": 3,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-02T20:15:00.000",
+            "teamA": "t4",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g005",
+            "order": 4,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-09T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g006",
+            "order": 5,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-09T19:05:00.000",
+            "teamA": "t3",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g007",
+            "order": 6,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-09T19:40:00.000",
+            "teamA": "t1",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g008",
+            "order": 7,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-09T20:15:00.000",
+            "teamA": "t2",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g009",
+            "order": 8,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-23T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g010",
+            "order": 9,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-23T19:05:00.000",
+            "teamA": "t4",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g011",
+            "order": 10,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-23T19:40:00.000",
+            "teamA": "t1",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g012",
+            "order": 11,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-06-23T20:15:00.000",
+            "teamA": "t3",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g013",
+            "order": 12,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-07-07T18:30:00.000",
+            "teamA": "t1",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g014",
+            "order": 13,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-07-07T19:05:00.000",
+            "teamA": "t2",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g015",
+            "order": 14,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-07-07T19:40:00.000",
+            "teamA": "t1",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g016",
+            "order": 15,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-07-07T20:15:00.000",
+            "teamA": "t4",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g017",
+            "order": 16,
+            "stage": "winners",
+            "round": 1,
+            "label": "Final",
+            "pool": null,
+            "field": 1,
+            "startsAt": "2027-07-14T18:30:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 1
+            },
+            "sourceB": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 2
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          }
+        ],
+        "days": [
+          {
+            "startsAt": "2027-06-02T18:30:00.000",
+            "endsAt": "2027-06-02T20:45:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-06-09T18:30:00.000",
+            "endsAt": "2027-06-09T20:45:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-06-23T18:30:00.000",
+            "endsAt": "2027-06-23T20:45:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-07-07T18:30:00.000",
+            "endsAt": "2027-07-07T20:45:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-07-14T18:30:00.000",
+            "endsAt": "2027-07-14T19:00:00.000",
+            "games": 1
+          }
+        ]
+      },
+      "byes": [
+        [],
+        [],
+        [],
+        [],
+        [
+          "t1",
+          "t2",
+          "t3",
+          "t4"
+        ]
+      ],
+      "playThrough": {
+        "awaitingSeedsAtStart": true,
+        "steps": [
+          {
+            "game": "g001",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": []
+          },
+          {
+            "game": "g002",
+            "scoreA": 13,
+            "scoreB": 5,
+            "fills": []
+          },
+          {
+            "game": "g003",
+            "scoreA": 10,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g004",
+            "scoreA": 3,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g005",
+            "scoreA": 13,
+            "scoreB": 8,
+            "fills": []
+          },
+          {
+            "game": "g006",
+            "scoreA": 1,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g007",
+            "scoreA": 13,
+            "scoreB": 6,
+            "fills": []
+          },
+          {
+            "game": "g008",
+            "scoreA": 13,
+            "scoreB": 11,
+            "fills": []
+          },
+          {
+            "game": "g009",
+            "scoreA": 4,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g010",
+            "scoreA": 9,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g011",
+            "scoreA": 13,
+            "scoreB": 2,
+            "fills": []
+          },
+          {
+            "game": "g012",
+            "scoreA": 7,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g013",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": []
+          },
+          {
+            "game": "g014",
+            "scoreA": 13,
+            "scoreB": 5,
+            "fills": []
+          },
+          {
+            "game": "g015",
+            "scoreA": 10,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g016",
+            "scoreA": 3,
+            "scoreB": 13,
+            "fills": [
+              {
+                "gameId": "g017",
+                "teamA": "t2",
+                "teamB": "t1"
+              }
+            ]
+          },
+          {
+            "game": "g017",
+            "scoreA": 8,
+            "scoreB": 13,
+            "fills": []
+          }
+        ],
+        "poolTeams": {
+          "A": [
+            "t1",
+            "t4",
+            "t2",
+            "t3"
+          ]
+        },
+        "poolStandings": {
+          "A": [
+            "t2",
+            "t1",
+            "t3",
+            "t4"
+          ]
+        },
+        "gamesToPlay": [],
+        "skipped": [],
+        "laterGamesPlayed": [],
+        "pendingFills": [],
+        "champion": "t1",
+        "placements": [
+          "t1",
+          "t2",
+          "t3",
+          "t4"
+        ]
+      }
+    },
+    {
+      "name": "eight-team playoffs in fewer weeks than rounds",
+      "teams": [
+        "t1",
+        "t2",
+        "t3",
+        "t4",
+        "t5",
+        "t6",
+        "t7",
+        "t8",
+        "t9"
+      ],
+      "settings": {
+        "startsAt": "2027-03-03T19:00:00.000",
+        "fields": 4
+      },
+      "season": {
+        "weeks": 10,
+        "playoffWeeks": 2,
+        "playoffTeams": 8
+      },
+      "nights": [
+        "2027-03-03T19:00:00.000",
+        "2027-03-10T19:00:00.000",
+        "2027-03-17T19:00:00.000",
+        "2027-03-24T19:00:00.000",
+        "2027-03-31T19:00:00.000",
+        "2027-04-07T19:00:00.000",
+        "2027-04-14T19:00:00.000",
+        "2027-04-21T19:00:00.000",
+        "2027-04-28T19:00:00.000",
+        "2027-05-05T19:00:00.000"
+      ],
+      "plan": {
+        "games": [
+          {
+            "id": "g001",
+            "order": 0,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-03-03T19:00:00.000",
+            "teamA": "t2",
+            "teamB": "t9",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g002",
+            "order": 1,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-03-03T19:00:00.000",
+            "teamA": "t3",
+            "teamB": "t8",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g003",
+            "order": 2,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 3,
+            "startsAt": "2027-03-03T19:00:00.000",
+            "teamA": "t4",
+            "teamB": "t7",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g004",
+            "order": 3,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 4,
+            "startsAt": "2027-03-03T19:00:00.000",
+            "teamA": "t5",
+            "teamB": "t6",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g005",
+            "order": 4,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-03-10T19:00:00.000",
+            "teamA": "t1",
+            "teamB": "t9",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g006",
+            "order": 5,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-03-10T19:00:00.000",
+            "teamA": "t2",
+            "teamB": "t7",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g007",
+            "order": 6,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 3,
+            "startsAt": "2027-03-10T19:00:00.000",
+            "teamA": "t3",
+            "teamB": "t6",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g008",
+            "order": 7,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 4,
+            "startsAt": "2027-03-10T19:00:00.000",
+            "teamA": "t4",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g009",
+            "order": 8,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-03-17T19:00:00.000",
+            "teamA": "t1",
+            "teamB": "t8",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g010",
+            "order": 9,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-03-17T19:00:00.000",
+            "teamA": "t9",
+            "teamB": "t7",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g011",
+            "order": 10,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 3,
+            "startsAt": "2027-03-17T19:00:00.000",
+            "teamA": "t2",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g012",
+            "order": 11,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 4,
+            "startsAt": "2027-03-17T19:00:00.000",
+            "teamA": "t3",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g013",
+            "order": 12,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-03-24T19:00:00.000",
+            "teamA": "t1",
+            "teamB": "t7",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g014",
+            "order": 13,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-03-24T19:00:00.000",
+            "teamA": "t8",
+            "teamB": "t6",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g015",
+            "order": 14,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 3,
+            "startsAt": "2027-03-24T19:00:00.000",
+            "teamA": "t9",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g016",
+            "order": 15,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 4,
+            "startsAt": "2027-03-24T19:00:00.000",
+            "teamA": "t2",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g017",
+            "order": 16,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-03-31T19:00:00.000",
+            "teamA": "t1",
+            "teamB": "t6",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g018",
+            "order": 17,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-03-31T19:00:00.000",
+            "teamA": "t7",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g019",
+            "order": 18,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 3,
+            "startsAt": "2027-03-31T19:00:00.000",
+            "teamA": "t8",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g020",
+            "order": 19,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 4,
+            "startsAt": "2027-03-31T19:00:00.000",
+            "teamA": "t9",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g021",
+            "order": 20,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-04-07T19:00:00.000",
+            "teamA": "t1",
+            "teamB": "t5",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g022",
+            "order": 21,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-04-07T19:00:00.000",
+            "teamA": "t6",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g023",
+            "order": 22,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 3,
+            "startsAt": "2027-04-07T19:00:00.000",
+            "teamA": "t7",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g024",
+            "order": 23,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 4,
+            "startsAt": "2027-04-07T19:00:00.000",
+            "teamA": "t8",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g025",
+            "order": 24,
+            "stage": "pool",
+            "round": 7,
+            "label": "Week 7",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-04-14T19:00:00.000",
+            "teamA": "t1",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g026",
+            "order": 25,
+            "stage": "pool",
+            "round": 7,
+            "label": "Week 7",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-04-14T19:00:00.000",
+            "teamA": "t5",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g027",
+            "order": 26,
+            "stage": "pool",
+            "round": 7,
+            "label": "Week 7",
+            "pool": "A",
+            "field": 3,
+            "startsAt": "2027-04-14T19:00:00.000",
+            "teamA": "t6",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g028",
+            "order": 27,
+            "stage": "pool",
+            "round": 7,
+            "label": "Week 7",
+            "pool": "A",
+            "field": 4,
+            "startsAt": "2027-04-14T19:00:00.000",
+            "teamA": "t8",
+            "teamB": "t9",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g029",
+            "order": 28,
+            "stage": "pool",
+            "round": 8,
+            "label": "Week 8",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-04-21T19:00:00.000",
+            "teamA": "t1",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g030",
+            "order": 29,
+            "stage": "pool",
+            "round": 8,
+            "label": "Week 8",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-04-21T19:00:00.000",
+            "teamA": "t4",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g031",
+            "order": 30,
+            "stage": "pool",
+            "round": 8,
+            "label": "Week 8",
+            "pool": "A",
+            "field": 3,
+            "startsAt": "2027-04-21T19:00:00.000",
+            "teamA": "t6",
+            "teamB": "t9",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g032",
+            "order": 31,
+            "stage": "pool",
+            "round": 8,
+            "label": "Week 8",
+            "pool": "A",
+            "field": 4,
+            "startsAt": "2027-04-21T19:00:00.000",
+            "teamA": "t7",
+            "teamB": "t8",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g033",
+            "order": 32,
+            "stage": "winners",
+            "round": 1,
+            "label": "Quarterfinal",
+            "pool": null,
+            "field": 1,
+            "startsAt": "2027-04-28T19:00:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 1
+            },
+            "sourceB": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 8
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g034",
+            "order": 33,
+            "stage": "winners",
+            "round": 1,
+            "label": "Quarterfinal",
+            "pool": null,
+            "field": 2,
+            "startsAt": "2027-04-28T19:00:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 4
+            },
+            "sourceB": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 5
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g035",
+            "order": 34,
+            "stage": "winners",
+            "round": 1,
+            "label": "Quarterfinal",
+            "pool": null,
+            "field": 3,
+            "startsAt": "2027-04-28T19:00:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 2
+            },
+            "sourceB": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 7
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g036",
+            "order": 35,
+            "stage": "winners",
+            "round": 1,
+            "label": "Quarterfinal",
+            "pool": null,
+            "field": 4,
+            "startsAt": "2027-04-28T19:00:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 3
+            },
+            "sourceB": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 6
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g037",
+            "order": 36,
+            "stage": "winners",
+            "round": 2,
+            "label": "Semifinal",
+            "pool": null,
+            "field": 1,
+            "startsAt": "2027-04-28T19:50:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "winner",
+              "game": "g033"
+            },
+            "sourceB": {
+              "type": "winner",
+              "game": "g034"
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g038",
+            "order": 37,
+            "stage": "winners",
+            "round": 2,
+            "label": "Semifinal",
+            "pool": null,
+            "field": 2,
+            "startsAt": "2027-04-28T19:50:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "winner",
+              "game": "g035"
+            },
+            "sourceB": {
+              "type": "winner",
+              "game": "g036"
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g039",
+            "order": 38,
+            "stage": "winners",
+            "round": 3,
+            "label": "Final",
+            "pool": null,
+            "field": 1,
+            "startsAt": "2027-05-05T19:00:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "winner",
+              "game": "g037"
+            },
+            "sourceB": {
+              "type": "winner",
+              "game": "g038"
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          }
+        ],
+        "days": [
+          {
+            "startsAt": "2027-03-03T19:00:00.000",
+            "endsAt": "2027-03-03T19:40:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-03-10T19:00:00.000",
+            "endsAt": "2027-03-10T19:40:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-03-17T19:00:00.000",
+            "endsAt": "2027-03-17T19:40:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-03-24T19:00:00.000",
+            "endsAt": "2027-03-24T19:40:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-03-31T19:00:00.000",
+            "endsAt": "2027-03-31T19:40:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-04-07T19:00:00.000",
+            "endsAt": "2027-04-07T19:40:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-04-14T19:00:00.000",
+            "endsAt": "2027-04-14T19:40:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-04-21T19:00:00.000",
+            "endsAt": "2027-04-21T19:40:00.000",
+            "games": 4
+          },
+          {
+            "startsAt": "2027-04-28T19:00:00.000",
+            "endsAt": "2027-04-28T20:30:00.000",
+            "games": 6
+          },
+          {
+            "startsAt": "2027-05-05T19:00:00.000",
+            "endsAt": "2027-05-05T19:40:00.000",
+            "games": 1
+          }
+        ]
+      },
+      "byes": [
+        [
+          "t1"
+        ],
+        [
+          "t8"
+        ],
+        [
+          "t6"
+        ],
+        [
+          "t4"
+        ],
+        [
+          "t2"
+        ],
+        [
+          "t9"
+        ],
+        [
+          "t7"
+        ],
+        [
+          "t5"
+        ],
+        [
+          "t1",
+          "t2",
+          "t3",
+          "t4",
+          "t5",
+          "t6",
+          "t7",
+          "t8",
+          "t9"
+        ],
+        [
+          "t1",
+          "t2",
+          "t3",
+          "t4",
+          "t5",
+          "t6",
+          "t7",
+          "t8",
+          "t9"
+        ]
+      ],
+      "playThrough": {
+        "awaitingSeedsAtStart": true,
+        "steps": [
+          {
+            "game": "g001",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": []
+          },
+          {
+            "game": "g002",
+            "scoreA": 13,
+            "scoreB": 5,
+            "fills": []
+          },
+          {
+            "game": "g003",
+            "scoreA": 10,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g004",
+            "scoreA": 13,
+            "scoreB": 3,
+            "fills": []
+          },
+          {
+            "game": "g005",
+            "scoreA": 13,
+            "scoreB": 8,
+            "fills": []
+          },
+          {
+            "game": "g006",
+            "scoreA": 1,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g007",
+            "scoreA": 13,
+            "scoreB": 6,
+            "fills": []
+          },
+          {
+            "game": "g008",
+            "scoreA": 13,
+            "scoreB": 11,
+            "fills": []
+          },
+          {
+            "game": "g009",
+            "scoreA": 4,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g010",
+            "scoreA": 9,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g011",
+            "scoreA": 13,
+            "scoreB": 2,
+            "fills": []
+          },
+          {
+            "game": "g012",
+            "scoreA": 7,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g013",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": []
+          },
+          {
+            "game": "g014",
+            "scoreA": 5,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g015",
+            "scoreA": 13,
+            "scoreB": 10,
+            "fills": []
+          },
+          {
+            "game": "g016",
+            "scoreA": 13,
+            "scoreB": 3,
+            "fills": []
+          },
+          {
+            "game": "g017",
+            "scoreA": 13,
+            "scoreB": 8,
+            "fills": []
+          },
+          {
+            "game": "g018",
+            "scoreA": 13,
+            "scoreB": 1,
+            "fills": []
+          },
+          {
+            "game": "g019",
+            "scoreA": 6,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g020",
+            "scoreA": 11,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g021",
+            "scoreA": 4,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g022",
+            "scoreA": 9,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g023",
+            "scoreA": 2,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g024",
+            "scoreA": 13,
+            "scoreB": 7,
+            "fills": []
+          },
+          {
+            "game": "g025",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": []
+          },
+          {
+            "game": "g026",
+            "scoreA": 5,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g027",
+            "scoreA": 13,
+            "scoreB": 10,
+            "fills": []
+          },
+          {
+            "game": "g028",
+            "scoreA": 13,
+            "scoreB": 3,
+            "fills": []
+          },
+          {
+            "game": "g029",
+            "scoreA": 13,
+            "scoreB": 8,
+            "fills": []
+          },
+          {
+            "game": "g030",
+            "scoreA": 13,
+            "scoreB": 1,
+            "fills": []
+          },
+          {
+            "game": "g031",
+            "scoreA": 13,
+            "scoreB": 6,
+            "fills": []
+          },
+          {
+            "game": "g032",
+            "scoreA": 13,
+            "scoreB": 11,
+            "fills": [
+              {
+                "gameId": "g033",
+                "teamA": "t1",
+                "teamB": "t5"
+              },
+              {
+                "gameId": "g034",
+                "teamA": "t7",
+                "teamB": "t6"
+              },
+              {
+                "gameId": "g035",
+                "teamA": "t3",
+                "teamB": "t2"
+              },
+              {
+                "gameId": "g036",
+                "teamA": "t4",
+                "teamB": "t8"
+              }
+            ]
+          },
+          {
+            "game": "g033",
+            "scoreA": 4,
+            "scoreB": 13,
+            "fills": [
+              {
+                "gameId": "g037",
+                "teamA": "t5",
+                "teamB": null
+              }
+            ]
+          },
+          {
+            "game": "g034",
+            "scoreA": 9,
+            "scoreB": 13,
+            "fills": [
+              {
+                "gameId": "g037",
+                "teamA": null,
+                "teamB": "t6"
+              }
+            ]
+          },
+          {
+            "game": "g035",
+            "scoreA": 2,
+            "scoreB": 13,
+            "fills": [
+              {
+                "gameId": "g038",
+                "teamA": "t2",
+                "teamB": null
+              }
+            ]
+          },
+          {
+            "game": "g036",
+            "scoreA": 7,
+            "scoreB": 13,
+            "fills": [
+              {
+                "gameId": "g038",
+                "teamA": null,
+                "teamB": "t8"
+              }
+            ]
+          },
+          {
+            "game": "g037",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": [
+              {
+                "gameId": "g039",
+                "teamA": "t5",
+                "teamB": null
+              }
+            ]
+          },
+          {
+            "game": "g038",
+            "scoreA": 13,
+            "scoreB": 5,
+            "fills": [
+              {
+                "gameId": "g039",
+                "teamA": null,
+                "teamB": "t2"
+              }
+            ]
+          },
+          {
+            "game": "g039",
+            "scoreA": 13,
+            "scoreB": 10,
+            "fills": []
+          }
+        ],
+        "poolTeams": {
+          "A": [
+            "t2",
+            "t9",
+            "t3",
+            "t8",
+            "t4",
+            "t7",
+            "t5",
+            "t6",
+            "t1"
+          ]
+        },
+        "poolStandings": {
+          "A": [
+            "t1",
+            "t3",
+            "t4",
+            "t7",
+            "t6",
+            "t8",
+            "t2",
+            "t5",
+            "t9"
+          ]
+        },
+        "gamesToPlay": [],
+        "skipped": [],
+        "laterGamesPlayed": [
+          "g033",
+          "g034",
+          "g035",
+          "g036",
+          "g037",
+          "g038"
+        ],
+        "pendingFills": [],
+        "champion": "t5",
+        "placements": [
+          "t5",
+          "t1",
+          "t2",
+          "t3",
+          "t4",
+          "t6",
+          "t7",
+          "t8",
+          "t9"
+        ]
+      }
+    },
+    {
+      "name": "a longer season than the round robin, across a clock change",
+      "teams": [
+        "t1",
+        "t2",
+        "t3",
+        "t4"
+      ],
+      "settings": {
+        "startsAt": "2027-10-06T18:00:00.000",
+        "fields": 2
+      },
+      "season": {
+        "weeks": 9,
+        "playoffWeeks": 1,
+        "playoffTeams": 2
+      },
+      "nights": [
+        "2027-10-06T18:00:00.000",
+        "2027-10-13T18:00:00.000",
+        "2027-10-20T18:00:00.000",
+        "2027-10-27T18:00:00.000",
+        "2027-11-03T18:00:00.000",
+        "2027-11-10T18:00:00.000",
+        "2027-11-17T18:00:00.000",
+        "2027-11-24T18:00:00.000",
+        "2027-12-01T18:00:00.000"
+      ],
+      "plan": {
+        "games": [
+          {
+            "id": "g001",
+            "order": 0,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-10-06T18:00:00.000",
+            "teamA": "t1",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g002",
+            "order": 1,
+            "stage": "pool",
+            "round": 1,
+            "label": "Week 1",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-10-06T18:00:00.000",
+            "teamA": "t2",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g003",
+            "order": 2,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-10-13T18:00:00.000",
+            "teamA": "t1",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g004",
+            "order": 3,
+            "stage": "pool",
+            "round": 2,
+            "label": "Week 2",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-10-13T18:00:00.000",
+            "teamA": "t4",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g005",
+            "order": 4,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-10-20T18:00:00.000",
+            "teamA": "t1",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g006",
+            "order": 5,
+            "stage": "pool",
+            "round": 3,
+            "label": "Week 3",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-10-20T18:00:00.000",
+            "teamA": "t3",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g007",
+            "order": 6,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-10-27T18:00:00.000",
+            "teamA": "t1",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g008",
+            "order": 7,
+            "stage": "pool",
+            "round": 4,
+            "label": "Week 4",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-10-27T18:00:00.000",
+            "teamA": "t2",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g009",
+            "order": 8,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-11-03T18:00:00.000",
+            "teamA": "t1",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g010",
+            "order": 9,
+            "stage": "pool",
+            "round": 5,
+            "label": "Week 5",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-11-03T18:00:00.000",
+            "teamA": "t4",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g011",
+            "order": 10,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-11-10T18:00:00.000",
+            "teamA": "t1",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g012",
+            "order": 11,
+            "stage": "pool",
+            "round": 6,
+            "label": "Week 6",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-11-10T18:00:00.000",
+            "teamA": "t3",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g013",
+            "order": 12,
+            "stage": "pool",
+            "round": 7,
+            "label": "Week 7",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-11-17T18:00:00.000",
+            "teamA": "t1",
+            "teamB": "t4",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g014",
+            "order": 13,
+            "stage": "pool",
+            "round": 7,
+            "label": "Week 7",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-11-17T18:00:00.000",
+            "teamA": "t2",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g015",
+            "order": 14,
+            "stage": "pool",
+            "round": 8,
+            "label": "Week 8",
+            "pool": "A",
+            "field": 1,
+            "startsAt": "2027-11-24T18:00:00.000",
+            "teamA": "t1",
+            "teamB": "t3",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g016",
+            "order": 15,
+            "stage": "pool",
+            "round": 8,
+            "label": "Week 8",
+            "pool": "A",
+            "field": 2,
+            "startsAt": "2027-11-24T18:00:00.000",
+            "teamA": "t4",
+            "teamB": "t2",
+            "sourceA": null,
+            "sourceB": null,
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          },
+          {
+            "id": "g017",
+            "order": 16,
+            "stage": "winners",
+            "round": 1,
+            "label": "Final",
+            "pool": null,
+            "field": 1,
+            "startsAt": "2027-12-01T18:00:00.000",
+            "teamA": null,
+            "teamB": null,
+            "sourceA": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 1
+            },
+            "sourceB": {
+              "type": "pool",
+              "pool": "A",
+              "rank": 2
+            },
+            "status": "scheduled",
+            "scoreA": null,
+            "scoreB": null,
+            "report": null,
+            "ifNeeded": false
+          }
+        ],
+        "days": [
+          {
+            "startsAt": "2027-10-06T18:00:00.000",
+            "endsAt": "2027-10-06T18:40:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-10-13T18:00:00.000",
+            "endsAt": "2027-10-13T18:40:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-10-20T18:00:00.000",
+            "endsAt": "2027-10-20T18:40:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-10-27T18:00:00.000",
+            "endsAt": "2027-10-27T18:40:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-11-03T18:00:00.000",
+            "endsAt": "2027-11-03T18:40:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-11-10T18:00:00.000",
+            "endsAt": "2027-11-10T18:40:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-11-17T18:00:00.000",
+            "endsAt": "2027-11-17T18:40:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-11-24T18:00:00.000",
+            "endsAt": "2027-11-24T18:40:00.000",
+            "games": 2
+          },
+          {
+            "startsAt": "2027-12-01T18:00:00.000",
+            "endsAt": "2027-12-01T18:40:00.000",
+            "games": 1
+          }
+        ]
+      },
+      "byes": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [
+          "t1",
+          "t2",
+          "t3",
+          "t4"
+        ]
+      ],
+      "playThrough": {
+        "awaitingSeedsAtStart": true,
+        "steps": [
+          {
+            "game": "g001",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": []
+          },
+          {
+            "game": "g002",
+            "scoreA": 13,
+            "scoreB": 5,
+            "fills": []
+          },
+          {
+            "game": "g003",
+            "scoreA": 10,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g004",
+            "scoreA": 3,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g005",
+            "scoreA": 13,
+            "scoreB": 8,
+            "fills": []
+          },
+          {
+            "game": "g006",
+            "scoreA": 1,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g007",
+            "scoreA": 13,
+            "scoreB": 6,
+            "fills": []
+          },
+          {
+            "game": "g008",
+            "scoreA": 13,
+            "scoreB": 11,
+            "fills": []
+          },
+          {
+            "game": "g009",
+            "scoreA": 4,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g010",
+            "scoreA": 9,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g011",
+            "scoreA": 13,
+            "scoreB": 2,
+            "fills": []
+          },
+          {
+            "game": "g012",
+            "scoreA": 7,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g013",
+            "scoreA": 13,
+            "scoreB": 0,
+            "fills": []
+          },
+          {
+            "game": "g014",
+            "scoreA": 13,
+            "scoreB": 5,
+            "fills": []
+          },
+          {
+            "game": "g015",
+            "scoreA": 10,
+            "scoreB": 13,
+            "fills": []
+          },
+          {
+            "game": "g016",
+            "scoreA": 3,
+            "scoreB": 13,
+            "fills": [
+              {
+                "gameId": "g017",
+                "teamA": "t2",
+                "teamB": "t1"
+              }
+            ]
+          },
+          {
+            "game": "g017",
+            "scoreA": 8,
+            "scoreB": 13,
+            "fills": []
+          }
+        ],
+        "poolTeams": {
+          "A": [
+            "t1",
+            "t4",
+            "t2",
+            "t3"
+          ]
+        },
+        "poolStandings": {
+          "A": [
+            "t2",
+            "t1",
+            "t3",
+            "t4"
+          ]
+        },
+        "gamesToPlay": [],
+        "skipped": [],
+        "laterGamesPlayed": [],
+        "pendingFills": [],
+        "champion": "t1",
+        "placements": [
+          "t1",
+          "t2",
+          "t3",
+          "t4"
+        ]
+      }
+    }
+  ]
+}

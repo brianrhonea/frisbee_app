@@ -1,8 +1,8 @@
 {
   "name": "@stall10/web",
-  "version": "0.10.1",
+  "version": "0.33.0",
   "private": true,
-  "description": "Stall 10 website (phase 3): Next.js on Vercel; writes through apps/api, member reads from Firestore. Replaces the Flutter web build in firebase/hosting.",
+  "description": "Stall 10 website (phase 3): Next.js on Vercel; writes through apps/api, member reads from Firestore. Replaced the Flutter web build on Firebase Hosting.",
   "scripts": {
     "dev": "next dev",
     "build": "pnpm --filter @stall10/shared build && next build",
@@ -12,6 +12,7 @@
   "dependencies": {
     "@stall10/shared": "workspace:*",
     "firebase": "^13.2.0",
+    "livekit-client": "2.23.0",
     "next": "16.4.6",
     "react": "19.3.1",
     "react-dom": "19.3.1"

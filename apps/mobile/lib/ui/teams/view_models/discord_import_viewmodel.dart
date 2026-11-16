@@ -216,8 +216,10 @@ class DiscordImportViewModel extends ChangeNotifier {
               '${norm(plan.rooms[i].name)}',
     };
     return [
+      // Every team keeps its General room, so it never moves out.
       for (final r in rooms)
-        if (going.contains('${folderNames[r.folderId] ?? ''}/${norm(r.name)}'))
+        if (!r.isGeneral &&
+            going.contains('${folderNames[r.folderId] ?? ''}/${norm(r.name)}'))
           r,
     ];
   }

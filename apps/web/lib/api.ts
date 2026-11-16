@@ -27,12 +27,12 @@ export const tags = {
   search: "search",
 } as const;
 
-export interface PublicOptions {
+interface PublicOptions {
   /** Cache tags, so a change can expire this answer at once. */
   tags?: string[];
 }
 
-export class ApiUnavailable extends Error {}
+class ApiUnavailable extends Error {}
 
 /**
  * GETs a public API route (`/v1/public/...`) for a server component. A 404

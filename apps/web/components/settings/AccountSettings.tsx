@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { deleteOwnAccount } from "@/lib/firebase";
 import { useAuth } from "../AuthProvider";
+import { ChangePassword } from "./ChangePassword";
+import { isSignInCancelled, popupBlockedMessage } from "@/lib/auth_errors";
 
 type Method = "password" | "google.com" | "apple.com";
 const methodNames: Record<Method, string> = { password: "email and password", "google.com": "Google", "apple.com": "Apple" };
@@ -24,13 +26,14 @@ function methodOf(providers: string[]): Method | null {
 function problem(e: unknown): string {
   const code = e instanceof FirebaseError ? e.code : "";
   if (code === "auth/wrong-password" || code === "auth/invalid-credential") return "That password isn't right.";
-  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return "";
+  if (isSignInCancelled(e)) return "";
+  if (code === "auth/popup-blocked") return popupBlockedMessage;
   if (code === "auth/too-many-requests") return "Too many tries. Wait a minute and try again.";
   if (code === "functions/failed-precondition") return "Confirm it's you again, then delete your account.";
   return "Couldn't delete your account. Try again, or contact us.";
 }
 
-/** Settings → Account: who they're signed in as, and deleting the account and its data. */
+/** Settings → Account: who they're signed in as, changing their password, and deleting the account and its data. */
 export function AccountSettings() {
   const { user } = useAuth();
   const router = useRouter();
@@ -75,6 +78,17 @@ export function AccountSettings() {
           {method && <span className="muted"> with {methodNames[method]}</span>}.
         </p>
       </div>
+      {/* As in the app: only accounts with a password can change it; Google and Apple ones say how they sign in. */}
+      {method === "password" ? (
+        <ChangePassword user={me} />
+      ) : (
+        method && (
+          <div className="card">
+            <h2 className="card-title">Password</h2>
+            <p className="muted">You sign in with {methodNames[method]}</p>
+          </div>
+        )
+      )}
       <div className="card danger-zone">
         <h2 className="card-title">Delete account</h2>
         <p className="muted small">

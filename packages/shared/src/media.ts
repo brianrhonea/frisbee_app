@@ -128,12 +128,127 @@ export const mediaFolders: Record<UploadPurpose, string> = {
   chat: "teams/{teamId}/chats/{roomId}/{uid}/{itemId} or conversations/{convId}/{uid}/{itemId}",
 };
 
+// ---- Chat attachments ------------------------------------------------------
+//
+// Team chat and direct messages take any file, as the app does
+// (lib/domain/models/chat.dart): photos are compressed like any upload;
+// videos and other files are stored as sent, so they play and open as they
+// are. storage.rules' attachmentSizeOk sets the same limits.
+
+/** Any chat file but a video: 10 MB (maxAttachmentBytes in the app). */
+export const chatFileMax = 10 * MB;
+/** A video in a message: 100 MB (maxVideoBytes in the app). */
+export const chatVideoMax = 100 * MB;
+
+/** File types by extension, the app's table (contentTypeFor in chat.dart); anything else is application/octet-stream. */
+export const chatFileTypes: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  bmp: "image/bmp",
+  heic: "image/heic",
+  heif: "image/heif",
+  pdf: "application/pdf",
+  txt: "text/plain",
+  csv: "text/csv",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+  m4v: "video/mp4",
+  webm: "video/webm",
+  "3gp": "video/3gpp",
+  zip: "application/zip",
+};
+
+/** The type a chat file is sent as, from its name (the app's contentTypeFor). */
+export function chatContentTypeFor(fileName: string): string {
+  const dot = fileName.lastIndexOf(".");
+  const ext = dot < 0 ? "" : fileName.slice(dot + 1).toLowerCase();
+  return chatFileTypes[ext] ?? "application/octet-stream";
+}
+
+/**
+ * Types a chat file that isn't a photo or video may be stored as: the
+ * app's document types, or application/octet-stream for anything else.
+ * Never HTML, SVG or script, so a stored file can't run in a browser.
+ */
+export const chatDocumentTypes = [
+  ...new Set(Object.values(chatFileTypes).filter((t) => !t.startsWith("image/") && !t.startsWith("video/"))),
+  "application/octet-stream",
+] as readonly string[];
+
+/** Video names storage.rules lets past [chatFileMax] (attachmentSizeOk). */
+export const chatVideoName = /\.(mp4|mov|m4v|webm|3gp)$/i;
+
+/**
+ * The most a chat file may be, as storage.rules' attachmentSizeOk has it:
+ * [chatFileMax], or [chatVideoMax] for a video ([videoType] is a video/*
+ * type, or none known) named like one.
+ */
+export function chatAttachmentMax(fileName: string, videoType: boolean): number {
+  return videoType && chatVideoName.test(fileName) ? chatVideoMax : chatFileMax;
+}
+
+/**
+ * What one member may upload to chats in a UTC day through the API: files
+ * asked for, and bytes received. Kept in uploadQuotas/{uid}; a file removed
+ * from the composer still counts, so removing and re-adding doesn't reset it.
+ */
+export const chatUploadQuota = { files: 200, bytes: 2 * 1024 * MB } as const;
+
+/** Longest file name kept on a chat file. */
+export const chatFileNameMax = 120;
+
+/**
+ * A file name as people see it, safe to show: control characters and bidi
+ * controls (which can make "photo<U+202E>fdp.exe" read as "photoexe.pdf")
+ * removed, and path separators turned into "_". The upload schema applies
+ * it, so a stored `name` never has them.
+ */
+export function cleanFileName(name: string): string {
+  return name
+    .replace(/[\u0000-\u001f\u007f-\u009f؜‎‏‪-‮⁦-⁩]/g, "")
+    .replace(/[/\\]/g, "_")
+    .trim();
+}
+
+/**
+ * [name] as a chat file's stored name: readable, with anything that would
+ * add path segments or trip up Storage URLs replaced (the app's
+ * AttachmentStorage._safeName), and its last 80 characters at most.
+ */
+export function safeFileName(name: string): string {
+  const cleaned = name.replace(/[^A-Za-z0-9._ -]/g, "_").trim();
+  const short = cleaned.length > 80 ? cleaned.slice(cleaned.length - 80) : cleaned;
+  return short.length === 0 ? "file" : short;
+}
+
+/** "2.4 MB", "830 KB", "12 B" (the app's formatFileSize). */
+export function formatFileSize(bytes: number): string {
+  if (bytes >= MB) return `${(bytes / MB).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
 /** Body of `POST /v1/uploads`: asks for a signed URL to upload one file. */
 export const createUploadRequestSchema = z
   .strictObject({
     purpose: z.enum(uploadPurposes),
-    contentType: z.enum([...acceptedImageTypes, ...acceptedVideoTypes]),
+    /**
+     * A photo or video type; for `chat`, also one of [chatDocumentTypes]
+     * (any other file, stored as sent, as the app stores it).
+     */
+    contentType: z.string().min(1).max(160),
     size: z.number().int().positive(),
+    /** The file's own name (`chat`): kept on the message, and decides the video limit as storage.rules does. */
+    name: z.string().max(chatFileNameMax * 4).transform(cleanFileName).pipe(z.string().min(1).max(chatFileNameMax)).optional(),
     /** The team (teamImage, teamVideo) or chat (chat: `teams/{t}/chats/{r}` or `conversations/{c}`) it's for. */
     targetId: z.string().min(1).max(128).optional(),
     /**
@@ -150,8 +265,12 @@ export const createUploadRequestSchema = z
     if (u.purpose !== "avatar" && !u.itemId) {
       ctx.addIssue({ code: "custom", path: ["itemId"], message: "Say which post, video or message this is for." });
     }
-    const limits = uploadLimits[u.purpose];
-    const max = isImageType(u.contentType) ? limits.image : limits.video;
+    const media = isImageType(u.contentType) || isVideoType(u.contentType);
+    if (!media && !(u.purpose === "chat" && chatDocumentTypes.includes(u.contentType))) {
+      ctx.addIssue({ code: "custom", path: ["contentType"], message: "That file can't be uploaded here." });
+      return;
+    }
+    const max = uploadMax(u.purpose, u.contentType, u.name);
     if (max == null) {
       ctx.addIssue({ code: "custom", path: ["contentType"], message: "Videos can't be uploaded here." });
     } else if (u.size > max) {
@@ -162,15 +281,44 @@ export const createUploadRequestSchema = z
       });
     }
   });
-export type CreateUploadRequest = z.input<typeof createUploadRequestSchema>;
+
+/** A name for a chat video sent without one, so its limit still follows its type. */
+const videoExtensions: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/x-m4v": "m4v",
+  "video/webm": "webm",
+  "video/3gpp": "3gp",
+  "video/x-matroska": "mkv",
+};
+export function videoFileName(contentType: string, id: string): string {
+  return `${id}.${videoExtensions[contentType] ?? "bin"}`;
+}
+
+/**
+ * The largest file of [contentType] for [purpose], or null if that kind
+ * can't be uploaded for it. Chat follows storage.rules' attachmentSizeOk:
+ * 10 MB for anything, 100 MB for a video named like one ([name], or its
+ * type's own extension); other purposes, [uploadLimits].
+ */
+export function uploadMax(purpose: UploadPurpose, contentType: string, name?: string): number | null {
+  if (purpose === "chat" && !isImageType(contentType)) {
+    const video = isVideoType(contentType) || contentType === "application/octet-stream";
+    return chatAttachmentMax(name ?? (isVideoType(contentType) ? videoFileName(contentType, "file") : ""), video);
+  }
+  const limits = uploadLimits[purpose];
+  return isImageType(contentType) ? limits.image : isVideoType(contentType) ? limits.video : null;
+}
 
 /**
  * An upload's life (uploads/{id}.status): `pending` until the client says
  * it's uploaded, then `ready` (images, compressed in the request) or
  * `processing` (videos, until the transcode job ends in `ready` or
- * `failed`). A file that isn't what it claims is `failed`.
+ * `failed`). A file that isn't what it claims is `failed`. A chat file
+ * taken out of the composer before it's sent (`DELETE /v1/uploads/{id}`)
+ * is `removed`, and its stored files are deleted.
  */
-export const uploadStatuses = ["pending", "processing", "ready", "failed"] as const;
+export const uploadStatuses = ["pending", "processing", "ready", "failed", "removed"] as const;
 export type UploadStatus = (typeof uploadStatuses)[number];
 
 /** Answer to `POST /v1/uploads`: PUT the file to [uploadUrl] with [headers]. */

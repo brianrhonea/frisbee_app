@@ -2,7 +2,7 @@
 import { type PublicPost, type WorkoutActivity, workoutActivityLabels } from "@stall10/shared";
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { Comments } from "./Comments";
@@ -199,14 +199,21 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
       await callApi(user, `/v1/posts/${encodeURIComponent(post.id)}`, { method: "DELETE" });
       setDeleted(true);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't delete it. Try again.");
+      setError(problem(e, "Couldn't delete it. Try again."));
     }
   }
 
   const menu = mine && !editing ? <OwnerMenu onEdit={() => setEditing(true)} onDelete={() => void remove()} /> : undefined;
   const editor = editing && (
     <Composer
-      editing={{ id: post.id, body: post.body ?? "", links: post.links ?? [], images: post.images ?? [], kind: kindOf(post) }}
+      editing={{
+        id: post.id,
+        body: post.body ?? "",
+        links: post.links ?? [],
+        images: post.images ?? [],
+        kind: kindOf(post),
+        tournament: post.tournamentKey ? { key: post.tournamentKey, name: post.tournamentName ?? "" } : null,
+      }}
       autoFocus
       onCancel={() => setEditing(false)}
       onSaved={(r, saved) => {
@@ -215,6 +222,7 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
           ...p,
           body: saved.body,
           links: saved.links,
+          ...(saved.tournament !== undefined && { tournamentKey: saved.tournament?.key, tournamentName: saved.tournament?.name || undefined }),
           images: r.images.map((i) => ({ ...i, url: p.images?.find((x) => x.path === i.path)?.url ?? "" })),
         }));
         setEditing(false);

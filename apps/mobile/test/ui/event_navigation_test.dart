@@ -19,7 +19,7 @@ import 'package:frisbee_app/data/repositories/direct_message/direct_message_repo
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
 import 'package:frisbee_app/data/repositories/meeting/meeting_repository.dart';
 import 'package:frisbee_app/data/repositories/playbook/play_repository.dart';
-import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
+import '../testing/mock_stats_repository.dart';
 import 'package:frisbee_app/data/repositories/profile/profile_repository.dart';
 import 'package:frisbee_app/ui/profile/widgets/profile_screen.dart';
 import 'package:frisbee_app/data/repositories/stats/stats_repository.dart';
@@ -121,9 +121,7 @@ void main() {
           Provider<FilePickerService>.value(value: FakeFilePickerService()),
           Provider<EventRepository>.value(value: events),
           Provider<MeetingRepository>.value(value: FakeMeetingRepository()),
-          Provider<CalendarRepository>.value(
-            value: FakeCalendarRepository(),
-          ),
+          Provider<CalendarRepository>.value(value: FakeCalendarRepository()),
           Provider<TeamPostRepository>.value(value: FakeTeamPostRepository()),
           Provider<ProfileRepository>.value(value: FakeProfileRepository()),
           Provider<StatsRepository>.value(

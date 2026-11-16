@@ -26,7 +26,8 @@ class FeatureFlags extends ChangeNotifier {
     // an API_BASE_URL. Off sends them straight to Firestore again.
     'use_api_teams': true,
     // Team membership and management (joining, invites, roles, details,
-    // invite codes, communities) through the API when the build has one.
+    // invite codes, communities, deleting a team) through the API when the
+    // build has one.
     // Off writes Firestore directly again, under firestore.rules.
     'use_api_membership': true,
     // Profile details, privacy, visibility and username claims through

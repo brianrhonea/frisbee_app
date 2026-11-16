@@ -1,6 +1,6 @@
 import { type ApiErrorBody, type ApiErrorCode, apiErrorStatus } from "@stall10/shared";
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
-import { ZodError } from "zod";
+import { type z, ZodError } from "zod";
 
 /** A request the API turns down, with a message ready to show the user. */
 export class ApiError extends Error {
@@ -50,4 +50,11 @@ export function errorHandler(err: FastifyError | Error, req: FastifyRequest, rep
     api = new ApiError("internal", "Something went wrong. Try again.");
   }
   return reply.status(api.status).send(api.toBody());
+}
+
+/** [body] (or {} when there is none) checked against [schema], or one invalid_argument error. */
+export function parseBody<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
+  const r = schema.safeParse(body ?? {});
+  if (!r.success) throw fromZod(r.error);
+  return r.data;
 }

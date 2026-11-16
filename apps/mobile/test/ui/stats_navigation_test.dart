@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frisbee_app/data/repositories/stats/mock_stats_repository.dart';
+import '../testing/mock_stats_repository.dart';
 import 'package:frisbee_app/domain/models/stats.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/ui/stats/view_models/game_tracker_viewmodel.dart';

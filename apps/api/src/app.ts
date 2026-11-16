@@ -1,4 +1,29 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
+import { registerWriteLimits } from "./limits/writes.js";
+import { accountRoutes } from "./account/routes.js";
+import { AccountService } from "./account/service.js";
+import { TeamDeletion, teamDeletionRoutes } from "./teams/deletion.js";
+import { ChatAdmin, chatAdminRoutes } from "./hub/rooms.js";
+import { DiscordService, discordRoutes } from "./discord/service.js";
+import { PlaybookService, playbookRoutes } from "./playbook/service.js";
+import { MeetingService, meetingRoutes } from "./meetings/service.js";
+import type { LiveKitSigner } from "./meetings/signer.js";
+import { VideoService, videoRoutes } from "./videos/service.js";
+import { type DraftQueries, listDraftQueries } from "./drafts/repository.js";
+import { type DocQueries, listDocQueries } from "./queries.js";
+import { draftRoutes } from "./drafts/routes.js";
+import { DraftService } from "./drafts/service.js";
+import { statsRoutes } from "./stats/routes.js";
+import { StatsService } from "./stats/service.js";
+import { GroupTournamentService, groupTournamentRoutes } from "./group_tournaments/service.js";
+import { tournamentRoutes } from "./tournaments/routes.js";
+import { TournamentService } from "./tournaments/service.js";
+import type { PublicRankingRepository } from "./rankings/public_repository.js";
+import { publicRankingRoutes } from "./rankings/public_routes.js";
+import { PublicRankingService } from "./rankings/public_service.js";
+import type { PublicTournamentRepository } from "./tournaments/public_repository.js";
+import { publicTournamentRoutes } from "./tournaments/public_routes.js";
+import { PublicTournamentService } from "./tournaments/public_service.js";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
@@ -18,6 +43,11 @@ import { uploadRoutes } from "./media/routes.js";
 import { type TranscodeQueue, UploadService } from "./media/service.js";
 import type { MediaStorage } from "./media/storage.js";
 import { followRoutes } from "./follows/routes.js";
+import { hubRoutes } from "./hub/routes.js";
+import { HubService } from "./hub/service.js";
+import { MemoryRateLimiter } from "./limits/memory.js";
+import { conversationRoutes } from "./messages/routes.js";
+import { ConversationService } from "./messages/service.js";
 import { FollowService } from "./follows/service.js";
 import { PostEditor } from "./posts/editor.js";
 import { postEditorRoutes, postRoutes } from "./posts/routes.js";
@@ -28,6 +58,7 @@ import { PersonalService } from "./personal/service.js";
 import { profileRoutes } from "./profiles/routes.js";
 import { ProfileService } from "./profiles/service.js";
 import type { DocStore } from "./store.js";
+import { ClubAgeGate } from "./teams/club_age.js";
 import { MembershipService } from "./teams/membership.js";
 import { membershipRoutes } from "./teams/membership_routes.js";
 import type { TeamRepository } from "./teams/repository.js";
@@ -49,9 +80,19 @@ export interface AppDeps {
     limiter: RateLimiter;
     imageUrl: (path: string) => string;
     webServerKey?: string;
+    /** Buckets visitors may load profile photos from (photoBuckets); none: Google account photos only. */
+    photoBuckets?: string[];
   };
+  /** Visitors' tournament pages (`/v1/public/tournaments*`), limited by [browse]'s limiter; off without both. */
+  publicTournaments?: PublicTournamentRepository;
+  /** Visitors' team rankings (`/v1/public/rankings`), limited by [browse]'s limiter; off without both. */
+  publicRankings?: PublicRankingRepository;
   /** Transactional document access; enables the membership, profile and post routes. */
   store?: DocStore;
+  /** The draft operations' queries; with [store], else they list documents (tests). */
+  draftQueries?: DraftQueries;
+  /** Id-only and few-field queries (stats, videos, tournaments); with [store], else they list documents (tests). */
+  queries?: DocQueries;
   /** Calendars' queries; with [store], enables the calendar routes (the feed also needs [browse]'s limiter). */
   calendar?: CalendarRepository;
   /** The API's public address, for calendar subscription links (PUBLIC_API_URL). */
@@ -66,6 +107,8 @@ export interface AppDeps {
   /** true for Fastify's default logger, or pino options (cloudLoggingOptions). */
   logger?: boolean | LoggerOptions;
   now?: () => number;
+  /** Per-caller write limits (registerWriteLimits); off only in tests that make many writes as one caller. */
+  writeLimits?: boolean;
   /** Origins browsers may call from (CORS_ORIGINS); none when omitted. */
   corsOrigins?: string[];
   /** Fastify's trustProxy; on Cloud Run, [trustHops] (server.ts). */
@@ -76,6 +119,8 @@ export interface AppDeps {
   traceProjectId?: string;
   /** Expires the website's cached public pages after a change (WEB_SITE_URL); off when not given. */
   revalidate?: Revalidate;
+  /** Signs meeting and voice tokens (LIVEKIT_*); without it the token routes answer 412. */
+  livekit?: LiveKitSigner;
 }
 
 /**
@@ -116,6 +161,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
   registerCors(app, deps.corsOrigins ?? []);
   registerAuth(app, deps.verifier, deps.enforceAppCheck ?? false);
+  const writes = new MemoryRateLimiter(deps.now);
+  if (deps.writeLimits !== false) registerWriteLimits(app, writes);
 
   // Every answer says which API version gave it, for tracking changes.
   app.addHook("onSend", async (_req, reply) => {
@@ -123,21 +170,52 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
   app.get("/health", async () => ({ ok: true, version: apiVersion }));
   const revalidate = deps.revalidate ?? noRevalidate;
-  teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now));
-  if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now));
-  if (deps.browse) browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now), deps.browse);
+  // Club teams' age rule reads birth dates from personal details: none
+  // without the key, so club joins are refused rather than unchecked.
+  const personal = deps.store && deps.personal ? new PersonalService(deps.store, deps.users, deps.personal, deps.now) : undefined;
+  const clubAges = new ClubAgeGate(personal, deps.now);
+  teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now, clubAges));
+  if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now), deps.writeLimits !== false ? writes : undefined);
+  if (deps.browse) {
+    const buckets = deps.browse.photoBuckets ?? [];
+    const roster = deps.store ? new RosterService(deps.store, buckets) : undefined;
+    browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now, buckets), { ...deps.browse, roster });
+  }
+  if (deps.browse && deps.publicTournaments) {
+    publicTournamentRoutes(app, new PublicTournamentService(deps.publicTournaments, deps.now), deps.browse);
+  }
+  if (deps.browse && deps.publicRankings) {
+    publicRankingRoutes(app, new PublicRankingService(deps.publicRankings, deps.now), deps.browse);
+  }
   if (deps.store) {
-    membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
+    membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now, undefined, clubAges));
     profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);
-    if (deps.personal) personalRoutes(app, new PersonalService(deps.store, deps.users, deps.personal, deps.now));
-    rosterRoutes(app, new RosterService(deps.store));
-    postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate);
+    accountRoutes(app, new AccountService(deps.store, deps.users, deps.media), revalidate);
+    const queries = deps.queries ?? listDocQueries(deps.store);
+    teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media, queries));
+    if (personal) personalRoutes(app, personal);
+    const reads = deps.writeLimits !== false ? writes : undefined;
+    rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? []), reads);
+    postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate, reads);
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));
+    hubRoutes(app, new HubService(deps.store, deps.users, deps.media, deps.now), writes);
+    const chats = new ChatAdmin(deps.store, deps.teams, deps.media);
+    chatAdminRoutes(app, chats, writes);
+    discordRoutes(app, new DiscordService(deps.store, chats), writes);
+    playbookRoutes(app, new PlaybookService(deps.store), writes);
+    meetingRoutes(app, new MeetingService(deps.store, deps.users, deps.teams, deps.livekit, deps.now), writes);
+    videoRoutes(app, new VideoService(deps.store, deps.users, deps.media, queries), writes);
+    draftRoutes(app, new DraftService(deps.store, deps.draftQueries ?? listDraftQueries(deps.store)), writes);
+    statsRoutes(app, new StatsService(deps.store, queries), writes);
+    groupTournamentRoutes(app, new GroupTournamentService(deps.store, deps.teams, queries), writes);
+    tournamentRoutes(app, new TournamentService(deps.store, queries), writes);
+    conversationRoutes(app, new ConversationService(deps.store, deps.users, deps.media, deps.now), writes);
     if (deps.calendar) {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {
         limiter: deps.browse?.limiter,
         publicUrl: deps.publicUrl,
+        reads,
       });
     }
     if (deps.media) {

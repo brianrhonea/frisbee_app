@@ -11,34 +11,31 @@ import {
   calendarWindowDays,
   type EventType,
   eventTypeLabels,
+  type ScheduleFilter,
+  type ScheduleItem,
+  scheduleFilters,
+  scheduleTeamLabel,
   shareRoleLabels,
+  upcomingSchedule,
 } from "@stall10/shared";
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { colorOf, downloadIcs, loadHidden, saveHidden } from "@/lib/calendar";
-import { ApiError, callApi } from "@/lib/client";
+import { callApi, problem } from "@/lib/client";
+import { type Doc, useLiveQueries } from "@/lib/live";
+import { type Meeting, type MeetingData, meetingHref, teamBase, teamMeetingQueries } from "./team/meetings/model";
+import { memberViewer, type TeamDoc } from "./team/TeamContext";
+import { scheduleMeetings, type TeamEventDoc, teamEventQueries } from "./team/TeamSchedule";
 import { useAuth } from "./AuthProvider";
 import { EventItem } from "./EventItem";
 import { LocalTime } from "./LocalTime";
+import { type ShareChoice, ShareEventField, shareEvent } from "./team/ShareEvent";
+import { fromLocalInput, startOfToday, toLocalInput } from "@/lib/dates";
+import { useMyTeams } from "./useMyTeams";
 
 const dayMs = 86_400_000;
-const problem = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 const canEdit = (c: CalendarInfo | undefined) => c?.role === "owner" || c?.role === "edit";
 
-/** ISO → the value a datetime-local input takes, in the browser's zone. */
-function toLocalInput(iso?: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
-const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
-
-function startOfToday(): number {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
 
 interface Loaded {
   calendars: CalendarInfo[];
@@ -46,13 +43,65 @@ interface Loaded {
   events: CalendarEvent[];
 }
 
+/** One team's live events and meetings, as its listeners last answered (undefined while loading or refused). */
+interface TeamFeedData {
+  events?: Array<Doc<TeamEventDoc>>;
+  meetings?: Meeting[];
+}
+
+/** An entry on My schedule: a calendar event, or a team's event or meeting (ScheduleEntry). */
+type Row = ScheduleItem &
+  (
+    | { kind: "calendar"; event: CalendarEvent }
+    | { kind: "event"; team: Doc<TeamDoc>; event: Doc<TeamEventDoc> }
+    | { kind: "meeting"; team: Doc<TeamDoc>; meeting: Meeting }
+  );
+
+/** Team entries share one color, as in the app; calendars have their own. */
+
+/** How far back team events are read, so multi-day ones under way stay in (MySchedule.lookBack). */
+const lookBackDays = 7;
+const teamColor = "var(--accent)";
+
 /**
- * The member's schedule on the website, like Outlook or Apple Calendar:
- * every calendar they're on (their own and ones they accepted), each in
- * its color and hidden or shown on this browser, with invites to accept.
- * Events are added to any calendar they may change. Everything goes through
- * the API, which checks each calendar's members. Team events stay on each
- * team's page.
+ * Listens to one team's upcoming events and meetings for My schedule, with
+ * the same reads (and so the same rules) as the team's own schedule, and
+ * hands them up. Renders nothing. A refused or failed read leaves that
+ * team out rather than blanking the schedule, as MySchedule logs and goes on.
+ */
+function TeamFeed({
+  team,
+  uid,
+  onData,
+}: {
+  team: Doc<TeamDoc>;
+  uid: string;
+  onData: (teamId: string, data: TeamFeedData | null) => void;
+}) {
+  const member = memberViewer(team, uid);
+  const ev = teamEventQueries(member, false, lookBackDays);
+  const events = useLiveQueries<TeamEventDoc>(`teams/${team.id}/events`, ev.queries, ev.key);
+  const mq = teamMeetingQueries(member);
+  const meetings = useLiveQueries<MeetingData>(`teams/${team.id}/meetings`, mq.queries, mq.key);
+  // The live states change only when a listener answers, so this doesn't loop.
+  useEffect(
+    () => onData(team.id, { events: events.data, meetings: meetings.data }),
+    [team.id, events.data, meetings.data, onData],
+  );
+  useEffect(() => () => onData(team.id, null), [team.id, onData]);
+  return null;
+}
+
+/**
+ * The member's schedule on the website (the app's MySchedule), like
+ * Outlook or Apple Calendar: every calendar they're on (their own and ones
+ * they accepted), each in its color and hidden or shown on this browser,
+ * with invites to accept, plus the events and meetings of every team
+ * they're on, merged soonest first, with the app's All / Team / Personal
+ * filter. Calendars go through the API, which checks each calendar's
+ * members; team events and meetings are live Firestore reads under the
+ * same rules as each team's schedule. Events are added to any calendar the
+ * member may change; team events on the team's page.
  */
 export function Schedule() {
   const { user } = useAuth();
@@ -60,12 +109,24 @@ export function Schedule() {
   const [error, setError] = useState<string | null>(null);
   const [hidden, setHidden] = useState<string[]>([]);
   const [editing, setEditing] = useState<(Partial<CalendarEvent> & { calendarId?: string }) | null>(null);
+  const [filter, setFilter] = useState<ScheduleFilter>("all");
+  // Every team the member is on (watchMyTeams), each listened to by a TeamFeed.
+  const teamsLive = useMyTeams<TeamDoc>(user?.uid);
+  const [feeds, setFeeds] = useState<Record<string, TeamFeedData>>({});
+  const onFeed = useCallback((teamId: string, d: TeamFeedData | null) => {
+    setFeeds((f) => {
+      if (d) return { ...f, [teamId]: d };
+      const next = { ...f };
+      delete next[teamId];
+      return next;
+    });
+  }, []);
 
   useEffect(() => setHidden(loadHidden()), []);
 
   const load = useCallback(async () => {
     if (!user) return;
-    const from = startOfToday() - dayMs;
+    const from = startOfToday().getTime() - dayMs;
     const qs = new URLSearchParams({
       from: new Date(from).toISOString(),
       to: new Date(from + (calendarWindowDays - 1) * dayMs).toISOString(),
@@ -98,11 +159,52 @@ export function Schedule() {
 
   const byId = new Map((data?.calendars ?? []).map((c) => [c.id, c]));
   const writable = (data?.calendars ?? []).filter(canEdit);
-  const upcoming = (data?.events ?? []).filter((e) => {
-    if (hidden.includes(e.calendarId)) return false;
-    const end = Date.parse(e.endsAt ?? e.startsAt);
-    return Number.isFinite(end) && end >= Date.now() - 60 * 60_000;
-  });
+  const teams = (teamsLive.data ?? []).filter((t) => t.memberIds?.includes(me.uid));
+  const rows: Row[] = [
+    ...(data?.events ?? []).map(
+      (e): Row => ({
+        kind: "calendar",
+        key: `cal-${e.calendarId}/${e.id}`,
+        calendarId: e.calendarId,
+        startsAt: e.startsAt,
+        endsAt: e.endsAt,
+        event: e,
+      }),
+    ),
+    ...teams.flatMap((t): Row[] => [
+      ...(feeds[t.id]?.events ?? []).map(
+        (e): Row => ({ kind: "event", key: `${t.id}/${e.id}`, teamId: t.id, startsAt: e.startsAt, endsAt: e.endsAt, team: t, event: e }),
+      ),
+      ...scheduleMeetings(feeds[t.id]?.meetings, false).map(
+        (m): Row => ({
+          kind: "meeting",
+          key: `${t.id}/meeting-${m.id}`,
+          teamId: t.id,
+          startsAt: m.startsAt,
+          endsAt: m.endsAt,
+          live: m.status === "live",
+          team: t,
+          meeting: m,
+        }),
+      ),
+    ]),
+  ];
+  // Team entries stop where the calendars' window does, so the list has one horizon.
+  const windowEnd = startOfToday().getTime() - dayMs + (calendarWindowDays - 1) * dayMs;
+  const upcoming = upcomingSchedule(rows, { now: Date.now(), until: windowEnd, filter, hiddenCalendars: hidden });
+
+  /** Team events can be deleted from here by the team's event managers, as the app's swipe does. */
+  async function removeTeamEvent(team: Doc<TeamDoc>, e: Doc<TeamEventDoc>) {
+    if (!window.confirm("Delete this event for everyone?")) return;
+    try {
+      // The listener drops it once it's gone.
+      await callApi(me, `/v1/teams/${encodeURIComponent(team.id)}/events/${encodeURIComponent(e.id)}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      window.alert(problem(err));
+    }
+  }
 
   async function remove(e: CalendarEvent) {
     if (!window.confirm("Delete this event?")) return;
@@ -118,6 +220,9 @@ export function Schedule() {
 
   return (
     <div className="stack">
+      {teams.map((t) => (
+        <TeamFeed key={t.id} team={t} uid={me.uid} onData={onFeed} />
+      ))}
       {data && data.invites.length > 0 && <Invites invites={data.invites} onAnswered={load} />}
       <div className="card">
         <div className="card-head">
@@ -127,6 +232,20 @@ export function Schedule() {
               Add event
             </button>
           )}
+        </div>
+        <div className="segmented schedule-filter" role="tablist" aria-label="Show">
+          {scheduleFilters.map(([f, label]) => (
+            <button
+              key={f}
+              type="button"
+              role="tab"
+              aria-selected={filter === f}
+              className={filter === f ? "on" : ""}
+              onClick={() => setFilter(f)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
         {editing && data && (
           <EventEditor
@@ -150,13 +269,60 @@ export function Schedule() {
         {!data && !error ? (
           <p className="muted">Loading…</p>
         ) : data && upcoming.length === 0 ? (
-          <p className="muted small">Nothing coming up. Add a workout, a pickup game or anything else you&apos;re doing.</p>
+          <p className="muted small">
+            {filter !== "team"
+              ? "Nothing coming up. Add a workout, a pickup game or anything else you're doing."
+              : teamsLive.data !== undefined && teams.length === 0
+                ? "You're not on a team yet."
+                : "Nothing coming up on your teams."}
+          </p>
         ) : (
           <div className="stack">
-            {upcoming.map((e) => {
+            {upcoming.map((x) => {
+              if (x.kind === "event") {
+                const e = x.event;
+                const label = eventTypeLabels[e.type as EventType] ?? "Event";
+                return (
+                  <EventItem key={x.key} startsAt={e.startsAt}>
+                    <b>
+                      <span className="cal-dot" style={{ background: teamColor }} aria-hidden />
+                      <Link href={`${teamBase(x.team.id)}/schedule?event=${encodeURIComponent(e.id)}`}>{e.title || label}</Link>
+                    </b>
+                    <small>
+                      {label} · <LocalTime iso={e.startsAt} style="dateTime" />
+                      {e.location ? ` · ${e.location}` : ""}
+                    </small>
+                    <small className="muted">{scheduleTeamLabel(x.team.name, teams.length)}</small>
+                    {memberViewer(x.team, me.uid).can("manageEvents") && (
+                      <span className="event-actions">
+                        <button type="button" className="text-btn danger" onClick={() => void removeTeamEvent(x.team, e)}>
+                          Delete
+                        </button>
+                      </span>
+                    )}
+                  </EventItem>
+                );
+              }
+              if (x.kind === "meeting") {
+                const m = x.meeting;
+                return (
+                  <EventItem key={x.key} startsAt={m.startsAt}>
+                    <b>
+                      <span className="cal-dot" style={{ background: teamColor }} aria-hidden />
+                      <Link href={meetingHref(x.team.id, m.id)}>{m.title || "Meeting"}</Link>
+                    </b>
+                    <small>
+                      Meeting · <LocalTime iso={m.startsAt} style="dateTime" /> ·{" "}
+                      <span className={x.live ? "schedule-meeting-live" : ""}>{x.live ? "Live now" : "Video meeting"}</span>
+                    </small>
+                    <small className="muted">{scheduleTeamLabel(x.team.name, teams.length)}</small>
+                  </EventItem>
+                );
+              }
+              const e = x.event;
               const cal = byId.get(e.calendarId);
               return (
-                <EventItem key={`${e.calendarId}/${e.id}`} startsAt={e.startsAt}>
+                <EventItem key={x.key} startsAt={e.startsAt}>
                   <b>
                     <span className="cal-dot" style={{ background: colorOf(cal?.color) }} aria-hidden />
                     {e.title}
@@ -326,6 +492,11 @@ function EventEditor({
   const [notes, setNotes] = useState(event.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A new event may be posted for followers, as the app's editor offers on
+  // My calendar and shared calendars (canShare); the list only offers
+  // calendars the member can edit.
+  const canShare = !event.id;
+  const [share, setShare] = useState<ShareChoice>({ on: false, message: "" });
   if (!user) return null;
   const me = user;
   const calendar = calendars.find((c) => c.id === calendarId);
@@ -345,7 +516,11 @@ function EventEditor({
       if (event.id) {
         await callApi(me, `${base}/${encodeURIComponent(event.id)}`, { method: "PATCH", body });
       } else {
-        await callApi<CalendarEventResult>(me, base, { method: "POST", body });
+        const res = await callApi<CalendarEventResult>(me, base, { method: "POST", body });
+        // The event is saved either way, as in the app and TeamEventEditor.
+        if (canShare && share.on && !(await shareEvent(me, null, res.id, share.message, calendarId))) {
+          window.alert("Event created, but it couldn't be shared. Try posting it.");
+        }
       }
       onDone(true);
     } catch (err) {
@@ -402,6 +577,7 @@ function EventEditor({
         </small>
         <textarea value={notes} rows={3} maxLength={5000} onChange={(e) => setNotes(e.target.value)} />
       </label>
+      {canShare && <ShareEventField value={share} onChange={setShare} personal />}
       <div className="form-actions">
         {error && (
           <span className="form-error" role="alert">

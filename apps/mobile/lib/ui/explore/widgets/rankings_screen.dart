@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
@@ -10,8 +11,9 @@ import '../../core/ui/status_views.dart';
 import '../view_models/explore_viewmodel.dart';
 import 'explore_cards.dart';
 
-/// Every division's full team ranking, one at a time, or the player
-/// ranking.
+/// Every division's full team ranking, one at a time, picked with the
+/// Level and Division filters (as on the website), or the player ranking.
+/// Youth is never ranked.
 class RankingsScreen extends StatelessWidget {
   const RankingsScreen({super.key, required this.viewModel});
 
@@ -87,7 +89,7 @@ class RankingsScreen extends StatelessWidget {
       ];
     }
     return [
-      RankingPicker(viewModel: vm, onPick: (_) => relink()),
+      RankingFilters(viewModel: vm, onPick: relink),
       const SizedBox(height: 12),
       SectionCard(
         title: ranking.label,
@@ -108,7 +110,7 @@ class RankingsScreen extends StatelessWidget {
               'tournaments over the last 12 months: bigger wins and newer '
               'games count more, and beating strong teams counts more than '
               'beating weak ones. Teams need ${ranking.minGames} games to be '
-              'ranked.',
+              "ranked. Youth teams aren't ranked.",
           if (ranking.updatedAt case final at?)
             'Updated ${DateFormat.yMMMd().add_jm().format(at)}.',
         ].join(' '),
@@ -156,7 +158,7 @@ class RankingsScreen extends StatelessWidget {
               'and touches per point played, less throwaways and drops. '
               'More points played means a steadier rating. 50 is average. '
               'Players need ${ranking.minGames} games, and a public profile '
-              'that shows stats.',
+              "that shows stats. Players on youth teams aren't rated.",
           if (ranking.updatedAt case final at?)
             'Updated ${DateFormat.yMMMd().add_jm().format(at)}.',
         ].join(' '),
@@ -164,6 +166,107 @@ class RankingsScreen extends StatelessWidget {
       ),
     ];
   }
+}
+
+/// The Level and Division filters: only levels with a ranking, and the
+/// divisions ranked at the level showing. The same options, order and
+/// default as the website's.
+class RankingFilters extends StatelessWidget {
+  const RankingFilters({super.key, required this.viewModel, this.onPick});
+
+  final ExploreViewModel viewModel;
+
+  /// Called after the view model has the pick.
+  final VoidCallback? onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final choice = viewModel.rankingChoice;
+    if (choice == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FilterRow<CompetitionLevel>(
+          label: 'Level',
+          options: choice.levels,
+          current: choice.level,
+          text: (l) => l.label,
+          onPick: (l) {
+            viewModel.pickLevel(l);
+            onPick?.call();
+          },
+        ),
+        const SizedBox(height: 8),
+        _FilterRow<Division>(
+          label: 'Division',
+          options: choice.divisions,
+          current: choice.division,
+          text: (d) => d.label,
+          onPick: (d) {
+            viewModel.pickDivision(d);
+            onPick?.call();
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _FilterRow<T> extends StatelessWidget {
+  const _FilterRow({
+    required this.label,
+    required this.options,
+    required this.current,
+    required this.text,
+    required this.onPick,
+  });
+
+  final String label;
+  final List<T> options;
+  final T current;
+  final String Function(T) text;
+  final ValueChanged<T> onPick;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    label: label,
+    child: Row(
+      children: [
+        SizedBox(
+          width: 64,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.of(context).muted,
+            ),
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final o in options)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(text(o)),
+                      showCheckmark: false,
+                      visualDensity: VisualDensity.compact,
+                      selected: o == current,
+                      onSelected: (_) => onPick(o),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Column labels over a ranking: rank, then [columns]; the last one is

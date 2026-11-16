@@ -24,9 +24,8 @@ import {
   teamNameProbe,
   transferOwnershipRequestSchema,
 } from "@stall10/shared";
-import type { z } from "zod";
 import { type Caller, callerLabel, type UserLookup } from "../auth.js";
-import { ApiError, fromZod } from "../errors.js";
+import { ApiError, parseBody } from "../errors.js";
 import { AlreadyExists, type Data, type DocStore, serverTime, type Tx } from "../store.js";
 import {
   addMember,
@@ -48,6 +47,7 @@ import {
   strings,
   transferOwnership,
 } from "./access.js";
+import { ClubAgeGate } from "./club_age.js";
 import { newTeamDocuments } from "./documents.js";
 import type { TeamRepository } from "./repository.js";
 import { tooFastMessage } from "./service.js";
@@ -66,12 +66,6 @@ const p = {
 
 /** No 0/O/1/I, so codes read aloud easily (as the app mints them). */
 const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function parse<S extends z.ZodType>(schema: S, body: unknown): z.output<S> {
-  const r = schema.safeParse(body ?? {});
-  if (!r.success) throw fromZod(r.error);
-  return r.data;
-}
 
 const notFound = (what = "team") => new ApiError("not_found", `That ${what} doesn't exist anymore.`);
 
@@ -92,6 +86,8 @@ export class MembershipService {
     private readonly now: () => number = Date.now,
     private readonly randomCode: (length: number) => string = (n) =>
       Array.from({ length: n }, () => codeAlphabet[randomInt(codeAlphabet.length)]).join(""),
+    /** Club teams' age rule (16 and over); without birth dates, club joins are refused. */
+    private readonly clubAges: ClubAgeGate = new ClubAgeGate(undefined, now),
   ) {}
 
   /** The caller's name as the app shows it, from their Auth record. */
@@ -141,7 +137,7 @@ export class MembershipService {
    * joins/{uid} proof as the app does. Returns the team id.
    */
   async joinByCode(caller: Caller, body: unknown): Promise<string> {
-    const code = normalizeInviteCode(parse(joinByCodeRequestSchema, body).code);
+    const code = normalizeInviteCode(parseBody(joinByCodeRequestSchema, body).code);
     if (!code) throw new ApiError("not_found", "No team found for that invite code.");
     const name = await this.label(caller);
     return this.store.transact(async (tx) => {
@@ -158,6 +154,7 @@ export class MembershipService {
       if (!team) throw new ApiError("not_found", "No team found for that invite code.");
       // Already in: nothing to do (the rule refuses, so no one's role drops).
       if (isMember(team, caller.uid)) return teamId;
+      await this.clubAges.check(team, caller.uid);
       tx.set(p.join(teamId, caller.uid), { code });
       tx.update(p.team(teamId), addMember(team, caller.uid, name));
       return teamId;
@@ -224,6 +221,9 @@ export class MembershipService {
         tx.delete(p.request(teamId, uid));
         return;
       }
+      // Only groups take requests, so this never refuses today; it's here
+      // so a club team never gains someone under 16 this way.
+      await this.clubAges.check(team, uid, name);
       tx.update(p.team(teamId), addMember(team, uid, name));
       tx.delete(p.request(teamId, uid));
     });
@@ -234,7 +234,7 @@ export class MembershipService {
    * member. Inviting again refreshes the invite.
    */
   async invite(caller: Caller, teamId: string, body: unknown): Promise<void> {
-    const { uid } = parse(inviteToTeamRequestSchema, body);
+    const { uid } = parseBody(inviteToTeamRequestSchema, body);
     const by = await this.label(caller);
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
@@ -263,7 +263,11 @@ export class MembershipService {
       const team = await tx.get(p.team(teamId));
       if (!invite) throw new ApiError("not_found", "That invite was withdrawn.");
       if (!team) throw notFound();
-      if (!isMember(team, caller.uid)) tx.update(p.team(teamId), addMember(team, caller.uid, name));
+      if (!isMember(team, caller.uid)) {
+        // Inviting anyone works (their age is private); joining is checked.
+        await this.clubAges.check(team, caller.uid);
+        tx.update(p.team(teamId), addMember(team, caller.uid, name));
+      }
       tx.delete(p.invite(caller.uid, teamId));
       tx.delete(p.request(teamId, caller.uid));
     });
@@ -288,7 +292,7 @@ export class MembershipService {
 
   /** changeRole(). */
   async setMemberRole(caller: Caller, teamId: string, uid: string, body: unknown): Promise<void> {
-    const { role } = parse(setMemberRoleRequestSchema, body);
+    const { role } = parseBody(setMemberRoleRequestSchema, body);
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
       const update = changeRole(team, caller.uid, uid, role);
@@ -298,7 +302,7 @@ export class MembershipService {
 
   /** setStatKeepers(). */
   async setStatKeeper(caller: Caller, teamId: string, uid: string, body: unknown): Promise<void> {
-    const { on } = parse(setStatKeeperRequestSchema, body);
+    const { on } = parseBody(setStatKeeperRequestSchema, body);
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
       const update = setStatKeeper(team, caller.uid, uid, on);
@@ -308,7 +312,7 @@ export class MembershipService {
 
   /** transferOwnership(). */
   async transferOwnership(caller: Caller, teamId: string, body: unknown): Promise<void> {
-    const { uid } = parse(transferOwnershipRequestSchema, body);
+    const { uid } = parseBody(transferOwnershipRequestSchema, body);
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
       tx.update(p.team(teamId), transferOwnership(team, caller.uid, uid));
@@ -322,7 +326,7 @@ export class MembershipService {
    * from the body. Tiers and community role copies (orgRoles) stay.
    */
   async saveRoles(caller: Caller, teamId: string, body: unknown): Promise<void> {
-    const input = parse(saveRolesRequestSchema, body);
+    const input = parseBody(saveRolesRequestSchema, body);
     await this.store.transact(async (tx) => {
       const team = await this.team(tx, teamId);
       if (!isOwner(team, caller.uid)) throw new ApiError("permission_denied", "Only the owner can edit roles.");
@@ -340,7 +344,7 @@ export class MembershipService {
    * the same transaction. A new name must be free, as the app checks.
    */
   async editTeam(caller: Caller, teamId: string, body: unknown): Promise<void> {
-    const input = parse(editTeamRequestSchema, body);
+    const input = parseBody(editTeamRequestSchema, body);
     const [current, listed] = await Promise.all([this.store.get(p.team(teamId)), this.store.get(p.listing(teamId))]);
     if (!current) throw notFound();
     requirePermission(current, caller.uid, "manageTeam", `You can't edit this ${nounOf(current)}.`);
@@ -375,7 +379,7 @@ export class MembershipService {
    * 45 s) or a link token (an hour to 30 days). Codes are made here.
    */
   async createInviteCode(caller: Caller, body: unknown): Promise<InviteCodeResponse> {
-    const { teamId, ttl } = parse(createInviteCodeRequestSchema, body);
+    const { teamId, ttl } = parseBody(createInviteCodeRequestSchema, body);
     const team = await this.store.get(p.team(teamId));
     if (!team) throw notFound();
     requirePermission(team, caller.uid, "manageMembers", `You can't invite people to this ${nounOf(team)}.`);
@@ -423,7 +427,7 @@ export class MembershipService {
    * community (orgId, orgName from its doc) and asks to join it.
    */
   async requestCommunityLink(caller: Caller, teamId: string, body: unknown): Promise<void> {
-    const { orgId } = parse(communityLinkRequestSchema, body);
+    const { orgId } = parseBody(communityLinkRequestSchema, body);
     if (orgId === teamId) throw new ApiError("invalid_argument", "A team can't join itself.");
     const by = await this.label(caller);
     await this.store.transact(async (tx) => {
@@ -464,7 +468,7 @@ export class MembershipService {
 
   /** editLinks(): lists the asking team with [roles]; clears the request. */
   async acceptLinkRequest(caller: Caller, orgId: string, teamId: string, body: unknown): Promise<void> {
-    const { roles } = parse(linkedTeamRolesRequestSchema, body);
+    const { roles } = parseBody(linkedTeamRolesRequestSchema, body);
     await this.store.transact(async (tx) => {
       const org = await this.orgForLinks(tx, orgId, caller.uid);
       const request = await tx.get(p.linkRequest(orgId, teamId));
@@ -496,7 +500,7 @@ export class MembershipService {
 
   /** editLinks(): changes which community roles get on a listed team. */
   async saveLinkedTeam(caller: Caller, orgId: string, teamId: string, body: unknown): Promise<void> {
-    const { roles } = parse(linkedTeamRolesRequestSchema, body);
+    const { roles } = parseBody(linkedTeamRolesRequestSchema, body);
     await this.store.transact(async (tx) => {
       const org = await this.orgForLinks(tx, orgId, caller.uid);
       const links = MembershipService.linked(org);
@@ -524,9 +528,11 @@ export class MembershipService {
    * community, in one transaction. Returns the team id.
    */
   async createTeamInCommunity(caller: Caller, orgId: string, body: unknown): Promise<string> {
-    const input = parse(createCommunityTeamRequestSchema, body);
+    const input = parseBody(createCommunityTeamRequestSchema, body);
     await this.checkNotMuted(caller.uid);
     await this.ensureNameFree(input.name, "team", input.division);
+    // The creator is its first member.
+    await this.clubAges.check({ kind: "team", level: input.level }, caller.uid);
     const label = await this.label(caller);
     const teamId = this.store.newId("teams");
     const team: CreateTeamInput = {

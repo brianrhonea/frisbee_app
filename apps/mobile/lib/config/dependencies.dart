@@ -9,8 +9,6 @@ import '../data/repositories/voice/voice_repository.dart';
 import '../data/repositories/voice/voice_repository_livekit.dart';
 import '../data/services/device_permissions.dart';
 import '../data/services/callable_client.dart';
-import '../data/repositories/browse/browse_repository.dart';
-import '../data/repositories/browse/browse_repository_functions.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/auth/auth_repository_firebase.dart';
 import '../data/repositories/personal/personal_repository.dart';
@@ -103,8 +101,7 @@ List<SingleChildWidget> get firebaseProviders => [
     ),
   ),
   Provider<CalendarRepository>(
-    create: (context) =>
-        CalendarRepositoryApi(api: context.read<ApiClient?>()),
+    create: (context) => CalendarRepositoryApi(api: context.read<ApiClient?>()),
   ),
   ChangeNotifierProvider<PersonalDetailsRepository>(
     create: (context) => PersonalDetailsRepositoryApi(
@@ -113,13 +110,6 @@ List<SingleChildWidget> get firebaseProviders => [
     ),
   ),
   Provider(create: (_) => AttachmentStorage()),
-  // Public pages for the website's signed-out visitors (functions/src/browse).
-  Provider<BrowseRepository>(
-    create: (context) => BrowseRepositoryFunctions(
-      functions: context.read<CallableClient>(),
-      attachments: context.read<AttachmentStorage>(),
-    ),
-  ),
   Provider<TeamRepository>(
     create: (context) => TeamRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
@@ -146,13 +136,23 @@ List<SingleChildWidget> get firebaseProviders => [
   Provider<UserPostRepository>(
     create: (context) => UserPostRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
+      api: context.read<ApiClient?>(),
     ),
   ),
   Provider<PostCommentRepository>(
     create: (_) => PostCommentRepositoryFirebase(),
   ),
+  // Drafts belong to whoever is signed in, and go when they sign out.
+  // Made at start (not lazily on the first chat), so it sees every sign-out.
   Provider<MessageDraftRepository>(
-    create: (_) => MessageDraftRepositoryPrefs(SharedPreferencesService()),
+    lazy: false,
+    create: (context) => MessageDraftRepositoryPrefs(
+      SharedPreferencesService(),
+      auth: context.read<AuthRepository>(),
+    ),
+    dispose: (_, drafts) {
+      if (drafts is MessageDraftRepositoryPrefs) drafts.dispose();
+    },
   ),
   ChangeNotifierProvider<PeopleRepository>(
     create: (_) => PeopleRepositoryFirebase(),
@@ -214,6 +214,9 @@ List<SingleChildWidget> get firebaseProviders => [
       functions: context.read(),
       media: context.read(),
       settings: context.read(),
+      teams: context.read(),
+      chats: context.read(),
+      auth: context.read(),
     ),
   ),
   Provider(create: (_) => PushService()),

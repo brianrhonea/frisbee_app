@@ -1,10 +1,8 @@
-import type { EventsPage, PostPage } from "@stall10/shared";
+import type { PostPage } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
-import { EventItem } from "@/components/EventItem";
 import { HomeGate } from "@/components/HomeGate";
-import { LocalTime } from "@/components/LocalTime";
 import { LearnPromo, PickupCard } from "@/components/HomeCards";
 import { PostCard } from "@/components/PostCard";
 import { getPublic, tags } from "@/lib/api";
@@ -17,24 +15,21 @@ export const metadata: Metadata = {
 
 /** How much of the community a visitor sees before signing up. */
 const previewPosts = 3;
-const previewEvents = 3;
 
 /** Members-only parts, shown to visitors as locked cards. */
 const locked = [
   ["Your teams", "Rosters, roles and team chat."],
   ["Your schedule", "Practices, games and RSVPs across every team."],
+  ["Players and search", "Profiles, stats and finding people."],
   ["Your stats", "Goals, assists and blocks, season by season."],
 ];
 
 export default async function Home() {
   // Rendered per request (the build has no API); the reads stay cached 60s.
   await connection();
-  const [feed, upcoming] = await Promise.all([
-    getPublic<PostPage>("/v1/public/feed", undefined, { tags: [tags.feed] }).catch(() => null),
-    getPublic<EventsPage>("/v1/public/events").catch(() => null),
-  ]);
+  // Visitors see the community's newest posts here; events, teams and Learn have their own tabs. No profiles.
+  const feed = await getPublic<PostPage>("/v1/public/feed", undefined, { tags: [tags.feed] }).catch(() => null);
   const posts = feed?.posts.slice(0, previewPosts) ?? [];
-  const events = upcoming?.events.slice(0, previewEvents) ?? [];
 
   return (
     <HomeGate>
@@ -57,6 +52,10 @@ export default async function Home() {
                 Log in
               </Link>
             </div>
+            <p className="muted small">
+              Or look around first: <Link href="/teams#find">find a team</Link>,{" "}
+              <Link href="/events">see what&apos;s coming up</Link> or <Link href="/learn">learn to play</Link>.
+            </p>
           </section>
 
           <div className="feed-tabs">
@@ -83,32 +82,6 @@ export default async function Home() {
 
         <aside className="huddle-side" aria-label="Coming up">
           <PickupCard />
-
-          <div className="card">
-            <div className="card-head">
-              <h2 className="card-title">Upcoming events</h2>
-              <Link className="see-all" href="/events">
-                View all
-              </Link>
-            </div>
-            {events.length === 0 ? (
-              <p className="muted small">Nothing public scheduled.</p>
-            ) : (
-              <div className="date-list">
-                {events.map((e) => (
-                  <EventItem key={`${e.teamId}/${e.id}`} startsAt={e.startsAt} plain>
-                    <b>{e.title || "Event"}</b>
-                    <small>
-                      <LocalTime iso={e.startsAt} style="dateTime" />
-                    </small>
-                    <small>
-                      <Link href={`/teams/${encodeURIComponent(e.teamId)}`}>{e.teamName}</Link>
-                    </small>
-                  </EventItem>
-                ))}
-              </div>
-            )}
-          </div>
 
           <div className="card">
             <h2 className="card-title">With a free account</h2>

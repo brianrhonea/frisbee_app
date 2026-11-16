@@ -4,6 +4,7 @@
 // that can sign (on Cloud Run: the service account with
 // iam.serviceAccounts.signBlob on itself); the emulator can't sign, so
 // emulator tests put files with the Admin SDK instead.
+import { randomUUID } from "node:crypto";
 import type { Storage } from "firebase-admin/storage";
 
 type Bucket = ReturnType<Storage["bucket"]>;
@@ -23,18 +24,50 @@ export interface MediaStorage {
     maxBytes: number,
     expiresAt: Date,
   ): Promise<{ url: string; headers: Record<string, string> }>;
-  /** The object's size in bytes, or null if there's none. */
-  size(path: string): Promise<number | null>;
-  /** The first [bytes] bytes, or the whole object without a limit. */
-  read(path: string, bytes?: number): Promise<Buffer>;
+  /**
+   * The object's size in bytes and its generation (which changes whenever
+   * it's written again), or null if there's none.
+   */
+  stat(path: string): Promise<{ size: number; generation: string } | null>;
+  /**
+   * The first [bytes] bytes, or the whole object without a limit. With
+   * [generation], only that version: it fails if the object was replaced.
+   */
+  read(path: string, bytes?: number, generation?: string): Promise<Buffer>;
   write(path: string, data: Buffer, contentType: string): Promise<void>;
+  /**
+   * Copies [from] to [to] in the bucket (no download), saved as
+   * [contentType]. With [generation], copies only that version of [from]
+   * and fails if it was replaced, so what was checked is what's copied.
+   */
+  copy(from: string, to: string, contentType: string, generation?: string): Promise<void>;
   downloadTo(path: string, file: string): Promise<void>;
   uploadFrom(file: string, path: string, contentType: string): Promise<void>;
   delete(path: string): Promise<void>;
+  /**
+   * A lasting download URL for [path] (a Firebase download token), for
+   * pictures the app shows by URL: profile pictures and header photos.
+   */
+  downloadUrl(path: string): Promise<string>;
+  /** Deletes every object under [prefix] (a folder ending in "/"). */
+  deletePrefix(prefix: string): Promise<void>;
 }
 
 export class FirebaseMediaStorage implements MediaStorage {
   constructor(private readonly bucket: Bucket) {}
+
+  async deletePrefix(prefix: string) {
+    if (!prefix.endsWith("/") || prefix.split("/").includes("..")) throw new Error(`not a folder: ${prefix}`);
+    await this.bucket.deleteFiles({ prefix, force: true });
+  }
+
+  async downloadUrl(path: string) {
+    const token = randomUUID();
+    await this.bucket.file(path).setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
+    const host = process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+    const base = host ? `http://${host}` : "https://firebasestorage.googleapis.com";
+    return `${base}/v0/b/${this.bucket.name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+  }
 
   async signedUploadUrl(
     path: string,
@@ -53,20 +86,29 @@ export class FirebaseMediaStorage implements MediaStorage {
     return { url, headers: { "content-type": contentType, ...headers } };
   }
 
-  async size(path: string) {
+  async stat(path: string) {
     const [exists] = await this.bucket.file(path).exists();
     if (!exists) return null;
     const [meta] = await this.bucket.file(path).getMetadata();
-    return Number(meta.size ?? 0);
+    return { size: Number(meta.size ?? 0), generation: String(meta.generation ?? "") };
   }
 
-  async read(path: string, bytes?: number) {
-    const [data] = await this.bucket.file(path).download(bytes ? { start: 0, end: bytes - 1 } : {});
+  private file(path: string, generation?: string) {
+    return this.bucket.file(path, generation ? { generation } : {});
+  }
+
+  async read(path: string, bytes?: number, generation?: string) {
+    const [data] = await this.file(path, generation).download(bytes ? { start: 0, end: bytes - 1 } : {});
     return data;
   }
 
   async write(path: string, data: Buffer, contentType: string) {
     await this.bucket.file(path).save(data, { contentType, resumable: false, metadata: { cacheControl: mediaCacheControl } });
+  }
+
+  async copy(from: string, to: string, contentType: string, generation?: string) {
+    // A File with a generation copies with sourceGeneration: that version or nothing.
+    await this.file(from, generation).copy(this.bucket.file(to), { contentType, cacheControl: mediaCacheControl });
   }
 
   async downloadTo(path: string, file: string) {

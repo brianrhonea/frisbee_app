@@ -1,0 +1,10 @@
+/* The team schedule's meetings and its New event / New meeting buttons. */
+.schedule-new {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.schedule-meeting-live {
+  color: var(--danger);
+  font-weight: 600;
+}

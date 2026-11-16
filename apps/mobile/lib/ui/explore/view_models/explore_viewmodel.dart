@@ -14,18 +14,25 @@ import '../../../domain/models/team.dart';
 enum RankingKind { teams, players }
 
 /// Explore's cards beside search: upcoming tournaments, recent results
-/// and a rankings preview. The Rankings page uses it too.
+/// and a rankings preview. The Rankings page uses it too
+/// ([rankingsPage]), with its Level and Division filters.
+///
+/// Youth is never ranked or shown: the `rankings` Cloud Functions skip
+/// it, and a youth ranking that's still stored is left out here too.
 class ExploreViewModel extends ChangeNotifier {
   ExploreViewModel({
     required HostedTournamentRepository tournamentRepository,
     required RankingRepository rankingRepository,
     TeamRepository? teamRepository,
     AuthRepository? authRepository,
-    this.initialRanking,
+    this.rankingsPage = false,
+    RankingKind kind = RankingKind.teams,
+    String? level,
+    String? division,
   }) : _uid = authRepository?.currentUser?.uid,
-       _kind = initialRanking == playersKey
-           ? RankingKind.players
-           : RankingKind.teams {
+       _kind = kind,
+       _level = level,
+       _division = division {
     _subs
       ..add(
         tournamentRepository.watchUpcoming(limit: 30).listen((l) {
@@ -36,13 +43,16 @@ class ExploreViewModel extends ChangeNotifier {
       )
       ..add(
         rankingRepository.watchRankings().listen((l) {
-          _rankings = [...l]
-            ..sort((a, b) {
-              final level = a.level.index.compareTo(b.level.index);
-              return level != 0
-                  ? level
-                  : a.division.index.compareTo(b.division.index);
-            });
+          _rankings =
+              [
+                for (final r in l)
+                  if (r.isRanked && r.teams.isNotEmpty) r,
+              ]..sort((a, b) {
+                final level = a.level.index.compareTo(b.level.index);
+                return level != 0
+                    ? level
+                    : a.division.index.compareTo(b.division.index);
+              });
           _rankingsLoaded = true;
           notifyListeners();
         }, onError: _fail),
@@ -77,15 +87,18 @@ class ExploreViewModel extends ChangeNotifier {
     }
   }
 
-  /// The ranking to open on ("club-mixed", or [playersKey]), from the
-  /// page's link.
-  final String? initialRanking;
-
-  /// [initialRanking] for the player ranking.
-  static const playersKey = 'players';
+  /// The Rankings page: with nothing asked for, it opens on Club Mixed
+  /// (else the first ranking), as the website does; Explore's preview
+  /// opens on the user's team's division, else the biggest.
+  final bool rankingsPage;
 
   final String? _uid;
   RankingKind _kind;
+
+  /// The level and division asked for (by the link or a filter), by name;
+  /// [ranking] falls back when there's no such ranking.
+  String? _level;
+  String? _division;
   PlayerRanking _players = const PlayerRanking();
   bool _playersLoaded = false;
 
@@ -104,9 +117,15 @@ class ExploreViewModel extends ChangeNotifier {
   /// Whether [uid] is the user, to highlight their row.
   bool isMe(String uid) => uid == _uid;
 
-  /// The link to the ranking showing: [playersKey] or a division's key.
-  String? get rankingLink =>
-      _kind == RankingKind.players ? playersKey : ranking?.key;
+  /// The Rankings page's link query for what's showing:
+  /// `{kind: players}` or `{level: club, division: mixed}`.
+  Map<String, String>? get rankingLink {
+    if (_kind == RankingKind.players) return const {'kind': 'players'};
+    final r = ranking;
+    return r == null
+        ? null
+        : {'level': r.level.name, 'division': r.division.name};
+  }
 
   final List<StreamSubscription<Object?>> _subs = [];
 
@@ -117,7 +136,6 @@ class ExploreViewModel extends ChangeNotifier {
   bool _tournamentsLoaded = false;
   bool _rankingsLoaded = false;
   Object? _error;
-  String? _picked;
 
   bool get tournamentsLoaded => _tournamentsLoaded || _error != null;
   bool get rankingsLoaded => _rankingsLoaded || _error != null;
@@ -138,27 +156,68 @@ class ExploreViewModel extends ChangeNotifier {
   /// Every division with ranked teams, by level then division.
   List<DivisionRanking> get rankings => _rankings;
 
-  /// The ranking shown: the one picked, else the one linked to, else the
-  /// division of the user's first team that has one, else the biggest.
+  /// The ranking shown: the level and division asked for (see
+  /// [RankingChoice.choose] for the fallbacks); with nothing asked for,
+  /// Club Mixed (else the first) on the Rankings page, and in Explore's
+  /// preview the division of the user's first team that has one, else
+  /// the biggest.
   DivisionRanking? get ranking {
     if (_rankings.isEmpty) return null;
     DivisionRanking? byKey(String? key) =>
         _rankings.where((r) => r.key == key).firstOrNull;
+    if (rankingsPage || _level != null || _division != null) {
+      return byKey(_choice()?.key);
+    }
     final mine = [
       for (final t in _myTeams)
         if (t.kind == TeamKind.team)
           DivisionRanking.keyFor(t.level, t.division),
     ];
-    return byKey(_picked) ??
-        byKey(initialRanking) ??
-        mine.map(byKey).nonNulls.firstOrNull ??
+    return mine.map(byKey).nonNulls.firstOrNull ??
         (_rankings.toList()
               ..sort((a, b) => b.teams.length.compareTo(a.teams.length)))
             .first;
   }
 
+  RankingChoice? _choice() => RankingChoice.choose(
+    _rankings.map((r) => r.key),
+    level: _level,
+    division: _division,
+  );
+
+  /// The Level and Division filters for [ranking]: their options (only
+  /// those with rankings) and what they're set to.
+  RankingChoice? get rankingChoice {
+    final r = ranking;
+    return r == null
+        ? null
+        : RankingChoice.choose(
+            _rankings.map((x) => x.key),
+            level: r.level.name,
+            division: r.division.name,
+          );
+  }
+
+  /// Shows [level]'s ranking for the division showing, else its first.
+  void pickLevel(CompetitionLevel level) {
+    _division = ranking?.division.name;
+    _level = level.name;
+    notifyListeners();
+  }
+
+  /// Shows [division]'s ranking at the level showing, if it has one.
+  void pickDivision(Division division) {
+    _level = ranking?.level.name;
+    _division = division.name;
+    notifyListeners();
+  }
+
+  /// Shows the ranking with [key] ("club-mixed").
   void pickRanking(String key) {
-    _picked = key;
+    final p = RankingChoice.parseKey(key);
+    if (p == null) return;
+    _level = p.level.name;
+    _division = p.division.name;
     notifyListeners();
   }
 

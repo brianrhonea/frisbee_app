@@ -2,25 +2,30 @@ import { searchKeywords } from "@stall10/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { tooFastMessage } from "../src/teams/service.js";
-import { FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
+import { FakeCipher, FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier, seedBirthDate } from "./fakes.js";
 
 const now = Date.UTC(2026, 10, 11, 12);
 
-function setup(opts: { enforceAppCheck?: boolean } = {}) {
+async function setup(opts: { enforceAppCheck?: boolean; personal?: boolean } = {}) {
   const teams = new FakeTeamRepository();
   const users = new FakeUsers();
-  const app = buildApp({ verifier: new FakeVerifier(), users, teams, now: () => now, ...opts });
+  const store = new FakeStore(() => now);
+  const cipher = new FakeCipher();
+  const { personal = true, ...rest } = opts;
+  const app = buildApp({ verifier: new FakeVerifier(), users, teams, store, personal: personal ? cipher : undefined, now: () => now, ...rest });
+  // u1 is an adult, so club teams are theirs to start.
+  await seedBirthDate(store, cipher, "u1", "1995-06-01");
   const post = (body: unknown, headers: Record<string, string> = { authorization: "Bearer token:u1:Pat" }) =>
     app.inject({ method: "POST", url: "/v1/teams", payload: body as object, headers });
-  return { app, teams, users, post };
+  return { app, teams, users, store, cipher, post };
 }
 
 const team = { name: "The Haze", division: "open", level: "club", city: "Austin" };
 
 describe("POST /v1/teams", () => {
-  let t: ReturnType<typeof setup>;
-  beforeEach(() => {
-    t = setup();
+  let t: Awaited<ReturnType<typeof setup>>;
+  beforeEach(async () => {
+    t = await setup();
   });
 
   it("creates a team owned by the caller", async () => {
@@ -129,28 +134,81 @@ describe("POST /v1/teams", () => {
   });
 });
 
+describe("POST /v1/teams: club teams are for players 16 and over", () => {
+  // now is 2026-11-11 12:00 UTC; ages count on the date in UTC+14, 2026-11-12.
+  let t: Awaited<ReturnType<typeof setup>>;
+  beforeEach(async () => {
+    t = await setup();
+  });
+  const as = (uid: string) => ({ authorization: `Bearer token:${uid}:Kid` });
+  const club = (name: string) => ({ ...team, name });
+
+  it("lets a creator start one on their 16th birthday", async () => {
+    await seedBirthDate(t.store, t.cipher, "k1", "2010-11-12");
+    expect((await t.post(club("Birthday"), as("k1"))).statusCode).toBe(201);
+  });
+
+  it("refuses the day before, and nothing is made", async () => {
+    await seedBirthDate(t.store, t.cipher, "k1", "2010-11-13");
+    const res = await t.post(club("Too Soon"), as("k1"));
+    expect(res.statusCode).toBe(412);
+    expect(res.json().error).toEqual({ code: "failed_precondition", message: "Club teams are for players 16 and over." });
+    expect(t.teams.created).toEqual([]);
+  });
+
+  it("asks for a date of birth first when there's none on file", async () => {
+    const res = await t.post(club("No Birthday"), as("nobody"));
+    expect(res.statusCode).toBe(412);
+    expect(res.json().error.message).toBe("Add your date of birth in About you to join a club team.");
+  });
+
+  it("covers a team started for a club league spot too", async () => {
+    t.teams.leagues.set("l1", true);
+    await seedBirthDate(t.store, t.cipher, "k1", "2012-01-01");
+    expect((await t.post({ ...club("League Spot"), leagueId: "l1" }, as("k1"))).statusCode).toBe(412);
+  });
+
+  it("leaves other levels and groups alone", async () => {
+    await seedBirthDate(t.store, t.cipher, "k1", "2012-01-01");
+    for (const level of ["college", "youth", "league", "pickup"]) {
+      expect((await t.post({ ...team, name: `Kids ${level}`, level }, as("k1"))).statusCode).toBe(201);
+    }
+    expect((await t.post({ ...team, name: "Kids Group", kind: "community" }, as("nobody"))).statusCode).toBe(201);
+    // Nothing decrypted for them.
+    expect(t.cipher.calls.open).toBe(0);
+  });
+
+  it("refuses club teams when the API can't read birth dates (no key)", async () => {
+    const off = await setup({ personal: false });
+    const res = await off.post(team);
+    expect(res.statusCode).toBe(503);
+    expect(res.json().error.code).toBe("unavailable");
+    expect((await off.post({ ...team, level: "pickup" })).statusCode).toBe(201);
+  });
+});
+
 describe("App Check", () => {
   it("is required when enforced", async () => {
-    const { post } = setup({ enforceAppCheck: true });
+    const { post } = await setup({ enforceAppCheck: true });
     expect((await post(team)).statusCode).toBe(401);
     expect((await post(team, { authorization: "Bearer token:u1", "x-firebase-appcheck": "bad" })).statusCode).toBe(401);
     expect((await post(team, { authorization: "Bearer token:u1", "x-firebase-appcheck": "good" })).statusCode).toBe(201);
   });
 
   it("only logs a bad token when not enforced", async () => {
-    const { post } = setup();
+    const { post } = await setup();
     expect((await post(team, { authorization: "Bearer token:u1", "x-firebase-appcheck": "bad" })).statusCode).toBe(201);
   });
 });
 
 describe("misc", () => {
   it("answers /health without auth", async () => {
-    const { app } = setup({ enforceAppCheck: true });
+    const { app } = await setup({ enforceAppCheck: true });
     expect((await app.inject({ url: "/health" })).json()).toMatchObject({ ok: true });
   });
 
   it("404s unknown routes in the error shape", async () => {
-    const { app } = setup();
+    const { app } = await setup();
     const res = await app.inject({ url: "/nope" });
     expect(res.statusCode).toBe(404);
     expect(res.json().error.code).toBe("not_found");

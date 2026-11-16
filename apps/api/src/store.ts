@@ -31,6 +31,8 @@ export interface Tx {
 
 export interface DocStore {
   get(path: string): Promise<Data | null>;
+  /** Several documents in one round trip, in [paths]' order (null for a missing one). */
+  getAll(paths: string[]): Promise<Array<Data | null>>;
   /** Up to [limit] documents of [collection], in id order. */
   list(collection: string, limit: number): Promise<Array<{ id: string; data: Data }>>;
   /** A fresh auto id for a document in [collection]. */
