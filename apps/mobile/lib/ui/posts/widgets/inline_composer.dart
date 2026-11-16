@@ -129,239 +129,251 @@ class _InlineComposerState extends State<InlineComposer> {
         contentPadding: const EdgeInsets.symmetric(vertical: 8),
         hintStyle: TextStyle(color: c.muted, fontSize: 13.5),
       );
-      return Card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: PersonAvatar(
-                      name: widget.name,
-                      photoUrl: widget.photoUrl,
-                      radius: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (vm.audiences.isNotEmpty)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: _AudienceChip(
-                              teams: vm.audiences,
-                              selected: team,
-                              enabled: !vm.post.running,
-                              onPick: vm.pickAudience,
-                            ),
-                          ),
-                        if (team != null)
-                          TextField(
-                            controller: _title,
-                            maxLength: 100,
-                            textCapitalization: TextCapitalization.sentences,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                            decoration: field.copyWith(
-                              hintText: 'Title (optional)',
-                              counterText: '',
-                            ),
-                          ),
-                        TextField(
-                          controller: _body,
-                          focusNode: _bodyFocus,
-                          minLines: 1,
-                          maxLines: 8,
-                          keyboardType: TextInputType.multiline,
-                          textCapitalization: TextCapitalization.sentences,
-                          // Keeps the tools and Post above the keyboard.
-                          scrollPadding: const EdgeInsets.only(
-                            top: 20,
-                            bottom: 140,
-                          ),
-                          decoration: field.copyWith(
-                            hintText: team != null
-                                ? "What's the news for ${team.name}?"
-                                : vm.workout != null
-                                ? 'How did it go? (optional)'
-                                : "What's happening on your sideline?",
-                          ),
-                        ),
-                        if (team != null)
-                          TextField(
-                            controller: _place,
-                            maxLength: 200,
-                            decoration: field.copyWith(
-                              hintText: 'Where (optional)',
-                              counterText: '',
-                              prefixIcon: Icon(
-                                Icons.place_outlined,
-                                size: 18,
-                                color: c.muted,
-                              ),
-                              prefixIconConstraints: const BoxConstraints(
-                                minWidth: 26,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              // Extras get the card's full width (not under the avatar),
-              // so the workout's fields have room on phones.
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (vm.workout case final w?)
-                    _WorkoutFields(key: _workoutKey, draft: w, viewModel: vm),
-                  if (vm.photos.isNotEmpty)
+      // While posting nothing can change: the draft is cleared once it's
+      // saved, so anything added meanwhile would be lost.
+      return AbsorbPointer(
+        absorbing: vm.post.running,
+        child: Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Padding(
-                      key: _photosKey,
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                      padding: const EdgeInsets.only(top: 4),
+                      child: PersonAvatar(
+                        name: widget.name,
+                        photoUrl: widget.photoUrl,
+                        radius: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          for (final a in vm.photos)
-                            _RemovablePhoto(
-                              onRemove: () => vm.removePhoto(a),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.memory(
-                                  a.bytes,
-                                  width: 72,
-                                  height: 72,
-                                  fit: BoxFit.cover,
-                                  semanticLabel: a.name,
-                                  errorBuilder: (_, _, _) => Container(
+                          if (vm.audiences.isNotEmpty)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: _AudienceChip(
+                                teams: vm.audiences,
+                                selected: team,
+                                enabled: !vm.post.running,
+                                onPick: vm.pickAudience,
+                              ),
+                            ),
+                          if (team != null)
+                            TextField(
+                              controller: _title,
+                              maxLength: 100,
+                              textCapitalization: TextCapitalization.sentences,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: field.copyWith(
+                                hintText: 'Title (optional)',
+                                counterText: '',
+                              ),
+                            ),
+                          TextField(
+                            controller: _body,
+                            focusNode: _bodyFocus,
+                            minLines: 1,
+                            maxLines: 8,
+                            keyboardType: TextInputType.multiline,
+                            textCapitalization: TextCapitalization.sentences,
+                            // Keeps the tools and Post above the keyboard.
+                            scrollPadding: const EdgeInsets.only(
+                              top: 20,
+                              bottom: 140,
+                            ),
+                            decoration: field.copyWith(
+                              hintText: team != null
+                                  ? "What's the news for ${team.name}?"
+                                  : vm.workout != null
+                                  ? 'How did it go? (optional)'
+                                  : "What's happening on your sideline?",
+                            ),
+                          ),
+                          if (team != null)
+                            TextField(
+                              controller: _place,
+                              maxLength: 200,
+                              decoration: field.copyWith(
+                                hintText: 'Where (optional)',
+                                counterText: '',
+                                prefixIcon: Icon(
+                                  Icons.place_outlined,
+                                  size: 18,
+                                  color: c.muted,
+                                ),
+                                prefixIconConstraints: const BoxConstraints(
+                                  minWidth: 26,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                // Extras get the card's full width (not under the avatar),
+                // so the workout's fields have room on phones.
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (vm.workout case final w?)
+                      _WorkoutFields(key: _workoutKey, draft: w, viewModel: vm),
+                    if (vm.photos.isNotEmpty)
+                      Padding(
+                        key: _photosKey,
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final a in vm.photos)
+                              _RemovablePhoto(
+                                onRemove: () => vm.removePhoto(a),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.memory(
+                                    a.bytes,
                                     width: 72,
                                     height: 72,
-                                    color: AppColors.of(context).field,
-                                    child: const Icon(Icons.image_outlined),
+                                    fit: BoxFit.cover,
+                                    semanticLabel: a.name,
+                                    errorBuilder: (_, _, _) => Container(
+                                      width: 72,
+                                      height: 72,
+                                      color: AppColors.of(context).field,
+                                      child: const Icon(Icons.image_outlined),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  if (vm.links.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          for (final l in vm.links)
-                            InputChip(
-                              label: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 220,
-                                ),
-                                child: Text(
-                                  l.replaceFirst(RegExp(r'^https?://'), ''),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              onDeleted: () => vm.removeLink(l),
-                            ),
-                        ],
-                      ),
-                    ),
-                  if (vm.linkOpen)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: TextField(
-                        controller: _link,
-                        autofocus: true,
-                        keyboardType: TextInputType.url,
-                        textInputAction: TextInputAction.done,
-                        scrollPadding: const EdgeInsets.only(
-                          top: 20,
-                          bottom: 120,
+                          ],
                         ),
-                        decoration: InputDecoration(
-                          isDense: true,
-                          hintText: 'example.com/highlights',
-                          prefixIcon: const Icon(Icons.link, size: 18),
-                          errorText: vm.linkError,
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                tooltip: 'Add link',
-                                icon: const Icon(Icons.check),
-                                onPressed: vm.addLink,
+                      ),
+                    if (vm.links.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            for (final l in vm.links)
+                              InputChip(
+                                label: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 220,
+                                  ),
+                                  child: Text(
+                                    l.replaceFirst(RegExp(r'^https?://'), ''),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                onDeleted: () => vm.removeLink(l),
                               ),
-                              IconButton(
-                                tooltip: 'Cancel',
-                                icon: const Icon(Icons.close),
-                                onPressed: vm.closeLink,
-                              ),
-                            ],
+                          ],
+                        ),
+                      ),
+                    if (vm.linkOpen)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: TextField(
+                          controller: _link,
+                          autofocus: true,
+                          keyboardType: TextInputType.url,
+                          textInputAction: TextInputAction.done,
+                          scrollPadding: const EdgeInsets.only(
+                            top: 20,
+                            bottom: 120,
+                          ),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'example.com/highlights',
+                            prefixIcon: const Icon(Icons.link, size: 18),
+                            errorText: vm.linkError,
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Add link',
+                                  icon: const Icon(Icons.check),
+                                  onPressed: vm.addLink,
+                                ),
+                                IconButton(
+                                  tooltip: 'Cancel',
+                                  icon: const Icon(Icons.close),
+                                  onPressed: vm.closeLink,
+                                ),
+                              ],
+                            ),
+                          ),
+                          onSubmitted: (_) => vm.addLink(),
+                        ),
+                      ),
+                    if (vm.tournaments.isNotEmpty) _tagField(),
+                    if (error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          errorMessage(error),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 13,
                           ),
                         ),
-                        onSubmitted: (_) => vm.addLink(),
                       ),
-                    ),
-                  if (vm.tournaments.isNotEmpty) _tagField(),
-                  if (error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        errorMessage(error),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                          fontSize: 13,
+                  ],
+                ),
+              ),
+              if (vm.post.running) const LinearProgressIndicator(minHeight: 2),
+              Divider(height: 1, color: c.border),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 2, 10, 2),
+                child: Row(
+                  children: [
+                    Expanded(child: _tools(team)),
+                    if (vm.charactersLeft < 300)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          '${vm.charactersLeft}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: vm.charactersLeft < 0
+                                ? Theme.of(context).colorScheme.error
+                                : c.muted,
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ),
-            if (vm.post.running) const LinearProgressIndicator(minHeight: 2),
-            Divider(height: 1, color: c.border),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(6, 2, 10, 2),
-              child: Row(
-                children: [
-                  Expanded(child: _tools(team)),
-                  if (vm.charactersLeft < 300)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Text(
-                        '${vm.charactersLeft}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: vm.charactersLeft < 0
-                              ? Theme.of(context).colorScheme.error
-                              : c.muted,
-                        ),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
                       ),
+                      onPressed: vm.canPost
+                          ? () {
+                              FocusScope.of(context).unfocus();
+                              vm.post.execute();
+                            }
+                          : null,
+                      icon: const Icon(Icons.send, size: 16),
+                      label: const Text('Post'),
                     ),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                    ),
-                    onPressed: vm.canPost ? vm.post.execute : null,
-                    icon: const Icon(Icons.send, size: 16),
-                    label: const Text('Post'),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     },
@@ -502,8 +514,12 @@ class _AudienceChip extends StatelessWidget {
       tooltip: 'Who sees this post',
       enabled: enabled,
       initialValue: selected?.id ?? '',
-      onSelected: (id) =>
-          onPick(id.isEmpty ? null : teams.where((t) => t.id == id).first),
+      onSelected: (id) {
+        if (id.isEmpty) return onPick(null);
+        // A team that left the list while the menu was open: keep the pick.
+        final to = teams.where((t) => t.id == id).firstOrNull;
+        if (to != null) onPick(to);
+      },
       itemBuilder: (_) => [
         const PopupMenuItem(
           value: '',

@@ -74,14 +74,27 @@ export function TeamPostComposer({
     }
   }
 
-  function addLink() {
+  /** The links with the one typed in the link field added, or what's wrong with it. */
+  function withTypedLink(): string[] | { problem: string } {
     const t = link.trim();
-    if (!t) return;
+    if (!t) return links;
     const url = normalizeLink(t);
-    if (!url) return setError("Enter a web address, like example.com/tryouts.");
-    if (links.length >= teamPostLinksMax) return setError(`Add at most ${teamPostLinksMax} links.`);
-    setLinks([...links, url]);
+    if (!url) return { problem: "Enter a web address, like example.com/tryouts." };
+    if (links.includes(url)) return links;
+    if (links.length >= teamPostLinksMax) return { problem: `Add at most ${teamPostLinksMax} links.` };
+    return [...links, url];
+  }
+
+  /** Adds the typed link; null (with the error shown) when it isn't one. */
+  function addLink(): string[] | null {
+    const next = withTypedLink();
+    if (!Array.isArray(next)) {
+      setError(next.problem);
+      return null;
+    }
+    setLinks(next);
     setLink("");
+    return next;
   }
 
   const uploading = photos.some((p) => p.kind === "new" && !p.uploadId && !p.error);
@@ -90,13 +103,16 @@ export function TeamPostComposer({
   async function submit(e?: FormEvent) {
     e?.preventDefault();
     if (!user || !canPost) return;
+    // A link typed but not added still counts (as in the app and on Home).
+    const sent = addLink();
+    if (!sent) return;
     setBusy(true);
     setError(null);
     const req: SaveTeamPostRequest = {
       title: title.trim(),
       body,
       location: location.trim(),
-      links,
+      links: sent,
       public: isPublic,
       uploadIds: photos.flatMap((p) => (p.kind === "new" && p.uploadId ? [p.uploadId] : [])),
       ...(post && { keepImages: photos.flatMap((p) => (p.kind === "saved" ? [p.path] : [])) }),

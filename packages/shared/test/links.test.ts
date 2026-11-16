@@ -6,6 +6,7 @@ describe("normalizeLink", () => {
   it("adds https:// and keeps http(s) links", () => {
     expect(normalizeLink("example.com/a")).toBe("https://example.com/a");
     expect(normalizeLink(" http://x.org ")).toBe("http://x.org");
+    expect(normalizeLink("Https://X.org/Path")).toBe("https://X.org/Path");
   });
   it("refuses other schemes, spaces, hosts without a dot and long links", () => {
     expect(normalizeLink("ftp://x.org")).toBeNull();

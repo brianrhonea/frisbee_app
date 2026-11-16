@@ -260,6 +260,10 @@ void main() {
   test('links are normalized to web addresses', () {
     expect(TeamPost.normalizeLink('example.com/a'), 'https://example.com/a');
     expect(TeamPost.normalizeLink(' http://x.org '), 'http://x.org');
+    expect(
+      TeamPost.normalizeLink('Https://X.org/Path'),
+      'https://X.org/Path',
+    );
     expect(TeamPost.normalizeLink('ftp://x.org'), isNull);
     expect(TeamPost.normalizeLink('javascript:alert(1)'), isNull);
     expect(TeamPost.normalizeLink('not a link'), isNull);

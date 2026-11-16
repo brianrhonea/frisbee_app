@@ -23,7 +23,10 @@ Needs API 0.28.0.
 - Get started: "Join or create a team", ticked once you're on any team,
   opens the create-or-join choice.
 - The composer adds a link you typed but didn't add when you post; both
-  composers check links with the app's rule (`normalizeLink`).
+  composers check links with the app's rule (`normalizeLink`), including
+  the team page's; Escape in the link field drops what was typed.
+- If the team picked in "To" leaves your list before you post, the post
+  isn't sent (it used to go to Everyone).
 
 ## 0.32.0 — 2026-11-15
 

@@ -321,6 +321,11 @@ export function Composer({
     e?.preventDefault();
     if (!canPost) return;
     // A link typed but not added still counts (as in the app).
+    // The team picked left the list (no longer managed, or left): never fall
+    // back to Everyone, so a members-only post isn't made public.
+    if (teamId && !team && !editing) {
+      return setError("You can no longer post on that team. Choose who to post to.");
+    }
     const sent = addLink();
     if (!sent) return;
     if (team) return submitTeam(team, sent);
@@ -478,7 +483,11 @@ export function Composer({
                   e.preventDefault();
                   addLink();
                 }
-                if (e.key === "Escape") setAddingLink(false);
+                if (e.key === "Escape") {
+                  // Cancelled: the typed link isn't posted.
+                  setLinkText("");
+                  setAddingLink(false);
+                }
               }}
             />
             <button type="button" className="btn btn-small" onClick={addLink}>

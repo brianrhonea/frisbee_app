@@ -326,6 +326,15 @@ class InlineComposerViewModel extends ChangeNotifier {
       return Result.error(Exception('Write something or add a photo'));
     }
     final to = team;
+    // The team picked left the list (no longer managed, or left): never
+    // fall back to Everyone, so a members-only post isn't made public.
+    if (_teamId != null && to == null) {
+      return Result.error(
+        Exception(
+          'You can no longer post on that team. Choose who to post to.',
+        ),
+      );
+    }
     final Result<void> saved;
     if (to != null) {
       final draft = PostDraft(

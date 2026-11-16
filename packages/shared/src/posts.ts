@@ -82,7 +82,8 @@ export function normalizeLink(text: string): string | null {
   // The scheme and host (after any user info, before a port or path).
   const m = /^(https?):\/\/(?:[^/?#@]*@)?([^/?#:]*)/i.exec(withScheme);
   if (!m || !m[2].includes(".") || withScheme.length > postLinkMax) return null;
-  return withScheme;
+  // The scheme in lower case ("Https://…" too), as the server's check wants.
+  return m[1].toLowerCase() + withScheme.slice(m[1].length);
 }
 
 const link = z

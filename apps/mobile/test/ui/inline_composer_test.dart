@@ -219,6 +219,22 @@ void main() {
       expect(vm.team, isNull);
     });
 
+    test('a team that left the list is never posted to Everyone', () async {
+      teams = [flyers];
+      final vm = build()
+        ..pickAudience(flyers)
+        ..setBody('Members only: practice moved');
+      teams = [];
+      await vm.post.execute();
+      expect(vm.post.error, isTrue);
+      expect(
+        vm.post.result.toString(),
+        contains('You can no longer post on that team'),
+      );
+      expect(userPosts.posts, isEmpty);
+      expect(teamPosts.posts, isEmpty);
+    });
+
     test('too long a post cannot be sent', () {
       final vm = build()..setBody('x' * (UserPost.maxBody + 1));
       expect(vm.charactersLeft, -1);
