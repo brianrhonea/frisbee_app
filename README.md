@@ -88,7 +88,7 @@ API keys are kept out of git (see `CLAUDE.md`). On a fresh clone:
 1. In `apps/mobile`, copy `secrets.example.json` to `secrets.local.json` and fill in the Firebase API keys
    (Firebase console > Project settings > Your apps).
 2. Download `google-services.json` to `android/app/` (and `GoogleService-Info.plist` to
-   `ios/Runner/` and `macos/Runner/` on a Mac), or run
+   `ios/Runner/`), or run
    `flutterfire configure --out=lib/firebase_options.generated.dart`.
 
 ## Running
