@@ -37,6 +37,10 @@ More for signed-out visitors (parents, friends, colleagues). Needs API
   one of the event's (an unknown `?division=` shows the first).
 - Roster pages aren't indexed by search engines; avatars and post
   photos load with `referrerPolicy="no-referrer"`.
+- Members see their own team's real name and address in the hub's
+  banner (the public page hides a drafted league team's name and a
+  youth team's address). Signed in, Find a team uses the members'
+  search, so it lists every team as the app's search does.
 
 **Changed**
 - Visitor prompts and home copy say what's open without an account.

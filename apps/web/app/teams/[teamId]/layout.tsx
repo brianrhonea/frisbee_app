@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { Avatar } from "@/components/Avatar";
 import { ForVisitors } from "@/components/ForVisitors";
 import { InviteProvider } from "@/components/team/InviteDialog";
-import { InviteOnlyHint, MemberCount, TeamAbout, TeamBannerActions } from "@/components/team/TeamBanner";
+import { InviteOnlyHint, MemberCount, TeamAbout, TeamAddress, TeamBannerActions, TeamName } from "@/components/team/TeamBanner";
 import { TeamProvider } from "@/components/team/TeamContext";
 import { TeamNav } from "@/components/team/TeamNav";
 import { listingSubtitle } from "@/lib/site";
@@ -46,9 +46,9 @@ export default async function TeamLayout({ params, children }: Props) {
           <header className="team-banner">
             <Avatar name={name} size={72} />
             <div className="team-banner-text">
-              <h1>{name}</h1>
+              <TeamName />
               {subtitle && <p className="muted">{subtitle}</p>}
-              {team.location?.address && <p className="muted small">{team.location.address}</p>}
+              <TeamAddress address={team.location?.address} />
               <MemberCount />
               {team.description && <TeamAbout text={team.description} />}
               <InviteOnlyHint />

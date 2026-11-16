@@ -1,5 +1,5 @@
 "use client";
-import type { PublicListing, TeamSearchPage } from "@stall10/shared";
+import type { PublicListing, SearchPage, TeamSearchPage } from "@stall10/shared";
 import { teamSearchMaxLength } from "@stall10/shared";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -42,7 +42,12 @@ export function TeamFinder() {
     const timer = setTimeout(() => {
       writeQuery(q);
       setError("");
-      getPublicApi<TeamSearchPage>(user, `/v1/public/teams?q=${encodeURIComponent(q)}`).then(
+      // Signed in: the members' search (its teams), which lists every team
+      // as the app's search does; visitors get the public finder.
+      const page = user
+        ? getPublicApi<SearchPage>(user, `/v1/public/search?q=${encodeURIComponent(q)}`)
+        : getPublicApi<TeamSearchPage>(user, `/v1/public/teams?q=${encodeURIComponent(q)}`);
+      page.then(
         (page) => live && setResult({ q, teams: page.teams }),
         (e) => live && setError(problem(e, "Couldn't search. Try again.")),
       );

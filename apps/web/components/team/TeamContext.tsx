@@ -38,6 +38,7 @@ export interface TeamDoc {
   memberPerms?: Record<string, TeamPermission[]>;
   statKeepers?: string[];
   requiresApproval?: boolean;
+  location?: { address?: string } | null;
 }
 
 /**
@@ -108,7 +109,10 @@ export function TeamProvider({
   else if (live.data === undefined) viewer = { state: "loading" };
   else if (!live.data || !live.data.memberIds?.includes(user.uid)) viewer = { state: "outsider", uid: user.uid };
   else viewer = memberViewer(live.data, user.uid);
-  return <TeamContext.Provider value={{ teamId, name, kind, privateGroup, youth, viewer }}>{children}</TeamContext.Provider>;
+  // Members see their team as it is: the public page hides a drafted
+  // league team's name (its players') from everyone else.
+  const shownName = viewer.state === "member" ? viewer.team.name || name : name;
+  return <TeamContext.Provider value={{ teamId, name: shownName, kind, privateGroup, youth, viewer }}>{children}</TeamContext.Provider>;
 }
 
 export function useTeamHub(): TeamHubInfo {
