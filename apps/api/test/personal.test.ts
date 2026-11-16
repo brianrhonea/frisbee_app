@@ -159,6 +159,105 @@ describe("GET /v1/me/personal/status", () => {
   });
 });
 
+describe("PUT /v1/me/personal/birth-date (sign-up)", () => {
+  const B = "/v1/me/personal/birth-date";
+
+  it("stores only ciphertext, sealed like the details, bound to the document", async () => {
+    const res = await s.call("PUT", B, { birthDate: "1995-04-02" });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["cache-control"]).toBe("private, no-store");
+    const doc = s.store.doc(D)!;
+    expect(Object.keys(doc).sort()).toEqual(["birthDateOnly", "ciphertext", "format", "key", "updatedAt"]);
+    expect(doc.key).toBe("fake-key");
+    expect(JSON.stringify(doc)).not.toMatch(/1995/);
+    // The record a birthday-on-file check opens: the same ciphertext slot
+    // and context as the full details, with a birthDate inside.
+    const plain = await s.cipher.open({ ciphertext: String(doc.ciphertext), key: String(doc.key) }, D);
+    expect(JSON.parse(plain.toString())).toEqual({ birthDate: "1995-04-02" });
+  });
+
+  it("comes back to its owner for About you, without completing the details", async () => {
+    await s.call("PUT", B, { birthDate: "1995-04-02" });
+    expect((await s.call("GET", "/v1/me/personal")).json()).toEqual({
+      details: null,
+      email: "pat@x.test",
+      signUpBirthDate: "1995-04-02",
+    });
+    expect((await s.call("GET", "/v1/me/personal/status")).json()).toEqual({ complete: false, required: true });
+  });
+
+  it("is only ever the caller's own", async () => {
+    await s.call("PUT", B, { birthDate: "1995-04-02" });
+    expect((await s.call("GET", "/v1/me/personal", undefined, "u2")).json()).toEqual({ details: null, email: "u2@x.test" });
+    expect(s.store.doc("personalDetails/u2")).toBeUndefined();
+    expect((await s.app.inject({ method: "PUT", url: B, payload: { birthDate: "1995-04-02" } })).statusCode).toBe(401);
+  });
+
+  it("is replaced whole by the full details, which complete them", async () => {
+    await s.call("PUT", B, { birthDate: "1996-01-01" });
+    await s.call("PUT", "/v1/me/personal", adult);
+    expect(s.store.doc(D)).not.toHaveProperty("birthDateOnly");
+    const got = (await s.call("GET", "/v1/me/personal")).json();
+    expect(got.details.birthDate).toBe("1995-04-02");
+    expect(got).not.toHaveProperty("signUpBirthDate");
+    expect((await s.call("GET", "/v1/me/personal/status")).json().complete).toBe(true);
+  });
+
+  it("can't change saved details", async () => {
+    await s.call("PUT", "/v1/me/personal", adult);
+    const before = s.store.doc(D);
+    const res = await s.call("PUT", B, { birthDate: "2000-01-01" });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.code).toBe("already_exists");
+    expect(s.store.doc(D)).toEqual(before);
+    expect((await s.call("GET", "/v1/me/personal")).json().details.birthDate).toBe("1995-04-02");
+  });
+
+  it("can be given again until then", async () => {
+    await s.call("PUT", B, { birthDate: "1995-04-02" });
+    expect((await s.call("PUT", B, { birthDate: "1995-04-03" })).statusCode).toBe(200);
+    expect((await s.call("GET", "/v1/me/personal")).json().signUpBirthDate).toBe("1995-04-03");
+  });
+
+  it("refuses under 13 as the full save does, and saves nothing", async () => {
+    const res = await s.call("PUT", B, { birthDate: "2013-11-22" });
+    expect(res.statusCode).toBe(412);
+    expect(res.json().error).toEqual({
+      code: "failed_precondition",
+      message: tooYoungMessage,
+      fields: { birthDate: tooYoungMessage },
+    });
+    expect(s.store.doc(D)).toBeUndefined();
+    expect(s.cipher.calls.seal).toBe(0);
+    // A 13th birthday today in UTC+14 is fine.
+    expect((await s.call("PUT", B, { birthDate: "2013-11-21" })).statusCode).toBe(200);
+  });
+
+  it.each([
+    ["a bad date", { birthDate: "1995-02-30" }],
+    ["a future date", { birthDate: "2027-01-01" }],
+    ["no date", {}],
+    ["extra fields", { birthDate: "1995-04-02", phone: "555" }],
+  ])("refuses %s", async (_, body) => {
+    const res = await s.call("PUT", B, body);
+    expect(res.statusCode).toBe(400);
+    expect(s.store.doc(D)).toBeUndefined();
+    expect(res.body).not.toContain("1995");
+  });
+
+  it("is rate limited", async () => {
+    for (let i = 0; i < 5; i++) expect((await s.call("PUT", B, { birthDate: "1995-04-02" })).statusCode).toBe(200);
+    expect((await s.call("PUT", B, { birthDate: "1995-04-02" })).statusCode).toBe(429);
+    // Someone else's own count.
+    expect((await s.call("PUT", B, { birthDate: "1995-04-02" }, "u2")).statusCode).toBe(200);
+  });
+
+  it("is off without a cipher", async () => {
+    const off = setup(false);
+    expect((await off.call("PUT", B, { birthDate: "1995-04-02" })).statusCode).toBe(404);
+  });
+});
+
 it("is off without a cipher (never stored in the clear)", async () => {
   const off = setup(false);
   expect((await off.call("PUT", "/v1/me/personal", adult)).statusCode).toBe(404);

@@ -14,4 +14,9 @@ export function personalRoutes(app: FastifyInstance, personal: PersonalService) 
     await personal.save(requireCaller(req), req.body);
     return reply.header("cache-control", "private, no-store").send({});
   });
+  // Right after an email sign-up: just the birthday, until the full form.
+  app.put("/v1/me/personal/birth-date", async (req, reply) => {
+    await personal.saveSignUpBirthDate(requireCaller(req), req.body);
+    return reply.header("cache-control", "private, no-store").send({});
+  });
 }

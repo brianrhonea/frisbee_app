@@ -273,7 +273,13 @@ which fails when the current version has no entry.
 - **Personal details** (decided 2026-11-13; `packages/shared/src/personal.ts`):
   legal name, date of birth, phone, gender, mailing address and, under 18,
   a parent or guardian, asked at sign-up on both clients. Only their owner
-  sees them, and only through the API (`/v1/me/personal`, `apps/api/src/personal`).
+  sees them, and only through the API (`GET /v1/me/personal/status`,
+  `GET`/`PUT /v1/me/personal`, `PUT /v1/me/personal/birth-date`;
+  `apps/api/src/personal`). The email sign-up form's birthday is saved
+  alone right after the account is made (a `birthDateOnly` record, sealed
+  the same way), so "About you" can start from it anywhere; it doesn't
+  complete the details, is refused once they're saved, and is replaced by
+  the full save.
   `personalDetails/{uid}` holds one Cloud KMS ciphertext (key
   `stall10/personal-details`, only `api-runtime` may use it), bound to the
   document path; `firestore.rules` denies every client read and write.

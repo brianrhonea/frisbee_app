@@ -17,6 +17,10 @@ Firebase project; App Store builds come from `main` and use production.
   community feed. Other tabs ask you to sign up or log in, then bring
   you back.
 
+**Your birthday is remembered**
+- After signing up with email, "About you" remembers your date of birth
+  after the app restarts or on another device.
+
 **Club teams are 16 and over**
 - Club teams are now for players 16 and over. Add your date of birth in
   About you to join one. Anyone already on a club team stays on it.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/personal_details.dart';
+import 'package:frisbee_app/ui/auth/view_models/sign_up_viewmodel.dart';
 import 'package:frisbee_app/ui/personal/view_models/personal_details_viewmodel.dart';
 import 'package:frisbee_app/ui/personal/widgets/personal_details_screen.dart';
 
@@ -15,6 +16,8 @@ void main() {
     WidgetTester tester, {
     bool finishing = true,
     DateTime? birth,
+    DateTime? savedBirth,
+    bool offline = false,
   }) async {
     tester.view.physicalSize = const Size(500, 3000);
     tester.view.devicePixelRatio = 1;
@@ -26,9 +29,17 @@ void main() {
         email: 'pat@x.test',
       ),
     );
-    personal = FakePersonalDetailsRepository(
-      status: const PersonalDetailsStatus(complete: false, required: true),
-    )..signUpBirthDate = birth;
+    personal =
+        FakePersonalDetailsRepository(
+            status: const PersonalDetailsStatus(
+              complete: false,
+              required: true,
+            ),
+          )
+          ..email = 'pat@x.test'
+      ..signUpBirthDate = birth
+          ..savedSignUpBirthDate = savedBirth
+          ..failLoad = offline;
     final vm = PersonalDetailsViewModel(
       personalRepository: personal,
       authRepository: auth,
@@ -149,5 +160,78 @@ void main() {
     expect(find.text(tooYoungMessage), findsOneWidget); // The snack bar.
     expect(auth.deleted, isFalse);
     expect(auth.currentUser, isNotNull);
+  });
+
+  group('the sign-up birthday', () {
+    SignUpForm form(DateTime birth) => (
+      firstName: 'Pat',
+      lastName: 'Lee',
+      username: 'patlee',
+      email: 'pat@x.test',
+      password: 'correct horse battery',
+      birthDate: birth,
+    );
+
+    test('email sign-up saves it, without completing the details', () async {
+      final auth = FakeAuthRepository();
+      final personal = FakePersonalDetailsRepository(
+        status: const PersonalDetailsStatus(complete: false, required: true),
+      );
+      final vm = SignUpViewModel(
+        authRepository: auth,
+        personalRepository: personal,
+      );
+      addTearDown(vm.dispose);
+      await vm.signUp.execute(form(DateTime(1995, 4, 2)));
+      expect(vm.signUp.completed, isTrue);
+      expect(personal.savedSignUpBirthDate, DateTime(1995, 4, 2));
+      expect(personal.mustComplete, isTrue);
+    });
+
+    test('a failed save never holds up sign-up', () async {
+      final auth = FakeAuthRepository();
+      final personal = FakePersonalDetailsRepository()..refuseTooYoung = true;
+      final vm = SignUpViewModel(
+        authRepository: auth,
+        personalRepository: personal,
+      );
+      addTearDown(vm.dispose);
+      await vm.signUp.execute(form(DateTime(1995, 4, 2)));
+      expect(vm.signUp.completed, isTrue);
+      expect(auth.currentUser, isNotNull);
+      expect(personal.savedSignUpBirthDate, isNull);
+    });
+
+    test('nothing is saved when no account was made', () async {
+      final auth = FakeAuthRepository()..takenUsernames.add('patlee');
+      final personal = FakePersonalDetailsRepository();
+      final vm = SignUpViewModel(
+        authRepository: auth,
+        personalRepository: personal,
+      );
+      addTearDown(vm.dispose);
+      await vm.signUp.execute(form(DateTime(1995, 4, 2)));
+      expect(vm.signUp.error, isTrue);
+      expect(personal.savedSignUpBirthDate, isNull);
+    });
+
+    testWidgets('About you starts from the saved one after a fresh start', (
+      tester,
+    ) async {
+      // Nothing in memory (a restart, another device): only the API's copy.
+      final vm = await pump(tester, savedBirth: DateTime(1995, 4, 2));
+      expect(vm.prefillBirthDate, DateTime(1995, 4, 2));
+      await fillAdultFields(tester);
+      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await tester.pumpAndSettle();
+      expect(personal.saved.single.birthDate, DateTime(1995, 4, 2));
+    });
+
+    testWidgets('offline, it starts from the one in memory', (tester) async {
+      final vm = await pump(tester, birth: DateTime(1996, 5, 6), offline: true);
+      expect(vm.load.completed, isTrue);
+      expect(vm.prefillBirthDate, DateTime(1996, 5, 6));
+      expect(find.widgetWithText(FilledButton, 'Continue'), findsOneWidget);
+    });
   });
 }

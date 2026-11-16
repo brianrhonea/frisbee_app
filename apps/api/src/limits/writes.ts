@@ -21,6 +21,8 @@ export const routeWriteLimits: Record<string, Limit[]> = {
   "POST /v1/teams/:teamId/join-requests": [{ max: 10, windowMs: minute }],
   "POST /v1/uploads": [{ max: 30, windowMs: minute }],
   "PUT /v1/me/identity": [{ max: 10, windowMs: minute }],
+  // Once per sign-up; each one is a KMS encrypt.
+  "PUT /v1/me/personal/birth-date": [{ max: 5, windowMs: minute }, { max: 20, windowMs: day }],
   "DELETE /v1/teams/:teamId": [{ max: 3, windowMs: minute }],
   "POST /v1/conversations": [{ max: 10, windowMs: minute }, { max: 100, windowMs: day }],
   "POST /v1/conversations/groups": [{ max: 5, windowMs: minute }, { max: 30, windowMs: day }],

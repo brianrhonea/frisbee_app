@@ -13,6 +13,10 @@ Needs API 0.27.0.
   moving a team to club, making a community's team, and on invite links
   and club team invites. A refused join shows why where it failed.
 - The community role picker notes that club teams take no one from roles.
+- After signing up with email, "About you" remembers your date of birth
+  even if you leave and come back later or use another device (saved
+  right after the account is made; it never holds up sign-up). Settings
+  → Personal details starts from it too.
 
 ## 0.31.0 — 2026-11-15
 

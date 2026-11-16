@@ -23,6 +23,12 @@ Club teams are for players 16 and over. Deploy with (or before) the new
 - Invites can still be sent to anyone; people already on a club team
   stay. `clubMinimumAge`, `canJoinClubTeam` and `isClubTeam` (a team
   with level club, or no level) are in `@stall10/shared`.
+- `PUT /v1/me/personal/birth-date` keeps an email sign-up's birthday,
+  encrypted like the rest of the personal details, until "About you" is
+  saved: under 13 refused, never completes the details, refused (409)
+  once they're saved, 5 a minute / 20 a day. `GET /v1/me/personal`
+  returns it as `signUpBirthDate` until the details are given; it counts
+  as "on file" for the club rule.
 
 ## 0.26.0 — 2026-11-15
 

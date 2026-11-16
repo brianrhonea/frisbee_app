@@ -58,6 +58,14 @@ class SignUpViewModel extends ChangeNotifier {
     if (result case Error(error: UsernameTakenException())) {
       username.markTaken();
     }
+    // Whenever the account was made, even if a later step failed.
+    if (_auth.currentUser != null) {
+      // Kept (encrypted) so "About you" has it after a restart or on
+      // another device. Never holds up sign-up: if it fails (offline, a
+      // build without the API, or under 13 by the server's date), the
+      // in-memory copy still fills the form, whose save checks again.
+      await _personal.saveSignUpBirthDate(f.birthDate);
+    }
     return result;
   }
 
