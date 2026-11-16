@@ -19,3 +19,32 @@ export function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 }
+
+/** Web addresses in plain text: http(s) links and bare `www.` ones (as the app's LinkifiedText). */
+const urlPattern = /(https?:\/\/|www\.)[^\s<>"']+/gi;
+/** Trailing punctuation that usually ends the sentence, not the link. */
+const trailingPunctuation = /[.,;:!?)\]]+$/;
+
+/** [text] in plain runs and links: `href` is set on links only. */
+export function splitLinks(text: string): Array<{ text: string; href?: string }> {
+  const parts: Array<{ text: string; href?: string }> = [];
+  let at = 0;
+  for (const m of text.matchAll(urlPattern)) {
+    const start = m.index ?? 0;
+    const raw = m[0].replace(trailingPunctuation, "");
+    const href = raw.toLowerCase().startsWith("www.") ? `https://${raw}` : raw;
+    let ok = false;
+    try {
+      const u = new URL(href);
+      ok = (u.protocol === "https:" || u.protocol === "http:") && u.hostname.length > 0;
+    } catch {
+      ok = false;
+    }
+    if (!ok) continue;
+    if (start > at) parts.push({ text: text.slice(at, start) });
+    parts.push({ text: raw, href });
+    at = start + raw.length;
+  }
+  if (at < text.length) parts.push({ text: text.slice(at) });
+  return parts;
+}

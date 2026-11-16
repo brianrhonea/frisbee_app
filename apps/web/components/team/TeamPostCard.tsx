@@ -2,6 +2,7 @@ import type { PublicTeamPost } from "@stall10/shared";
 import type { ReactNode } from "react";
 import { LocalTime } from "../LocalTime";
 import { MemberImage } from "../MemberImage";
+import { LinkedText } from "../LinkedText";
 
 /** A team post as the browser reads it: the public shape, plus the member-only flag. */
 export type TeamPostView = PublicTeamPost & {
@@ -41,7 +42,7 @@ export function TeamPostCard({
         {actions}
       </header>
       {post.location && <p className="muted small" style={{ margin: "4px 0 0" }}>{post.location}</p>}
-      {post.body && <p className="post-body">{post.body}</p>}
+      {post.body && <p className="post-body"><LinkedText text={post.body} /></p>}
       {images.length > 0 && (
         <div className={`post-images n${Math.min(images.length, 4)}`}>
           {images.slice(0, 4).map((img) => (

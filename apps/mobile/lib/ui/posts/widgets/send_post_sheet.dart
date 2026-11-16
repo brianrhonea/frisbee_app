@@ -12,24 +12,29 @@ import '../../core/ui/view_model_host.dart';
 import '../view_models/send_post_viewmodel.dart';
 import '../../core/ui/app_search_field.dart';
 import '../../core/ui/skeleton.dart';
+import '../../core/ui/tap_outside_unfocus.dart';
 
 /// Sends [post] to people as a direct message, one tap each, or shares its
-/// link to another app.
-Future<void> showSendPost(BuildContext context, UserPost post) =>
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      useSafeArea: true,
-      builder: (_) => ViewModelHost(
-        create: (c) => SendPostViewModel(
-          post: post,
-          directMessageRepository: c.read(),
-          authRepository: c.read(),
-        ),
-        builder: (_, vm) => SendPostSheet(viewModel: vm),
+/// link to another app. Nothing is focused when it opens or after it
+/// closes, so the keyboard only shows when someone taps the search box.
+Future<void> showSendPost(BuildContext context, UserPost post) async {
+  dropKeyboard();
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    useSafeArea: true,
+    builder: (_) => ViewModelHost(
+      create: (c) => SendPostViewModel(
+        post: post,
+        directMessageRepository: c.read(),
+        authRepository: c.read(),
       ),
-    );
+      builder: (_, vm) => SendPostSheet(viewModel: vm),
+    ),
+  );
+  dropKeyboard();
+}
 
 class SendPostSheet extends StatefulWidget {
   const SendPostSheet({super.key, required this.viewModel});

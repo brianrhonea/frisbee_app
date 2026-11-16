@@ -601,8 +601,6 @@ dialog.dialog > * { max-height: calc(100vh - 32px); overflow-y: auto; }
 }
 .composer-links span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composer-links button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 16px; }
-.composer-link-row { display: flex; gap: 8px; }
-.composer-link-row input { flex: 1; min-width: 0; }
 .composer-bar { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--line); padding-top: 10px; margin-left: -10px; }
 .composer-count { color: var(--muted); font-size: 0.85rem; margin-right: 6px; }
 .composer-count.over { color: var(--danger); font-weight: 700; }

@@ -8,13 +8,14 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
 import '../../workouts/widgets/record_button.dart';
 import '../../workouts/widgets/route_widgets.dart';
+import '../../workouts/widgets/workout_fields.dart';
 import '../view_models/inline_composer_viewmodel.dart';
-import 'post_widgets.dart';
 
 /// The composer at the top of Home, written in place (as on the website):
 /// type and tap Post. The tools under the box add to the same box: Photo
-/// shows the picked photos under the text, Link a field for a web address,
-/// Workout the workout's fields. With teams to post to, "To" picks
+/// shows the picked photos under the text, Workout the workout's fields.
+/// There's no link tool: web addresses typed or pasted in the text show as
+/// links. With teams to post to, "To" picks
 /// Everyone or a team, whose post adds a title, a place and Public. The
 /// draft lives in [viewModel], so it outlasts this widget.
 class InlineComposer extends StatefulWidget {
@@ -41,7 +42,6 @@ class _InlineComposerState extends State<InlineComposer> {
   late final _body = TextEditingController(text: vm.body);
   late final _title = TextEditingController(text: vm.title);
   late final _place = TextEditingController(text: vm.place);
-  late final _link = TextEditingController(text: vm.linkText);
   final _bodyFocus = FocusNode();
   final _workoutKey = GlobalKey();
   final _photosKey = GlobalKey();
@@ -52,7 +52,6 @@ class _InlineComposerState extends State<InlineComposer> {
     _body.addListener(() => vm.setBody(_body.text));
     _title.addListener(() => vm.setTitle(_title.text));
     _place.addListener(() => vm.setPlace(_place.text));
-    _link.addListener(() => vm.setLinkText(_link.text));
     vm.addListener(_sync);
     vm.post.addListener(_onPost);
   }
@@ -67,21 +66,20 @@ class _InlineComposerState extends State<InlineComposer> {
   void dispose() {
     vm.removeListener(_sync);
     vm.post.removeListener(_onPost);
-    for (final c in [_body, _title, _place, _link]) {
+    for (final c in [_body, _title, _place]) {
       c.dispose();
     }
     _bodyFocus.dispose();
     super.dispose();
   }
 
-  /// Copies changes the view model made (cleared after posting, a link
-  /// added) into the fields.
+  /// Copies changes the view model made (cleared after posting) into the
+  /// fields.
   void _sync() {
     for (final (c, v) in [
       (_body, vm.body),
       (_title, vm.title),
       (_place, vm.place),
-      (_link, vm.linkText),
     ]) {
       if (c.text != v) c.text = v;
     }
@@ -113,8 +111,12 @@ class _InlineComposerState extends State<InlineComposer> {
     });
   }
 
+  // Its tools (photos, workout, To) keep the keyboard open; Post closes it.
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
+  Widget build(BuildContext context) =>
+      TextFieldTapRegion(child: _composer(context));
+
+  Widget _composer(BuildContext context) => ListenableBuilder(
     listenable: vm,
     builder: (context, _) {
       final c = AppColors.of(context);
@@ -261,65 +263,6 @@ class _InlineComposerState extends State<InlineComposer> {
                           ],
                         ),
                       ),
-                    if (vm.links.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            for (final l in vm.links)
-                              InputChip(
-                                label: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 220,
-                                  ),
-                                  child: Text(
-                                    l.replaceFirst(RegExp(r'^https?://'), ''),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                onDeleted: () => vm.removeLink(l),
-                              ),
-                          ],
-                        ),
-                      ),
-                    if (vm.linkOpen)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: TextField(
-                          controller: _link,
-                          autofocus: true,
-                          keyboardType: TextInputType.url,
-                          textInputAction: TextInputAction.done,
-                          scrollPadding: const EdgeInsets.only(
-                            top: 20,
-                            bottom: 120,
-                          ),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            hintText: 'example.com/highlights',
-                            prefixIcon: const Icon(Icons.link, size: 18),
-                            errorText: vm.linkError,
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Add link',
-                                  icon: const Icon(Icons.check),
-                                  onPressed: vm.addLink,
-                                ),
-                                IconButton(
-                                  tooltip: 'Cancel',
-                                  icon: const Icon(Icons.close),
-                                  onPressed: vm.closeLink,
-                                ),
-                              ],
-                            ),
-                          ),
-                          onSubmitted: (_) => vm.addLink(),
-                        ),
-                      ),
                     if (vm.tournaments.isNotEmpty) _tagField(),
                     if (error != null)
                       Padding(
@@ -426,12 +369,6 @@ class _InlineComposerState extends State<InlineComposer> {
                 : null,
             icon: const Icon(Icons.photo_camera_outlined),
           ),
-        TextButton.icon(
-          style: compact,
-          onPressed: vm.canAddLink && !vm.linkOpen ? vm.openLink : null,
-          icon: const Icon(Icons.link, size: 18),
-          label: const Text('Link'),
-        ),
         if (vm.offersWorkout) ...[
           Semantics(
             toggled: vm.workout != null,
@@ -625,7 +562,8 @@ class _WorkoutFieldsState extends State<_WorkoutFields> {
     final w = widget.draft;
     return Container(
       margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 4, 4, 8),
+      // A thin outline, not a filled panel: the fields inside are filled.
       decoration: BoxDecoration(
         border: Border.all(color: c.border),
         borderRadius: BorderRadius.circular(controlRadius),
@@ -633,80 +571,63 @@ class _WorkoutFieldsState extends State<_WorkoutFields> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Workout', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              for (final a in WorkoutActivity.values)
-                ChoiceChip(
-                  visualDensity: VisualDensity.compact,
-                  avatar: Icon(
-                    workoutIcon(a),
-                    size: 16,
-                    color: w.activity == a ? c.onAccent : null,
-                  ),
-                  label: Text(a.label),
-                  selected: w.activity == a,
-                  showCheckmark: false,
-                  onSelected: (_) => vm.setActivity(a),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _minutes,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    labelText: 'Minutes',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _distance,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    labelText: '${vm.unit.label} (optional)',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
           Row(
             children: [
-              Text('Effort', style: theme.textTheme.titleSmall),
-              const SizedBox(width: 8),
-              Text(
-                w.effort == null ? 'Not set' : '${w.effort}/10',
-                style: theme.textTheme.bodySmall,
-              ),
+              Icon(Icons.directions_run, size: 16, color: c.muted),
+              const SizedBox(width: 6),
+              Text('Workout', style: theme.textTheme.labelLarge),
               const Spacer(),
-              if (w.effort != null)
-                TextButton(
-                  onPressed: () => vm.setEffort(null),
-                  child: const Text('Clear'),
-                ),
+              IconButton(
+                tooltip: 'Remove workout',
+                visualDensity: VisualDensity.compact,
+                iconSize: 18,
+                onPressed: vm.toggleWorkout,
+                icon: const Icon(Icons.close),
+              ),
             ],
           ),
-          Slider(
-            value: (w.effort ?? 5).toDouble(),
-            min: 1,
-            max: 10,
-            divisions: 9,
-            label: '${w.effort ?? 5}',
-            onChanged: (v) => vm.setEffort(v.round()),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ActivityPicker(
+              selected: w.activity,
+              onSelected: vm.setActivity,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _minutes,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      labelText: 'Minutes',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _distance,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      labelText: '${vm.unit.label} (optional)',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: EffortRow(effort: w.effort, onChanged: vm.setEffort),
           ),
           for (final (i, e) in w.exercises.indexed)
             _ExerciseFields(
@@ -715,21 +636,19 @@ class _WorkoutFieldsState extends State<_WorkoutFields> {
               draft: e,
               viewModel: vm,
             ),
-          Wrap(
-            spacing: 8,
-            children: [
-              if (vm.canAddExercise)
-                TextButton.icon(
-                  onPressed: vm.addExercise,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add exercise'),
+          if (vm.canAddExercise)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                 ),
-              TextButton(
-                onPressed: vm.toggleWorkout,
-                child: const Text('Remove workout'),
+                onPressed: vm.addExercise,
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add exercise'),
               ),
-            ],
-          ),
+            ),
         ],
       ),
     );
@@ -782,7 +701,7 @@ class _ExerciseFieldsState extends State<_ExerciseFields> {
     InputDecoration label(String text) =>
         InputDecoration(isDense: true, labelText: text, counterText: '');
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(top: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

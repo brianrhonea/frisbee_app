@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/models/chat.dart';
-import '../../../domain/models/team_post.dart';
 import '../../../domain/models/user_post.dart';
 import '../../../domain/models/workout.dart';
 import '../../../domain/models/workout_route.dart';
 import '../../../utils/result.dart';
-import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/overlay_panel.dart';
@@ -15,8 +13,8 @@ import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../../teams/widgets/team_post_widgets.dart';
 import '../../workouts/widgets/route_widgets.dart';
+import '../../workouts/widgets/workout_fields.dart';
 import '../view_models/post_composer_viewmodel.dart';
-import 'post_widgets.dart';
 
 /// Opens the composer over the current page: a dialog on wide screens, a
 /// bottom sheet on phones. Writes a new post (or, with [workout], starts on
@@ -106,10 +104,11 @@ class _PostComposerState extends State<PostComposer> {
 
   final _formKey = GlobalKey<FormState>();
   final _body = TextEditingController();
-  final _link = TextEditingController();
   final _minutes = TextEditingController();
   final _distance = TextEditingController();
   final _exercises = <_ExerciseRow>[];
+  // Links from before the link field went (editing an older post): kept,
+  // and can be removed. New ones go in the text.
   final _links = <String>[];
   final _kept = <ChatAttachment>[];
   final _added = <NewAttachment>[];
@@ -127,7 +126,6 @@ class _PostComposerState extends State<PostComposer> {
   int? _effort;
   String? _tagKey;
   String? _tagName;
-  String? _linkError;
   bool _picking = false;
   bool _filled = false;
 
@@ -171,7 +169,7 @@ class _PostComposerState extends State<PostComposer> {
   void dispose() {
     vm.removeListener(_fill);
     vm.save.removeListener(_onSave);
-    for (final c in [_body, _link, _minutes, _distance]) {
+    for (final c in [_body, _minutes, _distance]) {
       c.dispose();
     }
     for (final r in _exercises) {
@@ -222,22 +220,6 @@ class _PostComposerState extends State<PostComposer> {
       case null:
         break;
     }
-  }
-
-  void _addLink() {
-    if (_link.text.trim().isEmpty) return;
-    final link = TeamPost.normalizeLink(_link.text);
-    _edit(() {
-      if (link == null) {
-        _linkError = 'Enter a web address, like example.com/video';
-      } else if (_links.length >= UserPost.maxLinks) {
-        _linkError = 'Up to ${UserPost.maxLinks} links';
-      } else {
-        _linkError = null;
-        if (!_links.contains(link)) _links.add(link);
-        _link.clear();
-      }
-    });
   }
 
   Future<void> _addPhotos({bool camera = false}) async {
@@ -292,8 +274,6 @@ class _PostComposerState extends State<PostComposer> {
   );
 
   void _submit() {
-    if (_link.text.trim().isNotEmpty) _addLink();
-    if (_linkError != null) return;
     if (!_formKey.currentState!.validate()) return;
     final post = (vm.initial ?? const UserPost(id: '')).copyWith(
       body: _body.text.trim(),
@@ -406,27 +386,6 @@ class _PostComposerState extends State<PostComposer> {
                 ),
                 if (vm.tournaments.isNotEmpty || _tagKey != null) _tagField(),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _link,
-                  keyboardType: TextInputType.url,
-                  enabled: _links.length < UserPost.maxLinks,
-                  decoration: InputDecoration(
-                    labelText: 'Add a link',
-                    hintText: 'example.com/highlights',
-                    prefixIcon: const Icon(Icons.link),
-                    errorText: _linkError,
-                    suffixIcon: IconButton(
-                      tooltip: 'Add link',
-                      icon: const Icon(Icons.add),
-                      onPressed: _addLink,
-                    ),
-                  ),
-                  onChanged: (_) {
-                    _changed = true;
-                    if (_linkError != null) setState(() => _linkError = null);
-                  },
-                  onSubmitted: (_) => _addLink(),
-                ),
                 if (_links.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Wrap(
@@ -620,29 +579,12 @@ class _PostComposerState extends State<PostComposer> {
   List<Widget> _workoutFields(BuildContext context) {
     final theme = Theme.of(context);
     return [
-      Text('Activity', style: theme.textTheme.titleSmall),
-      const SizedBox(height: 6),
-      Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        children: [
-          for (final a
-              in _route == null
-                  ? WorkoutActivity.values
-                  : WorkoutActivity.tracked)
-            ChoiceChip(
-              avatar: Icon(
-                workoutIcon(a),
-                size: 18,
-                color: _activity == a
-                    ? AppColors.of(context).onAccent
-                    : null,
-              ),
-              label: Text(a.label),
-              selected: _activity == a,
-              onSelected: (_) => _edit(() => _activity = a),
-            ),
-        ],
+      ActivityPicker(
+        activities: _route == null
+            ? WorkoutActivity.values
+            : WorkoutActivity.tracked,
+        selected: _activity,
+        onSelected: (a) => _edit(() => _activity = a),
       ),
       const SizedBox(height: 12),
       if (_route != null)
@@ -693,40 +635,19 @@ class _PostComposerState extends State<PostComposer> {
           ],
         ),
       const SizedBox(height: 12),
-      Row(
-        children: [
-          Text('Effort', style: theme.textTheme.titleSmall),
-          const SizedBox(width: 8),
-          Text(
-            _effort == null ? 'Not set' : '$_effort/10',
-            style: theme.textTheme.bodySmall,
-          ),
-          const Spacer(),
-          if (_effort != null)
-            TextButton(
-              onPressed: () => _edit(() => _effort = null),
-              child: const Text('Clear'),
-            ),
-        ],
-      ),
-      Slider(
-        value: (_effort ?? 5).toDouble(),
-        min: 1,
-        max: 10,
-        divisions: 9,
-        label: '${_effort ?? 5}',
-        onChanged: (v) => _edit(() => _effort = v.round()),
-      ),
+      const SizedBox(height: 4),
+      EffortRow(effort: _effort, onChanged: (v) => _edit(() => _effort = v)),
       if (_route == null)
         Row(
           children: [
             Text('Exercises', style: theme.textTheme.titleSmall),
             const Spacer(),
             TextButton.icon(
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               onPressed: _exercises.length >= Workout.maxExercises
                   ? null
                   : () => _edit(() => _exercises.add(_ExerciseRow())),
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add, size: 18),
               label: const Text('Add exercise'),
             ),
           ],

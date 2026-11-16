@@ -265,6 +265,9 @@ void main() {
       await tester.pump();
       expect(find.text('How long, in minutes'), findsOneWidget);
 
+      // The activities scroll sideways in one row.
+      await tester.ensureVisible(find.text('Gym'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Gym'));
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Minutes'),

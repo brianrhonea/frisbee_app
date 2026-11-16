@@ -1,14 +1,11 @@
 "use client";
 import {
-  normalizeLink,
   postBodyMax,
   postImagesMax,
-  postLinksMax,
   type PublicImage,
   type SavePostResult,
   type SaveTeamPostRequest,
   teamPostImagesMax,
-  teamPostLinksMax,
   type WorkoutActivity,
   type WorkoutInput,
   workoutActivities,
@@ -107,7 +104,8 @@ interface EditingPost {
 
 /**
  * Writing a post, or editing one: words, up to 4 photos (choose, drop or
- * paste them; they upload while you type) and up to 5 links. A new post
+ * paste them; they upload while you type). There's no link tool: web
+ * addresses in the words show as links. A new post
  * can be a workout, typed in (GPS recordings are made in the app).
  * Ctrl+Enter (⌘+Enter) posts.
  *
@@ -137,9 +135,9 @@ export function Composer({
   const { user } = useAuth();
   const [postId, setPostId] = useState(() => editing?.id ?? newId());
   const [body, setBody] = useState(editing?.body ?? "");
+  // Links from before the link tool went (editing an older post): kept, and
+  // can be removed. New ones go in the text, which shows them as links.
   const [links, setLinks] = useState<string[]>(editing?.links ?? []);
-  const [linkText, setLinkText] = useState("");
-  const [addingLink, setAddingLink] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>(
     () => editing?.images.map((image) => ({ kind: "saved" as const, image })) ?? [],
   );
@@ -193,7 +191,6 @@ export function Composer({
   if (!user) return null;
   const me = user;
   const imagesMax = team ? teamPostImagesMax : postImagesMax;
-  const linksMax = team ? teamPostLinksMax : postLinksMax;
 
   /** Uploads [file] for a post to [target] ("" for Everyone); a result for an older target is dropped. */
   function upload(key: string, file: File, target: string) {
@@ -247,31 +244,6 @@ export function Composer({
     });
   }
 
-  /** The links with the one typed in the link field added, or what's wrong with it. */
-  function withTypedLink(): string[] | { problem: string } {
-    const raw = linkText.trim();
-    if (!raw) return links;
-    const url = normalizeLink(raw);
-    if (!url) return { problem: "Enter a web address, like example.com/video." };
-    if (links.includes(url)) return links;
-    if (links.length >= linksMax) return { problem: `Add at most ${linksMax} links.` };
-    return [...links, url];
-  }
-
-  /** Adds the typed link; null (with the error shown) when it isn't one. */
-  function addLink(): string[] | null {
-    const next = withTypedLink();
-    if (!Array.isArray(next)) {
-      setError(next.problem);
-      return null;
-    }
-    setLinks(next);
-    setLinkText("");
-    setAddingLink(false);
-    setError(null);
-    return next;
-  }
-
   const uploading = photos.some((p) => p.kind === "new" && !p.uploadId && !p.error);
   const failedPhoto = photos.some((p) => p.kind === "new" && p.error);
   const empty = !body.trim() && photos.length === 0;
@@ -320,22 +292,19 @@ export function Composer({
   async function submit(e?: FormEvent) {
     e?.preventDefault();
     if (!canPost) return;
-    // A link typed but not added still counts (as in the app).
     // The team picked left the list (no longer managed, or left): never fall
     // back to Everyone, so a members-only post isn't made public.
     if (teamId && !team && !editing) {
       return setError("You can no longer post on that team. Choose who to post to.");
     }
-    const sent = addLink();
-    if (!sent) return;
-    if (team) return submitTeam(team, sent);
+    if (team) return submitTeam(team, links);
     const w = workout ? workoutOf(workout) : undefined;
     if (typeof w === "string") return setError(w);
     setBusy(true);
     setError(null);
     const payload = {
       body,
-      links: repost ? [] : sent,
+      links: repost ? [] : links,
       uploadIds: photos.flatMap((p) => (p.kind === "new" && p.uploadId ? [p.uploadId] : [])),
       ...(editing && { keepImages: photos.flatMap((p) => (p.kind === "saved" ? [p.image.path] : [])) }),
       // An edit sends the tag either way (null removes it); a new post only when tagged.
@@ -470,32 +439,6 @@ export function Composer({
             ))}
           </ul>
         )}
-        {addingLink && (
-          <div className="composer-link-row">
-            <input
-              type="url"
-              value={linkText}
-              placeholder="https://"
-              autoFocus
-              onChange={(e) => setLinkText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addLink();
-                }
-                if (e.key === "Escape") {
-                  // Cancelled: the typed link isn't posted.
-                  setLinkText("");
-                  setAddingLink(false);
-                }
-              }}
-            />
-            <button type="button" className="btn btn-small" onClick={addLink}>
-              Add
-            </button>
-          </div>
-        )}
-
         {!repost && !team && tagOptions.length > 0 && (
           <label className="composer-tag small">
             At a tournament
@@ -547,16 +490,6 @@ export function Composer({
               >
                 <PhotoIcon />
                 <span>Photo</span>
-              </button>
-              <button
-                type="button"
-                className="composer-tool"
-                title="Add a link"
-                disabled={links.length >= linksMax}
-                onClick={() => setAddingLink(true)}
-              >
-                <LinkIcon />
-                <span>Link</span>
               </button>
               {!editing && !team && (
                 <button
@@ -709,11 +642,3 @@ function PhotoIcon() {
   );
 }
 
-function LinkIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
-      <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
-      <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
-    </svg>
-  );
-}

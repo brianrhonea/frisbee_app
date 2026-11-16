@@ -29,9 +29,14 @@ class SendPostViewModel extends ChangeNotifier {
           .watchConversations(uid)
           .listen(
             (c) {
+              // One-to-one conversations only, and never with someone
+              // who deleted their account (it stays, under "Deleted user",
+              // for the other person's history).
               _recent = [
                 for (final x in c)
-                  if (x.otherId(uid) != uid)
+                  if (!x.isGroup &&
+                      x.otherId(uid) != uid &&
+                      !x.otherDeleted(uid))
                     UserProfile(uid: x.otherId(uid), name: x.otherName(uid)),
               ];
               notifyListeners();

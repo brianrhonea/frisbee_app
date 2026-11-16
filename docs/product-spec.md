@@ -329,14 +329,16 @@ everything the app does on the website alone, styled like the website
     visitors only for a public adult roster, "See who's on the team.";
     none for a youth team or private group).
 13. Home: [x] post to Everyone or a team you manage from Home in one
-    inline composer on both (type and Post; Photo, Link and Workout open
+    inline composer on both (type and Post; Photo and Workout open
     inside the box; a "To" chip for teams you manage, whose posts add
     Title, Where and Public, no Public for a private group, no Workout or
-    tournament tag; a link typed but not added counts on Post; app
-    `InlineComposerViewModel`, `test/ui/inline_composer_test.dart`). The
-    app also has Take photo and Record; editing posts keeps the
-    full-screen editor. Links are checked by one rule (`normalizeLink`
-    in `@stall10/shared`, `TeamPost.normalizeLink` in the app). Left:
+    tournament tag; app `InlineComposerViewModel`,
+    `test/ui/inline_composer_test.dart`). The app also has Take photo and
+    Record; editing posts keeps the full-screen editor. [x] No link tool
+    on either platform (Home, post editor, team post editor): web
+    addresses in a post's text show as links (app `LinkifiedText`,
+    website `LinkedText`); older posts keep their `links`, shown and
+    removable when edited. Left:
     the app types distances in the country's unit where the website has
     a km/mi picker. [x] the Your teams tab is a feed of your teams' posts;
     [x] a team strip with New / Join under the composer; [x] a Get
