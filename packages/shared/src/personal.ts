@@ -158,6 +158,19 @@ export function personalDetailsProblem(
   return null;
 }
 
+/**
+ * `PUT /v1/me/personal/birth-date`: the email sign-up form's birthday,
+ * saved (encrypted, like the rest) right after the account is made, so
+ * "About you" can start from it on any device or after a restart. Only
+ * while the details aren't complete: it never changes a saved record, and
+ * it doesn't complete them. Under 13 is refused, as with the full save.
+ */
+export const signUpBirthDateSchema = z.strictObject({
+  /** YYYY-MM-DD. */
+  birthDate: z.string().refine(isCalendarDate, { message: "Enter your date of birth." }),
+});
+export type SignUpBirthDateInput = z.input<typeof signUpBirthDateSchema>;
+
 /** `GET /v1/me/personal/status`: whether they've given their details (nothing decrypted). */
 export interface PersonalDetailsStatus {
   complete: boolean;
@@ -170,4 +183,9 @@ export interface PersonalDetailsResponse {
   details: PersonalDetails | null;
   /** The account's email (Firebase Auth), shown beside them. */
   email: string | null;
+  /**
+   * Only before the details are given: the birthday saved at sign-up
+   * (`PUT /v1/me/personal/birth-date`), for "About you" to start from.
+   */
+  signUpBirthDate?: string;
 }

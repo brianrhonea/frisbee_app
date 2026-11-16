@@ -6,6 +6,7 @@ import {
   personalDetailsProblem,
   personalDetailsSchema,
   phoneProblem,
+  signUpBirthDateSchema,
   tooYoungMessage,
 } from "../src/personal.js";
 
@@ -54,4 +55,13 @@ it("the schema trims, defaults the country and refuses extra fields", () => {
   expect(ok.address).toEqual({ ...base.address, line2: "", country: "US" });
   expect(personalDetailsSchema.safeParse({ ...base, ssn: "1" }).success).toBe(false);
   expect(personalDetailsSchema.safeParse({ ...base, address: { ...base.address, country: "USA" } }).success).toBe(false);
+});
+
+describe("signUpBirthDateSchema", () => {
+  it("takes only a real calendar date", () => {
+    expect(signUpBirthDateSchema.safeParse({ birthDate: "2000-02-29" }).success).toBe(true);
+    expect(signUpBirthDateSchema.safeParse({ birthDate: "2001-02-29" }).success).toBe(false);
+    expect(signUpBirthDateSchema.safeParse({}).success).toBe(false);
+    expect(signUpBirthDateSchema.safeParse({ birthDate: "2000-01-01", phone: "1" }).success).toBe(false);
+  });
 });
