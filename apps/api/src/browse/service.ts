@@ -16,7 +16,6 @@ import { ApiError } from "../errors.js";
 import { searchKey } from "../limits/model.js";
 import {
   eventView,
-  isPrivateGroup,
   isPrivateProfile,
   isPublicTeamPost,
   listingView,
@@ -29,6 +28,7 @@ import {
   validId,
 } from "./model.js";
 import type { BrowseRepository, Data, Doc } from "./repository.js";
+import { draftedLeagueTeamName, isDraftedLeagueTeam, isPrivateHost, isYouthHost, pinnedImageUrl } from "./visibility.js";
 import { nextCursor, originalsOf, withOriginal } from "./reposts.js";
 
 /** A group tournament's directory listing as anyone sees it (the fields firestore.rules lets organizers write). */
@@ -58,7 +58,42 @@ export class BrowseService {
     /** Turns a stored path into a URL Storage's rules let visitors read. */
     private readonly imageUrl: (path: string) => string,
     private readonly now: () => number = Date.now,
+    /** The Storage buckets profile photos may come from (visibility.ts photoBuckets). */
+    private readonly buckets: readonly string[] = [],
   ) {}
+
+  /** [view]'s photo and header, dropped unless pinnedImageUrl allows them. */
+  private pinPhotos(view: Data): Data {
+    for (const k of ["photoUrl", "headerUrl"]) {
+      if (!(k in view)) continue;
+      const url = pinnedImageUrl(view[k], this.buckets);
+      if (url) view[k] = url;
+      else delete view[k];
+    }
+    return view;
+  }
+
+  /** Listings and (masked) team docs of [ids], read together. */
+  private async hosts(ids: string[]): Promise<{ listings: Map<string, Data>; teams: Map<string, Data> }> {
+    const unique = [...new Set(ids.filter((id) => validId(id)))];
+    const [listings, teams] = await Promise.all([this.repo.listings(unique), this.repo.teams(unique)]);
+    return { listings, teams };
+  }
+
+  /**
+   * A listing as visitors see it: a youth team's without its location
+   * (and marked youth when only its team doc says so), a drafted league
+   * team's without its name.
+   */
+  private listing(id: string, data: Data, team: Data | undefined): PublicListing {
+    const view = { ...listingView(data), id } as PublicListing;
+    if (isYouthHost(data, team)) {
+      delete view.location;
+      view.level = "youth";
+    }
+    if (isDraftedLeagueTeam(id)) view.name = draftedLeagueTeamName;
+    return view;
+  }
 
   private images(raw: unknown): PublicImage[] | undefined {
     if (!Array.isArray(raw)) return undefined;
@@ -121,37 +156,52 @@ export class BrowseService {
     if (!validId(uid)) throw new ApiError("not_found", "No such player.");
     const data = (await this.repo.profiles([uid])).get(uid);
     if (!data) throw new ApiError("not_found", "No such player.");
-    const profile = { ...profileView(data), id: uid } as PublicProfile;
+    const profile = { ...this.pinPhotos(profileView(data)), id: uid } as PublicProfile;
     if (data.private === true) return { profile, posts: [], next: null };
     const docs = await this.repo.posts(null, uid);
     return { profile, posts: await this.publicPosts(docs), next: null };
   }
 
-  /** A team or group's page: its listing and, unless it's a private group, public posts and upcoming events. */
+  /**
+   * A team or group's page: its listing and, unless it's a private group
+   * (by listing or team doc, isPrivateHost) or a youth team (its card
+   * only, without a location), public posts and upcoming events. A post
+   * names its author only when the author's profile is public, and never
+   * by uid.
+   */
   async team(id: unknown): Promise<TeamPage> {
     if (!validId(id)) throw new ApiError("not_found", "No such team.");
-    const data = await this.repo.listing(id);
+    const { listings, teams } = await this.hosts([id]);
+    const data = listings.get(id);
     if (!data) throw new ApiError("not_found", "No such team.");
-    const team = { ...listingView(data), id } as PublicListing;
-    if (isPrivateGroup(data)) return { team, posts: [], events: [] };
+    const teamDoc = teams.get(id);
+    const team = this.listing(id, data, teamDoc);
+    if (isPrivateHost(data, teamDoc) || isYouthHost(data, teamDoc)) return { team, posts: [], events: [] };
     const [posts, events] = await Promise.all([
       this.repo.publicTeamPosts(id),
       this.repo.upcomingTeamEvents(id, this.now()),
     ]);
+    const shown = posts.filter((d) => isPublicTeamPost(d.data));
+    const authorOf = (d: Doc) => (typeof d.data.authorId === "string" && d.data.authorId ? d.data.authorId : null);
+    const people = await this.repo.profiles(shown.flatMap((d) => authorOf(d) ?? []));
     return {
       team,
-      posts: posts
-        .filter((d) => isPublicTeamPost(d.data))
-        .map((d) => {
-          const view = teamPostView(d.data);
-          delete view.public;
-          return { ...view, id: d.id, images: this.images(view.images) } as TeamPage["posts"][number];
-        }),
+      posts: shown.map((d) => {
+        const view = teamPostView(d.data);
+        delete view.public;
+        delete view.authorId;
+        const author = authorOf(d);
+        if (!author || isPrivateProfile(people.get(author))) delete view.authorName;
+        return { ...view, id: d.id, images: this.images(view.images) } as TeamPage["posts"][number];
+      }),
       events: events.map((d) => ({ ...eventView(d.data), id: d.id })),
     };
   }
 
-  /** Public team events across teams that aren't private groups, and group tournaments. */
+  /**
+   * Public team events across teams that aren't private groups or youth
+   * teams, and group tournaments of groups that aren't private.
+   */
   async events(): Promise<EventsPage> {
     const now = this.now();
     const [events, tournaments] = await Promise.all([this.repo.upcomingEvents(now), this.repo.upcomingTournaments(now)]);
@@ -161,16 +211,15 @@ export class BrowseService {
       const g = groupOf(t);
       if (validId(g)) teamIds.add(g);
     }
-    const listings = await this.repo.listings([...teamIds]);
+    const { listings, teams } = await this.hosts([...teamIds]);
+    const hidden = (id: string) => isPrivateHost(listings.get(id), teams.get(id));
     return {
       events: events.flatMap((d) => {
-        const listing = listings.get(d.teamId);
-        if (isPrivateGroup(listing)) return [];
-        return [{ ...eventView(d.data), id: d.id, teamId: d.teamId, teamName: String(listing?.name ?? "") }];
+        if (hidden(d.teamId) || isYouthHost(listings.get(d.teamId), teams.get(d.teamId))) return [];
+        const name = isDraftedLeagueTeam(d.teamId) ? draftedLeagueTeamName : String(listings.get(d.teamId)?.name ?? "");
+        return [{ ...eventView(d.data), id: d.id, teamId: d.teamId, teamName: name }];
       }),
-      tournaments: tournaments
-        .filter((d) => !isPrivateGroup(listings.get(groupOf(d) as string)))
-        .map(tournamentView),
+      tournaments: tournaments.filter((d) => validId(groupOf(d)) && !hidden(groupOf(d) as string)).map(tournamentView),
     };
   }
 
@@ -183,7 +232,7 @@ export class BrowseService {
     if (!key) return { players: [], teams: [] };
     const [profiles, listings] = await Promise.all([this.repo.searchProfiles(key), this.repo.searchListings(key)]);
     return {
-      players: profiles.map((d) => ({ ...searchProfileView(d.data), id: d.id }) as PublicProfile),
+      players: profiles.map((d) => ({ ...this.pinPhotos(searchProfileView(d.data)), id: d.id }) as PublicProfile),
       teams: listings.map((d) => ({ ...listingView(d.data), id: d.id }) as PublicListing),
     };
   }
@@ -192,12 +241,15 @@ export class BrowseService {
    * The team finder (`GET /v1/public/teams?q=`), for anyone: teams,
    * groups and schools or clubs by the query's longest word, as their
    * public pages list them (a private group's listing too, as its page
-   * shows it). Never players.
+   * shows it; a youth team's without its location). Never players, and
+   * never a league's drafted teams.
    */
   async teams(query: unknown): Promise<TeamSearchPage> {
     const key = queryKey(query);
     if (!key) return { teams: [] };
-    const listings = await this.repo.searchListings(key);
-    return { teams: listings.map((d) => ({ ...listingView(d.data), id: d.id }) as PublicListing) };
+    // Drafted league teams are named after their players: not for visitors.
+    const listings = (await this.repo.searchListings(key)).filter((d) => !isDraftedLeagueTeam(d.id));
+    const teams = await this.repo.teams(listings.map((d) => d.id));
+    return { teams: listings.map((d) => this.listing(d.id, d.data, teams.get(d.id))) };
   }
 }

@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import { teamSearchQuerySchema } from "@stall10/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { requireCaller } from "../auth.js";
@@ -6,12 +5,12 @@ import { ApiError } from "../errors.js";
 import type { RateLimiter } from "../limits/limiter.js";
 import { MemoryRateLimiter } from "../limits/memory.js";
 import { browseLimit } from "../limits/model.js";
-import { clientIp, visitorKey } from "./model.js";
+import { visitorAdmitter, webKeyHeader } from "./admit.js";
 import type { RosterService } from "../teams/roster.js";
 import type { BrowseService } from "./service.js";
 
 /** Header the website's server sends with [BrowseOptions.webServerKey]. */
-export const webKeyHeader = "x-stall10-web-key";
+export { webKeyHeader };
 
 export interface BrowseOptions {
   limiter: RateLimiter;
@@ -31,29 +30,13 @@ const cacheControl = "public, max-age=30, s-maxage=60, stale-while-revalidate=60
 // can't be shown the first one's answer.
 const memberCacheControl = "private, no-store";
 
-function sameSecret(a: string, b: string): boolean {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
-  return x.length === y.length && timingSafeEqual(x, y);
-}
-
 export function browseRoutes(app: FastifyInstance, browse: BrowseService, opts: BrowseOptions) {
   // Members are counted in memory: the shared limiter's mute
   // (limits/{uid}.mutedUntil) would also stop their chat and posts.
   const members = new MemoryRateLimiter();
   const tooMany = () => new ApiError("resource_exhausted", "Too many requests. Try again in a few minutes.");
 
-  async function admit(req: FastifyRequest) {
-    const sent = req.headers[webKeyHeader];
-    if (opts.webServerKey && typeof sent === "string" && sameSecret(sent, opts.webServerKey)) return;
-    if (req.caller) {
-      if (!members.admit(req.caller.uid, browseLimit)) throw tooMany();
-      return;
-    }
-    if (!(await opts.limiter.admit(visitorKey(clientIp(req.headers["x-forwarded-for"], req.ip)), browseLimit))) {
-      throw new ApiError("resource_exhausted", "Too many requests. Try again in a few minutes.");
-    }
-  }
+  const admit = visitorAdmitter(opts);
 
   /**
    * Signed-in members only, with App Check as on other member routes (visitors don't see players): player

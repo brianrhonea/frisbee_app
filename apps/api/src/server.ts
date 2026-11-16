@@ -7,6 +7,7 @@ import { getAppCheck } from "firebase-admin/app-check";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { FirestoreBrowseRepository } from "./browse/repository.js";
+import { photoBuckets } from "./browse/visibility.js";
 import { FirestoreRateLimiter } from "./limits/limiter.js";
 import { FirestoreCalendarRepository } from "./calendar/repository.js";
 import { FirestoreMeRepository } from "./me/repository.js";
@@ -97,6 +98,7 @@ const app = buildApp({
     limiter: new FirestoreRateLimiter(db),
     imageUrl,
     webServerKey,
+    photoBuckets: photoBuckets(projectId, process.env.STORAGE_BUCKET),
   },
   publicTournaments: new FirestorePublicTournamentRepository(db),
   store: new FirestoreDocStore(db),

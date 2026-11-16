@@ -167,6 +167,13 @@ describe("the new team", () => {
     expect(nameless.memberNames).toEqual({ d: "Player", e: "Player" });
   });
 
+  it("stays a youth team when drafted from a youth division, team doc and listing alike", () => {
+    const youth = { ...division, level: "youth" };
+    const doc = teamDoc({ team: red, tournamentId: "t1", tournament: league, division: youth, city: "", createdAt: 1 });
+    expect(doc.level).toBe("youth");
+    expect(directoryDoc(doc).level).toBe("youth");
+  });
+
   it("is listed in the team directory with search keywords", () => {
     const doc = teamDoc({ team: red, tournamentId: "t1", tournament: league, division, city: "Denver", createdAt: 1 });
     const listing = directoryDoc(doc);

@@ -1,17 +1,22 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.js";
+import { type AppDeps, buildApp, trustHops } from "../src/app.js";
 import type { BrowseRepository, Data, Doc } from "../src/browse/repository.js";
 import { webKeyHeader } from "../src/browse/routes.js";
 import type { RateLimiter } from "../src/limits/limiter.js";
+import { MemoryRateLimiter } from "../src/limits/memory.js";
 import { FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.parse("2026-11-11T12:00:00Z");
 const iso = (ms: number) => new Date(ms).toISOString();
 
+const pickHost = (d: Data): Data => Object.fromEntries(["kind", "requiresApproval", "level"].filter((k) => d[k] !== undefined).map((k) => [k, d[k]]));
+
 class FakeBrowse implements BrowseRepository {
   postsList: Doc[] = [];
   profileMap = new Map<string, Data>();
   listingMap = new Map<string, Data>();
+  /** Team docs, as the repository's field mask reads them. */
+  teamMap = new Map<string, Data>();
   teamPosts = new Map<string, Doc[]>();
   teamEvents = new Map<string, Doc[]>();
   events: Array<Doc & { teamId: string }> = [];
@@ -35,6 +40,14 @@ class FakeBrowse implements BrowseRepository {
   }
   async listings(ids: string[]) {
     return new Map(ids.flatMap((id) => (this.listingMap.has(id) ? [[id, this.listingMap.get(id)!] as const] : [])));
+  }
+  async teams(ids: string[]) {
+    return new Map(ids.flatMap((id) => (this.teamMap.has(id) ? [[id, this.teamMap.get(id)!] as const] : [])));
+  }
+  /** A team (or group) with its listing, the two in step as the rules keep them. */
+  listed(id: string, listing: Data, team: Data = pickHost(listing)) {
+    this.listingMap.set(id, listing);
+    this.teamMap.set(id, team);
   }
   async publicTeamPosts(id: string) {
     return this.teamPosts.get(id) ?? [];
@@ -67,9 +80,10 @@ class FakeLimiter implements RateLimiter {
   }
 }
 
-function setup(opts: { enforceAppCheck?: boolean; webServerKey?: string } = {}) {
+function setup(opts: { enforceAppCheck?: boolean; webServerKey?: string; trustProxy?: AppDeps["trustProxy"]; limiter?: RateLimiter } = {}) {
   const repo = new FakeBrowse();
-  const limiter = new FakeLimiter();
+  const fake = new FakeLimiter();
+  const limiter = opts.limiter ?? fake;
   const store = new FakeStore();
   const app = buildApp({
     verifier: new FakeVerifier(),
@@ -79,10 +93,12 @@ function setup(opts: { enforceAppCheck?: boolean; webServerKey?: string } = {}) 
     store,
     writeLimits: false,
     enforceAppCheck: opts.enforceAppCheck,
-    browse: { repo, limiter, imageUrl: (p) => `https://img.test/${p}`, webServerKey: opts.webServerKey },
+    trustProxy: opts.trustProxy,
+    browse: { repo, limiter, imageUrl: (p) => `https://img.test/${p}`, webServerKey: opts.webServerKey, photoBuckets: ["x"] },
   });
-  const get = (url: string, headers: Record<string, string> = {}) => app.inject({ method: "GET", url, headers });
-  return { app, repo, limiter, store, get };
+  const get = (url: string, headers: Record<string, string> = {}, remoteAddress?: string) =>
+    app.inject({ method: "GET", url, headers, ...(remoteAddress && { remoteAddress }) });
+  return { app, repo, limiter: fake, store, get };
 }
 
 const member = { authorization: "Bearer token:m1" };
@@ -191,8 +207,80 @@ describe("public reads", () => {
     expect((await t.get("/v1/public/players/nobody", member)).statusCode).toBe(404);
   });
 
+  it("treats a team whose doc is missing or disagrees with its listing as private", async () => {
+    t.repo.listed("gone", { name: "Gone", level: "club" });
+    t.repo.teamMap.delete("gone");
+    t.repo.listed("stale", { name: "Stale", kind: "community" }, { kind: "community", requiresApproval: true });
+    t.repo.listed("kind", { name: "Kind", kind: "team" }, { kind: "community" });
+    for (const id of ["gone", "stale", "kind"]) {
+      t.repo.teamPosts.set(id, [{ id: "tp", data: { title: "hi", public: true } }]);
+      t.repo.teamEvents.set(id, [{ id: "e", data: { title: "practice" } }]);
+      const body = (await t.get(`/v1/public/teams/${id}`)).json();
+      expect(body.posts, id).toEqual([]);
+      expect(body.events, id).toEqual([]);
+    }
+    t.repo.events = ["gone", "stale", "kind"].map((id) => ({ id: `e_${id}`, teamId: id, data: { title: "x" } }));
+    t.repo.tournaments = [{ id: "s_1", data: { groupId: "stale", name: "Cup" } }];
+    const events = (await t.get("/v1/public/events")).json();
+    expect(events).toEqual({ events: [], tournaments: [] });
+  });
+
+  it("shows visitors a youth team's card only: no posts, events or location", async () => {
+    const location = { address: "1 Field Rd", lat: 1, lng: 2 };
+    t.repo.listed("y", { name: "Juniors", division: "mixed", level: "youth", city: "Austin", description: "U17", location, keywords: ["juniors"] });
+    // Youth by the team doc alone counts too.
+    t.repo.listed("y2", { name: "Juniors 2", level: "club", location, keywords: ["juniors"] }, { level: "youth" });
+    for (const id of ["y", "y2"]) {
+      t.repo.teamPosts.set(id, [{ id: "tp", data: { title: "Practice moved", public: true } }]);
+      t.repo.teamEvents.set(id, [{ id: "e", data: { title: "Game", location: "Field 3" } }]);
+      const body = (await t.get(`/v1/public/teams/${id}`)).json();
+      expect(body.posts, id).toEqual([]);
+      expect(body.events, id).toEqual([]);
+      expect(body.team, id).not.toHaveProperty("location");
+      expect(body.team.level, id).toBe("youth");
+    }
+    expect((await t.get("/v1/public/teams/y")).json().team).toEqual({ id: "y", name: "Juniors", division: "mixed", level: "youth", city: "Austin", description: "U17" });
+    t.repo.events = [
+      { id: "e1", teamId: "y", data: { title: "Game" } },
+      { id: "e2", teamId: "y2", data: { title: "Game" } },
+    ];
+    expect((await t.get("/v1/public/events")).json().events).toEqual([]);
+    const found = (await t.get("/v1/public/teams?q=juniors")).json().teams;
+    expect(found.map((x: Data) => x.id)).toEqual(["y", "y2"]);
+    for (const x of found) expect(x).not.toHaveProperty("location");
+  });
+
+  it("names a team post's author only when their profile is public, and never by uid", async () => {
+    t.repo.listed("t", { name: "Haze", level: "club" });
+    t.repo.teamPosts.set("t", [
+      { id: "a", data: { title: "A", public: true, authorId: "pub", authorName: "Pat" } },
+      { id: "b", data: { title: "B", public: true, authorId: "priv", authorName: "Sam" } },
+      { id: "c", data: { title: "C", public: true, authorId: "ghost", authorName: "Gus" } },
+    ]);
+    const res = await t.get("/v1/public/teams/t");
+    expect(res.json().posts).toEqual([
+      { id: "a", title: "A", authorName: "Pat" },
+      { id: "b", title: "B" },
+      { id: "c", title: "C" },
+    ]);
+    for (const leak of ["authorId", "Sam", "Gus", "\"pub\"", "priv"]) expect(res.body).not.toContain(leak);
+  });
+
+  it("keeps a league's drafted teams out of the finder and their names off their pages and events", async () => {
+    t.repo.listed("league_l1_d1", { name: "Team Alex - Thursday Night", level: "league", keywords: ["team"] });
+    t.repo.listed("t", { name: "Team Haze", level: "club", keywords: ["team"] });
+    expect((await t.get("/v1/public/teams?q=team")).json().teams.map((x: Data) => x.id)).toEqual(["t"]);
+    const page = await t.get("/v1/public/teams/league_l1_d1");
+    expect(page.json().team.name).toBe("League team");
+    expect(page.body).not.toContain("Alex");
+    t.repo.events = [{ id: "e1", teamId: "league_l1_d1", data: { title: "Game" } }];
+    const events = await t.get("/v1/public/events");
+    expect(events.json().events[0].teamName).toBe("League team");
+    expect(events.body).not.toContain("Alex");
+  });
+
   it("hides a private group's posts and events but shows its listing", async () => {
-    t.repo.listingMap.set("g", { name: "Secret Club", kind: "community", requiresApproval: true, keywords: ["s"] });
+    t.repo.listed("g", { name: "Secret Club", kind: "community", requiresApproval: true, keywords: ["s"] });
     t.repo.teamPosts.set("g", [{ id: "tp", data: { title: "hi", public: true } }]);
     t.repo.teamEvents.set("g", [{ id: "e", data: { title: "practice" } }]);
     const body = (await t.get("/v1/public/teams/g")).json();
@@ -200,7 +288,7 @@ describe("public reads", () => {
   });
 
   it("shows a team's public posts and events", async () => {
-    t.repo.listingMap.set("t", { name: "Haze", division: "open", level: "club" });
+    t.repo.listed("t", { name: "Haze", division: "open", level: "club" });
     t.repo.teamPosts.set("t", [
       { id: "a", data: { title: "Win!", public: true, reactions: { u: "🔥" } } },
       { id: "b", data: { title: "Members only", public: false } },
@@ -212,8 +300,8 @@ describe("public reads", () => {
   });
 
   it("lists events and tournaments, without private groups'", async () => {
-    t.repo.listingMap.set("t", { name: "Haze" });
-    t.repo.listingMap.set("g", { name: "Secret", kind: "community", requiresApproval: true });
+    t.repo.listed("t", { name: "Haze" });
+    t.repo.listed("g", { name: "Secret", kind: "community", requiresApproval: true });
     t.repo.events = [
       { id: "e1", teamId: "t", data: { title: "Open game" } },
       { id: "e2", teamId: "g", data: { title: "Secret practice" } },
@@ -251,7 +339,7 @@ describe("public reads", () => {
   });
 
   it("shows visitors the feed, team pages, the team finder and events, but not players or search", async () => {
-    t.repo.listingMap.set("t", { name: "Haze" });
+    t.repo.listed("t", { name: "Haze" });
     for (const url of ["/v1/public/feed", "/v1/public/teams/t", "/v1/public/teams?q=haze", "/v1/public/events"]) {
       expect((await t.get(url)).statusCode).toBe(200);
     }
@@ -274,6 +362,36 @@ describe("public route access", () => {
   it("treats a bad token as a visitor", async () => {
     const { get } = setup();
     expect((await get("/v1/public/feed", { authorization: "Bearer junk" })).statusCode).toBe(200);
+  });
+
+  it("keys visitors on the address the proxy saw, not a spoofed X-Forwarded-For", async () => {
+    // Off (local runs): the socket's address, whatever the header says.
+    const off = setup();
+    await off.get("/v1/public/feed", { "x-forwarded-for": "6.6.6.6" }, "203.0.113.7");
+    await off.get("/v1/public/feed", { "x-forwarded-for": "7.7.7.7" }, "203.0.113.7");
+    await off.get("/v1/public/feed", {}, "6.6.6.6");
+    expect(off.limiter.keys[0]).toBe(off.limiter.keys[1]);
+    expect(off.limiter.keys[0]).not.toBe(off.limiter.keys[2]);
+    // On Cloud Run (one trusted hop): the address its front end appended.
+    const run = setup({ trustProxy: trustHops(1) });
+    await run.get("/v1/public/feed", { "x-forwarded-for": "6.6.6.6, 203.0.113.7" }, "169.254.1.1");
+    await run.get("/v1/public/feed", { "x-forwarded-for": "8.8.8.8, 203.0.113.7" }, "169.254.1.1");
+    await run.get("/v1/public/feed", { "x-forwarded-for": "6.6.6.6" }, "169.254.1.1");
+    expect(run.limiter.keys[0]).toBe(run.limiter.keys[1]);
+    expect(run.limiter.keys[0]).not.toBe(run.limiter.keys[2]);
+  });
+
+  it("gives a spoofing visitor no fresh bucket, and can't spend another address's", async () => {
+    const shared = new MemoryRateLimiter(() => now);
+    const { get } = setup({ trustProxy: trustHops(1), limiter: { admit: async (k, l) => shared.admit(k, l) } });
+    let last = 0;
+    for (let i = 0; i < 200 && last !== 429; i++) {
+      last = (await get("/v1/public/feed", { "x-forwarded-for": `10.0.0.${i % 250}, 203.0.113.7` }, "169.254.1.1")).statusCode;
+    }
+    expect(last).toBe(429);
+    // The address the attacker named in its first hops still gets in.
+    expect((await get("/v1/public/feed", { "x-forwarded-for": "10.0.0.5" }, "169.254.1.1")).statusCode).toBe(200);
+    expect((await get("/v1/public/feed", { "x-forwarded-for": "198.51.100.1, 10.0.0.5" }, "169.254.1.1")).statusCode).toBe(200);
   });
 
   it("limits visitors by hashed IP, and members in memory (never the shared mute)", async () => {
@@ -324,7 +442,7 @@ describe("visitor access to events, the team finder and rosters", () => {
   });
 
   it("serves events without a token, cacheable, limited by IP, with only public event and tournament fields", async () => {
-    t.repo.listingMap.set("t", { name: "Haze" });
+    t.repo.listed("t", { name: "Haze" });
     t.repo.events = [
       { id: "e1", teamId: "t", data: { title: "Open game", location: "Field 3", notes: "Bring both", rsvps: { u: "yes" }, createdBy: "u" } },
     ];
@@ -353,8 +471,8 @@ describe("visitor access to events, the team finder and rosters", () => {
 
   it("finds teams and groups by name without players or search keywords", async () => {
     t.repo.profileMap.set("pub", { name: "Haze Fan", username: "hazefan", keywords: ["haze"] });
-    t.repo.listingMap.set("t", { name: "Haze", division: "open", level: "club", keywords: ["haze"], ownerId: "o", memberIds: ["o"] });
-    t.repo.listingMap.set("g", {
+    t.repo.listed("t", { name: "Haze", division: "open", level: "club", keywords: ["haze"], ownerId: "o", memberIds: ["o"] });
+    t.repo.listed("g", {
       name: "Haze Secret",
       kind: "community",
       requiresApproval: true,
@@ -414,30 +532,59 @@ describe("visitor access to events, the team finder and rosters", () => {
     expect(res.headers["cache-control"]).toContain("public");
     expect(res.json()).toEqual({
       players: [
-        // A private profile: the roster's name only.
-        { name: "Sam Private", number: 3, position: "cutter" },
+        // Linked to a private profile: not named at all.
+        { name: "Player", number: 3, position: "cutter" },
         { name: "Pat Public", number: 7, position: "handler", username: "pat", photoUrl: "https://firebasestorage.googleapis.com/v0/b/x/o/p.jpg" },
         { name: "Una Unlinked" },
       ],
     });
     const text = res.body;
-    for (const leak of ["pat@x.test", "2001", "555", "keepStats", "Olive", "\"o\"", "userId", "uid", "\"id\""]) {
+    for (const leak of ["Sam", "pat@x.test", "2001", "555", "keepStats", "Olive", "\"o\"", "userId", "uid", "\"id\""]) {
       expect(text).not.toContain(leak);
     }
   });
 
-  it("doesn't tie a profile that hides its teams to the roster", async () => {
-    t.store.put("profiles/pat", { name: "Pat", username: "pat", photoUrl: "https://firebasestorage.googleapis.com/p.jpg", visibility: { teams: false } });
+  it("doesn't name or tie a profile that hides its teams (or is gone) to the roster", async () => {
+    t.store.put("profiles/pat", { name: "Pat", username: "pat", photoUrl: "https://firebasestorage.googleapis.com/v0/b/x/o/p.jpg", visibility: { teams: false } });
     seedTeam("t", { name: "Haze", level: "league" });
-    const [, pat] = (await t.get("/v1/public/teams/t/roster")).json().players;
-    expect(pat).toEqual({ name: "Pat Public", number: 7, position: "handler" });
+    const players = (await t.get("/v1/public/teams/t/roster")).json().players;
+    expect(players).toEqual([
+      { name: "Player", number: 3, position: "cutter" },
+      { name: "Player", number: 7, position: "handler" },
+      { name: "Una Unlinked" },
+    ]);
   });
 
-  it("drops a picture from any other host", async () => {
-    t.store.put("profiles/pat", { name: "Pat", photoUrl: "https://tracker.example/p.jpg" });
+  it("drops a picture from any other host or bucket", async () => {
     seedTeam("t", { name: "Haze", level: "college" });
-    const [, pat] = (await t.get("/v1/public/teams/t/roster")).json().players;
-    expect(pat).toEqual({ name: "Pat Public", number: 7, position: "handler" });
+    for (const url of [
+      "https://tracker.example/p.jpg",
+      "https://firebasestorage.googleapis.com/v0/b/someone-elses-bucket/o/p.jpg",
+      "https://storage.googleapis.com/someone-elses-bucket/p.jpg",
+      "https://evil.googleusercontent.com/p.jpg",
+      "http://lh3.googleusercontent.com/p.jpg",
+    ]) {
+      t.store.put("profiles/pat", { name: "Pat", photoUrl: url });
+      const [, pat] = (await t.get("/v1/public/teams/t/roster")).json().players;
+      expect(pat, url).toEqual({ name: "Pat Public", number: 7, position: "handler" });
+    }
+    for (const url of ["https://storage.googleapis.com/x/p.jpg", "https://lh3.googleusercontent.com/a/p"]) {
+      t.store.put("profiles/pat", { name: "Pat", photoUrl: url });
+      const [, pat] = (await t.get("/v1/public/teams/t/roster")).json().players;
+      expect(pat.photoUrl, url).toBe(url);
+    }
+  });
+
+  it("refuses a league's drafted team, and a team in a youth division of a league", async () => {
+    seedTeam("league_l1_d1", { name: "Team Alex - Thursday", level: "league", leagueId: "l1" });
+    t.store.put("tournaments/l1", { kind: "league", divisions: [{ id: "u17", division: "mixed", level: "youth" }, { id: "open", division: "open", level: "club" }] });
+    seedTeam("entered", { name: "Juniors", level: "club", leagueId: "l1" });
+    t.store.put("tournaments/l1/entries/entered", { divisionId: "u17", status: "accepted" });
+    seedTeam("noentry", { name: "Maybe", level: "club", leagueId: "l1" });
+    seedTeam("adult", { name: "Adults", level: "club", leagueId: "l1" });
+    t.store.put("tournaments/l1/entries/adult", { divisionId: "open", status: "accepted" });
+    for (const id of ["league_l1_d1", "entered", "noentry"]) expect((await t.get(`/v1/public/teams/${id}/roster`)).statusCode, id).toBe(404);
+    expect((await t.get("/v1/public/teams/adult/roster")).statusCode).toBe(200);
   });
 
   it("refuses youth teams, teams without a level, groups and private groups", async () => {

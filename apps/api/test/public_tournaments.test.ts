@@ -8,6 +8,7 @@ import type { BrowseRepository } from "../src/browse/repository.js";
 import { webKeyHeader } from "../src/browse/routes.js";
 import type { RateLimiter } from "../src/limits/limiter.js";
 import type { Data, Doc, PublicTournamentRepository } from "../src/tournaments/public_repository.js";
+import { publicCacheMs } from "../src/tournaments/public_service.js";
 import { FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.parse("2026-11-15T18:00:00Z");
@@ -20,8 +21,11 @@ class FakeTournaments implements PublicTournamentRepository {
   entryDocs = new Map<string, Doc[]>();
   gameDocs = new Map<string, Doc[]>();
   listingMap = new Map<string, Data>();
+  /** Team docs, as the repository's field mask reads them. */
+  teamMap = new Map<string, Data>();
   groupListings = new Map<string, Data>();
   gamesAsked: string[] = [];
+  tournamentsAsked: string[] = [];
   endingFails = false;
 
   private upcoming(field: string, statuses: readonly string[], since: Date, max: number) {
@@ -39,6 +43,7 @@ class FakeTournaments implements PublicTournamentRepository {
     return this.upcoming("endsOn", statuses, since, max);
   }
   async tournament(id: string) {
+    this.tournamentsAsked.push(id);
     return this.tournaments.get(id) ?? null;
   }
   async divisions(id: string) {
@@ -57,6 +62,14 @@ class FakeTournaments implements PublicTournamentRepository {
   }
   async listings(ids: string[]) {
     return new Map(ids.flatMap((id) => (this.listingMap.has(id) ? [[id, this.listingMap.get(id)!] as const] : [])));
+  }
+  async teams(ids: string[]) {
+    return new Map(ids.flatMap((id) => (this.teamMap.has(id) ? [[id, this.teamMap.get(id)!] as const] : [])));
+  }
+  /** A host with its listing, the two in step as the rules keep them. */
+  listed(id: string, listing: Data, team: Data = { kind: listing.kind, requiresApproval: listing.requiresApproval }) {
+    this.listingMap.set(id, listing);
+    this.teamMap.set(id, team);
   }
   async groupListing(id: string) {
     return this.groupListings.get(id) ?? null;
@@ -77,17 +90,18 @@ const noBrowse = {} as BrowseRepository;
 function setup(opts: { webServerKey?: string; enforceAppCheck?: boolean } = {}) {
   const repo = new FakeTournaments();
   const limiter = new FakeLimiter();
+  const clock = { now };
   const app = buildApp({
     verifier: new FakeVerifier(),
     users: new FakeUsers(),
     teams: new FakeTeamRepository(),
-    now: () => now,
+    now: () => clock.now,
     enforceAppCheck: opts.enforceAppCheck,
     browse: { repo: noBrowse, limiter, imageUrl: (p) => p, webServerKey: opts.webServerKey },
     publicTournaments: repo,
   });
   const get = (url: string, headers: Record<string, string> = {}) => app.inject({ method: "GET", url, headers });
-  return { app, repo, limiter, get };
+  return { app, repo, limiter, get, clock };
 }
 
 const fee = { amountCents: 2500, currency: "USD", instructions: "Venmo @host-person, or call 555-0100", dueAt: iso(now + 3 * day) };
@@ -188,9 +202,9 @@ describe("visitors' tournament pages", () => {
   let t: ReturnType<typeof setup>;
   beforeEach(() => {
     t = setup();
-    t.repo.listingMap.set("club", { name: "Austin Ultimate", kind: "organization", requiresApproval: false });
-    t.repo.listingMap.set("secret", { name: "Secret Pickup", kind: "community", requiresApproval: true });
-    t.repo.listingMap.set("team1", { name: "Haze", kind: "team", requiresApproval: true });
+    t.repo.listed("club", { name: "Austin Ultimate", kind: "organization", requiresApproval: false });
+    t.repo.listed("secret", { name: "Secret Pickup", kind: "community", requiresApproval: true });
+    t.repo.listed("team1", { name: "Haze", kind: "team", requiresApproval: true });
   });
 
   describe("GET /v1/public/tournaments", () => {
@@ -312,7 +326,35 @@ describe("visitors' tournament pages", () => {
       expect(mixed.games.map((g: { id: string }) => g.id)).toEqual(["m1"]);
       expect((await t.get("/v1/public/tournaments/fall?division=stray")).json().divisionId).toBe("open");
       expect((await t.get("/v1/public/tournaments/fall?division=../x")).json().divisionId).toBe("open");
-      expect(t.repo.gamesAsked).toEqual(["fall/mixed", "fall/open", "fall/open"]);
+      // Each division's games are read once: unknown divisions share the first's.
+      expect(t.repo.gamesAsked).toEqual(["fall/mixed", "fall/open"]);
+    });
+
+    it("reads an event once per 30 seconds, however many visitors or ?division= values ask", async () => {
+      for (let i = 0; i < 20; i++) {
+        expect((await t.get(`/v1/public/tournaments/fall?division=junk${i}`)).json().divisionId).toBe("open");
+      }
+      await Promise.all([t.get("/v1/public/tournaments/fall"), t.get("/v1/public/tournaments/fall?division=mixed")]);
+      expect(t.repo.tournamentsAsked).toEqual(["fall"]);
+      expect(t.repo.gamesAsked).toEqual(["fall/open", "fall/mixed"]);
+      // A hidden event's answer is kept too.
+      await t.get("/v1/public/tournaments/none");
+      await t.get("/v1/public/tournaments/none");
+      expect(t.repo.tournamentsAsked).toEqual(["fall", "none"]);
+      // Then it's read again.
+      t.clock.now += publicCacheMs;
+      t.repo.tournaments.set("fall", tournament({ status: "live", name: "Renamed" }));
+      expect((await t.get("/v1/public/tournaments/fall")).json().tournament.name).toBe("Renamed");
+      expect(t.repo.gamesAsked).toEqual(["fall/open", "fall/mixed", "fall/open"]);
+    });
+
+    it("caches the list for 30 seconds", async () => {
+      const count = async () => (await t.get("/v1/public/tournaments")).json().tournaments.length;
+      const before = await count();
+      t.repo.tournaments.set("ok2", tournament());
+      expect(await count()).toBe(before);
+      t.clock.now += publicCacheMs;
+      expect(await count()).toBe(before + 1);
     });
 
     it("leaves out signups, captains, contact and payment details, and teams that aren't in", async () => {
@@ -387,15 +429,52 @@ describe("visitors' tournament pages", () => {
       t.repo.entryDocs.set("hat", []);
       t.repo.gameDocs.set("hat/open", [gameDoc("w1", { teamA: "d1", teamB: "d2" })]);
       const body = (await t.get("/v1/public/tournaments/hat")).json();
+      // Always "Team N", even a name without a player's in it.
       expect(body.divisions[0].teams).toEqual([
         { id: "d1", name: "Team 1" },
-        { id: "d2", name: "Sky Pilots" },
+        { id: "d2", name: "Team 2" },
         { id: "d3", name: "Team 3" },
       ]);
-      expect(body.names).toEqual({ d1: "Team 1", d2: "Sky Pilots", d3: "Team 3" });
+      expect(body.names).toEqual({ d1: "Team 1", d2: "Team 2", d3: "Team 3" });
       expect(body.tournament.season).toEqual({ weeks: 6, playoffWeeks: 1, playoffTeams: 4, gamesPerNight: 1, skipDates: [] });
       const all = strings(body).join(" ");
       for (const name of ["Riley", "Parker", "Jo Smith", "Max Lee", "kid1", "kid3"]) expect(all).not.toContain(name);
+    });
+
+    it("names created league teams \"Team N\" too, not by their real names, without colliding with a real team", async () => {
+      t.repo.tournaments.set("thu", tournament({ entryType: "players", kind: "league" }));
+      const made = (i: number, name: string) => ({ id: `league_thu_d${i}`, name, captainId: `c${i}`, playerIds: [`c${i}`], playerNames: { [`c${i}`]: "Alex Kim" } });
+      t.repo.divisionDocs.set("thu", [
+        { id: "open", data: division({ seeds: ["league_thu_d1", "league_thu_d2"], teams: [made(1, "Team Alex"), made(2, "Reds")] }) },
+      ]);
+      t.repo.entryDocs.set("thu", [
+        entry("league_thu_d1", "Team Alex - Thursday Night", "accepted"),
+        entry("league_thu_d2", "Reds - Thursday Night", "accepted"),
+        // A real team that happens to be called "Team 2".
+        entry("real", "Team 2", "accepted"),
+        // A drafted team no division lists any more.
+        entry("league_thu_old", "Team Sam - Thursday Night", "accepted"),
+      ]);
+      t.repo.gameDocs.set("thu/open", [gameDoc("w1", { teamA: "league_thu_d1", teamB: "league_thu_old" })]);
+      const body = (await t.get("/v1/public/tournaments/thu")).json();
+      expect(body.divisions[0].teams.map((x: { name: string }) => x.name)).toEqual(["Team 1", "Team 2 (drafted)"]);
+      expect(body.names).toEqual({ league_thu_d1: "Team 1", league_thu_d2: "Team 2 (drafted)", league_thu_old: "League team" });
+      expect(body.entries.map((e: { teamName: string }) => e.teamName)).toEqual(["League team", "Team 1", "Team 2", "Team 2 (drafted)"]);
+      const all = strings(body).join(" ");
+      for (const name of ["Alex", "Reds", "Sam", "Thursday Night"]) expect(all).not.toContain(name);
+    });
+
+    it("hides events whose host's team doc is missing or disagrees with its listing", async () => {
+      t.repo.listed("stale", { name: "Stale", kind: "community", requiresApproval: false }, { kind: "community", requiresApproval: true });
+      t.repo.listed("nodoc", { name: "No doc", kind: "organization" });
+      t.repo.teamMap.delete("nodoc");
+      t.repo.tournaments.set("s1", tournament({ hostId: "stale", hostKind: "community" }));
+      t.repo.tournaments.set("s2", tournament({ hostId: "nodoc" }));
+      expect((await t.get("/v1/public/tournaments/s1")).statusCode).toBe(404);
+      expect((await t.get("/v1/public/tournaments/s2")).statusCode).toBe(404);
+      const ids = (await t.get("/v1/public/tournaments")).json().tournaments.map((x: { id: string }) => x.id);
+      expect(ids).not.toContain("s1");
+      expect(ids).not.toContain("s2");
     });
 
     it("hides drafts, even from their host's managers, and unknown ids, with the same 404", async () => {
@@ -418,15 +497,15 @@ describe("visitors' tournament pages", () => {
 
     it("works for every published status", async () => {
       for (const status of ["registration", "seeding", "scheduled", "live", "finished"]) {
-        t.repo.tournaments.set("fall", tournament({ status }));
-        expect((await t.get("/v1/public/tournaments/fall")).statusCode, status).toBe(200);
+        t.repo.tournaments.set(status, tournament({ status }));
+        expect((await t.get(`/v1/public/tournaments/${status}`)).statusCode, status).toBe(200);
       }
     });
   });
 
   describe("GET /v1/public/group-tournaments/:groupId/:id", () => {
     beforeEach(() => {
-      t.repo.listingMap.set("pickup", { name: "Pickup", kind: "community", requiresApproval: false });
+      t.repo.listed("pickup", { name: "Pickup", kind: "community", requiresApproval: false });
       const listing = (groupId: string, tournamentId: string): Data => ({
         groupId,
         tournamentId,
@@ -489,11 +568,9 @@ describe("visitors' tournament pages", () => {
 });
 
 describe("publicDraftedName", () => {
-  it("renames teams named after one of their players", () => {
-    expect(publicDraftedName("Team Riley", ["Riley Parker"], 0)).toBe("Team 1");
-    expect(publicDraftedName("Riley Parker's team", ["Riley Parker"], 1)).toBe("Team 2");
-    expect(publicDraftedName("Sky Pilots", ["Riley Parker"], 2)).toBe("Sky Pilots");
-    expect(publicDraftedName("Team 4", [], 3)).toBe("Team 4");
-    expect(publicDraftedName("  ", [], 4)).toBe("Team 5");
+  it("is always the team's place, kept apart from a real team of that name", () => {
+    expect(publicDraftedName(0)).toBe("Team 1");
+    expect(publicDraftedName(3, new Set(["Haze"]))).toBe("Team 4");
+    expect(publicDraftedName(1, new Set([" team 2 "]))).toBe("Team 2 (drafted)");
   });
 });

@@ -76,6 +76,8 @@ export interface AppDeps {
     limiter: RateLimiter;
     imageUrl: (path: string) => string;
     webServerKey?: string;
+    /** Buckets visitors may load profile photos from (photoBuckets); none: Google account photos only. */
+    photoBuckets?: string[];
   };
   /** Visitors' tournament pages (`/v1/public/tournaments*`), limited by [browse]'s limiter; off without both. */
   publicTournaments?: PublicTournamentRepository;
@@ -165,8 +167,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now));
   if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now), deps.writeLimits !== false ? writes : undefined);
   if (deps.browse) {
-    const roster = deps.store ? new RosterService(deps.store) : undefined;
-    browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now), { ...deps.browse, roster });
+    const buckets = deps.browse.photoBuckets ?? [];
+    const roster = deps.store ? new RosterService(deps.store, buckets) : undefined;
+    browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now, buckets), { ...deps.browse, roster });
   }
   if (deps.browse && deps.publicTournaments) {
     publicTournamentRoutes(app, new PublicTournamentService(deps.publicTournaments, deps.now), deps.browse);
@@ -179,7 +182,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media, queries));
     if (deps.personal) personalRoutes(app, new PersonalService(deps.store, deps.users, deps.personal, deps.now));
     const reads = deps.writeLimits !== false ? writes : undefined;
-    rosterRoutes(app, new RosterService(deps.store), reads);
+    rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? []), reads);
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate, reads);
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));

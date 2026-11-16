@@ -27,7 +27,9 @@ const app = buildApp({
 });
 
 const ts = (msFromNow: number) => Timestamp.fromMillis(Date.now() + msFromNow);
-const get = (url: string, ip = "198.51.100.7") => app.inject({ method: "GET", url, headers: { "x-forwarded-for": ip } });
+// The visitor's address as the socket (or a trusted proxy) gives it; a
+// spoofed X-Forwarded-For first hop is ignored.
+const get = (url: string, ip = "198.51.100.7") => app.inject({ method: "GET", url, remoteAddress: ip, headers: { "x-forwarded-for": "6.6.6.6" } });
 /** Players and search are for signed-in members. */
 const memberGet = (url: string) => app.inject({ method: "GET", url, headers: { authorization: "Bearer token:member1" } });
 
@@ -62,7 +64,7 @@ beforeAll(async () => {
     requiresApproval: true,
     keywords: ["secret"],
   });
-  batch.set(db.doc("teams/haze/posts/tp1"), { title: "We won", public: true, createdAt: ts(-5_000) });
+  batch.set(db.doc("teams/haze/posts/tp1"), { title: "We won", public: true, authorId: "priv", authorName: "Sam Private", createdAt: ts(-5_000) });
   batch.set(db.doc("teams/haze/posts/tp2"), { title: "Members only", public: false, createdAt: ts(-4_000) });
   batch.set(db.doc("teams/haze/publicEvents/e1"), { title: "Open practice", startsAt: ts(86_400_000) });
   batch.set(db.doc("teams/haze/publicEvents/past"), { title: "Old game", startsAt: ts(-86_400_000) });
@@ -74,6 +76,8 @@ beforeAll(async () => {
   batch.set(db.doc("teamDirectory/juniors"), { name: "Juniors", division: "mixed", level: "youth", keywords: ["juniors"] });
   batch.set(db.doc("teams/juniors"), { name: "Juniors", division: "mixed", level: "youth", ownerId: "pub", memberIds: ["pub"] });
   batch.set(db.doc("teams/juniors/roster/r1"), { name: "Kid Player", number: 1 });
+  batch.set(db.doc("teams/juniors/posts/jp"), { title: "Practice at the school", public: true, createdAt: ts(-1_000) });
+  batch.set(db.doc("teams/juniors/publicEvents/je"), { title: "Juniors game", startsAt: ts(86_400_000) });
   await batch.commit();
 });
 
@@ -103,13 +107,22 @@ describe("public reads on the emulator", () => {
   });
 
   it("teams: public posts and upcoming events; nothing from a private group", async () => {
-    const haze = (await get("/v1/public/teams/haze")).json();
+    const res = await get("/v1/public/teams/haze");
+    const haze = res.json();
     expect(haze.posts.map((p: { title: string }) => p.title)).toEqual(["We won"]);
+    // Its author's profile is private: not named, and never by uid.
+    expect(res.body).not.toContain("Sam");
+    expect(res.body).not.toContain("authorId");
     expect(haze.events.map((e: { title: string }) => e.title)).toEqual(["Open practice"]);
     const secret = (await get("/v1/public/teams/secret")).json();
     expect(secret.posts).toEqual([]);
     expect(secret.events).toEqual([]);
     expect(secret.team.name).toBe("Secret Club");
+  });
+
+  it("teams: a youth team's card only for visitors", async () => {
+    const juniors = (await get("/v1/public/teams/juniors")).json();
+    expect(juniors).toEqual({ team: { id: "juniors", name: "Juniors", division: "mixed", level: "youth" }, posts: [], events: [] });
   });
 
   it("events: across teams, without the private group's", async () => {
@@ -136,7 +149,8 @@ describe("public reads on the emulator", () => {
     expect(haze.json()).toEqual({
       players: [
         { name: "Pat Public", number: 4, position: "cutter", username: "pat" },
-        { name: "Sam Private", number: 9 },
+        // Linked to a private profile: not named.
+        { name: "Player", number: 9 },
       ],
     });
     expect((await get("/v1/public/teams/juniors/roster")).statusCode).toBe(404);

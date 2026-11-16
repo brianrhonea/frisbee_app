@@ -109,17 +109,14 @@ export const publicHostedQuerySchema = z.object({
 });
 
 /**
- * A drafted team's name as visitors see it: "Team 3" (its place in the
- * division) when the name has one of its players' names in it, as a
- * captains' draft's "Team Alex" does, so no player is named to visitors.
+ * A drafted team's name as visitors see it: always "Team N" (its place in
+ * the division), whatever the host or the draft called it, since a
+ * captains' draft names teams after their captains ("Team Alex"). When
+ * another team in the event is already called that ([taken]), "Team N
+ * (drafted)".
  */
-export function publicDraftedName(name: string, playerNames: readonly string[], index: number): string {
-  const lower = name.toLowerCase();
-  const words = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2);
-  const own = new Set(words(name));
-  const named = playerNames.some((p) => {
-    const full = p.trim().toLowerCase();
-    return (full.length >= 2 && lower.includes(full)) || words(p).some((w) => own.has(w));
-  });
-  return !name.trim() || named ? `Team ${index + 1}` : name;
+export function publicDraftedName(index: number, taken: ReadonlySet<string> = new Set()): string {
+  const name = `Team ${index + 1}`;
+  const lower = new Set([...taken].map((n) => n.trim().toLowerCase()));
+  return lower.has(name.toLowerCase()) ? `${name} (drafted)` : name;
 }

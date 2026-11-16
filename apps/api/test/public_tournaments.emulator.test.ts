@@ -53,6 +53,12 @@ beforeAll(async () => {
   });
   const batch = db.batch();
   batch.set(db.doc("teamDirectory/club"), { name: "Club", kind: "organization", requiresApproval: false, division: "open", level: "club", city: "" });
+  // Team docs, read with a field mask (kind, requiresApproval, level): the host's agrees with its listing.
+  batch.set(db.doc("teams/club"), { name: "Club", kind: "organization", requiresApproval: false, memberIds: ["hostUid"], members: { hostUid: "owner" } });
+  // A listing that says open, but the group now approves members: private.
+  batch.set(db.doc("teamDirectory/stale"), { name: "Stale", kind: "community", requiresApproval: false, division: "mixed", level: "pickup", city: "" });
+  batch.set(db.doc("teams/stale"), { name: "Stale", kind: "community", requiresApproval: true, memberIds: ["x"] });
+  batch.set(db.doc("tournaments/stale"), tournament("Stale", { hostId: "stale" }));
   batch.set(db.doc("teamDirectory/secret"), { name: "Secret", kind: "community", requiresApproval: true, division: "mixed", level: "pickup", city: "" });
   batch.set(db.doc("tournaments/soon"), tournament("Soon", { startsOn: ts(day) }));
   batch.set(db.doc("tournaments/later"), tournament("Later", { startsOn: ts(10 * day) }));
@@ -122,6 +128,7 @@ describe("visitors' tournament pages on Firestore", () => {
   it("404s drafts and private groups' events", async () => {
     expect((await get("/v1/public/tournaments/draft")).statusCode).toBe(404);
     expect((await get("/v1/public/tournaments/private")).statusCode).toBe(404);
+    expect((await get("/v1/public/tournaments/stale")).statusCode).toBe(404);
   });
 
   it("reads a group tournament's listing", async () => {

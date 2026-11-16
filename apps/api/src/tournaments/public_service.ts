@@ -47,14 +47,24 @@ import {
   type SettingsDoc,
   tournamentVisibilities,
 } from "@stall10/shared";
-import { isPrivateGroup, validId } from "../browse/model.js";
+import { validId } from "../browse/model.js";
+import { draftedLeagueTeamName, isDraftedLeagueTeam, isPrivateHost } from "../browse/visibility.js";
 import { ApiError } from "../errors.js";
+import { TtlCache } from "../ttl_cache.js";
 import type { Data, Doc, PublicTournamentRepository } from "./public_repository.js";
 
 /** What Find tournaments lists: published and not finished (openStatuses on the website). */
 export const listedStatuses: readonly HostedStatus[] = ["registration", "seeding", "scheduled", "live"];
 /** Most events in the list, as the website's useUpcomingTournaments. */
 export const listMax = 50;
+/**
+ * Answers are kept this long in each instance, so a burst of visitors (or
+ * one scraping) costs one set of reads: an event page reads up to
+ * ~3,200 documents. The HTTP answers are cached for 30s anyway.
+ */
+export const publicCacheMs = 30_000;
+/** Most events (and, separately, divisions' games) kept per instance. */
+export const publicCacheMax = 200;
 
 const day = 24 * 60 * 60 * 1000;
 const hiddenTournament = () => new ApiError("not_found", "This event isn't here: it may have been removed, or it hasn't been published yet.");
@@ -149,17 +159,39 @@ function game(d: Doc): PublicHostedGame {
   };
 }
 
+/** An event's page without its games, as cached. */
+interface EventBase {
+  tournament: PublicHostedTournament;
+  divisions: PublicHostedDivision[];
+  entries: PublicHostedEntry[];
+  /** Drafted teams' public names ("Team N"), by team id. */
+  drafted: Map<string, string>;
+  /** Entrants' names as visitors see them, by team id. */
+  entryNames: Map<string, string>;
+}
+
 export class PublicTournamentService {
+  private readonly lists: TtlCache<PublicHostedList>;
+  private readonly bases: TtlCache<EventBase | null>;
+  private readonly gameCache: TtlCache<PublicHostedGame[]>;
+
   constructor(
     private readonly repo: PublicTournamentRepository,
     private readonly now: () => number = Date.now,
-  ) {}
+  ) {
+    this.lists = new TtlCache(publicCacheMs, 1, now);
+    this.bases = new TtlCache(publicCacheMs, publicCacheMax, now);
+    this.gameCache = new TtlCache(publicCacheMs, publicCacheMax, now);
+  }
 
-  /** Hosts that are private groups (or have no listing), among [hostIds]. */
+  /**
+   * Hosts that are private groups, among [hostIds]: by their listing or
+   * their team doc, or with either missing (isPrivateHost).
+   */
   private async privateHosts(hostIds: string[]): Promise<Set<string>> {
     const valid = [...new Set(hostIds.filter((id) => validId(id)))];
-    const listings = await this.repo.listings(valid);
-    return new Set(hostIds.filter((id) => !validId(id) || isPrivateGroup(listings.get(id))));
+    const [listings, teams] = await Promise.all([this.repo.listings(valid), this.repo.teams(valid)]);
+    return new Set(hostIds.filter((id) => !validId(id) || isPrivateHost(listings.get(id), teams.get(id))));
   }
 
   /**
@@ -167,7 +199,11 @@ export class PublicTournamentService {
    * website's useUpcomingTournaments): ones starting from about a week ago,
    * plus leagues still running.
    */
-  async list(): Promise<PublicHostedList> {
+  list(): Promise<PublicHostedList> {
+    return this.lists.get("list", () => this.loadList());
+  }
+
+  private async loadList(): Promise<PublicHostedList> {
     const now = this.now();
     const [starting, running] = await Promise.all([
       this.repo.startingFrom(listedStatuses, new Date(now - 8 * day), listMax),
@@ -187,22 +223,63 @@ export class PublicTournamentService {
     };
   }
 
-  /** One event's page, with [query].division's games (else the first division's). */
+  /**
+   * One event's page, with [query].division's games (else the first
+   * division's). The event and its games are cached separately
+   * (publicCacheMs), the games by the division they resolve to, so an
+   * unknown `?division=` costs no more reads than none.
+   */
   async page(id: unknown, query: unknown): Promise<PublicHostedPage> {
     if (!validId(id)) throw hiddenTournament();
+    const base = await this.bases.get(id, () => this.loadBase(id));
+    if (!base) throw hiddenTournament();
+    const { divisions, drafted, entryNames } = base;
+
+    const { division } = publicHostedQuerySchema.parse(isRecord(query) ? query : {});
+    const divisionId = (division && divisions.some((d) => d.id === division) ? division : divisions[0]?.id) ?? null;
+    const games = divisionId
+      ? await this.gameCache.get(`${id}/${divisionId}`, async () => (await this.repo.games(id, divisionId)).map(game))
+      : [];
+
+    // Only the teams the page shows: seeds, places and games.
+    const names: Record<string, string> = {};
+    const named = (teamId: string | null | undefined) => {
+      if (!teamId || teamId in names) return;
+      const name = drafted.get(teamId) ?? entryNames.get(teamId);
+      if (name) names[teamId] = name;
+    };
+    for (const d of divisions) for (const x of [...d.seeds, ...d.placements]) named(x);
+    for (const g of games) [g.teamA, g.teamB, g.report?.byTeam].forEach(named);
+
+    return { tournament: base.tournament, divisions, entries: base.entries, names, divisionId, games };
+  }
+
+  /** The event's page without its games, or null when visitors can't see it. */
+  private async loadBase(id: string): Promise<EventBase | null> {
     const t = await this.repo.tournament(id);
     const status = t ? publishedStatus(t) : null;
-    if (!t || !status) throw hiddenTournament();
-    if ((await this.privateHosts([str(t.hostId)])).size > 0) throw hiddenTournament();
+    if (!t || !status) return null;
+    if ((await this.privateHosts([str(t.hostId)])).size > 0) return null;
 
     const [divDocs, entryDocs] = await Promise.all([this.repo.divisions(id), this.repo.entries(id)]);
     const summaries = divisionSummaries(t.divisions);
     const byId = new Map(divDocs.map((d) => [d.id, d.data]));
+
+    // Entrants' names. A drafted league team's (`league_...`) is its
+    // players', as "Team Alex - Thursday Night": never shown.
+    const entryNames = new Map<string, string>();
+    for (const e of entryDocs) {
+      const teamName = str(e.data.teamName);
+      if (teamName) entryNames.set(e.id, isDraftedLeagueTeam(e.id) ? draftedLeagueTeamName : teamName);
+    }
+    const taken = new Set([...entryNames].filter(([teamId]) => !isDraftedLeagueTeam(teamId)).map(([, n]) => n));
+
+    // Drafted teams are always "Team N" for visitors, whatever they're called.
     const drafted = new Map<string, string>();
     const divisions: PublicHostedDivision[] = summaries.flatMap((s) => {
       const d = byId.get(s.id);
       if (!d) return [];
-      const teams = draftedTeams(d.teams).map((x, i) => ({ id: x.id, name: publicDraftedName(x.name, Object.values(x.playerNames), i) }));
+      const teams = draftedTeams(d.teams).map((x, i) => ({ id: x.id, name: publicDraftedName(i, taken) }));
       for (const x of teams) if (x.id) drafted.set(x.id, x.name);
       return [
         {
@@ -219,26 +296,11 @@ export class PublicTournamentService {
       ];
     });
 
-    const { division } = publicHostedQuerySchema.parse(isRecord(query) ? query : {});
-    const divisionId = (division && divisions.some((d) => d.id === division) ? division : divisions[0]?.id) ?? null;
-    const games = divisionId ? (await this.repo.games(id, divisionId)).map(game) : [];
-
-    const entryNames = new Map<string, string>();
     const entries: PublicHostedEntry[] = [];
     for (const e of entryDocs) {
-      const teamName = str(e.data.teamName);
-      if (teamName) entryNames.set(e.id, teamName);
+      const teamName = entryNames.get(e.id);
       if (e.data.status === "accepted" && teamName) entries.push({ id: e.id, teamName, divisionId: str(e.data.divisionId), status: "accepted" });
     }
-    // Only the teams the page shows: seeds, places and games.
-    const names: Record<string, string> = {};
-    const named = (teamId: string | null | undefined) => {
-      if (!teamId || teamId in names) return;
-      const name = drafted.get(teamId) ?? entryNames.get(teamId);
-      if (name) names[teamId] = name;
-    };
-    for (const d of divisions) for (const x of [...d.seeds, ...d.placements]) named(x);
-    for (const g of games) [g.teamA, g.teamB, g.report?.byTeam].forEach(named);
 
     return {
       tournament: {
@@ -253,9 +315,8 @@ export class PublicTournamentService {
         .filter((e) => divisions.some((d) => d.id === e.divisionId))
         .map((e) => ({ ...e, teamName: drafted.get(e.id) ?? e.teamName }))
         .sort((a, b) => a.teamName.localeCompare(b.teamName)),
-      names,
-      divisionId,
-      games,
+      drafted,
+      entryNames,
     };
   }
 

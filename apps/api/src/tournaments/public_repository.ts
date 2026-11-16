@@ -2,6 +2,7 @@
 // is shown). Timestamps come back as ISO strings.
 import { type Firestore, Timestamp } from "firebase-admin/firestore";
 import { plain } from "../browse/repository.js";
+import { hostFields } from "../browse/visibility.js";
 
 export type Data = Record<string, unknown>;
 export interface Doc {
@@ -22,6 +23,8 @@ export interface PublicTournamentRepository {
   games(id: string, divisionId: string): Promise<Doc[]>;
   /** teamDirectory listings by team id (missing ones left out). */
   listings(teamIds: string[]): Promise<Map<string, Data>>;
+  /** Team docs by id, only the fields visibility.ts checks (hostFields); missing ones left out. */
+  teams(teamIds: string[]): Promise<Map<string, Data>>;
   /** tournamentDirectory/{listingId}: a group tournament's public listing. */
   groupListing(listingId: string): Promise<Data | null>;
 }
@@ -88,6 +91,13 @@ export class FirestorePublicTournamentRepository implements PublicTournamentRepo
     const unique = [...new Set(teamIds)];
     if (unique.length === 0) return new Map();
     const snaps = await this.db.getAll(...unique.map((id) => this.db.doc(`teamDirectory/${id}`)));
+    return new Map(snaps.filter((s) => s.exists).map((s) => [s.id, plain(s.data()) as Data]));
+  }
+
+  async teams(teamIds: string[]): Promise<Map<string, Data>> {
+    const unique = [...new Set(teamIds)];
+    if (unique.length === 0) return new Map();
+    const snaps = await this.db.getAll(...unique.map((id) => this.db.doc(`teams/${id}`)), { fieldMask: [...hostFields] });
     return new Map(snaps.filter((s) => s.exists).map((s) => [s.id, plain(s.data()) as Data]));
   }
 
