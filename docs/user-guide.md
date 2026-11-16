@@ -128,7 +128,8 @@ Explore, Team, Messages and Profile.
   see your posts on your profile. Optionally tag a tournament you follow, so its followers see the post too.
 - **Share a workout**: pick the activity, then add how long it took, an
   optional distance and effort, and any exercises with sets, reps and
-  weight. Runs with a distance show your pace.
+  weight. Each box is named above it, and each exercise has its own
+  card. Runs with a distance show your pace.
 - **Record a run or ride** (phones): tap **Record** on Home or your
   profile. Pick Run, Ride, Walk or Hike, then **Start**. The map draws your
   route as you go, with your time, distance and pace (speed for rides).
@@ -177,7 +178,8 @@ Notifications):
 
 - **This device**: tap **Turn on** to get push notifications on your phone,
   or tablet, even when Stall 10 is closed. Everything also shows under
-  the 🔔.
+  the 🔔. Tapping one opens its page; back goes to where that page
+  belongs (Messages for a message, Home for a post).
 - **Notify me about**: turn each kind on or off for all your teams. Your
   choices apply on every device you use.
 - **Teams**: change any kind for one team, for example reminders only for
@@ -198,7 +200,8 @@ many conversations have something new.
   arrow returns to Messages.
 - Press and hold a message to react, reply, copy or delete it. On a
   phone, swipe a message's bubble to the right to reply, and drag the
-  conversation to the left to see every message's time. On a computer,
+  conversation to the left to see every message's time (you can keep
+  scrolling while you do). On a computer,
   point at a message to see its time.
 - **Seen** shows under your last message once the other person has read
   it. Turn **Read receipts** off in Settings → Privacy; then they don't

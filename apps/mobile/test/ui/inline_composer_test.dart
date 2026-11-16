@@ -9,6 +9,7 @@ import 'package:frisbee_app/domain/models/workout_route.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/posts/view_models/inline_composer_viewmodel.dart';
 import 'package:frisbee_app/ui/posts/widgets/inline_composer.dart';
+import 'package:frisbee_app/ui/workouts/widgets/workout_fields.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
@@ -343,8 +344,24 @@ void main() {
         ..toggleWorkout()
         ..addExercise();
       await tester.pumpAndSettle();
-      final sets = tester.getSize(find.widgetWithText(TextField, 'Sets'));
-      expect(sets.width, greaterThan(40));
+      // Every box says what it's for, above it, even once typed in.
+      final sets = tester.getSize(
+        find.descendant(
+          of: find.widgetWithText(WorkoutField, 'Sets'),
+          matching: find.byType(TextField),
+        ),
+      );
+      expect(sets.width, greaterThan(56));
+      for (final label in [
+        'Minutes',
+        'Distance (optional)',
+        'Reps',
+        'Weight',
+      ]) {
+        expect(find.widgetWithText(WorkoutField, label), findsOneWidget);
+      }
+      expect(find.text('Exercise 1'), findsOneWidget);
+      expect(find.text(ExerciseHints.name), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

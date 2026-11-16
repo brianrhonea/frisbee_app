@@ -834,6 +834,69 @@ void main() {
     }
   });
 
+  testWidgets('the thread still scrolls while the times show', (tester) async {
+    await dms.openConversation(
+      testUser,
+      const UserProfile(uid: 'a', name: 'Avery'),
+    );
+    for (var i = 0; i < 40; i++) {
+      await dms.sendMessage(
+        'a_u1',
+        author: const AppUser(uid: 'a', displayName: 'Avery'),
+        text: 'Message $i',
+      );
+    }
+    final vm = DirectChatViewModel(
+      conversationId: 'a_u1',
+      directMessageRepository: dms,
+      authRepository: auth,
+      filePicker: FakeFilePickerService(),
+    );
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      withRepos(
+        MaterialApp(
+          theme: AppTheme.light.copyWith(platform: TargetPlatform.iOS),
+          home: DirectChatScreen(viewModel: vm),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final list = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byType(ListView).first,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    final before = list.position.pixels;
+    final newest = find.text('Message 39').first;
+    // Each message's time, as the reveal shows them.
+    final times = find.byWidgetPredicate(
+      (w) =>
+          w is Text &&
+          vm.messages.any(
+            (m) => w.data == DateFormat.jm().format(m.createdAt!),
+          ),
+    );
+    final shownBefore = times.evaluate().length;
+
+    // Left from a bubble, then down: the times show and the thread scrolls.
+    final g = await tester.startGesture(tester.getCenter(newest));
+    await g.moveBy(const Offset(-20, 0));
+    await g.moveBy(const Offset(-80, 0));
+    for (var i = 0; i < 6; i++) {
+      await g.moveBy(const Offset(0, 40));
+      await tester.pump();
+    }
+    expect(times.evaluate().length, greaterThan(shownBefore + 3));
+    expect(list.position.pixels, isNot(before));
+    expect(vm.replyingTo, isNull);
+    await g.up();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('on a phone, press and hold a message to react, reply or '
       'see their profile; tap the header for it', (tester) async {
     await dms.openConversation(

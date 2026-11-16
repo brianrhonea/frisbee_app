@@ -10,6 +10,23 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.26
+
+**Workouts**
+- Every box in a workout now says what it's for above it (Minutes,
+  Distance, Sets, Reps, Weight), with an example inside. Each exercise
+  gets its own card.
+
+**Messages**
+- You can keep scrolling while you drag left to see message times.
+
+**Notifications**
+- Opening a notification from outside the app, then going back, now
+  takes you to where that page belongs (a message → Messages, a post →
+  Home), not to whatever you had open before.
+
+---
+
 ## 0.0.25
 
 **Messages**

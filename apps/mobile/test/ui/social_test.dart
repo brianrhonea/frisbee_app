@@ -19,6 +19,7 @@ import 'package:frisbee_app/ui/people/view_models/following_viewmodel.dart';
 import 'package:frisbee_app/ui/people/widgets/following_screen.dart';
 import 'package:frisbee_app/ui/posts/view_models/post_composer_viewmodel.dart';
 import 'package:frisbee_app/ui/posts/widgets/post_composer.dart';
+import 'package:frisbee_app/ui/workouts/widgets/workout_fields.dart';
 import 'package:frisbee_app/ui/profile/view_models/player_profile_viewmodel.dart';
 import 'package:frisbee_app/ui/profile/widgets/profile_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
@@ -269,18 +270,20 @@ void main() {
       await tester.ensureVisible(find.text('Gym'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Gym'));
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Minutes'),
-        '45',
-      );
+      await tester.enterText(workoutBox('Minutes'), '45');
       await tester.tap(find.text('Add exercise'));
       await tester.pump();
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Exercise 1'),
+        find
+            .descendant(
+              of: find.byType(ExerciseCard),
+              matching: find.byType(TextFormField),
+            )
+            .first,
         'Deadlift',
       );
-      await tester.enterText(find.widgetWithText(TextFormField, 'Sets'), '5');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Reps'), '3');
+      await tester.enterText(workoutBox('Sets'), '5');
+      await tester.enterText(workoutBox('Reps'), '3');
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Notes (optional)'),
         'Heavy day',
@@ -486,3 +489,9 @@ void main() {
     });
   });
 }
+
+/// The box under a workout field's name ([WorkoutField]).
+Finder workoutBox(String label) => find.descendant(
+  of: find.widgetWithText(WorkoutField, label),
+  matching: find.byType(TextFormField),
+);
