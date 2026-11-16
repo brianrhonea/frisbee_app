@@ -6,8 +6,10 @@ import type {
   PublicListing,
   PublicPost,
   PublicProfile,
+  PublicTournament,
   SearchPage,
   TeamPage,
+  TeamSearchPage,
 } from "@stall10/shared";
 import { searchWords } from "@stall10/shared";
 import { ApiError } from "../errors.js";
@@ -28,6 +30,22 @@ import {
 } from "./model.js";
 import type { BrowseRepository, Data, Doc } from "./repository.js";
 import { nextCursor, originalsOf, withOriginal } from "./reposts.js";
+
+/** A group tournament's directory listing as anyone sees it (the fields firestore.rules lets organizers write). */
+const tournamentFields = ["groupId", "tournamentId", "name", "startsAt", "endsOn", "status", "format"] as const;
+
+function tournamentView(d: Doc): PublicTournament {
+  const out: Data = { id: d.id };
+  for (const k of tournamentFields) if (d.data[k] !== undefined) out[k] = d.data[k];
+  return out as unknown as PublicTournament;
+}
+
+/** The search key for [query]: its longest word, as the app searches; null for nothing to search. */
+function queryKey(query: unknown): string | null {
+  const words = typeof query === "string" ? searchWords(query) : [];
+  const longest = words.reduce((a, b) => (b.length > a.length ? b : a), "");
+  return searchKey(longest.slice(0, 20));
+}
 
 /**
  * What anyone may see, signed in or not: the same allow-lists and privacy
@@ -152,7 +170,7 @@ export class BrowseService {
       }),
       tournaments: tournaments
         .filter((d) => !isPrivateGroup(listings.get(groupOf(d) as string)))
-        .map((d) => ({ ...d.data, id: d.id })),
+        .map(tournamentView),
     };
   }
 
@@ -161,14 +179,25 @@ export class BrowseService {
    * Private profiles show only their card.
    */
   async search(query: unknown): Promise<SearchPage> {
-    const words = typeof query === "string" ? searchWords(query) : [];
-    const longest = words.reduce((a, b) => (b.length > a.length ? b : a), "");
-    const key = searchKey(longest.slice(0, 20));
+    const key = queryKey(query);
     if (!key) return { players: [], teams: [] };
     const [profiles, listings] = await Promise.all([this.repo.searchProfiles(key), this.repo.searchListings(key)]);
     return {
       players: profiles.map((d) => ({ ...searchProfileView(d.data), id: d.id }) as PublicProfile),
       teams: listings.map((d) => ({ ...listingView(d.data), id: d.id }) as PublicListing),
     };
+  }
+
+  /**
+   * The team finder (`GET /v1/public/teams?q=`), for anyone: teams,
+   * groups and schools or clubs by the query's longest word, as their
+   * public pages list them (a private group's listing too, as its page
+   * shows it). Never players.
+   */
+  async teams(query: unknown): Promise<TeamSearchPage> {
+    const key = queryKey(query);
+    if (!key) return { teams: [] };
+    const listings = await this.repo.searchListings(key);
+    return { teams: listings.map((d) => ({ ...listingView(d.data), id: d.id }) as PublicListing) };
   }
 }

@@ -159,7 +159,10 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const revalidate = deps.revalidate ?? noRevalidate;
   teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now));
   if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now), deps.writeLimits !== false ? writes : undefined);
-  if (deps.browse) browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now), deps.browse);
+  if (deps.browse) {
+    const roster = deps.store ? new RosterService(deps.store) : undefined;
+    browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now), { ...deps.browse, roster });
+  }
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
     profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);

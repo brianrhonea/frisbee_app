@@ -116,7 +116,9 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   function onSearch(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const q = String(new FormData(e.currentTarget).get("q") ?? "").trim();
-    router.push(q ? `/explore?q=${encodeURIComponent(q)}` : "/explore");
+    // Visitors can't search players (Explore is members-only): they find teams and groups.
+    const where = user ? "/explore" : "/teams";
+    router.push(q ? `${where}?q=${encodeURIComponent(q)}` : user ? where : `${where}#find`);
   }
 
   const tabLinks = (className: string) =>
@@ -153,7 +155,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
             <input
               type="search"
               name="q"
-              placeholder="Search players, teams and upcoming events"
+              placeholder={user === null ? "Search teams and groups" : "Search players, teams and upcoming events"}
               aria-label="Search Stall 10"
               enterKeyHint="search"
             />
@@ -163,7 +165,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
         )}
         <div className="header-actions">
           {search && (
-            <Link href="/explore" className="icon-btn top-search-icon" aria-label="Search">
+            <Link href={user === null ? "/teams#find" : "/explore"} className="icon-btn top-search-icon" aria-label="Search">
               <NavIcon name="search" size={22} />
             </Link>
           )}

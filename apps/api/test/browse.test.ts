@@ -3,7 +3,7 @@ import { buildApp } from "../src/app.js";
 import type { BrowseRepository, Data, Doc } from "../src/browse/repository.js";
 import { webKeyHeader } from "../src/browse/routes.js";
 import type { RateLimiter } from "../src/limits/limiter.js";
-import { FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
+import { FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.parse("2026-11-11T12:00:00Z");
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -70,16 +70,19 @@ class FakeLimiter implements RateLimiter {
 function setup(opts: { enforceAppCheck?: boolean; webServerKey?: string } = {}) {
   const repo = new FakeBrowse();
   const limiter = new FakeLimiter();
+  const store = new FakeStore();
   const app = buildApp({
     verifier: new FakeVerifier(),
     users: new FakeUsers(),
     teams: new FakeTeamRepository(),
     now: () => now,
+    store,
+    writeLimits: false,
     enforceAppCheck: opts.enforceAppCheck,
     browse: { repo, limiter, imageUrl: (p) => `https://img.test/${p}`, webServerKey: opts.webServerKey },
   });
   const get = (url: string, headers: Record<string, string> = {}) => app.inject({ method: "GET", url, headers });
-  return { app, repo, limiter, get };
+  return { app, repo, limiter, store, get };
 }
 
 const member = { authorization: "Bearer token:m1" };
@@ -219,7 +222,7 @@ describe("public reads", () => {
       { id: "t_1", data: { groupId: "t", name: "Cup" } },
       { id: "g_1", data: { groupId: "g", name: "Secret Cup" } },
     ];
-    const body = (await t.get("/v1/public/events", member)).json();
+    const body = (await t.get("/v1/public/events")).json();
     expect(body.events).toEqual([{ id: "e1", teamId: "t", teamName: "Haze", title: "Open game" }]);
     expect(body.tournaments.map((x: { name: string }) => x.name)).toEqual(["Cup"]);
   });
@@ -243,14 +246,16 @@ describe("public reads", () => {
   });
 
   it("keeps members-only reads out of shared caches", async () => {
-    const res = await t.get("/v1/public/events", member);
+    const res = await t.get("/v1/public/search?q=pat", member);
     expect(res.headers["cache-control"]).toBe("private, no-store");
   });
 
-  it("shows visitors only the feed, posts and team pages", async () => {
+  it("shows visitors the feed, team pages, the team finder and events, but not players or search", async () => {
     t.repo.listingMap.set("t", { name: "Haze" });
-    for (const url of ["/v1/public/feed", "/v1/public/teams/t"]) expect((await t.get(url)).statusCode).toBe(200);
-    for (const url of ["/v1/public/events", "/v1/public/search?q=pat", "/v1/public/players/pub"]) {
+    for (const url of ["/v1/public/feed", "/v1/public/teams/t", "/v1/public/teams?q=haze", "/v1/public/events"]) {
+      expect((await t.get(url)).statusCode).toBe(200);
+    }
+    for (const url of ["/v1/public/search?q=pat", "/v1/public/players/pub"]) {
       expect((await t.get(url)).statusCode).toBe(401);
       expect((await t.get(url, { authorization: "Bearer junk" })).statusCode).toBe(401);
     }
@@ -275,18 +280,18 @@ describe("public route access", () => {
     const { get, limiter } = setup();
     await get("/v1/public/feed", { "x-forwarded-for": "203.0.113.9, 10.0.0.1" });
     await get("/v1/public/feed", { authorization: "Bearer token:u1" });
-    await get("/v1/public/events", { authorization: "Bearer token:u2", "x-forwarded-for": "203.0.113.9" });
+    await get("/v1/public/search?q=pat", { authorization: "Bearer token:u2", "x-forwarded-for": "203.0.113.9" });
     expect(limiter.keys).toHaveLength(1);
     expect(limiter.keys[0]).toMatch(/^ip_[0-9a-f]{32}$/);
     expect(limiter.keys[0]).not.toContain("203");
     let last = 0;
-    for (let i = 0; i < 121; i++) last = (await get("/v1/public/events", { authorization: "Bearer token:u3" })).statusCode;
+    for (let i = 0; i < 121; i++) last = (await get("/v1/public/search?q=pat", { authorization: "Bearer token:u3" })).statusCode;
     expect(last).toBe(429);
   });
 
   it("needs App Check for members-only reads when it's enforced", async () => {
     const { get } = setup({ enforceAppCheck: true });
-    expect((await get("/v1/public/events", { authorization: "Bearer token:u1" })).statusCode).toBe(401);
+    expect((await get("/v1/public/search?q=pat", { authorization: "Bearer token:u1" })).statusCode).toBe(401);
   });
 
   it("turns away someone over the limit", async () => {
@@ -303,11 +308,149 @@ describe("public route access", () => {
     expect((await get("/v1/public/feed", { [webKeyHeader]: "s3cret-key" })).statusCode).toBe(200);
     expect((await get("/v1/public/feed", { [webKeyHeader]: "wrong" })).statusCode).toBe(429);
     // The key doesn't open members-only reads.
-    expect((await get("/v1/public/events", { [webKeyHeader]: "s3cret-key" })).statusCode).toBe(401);
+    expect((await get("/v1/public/search?q=pat", { [webKeyHeader]: "s3cret-key" })).statusCode).toBe(401);
   });
 
   it("isn't served when the app is built without browse", async () => {
     const app = buildApp({ verifier: new FakeVerifier(), users: new FakeUsers(), teams: new FakeTeamRepository() });
     expect((await app.inject({ url: "/v1/public/feed" })).statusCode).toBe(404);
+  });
+});
+
+describe("visitor access to events, the team finder and rosters", () => {
+  let t: ReturnType<typeof setup>;
+  beforeEach(() => {
+    t = setup();
+  });
+
+  it("serves events without a token, cacheable, limited by IP, with only public event and tournament fields", async () => {
+    t.repo.listingMap.set("t", { name: "Haze" });
+    t.repo.events = [
+      { id: "e1", teamId: "t", data: { title: "Open game", location: "Field 3", notes: "Bring both", rsvps: { u: "yes" }, createdBy: "u" } },
+    ];
+    t.repo.tournaments = [
+      { id: "t_1", data: { groupId: "t", tournamentId: "1", name: "Cup", status: "scheduled", format: "pools", organizerIds: ["u"], secret: "x" } },
+    ];
+    const res = await t.get("/v1/public/events", { "x-forwarded-for": "198.51.100.7" });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["cache-control"]).toContain("public");
+    expect(t.limiter.keys).toHaveLength(1);
+    const body = res.json();
+    expect(body.events).toEqual([
+      { id: "e1", teamId: "t", teamName: "Haze", title: "Open game", location: "Field 3", notes: "Bring both" },
+    ]);
+    expect(body.tournaments).toEqual([
+      { id: "t_1", groupId: "t", tournamentId: "1", name: "Cup", status: "scheduled", format: "pools" },
+    ]);
+  });
+
+  it("turns away a visitor over the limit on every new public route", async () => {
+    t.limiter.allow = false;
+    for (const url of ["/v1/public/events", "/v1/public/teams?q=haze", "/v1/public/teams/t/roster"]) {
+      expect((await t.get(url)).statusCode).toBe(429);
+    }
+  });
+
+  it("finds teams and groups by name without players or search keywords", async () => {
+    t.repo.profileMap.set("pub", { name: "Haze Fan", username: "hazefan", keywords: ["haze"] });
+    t.repo.listingMap.set("t", { name: "Haze", division: "open", level: "club", keywords: ["haze"], ownerId: "o", memberIds: ["o"] });
+    t.repo.listingMap.set("g", {
+      name: "Haze Secret",
+      kind: "community",
+      requiresApproval: true,
+      keywords: ["haze"],
+    });
+    const res = await t.get("/v1/public/teams?q=The%20Haze");
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["cache-control"]).toContain("public");
+    expect(t.repo.queries).toEqual(["listings:haze"]);
+    const body = res.json();
+    expect(Object.keys(body)).toEqual(["teams"]);
+    expect(body.teams).toEqual([
+      { id: "t", name: "Haze", division: "open", level: "club" },
+      // A private group's listing, as its own public page shows it: nothing more.
+      { id: "g", name: "Haze Secret", kind: "community", requiresApproval: true },
+    ]);
+    const page = (await t.get("/v1/public/teams/g")).json();
+    expect(body.teams[1]).toEqual(page.team);
+  });
+
+  it("answers an empty or junk team search without querying, and refuses a huge one", async () => {
+    expect((await t.get("/v1/public/teams")).json()).toEqual({ teams: [] });
+    expect((await t.get("/v1/public/teams?q=%20-%20")).json()).toEqual({ teams: [] });
+    expect(t.repo.queries).toEqual([]);
+    const res = await t.get(`/v1/public/teams?q=${"a".repeat(101)}`);
+    expect(res.statusCode).toBe(400);
+    expect((await t.get("/v1/public/teams?q=a&q=b")).statusCode).toBe(400);
+  });
+
+  function seedTeam(id: string, team: Data, listing: Data = team) {
+    t.store.put(`teams/${id}`, {
+      ownerId: "o",
+      memberIds: ["o", "pat", "sam"],
+      members: { o: "owner", pat: "player", sam: "player" },
+      memberNames: { o: "Olive" },
+      memberPerms: { pat: ["keepStats"] },
+      paid: { pat: true },
+      ...team,
+    });
+    t.store.put(`teamDirectory/${id}`, listing);
+    t.store.put(`teams/${id}/roster/a`, { name: "Pat Public", number: 7, position: "handler", userId: "pat", email: "pat@x.test", paid: true });
+    t.store.put(`teams/${id}/roster/b`, { name: "Sam Private", number: 3, position: "cutter", userId: "sam", birthDate: "2001-01-01" });
+    t.store.put(`teams/${id}/roster/c`, { name: "Una Unlinked", phone: "555", position: "goalie" });
+  }
+
+  it("shows an adult club team's roster without a token: names, numbers and positions only", async () => {
+    t.store.put("profiles/pat", {
+      name: "Pat P",
+      username: "pat",
+      photoUrl: "https://firebasestorage.googleapis.com/v0/b/x/o/p.jpg",
+      email: "pat@x.test",
+    });
+    t.store.put("profiles/sam", { name: "Sam S", username: "sam", photoUrl: "https://firebasestorage.googleapis.com/s.jpg", private: true });
+    seedTeam("t", { name: "Haze", division: "open", level: "club" });
+    const res = await t.get("/v1/public/teams/t/roster");
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["cache-control"]).toContain("public");
+    expect(res.json()).toEqual({
+      players: [
+        // A private profile: the roster's name only.
+        { name: "Sam Private", number: 3, position: "cutter" },
+        { name: "Pat Public", number: 7, position: "handler", username: "pat", photoUrl: "https://firebasestorage.googleapis.com/v0/b/x/o/p.jpg" },
+        { name: "Una Unlinked" },
+      ],
+    });
+    const text = res.body;
+    for (const leak of ["pat@x.test", "2001", "555", "keepStats", "Olive", "\"o\"", "userId", "uid", "\"id\""]) {
+      expect(text).not.toContain(leak);
+    }
+  });
+
+  it("drops a picture from any other host", async () => {
+    t.store.put("profiles/pat", { name: "Pat", photoUrl: "https://tracker.example/p.jpg" });
+    seedTeam("t", { name: "Haze", level: "college" });
+    const [, pat] = (await t.get("/v1/public/teams/t/roster")).json().players;
+    expect(pat).toEqual({ name: "Pat Public", number: 7, position: "handler" });
+  });
+
+  it("refuses youth teams, teams without a level, groups and private groups", async () => {
+    seedTeam("youth", { name: "Juniors", level: "youth" });
+    seedTeam("nolevel", { name: "Old team" });
+    seedTeam("community", { name: "Pickup", kind: "community", level: "pickup" });
+    seedTeam("org", { name: "School", kind: "organization", level: "college" });
+    seedTeam("private", { name: "Secret", kind: "community", level: "club", requiresApproval: true });
+    for (const id of ["youth", "nolevel", "community", "org", "private", "missing", "..%2Fx"]) {
+      const res = await t.get(`/v1/public/teams/${id}/roster`);
+      expect(res.statusCode, id).toBe(404);
+      expect(res.body).not.toContain("Pat Public");
+    }
+  });
+
+  it("refuses when the team doc and its listing disagree", async () => {
+    seedTeam("a", { name: "A", level: "youth" }, { name: "A", level: "club" });
+    seedTeam("b", { name: "B", level: "club" }, { name: "B", level: "youth" });
+    seedTeam("c", { name: "C", level: "club" });
+    t.store.docs.delete("teamDirectory/c");
+    for (const id of ["a", "b", "c"]) expect((await t.get(`/v1/public/teams/${id}/roster`)).statusCode, id).toBe(404);
   });
 });

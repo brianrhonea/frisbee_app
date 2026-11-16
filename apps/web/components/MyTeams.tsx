@@ -40,13 +40,16 @@ export function MyTeams() {
   if (!user) {
     return (
       <div className="card">
-        <p>Join teams and pickup groups to see their schedules, chat and posts in one place.</p>
+        <p>
+          Sign up free to create a team or join one, and see your teams&apos; schedules, chat and posts in one place.
+          To look at a team without joining, find it below.
+        </p>
         <div className="home-actions">
           <Link className="btn btn-primary btn-small" href="/sign-up?next=/teams">
             Sign up free
           </Link>
-          <Link className="btn btn-small" href="/explore">
-            Find a team
+          <Link className="btn btn-small" href="/sign-in?next=/teams">
+            Log in
           </Link>
         </div>
       </div>

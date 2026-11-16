@@ -10,7 +10,7 @@ import { usePublicEvents } from "./usePublicEvents";
 
 const shown = 4;
 
-/** The right column: what's coming up for members, and a sign-up prompt for visitors. */
+/** The right column: what's coming up (for everyone), and a sign-up prompt for visitors. */
 export function UpcomingAside() {
   const { user } = useAuth();
   const page = usePublicEvents();
@@ -20,8 +20,14 @@ export function UpcomingAside() {
       id: `t-${t.id}`,
       startsAt: t.startsAt,
       title: t.name || "Tournament",
-      // A group's tournament has its own page; anything else is on Events.
-      href: t.groupId && t.tournamentId ? `/teams/${encodeURIComponent(t.groupId)}/tournaments/${encodeURIComponent(t.tournamentId)}` : "/events",
+      // A group's tournament has its own page for members; visitors get the group's page (its
+      // tournaments are members-only); anything else is on Events.
+      href:
+        t.groupId && t.tournamentId
+          ? user
+            ? `/teams/${encodeURIComponent(t.groupId)}/tournaments/${encodeURIComponent(t.tournamentId)}`
+            : `/teams/${encodeURIComponent(t.groupId)}`
+          : "/events",
     })),
     ...(page?.events ?? []).map((e) => ({
       id: `e-${e.id}`,
@@ -35,7 +41,7 @@ export function UpcomingAside() {
 
   return (
     <>
-      {user && (
+      {user !== undefined && (
       <div className="card">
         <div className="card-head">
           <h2 className="card-title">Upcoming events</h2>
