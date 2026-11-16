@@ -7,6 +7,22 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.28.0 — 2026-11-16
+
+Public rankings. Deploy before web 0.33.0 and with the `rankings`
+functions group.
+
+**Added**
+- `GET /v1/public/rankings`: team rankings for visitors, no token. Never
+  youth (no youth rankings, youth teams, private groups or drafted
+  league teams); rank, team, rating and record only. Visitor limit,
+  cached 5 minutes.
+
+**Changed**
+- `GET /v1/teams/:id/roster`: a team in a youth division of a league is
+  members-only too (and its school or club's member managers), whatever
+  level its team doc says.
+
 ## 0.27.0 — 2026-11-15
 
 Club teams are for players 16 and over. Deploy with (or before) the new

@@ -21,6 +21,10 @@ Firebase project; App Store builds come from `main` and use production.
 - After signing up with email, "About you" remembers your date of birth
   after the app restarts or on another device.
 
+**Rankings**
+- Rankings have Level and Division filters, as on the website. Youth
+  teams aren't ranked and players on youth teams aren't rated.
+
 **Club teams are 16 and over**
 - Club teams are now for players 16 and over. Add your date of birth in
   About you to join one. Anyone already on a club team stays on it.

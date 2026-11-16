@@ -66,9 +66,11 @@ export class RosterService {
     if (kind !== "team" && team.requiresApproval === true && !isMember) {
       throw new ApiError("permission_denied", "Only members see who's in this group.");
     }
-    // A youth team's roster is its members' (and its school or club's admins').
-    if (isYouthTeam(team) && !isMember && !(await this.managesOrgOf(team, teamId, caller.uid))) {
-      throw new ApiError("permission_denied", youthRosterPrivate);
+    // A youth team's roster is its members' (and its school or club's
+    // admins'), and so is a team's in a youth division of a league, whatever
+    // level the team doc says (drafted before league teams kept "youth").
+    if (!isMember && (isYouthTeam(team) || (await this.inYouthLeague(team, teamId)))) {
+      if (!(await this.managesOrgOf(team, teamId, caller.uid))) throw new ApiError("permission_denied", youthRosterPrivate);
     }
 
     const players = kind === "team" ? await this.store.list(`teams/${teamId}/roster`, rosterMax) : [];

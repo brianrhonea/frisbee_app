@@ -132,6 +132,22 @@ describe("roster", () => {
     expect((await s.get("/v1/teams/t1/roster", "visitor")).statusCode).toBe(200);
   });
 
+  it("keeps a team in a youth league division to its members, whatever its level says", async () => {
+    s.store.put("tournaments/lg", { name: "Junior League", divisions: [{ id: "d1", level: "youth", division: "mixed" }] });
+    s.store.put("teams/lt", { name: "Team 1", level: "league", leagueId: "lg", memberIds: ["pat"], members: { pat: "owner" } });
+    s.store.put("tournaments/lg/entries/lt", { divisionId: "d1", teamName: "Team 1" });
+    s.store.put("teams/lt/roster/a", { name: "Kid Player", number: 4 });
+    const res = await s.get("/v1/teams/lt/roster", "visitor");
+    expect(res.statusCode).toBe(403);
+    expect(res.body).not.toContain("Kid Player");
+    expect((await s.get("/v1/teams/lt/roster", "pat")).statusCode).toBe(200);
+    // An adult division of the same kind of league stays open to anyone signed in.
+    s.store.put("tournaments/al", { name: "Adult League", divisions: [{ id: "d1", level: "club", division: "mixed" }] });
+    s.store.put("teams/at", { name: "Team 2", level: "league", leagueId: "al", memberIds: ["pat"], members: { pat: "owner" } });
+    s.store.put("tournaments/al/entries/at", { divisionId: "d1", teamName: "Team 2" });
+    expect((await s.get("/v1/teams/at/roster", "visitor")).statusCode).toBe(200);
+  });
+
   it("reads the profile cards in one getAll", async () => {
     expect((await s.get("/v1/teams/t1/roster")).statusCode).toBe(200);
     expect(s.store.getAllCalls).toBe(1);

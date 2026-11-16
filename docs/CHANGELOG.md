@@ -82,6 +82,20 @@ Plain-language notes for testers are in
   Google exception or "Sign-in was cancelled.".
 - Message drafts are kept per user and cleared on sign-out (as on the
   website).
+- Home: the Your teams tab is your teams' posts, a team strip with
+  New / Join, a Get started checklist and a Needs you card; the invite
+  dialog makes its link on open and lists join requests.
+- Phone top bar: "Stall 10" without the logo, and a bell for
+  notifications.
+- Google and Apple sign-ups are asked "Your name and username"; "About
+  you" starts the legal name from it.
+- Email sign-up saves the birthday (encrypted, through the API) so
+  "About you" fills it in after a restart or on another device.
+- Club teams are for players 16 and over: creating, joining and
+  accepting an invite go through the API, which checks the date of
+  birth; the rules refuse direct writes for club teams.
+- Rankings: Level and Division filters (as on the website), opening on
+  Club Mixed; youth is never ranked or rated.
 - Tests: shared test vectors (`packages/shared/fixtures`, written by
   `test/shared_fixtures`) check the tournament engine, stats, play
   animation, drafts, Discord import and calendar files against the

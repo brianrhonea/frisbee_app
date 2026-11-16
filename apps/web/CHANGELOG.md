@@ -4,6 +4,17 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.33.0 — 2026-11-16
+
+Needs API 0.28.0.
+
+**Added**
+- Rankings are public: visitors see team rankings with Level (Club,
+  College, League, Pickup) and Division (Mixed, Open, Women, Masters)
+  filters kept in the address; old `?division=` links still work. The
+  Players tab asks visitors to sign up. Youth is never shown.
+- Explore points visitors to rankings and tournaments.
+
 ## 0.32.0 — 2026-11-15
 
 Needs API 0.27.0.

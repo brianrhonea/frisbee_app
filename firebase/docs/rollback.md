@@ -57,6 +57,14 @@ it's missing) and set a boolean field:
 Changes reach open apps within seconds, with no new build. Missing fields
 use the defaults in `lib/data/services/feature_flags.dart`.
 
+The `use_api_*` switches (and builds without `API_BASE_URL`) send the app
+back to writing Firestore directly. That no longer covers everything: the
+rules refuse direct writes that only the API can check, so with
+`use_api_teams` or `use_api_membership` off, creating, joining (code or
+link) and accepting an invite to a club team fail with a permission error
+(the API checks the 16+ rule against encrypted birth dates). Other teams
+are unaffected.
+
 To undo a whole app build, stop its rollout:
 - **TestFlight:** App Store Connect → TestFlight → the build → Expire.
 - **App Store:** pause the phased release, or submit the previous version
