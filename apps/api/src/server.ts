@@ -18,6 +18,7 @@ import { getStorage } from "firebase-admin/storage";
 import { FirestoreDocStore } from "./firestore_store.js";
 import { FirestoreDraftQueries } from "./drafts/repository.js";
 import { FirestoreDocQueries } from "./queries.js";
+import { FirestorePublicTournamentRepository } from "./tournaments/public_repository.js";
 import { ffmpegHeicDecoder } from "./media/image.js";
 import { FirebaseMediaStorage } from "./media/storage.js";
 import { FirestoreTeamRepository } from "./teams/repository.js";
@@ -97,6 +98,7 @@ const app = buildApp({
     imageUrl,
     webServerKey,
   },
+  publicTournaments: new FirestorePublicTournamentRepository(db),
   store: new FirestoreDocStore(db),
   draftQueries: new FirestoreDraftQueries(db),
   queries: new FirestoreDocQueries(db),

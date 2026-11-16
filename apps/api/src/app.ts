@@ -18,6 +18,9 @@ import { StatsService } from "./stats/service.js";
 import { GroupTournamentService, groupTournamentRoutes } from "./group_tournaments/service.js";
 import { tournamentRoutes } from "./tournaments/routes.js";
 import { TournamentService } from "./tournaments/service.js";
+import type { PublicTournamentRepository } from "./tournaments/public_repository.js";
+import { publicTournamentRoutes } from "./tournaments/public_routes.js";
+import { PublicTournamentService } from "./tournaments/public_service.js";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
@@ -74,6 +77,8 @@ export interface AppDeps {
     imageUrl: (path: string) => string;
     webServerKey?: string;
   };
+  /** Visitors' tournament pages (`/v1/public/tournaments*`), limited by [browse]'s limiter; off without both. */
+  publicTournaments?: PublicTournamentRepository;
   /** Transactional document access; enables the membership, profile and post routes. */
   store?: DocStore;
   /** The draft operations' queries; with [store], else they list documents (tests). */
@@ -160,6 +165,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now));
   if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now), deps.writeLimits !== false ? writes : undefined);
   if (deps.browse) browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now), deps.browse);
+  if (deps.browse && deps.publicTournaments) {
+    publicTournamentRoutes(app, new PublicTournamentService(deps.publicTournaments, deps.now), deps.browse);
+  }
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
     profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);

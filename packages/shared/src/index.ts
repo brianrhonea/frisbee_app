@@ -27,6 +27,7 @@ export * from "./stats_tracker.js";
 export * from "./group_tournaments.js";
 export * from "./tournament_engine.js";
 export * from "./tournaments.js";
+export * from "./public_tournaments.js";
 export * from "./meetings.js";
 export * from "./discord.js";
 export * from "./schedule.js";
