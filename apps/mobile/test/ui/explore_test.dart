@@ -6,6 +6,7 @@ import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/models/ranking.dart';
 import 'package:frisbee_app/domain/models/team.dart';
+import 'package:frisbee_app/routing/routes.dart' show ExploreFilter;
 import 'package:frisbee_app/ui/explore/view_models/explore_viewmodel.dart';
 import 'package:frisbee_app/ui/explore/view_models/player_search_viewmodel.dart';
 import 'package:frisbee_app/ui/explore/widgets/explore_screen.dart';
@@ -274,6 +275,68 @@ void main() {
     expect(find.text('12 gp'), findsOneWidget);
     expect(vm.isMe(testUser.uid), isTrue);
   });
+
+  testWidgets(
+    'the filter chips sit in one row that scrolls, selected chip in view',
+    (tester) async {
+      // A narrow phone: five chips are wider than the screen.
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final explore = build();
+      final teamSearch = TeamSearchViewModel(
+        teamRepository: FakeTeamRepository(),
+        authRepository: FakeAuthRepository(user: testUser),
+      );
+      final players = PlayerSearchViewModel(
+        profileRepository: FakeProfileRepository(),
+      );
+      addTearDown(teamSearch.dispose);
+      addTearDown(players.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ExploreScreen(
+            viewModel: teamSearch,
+            players: players,
+            explore: explore,
+            initialFilter: ExploreFilter.tournaments,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final chips = find.byType(ChoiceChip);
+      expect(chips, findsNWidgets(5));
+      final rows = {
+        for (final e in chips.evaluate())
+          tester.getTopLeft(find.byWidget(e.widget)).dy,
+      };
+      expect(rows, hasLength(1), reason: 'every chip on the same line');
+
+      // The selected chip, last in the row, was scrolled into view.
+      final selected = tester.getRect(
+        find.widgetWithText(ChoiceChip, 'Tournaments'),
+      );
+      expect(selected.left, greaterThanOrEqualTo(0));
+      expect(selected.right, lessThanOrEqualTo(320));
+
+      // A chip scrolled out of view comes back when it's picked.
+      await tester.drag(find.byType(ChoiceChip).last, const Offset(600, 0));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(find.widgetWithText(ChoiceChip, 'All')).left,
+        greaterThanOrEqualTo(0),
+      );
+      // (Picked by its callback: it's partly off the screen to tap.)
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Groups'))
+          .onSelected!(true);
+      await tester.pumpAndSettle();
+      final groups = tester.getRect(find.widgetWithText(ChoiceChip, 'Groups'));
+      expect(groups.left, greaterThanOrEqualTo(0));
+      expect(groups.right, lessThanOrEqualTo(320));
+    },
+  );
 
   test('a players link opens on players', () async {
     final vm = build(initialRanking: ExploreViewModel.playersKey);
