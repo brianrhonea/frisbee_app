@@ -209,122 +209,123 @@ class _InlineComposerState extends State<InlineComposer> {
                               ),
                             ),
                           ),
-                        if (vm.workout case final w?)
-                          _WorkoutFields(
-                            key: _workoutKey,
-                            draft: w,
-                            viewModel: vm,
-                          ),
-                        if (vm.photos.isNotEmpty)
-                          Padding(
-                            key: _photosKey,
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                for (final a in vm.photos)
-                                  _RemovablePhoto(
-                                    onRemove: () => vm.removePhoto(a),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Image.memory(
-                                        a.bytes,
-                                        width: 72,
-                                        height: 72,
-                                        fit: BoxFit.cover,
-                                        semanticLabel: a.name,
-                                        errorBuilder: (_, _, _) => Container(
-                                          width: 72,
-                                          height: 72,
-                                          color: AppColors.of(context).field,
-                                          child: const Icon(
-                                            Icons.image_outlined,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        if (vm.links.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              children: [
-                                for (final l in vm.links)
-                                  InputChip(
-                                    label: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 220,
-                                      ),
-                                      child: Text(
-                                        l.replaceFirst(
-                                          RegExp(r'^https?://'),
-                                          '',
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    onDeleted: () => vm.removeLink(l),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        if (vm.linkOpen)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: TextField(
-                              controller: _link,
-                              autofocus: true,
-                              keyboardType: TextInputType.url,
-                              textInputAction: TextInputAction.done,
-                              scrollPadding: const EdgeInsets.only(
-                                top: 20,
-                                bottom: 120,
-                              ),
-                              decoration: InputDecoration(
-                                isDense: true,
-                                hintText: 'example.com/highlights',
-                                prefixIcon: const Icon(Icons.link, size: 18),
-                                errorText: vm.linkError,
-                                suffixIcon: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      tooltip: 'Add link',
-                                      icon: const Icon(Icons.check),
-                                      onPressed: vm.addLink,
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Cancel',
-                                      icon: const Icon(Icons.close),
-                                      onPressed: vm.closeLink,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              onSubmitted: (_) => vm.addLink(),
-                            ),
-                          ),
-                        if (vm.tournaments.isNotEmpty) _tagField(),
-                        if (error != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              errorMessage(error),
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ),
+                ],
+              ),
+            ),
+            Padding(
+              // Extras get the card's full width (not under the avatar),
+              // so the workout's fields have room on phones.
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (vm.workout case final w?)
+                    _WorkoutFields(key: _workoutKey, draft: w, viewModel: vm),
+                  if (vm.photos.isNotEmpty)
+                    Padding(
+                      key: _photosKey,
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final a in vm.photos)
+                            _RemovablePhoto(
+                              onRemove: () => vm.removePhoto(a),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.memory(
+                                  a.bytes,
+                                  width: 72,
+                                  height: 72,
+                                  fit: BoxFit.cover,
+                                  semanticLabel: a.name,
+                                  errorBuilder: (_, _, _) => Container(
+                                    width: 72,
+                                    height: 72,
+                                    color: AppColors.of(context).field,
+                                    child: const Icon(Icons.image_outlined),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (vm.links.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          for (final l in vm.links)
+                            InputChip(
+                              label: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 220,
+                                ),
+                                child: Text(
+                                  l.replaceFirst(RegExp(r'^https?://'), ''),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              onDeleted: () => vm.removeLink(l),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (vm.linkOpen)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: TextField(
+                        controller: _link,
+                        autofocus: true,
+                        keyboardType: TextInputType.url,
+                        textInputAction: TextInputAction.done,
+                        scrollPadding: const EdgeInsets.only(
+                          top: 20,
+                          bottom: 120,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: 'example.com/highlights',
+                          prefixIcon: const Icon(Icons.link, size: 18),
+                          errorText: vm.linkError,
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'Add link',
+                                icon: const Icon(Icons.check),
+                                onPressed: vm.addLink,
+                              ),
+                              IconButton(
+                                tooltip: 'Cancel',
+                                icon: const Icon(Icons.close),
+                                onPressed: vm.closeLink,
+                              ),
+                            ],
+                          ),
+                        ),
+                        onSubmitted: (_) => vm.addLink(),
+                      ),
+                    ),
+                  if (vm.tournaments.isNotEmpty) _tagField(),
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        errorMessage(error),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

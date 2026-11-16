@@ -15,6 +15,8 @@ import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/home/view_models/home_viewmodel.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
 import 'package:frisbee_app/ui/posts/widgets/inline_composer.dart';
+import 'package:frisbee_app/ui/posts/widgets/post_composer.dart';
+import 'package:frisbee_app/ui/teams/widgets/team_post_widgets.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_editor_screen.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
@@ -662,7 +664,19 @@ void main() {
     await tester.pump();
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.byType(Dialog), findsNothing);
-    await tester.enterText(box, 'Half a thought');
+    for (final tool in ['Link', 'Workout']) {
+      await tester.tap(find.text(tool));
+      await tester.pumpAndSettle();
+    }
+    expect(find.byType(PostComposer), findsNothing);
+    expect(find.byType(PostEditorDialog), findsNothing);
+    expect(find.text('Minutes'), findsOneWidget, reason: 'opened in place');
+    vm.composer
+      ..toggleWorkout()
+      ..closeLink();
+    await tester.pumpAndSettle();
+    expect(find.text('Minutes'), findsNothing);
+    await tester.enterText(box.first, 'Half a thought');
     await tester.pump();
 
     await tester.ensureVisible(find.text('Your teams'));

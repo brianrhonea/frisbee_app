@@ -69,6 +69,22 @@ export interface PostImage {
   size: number;
 }
 
+/**
+ * [text] as an http(s) link, adding `https://` when no scheme is given;
+ * null if it isn't a usable web address (no spaces, http or https, a dot
+ * in the host, at most [postLinkMax] characters). The composers' check on
+ * both platforms (TeamPost.normalizeLink in the app).
+ */
+export function normalizeLink(text: string): string | null {
+  const t = text.trim();
+  if (!t || /\s/.test(t)) return null;
+  const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(t) ? t : `https://${t}`;
+  // The scheme and host (after any user info, before a port or path).
+  const m = /^(https?):\/\/(?:[^/?#@]*@)?([^/?#:]*)/i.exec(withScheme);
+  if (!m || !m[2].includes(".") || withScheme.length > postLinkMax) return null;
+  return withScheme;
+}
+
 const link = z
   .string()
   .trim()

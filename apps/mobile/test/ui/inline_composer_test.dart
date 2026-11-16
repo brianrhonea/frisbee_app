@@ -348,6 +348,48 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets("a workout's fields have room on a phone", (tester) async {
+      final vm = await pump(tester);
+      vm
+        ..toggleWorkout()
+        ..addExercise();
+      await tester.pumpAndSettle();
+      final sets = tester.getSize(find.widgetWithText(TextField, 'Sets'));
+      expect(sets.width, greaterThan(40));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Post stays above the keyboard while typing', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final vm = build();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                const SizedBox(height: 700),
+                InlineComposer(viewModel: vm, name: 'Alex'),
+                const SizedBox(height: 400),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.showKeyboard(find.byType(TextField));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.enterText(find.byType(TextField), 'Line one');
+      await tester.pumpAndSettle();
+      final post = tester.getRect(find.widgetWithText(FilledButton, 'Post'));
+      expect(post.bottom, lessThanOrEqualTo(844 - 300));
+      expect(post.top, greaterThanOrEqualTo(0));
+    });
+
     testWidgets('the draft outlasts the box being rebuilt', (tester) async {
       final vm = await pump(tester);
       await tester.enterText(find.byType(TextField), 'Half-written');

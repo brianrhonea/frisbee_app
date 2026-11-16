@@ -1,5 +1,5 @@
 "use client";
-import { type SaveTeamPostRequest, teamPostImagesMax, teamPostLinksMax } from "@stall10/shared";
+import { normalizeLink, type SaveTeamPostRequest, teamPostImagesMax, teamPostLinksMax } from "@stall10/shared";
 import { type ClipboardEvent, type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
 import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
@@ -77,8 +77,8 @@ export function TeamPostComposer({
   function addLink() {
     const t = link.trim();
     if (!t) return;
-    const url = /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`;
-    if (!/^https?:\/\/\S+$/i.test(url)) return setError("Links start with http:// or https://.");
+    const url = normalizeLink(t);
+    if (!url) return setError("Enter a web address, like example.com/tryouts.");
     if (links.length >= teamPostLinksMax) return setError(`Add at most ${teamPostLinksMax} links.`);
     setLinks([...links, url]);
     setLink("");

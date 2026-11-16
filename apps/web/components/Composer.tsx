@@ -1,5 +1,6 @@
 "use client";
 import {
+  normalizeLink,
   postBodyMax,
   postImagesMax,
   postLinksMax,
@@ -250,12 +251,8 @@ export function Composer({
   function withTypedLink(): string[] | { problem: string } {
     const raw = linkText.trim();
     if (!raw) return links;
-    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    try {
-      new URL(url);
-    } catch {
-      return { problem: "That doesn't look like a link." };
-    }
+    const url = normalizeLink(raw);
+    if (!url) return { problem: "Enter a web address, like example.com/video." };
     if (links.includes(url)) return links;
     if (links.length >= linksMax) return { problem: `Add at most ${linksMax} links.` };
     return [...links, url];
