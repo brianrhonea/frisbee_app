@@ -1,10 +1,11 @@
+import { isYouthTeam } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/Avatar";
 import { ForVisitors } from "@/components/ForVisitors";
 import { InviteProvider } from "@/components/team/InviteDialog";
-import { InviteOnlyHint, MemberCount, TeamAbout, TeamBannerActions } from "@/components/team/TeamBanner";
+import { InviteOnlyHint, MemberCount, TeamAbout, TeamAddress, TeamBannerActions, TeamName } from "@/components/team/TeamBanner";
 import { TeamProvider } from "@/components/team/TeamContext";
 import { TeamNav } from "@/components/team/TeamNav";
 import { listingSubtitle } from "@/lib/site";
@@ -39,15 +40,15 @@ export default async function TeamLayout({ params, children }: Props) {
   const subtitle = listingSubtitle(team);
 
   return (
-    <TeamProvider teamId={teamId} name={name} kind={kind} privateGroup={privateGroup}>
+    <TeamProvider teamId={teamId} name={name} kind={kind} privateGroup={privateGroup} youth={isYouthTeam(team)}>
       <InviteProvider>
         <div className="page page-wide team-hub">
           <header className="team-banner">
             <Avatar name={name} size={72} />
             <div className="team-banner-text">
-              <h1>{name}</h1>
+              <TeamName />
               {subtitle && <p className="muted">{subtitle}</p>}
-              {team.location?.address && <p className="muted small">{team.location.address}</p>}
+              <TeamAddress address={team.location?.address} />
               <MemberCount />
               {team.description && <TeamAbout text={team.description} />}
               <InviteOnlyHint />
@@ -58,7 +59,7 @@ export default async function TeamLayout({ params, children }: Props) {
           </header>
           <ForVisitors>
             <div className="cta-card">
-              <p>{group ? "Join this group on Stall 10." : "Follow this team and see its roster on Stall 10."}</p>
+              <p>{group ? "Join this group on Stall 10." : "Follow this team and keep up with its season on Stall 10."}</p>
               <Link className="btn btn-primary btn-small" href={`/sign-up?next=${encodeURIComponent(`/teams/${teamId}`)}`}>
                 {group ? "Sign up to join" : "Sign up free"}
               </Link>

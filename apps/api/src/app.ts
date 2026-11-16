@@ -18,6 +18,9 @@ import { StatsService } from "./stats/service.js";
 import { GroupTournamentService, groupTournamentRoutes } from "./group_tournaments/service.js";
 import { tournamentRoutes } from "./tournaments/routes.js";
 import { TournamentService } from "./tournaments/service.js";
+import type { PublicTournamentRepository } from "./tournaments/public_repository.js";
+import { publicTournamentRoutes } from "./tournaments/public_routes.js";
+import { PublicTournamentService } from "./tournaments/public_service.js";
 import { registerAuth, type TokenVerifier, type UserLookup } from "./auth.js";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
@@ -74,7 +77,11 @@ export interface AppDeps {
     limiter: RateLimiter;
     imageUrl: (path: string) => string;
     webServerKey?: string;
+    /** Buckets visitors may load profile photos from (photoBuckets); none: Google account photos only. */
+    photoBuckets?: string[];
   };
+  /** Visitors' tournament pages (`/v1/public/tournaments*`), limited by [browse]'s limiter; off without both. */
+  publicTournaments?: PublicTournamentRepository;
   /** Transactional document access; enables the membership, profile and post routes. */
   store?: DocStore;
   /** The draft operations' queries; with [store], else they list documents (tests). */
@@ -164,7 +171,14 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const clubAges = new ClubAgeGate(personal, deps.now);
   teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now, clubAges));
   if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now), deps.writeLimits !== false ? writes : undefined);
-  if (deps.browse) browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now), deps.browse);
+  if (deps.browse) {
+    const buckets = deps.browse.photoBuckets ?? [];
+    const roster = deps.store ? new RosterService(deps.store, buckets) : undefined;
+    browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now, buckets), { ...deps.browse, roster });
+  }
+  if (deps.browse && deps.publicTournaments) {
+    publicTournamentRoutes(app, new PublicTournamentService(deps.publicTournaments, deps.now), deps.browse);
+  }
   if (deps.store) {
     membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now, undefined, clubAges));
     profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);
@@ -173,7 +187,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media, queries));
     if (personal) personalRoutes(app, personal);
     const reads = deps.writeLimits !== false ? writes : undefined;
-    rosterRoutes(app, new RosterService(deps.store), reads);
+    rosterRoutes(app, new RosterService(deps.store, deps.browse?.photoBuckets ?? []), reads);
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate, reads);
     postEditorRoutes(app, new PostEditor(deps.store, deps.users, deps.media, deps.now), revalidate);
     followRoutes(app, new FollowService(deps.store, deps.users, deps.now));

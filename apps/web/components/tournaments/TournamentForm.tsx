@@ -191,6 +191,9 @@ function requestOf(f: FormState) {
 }
 
 /** /tournaments/new?host=…&type=… and /tournaments/:id/edit. */
+/** Under the location and About (the app says the same): published events are on the public website. */
+export const publicDetailsHint = "The location and About are public: anyone can see them once it's published, even without an account.";
+
 export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string; tournamentId?: string; type?: HostedType | null }) {
   const { user } = useAuth();
   const router = useRouter();
@@ -395,6 +398,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
           About
           <textarea rows={4} value={f.description} maxLength={tournamentLimits.description} placeholder="Format, parking, food, contacts…" onChange={(e) => set({ description: e.target.value })} />
         </label>
+        <p className="muted small">{publicDetailsHint}</p>
       </section>
 
       {league && (

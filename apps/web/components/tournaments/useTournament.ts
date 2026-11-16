@@ -12,6 +12,7 @@ import {
   engineGame,
   gamesToPlay,
   type GameDoc,
+  type PublicTeamPost,
   type TournamentDoc,
 } from "@stall10/shared";
 import { orderBy } from "firebase/firestore";
@@ -88,6 +89,12 @@ export function useTournament(id: string) {
     id,
     uid,
     user,
+    /** A signed-out visitor's read-only page (publicTournamentState); members' pages are live. */
+    visitor: false,
+    /** Where a visitor's sign-up returns to. */
+    visitorNext: null as string | null,
+    /** A visitor's News tab: the host's public posts about this event (members read them live). */
+    publicNews: null as PublicTeamPost[] | null,
     loaded: live.data !== undefined || !!live.error,
     error: live.error,
     t,
@@ -95,8 +102,9 @@ export function useTournament(id: string) {
     host: host.data ?? null,
     divisions,
     division,
-    divisionId,
-    selectDivision: setPicked,
+    /** Null when there are no divisions yet. */
+    divisionId: divisionId as string | null,
+    selectDivision: setPicked as (divisionId: string | null) => void,
     entries,
     entryOf,
     entriesIn: (div: string, status?: EntryStatus) => entries.filter((e) => e.divisionId === div && (!status || e.status === status)),

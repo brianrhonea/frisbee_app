@@ -495,6 +495,38 @@ void main() {
       );
     });
 
+    testWidgets("a youth team's roster is private to outsiders", (
+      tester,
+    ) async {
+      final youth = Team(
+        id: 't1',
+        name: 'Juniors',
+        division: Division.mixed,
+        level: CompetitionLevel.youth,
+        ownerId: 'owner',
+        members: const {'owner': TeamRole.owner},
+      );
+      teams.teams[youth.id] = youth;
+      teams.listings[youth.id] = TeamListing.of(youth);
+      final vm = homeVm();
+      await pump(tester, vm);
+      expect(vm.youthRosterPrivate, isTrue);
+      expect(
+        find.text('Rosters of youth teams are private: only members see them.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets("members and adult teams' outsiders see no youth note", (
+      tester,
+    ) async {
+      addTeam({'owner': TeamRole.owner});
+      final outsider = homeVm();
+      await pump(tester, outsider);
+      expect(outsider.youthRosterPrivate, isFalse);
+      expect(find.text(YouthRosterNote.text), findsNothing);
+    });
+
     testWidgets('a team says outsiders need an invite code', (tester) async {
       addTeam({'owner': TeamRole.owner});
       await pump(tester, homeVm());

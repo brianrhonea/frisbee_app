@@ -26,28 +26,37 @@ import { type Doc, useLiveQuery } from "@/lib/live";
 import { canOn } from "./useTournament";
 import "./tournaments.css";
 import { formatDate, startOfToday } from "@/lib/dates";
+import { dayKey, localeFor, useRenderZone } from "@/lib/renderZone";
 import { useMyTeams } from "../useMyTeams";
 
 export const tournamentHref = (id: string) => `/tournaments/${encodeURIComponent(id)}`;
 
-const dayFmt = (iso: string | null | undefined, opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" }) =>
-  iso ? formatDate(iso, opts) : "";
+const dayFmt = (iso: string | null | undefined, opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" }, zone?: string) =>
+  iso ? formatDate(iso, { ...opts, timeZone: zone }, localeFor(zone)) : "";
 
-/** "Jun 6 – 7, 2026" or "Jun 6, 2026" (hostedDates). */
-export function datesLabel(startsOn: string | null | undefined, endsOn: string | null | undefined): string {
+/** "Jun 6 – 7, 2026" or "Jun 6, 2026" (hostedDates), in [zone] (useRenderZone), else the viewer's. */
+export function datesLabel(startsOn: string | null | undefined, endsOn: string | null | undefined, zone?: string): string {
   if (!startsOn) return "";
   const s = new Date(startsOn);
   const e = endsOn ? new Date(endsOn) : null;
-  if (!e || e.toDateString() === s.toDateString()) return dayFmt(startsOn, { month: "short", day: "numeric", year: "numeric" });
-  return `${dayFmt(startsOn)} – ${dayFmt(endsOn, { month: "short", day: "numeric", year: "numeric" })}`;
+  const year: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+  if (!e || dayKey(e, zone) === dayKey(s, zone)) return dayFmt(startsOn, year, zone);
+  return `${dayFmt(startsOn, undefined, zone)} – ${dayFmt(endsOn, year, zone)}`;
 }
+
+/** What a list card shows: a member's live document, or a visitor's public card (PublicHostedCard). */
+export type CardTournament = Pick<
+  Doc<TournamentDoc>,
+  "id" | "name" | "hostName" | "hostOfficial" | "kind" | "entryType" | "teamEntry" | "divisions" | "visibility" | "startsOn" | "endsOn" | "location" | "status"
+> & { bidFee: { amountCents: number; currency: string } | null };
 
 export function StatusBadge({ status }: { status: HostedStatus }) {
   return <span className={`pill hosted-status hosted-${status}`}>{hostedStatusLabels[status] ?? status}</span>;
 }
 
 /** One tournament in a list (HostedTournamentCard). */
-export function TournamentCard({ t, showHost = true }: { t: Doc<TournamentDoc>; showHost?: boolean }) {
+export function TournamentCard({ t, showHost = true }: { t: CardTournament; showHost?: boolean }) {
+  const zone = useRenderZone();
   const type = hostedType(t);
   const fee = t.bidFee;
   const meta = [
@@ -64,7 +73,7 @@ export function TournamentCard({ t, showHost = true }: { t: Doc<TournamentDoc>; 
           {t.name || "Tournament"}
           {t.hostOfficial ? <span className="hosted-official"> Official</span> : null}
         </b>
-        <small>{[datesLabel(t.startsOn, t.endsOn), t.location].filter(Boolean).join(" · ")}</small>
+        <small>{[datesLabel(t.startsOn, t.endsOn, zone), t.location].filter(Boolean).join(" · ")}</small>
         {meta.length > 0 && <small>{meta.join(" · ")}</small>}
       </span>
       <StatusBadge status={t.status} />
@@ -91,7 +100,7 @@ function Filters<K extends string>({ counts, labels, value, onChange, label }: {
 }
 
 /** Narrows [list] by a search, a kind and a status, as HostedTournamentsViewModel does. */
-function useFiltered(list: Array<Doc<TournamentDoc>>) {
+function useFiltered<T extends CardTournament>(list: T[]) {
   const [query, setQuery] = useState("");
   const [type, setType] = useState<HostedType | null>(null);
   const [status, setStatus] = useState<HostedStatus | null>(null);
@@ -140,27 +149,37 @@ export function useUpcomingTournaments(max = 50) {
   return { list: starting.data ? list : undefined, error: starting.error };
 }
 
-/** Upcoming published tournaments and leagues, soonest first (FindTournamentsScreen). */
+/** Upcoming published tournaments and leagues, soonest first (FindTournamentsScreen), live for members. */
 export function FindTournaments() {
   const upcoming = useUpcomingTournaments();
-  const f = useFiltered(upcoming.list ?? []);
-
   if (upcoming.error) return <p className="form-error">{upcoming.error}</p>;
   if (!upcoming.list) return <p className="muted" aria-busy="true">Loading…</p>;
+  return <TournamentFinder list={upcoming.list} />;
+}
+
+/**
+ * The list with its search and filters. Visitors ([visitor], from
+ * `/v1/public/tournaments`) don't get Host an event; sign-up links come back to [visitor].next.
+ */
+export function TournamentFinder({ list, visitor }: { list: CardTournament[]; visitor?: { next: string } }) {
+  const f = useFiltered(list);
+  const q = visitor ? `?next=${encodeURIComponent(visitor.next)}` : "";
   return (
     <div className="stack">
       <div className="hosted-toolbar">
         <input type="search" placeholder="Search by name, host or place" value={f.query} onChange={(e) => f.setQuery(e.target.value)} aria-label="Search tournaments" />
-        <Link className="btn btn-primary btn-small" href="/tournaments/host">
-          Host an event
-        </Link>
+        {!visitor && (
+          <Link className="btn btn-primary btn-small" href="/tournaments/host">
+            Host an event
+          </Link>
+        )}
       </div>
       <Filters counts={f.typeCounts} labels={hostedTypeLabels} value={f.type} onChange={f.setType} label="Kind" />
       <Filters counts={f.statusCounts} labels={hostedStatusLabels} value={f.status} onChange={f.setStatus} label="Status" />
       {f.shown.length === 0 ? (
         <p className="empty">
           No upcoming events. Groups and schools or clubs host tournaments, hat tournaments and leagues.{" "}
-          <Link href="/tournaments/host">Host one</Link>.
+          <Link href={visitor ? `/sign-up${q}` : "/tournaments/host"}>Host one</Link>.
         </p>
       ) : (
         f.shown.map((t) => <TournamentCard key={t.id} t={t} />)

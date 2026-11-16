@@ -1,5 +1,5 @@
 "use client";
-import { minimumAge, type PersonalDetailsStatus } from "@stall10/shared";
+import { minimumAge, nameMissing, type PersonalDetailsStatus } from "@stall10/shared";
 import type { User } from "firebase/auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -11,7 +11,7 @@ import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
 import { PersonalDetailsForm } from "./PersonalDetailsForm";
 import { SignUpSteps } from "./SignUpSteps";
-import { UsernameStep } from "./UsernameStep";
+import { stepAsksName, UsernameStep, usernameStepCopy } from "./UsernameStep";
 
 /** Readable without finishing sign-up: the legal pages and help. */
 const open = ["/terms", "/privacy", "/cookies", "/help", "/about", "/delete-account", "/sign-in", "/sign-up"];
@@ -47,6 +47,9 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   const [hidePrompt, setHidePrompt] = useState(false);
   // Under 13: the account is removed and signed out, and this stays up.
   const [tooYoung, setTooYoung] = useState<"removing" | "removed" | null>(null);
+  // Bumped when the name step saves: reloading the user changes its
+  // displayName in place, which on its own doesn't re-render.
+  const [, setNamed] = useState(0);
 
   // Only the latest request answers: a slow one for the last account (or
   // an earlier refresh) never overwrites a newer status.
@@ -73,11 +76,14 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   }, [user, load]);
 
   const openPath = open.some((p) => path === p || path.startsWith(`${p}/`));
-  // A new account finishes sign-up first: its username (Google and Apple
-  // skip the form that asks it), then its details.
+  // A new account finishes sign-up first: its name and username (Google
+  // and Apple skip the form that asks them; Apple can hide the name), then
+  // its details.
   const newAccount = !!user && status?.required === true;
   const profile = useLiveDoc<{ username?: string }>(newAccount ? `profiles/${user!.uid}` : null);
-  const needsUsername = newAccount && profile.data !== undefined && !profile.data?.username;
+  const profileKnown = newAccount && profile.data !== undefined;
+  const needsUsername = profileKnown && !profile.data?.username;
+  const needsName = profileKnown && nameMissing(user!.displayName);
   const missing = !!user && status !== null && !status.complete;
   const blocked = missing && status.required && !openPath;
   const prompt = missing && !status.required && !hidePrompt && path !== "/settings/personal";
@@ -99,17 +105,8 @@ export function PersonalGate({ children }: { children: ReactNode }) {
             </Link>
           )}
         </div>
-      ) : needsUsername && !openPath && user ? (
-        <div className="page">
-          <div className="auth-card auth-card-wide">
-            <SignUpSteps at={1} />
-            <header className="auth-head">
-              <h1>Pick your username</h1>
-              <p>It&apos;s how teammates find and mention you. We started one from your name; change it to anything you like.</p>
-            </header>
-            <UsernameStep user={user} step onDone={() => {}} />
-          </div>
-        </div>
+      ) : (needsUsername || needsName) && !openPath && user ? (
+        <NameStep user={user} needsUsername={needsUsername} onDone={() => setNamed((n) => n + 1)} />
       ) : blocked && user ? (
         <FinishSignUp
           user={user}
@@ -157,9 +154,30 @@ export function PersonalGate({ children }: { children: ReactNode }) {
   );
 }
 
+/** Sign-up's first step for accounts that skipped the form: "Your name and username". */
+function NameStep({ user, needsUsername, onDone }: { user: User; needsUsername: boolean; onDone: () => void }) {
+  const [askName] = useState(() => stepAsksName(user, needsUsername));
+  const copy = usernameStepCopy(askName, needsUsername);
+  return (
+    <div className="page">
+      <div className="auth-card auth-card-wide">
+        <SignUpSteps at={1} />
+        <header className="auth-head">
+          <h1>{copy.title}</h1>
+          <p>{copy.subtitle}</p>
+        </header>
+        <UsernameStep user={user} step needsUsername={needsUsername} onDone={onDone} />
+      </div>
+    </div>
+  );
+}
+
 /** The sign-up form's last step, until it's done. */
 function FinishSignUp({ user, onDone, onTooYoung }: { user: User; onDone: () => void; onTooYoung: () => void }) {
   const [birthDate] = useState(() => signupDraft.takeBirthDate());
+  // The first and last name just typed (sign-up or the name step), else
+  // the account's name split.
+  const [name] = useState(() => signupDraft.takeName());
   return (
     <div className="page">
       <div className="card personal-finish">
@@ -172,7 +190,7 @@ function FinishSignUp({ user, onDone, onTooYoung }: { user: User; onDone: () => 
           user={user}
           email={user.email}
           initial={null}
-          prefill={{ name: user.displayName, birthDate }}
+          prefill={{ name: user.displayName, first: name?.first, last: name?.last, birthDate }}
           submitLabel="Continue"
           onSaved={onDone}
           onTooYoung={onTooYoung}

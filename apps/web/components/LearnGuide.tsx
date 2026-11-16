@@ -1,8 +1,7 @@
-"use client";
 import Link from "next/link";
 
-// The beginner's guide, for members (app/learn). A client component, so
-// its words aren't in the page sent to visitors.
+// The beginner's guide (app/learn), for everyone: a server component, so
+// visitors and search engines get the words in the page.
 // A beginner's summary in our own words, not an official rule book; keep it
 // that way (no copied rule text). Reviewed by: [pending].
 
@@ -198,7 +197,7 @@ export function LearnGuide() {
             </li>
             <li>
               <b>Find a game:</b> pickup and league groups welcome beginners.{" "}
-              <Link href="/explore">Search for groups and teams near you</Link>, or{" "}
+              <Link href="/teams#find">Search for groups and teams near you</Link>, or{" "}
               <Link href="/events">see what&apos;s coming up</Link>.
             </li>
           </ul>

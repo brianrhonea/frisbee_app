@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../domain/models/person_name.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/password_policy.dart';
 import '../../core/ui/error_message.dart';
@@ -97,7 +98,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           autofillHints: const [AutofillHints.givenName],
                           textCapitalization: TextCapitalization.words,
                           textInputAction: TextInputAction.next,
-                          maxLength: 40,
+                          maxLength: PersonName.maxFirst,
                           buildCounter: _noCounter,
                           validator: (v) =>
                               _required(v, 'Enter your first name'),
@@ -113,7 +114,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           autofillHints: const [AutofillHints.familyName],
                           textCapitalization: TextCapitalization.words,
                           textInputAction: TextInputAction.next,
-                          maxLength: 40,
+                          maxLength: PersonName.maxLast,
                           buildCounter: _noCounter,
                           validator: (v) =>
                               _required(v, 'Enter your last name'),

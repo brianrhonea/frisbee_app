@@ -11,8 +11,15 @@ version 0.0.12. What changed in each version is in
    and a password (twice), or with Google or Apple.
    - Your **username** is how people find and message you, as @name. It's
      3–20 lowercase letters, numbers, `_` or `.`, and only one person can
-     have each; the form tells you as you type if it's taken. Signing up
-     with Google or Apple asks you to pick one before you start.
+     have each; the form tells you as you type if it's taken.
+   - Signing up with **Google or Apple** first asks **Your name and
+     username**: your first and last name (filled in from Google or
+     Apple when they share it; Apple lets you hide it), which is the name
+     on your profile, posts and team rosters, and a username suggested
+     from your name until you change it.
+   - Then **About you**: your legal name (started from the name you just
+     gave), date of birth, gender, phone and address, and a parent or
+     guardian under 18. Only you see these.
    - **Passwords** need at least 8 characters with a letter and a number,
      and can't be a common password. The bar under the box shows how
      strong it is; the eye shows what you typed.

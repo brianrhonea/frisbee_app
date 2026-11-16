@@ -38,6 +38,7 @@ export interface TeamDoc {
   memberPerms?: Record<string, TeamPermission[]>;
   statKeepers?: string[];
   requiresApproval?: boolean;
+  location?: { address?: string } | null;
 }
 
 /**
@@ -59,6 +60,8 @@ interface TeamHubInfo {
   kind: "team" | "community" | "organization";
   /** A community or organization that approves joins: only members see inside. */
   privateGroup: boolean;
+  /** A youth team (isYouthTeam): visitors see its card only, and only members its roster. */
+  youth: boolean;
   viewer: TeamViewer;
 }
 
@@ -92,6 +95,7 @@ export function TeamProvider({
   name,
   kind,
   privateGroup,
+  youth,
   children,
 }: Omit<TeamHubInfo, "viewer"> & { children: ReactNode }) {
   const { user } = useAuth();
@@ -105,7 +109,10 @@ export function TeamProvider({
   else if (live.data === undefined) viewer = { state: "loading" };
   else if (!live.data || !live.data.memberIds?.includes(user.uid)) viewer = { state: "outsider", uid: user.uid };
   else viewer = memberViewer(live.data, user.uid);
-  return <TeamContext.Provider value={{ teamId, name, kind, privateGroup, viewer }}>{children}</TeamContext.Provider>;
+  // Members see their team as it is: the public page hides a drafted
+  // league team's name (its players') from everyone else.
+  const shownName = viewer.state === "member" ? viewer.team.name || name : name;
+  return <TeamContext.Provider value={{ teamId, name: shownName, kind, privateGroup, youth, viewer }}>{children}</TeamContext.Provider>;
 }
 
 export function useTeamHub(): TeamHubInfo {

@@ -52,6 +52,57 @@ export function profileKeywords(name: string, username?: string | null): string[
   return [...out].slice(0, 100);
 }
 
+/**
+ * "pat.lee" from "Pat Lee": a starting suggestion they can change, or ""
+ * when the name makes no valid one (Username.suggest in the app).
+ */
+export function suggestUsername(name: string | null | undefined): string {
+  const n = (name ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/^\.+|\.+$/g, "");
+  const s = n.length > usernameLimits.max ? n.slice(0, usernameLimits.max).replace(/\.+$/, "") : n;
+  return usernameProblem(s) == null ? s : "";
+}
+
+/**
+ * The first and last name boxes of sign-up and of "Your name and
+ * username" (PersonName in the app). Together, with a space, they fit
+ * the profile's name.
+ */
+export const personNameLimits = { first: 30, last: 30 } as const;
+
+/**
+ * A display name (Google's or Apple's, or the profile's) split into first
+ * and last to start the name boxes from: the first word, then the rest,
+ * each cut to [personNameLimits]. Nothing for an empty name or one that
+ * looks like an email (PersonName.split in the app).
+ */
+export function splitDisplayName(name: string | null | undefined): { first: string; last: string } {
+  const t = (name ?? "").trim();
+  if (!t || t.includes("@")) return { first: "", last: "" };
+  const [first = "", ...rest] = t.split(/\s+/);
+  return {
+    first: first.slice(0, personNameLimits.first).trim(),
+    last: rest.join(" ").slice(0, personNameLimits.last).trim(),
+  };
+}
+
+/** "Pat Lee": the name everyone sees, from the two boxes (PersonName.join). */
+export const joinPersonName = (first: string, last: string) => `${first.trim()} ${last.trim()}`.trim();
+
+/**
+ * Whether the username step asks for their name too (PersonName.asks):
+ * they signed in with Google or Apple (no password), whose name nobody
+ * typed, or the account has no usable name (Apple can hide it).
+ */
+export function asksForName(displayName: string | null | undefined, hasPassword: boolean): boolean {
+  return !hasPassword || nameMissing(displayName);
+}
+
+/** No usable name on the account: empty, or an email (PersonName.missing). */
+export const nameMissing = (displayName: string | null | undefined) => splitDisplayName(displayName).first === "";
+
 export const profileLimits = {
   name: 80,
   bio: 280,

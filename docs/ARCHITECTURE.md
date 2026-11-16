@@ -455,8 +455,17 @@ layers) and its subfeatures.
   `account-signInEmail`, which rate-limits per username, looks up the
   email server-side (so emails are never public) and returns a custom
   token.
-- **Username gate:** `authRedirect` sends a signed-in user with no
-  username to `/welcome/username?from=…` (`ChooseUsernameViewModel`).
+- **Name and username gate:** `authRedirect` sends a signed-in user with
+  no username, or a new account (`personalDetailsRequiredSince`) with no
+  usable name, to `/welcome/username?from=…` (`ChooseUsernameViewModel`,
+  "Your name and username"). Google and Apple accounts and accounts
+  without a name give their first and last name there too (prefilled from
+  the provider's): `AuthRepository.saveName` sets the Auth display name
+  (which the profile and people directory pick up) and the private
+  `users/{uid}` first and last name, then the username is claimed. The
+  website's `UsernameStep` does the same through `PUT /v1/me/identity`
+  and `POST /v1/me/username`. "About you" then starts the legal name from
+  the names just typed.
 - **Delete account:** the app removes its own data (events, settings,
   devices, feed, follows, posts, profile), then `account-deleteAccount`
   frees the username and deletes the Auth user; `follows` functions clean

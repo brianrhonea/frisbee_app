@@ -1,5 +1,6 @@
 import { type DocumentData, type Firestore, type Query, Timestamp } from "firebase-admin/firestore";
 import { pageSize, eventLimit } from "./model.js";
+import { hostFields } from "./visibility.js";
 import { searchLimit } from "../limits/model.js";
 
 export type Data = Record<string, unknown>;
@@ -19,6 +20,8 @@ export interface BrowseRepository {
   profiles(ids: string[]): Promise<Map<string, Data>>;
   listing(teamId: string): Promise<Data | null>;
   listings(teamIds: string[]): Promise<Map<string, Data>>;
+  /** Team docs by id, only the fields visibility.ts checks (hostFields); missing ones left out. */
+  teams(teamIds: string[]): Promise<Map<string, Data>>;
   publicTeamPosts(teamId: string): Promise<Doc[]>;
   upcomingTeamEvents(teamId: string, now: number): Promise<Doc[]>;
   /** Upcoming public events across all teams, with their team's id. */
@@ -62,10 +65,11 @@ export class FirestoreBrowseRepository implements BrowseRepository {
     return snap.exists ? doc(snap) : null;
   }
 
-  private async getAll(paths: string[]): Promise<Map<string, Data>> {
+  private async getAll(paths: string[], fieldMask?: readonly string[]): Promise<Map<string, Data>> {
     const unique = [...new Set(paths)];
     if (unique.length === 0) return new Map();
-    const snaps = await this.db.getAll(...unique.map((p) => this.db.doc(p)));
+    const refs = unique.map((p) => this.db.doc(p));
+    const snaps = await (fieldMask ? this.db.getAll(...refs, { fieldMask: [...fieldMask] }) : this.db.getAll(...refs));
     return new Map(snaps.filter((s) => s.exists).map((s) => [s.id, plain(s.data()) as Data]));
   }
 
@@ -80,6 +84,10 @@ export class FirestoreBrowseRepository implements BrowseRepository {
 
   listings(teamIds: string[]) {
     return this.getAll(teamIds.map((id) => `teamDirectory/${id}`));
+  }
+
+  teams(teamIds: string[]) {
+    return this.getAll(teamIds.map((id) => `teams/${id}`), hostFields);
   }
 
   async publicTeamPosts(teamId: string): Promise<Doc[]> {

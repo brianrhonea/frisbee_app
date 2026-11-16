@@ -9,7 +9,7 @@ import {
   signInWithPopup,
   updateProfile,
 } from "firebase/auth";
-import { passwordMaxLength, passwordMinLength, passwordProblem } from "@stall10/shared";
+import { joinPersonName, passwordMaxLength, passwordMinLength, passwordProblem, personNameLimits } from "@stall10/shared";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
@@ -77,7 +77,8 @@ function safeNext(next: string | null): string {
  * SignUpScreen): name, a username they can change (suggested from the name
  * until they edit it), birthday, email and password. Under 13 is refused
  * before any account exists. Google and Apple skip the form; PersonalGate
- * then asks their username and, like everyone, the details ("About you").
+ * then asks their name and username ("Your name and username") and, like
+ * everyone, the details ("About you").
  */
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const router = useRouter();
@@ -94,7 +95,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const signUp = mode === "sign-up";
-  const shownUsername = usernameEdited ? username : suggestUsername(`${first} ${last}`);
+  const shownUsername = usernameEdited ? username : suggestUsername(joinPersonName(first, last));
   const check = useUsernameCheck(signUp ? shownUsername : "", null);
 
   // Not while sign-up is still claiming the username.
@@ -150,9 +151,10 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     const passwordIssue = passwordProblem(password);
     if (passwordIssue) return fail(passwordIssue, "su-password");
     signupDraft.setBirthDate(birthDate);
+    signupDraft.setName(first, last);
     void run(async () => {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      await updateProfile(cred.user, { displayName: `${first.trim()} ${last.trim()}` });
+      await updateProfile(cred.user, { displayName: joinPersonName(first, last) });
       try {
         await callApi(cred.user, "/v1/me/username", { method: "POST", body: { username: check.handle } });
       } catch (err) {
@@ -284,11 +286,11 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         <div className="form-grid">
           <label>
             First name
-            <input id="su-first" value={first} onChange={(e) => setFirst(e.target.value)} autoComplete="given-name" maxLength={30} />
+            <input id="su-first" value={first} onChange={(e) => setFirst(e.target.value)} autoComplete="given-name" maxLength={personNameLimits.first} />
           </label>
           <label>
             Last name
-            <input id="su-last" value={last} onChange={(e) => setLast(e.target.value)} autoComplete="family-name" maxLength={30} />
+            <input id="su-last" value={last} onChange={(e) => setLast(e.target.value)} autoComplete="family-name" maxLength={personNameLimits.last} />
           </label>
         </div>
         <UsernameField

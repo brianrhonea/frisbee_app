@@ -95,6 +95,43 @@ describe("roster", () => {
     });
   });
 
+  it("keeps a youth team's roster to its members and its school or club's member managers", async () => {
+    s.store.put("teams/y1", {
+      name: "Juniors",
+      level: "youth",
+      memberIds: ["olive", "pat"],
+      members: { olive: "owner", pat: "player" },
+      orgId: "school",
+      orgLinked: true,
+    });
+    s.store.put("teams/y1/roster/a", { name: "Kid Player", number: 4, position: "cutter" });
+    s.store.put("teams/school", {
+      name: "Austin High",
+      kind: "organization",
+      memberIds: ["admin", "helper", "parent"],
+      members: { admin: "owner", helper: "player", parent: "player" },
+      memberPerms: { helper: ["manageMembers"] },
+      linkedTeams: { y1: { name: "Juniors" } },
+    });
+    for (const uid of ["visitor", "parent"]) {
+      const res = await s.get("/v1/teams/y1/roster", uid);
+      expect(res.statusCode, uid).toBe(403);
+      expect(res.json().error.message).toBe("Rosters of youth teams are private: only members see them.");
+      expect(res.body).not.toContain("Kid Player");
+    }
+    for (const uid of ["pat", "admin", "helper"]) {
+      const res = await s.get("/v1/teams/y1/roster", uid);
+      expect(res.statusCode, uid).toBe(200);
+      expect(res.json().players[0].name).toBe("Kid Player");
+    }
+    // A community that hasn't accepted the team (or doesn't list it) doesn't open it.
+    s.store.put("teams/y2", { name: "Juniors 2", level: "youth", memberIds: ["olive"], members: { olive: "owner" }, orgId: "school", orgLinked: false });
+    s.store.put("teams/y3", { name: "Juniors 3", level: "youth", memberIds: ["olive"], members: { olive: "owner" }, orgId: "school", orgLinked: true });
+    for (const id of ["y2", "y3"]) expect((await s.get(`/v1/teams/${id}/roster`, "admin")).statusCode, id).toBe(403);
+    // Adult teams are unchanged: anyone signed in.
+    expect((await s.get("/v1/teams/t1/roster", "visitor")).statusCode).toBe(200);
+  });
+
   it("reads the profile cards in one getAll", async () => {
     expect((await s.get("/v1/teams/t1/roster")).statusCode).toBe(200);
     expect(s.store.getAllCalls).toBe(1);

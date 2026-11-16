@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { LearnGuide } from "@/components/LearnGuide";
-import { MembersOnly } from "@/components/MembersOnly";
 
 export const metadata: Metadata = {
   title: "Learn to play ultimate",
@@ -8,6 +7,7 @@ export const metadata: Metadata = {
     "New to ultimate frisbee? The basic rules in five minutes: the field, the pull, the stall count, scoring, turnovers and spirit of the game.",
 };
 
+/** Public, and rendered on the server, so visitors and search engines read the whole guide. */
 export default function Learn() {
   return (
     <div className="page learn">
@@ -20,9 +20,7 @@ export default function Learn() {
         </p>
       </div>
 
-      <MembersOnly next="/learn" what="Sign up free or log in for the beginner's guide to the rules.">
-        <LearnGuide />
-      </MembersOnly>
+      <LearnGuide />
     </div>
   );
 }

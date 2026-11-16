@@ -12,6 +12,7 @@ class UsernameField extends StatelessWidget {
     this.autofocus = false,
     this.textInputAction,
     this.onFieldSubmitted,
+    this.hint = 'Letters, numbers, _ and . People find you by it.',
   });
 
   final TextEditingController controller;
@@ -19,6 +20,9 @@ class UsernameField extends StatelessWidget {
   final bool autofocus;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onFieldSubmitted;
+
+  /// Under the box while it's empty.
+  final String hint;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +49,7 @@ class UsernameField extends StatelessWidget {
             helperText: ok
                 ? checker.message
                 : status == UsernameStatus.empty
-                ? 'Letters, numbers, _ and . People find you by it.'
+                ? hint
                 : null,
             helperStyle: ok ? TextStyle(color: colors.primary) : null,
             errorText: switch (status) {

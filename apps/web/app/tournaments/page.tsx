@@ -1,20 +1,29 @@
 import type { Metadata } from "next";
-import { MembersOnly } from "@/components/MembersOnly";
-import { FindTournaments } from "@/components/tournaments/TournamentLists";
+import { TournamentsForEveryone } from "@/components/tournaments/PublicTournament";
+import { loadTournaments } from "@/lib/tournamentPage";
 
-export const metadata: Metadata = { title: "Tournaments and leagues" };
+// Rendered per request (the API answer itself is cached for a minute), so
+// an API outage during a build or revalidation can't be baked into the page.
+export const dynamic = "force-dynamic";
 
-/** Upcoming hosted tournaments and leagues to find and enter. */
-export default function TournamentsPage() {
+export const metadata: Metadata = {
+  title: "Tournaments and leagues",
+  description: "Tournaments, hat tournaments and leagues hosted on Stall 10: schedules, scores and standings.",
+};
+
+/**
+ * Upcoming hosted tournaments and leagues to find and enter. Server-rendered
+ * for visitors and search engines from the public list; members get it live.
+ */
+export default async function TournamentsPage() {
+  const list = await loadTournaments();
   return (
     <div className="page">
       <header className="page-head">
         <h1>Tournaments and leagues</h1>
         <p>Events hosted on Stall 10: enter a team, sign up to play or follow along.</p>
       </header>
-      <MembersOnly next="/tournaments" what="Sign up free or log in to find tournaments and leagues.">
-        <FindTournaments />
-      </MembersOnly>
+      <TournamentsForEveryone list={list?.tournaments ?? null} />
     </div>
   );
 }

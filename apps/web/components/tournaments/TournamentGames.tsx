@@ -33,10 +33,12 @@ import {
   pointDiff,
 } from "@stall10/shared";
 import { type FormEvent, useState } from "react";
+import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { type TournamentState, divisionPath, useAction } from "./useTournament";
 
-const dayLabel = (d: Date) => d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
-const timeLabel = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+// In [zone] (useRenderZone: UTC while a server-rendered page hydrates), else the viewer's.
+const dayLabel = (d: Date, zone?: string) => d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: zone });
+const timeLabel = (d: Date, zone?: string) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: zone });
 
 /** The schedule a division would get now, or why it can't have one (preview). */
 export function previewPlan(s: TournamentState): { plan: SchedulePlan | null; problem: string | null } {
@@ -127,6 +129,7 @@ function ScoreForm({ s, g, mode, onDone }: { s: TournamentState; g: EngineGame; 
 
 /** One game: its teams and score, and what the viewer can do with it. */
 export function GameCard({ s, g }: { s: TournamentState; g: EngineGame }) {
+  const zone = useRenderZone();
   const [open, setOpen] = useState<"report" | "final" | null>(null);
   const { busy, error, run } = useAction();
   const action = actionFor(s, g);
@@ -140,7 +143,7 @@ export function GameCard({ s, g }: { s: TournamentState; g: EngineGame }) {
       <div className="hosted-game-head">
         <small className="muted">
           Game {g.order + 1} · {g.label}
-          {g.startsAt ? ` · ${timeLabel(g.startsAt)}` : ""} · Field {g.field}
+          {g.startsAt ? ` · ${timeLabel(g.startsAt, zone)}` : ""} · Field {g.field}
         </small>
         {action && <span className="pill">{badge[action]}</span>}
       </div>
@@ -268,6 +271,7 @@ export function NoDivisions({ s }: { s: TournamentState }) {
 
 export function ScheduleTab({ s }: { s: TournamentState }) {
   const d = s.division;
+  const zone = useRenderZone();
   const { busy, error, run } = useAction();
   if (!d || !s.t) return <NoDivisions s={s} />;
   const league = s.t.kind === "league";
@@ -299,7 +303,7 @@ export function ScheduleTab({ s }: { s: TournamentState }) {
       {s.games.length === 0 && !s.manager && <p className="empty">The schedule appears here once the host publishes it.</p>}
       {s.games.length > 0 && <h3 className="hosted-heading">All games</h3>}
       {s.games.map((g) => {
-        const day = g.startsAt ? g.startsAt.toDateString() : "";
+        const day = g.startsAt ? dayKey(g.startsAt, zone) : "";
         const head = day && day !== lastDay;
         lastDay = day || lastDay;
         const byes = league && g.stage === "pool" && head ? byesIn(d.seeds, s.games, g.round) : [];
@@ -307,7 +311,7 @@ export function ScheduleTab({ s }: { s: TournamentState }) {
           <div key={g.id} className="stack hosted-game-row">
             {head && g.startsAt && (
               <div>
-                <h4 className="hosted-day">{league ? `${g.stage === "pool" ? `Week ${g.round}` : "Playoffs"} · ${dayLabel(g.startsAt)}` : dayLabel(g.startsAt)}</h4>
+                <h4 className="hosted-day">{league ? `${g.stage === "pool" ? `Week ${g.round}` : "Playoffs"} · ${dayLabel(g.startsAt, zone)}` : dayLabel(g.startsAt, zone)}</h4>
                 {byes.length > 0 && <small className="muted">Bye: {byes.map(s.teamName).join(", ")}</small>}
               </div>
             )}

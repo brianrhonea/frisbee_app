@@ -20,6 +20,11 @@ abstract class AuthRepository extends ChangeNotifier {
   /// app asks for one before anything else.
   bool get needsUsername;
 
+  /// Signed in with no usable name (empty, or an email; Apple can hide
+  /// it), and not in the middle of signing up. The router asks a new
+  /// account for one ("Your name and username").
+  bool get needsName;
+
   /// Whether nobody has [username] yet. It's only claimed by
   /// [claimUsername], so it can still be taken in between.
   Future<Result<bool>> isUsernameAvailable(String username);
@@ -53,6 +58,15 @@ abstract class AuthRepository extends ChangeNotifier {
   Future<Result<void>> sendPasswordReset(String email);
 
   Future<Result<void>> updateDisplayName(String name);
+
+  /// Names the signed-in user "[firstName] [lastName]" the way email
+  /// sign-up does: the Auth record (which the profile and people
+  /// directory pick up) and the private first and last name on
+  /// users/{uid}.
+  Future<Result<void>> saveName({
+    required String firstName,
+    required String lastName,
+  });
 
   /// Sets the profile picture (a download URL); null removes it. The
   /// profile and the people directory pick it up.

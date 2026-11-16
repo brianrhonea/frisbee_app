@@ -69,6 +69,10 @@ Plain-language notes for testers are in
   longer drops while a team is still loading, and its watches reconnect.
 - Drafts typed right after sign-in no longer overwrite saved ones.
 - Players with the same name are drafted in a fixed order (by uid).
+- A youth team's page says "Rosters of youth teams are private: only
+  members see them." to anyone who isn't on it (as on the website; the
+  API refuses them its roster).
+- The tournament form says the location and About are public.
 - Removed code we no longer need: the old Flutter website, the
   Windows/macOS leftovers (Windows Google sign-in, screen-source and
   speaker pickers, the mouse-only message strip, WebView2 players) and

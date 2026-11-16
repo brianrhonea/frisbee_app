@@ -44,6 +44,20 @@ abstract final class Username {
     if (_reserved.contains(name)) return 'That username is reserved';
     return null;
   }
+
+  /// A starting suggestion from [name], e.g. "pat.lee" from "Pat Lee", or
+  /// '' when the name makes no valid one (`suggestUsername` in
+  /// packages/shared).
+  static String suggest(String? name) {
+    final n = (name ?? '')
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '.')
+        .replaceAll(RegExp(r'^\.+|\.+$'), '');
+    final s = n.length > maxLength
+        ? n.substring(0, maxLength).replaceAll(RegExp(r'\.+$'), '')
+        : n;
+    return problem(s) == null ? s : '';
+  }
 }
 
 /// Someone else got the username first.
