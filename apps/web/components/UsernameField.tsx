@@ -25,18 +25,7 @@ async function available(handle: string, uid: string | null): Promise<boolean> {
   }
 }
 
-/**
- * "pat.lee" from "Pat Lee": a starting suggestion they can change, or ""
- * when the name makes no valid one (the app's ChooseUsernameViewModel).
- */
-export function suggestUsername(name: string | null | undefined): string {
-  const n = (name ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ".")
-    .replace(/^\.+|\.+$/g, "");
-  const s = n.length > usernameLimits.max ? n.slice(0, usernameLimits.max).replace(/\.+$/, "") : n;
-  return usernameProblem(s) == null ? s : "";
-}
+export { suggestUsername } from "@stall10/shared";
 
 /** The status of [value] as it's typed: its format at once, whether it's free after a pause. */
 export function useUsernameCheck(value: string, uid: string | null, delay = 400) {

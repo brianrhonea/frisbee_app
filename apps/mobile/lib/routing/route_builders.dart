@@ -65,7 +65,10 @@ Widget personalDetailsPage({bool finishing = false}) => ViewModelHost(
 );
 
 Widget chooseUsernamePage() => ViewModelHost(
-  create: (c) => ChooseUsernameViewModel(authRepository: c.read()),
+  create: (c) => ChooseUsernameViewModel(
+    authRepository: c.read(),
+    personalRepository: c.read(),
+  ),
   builder: (_, vm) => ChooseUsernameScreen(viewModel: vm),
 );
 

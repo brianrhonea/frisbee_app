@@ -22,6 +22,7 @@ import 'package:frisbee_app/data/services/file_picker_service.dart';
 import 'package:frisbee_app/data/services/image_compressor.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/data/services/account_service.dart';
+import 'package:frisbee_app/domain/models/person_name.dart';
 import 'package:frisbee_app/domain/models/username.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
@@ -127,6 +128,29 @@ class FakeAuthRepository extends AuthRepository {
   bool get needsUsername => _user != null && usernameMissing;
 
   @override
+  bool get needsName => _user != null && PersonName.missing(_user!.displayName);
+
+  /// What [saveName] was given.
+  ({String first, String last})? savedName;
+
+  @override
+  Future<Result<void>> saveName({
+    required String firstName,
+    required String lastName,
+  }) => _run(() {
+    savedName = (first: firstName.trim(), last: lastName.trim());
+    setUser(
+      AppUser(
+        uid: _user!.uid,
+        email: _user!.email,
+        displayName: PersonName.join(firstName, lastName),
+        photoUrl: _user!.photoUrl,
+        username: _user!.username,
+      ),
+    );
+  });
+
+  @override
   Future<Result<bool>> isUsernameAvailable(String username) async {
     final name = Username.normalize(username);
     return Result.ok(
@@ -162,7 +186,13 @@ class FakeAuthRepository extends AuthRepository {
   @override
   Future<Result<void>> updateDisplayName(String name) => _run(
     () => setUser(
-      AppUser(uid: _user!.uid, email: _user!.email, displayName: name),
+      AppUser(
+        uid: _user!.uid,
+        email: _user!.email,
+        displayName: name,
+        photoUrl: _user!.photoUrl,
+        username: _user!.username,
+      ),
     ),
   );
 
@@ -2560,6 +2590,18 @@ class FakePersonalDetailsRepository extends PersonalDetailsRepository {
 
   @override
   set signUpBirthDate(DateTime? value) => _birth = value;
+
+  ({String first, String last})? _name;
+
+  @override
+  ({String first, String last})? takeSignUpName() {
+    final n = _name;
+    _name = null;
+    return n;
+  }
+
+  @override
+  set signUpName(({String first, String last})? value) => _name = value;
 }
 
 /// Calendars in memory, like the API: [calendarList] the user is on (their

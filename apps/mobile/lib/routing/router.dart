@@ -1025,9 +1025,12 @@ String? authRedirect(
           : {'from': target},
     ).toString();
   }
-  // No username yet: pick one first, then carry on.
+  // No username yet, or a new account without a name (Google and Apple
+  // skip the form that asks them; Apple can hide the name): "Your name and
+  // username" first, then carry on.
   final choosing = path == Routes.chooseUsername;
-  if (auth.needsUsername) {
+  final needsName = (personal?.status?.required ?? false) && auth.needsName;
+  if (auth.needsUsername || needsName) {
     if (choosing) return null;
     final target = public || path == splashPath ? from : uri.toString();
     return Uri(

@@ -47,6 +47,7 @@ class SignUpViewModel extends ChangeNotifier {
     }
     // Kept in memory for the details step, which comes next.
     _personal.signUpBirthDate = f.birthDate;
+    _personal.signUpName = (first: f.firstName.trim(), last: f.lastName.trim());
     final result = await _auth.signUpWithEmail(
       email: f.email,
       password: f.password,

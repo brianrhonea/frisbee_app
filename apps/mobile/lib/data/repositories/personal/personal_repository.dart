@@ -35,4 +35,9 @@ abstract class PersonalDetailsRepository extends ChangeNotifier {
   /// step doesn't ask it again. Read once.
   DateTime? takeSignUpBirthDate();
   set signUpBirthDate(DateTime? value);
+
+  /// The first and last name just typed (sign-up, or "Your name and
+  /// username"), in memory only, to start the legal name from. Read once.
+  ({String first, String last})? takeSignUpName();
+  set signUpName(({String first, String last})? value);
 }

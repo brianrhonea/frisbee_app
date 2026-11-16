@@ -105,6 +105,18 @@ class PersonalDetailsRepositoryApi extends PersonalDetailsRepository {
   @override
   set signUpBirthDate(DateTime? value) => _signUpBirthDate = value;
 
+  ({String first, String last})? _signUpName;
+
+  @override
+  ({String first, String last})? takeSignUpName() {
+    final n = _signUpName;
+    _signUpName = null;
+    return n;
+  }
+
+  @override
+  set signUpName(({String first, String last})? value) => _signUpName = value;
+
   @override
   void dispose() {
     _auth.removeListener(_onAuth);

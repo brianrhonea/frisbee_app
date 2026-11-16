@@ -296,6 +296,25 @@ everything the app does on the website alone, styled like the website
     invitations (the website's does). Website only (layout): feeds load
     as you scroll (the app keeps "Show older posts"), and a floating
     Post button on phones.
+14. Sign-up with Google or Apple: [x] "Your name and username" on both
+    (website `UsernameStep` in `PersonalGate` and the Home card; app
+    `ChooseUsernameScreen`): first and last name, prefilled by splitting
+    the provider's name (`splitDisplayName` / `PersonName.split`; an
+    email-looking name is ignored) and required, with the sign-up form's
+    limits (`personNameLimits`, 30 each, on both sign-up forms too), then
+    the username suggested from the name until edited. Email accounts that
+    have a name see only the username. A new account with no usable name
+    is held at the step even with a username ("Your name"); older accounts
+    keep today's rules (asked when the username is missing). The name is
+    saved as each platform renames (website `PUT /v1/me/identity`, app the
+    Auth record), then the username is claimed. "About you" follows and
+    starts the legal name from the names just typed (in memory only),
+    else the display name split. Tests: `packages/shared/test/profile.test.ts`
+    (fixtures `profile_names.json` `displayNames`, written by the app's
+    `test/data/shared_fixtures_test.dart`), app
+    `test/ui/choose_username_test.dart`. Not yet: the sign-up birthday
+    reaches "About you" only within the same page load or app session
+    (it isn't stored anywhere before the details are saved).
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 
