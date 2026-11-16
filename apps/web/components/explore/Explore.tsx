@@ -4,7 +4,7 @@
 // recent results, a rankings preview and shortcuts. Players and teams come
 // from /v1/public/search; tournaments are matched in the browser over the
 // upcoming ones the card already reads, as the app's ExploreViewModel does.
-import type { PublicListing, PublicProfile, SearchPage, TournamentDoc } from "@stall10/shared";
+import { orderedRankingKeys, parseRankingKey, type PublicListing, type PublicProfile, rankingsHref, type SearchPage, type TournamentDoc } from "@stall10/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -13,7 +13,7 @@ import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { listingSubtitle } from "@/lib/site";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
-import { type DivisionRanking, type PlayerRanking, rankingLabel, rankingOrder, whole } from "../Rankings";
+import { type DivisionRanking, isShownRanking, type PlayerRanking, rankingLabel, whole } from "../Rankings";
 import { datesLabel, TournamentCard, tournamentHref, useUpcomingTournaments } from "../tournaments/TournamentLists";
 import { type ExploreFilter, exploreHref, listingsFor, matchTournaments, minQueryLength } from "./filters";
 import "./explore.css";
@@ -318,13 +318,16 @@ function RankingsPreview({ mine }: { mine: MyTeam[] }) {
   const [picked, setPicked] = useState<string | null>(null);
   const rankings = useLiveQuery<DivisionRanking>(user ? "rankings" : null, [], "rankings");
   const players = useLiveDoc<PlayerRanking>(user && kind === "players" ? "playerRankings/all" : null);
-  const ranked = (rankings.data ?? []).filter((r) => (r.teams?.length ?? 0) > 0).sort((a, b) => rankingOrder(a) - rankingOrder(b));
+  // Never youth (isShownRanking), by level then division.
+  const shown = (rankings.data ?? []).filter(isShownRanking);
+  const ranked = orderedRankingKeys(shown.map((r) => r.id)).map((k) => shown.find((r) => r.id === k)!);
   const byKey = (key: string | null | undefined) => ranked.find((r) => r.id === key);
   const mineKeys = mine.filter((t) => (t.kind ?? "team") === "team").map((t) => `${t.level ?? "club"}-${t.division ?? "mixed"}`);
   const ranking =
     byKey(picked) ?? mineKeys.map(byKey).find(Boolean) ?? [...ranked].sort((a, b) => (b.teams?.length ?? 0) - (a.teams?.length ?? 0))[0];
   const myIds = new Set(mine.map((t) => t.id));
-  const link = kind === "players" ? "/rankings?kind=players" : ranking ? `/rankings?division=${encodeURIComponent(ranking.id)}` : null;
+  const at = ranking ? parseRankingKey(ranking.id) : null;
+  const link = kind === "players" ? "/rankings?kind=players" : at ? rankingsHref(at.level, at.division) : null;
 
   return (
     <section className="card">
