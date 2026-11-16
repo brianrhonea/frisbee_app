@@ -17,6 +17,12 @@ Firebase project; App Store builds come from `main` and use production.
   community feed. Other tabs ask you to sign up or log in, then bring
   you back.
 
+**Youth teams**
+- A youth team's roster is only for its members (and its school or
+  club's admins). Others see "Rosters of youth teams are private: only
+  members see them."
+- The tournament form says the location and About are public.
+
 **Signing up with Google or Apple**
 - We now ask your first and last name along with your username, so your
   profile, posts and rosters show the name you choose, even if Apple hid
