@@ -366,9 +366,15 @@ everything the app does on the website alone, styled like the website
     else the display name split. Tests: `packages/shared/test/profile.test.ts`
     (fixtures `profile_names.json` `displayNames`, written by the app's
     `test/data/shared_fixtures_test.dart`), app
-    `test/ui/choose_username_test.dart`. Not yet: the sign-up birthday
-    reaches "About you" only within the same page load or app session
-    (it isn't stored anywhere before the details are saved).
+    `test/ui/choose_username_test.dart`. The email sign-up form's
+    birthday is saved right after the account is made
+    (`PUT /v1/me/personal/birth-date`, encrypted like the details, under
+    13 refused, never blocking sign-up), and "About you" starts from that
+    copy (`GET /v1/me/personal`'s `signUpBirthDate`), else the one in
+    memory, so a reload, restart or other device isn't asked again. It
+    doesn't complete the details and is refused once they're saved.
+    Tests: API `test/personal.test.ts`, app
+    `test/ui/personal_details_test.dart` ("the sign-up birthday").
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 
