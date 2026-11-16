@@ -25,6 +25,11 @@ version 0.0.12. What changed in each version is in
    - **Invite link**: tap a link someone sent you (in Messages, WhatsApp,
      email or a Stall 10 message). It opens Stall 10 and shows the team;
      tap **Join**. Links expire (1 hour to 30 days, the sender picks).
+   - **Club teams are for players 16 and over.** To join one, or start
+     one, you need to be 16 that day, with your date of birth in
+     **About you**. Other levels and groups are open to
+     everyone. Anyone can be invited to a club team; accepting checks
+     your age, and the invite waits until you can.
    - **Create team**: you become its owner. Show the invite code or share
      an invite link from the team's **Members** page.
    Sign in later with your email **or** your @username.
@@ -335,7 +340,8 @@ with a men's team and a women's team. Start one from Teams → **New** →
   onto it (say Woof Captain, Woof Coach, Woof Player for Woof). People
   with one of those roles join the team automatically, and leave it when
   the role is taken away. Teams show **Joining…** for a moment while
-  that happens.
+  that happens. Club teams (16 and over) don't take anyone from roles:
+  invite their players instead.
 - **Events**: a community event can be for everyone or only some roles
   (**Who sees it** in the event editor).
 - **Discord import**: importing a server into the community sorts its

@@ -99,6 +99,22 @@ and events; everything else in the hub is for members. A private group
   other levels work the same way once sanctioning exists (§7).
 - **Masters** is a new level (today's levels are club, college, youth,
   league and pickup).
+- **Club teams are for players 16 and over** (decided 2026-11-15). A
+  club team is a team (not a group) at the club level. Anyone becoming a
+  member of one, by code, link or invite, or by starting one, must be 16
+  or over that day, counted from the date of birth in their personal
+  details (`clubMinimumAge`, `clubJoinProblem` in
+  `packages/shared/src/personal.ts`). Without a date of birth on file
+  they're asked to add it in About you first. The API checks it
+  (`apps/api/src/teams/club_age.ts`; it never shows anyone the date),
+  so `firestore.rules` refuses direct joins and creates of club teams.
+  Invites can still be sent (an invitee's age is private); accepting is
+  checked. People already on a club team stay, and changing a team's
+  level to club removes no one. Community roles don't add anyone to a
+  club team: its players join with an invite. Free-text roster spots
+  aren't accounts, so they aren't checked; linking a spot only links an
+  existing member. Groups and other levels (college, youth, league,
+  pickup) are open to everyone.
 
 ## 6. News
 
@@ -296,6 +312,21 @@ everything the app does on the website alone, styled like the website
     invitations (the website's does). Website only (layout): feeds load
     as you scroll (the app keeps "Show older posts"), and a floating
     Post button on phones.
+14. Club teams, 16 and over (§5): [x] the API refuses joins (code,
+    link, invite) and starts of club teams for under-16s or anyone with
+    no date of birth on file, with the same words on both ("Club teams
+    are for players 16 and over." / "Add your date of birth in About you
+    to join a club team."), shown where the join fails; [x] the rule up
+    front on both: creating a team at the club level, moving a team to
+    club (people already on it stay), a community's new team, invite
+    links and club team invites; the community role picker says club
+    teams take no one from roles. Tests: shared
+    `test/personal.test.ts`, API `test/membership.test.ts`,
+    `test/teams.test.ts` and their emulator tests, rules
+    `firestore.rules.test.ts` ("club teams"), functions
+    `test/communities/model.test.ts`, app `test/ui/club_age_test.dart`
+    and `test/domain/personal_details_test.dart`. The website has no
+    test runner yet, so its side is checked by hand.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 
