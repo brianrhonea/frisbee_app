@@ -52,6 +52,7 @@ import { PersonalService } from "./personal/service.js";
 import { profileRoutes } from "./profiles/routes.js";
 import { ProfileService } from "./profiles/service.js";
 import type { DocStore } from "./store.js";
+import { ClubAgeGate } from "./teams/club_age.js";
 import { MembershipService } from "./teams/membership.js";
 import { membershipRoutes } from "./teams/membership_routes.js";
 import type { TeamRepository } from "./teams/repository.js";
@@ -157,16 +158,20 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
   app.get("/health", async () => ({ ok: true, version: apiVersion }));
   const revalidate = deps.revalidate ?? noRevalidate;
-  teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now));
+  // Club teams' age rule reads birth dates from personal details: none
+  // without the key, so club joins are refused rather than unchecked.
+  const personal = deps.store && deps.personal ? new PersonalService(deps.store, deps.users, deps.personal, deps.now) : undefined;
+  const clubAges = new ClubAgeGate(personal, deps.now);
+  teamRoutes(app, new TeamService(deps.teams, deps.users, deps.now, clubAges));
   if (deps.me) meRoutes(app, new MeService(deps.me.repo, deps.me.imageUrl, deps.now), deps.writeLimits !== false ? writes : undefined);
   if (deps.browse) browseRoutes(app, new BrowseService(deps.browse.repo, deps.browse.imageUrl, deps.now), deps.browse);
   if (deps.store) {
-    membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now));
+    membershipRoutes(app, new MembershipService(deps.store, deps.users, deps.teams, deps.now, undefined, clubAges));
     profileRoutes(app, new ProfileService(deps.store, deps.users), revalidate);
     accountRoutes(app, new AccountService(deps.store, deps.users, deps.media), revalidate);
     const queries = deps.queries ?? listDocQueries(deps.store);
     teamDeletionRoutes(app, new TeamDeletion(deps.store, deps.teams, deps.media, queries));
-    if (deps.personal) personalRoutes(app, new PersonalService(deps.store, deps.users, deps.personal, deps.now));
+    if (personal) personalRoutes(app, personal);
     const reads = deps.writeLimits !== false ? writes : undefined;
     rosterRoutes(app, new RosterService(deps.store), reads);
     postRoutes(app, new PostService(deps.store, deps.users, deps.now), revalidate, reads);

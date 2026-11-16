@@ -12,7 +12,7 @@ function setup(opts: Partial<AppDeps> = {}) {
 }
 
 const site = "https://stall10.app";
-const team = { name: "The Haze", division: "open", level: "club", city: "Austin" };
+const team = { name: "The Haze", division: "open", level: "pickup", city: "Austin" };
 
 describe("CORS", () => {
   const origins = [site, "http://localhost:3000", "https://stall10-*.vercel.app"];

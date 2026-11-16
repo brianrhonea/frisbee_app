@@ -95,6 +95,34 @@ export function birthDateProblem(birthDate: string, today: string | Date): strin
   return null;
 }
 
+/** Club teams (team.ts isClubTeam) take players this age and over. */
+export const clubMinimumAge = 16;
+
+/** Why someone too young can't join a club team; also shown up front. */
+export const clubTooYoungMessage = `Club teams are for players ${clubMinimumAge} and over.`;
+
+/** Why someone with no date of birth on file can't join a club team yet. */
+export const clubNeedsBirthDateMessage = "Add your date of birth in About you to join a club team.";
+
+/** What an admin sees when the person they're adding can't join a club team. */
+export const clubCantJoinMessage = (name: string) =>
+  `${name} can't join a club team: club teams are for players ${clubMinimumAge} and over.`;
+
+/**
+ * Whether someone born on [birthDate] (YYYY-MM-DD) may join a club team on
+ * [today]: [clubMinimumAge] or over that day, counted as [ageOn] counts
+ * (so their 16th birthday is the first day they can). No date: no.
+ */
+export function canJoinClubTeam(birthDate: string | null | undefined, today: string | Date): boolean {
+  return clubJoinProblem(birthDate, today) === null;
+}
+
+/** Why someone born on [birthDate] can't join a club team on [today], or null. */
+export function clubJoinProblem(birthDate: string | null | undefined, today: string | Date): string | null {
+  if (!birthDate || !isCalendarDate(birthDate)) return clubNeedsBirthDateMessage;
+  return ageOn(birthDate, today) >= clubMinimumAge ? null : clubTooYoungMessage;
+}
+
 export const addressSchema = z.strictObject({
   line1: text(personalLimits.line, "a street address"),
   line2: z.string().trim().max(personalLimits.line, "Address line 2 is too long.").default(""),

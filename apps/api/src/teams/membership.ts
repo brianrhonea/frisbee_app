@@ -47,6 +47,7 @@ import {
   strings,
   transferOwnership,
 } from "./access.js";
+import { ClubAgeGate } from "./club_age.js";
 import { newTeamDocuments } from "./documents.js";
 import type { TeamRepository } from "./repository.js";
 import { tooFastMessage } from "./service.js";
@@ -85,6 +86,8 @@ export class MembershipService {
     private readonly now: () => number = Date.now,
     private readonly randomCode: (length: number) => string = (n) =>
       Array.from({ length: n }, () => codeAlphabet[randomInt(codeAlphabet.length)]).join(""),
+    /** Club teams' age rule (16 and over); without birth dates, club joins are refused. */
+    private readonly clubAges: ClubAgeGate = new ClubAgeGate(undefined, now),
   ) {}
 
   /** The caller's name as the app shows it, from their Auth record. */
@@ -151,6 +154,7 @@ export class MembershipService {
       if (!team) throw new ApiError("not_found", "No team found for that invite code.");
       // Already in: nothing to do (the rule refuses, so no one's role drops).
       if (isMember(team, caller.uid)) return teamId;
+      await this.clubAges.check(team, caller.uid);
       tx.set(p.join(teamId, caller.uid), { code });
       tx.update(p.team(teamId), addMember(team, caller.uid, name));
       return teamId;
@@ -217,6 +221,9 @@ export class MembershipService {
         tx.delete(p.request(teamId, uid));
         return;
       }
+      // Only groups take requests, so this never refuses today; it's here
+      // so a club team never gains someone under 16 this way.
+      await this.clubAges.check(team, uid, name);
       tx.update(p.team(teamId), addMember(team, uid, name));
       tx.delete(p.request(teamId, uid));
     });
@@ -256,7 +263,11 @@ export class MembershipService {
       const team = await tx.get(p.team(teamId));
       if (!invite) throw new ApiError("not_found", "That invite was withdrawn.");
       if (!team) throw notFound();
-      if (!isMember(team, caller.uid)) tx.update(p.team(teamId), addMember(team, caller.uid, name));
+      if (!isMember(team, caller.uid)) {
+        // Inviting anyone works (their age is private); joining is checked.
+        await this.clubAges.check(team, caller.uid);
+        tx.update(p.team(teamId), addMember(team, caller.uid, name));
+      }
       tx.delete(p.invite(caller.uid, teamId));
       tx.delete(p.request(teamId, caller.uid));
     });
@@ -520,6 +531,8 @@ export class MembershipService {
     const input = parseBody(createCommunityTeamRequestSchema, body);
     await this.checkNotMuted(caller.uid);
     await this.ensureNameFree(input.name, "team", input.division);
+    // The creator is its first member.
+    await this.clubAges.check({ kind: "team", level: input.level }, caller.uid);
     const label = await this.label(caller);
     const teamId = this.store.newId("teams");
     const team: CreateTeamInput = {

@@ -4,7 +4,7 @@
 import { searchKeywords } from "@stall10/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import { FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
+import { FakeCipher, FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier, seedBirthDate } from "./fakes.js";
 
 const now = Date.UTC(2026, 10, 11, 12);
 const T = "teams/t1";
@@ -45,7 +45,8 @@ function setup() {
   const store = new FakeStore(() => now);
   const users = new FakeUsers();
   const teams = new FakeTeamRepository();
-  const app = buildApp({ verifier: new FakeVerifier(), users, teams, store, now: () => now });
+  const cipher = new FakeCipher();
+  const app = buildApp({ verifier: new FakeVerifier(), users, teams, store, personal: cipher, now: () => now });
   const call = (method: "POST" | "PUT" | "PATCH" | "DELETE", url: string, uid: string, body?: object) =>
     app.inject({
       method,
@@ -53,12 +54,14 @@ function setup() {
       headers: { authorization: `Bearer token:${uid}:Name ${uid}` },
       ...(body !== undefined && { payload: body }),
     });
-  return { store, users, teams, app, call };
+  return { store, users, teams, cipher, app, call };
 }
 
 let s: ReturnType<typeof setup>;
-beforeEach(() => {
+beforeEach(async () => {
   s = setup();
+  // "new" (who joins in most tests) is an adult: the club team below takes them.
+  await seedBirthDate(s.store, s.cipher, "new", "1998-04-02");
 });
 
 const team = () => s.store.doc(T)!;
@@ -731,5 +734,152 @@ describe("communities", () => {
       s.store.put("limits/owner", { mutedUntil: new Date(now + 60_000) });
       expect((await s.call("POST", "/v1/teams/org1/linked-teams", "owner", body)).statusCode).toBe(429);
     });
+  });
+});
+
+describe("club teams are for players 16 and over", () => {
+  // now is 2026-11-11 12:00 UTC; ages count on the date in UTC+14, 2026-11-12.
+  const turns16Today = "2010-11-12";
+  const turns16Tomorrow = "2010-11-13";
+  const tooYoung = { code: "failed_precondition", message: "Club teams are for players 16 and over." };
+  const noBirthDate = { code: "failed_precondition", message: "Add your date of birth in About you to join a club team." };
+  const code = () =>
+    s.store.put("inviteCodes/ABC234", { teamId: "t1", createdBy: "owner", createdAt: new Date(now - 10_000), ttl: 45, expiresAt: new Date(now + 35_000) });
+  const invite = (uid: string) => s.store.put(`users/${uid}/teamInvites/t1`, { teamName: "The Haze", kind: "team" });
+  const born = (uid: string, date: string) => seedBirthDate(s.store, s.cipher, uid, date);
+
+  beforeEach(() => s.store.put(T, seedTeam()));
+
+  describe("joining with a code or link", () => {
+    it("takes someone on their 16th birthday", async () => {
+      code();
+      await born("kid", turns16Today);
+      expect((await s.call("POST", "/v1/teams/join", "kid", { code: "ABC234" })).statusCode).toBe(200);
+      expect(team().memberIds).toContain("kid");
+    });
+
+    it("refuses the day before; nothing is written", async () => {
+      code();
+      await born("kid", turns16Tomorrow);
+      const res = await s.call("POST", "/v1/teams/join", "kid", { code: "ABC234" });
+      expect(res.statusCode).toBe(412);
+      expect(err(res)).toEqual(tooYoung);
+      expect(team().memberIds).not.toContain("kid");
+      expect(s.store.doc("teams/t1/joins/kid")).toBeUndefined();
+    });
+
+    it("needs a date of birth on file", async () => {
+      code();
+      const res = await s.call("POST", "/v1/teams/join", "nobirth", { code: "ABC234" });
+      expect(res.statusCode).toBe(412);
+      expect(err(res)).toEqual(noBirthDate);
+    });
+
+    it("never decrypts the date of birth of someone already on the team", async () => {
+      code();
+      // p1 has no date on file and is under no check: existing members stay.
+      expect((await s.call("POST", "/v1/teams/join", "p1", { code: "ABC234" })).statusCode).toBe(200);
+      expect(s.cipher.calls.open).toBe(0);
+    });
+
+    it("leaves other levels alone", async () => {
+      for (const level of ["college", "youth", "league", "pickup"]) {
+        s.store.put(T, seedTeam({ level }));
+        code();
+        await born("kid", "2012-06-01");
+        expect((await s.call("POST", "/v1/teams/join", "kid", { code: "ABC234" })).statusCode).toBe(200);
+        expect((await s.call("POST", "/v1/teams/join", "nobirth", { code: "ABC234" })).statusCode).toBe(200);
+      }
+      expect(s.cipher.calls.open).toBe(0);
+    });
+  });
+
+  describe("invites", () => {
+    it("anyone may be invited (their age is private), and the check is at accept", async () => {
+      expect((await s.call("POST", "/v1/teams/t1/invites", "owner", { uid: "kid" })).statusCode).toBe(200);
+      await born("kid", turns16Tomorrow);
+      const res = await s.call("POST", "/v1/me/team-invites/t1/accept", "kid", {});
+      expect(res.statusCode).toBe(412);
+      expect(err(res)).toEqual(tooYoung);
+      expect(team().memberIds).not.toContain("kid");
+      // The invite stays, to accept once they're 16 (or decline).
+      expect(s.store.doc("users/kid/teamInvites/t1")).toBeDefined();
+    });
+
+    it("accepting on the 16th birthday joins", async () => {
+      invite("kid");
+      await born("kid", turns16Today);
+      expect((await s.call("POST", "/v1/me/team-invites/t1/accept", "kid", {})).statusCode).toBe(200);
+      expect(team().members).toMatchObject({ kid: "player" });
+    });
+
+    it("accepting needs a date of birth on file", async () => {
+      invite("nobirth");
+      expect(err(await s.call("POST", "/v1/me/team-invites/t1/accept", "nobirth", {}))).toEqual(noBirthDate);
+    });
+
+    it("a group's invite is unaffected", async () => {
+      s.store.put(T, group({ level: "club" }));
+      invite("kid");
+      await born("kid", "2012-06-01");
+      expect((await s.call("POST", "/v1/me/team-invites/t1/accept", "kid", {})).statusCode).toBe(200);
+    });
+  });
+
+  it("join requests are for groups only, so they never reach a club team", async () => {
+    s.store.put("teams/t1/joinRequests/kid", { name: "Kid" });
+    expect((await s.call("POST", "/v1/teams/t1/join-requests", "kid", {})).statusCode).toBe(412);
+    expect((await s.call("POST", "/v1/teams/t1/join-requests/kid/approve", "owner", {})).statusCode).toBe(412);
+    // A group that approves who joins takes anyone, club level or not.
+    s.store.put(T, group({ level: "club", requiresApproval: true }));
+    await born("kid", "2012-06-01");
+    expect((await s.call("POST", "/v1/teams/t1/join-requests/kid/approve", "mgr", {})).statusCode).toBe(200);
+    expect(team().memberIds).toContain("kid");
+  });
+
+  it("changing a team's level to club removes no one", async () => {
+    s.store.put(T, seedTeam({ level: "youth", members: { ...seedTeam().members, kid: "player" }, memberIds: [...seedTeam().memberIds, "kid"] }));
+    await born("kid", "2012-06-01");
+    expect((await s.call("PATCH", "/v1/teams/t1", "owner", { name: "The Haze", level: "club", city: "Austin" })).statusCode).toBe(200);
+    expect(team()).toMatchObject({ level: "club" });
+    expect(team().memberIds).toContain("kid");
+    // They're still on it, so handing them the team works as before.
+    expect((await s.call("POST", "/v1/teams/t1/owner", "owner", { uid: "kid" })).statusCode).toBe(200);
+  });
+
+  describe("a new club team in a community", () => {
+    const body = { name: "Haze Club", division: "open", level: "club", city: "Austin", roles: [] };
+    beforeEach(() =>
+      s.store.put("teams/org1", group({ name: "St. Mary's", kind: "organization", requiresApproval: true, linkedTeams: {} })),
+    );
+
+    it("needs its creator to be 16 or over", async () => {
+      await born("owner", turns16Tomorrow);
+      const res = await s.call("POST", "/v1/teams/org1/linked-teams", "owner", body);
+      expect(res.statusCode).toBe(412);
+      expect(err(res)).toEqual(tooYoung);
+      expect(s.store.doc("teams/org1")!.linkedTeams).toEqual({});
+      await born("owner", turns16Today);
+      expect((await s.call("POST", "/v1/teams/org1/linked-teams", "owner", body)).statusCode).toBe(201);
+    });
+
+    it("needs a date of birth on file; other levels don't", async () => {
+      expect(err(await s.call("POST", "/v1/teams/org1/linked-teams", "owner", body))).toEqual(noBirthDate);
+      expect((await s.call("POST", "/v1/teams/org1/linked-teams", "owner", { ...body, level: "college" })).statusCode).toBe(201);
+    });
+  });
+
+  it("refuses club joins when the API has no personal-details key", async () => {
+    const app = buildApp({ verifier: new FakeVerifier(), users: s.users, teams: s.teams, store: s.store, now: () => now });
+    code();
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/teams/join",
+      headers: { authorization: "Bearer token:new:New" },
+      payload: { code: "ABC234" },
+    });
+    expect(res.statusCode).toBe(503);
+    expect(err(res).code).toBe("unavailable");
+    expect(team().memberIds).not.toContain("new");
   });
 });

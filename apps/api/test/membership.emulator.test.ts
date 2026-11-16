@@ -7,7 +7,9 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
+import { randomBytes } from "node:crypto";
 import { FirestoreDocStore } from "../src/firestore_store.js";
+import { LocalCipher } from "../src/personal/cipher.js";
 import { AlreadyExists } from "../src/store.js";
 import { FirestoreTeamRepository } from "../src/teams/repository.js";
 
@@ -21,6 +23,7 @@ const firebase = initializeApp({ projectId }, "membership-emulator-test");
 const db = getFirestore(firebase);
 const auth = getAuth(firebase);
 const store = new FirestoreDocStore(db);
+const cipher = new LocalCipher(randomBytes(32).toString("base64"));
 const app = buildApp({
   verifier: {
     async verifyIdToken(token) {
@@ -37,7 +40,15 @@ const app = buildApp({
   },
   teams: new FirestoreTeamRepository(db),
   store,
+  personal: cipher,
 });
+
+/** Personal details with only a date of birth, sealed as the API stores them. */
+async function seedBirthDate(uid: string, birthDate: string) {
+  const path = `personalDetails/${uid}`;
+  const sealed = await cipher.seal(Buffer.from(JSON.stringify({ birthDate }), "utf8"), path);
+  await db.doc(path).set({ ciphertext: sealed.ciphertext, key: sealed.key, format: 1 });
+}
 
 async function idTokenFor(uid: string, displayName: string): Promise<string> {
   await auth.createUser({ uid, displayName, email: `${uid}@x.test` }).catch(() => undefined);
@@ -54,9 +65,12 @@ const call = (method: "POST" | "PUT" | "PATCH" | "DELETE", url: string, uid: str
   app.inject({ method, url, headers: { authorization: `Bearer ${tokens[uid]}` }, ...(body && { payload: body }) });
 
 beforeAll(async () => {
-  for (const [uid, name] of [["m-owner", "Olive"], ["m-new", "Nia"], ["m-p1", "Pat"]]) {
+  for (const [uid, name] of [["m-owner", "Olive"], ["m-new", "Nia"], ["m-p1", "Pat"], ["m-kid", "Kit"]]) {
     tokens[uid] = await idTokenFor(uid, name);
   }
+  // The team is a club team: 16 and over. Nia is an adult; Kit is 14.
+  await seedBirthDate("m-new", "1999-03-04");
+  await seedBirthDate("m-kid", `${new Date().getUTCFullYear() - 14}-01-01`);
   await db.doc("teams/m-team").set({
     name: "Emulator Haze",
     division: "open",
@@ -95,6 +109,18 @@ describe("membership on the emulators", () => {
     expect(team.memberIds).toEqual(["m-owner", "m-p1", "m-new"]);
     expect(team.memberNames["m-new"]).toBe("Nia");
     expect((await db.doc("teams/m-team/joins/m-new").get()).data()).toEqual({ code });
+  });
+
+  it("refuses someone under 16 on the club team, reading their sealed date of birth", async () => {
+    const res = await call("POST", "/v1/teams/join", "m-kid", { code });
+    expect(res.statusCode).toBe(412);
+    expect(res.json().error.message).toBe("Club teams are for players 16 and over.");
+    expect((await db.doc("teams/m-team").get()).get("memberIds")).not.toContain("m-kid");
+    expect((await db.doc("teams/m-team/joins/m-kid").get()).exists).toBe(false);
+    // Inviting them works; accepting is refused, and the invite stays.
+    expect((await call("POST", "/v1/teams/m-team/invites", "m-owner", { uid: "m-kid" })).statusCode).toBe(200);
+    expect((await call("POST", "/v1/me/team-invites/m-team/accept", "m-kid", {})).statusCode).toBe(412);
+    expect((await db.doc("users/m-kid/teamInvites/m-team").get()).exists).toBe(true);
   });
 
   it("saves roles with memberPerms worked out", async () => {

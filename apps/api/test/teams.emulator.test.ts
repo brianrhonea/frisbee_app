@@ -6,7 +6,10 @@ import { deleteApp, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { randomBytes } from "node:crypto";
 import { buildApp } from "../src/app.js";
+import { FirestoreDocStore } from "../src/firestore_store.js";
+import { LocalCipher } from "../src/personal/cipher.js";
 import { FirestoreTeamRepository } from "../src/teams/repository.js";
 
 const projectId = "demo-stall10";
@@ -18,6 +21,7 @@ if (!process.env.FIRESTORE_EMULATOR_HOST || !authHost) {
 const firebase = initializeApp({ projectId }, "emulator-test");
 const db = getFirestore(firebase);
 const auth = getAuth(firebase);
+const cipher = new LocalCipher(randomBytes(32).toString("base64"));
 const app = buildApp({
   // One caller creates many teams here.
   writeLimits: false,
@@ -35,7 +39,17 @@ const app = buildApp({
     },
   },
   teams: new FirestoreTeamRepository(db),
+  // Club teams need their creator's date of birth (personal details).
+  store: new FirestoreDocStore(db),
+  personal: cipher,
 });
+
+/** Personal details with only a date of birth, sealed as the API stores them. */
+async function seedBirthDate(uid: string, birthDate: string) {
+  const path = `personalDetails/${uid}`;
+  const sealed = await cipher.seal(Buffer.from(JSON.stringify({ birthDate }), "utf8"), path);
+  await db.doc(path).set({ ciphertext: sealed.ciphertext, key: sealed.key, format: 1 });
+}
 
 /** A real ID token from the Auth emulator for a new user. */
 async function idTokenFor(uid: string, displayName: string): Promise<string> {
@@ -58,6 +72,7 @@ beforeAll(async () => {
   await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${projectId}/databases/(default)/documents`, { method: "DELETE" });
   await fetch(`http://${authHost}/emulator/v1/projects/${projectId}/accounts`, { method: "DELETE" });
   token = await idTokenFor("u1", "Pat Lee");
+  await seedBirthDate("u1", "1994-08-30");
 });
 
 afterAll(async () => {
@@ -123,6 +138,19 @@ describe("POST /v1/teams on the emulators", () => {
     expect(res.statusCode).toBe(201);
     const team = await db.doc(`teams/${res.json().id}`).get();
     expect(team.get("memberNames")).toEqual({ u1: "Pat Renamed" });
+  });
+
+  it("needs a club team's creator to be 16 or over", async () => {
+    const kid = await idTokenFor("u-kid", "Kit");
+    await seedBirthDate("u-kid", `${new Date().getUTCFullYear() - 14}-01-01`);
+    const res = await post({ name: "Kid Club", division: "open", level: "club" }, kid);
+    expect(res.statusCode).toBe(412);
+    expect(res.json().error.message).toBe("Club teams are for players 16 and over.");
+    expect((await post({ name: "Kid Youth", division: "open", level: "youth" }, kid)).statusCode).toBe(201);
+    const none = await idTokenFor("u-none", "Nobody");
+    expect((await post({ name: "No Birthday Club", division: "open", level: "club" }, none)).json().error.message).toBe(
+      "Add your date of birth in About you to join a club team.",
+    );
   });
 
   it("rejects a forged token", async () => {

@@ -53,6 +53,20 @@ export class PersonalService {
     return { details: JSON.parse(plain.toString("utf8")) as PersonalDetails, email };
   }
 
+  /**
+   * [uid]'s date of birth (YYYY-MM-DD), or null when they haven't given
+   * their details, for the API's own age checks (club teams: teams/
+   * club_age.ts). Never sent to anyone: callers only learn yes or no.
+   */
+  async birthDate(uid: string): Promise<string | null> {
+    const path = personalPath(uid);
+    const doc = await this.store.get(path);
+    if (!doc) return null;
+    const plain = await this.cipher.open({ ciphertext: String(doc.ciphertext), key: String(doc.key) }, path);
+    const birthDate = (JSON.parse(plain.toString("utf8")) as Partial<PersonalDetails>).birthDate;
+    return typeof birthDate === "string" ? birthDate : null;
+  }
+
   /** Replaces their details. Under 13 is refused and nothing is saved. */
   async save(caller: Caller, body: unknown): Promise<void> {
     const r = personalDetailsSchema.safeParse(body ?? {});

@@ -259,3 +259,13 @@ export class FakeCipher implements PersonalCipher {
     return Buffer.from(raw.slice(context.length + 1), "utf8");
   }
 }
+
+/**
+ * Seeds [uid]'s personal details with just a date of birth, sealed as the
+ * API stores them (personalDetails/{uid}), for the club age rule.
+ */
+export async function seedBirthDate(store: FakeStore, cipher: PersonalCipher, uid: string, birthDate: string) {
+  const path = `personalDetails/${uid}`;
+  const sealed = await cipher.seal(Buffer.from(JSON.stringify({ birthDate }), "utf8"), path);
+  store.put(path, { ciphertext: sealed.ciphertext, key: sealed.key, format: 1 });
+}

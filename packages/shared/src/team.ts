@@ -15,6 +15,15 @@ export type TeamKind = (typeof teamKinds)[number];
 
 export const isGroupLike = (kind: TeamKind) => kind !== "team";
 
+/**
+ * A club team: a team (no `kind`, or "team") at the club level (a stored
+ * team with no level reads as club, as the app and listings read it).
+ * Joining one needs [clubMinimumAge] (personal.ts); groups and other
+ * levels are open to everyone.
+ */
+export const isClubTeam = (t: { kind?: unknown; level?: unknown }) =>
+  (t.kind == null || t.kind === "team") && (t.level == null || t.level === "club");
+
 export const groupLocationSchema = z.strictObject({
   address: z.string().max(200),
   lat: z.number().min(-90).max(90),
