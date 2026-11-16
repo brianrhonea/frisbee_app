@@ -7,6 +7,23 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.27.0 — 2026-11-15
+
+Club teams are for players 16 and over. Deploy with (or before) the new
+`firestore.rules`; needs `PERSONAL_DETAILS_KMS_KEY`.
+
+**Added**
+- Joining a club team (code, link or invite) or starting one
+  (`POST /v1/teams`, a team made inside a community) needs the player to
+  be 16 that day, read from their encrypted personal details
+  (`PersonalService.birthDate`, never returned). No date of birth on file
+  → 412 "Add your date of birth in About you to join a club team.";
+  under 16 → 412 "Club teams are for players 16 and over."; no
+  personal-details key → 503.
+- Invites can still be sent to anyone; people already on a club team
+  stay. `clubMinimumAge`, `canJoinClubTeam` and `isClubTeam` (a team
+  with level club, or no level) are in `@stall10/shared`.
+
 ## 0.26.0 — 2026-11-15
 
 Public reads for signed-out website visitors. Deploy before web 0.31.0.

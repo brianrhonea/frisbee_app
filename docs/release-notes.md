@@ -17,6 +17,10 @@ Firebase project; App Store builds come from `main` and use production.
   community feed. Other tabs ask you to sign up or log in, then bring
   you back.
 
+**Club teams are 16 and over**
+- Club teams are now for players 16 and over. Add your date of birth in
+  About you to join one. Anyone already on a club team stays on it.
+
 **Youth teams**
 - A youth team's roster is only for its members (and its school or
   club's admins). Others see "Rosters of youth teams are private: only

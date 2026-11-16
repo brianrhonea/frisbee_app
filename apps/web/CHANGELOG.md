@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.32.0 — 2026-11-15
+
+Needs API 0.27.0.
+
+**Added**
+- "Club teams are for players 16 and over" when creating a club team,
+  moving a team to club, making a community's team, and on invite links
+  and club team invites. A refused join shows why where it failed.
+- The community role picker notes that club teams take no one from roles.
+
 ## 0.31.0 — 2026-11-15
 
 More for signed-out visitors (parents, friends, colleagues). Needs API
