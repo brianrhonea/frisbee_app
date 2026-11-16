@@ -109,6 +109,13 @@ export const clubCantJoinMessage = (name: string) =>
   `${name} can't join a club team: club teams are for players ${clubMinimumAge} and over.`;
 
 /**
+ * Community roles add their holders to the community's teams, but not to
+ * club teams: nothing but the API can check an age, so players join those
+ * with an invite.
+ */
+export const clubRolesNotice = "Club teams (16 and over) don't take anyone from roles: invite their players instead.";
+
+/**
  * Whether someone born on [birthDate] (YYYY-MM-DD) may join a club team on
  * [today]: [clubMinimumAge] or over that day, counted as [ageOn] counts
  * (so their 16th birthday is the first day they can). No date: no.

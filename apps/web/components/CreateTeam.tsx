@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { callApi } from "@/lib/client";
 import { useAuth } from "./AuthProvider";
+import { ClubAgeNote } from "./ClubAge";
 
 const kindCopy = {
   team: { title: "Create a team", name: "Team name", hint: "A club, college or league team with a roster, schedule and playbook." },
@@ -82,6 +83,7 @@ export function CreateTeam() {
           </select>
         </label>
       </div>
+      {kind === "team" && level === "club" && <ClubAgeNote />}
       <label>
         City <small className="muted">(optional)</small>
         <input value={city} maxLength={80} onChange={(e) => setCity(e.target.value)} />
@@ -118,11 +120,14 @@ export function CreateTeam() {
 export function JoinWithCode({
   initial = "",
   auto = false,
+  note,
   onJoined,
   onCancel,
 }: {
   initial?: string;
   auto?: boolean;
+  /** Shown under the title, e.g. the club age rule for a club team's link. */
+  note?: string;
   onJoined?: (teamId: string) => void;
   onCancel?: () => void;
 }) {
@@ -150,6 +155,7 @@ export function JoinWithCode({
   return (
     <form className="card settings-form" onSubmit={(e) => void join(e)}>
       <h2 className="card-title">{auto ? "Join on the web" : "Join with a code"}</h2>
+      {note && <p className="muted small">{note}</p>}
       {!auto && (
         <label>
           Invite code

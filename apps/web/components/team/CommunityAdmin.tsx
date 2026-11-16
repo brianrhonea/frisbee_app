@@ -1,5 +1,6 @@
 "use client";
 import {
+  clubRolesNotice,
   competitionLevels,
   divisions,
   roleLimits,
@@ -12,6 +13,7 @@ import { callApi } from "@/lib/client";
 import { useLiveQuery } from "@/lib/live";
 import { divisionLabels } from "@/lib/site";
 import { useAuth } from "../AuthProvider";
+import { ClubAgeNote } from "../ClubAge";
 import { rolesInOrder, useTeamHub } from "./TeamContext";
 import { EmptyState } from "../StatusViews";
 
@@ -52,6 +54,7 @@ function RolePicker({ value, onChange }: { value: string[]; onChange: (v: string
   if (roles.length === 0) return <p className="muted small">Make roles in Settings to put their members on teams automatically.</p>;
   return (
     <div className="role-members">
+      <p className="muted small">{clubRolesNotice}</p>
       {roles.map((r) => (
         <label key={r.id} className="check-row">
           <input
@@ -140,6 +143,7 @@ export function CommunityAdmin() {
               <input value={form.city} maxLength={teamLimits.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
             </label>
           </div>
+          {form.level === "club" && <ClubAgeNote />}
           <fieldset>
             <legend>Who&apos;s on it</legend>
             <RolePicker value={roles} onChange={setRoles} />

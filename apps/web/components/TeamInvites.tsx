@@ -1,4 +1,5 @@
 "use client";
+import { clubTooYoungMessage } from "@stall10/shared";
 import { orderBy } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -6,6 +7,7 @@ import { callApi } from "@/lib/client";
 import { useLiveQuery } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
+import { useIsClubTeam } from "./ClubAge";
 import "./team_invites.css";
 
 /** users/{uid}/teamInvites/{teamId} (TeamInvite in the app). */
@@ -15,6 +17,11 @@ interface TeamInvite {
   invitedBy?: string;
   invitedByName?: string;
   createdAt?: string;
+}
+
+/** A club team's invite says it's for players 16 and over; the API checks at Accept. */
+function ClubInviteNote({ teamId }: { teamId: string }) {
+  return useIsClubTeam(teamId) ? <small>{clubTooYoungMessage}</small> : null;
 }
 
 /** What the app calls each kind in a sentence (TeamKind.noun). */
@@ -63,6 +70,7 @@ export function TeamInvites() {
                 <small>
                   {i.invitedByName ? `${i.invitedByName} invited you to join this ${what}.` : `You were invited to join this ${what}.`}
                 </small>
+                {(i.kind ?? "team") === "team" && <ClubInviteNote teamId={i.id} />}
               </span>
               <span className="team-invite-actions">
                 <button type="button" className="btn btn-small" disabled={busy !== null} onClick={() => void answer(i.id, false)}>

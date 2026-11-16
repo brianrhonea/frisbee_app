@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
+import { ClubAgeNote } from "../ClubAge";
 import { roleLabel } from "../ProfileDashboard";
 import { InviteButton, useInvite } from "./InviteDialog";
 import { JoinRequests } from "./JoinRequests";
@@ -125,6 +126,8 @@ function DetailsForm() {
           <input value={city} maxLength={80} onChange={(e) => setCity(e.target.value)} />
         </label>
       </div>
+      {/* A team moved to club keeps everyone on it; only new players must be 16 or over. */}
+      {!group && level === "club" && <ClubAgeNote more={(team.level ?? "club") === "club" ? undefined : "People already on the team stay on it."} />}
       {group && (
         <>
           <label>
