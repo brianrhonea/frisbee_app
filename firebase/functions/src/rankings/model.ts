@@ -312,3 +312,22 @@ export function divisionResult(div: Data, names: Map<string, string>): DivisionR
     runnerUp: team(places[1]),
   };
 }
+
+/**
+ * A finished tournament's division results as Explore's Recent results
+ * show them: never youth. A youth division (or an unknown level) is left
+ * out, and a youth team never shows as champion or runner-up (a division
+ * whose champion is a youth team is left out).
+ */
+export function publicResults(
+  divisions: Array<{ key: string; result: DivisionResult }>,
+  youth: Set<string>,
+): DivisionResult[] {
+  const out: DivisionResult[] = [];
+  for (const { key, result } of divisions) {
+    if (!isRankedKey(key) || !result.champion || youth.has(result.champion.teamId)) continue;
+    const runnerUp = result.runnerUp && youth.has(result.runnerUp.teamId) ? null : result.runnerUp;
+    out.push({ ...result, runnerUp });
+  }
+  return out;
+}

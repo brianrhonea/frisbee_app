@@ -19,6 +19,8 @@ import {
   countsForRankings,
   type Data,
   divisionResult,
+  type DivisionResult,
+  publicResults,
   isRankedKey,
   isYouthTeam,
   rankingKey,
@@ -48,7 +50,7 @@ export async function rebuildRankings(now = new Date()): Promise<void> {
   // A team's newest name from its entries.
   const names = new Map<string, string>();
   const named = new Map<string, number>();
-  const recent: Data[] = [];
+  const recent: Array<Data & { divisions: Array<{ key: string; result: DivisionResult }> }> = [];
 
   for (const t of tournaments) {
     const data = t.data();
@@ -71,7 +73,7 @@ export async function rebuildRankings(now = new Date()): Promise<void> {
     for (const d of divisions.docs) {
       const div = d.data();
       const key = rankingKey(String(div.level ?? "club"), String(div.division ?? "mixed"));
-      if (data.status === "finished") results.push(divisionResult(div, tournamentNames));
+      if (data.status === "finished") results.push({ key, result: divisionResult(div, tournamentNames) });
       // Youth (and unknown) divisions are never ranked: skip their games.
       if (!isRankedKey(key)) continue;
       const done = await d.ref.collection("games").where("status", "==", "done").get();
@@ -97,13 +99,19 @@ export async function rebuildRankings(now = new Date()): Promise<void> {
         location: data.location ?? "",
         startsOn: data.startsOn ?? null,
         endsOn: data.endsOn ?? data.startsOn ?? null,
-        divisions: results.filter((r) => r.champion),
+        divisions: results,
       });
     }
   }
 
   const teamIds = new Set<string>();
   for (const list of games.values()) for (const g of list) teamIds.add(g.teamA).add(g.teamB);
+  for (const r of recent) {
+    for (const { result } of r.divisions) {
+      if (result.champion) teamIds.add(result.champion.teamId);
+      if (result.runnerUp) teamIds.add(result.runnerUp.teamId);
+    }
+  }
   const youth = await youthTeams([...teamIds]);
   // Every existing ranking doc not rewritten goes: youth ones from before
   // youth was skipped, and divisions with nobody ranked any more.
@@ -117,8 +125,13 @@ export async function rebuildRankings(now = new Date()): Promise<void> {
   for (const id of remove) void writer.delete(db.doc(`rankings/${id}`));
   const ends = (r: Data) => toDate(r.endsOn)?.getTime() ?? 0;
   recent.sort((a, b) => ends(b) - ends(a));
+  // Never youth: youth divisions and youth teams are left out, and so is a
+  // tournament with nothing else to show.
+  const shown = recent
+    .map((r) => ({ ...r, divisions: publicResults(r.divisions, youth) }))
+    .filter((r) => r.divisions.length > 0);
   void writer.set(db.doc("tournamentResults/recent"), {
-    tournaments: recent.slice(0, recentCount),
+    tournaments: shown.slice(0, recentCount),
     updatedAt: FieldValue.serverTimestamp(),
   });
   await writer.close();
