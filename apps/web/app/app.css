@@ -66,6 +66,11 @@
 .row-card > span { display: grid; min-width: 0; }
 .row-card b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-card small { color: var(--muted); }
+/* The Teams tab's finder (TeamFinder): search box, then listings as row cards. */
+.team-finder { display: grid; gap: 10px; }
+.team-finder .search-input { width: 100%; }
+.team-finder .card-title, .team-finder p { margin: 0; }
+.team-finder-list { gap: 8px; }
 .event-row { display: grid; grid-template-columns: 64px 1fr; gap: 14px; align-items: start; }
 .event-date {
   display: grid; place-items: center; padding: 8px 0; border-radius: 12px;

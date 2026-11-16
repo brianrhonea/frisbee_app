@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { teamSearchQuerySchema } from "@stall10/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { requireCaller } from "../auth.js";
 import { ApiError } from "../errors.js";
@@ -6,6 +7,7 @@ import type { RateLimiter } from "../limits/limiter.js";
 import { MemoryRateLimiter } from "../limits/memory.js";
 import { browseLimit } from "../limits/model.js";
 import { clientIp, visitorKey } from "./model.js";
+import type { RosterService } from "../teams/roster.js";
 import type { BrowseService } from "./service.js";
 
 /** Header the website's server sends with [BrowseOptions.webServerKey]. */
@@ -19,6 +21,8 @@ export interface BrowseOptions {
    * visitors are limited at Vercel's firewall, where their IP is known.
    */
   webServerKey?: string;
+  /** Adult teams' rosters for anyone (`/v1/public/teams/:id/roster`); off when not given. */
+  roster?: RosterService;
 }
 
 /** Short shared caching: a profile turned private drops out within a minute. */
@@ -52,8 +56,8 @@ export function browseRoutes(app: FastifyInstance, browse: BrowseService, opts: 
   }
 
   /**
-   * Signed-in members only, with App Check as on other member routes (the website shows visitors nothing but team
-   * and community pages): player profiles, events and search. Each member
+   * Signed-in members only, with App Check as on other member routes (visitors don't see players): player
+   * profiles and search across players and teams. Each member
    * is limited by uid, so the website's server key doesn't let anyone in.
    */
   async function admitMember(req: FastifyRequest) {
@@ -87,14 +91,31 @@ export function browseRoutes(app: FastifyInstance, browse: BrowseService, opts: 
     return sendPrivate(reply, await browse.profile(req.params.uid));
   });
 
+  // The team finder: listings only, never players.
+  app.get<Q>("/v1/public/teams", { config }, async (req, reply) => {
+    await admit(req);
+    const query = teamSearchQuerySchema.safeParse({ q: req.query.q });
+    if (!query.success) throw new ApiError("invalid_argument", query.error.issues[0]?.message ?? "Invalid search.");
+    return send(reply, await browse.teams(query.data.q));
+  });
+
   app.get<Q>("/v1/public/teams/:id", { config }, async (req, reply) => {
     await admit(req);
     return send(reply, await browse.team(req.params.id));
   });
 
-  app.get<Q>("/v1/public/events", async (req, reply) => {
-    await admitMember(req);
-    return sendPrivate(reply, await browse.events());
+  const roster = opts.roster;
+  if (roster) {
+    app.get<Q>("/v1/public/teams/:id/roster", { config }, async (req, reply) => {
+      await admit(req);
+      return send(reply, await roster.publicRoster(req.params.id));
+    });
+  }
+
+  // Public team events and group tournaments, as team pages show them to visitors.
+  app.get<Q>("/v1/public/events", { config }, async (req, reply) => {
+    await admit(req);
+    return send(reply, await browse.events());
   });
 
   app.get<Q>("/v1/public/search", async (req, reply) => {

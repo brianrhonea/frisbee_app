@@ -1,4 +1,7 @@
 import {
+  type PublicRoster,
+  type PublicRosterPlayer,
+  rosterIsPublic,
   type RosterMember,
   type RosterPerson,
   type RosterPlayer,
@@ -7,6 +10,7 @@ import {
   type TeamRoster,
 } from "@stall10/shared";
 import type { Caller } from "../auth.js";
+import { imageUrl, isPrivateProfile, validId } from "../browse/model.js";
 import { ApiError } from "../errors.js";
 import { docIdParam } from "../ids.js";
 import type { Data, DocStore } from "../store.js";
@@ -74,6 +78,47 @@ export class RosterService {
         .sort((a, b) => (a.number ?? 1000) - (b.number ?? 1000) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
       members,
       teams: kind === "team" ? [] : linkedTeams(team.linkedTeams),
+    };
+  }
+
+  /**
+   * An adult team's roster for anyone, signed in or not (the website's
+   * visitors): only when the team doc and its directory listing both pass
+   * rosterIsPublic, so youth teams, teams without a level and every group
+   * answer not_found. Players only, built field by field: the roster's
+   * name, number and position, plus a linked public profile's username and
+   * picture (a Storage or Google URL only) unless it hides its teams
+   * (visibility.teams false, as browse's profileView does). No uids or roster ids, and no
+   * members list: who joined, their tiers and roles stay with signed-in
+   * members (`GET /v1/teams/:id/roster`).
+   */
+  async publicRoster(rawTeamId: unknown): Promise<PublicRoster> {
+    const hidden = () => new ApiError("not_found", "This team's roster isn't public.");
+    if (!validId(rawTeamId)) throw hidden();
+    const [team, listing] = await this.store.getAll([`teams/${rawTeamId}`, `teamDirectory/${rawTeamId}`]);
+    if (!team || !listing || !rosterIsPublic(team) || !rosterIsPublic(listing)) throw hidden();
+    const players = await this.store.list(`teams/${rawTeamId}/roster`, rosterMax);
+    const uids = [...new Set(players.map((p) => str(p.data.userId)).filter(Boolean))];
+    const found = await this.store.getAll(uids.map((uid) => `profiles/${uid}`));
+    const profiles = new Map(uids.map((uid, i) => [uid, found[i] ?? undefined]));
+    return {
+      players: players
+        .map(({ data }) => {
+          const out: PublicRosterPlayer = { name: str(data.name) || "Player" };
+          if (typeof data.number === "number" && Number.isInteger(data.number)) out.number = data.number;
+          const pos = positions.find((p) => p === data.position);
+          if (pos) out.position = pos;
+          const profile = profiles.get(str(data.userId));
+          // A private profile, or one that hides its teams, isn't tied to the roster for visitors.
+          const hidesTeams = mapOf(profile?.visibility).teams === false;
+          if (profile && !isPrivateProfile(profile) && !hidesTeams) {
+            if (str(profile.username)) out.username = str(profile.username);
+            const photo = imageUrl(profile.photoUrl);
+            if (photo) out.photoUrl = photo;
+          }
+          return out;
+        })
+        .sort((a, b) => (a.number ?? 1000) - (b.number ?? 1000) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
     };
   }
 

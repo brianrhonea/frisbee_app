@@ -5,6 +5,7 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { FirestoreBrowseRepository } from "../src/browse/repository.js";
+import { FirestoreDocStore } from "../src/firestore_store.js";
 import { FirestoreRateLimiter } from "../src/limits/limiter.js";
 import { FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
@@ -17,6 +18,7 @@ const app = buildApp({
   verifier: new FakeVerifier(),
   users: new FakeUsers(),
   teams: new FakeTeamRepository(),
+  store: new FirestoreDocStore(db),
   browse: {
     repo: new FirestoreBrowseRepository(db),
     limiter: new FirestoreRateLimiter(db),
@@ -26,7 +28,7 @@ const app = buildApp({
 
 const ts = (msFromNow: number) => Timestamp.fromMillis(Date.now() + msFromNow);
 const get = (url: string, ip = "198.51.100.7") => app.inject({ method: "GET", url, headers: { "x-forwarded-for": ip } });
-/** Players, events and search are for signed-in members. */
+/** Players and search are for signed-in members. */
 const memberGet = (url: string) => app.inject({ method: "GET", url, headers: { authorization: "Bearer token:member1" } });
 
 beforeAll(async () => {
@@ -66,6 +68,12 @@ beforeAll(async () => {
   batch.set(db.doc("teams/haze/publicEvents/past"), { title: "Old game", startsAt: ts(-86_400_000) });
   batch.set(db.doc("teams/secret/publicEvents/e2"), { title: "Secret practice", startsAt: ts(86_400_000) });
   batch.set(db.doc("teams/secret/posts/sp"), { title: "Secret post", public: true, createdAt: ts(-1_000) });
+  batch.set(db.doc("teams/haze"), { name: "Haze", division: "open", level: "club", ownerId: "pub", memberIds: ["pub"], members: { pub: "owner" } });
+  batch.set(db.doc("teams/haze/roster/r1"), { name: "Pat Public", number: 4, position: "cutter", userId: "pub" });
+  batch.set(db.doc("teams/haze/roster/r2"), { name: "Sam Private", number: 9, userId: "priv" });
+  batch.set(db.doc("teamDirectory/juniors"), { name: "Juniors", division: "mixed", level: "youth", keywords: ["juniors"] });
+  batch.set(db.doc("teams/juniors"), { name: "Juniors", division: "mixed", level: "youth", ownerId: "pub", memberIds: ["pub"] });
+  batch.set(db.doc("teams/juniors/roster/r1"), { name: "Kid Player", number: 1 });
   await batch.commit();
 });
 
@@ -105,8 +113,7 @@ describe("public reads on the emulator", () => {
   });
 
   it("events: across teams, without the private group's", async () => {
-    expect((await get("/v1/public/events")).statusCode).toBe(401);
-    const body = (await memberGet("/v1/public/events")).json();
+    const body = (await get("/v1/public/events")).json();
     expect(body.events.map((e: { title: string }) => e.title)).toEqual(["Open practice"]);
   });
 
@@ -115,6 +122,25 @@ describe("public reads on the emulator", () => {
     expect(body.teams.map((t: { name: string }) => t.name)).toEqual(["Haze"]);
     const people = (await memberGet("/v1/public/search?q=sam")).json();
     expect(people.players).toEqual([{ id: "priv", name: "Sam Private", username: "sam", private: true }]);
+  });
+
+  it("team finder: listings only, for visitors", async () => {
+    const res = await get("/v1/public/teams?q=Haze");
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ teams: [{ id: "haze", name: "Haze", division: "open", level: "club", city: "Austin" }] });
+  });
+
+  it("rosters: an adult team's players for visitors, never a youth team's", async () => {
+    const haze = await get("/v1/public/teams/haze/roster");
+    expect(haze.statusCode).toBe(200);
+    expect(haze.json()).toEqual({
+      players: [
+        { name: "Pat Public", number: 4, position: "cutter", username: "pat" },
+        { name: "Sam Private", number: 9 },
+      ],
+    });
+    expect((await get("/v1/public/teams/juniors/roster")).statusCode).toBe(404);
+    expect((await get("/v1/public/teams/secret/roster")).statusCode).toBe(404);
   });
 
   it("rate-limits a visitor in limits/ by hashed IP, then mutes them", async () => {

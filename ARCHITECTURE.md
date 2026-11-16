@@ -205,9 +205,14 @@ sequenceDiagram
   repostCount}`; `GET /v1/posts/state?ids=a,b` → the caller's likes and
   reposts by id (≤ 50). A repost's likes and reposts go to its original.
   `GET /v1/feed?before=` → the community feed, paged, for members.
-- Public (no token; the website server): `GET /v1/public/feed`,
-  `/players/:uid`, `/posts/:id`, `/teams/:id`, `/events`, `/search`.
-  Visitors get one page (`next: null`); paging is for members.
+- Public (no token; the website's server or visitors' browsers, limited
+  by IP or the server key): `GET /v1/public/feed`, `/posts/:id`,
+  `/teams/:id`, `/teams?q=` (the team finder: listings only, never
+  players), `/teams/:id/roster` (an adult team's players only, when
+  `rosterIsPublic` in `packages/shared/src/team.ts` passes for both the
+  team doc and its listing; else 404), `/events`. Members only (a token,
+  never cached): `/players/:uid`, `/search`. Visitors get one page
+  (`next: null`); paging is for members.
 - Public tournaments (no token; `apps/api/src/tournaments/public_*.ts`):
   `GET /v1/public/tournaments` (upcoming and running published events,
   as Find tournaments lists them), `/v1/public/tournaments/:id?division=`
@@ -429,7 +434,7 @@ the API is deployed and the URL is added. The `use_api_teams` flag in
 | 6 | Follows | follow, requests, accept | `apps/api/src/follows`, with notification read/clear (the website uses them; the app still writes directly). Unit tests with fakes; emulator tests pending | **In the API**, app not switched |
 | 7 | Events | team/personal events, RSVPs, polls; calendar sharing | `apps/api/src/calendar`: calendars (`calendars/{id}`: members and roles, pending invites; invitee copies in `users/{uid}/calendarInvites`), events on any calendar the caller can edit (`/v1/calendars/:id/events`, `validMine` ported; My calendar's stay in `users/{uid}/events`), and the ICS subscription feed (`/v1/ical/:token.ics`, token stored hashed). API-only: clients read only calendars they're on, never another calendar's events, and viewers get no notes. Unit and emulator tests; rules tests for `calendars`, `calendarInvites` and the feed records. The app still writes My calendar's events directly. Team events with their `publicEvents` copy, RSVPs, reactions and votes: `apps/api/src/hub` (the website uses them; the app still writes directly) | **Calendars, their events, team events and answers in the API**; app not switched |
 | 8 | Leagues & tournaments | hosted tournaments, leagues, signups, drafts | `apps/api/src/tournaments` (hosted events and leagues), with signups and drafts in item 14 and group tournaments in item 16. The website uses them; the app still writes directly and keeps the callables. Not yet: payments | **In the API**, app not switched |
-| 9 | Search & browse | `api-search`, `browse-*` callables → API GETs with caching | `apps/api/src/browse`: `/v1/public/*` (feed, posts, players, teams, events, search; cached, with revalidation tags) and the members' `/v1/feed`; the website uses them. The app keeps `api-search` (`use_api_search` flag), and the `browse-*` callables only served the removed Flutter website (removable after the next hosting deploy, §9) | **In the API**, app not switched |
+| 9 | Search & browse | `api-search`, `browse-*` callables → API GETs with caching | `apps/api/src/browse`: `/v1/public/*` (feed, posts, players, teams, the team finder, adult rosters, events, search; cached, with revalidation tags) and the members' `/v1/feed`; the website uses them. The app keeps `api-search` (`use_api_search` flag), and the `browse-*` callables only served the removed Flutter website (removable after the next hosting deploy, §9) | **In the API**, app not switched |
 | 10 | Chat & DMs | send, edit, react; rooms and folders | Writes via the API; reads stay Firestore listeners (§11.2). Team rooms: send, react, delete in `apps/api/src/hub`; DMs and groups (open, groups and members, send, react, delete, read, requests, archive, clear) in `apps/api/src/messages`. The website uses both; the app still writes directly. Rooms and folders (create, edit, access, arrange, delete): `apps/api/src/hub/rooms.ts`, and DM typing marks, for the website. Discord template import: `apps/api/src/discord` | **Team room messages and DMs in the API**, app not switched |
 | 12 | Playbook | save and delete plays | `apps/api/src/playbook` (the website uses it; the app still writes `teams/{id}/plays` directly) | **In the API**, app not switched |
 | 13 | Team videos | links, edit, move, remove; folders | `apps/api/src/videos` (the website uses it; the app still writes directly). Uploads from the website wait on the transcode job (item 4) | **In the API**, app not switched; uploads not yet |

@@ -9,13 +9,15 @@ Firebase Hosting used to serve (Hosting now has only the static pages in
 | Path | What |
 |---|---|
 | `/` | Visitors: a preview (a few community posts, locked cards, sign-up prompts). Members: their dashboard (profile card, season stats, teams, upcoming events with RSVPs, their feed) from `GET /v1/me/home` |
-| `/learn` | Members: beginner's guide to the rules of ultimate (an original summary, not the official text) |
+| `/learn` | Everyone (server-rendered): beginner's guide to the rules of ultimate (an original summary, not the official text) |
 | `/community`, `/posts/[id]` | The public feed and one post |
-| `/teams/[id]` | Team and group pages; members get the hub (Feed, Schedule, Chat, Roster, More, Settings) |
+| `/teams` | Members: invitations and their teams. Everyone: the team finder (`GET /v1/public/teams?q=`; the top bar's search lands here for visitors) |
+| `/teams/[id]` | Team and group pages; members get the hub (Feed, Schedule, Chat, Roster, More, Settings). Visitors get the feed, public events and, for adult teams (`rosterIsPublic`), the roster's players (`GET /v1/public/teams/:id/roster`, server-rendered) |
 | `/players/[uid]` | Members: profiles (private ones show only their card) |
 | `/teams/new` | Members: create a team, group or school/club community |
 | `/messages` | Members: direct and group conversations |
-| `/events`, `/explore?q=` | Members: upcoming public events and tournaments; player and team search |
+| `/events` | Everyone: upcoming public events and tournaments (`GET /v1/public/events`; visitors read it without a token) |
+| `/explore?q=` | Members: player and team search |
 | `/about`, `/help`, `/terms`, `/privacy`, `/cookies`, `/delete-account` | Static pages ported from `firebase/hosting` (`content/*.html`, served by `app/[slug]`) |
 | `/join/[code]`, `/g/[id]`, `/p/[id]` | Invite and share link fallbacks; `public/.well-known` opens them in the app |
 | `/sign-in`, `/sign-up` | Firebase Auth (email/password, Google). Sign-up asks the date of birth first (13 and over) |
@@ -27,8 +29,12 @@ Firebase Hosting used to serve (Hosting now has only the static pages in
   (`lib/api.ts` → `GET /v1/public/*` at `API_BASE_URL`), cached 60 seconds.
   The server sends `x-stall10-web-key: WEB_SERVER_KEY`, so the API doesn't
   rate-limit it as a single visitor; Vercel's firewall limits visitors.
-- **Visitors** see one page of the feed and of each profile (the API
-  returns no cursor to them); everything else asks them to sign up.
+- **Visitors** see one page of the feed (the API returns no cursor to
+  them), team and group pages with their public posts and events, adult
+  teams' rosters, the team finder, Events, tournaments and Learn. Players,
+  search, messages and anything of their own ask them to sign up. The
+  browser reads public routes without a token for them
+  (`getPublicApi` in `lib/client.ts`; the API limits them by IP).
 - **Members:** the browser calls the API with the user's ID token
   (`lib/client.ts`, `NEXT_PUBLIC_API_BASE_URL`): `GET /v1/me/home` for the
   dashboard, `POST /v1/me/username` for the username step, likes and

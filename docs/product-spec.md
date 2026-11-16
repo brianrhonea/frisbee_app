@@ -296,7 +296,26 @@ everything the app does on the website alone, styled like the website
     invitations (the website's does). Website only (layout): feeds load
     as you scroll (the app keeps "Show older posts"), and a floating
     Post button on phones.
-14. Visitors: tournaments (website only; the app needs an account).
+14. Visitors (signed out): [x] website only; the app has no signed-out
+    mode, so this isn't a parity gap. Visitors see Learn (rendered on
+    the server), Events (`GET /v1/public/events`), tournaments, the
+    community feed's first page, a team finder on Teams (`GET
+    /v1/public/teams?q=`: listings only, never players; the top bar's
+    search lands there), and team and group pages with public posts and
+    events. A team's roster is public only for an adult team:
+    `rosterIsPublic` in `@stall10/shared` (kind team, level club,
+    college, league or pickup; youth, no level and every group stay
+    private), checked by the API on the team doc and its listing
+    (`GET /v1/public/teams/:id/roster`: players' names, numbers and
+    positions, plus a public profile's username and photo; no ids, no
+    members list, no links to players' pages). Players, search,
+    Explore, messages and My schedule stay members-only. Flag, not
+    changed: signed-in people who aren't members (in the app and on the
+    website) still see any team's roster, youth teams' included,
+    through `GET /v1/teams/:id/roster` as before. Tests: API
+    `test/browse.test.ts`, `test/browse.emulator.test.ts`; shared
+    `test/team_roster_public.test.ts`.
+15. Visitors: tournaments (website only; the app needs an account).
     [x] Signed-out visitors (parents, friends) browse `/tournaments` and
     follow any published tournament's or league's page: overview,
     divisions, the accepted teams, the schedule, scores, standings,

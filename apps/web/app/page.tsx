@@ -19,16 +19,15 @@ const previewPosts = 3;
 /** Members-only parts, shown to visitors as locked cards. */
 const locked = [
   ["Your teams", "Rosters, roles and team chat."],
-  ["Events near you", "Games, practices, pickup and tournaments."],
   ["Your schedule", "Practices, games and RSVPs across every team."],
-  ["Players and search", "Profiles, stats and finding people and teams."],
+  ["Players and search", "Profiles, stats and finding people."],
   ["Your stats", "Goals, assists and blocks, season by season."],
 ];
 
 export default async function Home() {
   // Rendered per request (the build has no API); the reads stay cached 60s.
   await connection();
-  // Visitors see only community and team pages: no events or profiles here.
+  // Visitors see the community's newest posts here; events, teams and Learn have their own tabs. No profiles.
   const feed = await getPublic<PostPage>("/v1/public/feed", undefined, { tags: [tags.feed] }).catch(() => null);
   const posts = feed?.posts.slice(0, previewPosts) ?? [];
 
@@ -53,6 +52,10 @@ export default async function Home() {
                 Log in
               </Link>
             </div>
+            <p className="muted small">
+              Or look around first: <Link href="/teams#find">find a team</Link>,{" "}
+              <Link href="/events">see what&apos;s coming up</Link> or <Link href="/learn">learn to play</Link>.
+            </p>
           </section>
 
           <div className="feed-tabs">

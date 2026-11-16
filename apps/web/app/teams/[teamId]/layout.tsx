@@ -58,7 +58,7 @@ export default async function TeamLayout({ params, children }: Props) {
           </header>
           <ForVisitors>
             <div className="cta-card">
-              <p>{group ? "Join this group on Stall 10." : "Follow this team and see its roster on Stall 10."}</p>
+              <p>{group ? "Join this group on Stall 10." : "Follow this team and keep up with its season on Stall 10."}</p>
               <Link className="btn btn-primary btn-small" href={`/sign-up?next=${encodeURIComponent(`/teams/${teamId}`)}`}>
                 {group ? "Sign up to join" : "Sign up free"}
               </Link>
