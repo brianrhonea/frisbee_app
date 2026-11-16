@@ -7,6 +7,31 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.26.0 — 2026-11-15
+
+Public reads for signed-out website visitors. Deploy before web 0.31.0.
+
+**Added**
+- `GET /v1/public/teams?q=`: a team finder that returns team and group
+  listings by name, never players.
+- `GET /v1/public/teams/:id/roster`: an adult team's roster for anyone
+  (names, numbers and positions, plus a public profile's username and
+  photo). Youth teams, teams without a level and groups answer 404.
+  `rosterIsPublic` in `@stall10/shared` decides, checked on both the
+  team and its listing.
+- `GET /v1/public/tournaments`, `/v1/public/tournaments/:id?division=`
+  and `/v1/public/group-tournaments/:groupId/:id`: published tournaments
+  and leagues (overview, divisions, accepted teams, one division's
+  schedule and scores) and a group tournament's listing. Drafts and
+  private groups' events are 404. No captains, signups, fee
+  instructions or player names; a drafted team named after a player
+  shows as "Team N". Cached publicly for 30 seconds.
+
+**Changed**
+- `GET /v1/public/events` is public (no token, limited by IP, publicly
+  cacheable). Its tournament listings carry only their seven public
+  fields.
+
 ## 0.25.1 — 2026-11-15
 
 Clean-up; no behaviour change for clients.

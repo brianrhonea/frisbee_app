@@ -4,6 +4,30 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.31.0 — 2026-11-15
+
+More for signed-out visitors (parents, friends, colleagues). Needs API
+0.26.0.
+
+**Added**
+- Learn is open to everyone and rendered on the server.
+- Events and the Upcoming events card are open to everyone (My schedule
+  stays for members).
+- Teams has "Find a team or group" for everyone; for visitors the top
+  bar's search goes there.
+- Visitors see an adult team's roster (names, numbers, positions).
+  Youth teams' rosters and groups' members stay private, with a note.
+- Visitors can browse Tournaments and leagues and follow a published
+  event's overview, teams, schedule, scores, standings, bracket and
+  news; server-rendered, live events refresh every minute. Entering,
+  signing up and following ask them to sign up or log in, then return.
+- Group tournaments show visitors their public listing.
+
+**Changed**
+- Visitor prompts and home copy say what's open without an account.
+- Server-rendered tournament dates show in UTC until the page loads,
+  then in the viewer's time zone.
+
 ## 0.30.0 — 2026-11-15
 
 Home and team pages redesign. Works with API 0.25.x.
