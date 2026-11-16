@@ -19,6 +19,7 @@ import { getStorage } from "firebase-admin/storage";
 import { FirestoreDocStore } from "./firestore_store.js";
 import { FirestoreDraftQueries } from "./drafts/repository.js";
 import { FirestoreDocQueries } from "./queries.js";
+import { FirestorePublicRankingRepository } from "./rankings/public_repository.js";
 import { FirestorePublicTournamentRepository } from "./tournaments/public_repository.js";
 import { ffmpegHeicDecoder } from "./media/image.js";
 import { FirebaseMediaStorage } from "./media/storage.js";
@@ -101,6 +102,7 @@ const app = buildApp({
     photoBuckets: photoBuckets(projectId, process.env.STORAGE_BUCKET),
   },
   publicTournaments: new FirestorePublicTournamentRepository(db),
+  publicRankings: new FirestorePublicRankingRepository(db),
   store: new FirestoreDocStore(db),
   draftQueries: new FirestoreDraftQueries(db),
   queries: new FirestoreDocQueries(db),
