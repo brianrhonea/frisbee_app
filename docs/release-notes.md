@@ -17,6 +17,11 @@ Firebase project; App Store builds come from `main` and use production.
   community feed. Other tabs ask you to sign up or log in, then bring
   you back.
 
+**Signing up with Google or Apple**
+- We now ask your first and last name along with your username, so your
+  profile, posts and rosters show the name you choose, even if Apple hid
+  it. "About you" starts from that name.
+
 **The top bar**
 - On phones the top bar shows just "Stall 10", as the website does,
   and notifications are a bell instead of the flying disc.

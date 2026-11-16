@@ -4,6 +4,18 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.30.1 — 2026-11-15
+
+**Changed**
+- Signing up with Google or Apple asks "Your name and username": first
+  and last name (filled in from Google or Apple when they share it) are
+  the name on your profile, posts and rosters; the username is suggested
+  from them until you change it.
+- New accounts with no name (Apple can hide it) are asked for one before
+  anything else; the Home username card asks it too.
+- "About you" starts your legal name from the first and last name you
+  just typed.
+
 ## 0.30.0 — 2026-11-15
 
 Home and team pages redesign. Works with API 0.25.x.
