@@ -3,7 +3,7 @@ import type { PublicListing, TeamSearchPage } from "@stall10/shared";
 import { teamSearchMaxLength } from "@stall10/shared";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getPublicApi, problem } from "@/lib/client";
 import { listingSubtitle } from "@/lib/site";
 import { useAuth } from "./AuthProvider";
@@ -27,9 +27,12 @@ export function TeamFinder() {
   const [error, setError] = useState("");
 
   // ?q= from the address: on opening, and when the top bar's search sends a new one.
+  // What this box last wrote there is skipped, so typing is never overwritten.
   const urlQuery = useSearchParams().get("q") ?? "";
+  const written = useRef<string | null>(null);
   useEffect(() => {
-    setQuery((typed) => (typed.trim() === urlQuery.trim() ? typed : urlQuery));
+    if (urlQuery === written.current) return;
+    setQuery(urlQuery);
   }, [urlQuery]);
 
   const q = query.trim();
@@ -37,6 +40,7 @@ export function TeamFinder() {
     if (user === undefined || q.length < minQueryLength) return;
     let live = true;
     const timer = setTimeout(() => {
+      writeQuery(q);
       setError("");
       getPublicApi<TeamSearchPage>(user, `/v1/public/teams?q=${encodeURIComponent(q)}`).then(
         (page) => live && setResult({ q, teams: page.teams }),
@@ -49,12 +53,18 @@ export function TeamFinder() {
     };
   }, [user, q]);
 
-  function onChange(value: string) {
-    setQuery(value);
+  /** Keeps the search in the address (?q=) once typing pauses. */
+  function writeQuery(value: string) {
+    written.current = value;
     const url = new URL(window.location.href);
-    if (value.trim()) url.searchParams.set("q", value.trim());
+    if (value) url.searchParams.set("q", value);
     else url.searchParams.delete("q");
     window.history.replaceState(null, "", url);
+  }
+
+  function onChange(value: string) {
+    setQuery(value);
+    if (!value.trim()) writeQuery("");
   }
 
   const shown = result && result.q === q ? result.teams : null;

@@ -221,7 +221,8 @@ export interface TeamSearchPage {
 /**
  * A player on a public roster (`GET /v1/public/teams/:id/roster`): the
  * roster's name, number and position. A player linked to a public profile
- * also shows its username and picture; a private profile, nothing more.
+ * also shows its username and picture; a private profile, or one that
+ * hides its teams, nothing more.
  * No ids: visitors can't open players' pages.
  */
 export interface PublicRosterPlayer {

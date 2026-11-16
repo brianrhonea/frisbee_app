@@ -426,6 +426,13 @@ describe("visitor access to events, the team finder and rosters", () => {
     }
   });
 
+  it("doesn't tie a profile that hides its teams to the roster", async () => {
+    t.store.put("profiles/pat", { name: "Pat", username: "pat", photoUrl: "https://firebasestorage.googleapis.com/p.jpg", visibility: { teams: false } });
+    seedTeam("t", { name: "Haze", level: "league" });
+    const [, pat] = (await t.get("/v1/public/teams/t/roster")).json().players;
+    expect(pat).toEqual({ name: "Pat Public", number: 7, position: "handler" });
+  });
+
   it("drops a picture from any other host", async () => {
     t.store.put("profiles/pat", { name: "Pat", photoUrl: "https://tracker.example/p.jpg" });
     seedTeam("t", { name: "Haze", level: "college" });

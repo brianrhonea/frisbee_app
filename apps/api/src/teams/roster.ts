@@ -87,7 +87,8 @@ export class RosterService {
    * rosterIsPublic, so youth teams, teams without a level and every group
    * answer not_found. Players only, built field by field: the roster's
    * name, number and position, plus a linked public profile's username and
-   * picture (a Storage or Google URL only). No uids or roster ids, and no
+   * picture (a Storage or Google URL only) unless it hides its teams
+   * (visibility.teams false, as browse's profileView does). No uids or roster ids, and no
    * members list: who joined, their tiers and roles stay with signed-in
    * members (`GET /v1/teams/:id/roster`).
    */
@@ -108,7 +109,9 @@ export class RosterService {
           const pos = positions.find((p) => p === data.position);
           if (pos) out.position = pos;
           const profile = profiles.get(str(data.userId));
-          if (profile && !isPrivateProfile(profile)) {
+          // A private profile, or one that hides its teams, isn't tied to the roster for visitors.
+          const hidesTeams = mapOf(profile?.visibility).teams === false;
+          if (profile && !isPrivateProfile(profile) && !hidesTeams) {
             if (str(profile.username)) out.username = str(profile.username);
             const photo = imageUrl(profile.photoUrl);
             if (photo) out.photoUrl = photo;
