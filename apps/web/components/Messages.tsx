@@ -525,6 +525,11 @@ function ConversationView({
             );
             return (
               <div key={m.id} className={`message${grouped ? " grouped" : ""}${m.authorId === me ? " mine" : ""}`}>
+                {grouped && (
+                  <span className="message-time">
+                    <LocalTime iso={m.createdAt} style="time" />
+                  </span>
+                )}
                 {!grouped && <Avatar name={m.authorName} size={32} />}
                 <div className="message-main">
                   {!grouped && (

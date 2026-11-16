@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/chat/chat_repository.dart';
 import 'package:frisbee_app/data/repositories/direct_message/direct_message_repository.dart';
@@ -767,6 +768,70 @@ void main() {
     expect(find.text('Hey!'), findsOneWidget);
     // On a phone, back goes to Messages; no conversation panel on top.
     expect(find.byTooltip('Chats'), findsNothing);
+  });
+
+  testWidgets('swipe a bubble right to reply, anywhere left for the times', (
+    tester,
+  ) async {
+    await dms.openConversation(
+      testUser,
+      const UserProfile(uid: 'a', name: 'Avery'),
+    );
+    await dms.sendMessage(
+      'a_u1',
+      author: const AppUser(uid: 'a', displayName: 'Avery'),
+      text: 'Pickup at 6?',
+    );
+    final vm = DirectChatViewModel(
+      conversationId: 'a_u1',
+      directMessageRepository: dms,
+      authRepository: auth,
+      filePicker: FakeFilePickerService(),
+    );
+    addTearDown(vm.dispose);
+    await tester.pumpWidget(
+      withRepos(
+        MaterialApp(
+          theme: AppTheme.light.copyWith(platform: TargetPlatform.iOS),
+          home: DirectChatScreen(viewModel: vm),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final sent = vm.messages.single.createdAt!;
+    final time = find.text(DateFormat.jm().format(sent));
+    final bubble = find.text('Pickup at 6?').first;
+
+    // Beside the bubble, a swipe right doesn't reply.
+    final beside = Offset(
+      tester.getSize(find.byType(Scaffold).first).width - 40,
+      tester.getCenter(bubble).dy,
+    );
+    await tester.dragFrom(beside, const Offset(120, 0));
+    await tester.pumpAndSettle();
+    expect(vm.replyingTo, isNull);
+
+    // On the bubble, it does.
+    await tester.drag(bubble, const Offset(120, 0));
+    await tester.pumpAndSettle();
+    expect(vm.replyingTo?.text, 'Pickup at 6?');
+    vm.cancelReply();
+    await tester.pumpAndSettle();
+
+    // Dragging left, from the bubble or beside it, shows the times until
+    // let go.
+    for (final from in [beside, tester.getCenter(bubble)]) {
+      expect(time, findsNothing);
+      final g = await tester.startGesture(from);
+      await g.moveBy(const Offset(-20, 0));
+      await g.moveBy(const Offset(-80, 0));
+      await tester.pump();
+      expect(time, findsOneWidget);
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(time, findsNothing);
+      expect(vm.replyingTo, isNull);
+    }
   });
 
   testWidgets('on a phone, press and hold a message to react, reply or '

@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.25  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.24  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.23  | 2026-11-14 | `feature/web-parity`                    |                     |
 | 0.0.22  | 2026-11-14 | `feature/web-redesign`                  |                     |
@@ -38,6 +39,27 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.25 — Message times, notifications stay, follow requests in Notifications
+
+- Messages: swiping right to reply only starts on the message bubble
+  (`_SwipeToReply` wraps the bubble, or the message body in feed-style
+  rooms), not the whole row. Dragging the thread left anywhere shows
+  every message's time at the right edge, sliding back on release
+  (`_TimeReveal`, `_RevealTimes`, `_TimeSlide`); your own bubbles slide
+  over to make room.
+- Profiles opened from a page over the tabs (Following, follow requests,
+  notifications) open over it at `/people/:uid` (`openPage` and
+  `openLink` rewrite `/players/:uid`), so back returns there instead of
+  switching to the Explore tab with no way back.
+- Notifications stay in the list once opened: `markSeen` and
+  `clearRoute` (a chat or post seen, a notice tapped) mark entries read
+  instead of deleting them. Unread entries are bold and larger; read ones
+  lighter. Clear and Clear all still remove them.
+- Follow requests moved from Settings → Privacy to the top of
+  Notifications (`/notifications/follow-requests`, with how many wait);
+  `/settings/follow-requests`, which older notices link to, redirects
+  there.
 
 ## 0.0.24 — Keyboard, Send, no link tool, lighter workouts
 

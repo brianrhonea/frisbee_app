@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { FollowRequests } from "@/components/settings/FollowRequests";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Follow requests" };
-
+/** Follow requests moved to the top of Notifications. */
 export default function RequestsPage() {
-  return <FollowRequests />;
+  redirect("/notifications/requests");
 }

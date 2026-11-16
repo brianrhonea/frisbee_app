@@ -4,6 +4,21 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.35.0 — 2026-11-16
+
+Works with API 0.28.0 (no API change).
+
+**Changed**
+- Notifications stay in the list once opened, marked read; the page no
+  longer marks everything read after a moment. Unread entries are bold
+  and larger, read ones lighter. A Mark all read button joins Clear.
+- Follow requests moved from Settings to the top of Notifications
+  (`/notifications/requests`, showing how many wait); `/settings/requests`
+  redirects there, and app routes `/settings/follow-requests` and
+  `/notifications/follow-requests` both open it (`webRoute`).
+- Messages and team chat show each message's time beside it on hover,
+  for the messages under a name (the app shows them with a swipe).
+
 ## 0.34.0 — 2026-11-16
 
 Works with API 0.28.0 (no API change).

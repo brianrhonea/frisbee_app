@@ -274,7 +274,8 @@ class PrivacySettingsScreen extends StatelessWidget {
                   'ask to follow you, and only those you accept see your '
                   'posts, bio and what you show below. Everyone still sees '
                   'your name, @username and photo. People who already '
-                  'follow you stay.',
+                  'follow you stay. Answer follow requests at the top of '
+                  'Notifications.',
               children: [
                 SwitchListTile(
                   secondary: const Icon(Icons.lock_outline),
@@ -284,16 +285,6 @@ class PrivacySettingsScreen extends StatelessWidget {
                       ? null
                       : vm.setPrivate.execute,
                 ),
-                if ((vm.isPrivate ?? false) || vm.followRequests.isNotEmpty)
-                  SettingsTile(
-                    icon: Icons.person_add_alt,
-                    title: 'Follow requests',
-                    value: switch (vm.followRequests.length) {
-                      0 => 'None',
-                      final n => '$n',
-                    },
-                    onTap: () => context.push(Routes.followRequests),
-                  ),
               ],
             ),
             SettingsGroup(

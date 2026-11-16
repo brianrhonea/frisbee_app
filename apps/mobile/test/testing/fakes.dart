@@ -2032,7 +2032,10 @@ class FakeNotificationRepository implements NotificationRepository {
   @override
   Future<void> markSeen(String uid, String collapseId) async {
     seen.add(collapseId);
-    await delete(uid, [collapseId]);
+    await markRead(uid, [
+      for (final n in feed)
+        if (n.id == collapseId) n.id,
+    ]);
   }
 
   final clearedRoutes = <String>[];
@@ -2040,7 +2043,7 @@ class FakeNotificationRepository implements NotificationRepository {
   @override
   Future<void> clearRoute(String uid, String route) async {
     clearedRoutes.add(route);
-    await delete(uid, [
+    await markRead(uid, [
       for (final n in feed)
         if (n.route == route) n.id,
     ]);

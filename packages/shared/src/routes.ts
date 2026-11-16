@@ -26,7 +26,8 @@ const teamSections = new Map([
   ["tournaments", "/tournaments"],
 ]);
 const rules: Rule[] = [
-  [/^\/settings\/follow-requests$/, () => "/settings/requests"],
+  // Follow requests moved from Settings to Notifications; older notices keep the old route.
+  [/^\/(settings|notifications)\/follow-requests$/, () => "/notifications/requests"],
   [/^\/settings\/calendar$/, () => "/settings/calendar"],
   [new RegExp(`^/posts/${id}$`), (m) => `/posts/${m[1]}`],
   [new RegExp(`^/players/${id}$`), (m) => `/players/${m[1]}`],
