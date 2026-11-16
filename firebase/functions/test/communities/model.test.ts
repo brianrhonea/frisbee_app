@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   holders,
+  isClubTeam,
   membershipUpdate,
   mirrorUpdate,
   type OrgDoc,
@@ -21,6 +22,8 @@ const org = (extra: Partial<OrgDoc> = {}): OrgDoc => ({
 });
 
 const team = (extra: Partial<TeamDoc> = {}): TeamDoc => ({
+  // A school's college team; club teams take no one from the community.
+  level: "college",
   ownerId: "o",
   members: { o: "owner", c: "player" },
   memberIds: ["o", "c"],
@@ -87,6 +90,38 @@ describe("communities", () => {
       orgMembers: [],
     });
     expect(membershipUpdate(team(), [], ["c"], {})).toBeNull();
+  });
+});
+
+describe("club teams (16 and over)", () => {
+  it("are teams at the club level, or with no level", () => {
+    expect(isClubTeam({ level: "club" })).toBe(true);
+    expect(isClubTeam({ kind: "team", level: "club" })).toBe(true);
+    expect(isClubTeam({})).toBe(true);
+    for (const level of ["college", "youth", "league", "pickup"]) expect(isClubTeam({ level })).toBe(false);
+    expect(isClubTeam({ kind: "community", level: "club" })).toBe(false);
+    expect(isClubTeam({ kind: "organization", level: "club" })).toBe(false);
+  });
+
+  it("gain no one from the community (only the API can check ages), but still let go of whom it added", () => {
+    expect(membershipUpdate(team({ level: "club" }), ["a", "b"], [], { a: "Ann" })).toBeNull();
+    const t = team({
+      level: "club",
+      members: { o: "owner", a: "player", c: "player" },
+      memberIds: ["o", "a", "c"],
+      orgMembers: ["a"],
+    });
+    expect(membershipUpdate(t, ["b"], ["a"], {})).toMatchObject({ memberIds: ["o", "c"], orgMembers: [] });
+    // A team joining the community: role copies still follow its members.
+    const cap = syncUpdate(
+      team({ level: "club", members: { o: "owner", c: "player" }, roles: { cap: { perms: ["manageEvents"] } }, orgRoles: { cap: "woof" } }),
+      org(),
+      ["a", "c"],
+      [],
+      {},
+    );
+    expect(cap?.memberIds).toBeUndefined();
+    expect(cap).toMatchObject({ memberRoles: { c: ["cap"] } });
   });
 });
 

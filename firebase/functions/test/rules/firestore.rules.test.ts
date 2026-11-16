@@ -67,10 +67,12 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const fs = ctx.firestore();
+    // College, so the direct joins below work: club teams (16 and over)
+    // are joined through the API only ("club teams" below).
     await setDoc(doc(fs, "teams", TEAM), {
       name: "Team",
       division: "mixed",
-      level: "club",
+      level: "college",
       city: "",
       ownerId: OWNER,
       members: {
@@ -121,6 +123,18 @@ describe("team create", () => {
       setDoc(doc(db(OUTSIDER), "teams", "t4"), newTeam({ kind: "community", description: "", requiresApproval: false, location: null })),
     );
     await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", "myleague_team"), newTeam()));
+  });
+
+  it("refuses starting a club team directly: the API checks the creator is 16 or over", async () => {
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam({ level: "club" })));
+    await assertFails(setDoc(doc(db(OUTSIDER), "teams", "t2"), newTeam({ level: "club", orgId: "org1", orgName: "Org" })));
+    for (const level of ["college", "youth", "pickup"]) {
+      await assertSucceeds(setDoc(doc(db(OUTSIDER), "teams", `t-${level}`), newTeam({ level })));
+    }
+    // Groups at the club level aren't club teams.
+    await assertSucceeds(
+      setDoc(doc(db(OUTSIDER), "teams", "g1"), newTeam({ level: "club", kind: "community", description: "", requiresApproval: false, location: null })),
+    );
   });
 
   it("rejects a team that keeps an invite code on the team doc", async () => {
@@ -297,6 +311,46 @@ describe("join", () => {
     });
     await assertFails(join("OLD234"));
     await assertFails(join("OLD777"));
+  });
+});
+
+describe("club teams (16 and over): joined through the API only", () => {
+  const joinUpdate = {
+    [`members.${OUTSIDER}`]: "player",
+    [`memberNames.${OUTSIDER}`]: "New Player",
+    memberIds: arrayUnion(OUTSIDER),
+  };
+  const toClub = (extra: Record<string, unknown> = { level: "club" }) =>
+    env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), "teams", TEAM), extra));
+  const invitePath = ["users", OUTSIDER, "teamInvites", TEAM] as const;
+
+  it("refuses joining one directly with a live code or link", async () => {
+    await toClub();
+    const fs = db(OUTSIDER);
+    await assertFails(
+      writeBatch(fs).set(doc(fs, "teams", TEAM, "joins", OUTSIDER), { code: CODE }).update(doc(fs, "teams", TEAM), joinUpdate).commit(),
+    );
+    // A team with no level reads as club, as the app reads it.
+    await toClub({ level: deleteField() });
+    await assertFails(
+      writeBatch(fs).set(doc(fs, "teams", TEAM, "joins", OUTSIDER), { code: CODE }).update(doc(fs, "teams", TEAM), joinUpdate).commit(),
+    );
+  });
+
+  it("invites still go out (ages are private), but accepting one directly is refused", async () => {
+    await toClub();
+    await assertSucceeds(
+      setDoc(doc(db(CAPTAIN), ...invitePath), { teamName: "Team", kind: "team", invitedBy: CAPTAIN, invitedByName: "K", createdAt: serverTimestamp() }),
+    );
+    const fs = db(OUTSIDER);
+    await assertFails(writeBatch(fs).update(doc(fs, "teams", TEAM), joinUpdate).delete(doc(fs, ...invitePath)).commit());
+    // Declining still works.
+    await assertSucceeds(deleteDoc(doc(fs, ...invitePath)));
+  });
+
+  it("changing a team's level to club is allowed, and its members stay", async () => {
+    await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), { name: "Team", level: "club", city: "" }));
+    await assertSucceeds(getDoc(doc(db(PLAYER), "teams", TEAM)));
   });
 });
 
@@ -1579,7 +1633,7 @@ describe("team directory", () => {
   const listing = (extra: Record<string, unknown> = {}) => ({
     name: "Team",
     division: "mixed",
-    level: "club",
+    level: "college",
     city: "",
     keywords: ["t", "te", "tea", "team"],
     ...extra,
@@ -1795,7 +1849,7 @@ describe("chat", () => {
     const fs = db(OUTSIDER);
     const batch = writeBatch(fs);
     batch.set(doc(fs, "teams", "t2"), {
-      name: "New", division: "mixed", level: "club", city: "",
+      name: "New", division: "mixed", level: "college", city: "",
       ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" }, memberIds: [OUTSIDER],
       memberNames: { [OUTSIDER]: "X" }, createdAt: serverTimestamp(),
     });
@@ -1812,7 +1866,7 @@ describe("chat", () => {
     const fs = db(OUTSIDER);
     const batch = writeBatch(fs);
     batch.set(doc(fs, "teams", "t3"), {
-      name: "New", division: "mixed", level: "club", city: "",
+      name: "New", division: "mixed", level: "college", city: "",
       ownerId: OUTSIDER, members: { [OUTSIDER]: "owner" }, memberIds: [OUTSIDER],
       memberNames: { [OUTSIDER]: "X" }, createdAt: serverTimestamp(),
     });
