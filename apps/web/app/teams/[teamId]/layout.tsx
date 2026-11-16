@@ -1,4 +1,4 @@
-import { isYouthTeam } from "@stall10/shared";
+import { isYouthTeam, rosterIsPublic } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -40,7 +40,7 @@ export default async function TeamLayout({ params, children }: Props) {
   const subtitle = listingSubtitle(team);
 
   return (
-    <TeamProvider teamId={teamId} name={name} kind={kind} privateGroup={privateGroup} youth={isYouthTeam(team)}>
+    <TeamProvider teamId={teamId} name={name} kind={kind} privateGroup={privateGroup} youth={isYouthTeam(team)} publicRoster={rosterIsPublic(team)}>
       <InviteProvider>
         <div className="page page-wide team-hub">
           <header className="team-banner">

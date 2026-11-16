@@ -14,6 +14,9 @@ import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/home/view_models/home_viewmodel.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
+import 'package:frisbee_app/ui/posts/widgets/inline_composer.dart';
+import 'package:frisbee_app/ui/posts/widgets/post_composer.dart';
+import 'package:frisbee_app/ui/teams/widgets/team_post_widgets.dart';
 import 'package:frisbee_app/ui/schedule/widgets/event_editor_screen.dart';
 import 'package:frisbee_app/data/repositories/auth/auth_repository.dart';
 import 'package:frisbee_app/data/repositories/event/event_repository.dart';
@@ -558,6 +561,23 @@ void main() {
       },
     );
 
+    test(
+      'creating a team ticks "Join or create a team", as joining does',
+      () async {
+        final vm = await load(withTeam: false);
+        bool joinDone() =>
+            vm.onboarding.firstWhere((s) => s.$1 == OnboardingStep.join).$2;
+        expect(joinDone(), isFalse);
+        expect(OnboardingStep.join.label, 'Join or create a team');
+
+        // A team the user created (owns), never joined with a code.
+        teams.teams['mine'] = team('mine', 'Mine', owner: testUser.uid);
+        teams.changed();
+        await pumpEventQueue();
+        expect(joinDone(), isTrue);
+      },
+    );
+
     test('joins a team by invite code', () async {
       final vm = await load(withTeam: false);
       teams.teams['t9'] = team('t9', 'Other', owner: 'u9');
@@ -616,6 +636,68 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('Home writes posts in place, and keeps the draft across tabs', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final vm = await tester.runAsync(() => load());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: HomeScreen(viewModel: vm!),
+      ),
+    );
+    await tester.pump();
+
+    // The box is the composer: no popup, and the user's team is a "To".
+    expect(find.byType(InlineComposer), findsOneWidget);
+    expect(find.text('Team post'), findsNothing);
+    expect(find.text('Everyone'), findsOneWidget);
+    final box = find.descendant(
+      of: find.byType(InlineComposer),
+      matching: find.byType(TextField),
+    );
+    await tester.tap(box);
+    await tester.pump();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(Dialog), findsNothing);
+    for (final tool in ['Link', 'Workout']) {
+      await tester.tap(find.text(tool));
+      await tester.pumpAndSettle();
+    }
+    expect(find.byType(PostComposer), findsNothing);
+    expect(find.byType(PostEditorDialog), findsNothing);
+    expect(find.text('Minutes'), findsOneWidget, reason: 'opened in place');
+    vm.composer
+      ..toggleWorkout()
+      ..closeLink();
+    await tester.pumpAndSettle();
+    expect(find.text('Minutes'), findsNothing);
+    await tester.enterText(box.first, 'Half a thought');
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Your teams'));
+    await tester.tap(find.text('Your teams'));
+    await tester.pump();
+    expect(find.byType(InlineComposer), findsNothing);
+    expect(vm.composer.body, 'Half a thought');
+    await tester.ensureVisible(find.text('For you'));
+    await tester.tap(find.text('For you'));
+    await tester.pumpAndSettle();
+    expect(find.text('Half a thought'), findsOneWidget);
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Post'));
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Post'));
+    await tester.pump();
+    await tester.pump();
+    expect(userPosts.posts.single.body, 'Half a thought');
+    expect(find.text('Half a thought'), findsWidgets, reason: 'in the feed');
+    expect(vm.composer.body, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('community feed shows a side column at desktop width', (
     tester,
@@ -717,7 +799,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('1 of 4 done'), findsOneWidget);
     expect(find.text('Join your team.'), findsNothing);
-    await tester.tap(find.text('Enter code'));
+    expect(find.text('Join or create a team'), findsOneWidget);
+    await tester.tap(find.text('Join or create'));
+    await tester.pumpAndSettle();
+    // Every way onto a team: a code, creating one, or finding a group.
+    expect(find.text('Create a team or group'), findsOneWidget);
+    await tester.tap(find.text('Join with a code'));
     await tester.pumpAndSettle();
     expect(find.text('Invite code'), findsOneWidget);
     await tester.tapAt(Offset.zero);

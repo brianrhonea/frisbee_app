@@ -1,5 +1,6 @@
 "use client";
 import {
+  normalizeLink,
   postBodyMax,
   postImagesMax,
   postLinksMax,
@@ -246,20 +247,29 @@ export function Composer({
     });
   }
 
-  function addLink() {
+  /** The links with the one typed in the link field added, or what's wrong with it. */
+  function withTypedLink(): string[] | { problem: string } {
     const raw = linkText.trim();
-    if (!raw) return setAddingLink(false);
-    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    try {
-      new URL(url);
-    } catch {
-      return setError("That doesn't look like a link.");
+    if (!raw) return links;
+    const url = normalizeLink(raw);
+    if (!url) return { problem: "Enter a web address, like example.com/video." };
+    if (links.includes(url)) return links;
+    if (links.length >= linksMax) return { problem: `Add at most ${linksMax} links.` };
+    return [...links, url];
+  }
+
+  /** Adds the typed link; null (with the error shown) when it isn't one. */
+  function addLink(): string[] | null {
+    const next = withTypedLink();
+    if (!Array.isArray(next)) {
+      setError(next.problem);
+      return null;
     }
-    if (links.length >= linksMax) return setError(`Add at most ${linksMax} links.`);
-    if (!links.includes(url)) setLinks([...links, url]);
+    setLinks(next);
     setLinkText("");
     setAddingLink(false);
     setError(null);
+    return next;
   }
 
   const uploading = photos.some((p) => p.kind === "new" && !p.uploadId && !p.error);
@@ -284,7 +294,7 @@ export function Composer({
   }
 
   /** A team post, as TeamPostComposer saves it (POST /v1/teams/{id}/posts). */
-  async function submitTeam(to: Audience) {
+  async function submitTeam(to: Audience, links: string[]) {
     setBusy(true);
     setError(null);
     const req: SaveTeamPostRequest = {
@@ -310,14 +320,17 @@ export function Composer({
   async function submit(e?: FormEvent) {
     e?.preventDefault();
     if (!canPost) return;
-    if (team) return submitTeam(team);
+    // A link typed but not added still counts (as in the app).
+    const sent = addLink();
+    if (!sent) return;
+    if (team) return submitTeam(team, sent);
     const w = workout ? workoutOf(workout) : undefined;
     if (typeof w === "string") return setError(w);
     setBusy(true);
     setError(null);
     const payload = {
       body,
-      links: repost ? [] : links,
+      links: repost ? [] : sent,
       uploadIds: photos.flatMap((p) => (p.kind === "new" && p.uploadId ? [p.uploadId] : [])),
       ...(editing && { keepImages: photos.flatMap((p) => (p.kind === "saved" ? [p.image.path] : [])) }),
       // An edit sends the tag either way (null removes it); a new post only when tagged.

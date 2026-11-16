@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/hosted_tournament.dart';
@@ -216,26 +217,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      for (final (label, filter) in <(String, ExploreFilter?)>[
-                        ('All', null),
-                        ('Players', ExploreFilter.players),
-                        ('Teams', ExploreFilter.teams),
-                        ('Groups', ExploreFilter.groups),
-                        if (widget.explore != null)
-                          ('Tournaments', ExploreFilter.tournaments),
-                      ])
-                        ChoiceChip(
-                          label: Text(label),
-                          showCheckmark: false,
-                          selected: _only == filter,
-                          onSelected: (_) =>
-                              setState(() => _applyFilter(filter)),
-                        ),
+                  _FilterChips(
+                    filters: [
+                      ('All', null),
+                      ('Players', ExploreFilter.players),
+                      ('Teams', ExploreFilter.teams),
+                      ('Groups', ExploreFilter.groups),
+                      if (widget.explore != null)
+                        ('Tournaments', ExploreFilter.tournaments),
                     ],
+                    selected: _only,
+                    onSelect: (f) => setState(() => _applyFilter(f)),
                   ),
                   const SizedBox(height: 8),
                   if (running && nothing)
@@ -281,6 +273,96 @@ class _ExploreScreenState extends State<ExploreScreen> {
       ),
     );
   }
+}
+
+/// The filter chips in one row that scrolls sideways when it's wider than
+/// the screen (rather than wrapping onto a second line), keeping the
+/// selected chip in view.
+class _FilterChips extends StatefulWidget {
+  const _FilterChips({
+    required this.filters,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<(String, ExploreFilter?)> filters;
+  final ExploreFilter? selected;
+  final ValueChanged<ExploreFilter?> onSelect;
+
+  @override
+  State<_FilterChips> createState() => _FilterChipsState();
+}
+
+class _FilterChipsState extends State<_FilterChips> {
+  final _keys = <ExploreFilter?, GlobalKey>{};
+  final _scroll = ScrollController();
+
+  GlobalKey _keyOf(ExploreFilter? f) => _keys[f] ??= GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _reveal();
+  }
+
+  @override
+  void didUpdateWidget(_FilterChips old) {
+    super.didUpdateWidget(old);
+    if (widget.selected != old.selected) _reveal();
+  }
+
+  /// Scrolls the row (only the row, not the page) so the selected chip is
+  /// fully in view, once it's laid out.
+  void _reveal() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final chip = _keys[widget.selected]?.currentContext?.findRenderObject();
+      if (!mounted || chip == null || !_scroll.hasClients) return;
+      final viewport = RenderAbstractViewport.maybeOf(chip);
+      if (viewport == null) return;
+      final pos = _scroll.position;
+      final start = viewport.getOffsetToReveal(chip, 0).offset;
+      final end = viewport.getOffsetToReveal(chip, 1).offset;
+      final target = pos.pixels > start
+          ? start
+          : pos.pixels < end
+          ? end
+          : pos.pixels;
+      final clamped = target.clamp(pos.minScrollExtent, pos.maxScrollExtent);
+      if (clamped != pos.pixels) {
+        _scroll.animateTo(
+          clamped,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    controller: _scroll,
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: [
+        for (final (i, (label, filter)) in widget.filters.indexed) ...[
+          if (i > 0) const SizedBox(width: 8),
+          ChoiceChip(
+            key: _keyOf(filter),
+            label: Text(label),
+            showCheckmark: false,
+            selected: widget.selected == filter,
+            onSelected: (_) => widget.onSelect(filter),
+          ),
+        ],
+      ],
+    ),
+  );
 }
 
 class _ResultTile extends StatelessWidget {

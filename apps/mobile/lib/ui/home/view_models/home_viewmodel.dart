@@ -22,6 +22,7 @@ import '../../../utils/result.dart';
 import '../../../domain/models/user_post.dart';
 import '../../posts/view_models/community_feed.dart';
 import '../../posts/view_models/home_feed.dart';
+import '../../posts/view_models/inline_composer_viewmodel.dart';
 import '../../posts/view_models/post_actions.dart';
 import '../../schedule/view_models/my_schedule.dart';
 import '../../teams/view_models/team_home_viewmodel.dart' show pickPostImages;
@@ -33,7 +34,7 @@ typedef FeedPostDraft = ({String teamId, PostDraft draft});
 /// website's onboardingSteps: same steps, same rules).
 enum OnboardingStep {
   username('Pick a username'),
-  join('Join your team with a code'),
+  join('Join or create a team'),
   find('Find a team or group near you'),
   follow('Follow people');
 
@@ -84,6 +85,14 @@ class HomeViewModel extends ChangeNotifier {
       teamPostRepository: teamPostRepository,
       userPostRepository: userPostRepository,
     )..addListener(_onPosts);
+    composer = InlineComposerViewModel(
+      authRepository: authRepository,
+      userPostRepository: userPostRepository,
+      teamPostRepository: teamPostRepository,
+      followRepository: followRepository,
+      filePicker: filePicker,
+      audiences: () => postableTeams,
+    );
     community = CommunityFeed(userPostRepository: userPostRepository)
       ..addListener(_onPosts);
     _feed = MySchedule(
@@ -112,7 +121,11 @@ class HomeViewModel extends ChangeNotifier {
   /// Joins by invite code; result value is the team id.
   late final Command1<String, String> joinTeam;
 
-  /// Creates or edits a post on one of the user's teams.
+  /// The composer at the top of For you: a post to Everyone or, for a
+  /// team the user manages, a team post, written in place.
+  late final InlineComposerViewModel composer;
+
+  /// Edits a post on one of the user's teams.
   late final Command1<void, FeedPostDraft> savePost;
   late final Command1<void, TeamPostItem> deletePost;
 
@@ -264,8 +277,9 @@ class HomeViewModel extends ChangeNotifier {
   bool get needsUsername => _auth.needsUsername;
 
   /// The checklist's steps and whether each is done: a username; joining
-  /// with a code and finding a team are done once on one; following once
-  /// following anything.
+  /// or creating a team and finding one are done once on any team (by
+  /// code, by finding it or by creating it); following once following
+  /// anything.
   List<(OnboardingStep, bool)> get onboarding => [
     (OnboardingStep.username, !needsUsername),
     (OnboardingStep.join, teams.isNotEmpty),
@@ -393,6 +407,7 @@ class HomeViewModel extends ChangeNotifier {
       ..removeListener(_onPosts)
       ..dispose();
     joinTeam.dispose();
+    composer.dispose();
     savePost.dispose();
     deletePost.dispose();
     deleteUserPost.dispose();

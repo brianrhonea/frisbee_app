@@ -62,6 +62,8 @@ interface TeamHubInfo {
   privateGroup: boolean;
   /** A youth team (isYouthTeam): visitors see its card only, and only members its roster. */
   youth: boolean;
+  /** Visitors may see the roster (rosterIsPublic: an adult team's), without links to profiles. */
+  publicRoster: boolean;
   viewer: TeamViewer;
 }
 
@@ -96,6 +98,7 @@ export function TeamProvider({
   kind,
   privateGroup,
   youth,
+  publicRoster,
   children,
 }: Omit<TeamHubInfo, "viewer"> & { children: ReactNode }) {
   const { user } = useAuth();
@@ -112,7 +115,7 @@ export function TeamProvider({
   // Members see their team as it is: the public page hides a drafted
   // league team's name (its players') from everyone else.
   const shownName = viewer.state === "member" ? viewer.team.name || name : name;
-  return <TeamContext.Provider value={{ teamId, name: shownName, kind, privateGroup, youth, viewer }}>{children}</TeamContext.Provider>;
+  return <TeamContext.Provider value={{ teamId, name: shownName, kind, privateGroup, youth, publicRoster, viewer }}>{children}</TeamContext.Provider>;
 }
 
 export function useTeamHub(): TeamHubInfo {
