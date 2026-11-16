@@ -1,5 +1,5 @@
 "use client";
-import { normalizeLink, type SaveTeamPostRequest, teamPostImagesMax, teamPostLinksMax } from "@stall10/shared";
+import { type SaveTeamPostRequest, teamPostImagesMax } from "@stall10/shared";
 import { type ClipboardEvent, type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
 import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
@@ -13,7 +13,8 @@ type Photo =
 
 /**
  * Writes or edits a team post (admins with manageTeam): a title, words,
- * a place, links, up to four photos and whether outsiders see it.
+ * a place, up to four photos and whether outsiders see it. Web addresses
+ * in the words show as links; an older post's separate links are kept.
  * Photos upload as they're added (`teamImage` uploads for this post id).
  */
 export function TeamPostComposer({
@@ -31,7 +32,6 @@ export function TeamPostComposer({
   const [body, setBody] = useState(post?.body ?? "");
   const [location, setLocation] = useState(post?.location ?? "");
   const [links, setLinks] = useState<string[]>(post?.links ?? []);
-  const [link, setLink] = useState("");
   const [isPublic, setPublic] = useState(post?.public === true);
   const [photos, setPhotos] = useState<Photo[]>(() => (post?.images ?? []).map((i) => ({ kind: "saved", path: i.path, name: i.name })));
   const [error, setError] = useState<string | null>(null);
@@ -74,45 +74,19 @@ export function TeamPostComposer({
     }
   }
 
-  /** The links with the one typed in the link field added, or what's wrong with it. */
-  function withTypedLink(): string[] | { problem: string } {
-    const t = link.trim();
-    if (!t) return links;
-    const url = normalizeLink(t);
-    if (!url) return { problem: "Enter a web address, like example.com/tryouts." };
-    if (links.includes(url)) return links;
-    if (links.length >= teamPostLinksMax) return { problem: `Add at most ${teamPostLinksMax} links.` };
-    return [...links, url];
-  }
-
-  /** Adds the typed link; null (with the error shown) when it isn't one. */
-  function addLink(): string[] | null {
-    const next = withTypedLink();
-    if (!Array.isArray(next)) {
-      setError(next.problem);
-      return null;
-    }
-    setLinks(next);
-    setLink("");
-    return next;
-  }
-
   const uploading = photos.some((p) => p.kind === "new" && !p.uploadId && !p.error);
   const canPost = !busy && !uploading && (body.trim().length > 0 || photos.some((p) => p.kind === "saved" || p.uploadId));
 
   async function submit(e?: FormEvent) {
     e?.preventDefault();
     if (!user || !canPost) return;
-    // A link typed but not added still counts (as in the app and on Home).
-    const sent = addLink();
-    if (!sent) return;
     setBusy(true);
     setError(null);
     const req: SaveTeamPostRequest = {
       title: title.trim(),
       body,
       location: location.trim(),
-      links: sent,
+      links,
       public: isPublic,
       uploadIds: photos.flatMap((p) => (p.kind === "new" && p.uploadId ? [p.uploadId] : [])),
       ...(post && { keepImages: photos.flatMap((p) => (p.kind === "saved" ? [p.path] : [])) }),
@@ -191,23 +165,6 @@ export function TeamPostComposer({
             ))}
           </ul>
         )}
-        <div className="composer-link-row">
-          <input
-            aria-label="Add a link"
-            placeholder="Add a link"
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addLink();
-              }
-            }}
-          />
-          <button type="button" className="btn btn-small" onClick={addLink}>
-            Add
-          </button>
-        </div>
         {error && (
           <p className="form-error" role="alert">
             {error}

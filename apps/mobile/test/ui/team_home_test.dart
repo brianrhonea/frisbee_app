@@ -260,10 +260,7 @@ void main() {
   test('links are normalized to web addresses', () {
     expect(TeamPost.normalizeLink('example.com/a'), 'https://example.com/a');
     expect(TeamPost.normalizeLink(' http://x.org '), 'http://x.org');
-    expect(
-      TeamPost.normalizeLink('Https://X.org/Path'),
-      'https://X.org/Path',
-    );
+    expect(TeamPost.normalizeLink('Https://X.org/Path'), 'https://X.org/Path');
     expect(TeamPost.normalizeLink('ftp://x.org'), isNull);
     expect(TeamPost.normalizeLink('javascript:alert(1)'), isNull);
     expect(TeamPost.normalizeLink('not a link'), isNull);
@@ -608,10 +605,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField).at(1), 'Pickup Sunday');
       await tester.enterText(find.byType(TextFormField).at(2), 'Wash Park');
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Add a link'),
-        'example.com/pickup',
-      );
+      // No link field: links go in the words.
+      expect(find.widgetWithText(TextField, 'Add a link'), findsNothing);
       await tester.ensureVisible(find.text('Public'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Public'));
@@ -623,8 +618,7 @@ void main() {
       final post = posts.posts['t1']!.single;
       expect(post.isPublic, isTrue);
       expect(post.location, 'Wash Park');
-      // Typed but not added with +: still saved.
-      expect(post.links, ['https://example.com/pickup']);
+      expect(post.links, isEmpty);
     });
   });
 

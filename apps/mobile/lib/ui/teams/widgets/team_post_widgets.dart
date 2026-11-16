@@ -9,6 +9,7 @@ import '../../../utils/result.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/linkified_text.dart';
 import '../../core/ui/skeleton.dart';
 import '../../core/ui/user_avatar.dart';
 
@@ -156,7 +157,7 @@ class TeamPostCard extends StatelessWidget {
                   ],
                   if (post.body.isNotEmpty) ...[
                     SizedBox(height: post.title.isEmpty ? 12 : 6),
-                    SelectableText(
+                    LinkifiedText(
                       post.body,
                       style: TextStyle(
                         fontSize: 13.5,
@@ -411,38 +412,22 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
   late final _title = TextEditingController(text: widget.initial?.title);
   late final _body = TextEditingController(text: widget.initial?.body);
   late final _location = TextEditingController(text: widget.initial?.location);
-  final _link = TextEditingController();
   late bool _public = widget.initial?.isPublic ?? false;
+  // Links from before the link field went: kept, and can be removed. New
+  // ones go in the text, which shows web addresses as links.
   late final List<String> _links = [...?widget.initial?.links];
   late final List<ChatAttachment> _kept = [...?widget.initial?.images];
   final List<NewAttachment> _added = [];
-  String? _linkError;
   bool _picking = false;
 
   int get _imageCount => _kept.length + _added.length;
 
   @override
   void dispose() {
-    for (final c in [_title, _body, _location, _link]) {
+    for (final c in [_title, _body, _location]) {
       c.dispose();
     }
     super.dispose();
-  }
-
-  void _addLink() {
-    if (_link.text.trim().isEmpty) return;
-    final link = TeamPost.normalizeLink(_link.text);
-    setState(() {
-      if (link == null) {
-        _linkError = 'Enter a web address, like example.com/tryouts';
-      } else if (_links.length >= TeamPost.maxLinks) {
-        _linkError = 'Up to ${TeamPost.maxLinks} links';
-      } else {
-        _linkError = null;
-        if (!_links.contains(link)) _links.add(link);
-        _link.clear();
-      }
-    });
   }
 
   Future<void> _addPhotos({bool camera = false}) async {
@@ -468,9 +453,6 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
   }
 
   void _submit() {
-    // A link typed but not added still counts.
-    if (_link.text.trim().isNotEmpty) _addLink();
-    if (_linkError != null) return;
     if (!_formKey.currentState!.validate()) return;
     final post = (widget.initial ?? const TeamPost(id: '')).copyWith(
       title: _title.text.trim(),
@@ -529,26 +511,6 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
                     labelText: 'Location (optional)',
                     prefixIcon: Icon(Icons.place_outlined),
                   ),
-                ),
-                TextField(
-                  controller: _link,
-                  keyboardType: TextInputType.url,
-                  enabled: _links.length < TeamPost.maxLinks,
-                  decoration: InputDecoration(
-                    labelText: 'Add a link',
-                    hintText: 'example.com/tryouts',
-                    prefixIcon: const Icon(Icons.link),
-                    errorText: _linkError,
-                    suffixIcon: IconButton(
-                      tooltip: 'Add link',
-                      icon: const Icon(Icons.add),
-                      onPressed: _addLink,
-                    ),
-                  ),
-                  onChanged: (_) {
-                    if (_linkError != null) setState(() => _linkError = null);
-                  },
-                  onSubmitted: (_) => _addLink(),
                 ),
                 if (_links.isNotEmpty) ...[
                   const SizedBox(height: 8),

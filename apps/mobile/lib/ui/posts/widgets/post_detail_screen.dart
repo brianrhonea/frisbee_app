@@ -503,8 +503,12 @@ class _CommentBox extends StatelessWidget {
   /// Stops replying or editing.
   final VoidCallback? onCancel;
 
+  // Its send button keeps the keyboard open.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      TextFieldTapRegion(child: _box(context));
+
+  Widget _box(BuildContext context) {
     final empty = controller.text.trim().isEmpty;
     return Material(
       elevation: 3,

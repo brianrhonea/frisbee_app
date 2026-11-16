@@ -10,6 +10,7 @@ import { Composer } from "./Composer";
 import { LocalTime } from "./LocalTime";
 import { MemberImage } from "./MemberImage";
 import { PostActions } from "./PostActions";
+import { LinkedText } from "./LinkedText";
 
 function workoutLine(w: NonNullable<PublicPost["workout"]>): string {
   const parts: string[] = [];
@@ -92,7 +93,7 @@ function PostContent({ post }: { post: PublicPost }) {
   return (
     <>
       {post.tournamentName && <p className="post-tag">{post.tournamentName}</p>}
-      {post.body && <p className="post-body">{post.body}</p>}
+      {post.body && <p className="post-body"><LinkedText text={post.body} /></p>}
       {post.workout && (
         <div className="post-box">
           <b>Workout</b> {workoutLine(post.workout)}
@@ -252,7 +253,7 @@ export function PostCard({ post: initial, standalone = false }: { post: PublicPo
   return (
     <article className="post">
       <PostHead post={post} standalone={standalone} note="reposted" menu={menu} />
-      {editor || (post.body && <p className="post-body">{post.body}</p>)}
+      {editor || (post.body && <p className="post-body"><LinkedText text={post.body} /></p>)}
       {original ? (
         <div className="post-original">
           <PostHead post={original} standalone={false} />

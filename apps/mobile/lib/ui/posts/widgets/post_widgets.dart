@@ -11,6 +11,8 @@ import '../../../domain/models/workout_route.dart';
 import '../../../routing/open_link.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/ui/linkified_text.dart';
+import '../../core/ui/tap_outside_unfocus.dart';
 import '../../core/ui/user_avatar.dart';
 import '../../schedule/widgets/event_style.dart';
 import '../../teams/widgets/team_post_widgets.dart';
@@ -162,7 +164,7 @@ class UserPostCard extends StatelessWidget {
                         children: [
                           if (post.body.isNotEmpty) ...[
                             const SizedBox(height: 8),
-                            SelectableText(
+                            LinkifiedText(
                               post.body,
                               style: theme.textTheme.bodyMedium,
                             ),
@@ -246,7 +248,7 @@ class _PostContent extends StatelessWidget {
         ],
         if (post.body.isNotEmpty) ...[
           const SizedBox(height: 8),
-          SelectableText(post.body, style: theme.textTheme.bodyMedium),
+          LinkifiedText(post.body, style: theme.textTheme.bodyMedium),
         ],
         if (workout != null) ...[
           const SizedBox(height: 10),
@@ -504,6 +506,7 @@ Future<void> repostOrUndo(
   PostActions actions,
   UserPost post,
 ) async {
+  dropKeyboard();
   final messenger = ScaffoldMessenger.of(context);
   void say(String text) => messenger
     ..hideCurrentSnackBar()
@@ -622,7 +625,6 @@ class _RepostDialogState extends State<_RepostDialog> {
             const SizedBox(height: 16),
             TextField(
               controller: _note,
-              autofocus: true,
               minLines: 1,
               maxLines: 4,
               maxLength: 1000,
@@ -774,7 +776,9 @@ IconData workoutIcon(WorkoutActivity a) => switch (a) {
   WorkoutActivity.other => Icons.sports,
 };
 
-/// A workout's route map, its stats, then its exercises.
+/// A workout, kept light: the route map when there is one, a line naming
+/// the activity, its numbers side by side (value over a small label), then
+/// any exercises as a compact list.
 class WorkoutSummary extends StatelessWidget {
   const WorkoutSummary({super.key, required this.workout});
 
@@ -793,109 +797,108 @@ class WorkoutSummary extends StatelessWidget {
     final unit = distanceUnitOf(context);
     final route = workout.route;
     final gain = route?.elevationGainMeters;
-    final stats = <(IconData, String, String)>[
-      if (workout.distanceLabel(unit) case final d?)
-        (Icons.straighten, 'Distance', d),
-      (Icons.timer_outlined, 'Time', workout.durationLabel),
+    final stats = <(String, String)>[
+      if (workout.distanceLabel(unit) case final d?) ('Distance', d),
+      ('Time', workout.durationLabel),
       if (workout.activity.showsSpeed)
-        if (workout.speedLabel(unit) case final v?) (Icons.speed, 'Speed', v),
+        if (workout.speedLabel(unit) case final v?) ('Speed', v),
       if (_paced.contains(workout.activity))
-        if (workout.paceLabel(unit) case final p?) (Icons.speed, 'Pace', p),
+        if (workout.paceLabel(unit) case final p?) ('Pace', p),
       if (gain != null && gain >= 1)
         (
-          Icons.terrain_outlined,
           'Elev gain',
           unit == DistanceUnit.mi
               ? '${(gain * 3.28084).round()} ft'
               : '${gain.round()} m',
         ),
-      if (workout.effort case final e?)
-        (Icons.local_fire_department_outlined, 'Effort', '$e/10'),
+      if (workout.effort case final e?) ('Effort', '$e/10'),
     ];
-    return Container(
+    final muted = theme.textTheme.labelSmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (route != null && route.path.length >= 2)
-            SizedBox(height: 200, child: RouteMap(path: route.path)),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(workoutIcon(workout.activity), color: scheme.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                      workout.activity.label,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 20,
-                  runSpacing: 8,
-                  children: [
-                    for (final (icon, label, value) in stats)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                icon,
-                                size: 14,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (route != null && route.path.length >= 2)
+              SizedBox(height: 160, child: RouteMap(path: route.path)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        workoutIcon(workout.activity),
+                        size: 16,
+                        color: scheme.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        workout.activity.label,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: scheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 18,
+                    runSpacing: 6,
+                    children: [
+                      for (final (label, value) in stats)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              value,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(label, style: muted),
+                          ],
+                        ),
+                    ],
+                  ),
+                  if (workout.exercises.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    for (final e in workout.exercises)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                e.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ),
+                            Text(
+                              e.detail,
+                              style: theme.textTheme.bodySmall?.copyWith(
                                 color: scheme.onSurfaceVariant,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                label,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(value, style: theme.textTheme.titleSmall),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                   ],
-                ),
-                if (workout.exercises.isNotEmpty) ...[
-                  const Divider(height: 20),
-                  for (final e in workout.exercises)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              e.name,
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                          ),
-                          Text(
-                            e.detail,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

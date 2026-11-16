@@ -9,6 +9,7 @@ import {
   signInFailure,
   signInHandle,
   tournamentWithout,
+  userFolder,
 } from "../../src/account/model";
 
 describe("nextOwner", () => {
@@ -86,6 +87,12 @@ describe("storage folders", () => {
   it("finds a post's photos", () => {
     expect(postFolder("teams/t1/posts/p1")).toBe("teams/t1/posts/p1/");
     expect(postFolder("teams/t1/plays/p1")).toBeUndefined();
+  });
+
+  it("finds a user's own uploads, and only theirs", () => {
+    expect(userFolder("u1")).toBe("users/u1/");
+    expect(() => userFolder("")).toThrow();
+    expect(() => userFolder("u1/../u2")).toThrow();
   });
 });
 

@@ -664,16 +664,14 @@ void main() {
     await tester.pump();
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.byType(Dialog), findsNothing);
-    for (final tool in ['Link', 'Workout']) {
-      await tester.tap(find.text(tool));
-      await tester.pumpAndSettle();
-    }
+    // No Link tool: links go in the words.
+    expect(find.text('Link'), findsNothing);
+    await tester.tap(find.text('Workout'));
+    await tester.pumpAndSettle();
     expect(find.byType(PostComposer), findsNothing);
     expect(find.byType(PostEditorDialog), findsNothing);
     expect(find.text('Minutes'), findsOneWidget, reason: 'opened in place');
-    vm.composer
-      ..toggleWorkout()
-      ..closeLink();
+    vm.composer.toggleWorkout();
     await tester.pumpAndSettle();
     expect(find.text('Minutes'), findsNothing);
     await tester.enterText(box.first, 'Half a thought');

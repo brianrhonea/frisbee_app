@@ -10,6 +10,29 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.24
+
+**Keyboard**
+- Tap anywhere outside a text box to close the keyboard. Send buttons in
+  chats and comments still keep it open while you type.
+- Closing the Send or Repost popup no longer opens the keyboard again.
+
+**Sending posts**
+- People who deleted their account no longer show up under Recent.
+
+**Links**
+- There's no Link button on posts any more: paste a link into your text
+  and it shows as a link people can tap.
+
+**Workouts**
+- Adding a workout takes less room, and workouts in the feed are
+  cleaner: the numbers stand out, with less clutter around them.
+
+**Deleting your account**
+- Your profile and header photos are deleted with it.
+
+---
+
 ## 0.0.23
 
 **The website, signed out**

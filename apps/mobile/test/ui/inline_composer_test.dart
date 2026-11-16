@@ -68,31 +68,12 @@ void main() {
       expect(vm.canPost, isFalse);
     });
 
-    test('links alone are not a post; a typed link is added on post', () async {
-      final vm = build();
-      vm
-        ..openLink()
-        ..setLinkText('example.com/clip');
-      expect(vm.canPost, isFalse);
-      expect(vm.addLink(), isTrue);
-      expect(vm.links, ['https://example.com/clip']);
-      expect(vm.linkOpen, isFalse);
-
-      vm
-        ..openLink()
-        ..setLinkText('not a link')
-        ..setBody('See this');
+    test('no link tool: a pasted link is part of the words', () async {
+      final vm = build()..setBody('Highlights https://youtu.be/x');
       await vm.post.execute();
-      expect(vm.post.error, isTrue);
-      expect(vm.linkError, isNotNull);
-      expect(userPosts.posts, isEmpty);
-
-      vm.setLinkText('youtu.be/x');
-      await vm.post.execute();
-      expect(userPosts.posts.single.links, [
-        'https://example.com/clip',
-        'https://youtu.be/x',
-      ]);
+      final post = userPosts.posts.single;
+      expect(post.body, 'Highlights https://youtu.be/x');
+      expect(post.links, isEmpty);
     });
 
     test('photos: picked into the box, up to the limit, then posted', () async {
@@ -288,7 +269,7 @@ void main() {
       expect(find.byType(Dialog), findsNothing);
     });
 
-    testWidgets('Photo, Link and Workout open inside the box, no popup', (
+    testWidgets('Photo and Workout open inside the box, no popup', (
       tester,
     ) async {
       await pump(tester);
@@ -301,16 +282,8 @@ void main() {
       expect(find.byTooltip('Remove photo'), findsOneWidget);
       expect(postEnabled(tester), isTrue);
 
-      await tester.tap(find.text('Link'));
-      await tester.pumpAndSettle();
-      expect(find.text('example.com/highlights'), findsOneWidget);
-      await tester.enterText(
-        find.widgetWithText(TextField, 'example.com/highlights'),
-        'example.com/clip',
-      );
-      await tester.tap(find.byTooltip('Add link'));
-      await tester.pumpAndSettle();
-      expect(find.text('example.com/clip'), findsOneWidget);
+      // No Link tool: pasted links in the words show as links.
+      expect(find.text('Link'), findsNothing);
 
       await tester.tap(find.text('Workout'));
       await tester.pumpAndSettle();

@@ -242,6 +242,15 @@ class Conversation {
 
   String otherName(String me) => names[otherId(me)] ?? 'Stall 10 user';
 
+  /// The name account deletion leaves on a conversation for the person who
+  /// left (deletedUserName in firebase/functions/src/account/model.ts).
+  static const deletedUserName = 'Deleted user';
+
+  /// Whether the other person in a direct conversation deleted their
+  /// account; nothing can be sent to them.
+  bool otherDeleted(String me) =>
+      !isGroup && names[otherId(me)] == deletedUserName;
+
   /// Everyone in it but [me].
   List<String> othersThan(String me) => [
     for (final p in participants)

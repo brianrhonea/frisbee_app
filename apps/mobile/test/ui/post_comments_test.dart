@@ -207,4 +207,41 @@ void main() {
     expect(vm.wasSent('jo'), isTrue);
     expect(dms.messages[Conversation.idFor(testUser.uid, 'jo')], hasLength(1));
   });
+
+  test('Recent never lists deleted accounts or group chats', () async {
+    final dms = FakeDirectMessageRepository();
+    for (final (uid, name) in [('zed', 'Zed'), ('gone', 'Gone')]) {
+      await dms.openConversation(testUser, UserProfile(uid: uid, name: name));
+      await dms.sendMessage(
+        Conversation.idFor(testUser.uid, uid),
+        author: testUser,
+        text: 'Hey',
+      );
+    }
+    // Account deletion keeps the conversation under "Deleted user".
+    final goneId = Conversation.idFor(testUser.uid, 'gone');
+    final gone = dms.conversations[goneId]!;
+    dms.conversations[goneId] = Conversation(
+      id: goneId,
+      participants: gone.participants,
+      names: {...gone.names, 'gone': Conversation.deletedUserName},
+      lastMessageAt: gone.lastMessageAt,
+    );
+    dms.conversations['g-1'] = Conversation(
+      id: 'g-1',
+      participants: [testUser.uid, 'zed', 'amy'],
+      isGroup: true,
+      name: 'Crew',
+      lastMessageAt: DateTime(2026),
+    );
+    final vm = SendPostViewModel(
+      post: const UserPost(id: 'p1', body: 'Hi'),
+      directMessageRepository: dms,
+      authRepository: FakeAuthRepository(user: testUser),
+      debounce: Duration.zero,
+    );
+    addTearDown(vm.dispose);
+    await pumpEventQueue();
+    expect(vm.recent!.map((p) => p.uid), ['zed']);
+  });
 }

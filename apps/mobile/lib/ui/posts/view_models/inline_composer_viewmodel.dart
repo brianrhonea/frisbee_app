@@ -49,7 +49,7 @@ class WorkoutDraft {
 /// The inline composer on Home (the website's Composer): a draft that
 /// lives here, not in the widget, so it survives the box being rebuilt
 /// (switching tabs, cards appearing above it). Type and post; the tools
-/// add photos, links or a workout to the same box. With [audiences], a
+/// add photos or a workout to the same box. With [audiences], a
 /// "To" chip posts to Everyone or to one of those teams: a team post has a
 /// title, a place and (unless it's a private group) a Public switch, and
 /// no workout or tournament tag.
@@ -144,61 +144,6 @@ class InlineComposerViewModel extends ChangeNotifier {
   bool _public = false;
   bool get isPublic => _public;
   void setPublic(bool v) => _set(() => _public = v);
-
-  // Links ------------------------------------------------------------------
-
-  final _links = <String>[];
-  List<String> get links => List.unmodifiable(_links);
-  bool get canAddLink => _links.length < UserPost.maxLinks;
-
-  bool _linkOpen = false;
-
-  /// Whether the "Add a link" field shows (the Link tool opens it).
-  bool get linkOpen => _linkOpen;
-  void openLink() => _set(() => _linkOpen = true);
-  void closeLink() => _set(() {
-    _linkOpen = false;
-    _linkText = '';
-    _linkError = null;
-  });
-
-  String _linkText = '';
-  String get linkText => _linkText;
-  void setLinkText(String v) {
-    if (v == _linkText) return;
-    _linkText = v;
-    _linkError = null;
-    _touch();
-  }
-
-  String? _linkError;
-  String? get linkError => _linkError;
-
-  /// Adds the typed link; false (with [linkError]) when it isn't one.
-  bool addLink() {
-    if (_linkText.trim().isEmpty) {
-      _set(() => _linkOpen = false);
-      return true;
-    }
-    final link = TeamPost.normalizeLink(_linkText);
-    if (link == null) {
-      _set(() => _linkError = 'Enter a web address, like example.com/video');
-      return false;
-    }
-    if (!canAddLink) {
-      _set(() => _linkError = 'Up to ${UserPost.maxLinks} links');
-      return false;
-    }
-    _set(() {
-      if (!_links.contains(link)) _links.add(link);
-      _linkText = '';
-      _linkError = null;
-      _linkOpen = false;
-    });
-    return true;
-  }
-
-  void removeLink(String link) => _set(() => _links.remove(link));
 
   // Photos -----------------------------------------------------------------
 
@@ -311,17 +256,14 @@ class InlineComposerViewModel extends ChangeNotifier {
 
   // Posting ----------------------------------------------------------------
 
-  /// Whether there's something to post: words, a photo or a workout (links
-  /// alone aren't a post), and nothing still being picked.
+  /// Whether there's something to post: words, a photo or a workout, and
+  /// nothing still being picked. Links go in the words: pasted web
+  /// addresses show as links.
   bool get canPost => !post.running && !_picking && _hasContent;
 
   Future<Result<PostedTo>> _post() async {
     final me = _auth.currentUser;
     if (me == null) return Result.error(Exception('Not signed in'));
-    // A link typed but not added still counts.
-    if (_linkText.trim().isNotEmpty && !addLink()) {
-      return Result.error(Exception(_linkError));
-    }
     if (!_hasContent) {
       return Result.error(Exception('Write something or add a photo'));
     }
@@ -343,7 +285,6 @@ class InlineComposerViewModel extends ChangeNotifier {
           title: _title.trim(),
           body: _body.trim(),
           location: _place.trim(),
-          links: List.of(_links),
           isPublic: _public && !to.isPrivateGroup,
         ),
         newImages: List.of(_photos),
@@ -361,7 +302,6 @@ class InlineComposerViewModel extends ChangeNotifier {
         post: UserPost(
           id: '',
           body: _body.trim(),
-          links: List.of(_links),
           workout: workout,
           tournamentKey: _tagKey,
           tournamentName: _tagKey == null ? null : _tagName,
@@ -444,10 +384,6 @@ class InlineComposerViewModel extends ChangeNotifier {
     _title = '';
     _place = '';
     _public = false;
-    _links.clear();
-    _linkText = '';
-    _linkError = null;
-    _linkOpen = false;
     _photos.clear();
     _notice = null;
     _workout = null;

@@ -160,6 +160,16 @@ export function attachmentFolder(messagePath: string, uid: string): string | und
 }
 
 /** Storage folder of a team post's photos, from the post's document path. */
+/**
+ * Everything a user uploaded under their own folder in Storage: profile
+ * and header photos (users/{uid}/profile/) and post photos
+ * (users/{uid}/posts/).
+ */
+export function userFolder(uid: string): string {
+  if (!uid || uid.includes("/")) throw new Error("Bad user id");
+  return `users/${uid}/`;
+}
+
 export function postFolder(postPath: string): string | undefined {
   const p = postPath.split("/");
   // teams/{teamId}/posts/{postId}

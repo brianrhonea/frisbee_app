@@ -24,6 +24,7 @@ import {
   wrongCredentials,
   type TeamMembers,
   tournamentWithout,
+  userFolder,
 } from "./model";
 import { overLimit } from "../api/functions";
 import { enforceAppCheck } from "../options";
@@ -84,7 +85,7 @@ export const signInEmail = onCall({ secrets: [webApiKey], enforceAppCheck }, asy
 /**
  * Deletes the caller's account and everything they put in the app: their
  * posts, chat and direct messages (with attachments), event responses,
- * join requests, profile, personal details and private data. They leave every team; a team
+ * join requests, profile (with its photos), personal details and private data. They leave every team; a team
  * they own passes to its next admin, or is deleted if nobody else is on
  * it. Messages other people sent them stay, under "Deleted user".
  *
@@ -125,6 +126,8 @@ async function deleteUserData(db: Firestore, uid: string): Promise<void> {
   await db.recursiveDelete(db.doc(`profiles/${uid}`));
   // Encrypted personal details (apps/api/src/personal).
   await db.doc(`personalDetails/${uid}`).delete();
+  // Their profile and header photos, and any post photos left behind.
+  await deleteFolder(userFolder(uid));
 }
 
 const bucket = () => getStorage().bucket();

@@ -23,6 +23,7 @@ import 'firebase_options.dart';
 import 'routing/router.dart';
 import 'ui/core/themes/theme.dart';
 import 'ui/core/ui/brand.dart';
+import 'ui/core/ui/tap_outside_unfocus.dart';
 import 'ui/meetings/view_models/meeting_alerts_viewmodel.dart';
 import 'ui/meetings/widgets/meeting_alerts.dart';
 import 'routing/open_link.dart';
@@ -174,14 +175,16 @@ class _FrisbeeAppState extends State<FrisbeeApp> {
     themeMode: context.watch<ThemeRepository>().themeMode,
     routerConfig: _router,
     scaffoldMessengerKey: _messengerKey,
-    builder: (_, child) => MeetingAlerts(
-      viewModel: _meetingAlerts,
-      router: _router,
-      messengerKey: _messengerKey,
-      child: InAppNoticeBubble(
-        viewModel: _notices,
-        onOpen: _router.openLink,
-        child: child ?? const SizedBox.shrink(),
+    builder: (_, child) => TapOutsideUnfocus(
+      child: MeetingAlerts(
+        viewModel: _meetingAlerts,
+        router: _router,
+        messengerKey: _messengerKey,
+        child: InAppNoticeBubble(
+          viewModel: _notices,
+          onOpen: _router.openLink,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     ),
   );

@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.24  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.23  | 2026-11-14 | `feature/web-parity`                    |                     |
 | 0.0.22  | 2026-11-14 | `feature/web-redesign`                  |                     |
 | 0.0.21  | 2026-11-14 | `feature/web-redesign`                  | `848021e`           |
@@ -37,6 +38,33 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.24 — Keyboard, Send, no link tool, lighter workouts
+
+- Keyboard: tapping outside a text field closes it everywhere
+  (`TapOutsideUnfocus` in `main.dart`'s builder overrides
+  `EditableTextTapOutsideIntent`, which Flutter only honours for a mouse
+  on phones). Chat, comment and Home composer bars sit in a
+  `TextFieldTapRegion`, so their Send/attach buttons keep it open.
+- Send (a post's paper plane) and Repost drop focus before opening and
+  after closing (`dropKeyboard`): closing a sheet no longer hands focus
+  back to a field, which re-opened the keyboard. The repost note no
+  longer autofocuses.
+- Send's Recent list skips group chats and people who deleted their
+  account (`Conversation.otherDeleted`: deletion keeps the conversation
+  under "Deleted user").
+- Account deletion (`account` functions) also deletes the user's Storage
+  folder (`users/{uid}/`: profile and header photos, leftover post
+  photos).
+- Posts have no Link tool or "Add a link" field (Home composer, post
+  editor, team post editor; same on the website). Web addresses in a
+  post's text are tappable (`LinkifiedText`). Older posts keep their
+  links, shown and removable when edited.
+- Workouts look lighter: a one-row activity picker (`ActivityPicker`)
+  and a one-line effort slider (`EffortRow`) in both composers, with a
+  close button instead of "Remove workout"; the posted workout is an
+  outlined card with values over small labels, a shorter map and a
+  compact exercise list.
 
 ## 0.0.23 — Visitors see only team and community pages
 

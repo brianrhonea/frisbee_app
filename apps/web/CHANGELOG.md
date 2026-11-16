@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.34.0 — 2026-11-16
+
+Works with API 0.28.0 (no API change).
+
+**Changed**
+- Posts have no Link tool (Home composer) or "Add a link" field (team
+  post composer), as in the app: web addresses in a post's text are
+  links (`LinkedText`, `splitLinks` in `lib/text.ts`). Older posts keep
+  their links, shown and removable when edited.
+
 ## 0.33.0 — 2026-11-16
 
 Needs API 0.28.0.

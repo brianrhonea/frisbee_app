@@ -1600,8 +1600,12 @@ class _Composer extends StatelessWidget {
   final VoidCallback onSend;
   final String hintText;
 
+  // Its buttons (send, attach) keep the keyboard open.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      TextFieldTapRegion(child: _bar(context));
+
+  Widget _bar(BuildContext context) {
     final c = AppColors.of(context);
     final vm = viewModel;
     return ListenableBuilder(
