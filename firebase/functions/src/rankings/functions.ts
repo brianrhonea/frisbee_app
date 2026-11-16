@@ -4,7 +4,11 @@
 // Rebuilt nightly, and when a tournament goes final, into
 // `rankings/{level-division}` and `tournamentResults/recent`; player
 // ratings (players.ts) nightly into `playerRankings/all`. Any signed-in
-// user can read them and nobody can write them.
+// user can read them and nobody can write them; visitors get the team
+// rankings through the API (`GET /v1/public/rankings`). Youth is never
+// ranked: youth divisions and youth teams are left out (and a youth
+// ranking left from before is deleted), and nobody on a youth team is
+// rated.
 
 import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
@@ -15,13 +19,14 @@ import {
   countsForRankings,
   type Data,
   divisionResult,
-  rankingDoc,
+  isRankedKey,
+  isYouthTeam,
   rankingKey,
+  rankingWrites,
   type RankedGame,
-  rate,
   windowDays,
 } from "./model";
-import { type PlayerInput, playerInput, playerRankingDoc, ratePlayers } from "./players";
+import { type PlayerInput, playerInput, playerRankingDoc, ratePlayers, youthPlayerUids } from "./players";
 
 /** How many finished tournaments Explore's Recent results lists. */
 const recentCount = 10;
@@ -66,6 +71,9 @@ export async function rebuildRankings(now = new Date()): Promise<void> {
     for (const d of divisions.docs) {
       const div = d.data();
       const key = rankingKey(String(div.level ?? "club"), String(div.division ?? "mixed"));
+      if (data.status === "finished") results.push(divisionResult(div, tournamentNames));
+      // Youth (and unknown) divisions are never ranked: skip their games.
+      if (!isRankedKey(key)) continue;
       const done = await d.ref.collection("games").where("status", "==", "done").get();
       const list = games.get(key) ?? [];
       for (const g of done.docs) {
@@ -80,7 +88,6 @@ export async function rebuildRankings(now = new Date()): Promise<void> {
         });
       }
       games.set(key, list);
-      if (data.status === "finished") results.push(divisionResult(div, tournamentNames));
     }
     if (data.status === "finished") {
       recent.push({
@@ -95,19 +102,19 @@ export async function rebuildRankings(now = new Date()): Promise<void> {
     }
   }
 
+  const teamIds = new Set<string>();
+  for (const list of games.values()) for (const g of list) teamIds.add(g.teamA).add(g.teamB);
+  const youth = await youthTeams([...teamIds]);
+  // Every existing ranking doc not rewritten goes: youth ones from before
+  // youth was skipped, and divisions with nobody ranked any more.
+  const existing = (await db.collection("rankings").select().get()).docs.map((d) => d.id);
+  const { set, remove } = rankingWrites(games, names, youth, existing, now);
+
   const writer = db.bulkWriter();
-  const keys = new Set<string>();
-  for (const [key, list] of games) {
-    const [level, division] = key.split("-");
-    const doc = rankingDoc(level, division, rate(list, now), names);
-    if ((doc.teams as unknown[]).length === 0) continue;
-    keys.add(key);
+  for (const [key, doc] of set) {
     void writer.set(db.doc(`rankings/${key}`), { ...doc, updatedAt: FieldValue.serverTimestamp() });
   }
-  // Divisions with nobody ranked any more.
-  for (const old of (await db.collection("rankings").get()).docs) {
-    if (!keys.has(old.id)) void writer.delete(old.ref);
-  }
+  for (const id of remove) void writer.delete(db.doc(`rankings/${id}`));
   const ends = (r: Data) => toDate(r.endsOn)?.getTime() ?? 0;
   recent.sort((a, b) => ends(b) - ends(a));
   void writer.set(db.doc("tournamentResults/recent"), {
@@ -115,7 +122,34 @@ export async function rebuildRankings(now = new Date()): Promise<void> {
     updatedAt: FieldValue.serverTimestamp(),
   });
   await writer.close();
-  logger.info("Rankings rebuilt", { tournaments: tournaments.length, divisions: keys.size });
+  logger.info("Rankings rebuilt", {
+    tournaments: tournaments.length,
+    divisions: set.size,
+    removed: remove.length,
+    youthTeams: youth.size,
+  });
+}
+
+/** Read this many documents per getAll. */
+const readBatch = 300;
+
+/**
+ * Which of [teamIds] are youth teams, by their team doc or their
+ * directory listing (either says youth: youth). Reads only `kind` and
+ * `level`. Ids that aren't team docs (a draft's league teams) count as
+ * adult, as they always have.
+ */
+async function youthTeams(teamIds: string[]): Promise<Set<string>> {
+  const db = getFirestore();
+  const youth = new Set<string>();
+  const valid = teamIds.filter((id) => id && !id.includes("/"));
+  for (let i = 0; i < valid.length; i += readBatch) {
+    const ids = valid.slice(i, i + readBatch);
+    const refs = ids.flatMap((id) => [db.doc(`teams/${id}`), db.doc(`teamDirectory/${id}`)]);
+    const snaps = await db.getAll(...refs, { fieldMask: ["kind", "level"] });
+    for (const s of snaps) if (s.exists && isYouthTeam(s.data())) youth.add(s.id);
+  }
+  return youth;
 }
 
 /** Rates every public profile that shows stats and writes the top players. */
@@ -124,14 +158,18 @@ export async function rebuildPlayerRankings(now = new Date()): Promise<void> {
   // Reads every profile: fine while the app is small; past tens of
   // thousands of players, keep a rated-players index instead.
   const snap = await db.collection("profiles").select("name", "username", "photoUrl", "private", "visibility", "stats").get();
+  // Nobody on a youth team is rated (bar its owner and coaches).
+  const youthSnap = await db.collection("teams").where("level", "==", "youth").select("kind", "level", "members", "memberIds").get();
+  const youth = youthPlayerUids(youthSnap.docs.map((d) => d.data()));
   const players: PlayerInput[] = [];
   for (const d of snap.docs) {
+    if (youth.has(d.id)) continue;
     const p = playerInput(d.id, d.data());
     if (p) players.push(p);
   }
   const doc = playerRankingDoc(ratePlayers(players, now));
   await db.doc("playerRankings/all").set({ ...doc, updatedAt: FieldValue.serverTimestamp() });
-  logger.info("Player rankings rebuilt", { profiles: snap.size, rated: (doc.players as unknown[]).length });
+  logger.info("Player rankings rebuilt", { profiles: snap.size, rated: (doc.players as unknown[]).length, youthLeftOut: youth.size });
 }
 
 /** Nightly, so recency weights and the window move on. */
