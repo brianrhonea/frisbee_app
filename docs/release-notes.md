@@ -21,6 +21,14 @@ Firebase project; App Store builds come from `main` and use production.
 - After signing up with email, "About you" remembers your date of birth
   after the app restarts or on another device.
 
+**Posting from Home**
+- Tap the post box and type: Post sends it. Photo, Link and Workout open
+  inside the same box instead of a popup, and "To" lets you post to a
+  team you manage.
+
+**Explore**
+- The filters sit on one row that scrolls sideways.
+
 **Rankings**
 - Rankings have Level and Division filters, as on the website. Youth
   teams aren't ranked and players on youth teams aren't rated.

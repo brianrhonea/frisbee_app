@@ -15,6 +15,16 @@ Needs API 0.28.0.
   Players tab asks visitors to sign up. Youth is never shown.
 - Explore points visitors to rankings and tournaments.
 
+**Changed**
+- A team's own members aren't offered Follow on its banner, and members
+  see one Settings gear (beside the tabs).
+- The team feed's roster card tells visitors only what they can do ("See
+  who's on the team.") and is hidden where the roster is members-only.
+- Get started: "Join or create a team", ticked once you're on any team,
+  opens the create-or-join choice.
+- The composer adds a link you typed but didn't add when you post; both
+  composers check links with the app's rule (`normalizeLink`).
+
 ## 0.32.0 — 2026-11-15
 
 Needs API 0.27.0.

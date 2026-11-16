@@ -96,6 +96,13 @@ Plain-language notes for testers are in
   birth; the rules refuse direct writes for club teams.
 - Rankings: Level and Division filters (as on the website), opening on
   Club Mixed; youth is never ranked or rated.
+- Home's post box is an inline composer (`InlineComposerViewModel`):
+  type and tap Post; Photo, Link and Workout open inside the box, and
+  "To" posts to Everyone or a team you manage (replaces the Team post
+  button and the editor popup on Home).
+- Explore's filter chips sit on one row that scrolls sideways.
+- Get started: "Join or create a team"; the create-or-join dialog no
+  longer overflows on narrow phones.
 - Tests: shared test vectors (`packages/shared/fixtures`, written by
   `test/shared_fixtures`) check the tournament engine, stats, play
   animation, drafts, Discord import and calendar files against the
