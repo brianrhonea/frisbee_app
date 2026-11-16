@@ -316,10 +316,10 @@ everything the app does on the website alone, styled like the website
     tournament tag; a link typed but not added counts on Post; app
     `InlineComposerViewModel`, `test/ui/inline_composer_test.dart`). The
     app also has Take photo and Record; editing posts keeps the
-    full-screen editor. Differences left: the app's link check
-    (`TeamPost.normalizeLink`) is stricter than the website's, and the
-    app types distances in the country's unit where the website has a
-    km/mi picker. [x] the Your teams tab is a feed of your teams' posts;
+    full-screen editor. Links are checked by one rule (`normalizeLink`
+    in `@stall10/shared`, `TeamPost.normalizeLink` in the app). Left:
+    the app types distances in the country's unit where the website has
+    a km/mi picker. [x] the Your teams tab is a feed of your teams' posts;
     [x] a team strip with New / Join under the composer; [x] a Get
     started checklist on an empty For you feed (same four steps on both:
     username, join or create a team (done once on any team; "Join or
