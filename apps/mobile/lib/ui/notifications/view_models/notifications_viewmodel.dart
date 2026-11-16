@@ -11,7 +11,9 @@ import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
 /// The in-app notification feed, newest first. New followers can be
-/// followed back from it.
+/// followed back from it, and follow requests waiting to be answered are
+/// counted at the top. Opening one marks it read; it stays in the list
+/// until cleared.
 class NotificationsViewModel extends ChangeNotifier {
   NotificationsViewModel({
     required NotificationRepository notificationRepository,
@@ -28,6 +30,10 @@ class NotificationsViewModel extends ChangeNotifier {
           for (final x in f)
             if (x.target.type == FollowType.user) x.target.targetId,
         };
+        notifyListeners();
+      }, onError: (Object _) {});
+      _requestsSub = followRepository.watchFollowRequests(uid).listen((r) {
+        _requestCount = r.length;
         notifyListeners();
       }, onError: (Object _) {});
     }
@@ -59,6 +65,8 @@ class NotificationsViewModel extends ChangeNotifier {
   final NotificationRepository _repo;
   final FollowRepository? _follows;
   StreamSubscription<List<Follow>>? _followsSub;
+  StreamSubscription<List<FollowRequest>>? _requestsSub;
+  int _requestCount = 0;
   Set<String> _following = const {};
   final String uid;
   late final StreamSubscription<List<AppNotification>> _sub;
@@ -70,8 +78,14 @@ class NotificationsViewModel extends ChangeNotifier {
   Object? get error => _error;
   int get unreadCount => items.where((n) => !n.read).length;
 
-  /// Puts [AppNotification] away (it's been checked); the screen then
-  /// follows its route.
+  /// Whether the Follow requests entry shows at the top of the list.
+  bool get showsFollowRequests => _follows != null && uid.isNotEmpty;
+
+  /// People waiting for an answer to follow the user's private profile.
+  int get followRequestCount => _requestCount;
+
+  /// Marks [AppNotification] read (it stays in the list, less prominent);
+  /// the screen then follows its route.
   late final Command1<void, AppNotification> open;
   late final Command0<void> markAllRead;
 
@@ -112,6 +126,7 @@ class NotificationsViewModel extends ChangeNotifier {
   void dispose() {
     _sub.cancel();
     _followsSub?.cancel();
+    _requestsSub?.cancel();
     open.dispose();
     followBack.dispose();
     markAllRead.dispose();

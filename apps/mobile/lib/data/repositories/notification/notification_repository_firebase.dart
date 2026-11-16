@@ -158,9 +158,11 @@ class NotificationRepositoryFirebase implements NotificationRepository {
       // A notice with a collapse id is stored under it (deliver.ts).
       final ref = _feed(uid).doc(collapseId);
       final snap = await ref.get();
-      if (snap.exists) await ref.delete();
+      if (snap.exists && snap.data()?['read'] != true) {
+        await ref.update({'read': true});
+      }
     } on Exception {
-      // Best effort: it's still in the notification panel to clear.
+      // Best effort: it's still unread in the list to open.
     }
   }
 
@@ -170,11 +172,17 @@ class NotificationRepositoryFirebase implements NotificationRepository {
       final snap = await _feed(
         uid,
       ).where('route', isEqualTo: route).limit(50).get();
-      if (snap.docs.isEmpty) return;
-      for (final d in snap.docs) {
+      final unread = [
+        for (final d in snap.docs)
+          if (d.data()['read'] != true) d,
+      ];
+      if (unread.isEmpty) return;
+      final batch = _db.batch();
+      for (final d in unread) {
         unawaited(_push.clearDelivered(d.id));
+        batch.update(d.reference, {'read': true});
       }
-      await deleteDocs(_db, [for (final d in snap.docs) d.reference]);
+      await batch.commit();
     } on Exception {
       // Best effort, as markSeen.
     }

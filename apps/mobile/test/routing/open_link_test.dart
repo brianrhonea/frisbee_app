@@ -50,4 +50,127 @@ void main() {
     expect(find.text('Messages'), findsOneWidget);
     expect(router.canPop(), isFalse);
   });
+
+  testWidgets('a profile opened from a page over the tabs keeps a way back', (
+    tester,
+  ) async {
+    final root = GlobalKey<NavigatorState>();
+    final router = GoRouter(
+      navigatorKey: root,
+      initialLocation: '/profile',
+      routes: [
+        GoRoute(
+          path: '/people/:uid',
+          builder: (_, s) => Text('Person ${s.pathParameters['uid']}'),
+        ),
+        StatefulShellRoute.indexedStack(
+          builder: (_, _, shell) => shell,
+          branches: [
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/explore',
+                  builder: (_, _) => const Text('Explore'),
+                ),
+                GoRoute(
+                  path: '/players/:uid',
+                  builder: (_, s) => Text('Player ${s.pathParameters['uid']}'),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/profile',
+                  builder: (_, _) => const Text('Profile'),
+                  routes: [
+                    GoRoute(
+                      path: 'following',
+                      parentNavigatorKey: root,
+                      builder: (context, _) => TextButton(
+                        onPressed: () => openPage(context, '/players/x'),
+                        child: const Text('Following'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    router.push('/profile/following');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Following'));
+    await tester.pumpAndSettle();
+    expect(find.text('Person x'), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Following'), findsOneWidget);
+  });
+
+  testWidgets('links from Notifications: profiles and follow requests come '
+      'back to it', (tester) async {
+    final root = GlobalKey<NavigatorState>();
+    final router = GoRouter(
+      navigatorKey: root,
+      initialLocation: '/home',
+      routes: [
+        GoRoute(
+          path: '/people/:uid',
+          builder: (_, s) => Text('Person ${s.pathParameters['uid']}'),
+        ),
+        GoRoute(
+          path: '/notifications',
+          builder: (_, _) => const Text('Notifications'),
+          routes: [
+            GoRoute(
+              path: 'follow-requests',
+              builder: (_, _) => const Text('Requests'),
+            ),
+          ],
+        ),
+        // Older notices still link to the old place.
+        GoRoute(
+          path: '/settings/follow-requests',
+          redirect: (_, _) => '/notifications/follow-requests',
+        ),
+        StatefulShellRoute.indexedStack(
+          builder: (_, _, shell) => shell,
+          branches: [
+            StatefulShellBranch(
+              routes: [
+                GoRoute(path: '/home', builder: (_, _) => const Text('Home')),
+                GoRoute(
+                  path: '/players/:uid',
+                  builder: (_, s) => Text('Player ${s.pathParameters['uid']}'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    router.push('/notifications');
+    await tester.pumpAndSettle();
+
+    router.openLink('/players/x');
+    await tester.pumpAndSettle();
+    expect(find.text('Person x'), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Notifications'), findsOneWidget);
+
+    router.openLink('/settings/follow-requests');
+    await tester.pumpAndSettle();
+    expect(find.text('Requests'), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Notifications'), findsOneWidget);
+  });
 }

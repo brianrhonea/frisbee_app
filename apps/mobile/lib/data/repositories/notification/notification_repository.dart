@@ -46,13 +46,13 @@ abstract class NotificationRepository {
   Future<Result<void>> markRead(String uid, Iterable<String> ids);
 
   /// The thing a notice is about (a conversation, a chat room) was seen
-  /// in the app: removes its feed entry, if it's there, and clears its
-  /// push notifications from this device. Also how a tapped notice is
-  /// put away.
+  /// in the app: marks its feed entry read, if it's there (it stays in
+  /// the list), and clears its push notifications from this device. Also
+  /// how a tapped notice is marked read.
   Future<void> markSeen(String uid, String collapseId);
 
-  /// The page at [route] (a post) was opened: removes the feed entries
-  /// that lead there, and their pushes.
+  /// The page at [route] (a post) was opened: marks the feed entries
+  /// that lead there read, and clears their pushes.
   Future<void> clearRoute(String uid, String route);
 
   Future<Result<void>> delete(String uid, Iterable<String> ids);

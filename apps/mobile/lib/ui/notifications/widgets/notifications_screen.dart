@@ -25,7 +25,8 @@ IconData categoryIcon(NotificationCategory c) => switch (c) {
 };
 
 /// The in-app feed: everything the Cloud Functions sent, including what
-/// went out as push. Tapping an entry marks it read and opens it.
+/// went out as push, under a Follow requests entry. Tapping an entry
+/// marks it read (it stays, in lighter type) and opens it.
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key, required this.viewModel});
 
@@ -133,17 +134,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget _body() {
     if (!vm.loaded) return const LoadingView();
     final items = vm.items;
+    final requests = vm.showsFollowRequests
+        ? _FollowRequestsTile(
+            count: vm.followRequestCount,
+            onTap: () => context.push(Routes.followRequests),
+          )
+        : null;
     if (items.isEmpty) {
-      if (vm.error != null) return ErrorView(error: vm.error);
-      return EmptyView(
-        art: const DiscIcon(),
-        title: 'No notifications',
-        message:
-            'Team chat, messages, event changes, reminders and playbook '
-            'updates show up here.',
-        action: OutlinedButton(
-          onPressed: () => context.push(Routes.notificationSettings),
-          child: const Text('Notification settings'),
+      final empty = _empty();
+      if (requests == null) return empty;
+      return ConstrainedContent(
+        maxWidth: 720,
+        child: Column(
+          children: [
+            requests,
+            const Divider(height: 1),
+            Expanded(child: empty),
+          ],
         ),
       );
     }
@@ -151,21 +158,84 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       maxWidth: 720,
       child: ListView.separated(
         padding: const EdgeInsets.only(bottom: 24),
-        itemCount: items.length,
+        itemCount: items.length + (requests == null ? 0 : 1),
         separatorBuilder: (_, _) =>
             const Divider(height: 1, indent: 16, endIndent: 16),
-        itemBuilder: (_, i) => _NotificationTile(
-          item: items[i],
-          onTap: () => _open(items[i]),
-          following: switch (items[i].followBack) {
-            final f? => vm.isFollowing(f.uid),
-            null => false,
-          },
-          onFollowBack: vm.canFollowBack(items[i])
-              ? () => vm.followBack.execute(items[i])
-              : null,
-          followingBack: vm.followBack.running,
+        itemBuilder: (_, j) {
+          if (requests != null && j == 0) return requests;
+          final i = requests == null ? j : j - 1;
+          return _NotificationTile(
+            item: items[i],
+            onTap: () => _open(items[i]),
+            following: switch (items[i].followBack) {
+              final f? => vm.isFollowing(f.uid),
+              null => false,
+            },
+            onFollowBack: vm.canFollowBack(items[i])
+                ? () => vm.followBack.execute(items[i])
+                : null,
+            followingBack: vm.followBack.running,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _empty() {
+    if (vm.error != null) return ErrorView(error: vm.error);
+    return EmptyView(
+      art: const DiscIcon(),
+      title: 'No notifications',
+      message:
+          'Team chat, messages, event changes, reminders and playbook '
+          'updates show up here.',
+      action: OutlinedButton(
+        onPressed: () => context.push(Routes.notificationSettings),
+        child: const Text('Notification settings'),
+      ),
+    );
+  }
+}
+
+/// The first entry: people asking to follow the user's private profile.
+class _FollowRequestsTile extends StatelessWidget {
+  const _FollowRequestsTile({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(
+        Icons.person_add_alt,
+        color: count > 0 ? c.accent : c.muted,
+      ),
+      title: Text(
+        'Follow requests',
+        style: TextStyle(
+          fontWeight: count > 0 ? FontWeight.w700 : FontWeight.w500,
+          color: c.ink,
         ),
+      ),
+      subtitle: Text(
+        count == 0 ? 'None waiting' : '$count waiting for an answer',
+        style: TextStyle(fontSize: 13, color: c.muted),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (count > 0)
+            Badge(
+              label: Text('$count'),
+              backgroundColor: c.accent,
+              textColor: c.onAccent,
+            ),
+          const SizedBox(width: 4),
+          Icon(Icons.chevron_right, color: c.muted),
+        ],
       ),
     );
   }
@@ -226,13 +296,15 @@ class _NotificationTile extends StatelessWidget {
                           item.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          // New: bold and larger. Read: lighter and
+                          // smaller, but still listed.
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: unread ? 15.5 : 14,
                             height: 1.3,
                             fontWeight: unread
                                 ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: c.ink,
+                                : FontWeight.w400,
+                            color: unread ? c.ink : c.muted,
                           ),
                         ),
                       ),
@@ -276,9 +348,9 @@ class _NotificationTile extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: unread ? 14 : 13,
                           height: 1.3,
-                          color: c.muted,
+                          color: unread ? c.ink : c.muted,
                         ),
                       ),
                     ),

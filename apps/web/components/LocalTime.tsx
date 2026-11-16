@@ -2,13 +2,16 @@
 import { useEffect, useState } from "react";
 import { formatDate, formatDateTime, serverLocale } from "@/lib/dates";
 
-type Style = "date" | "dateTime" | "relative";
+type Style = "date" | "dateTime" | "time" | "relative";
 
 function format(d: Date, style: Style, timeZone?: string): string {
   // The server's UTC copy has a fixed locale, so the browser's first render matches it.
   const locale = timeZone ? serverLocale : undefined;
   if (style === "date") {
     return formatDate(d, { month: "short", day: "numeric", year: "numeric", timeZone }, locale);
+  }
+  if (style === "time") {
+    return formatDateTime(d, { hour: "numeric", minute: "2-digit", timeZone }, locale);
   }
   if (style === "dateTime") {
     return formatDateTime(d, {

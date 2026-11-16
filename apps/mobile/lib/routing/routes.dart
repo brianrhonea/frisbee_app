@@ -25,11 +25,14 @@ abstract final class Routes {
   static const findEvents = '/schedule?view=find';
   static const profile = '/profile';
 
+  /// People asking to follow the user's private profile, from the top of
+  /// Notifications.
+  static const followRequests = '/notifications/follow-requests';
+
   /// Settings, sliding over the page; its sections open from it.
   static const settings = '/settings';
   static const settingsGeneral = '/settings/general';
   static const settingsPrivacy = '/settings/privacy';
-  static const followRequests = '/settings/follow-requests';
 
   /// What the user follows, from Settings (sliding over it, so back
   /// returns there). [following] is the same list from the profile.

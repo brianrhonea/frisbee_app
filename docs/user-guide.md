@@ -147,7 +147,12 @@ Explore, Team, Messages and Profile.
 ### Notifications
 
 Tap the 🔔 at the top of Home to see your notifications. A badge shows how
-many are unread. Tap one to open it; **Mark all read** clears the badge.
+many are unread. New ones are in bold; tap one to open it and it stays in
+the list, marked read, in lighter type. **Mark all read** clears the
+badge; **Clear all** (⋮ menu) removes them.
+
+**Follow requests** sits at the top of the list, with how many people
+are waiting: **Accept** or **Decline** each one.
 
 You're notified about:
 
@@ -191,6 +196,10 @@ many conversations have something new.
 - On a computer, conversations are listed on the left with the open one
   on the right. On a phone, a conversation opens full screen; the back
   arrow returns to Messages.
+- Press and hold a message to react, reply, copy or delete it. On a
+  phone, swipe a message's bubble to the right to reply, and drag the
+  conversation to the left to see every message's time. On a computer,
+  point at a message to see its time.
 - **Seen** shows under your last message once the other person has read
   it. Turn **Read receipts** off in Settings → Privacy; then they don't
   see yours and you don't see theirs.
@@ -495,8 +504,8 @@ from the right (on a computer, as a panel; click outside to close it).
 - **Notifications**: push on this device, and which notifications you get
   (see [Notifications](#notifications)).
 - **Privacy**: **Private profile**, **Read receipts**, and what others
-  see on your profile (stats, teams, games). **Follow requests** lists
-  people asking to follow a private profile: **Accept** or **Decline**.
+  see on your profile (stats, teams, games). Answer follow requests at
+  the top of [Notifications](#notifications).
 - **People you follow**.
 - **Account**: change your **display name**; see your **@username** and
   **email**; **Change password** (or "Forgot it?" for a reset link); **Delete account** (it asks you to type DELETE and confirm

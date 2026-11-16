@@ -102,7 +102,7 @@ void main() {
     expect(vm.current, isNull);
   });
 
-  testWidgets('tapping opens it and puts the entry away', (tester) async {
+  testWidgets('tapping opens it and marks the entry read', (tester) async {
     await pump(tester);
     arrive(_dm());
     await tester.pump();
@@ -111,9 +111,29 @@ void main() {
     await tester.tap(find.textContaining('Pat Player', findRichText: true));
     await tester.pump();
     expect(opened, ['/messages/c1']);
-    expect(repo.feed.where((n) => n.id == 'c1'), isEmpty);
+    // Still in the notifications list, read.
+    expect(repo.feed.singleWhere((n) => n.id == 'c1').read, isTrue);
     expect(vm.current, isNull);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  });
+
+  testWidgets('a read entry that comes back unread shows again', (
+    tester,
+  ) async {
+    await pump(tester);
+    arrive(_dm());
+    await tester.pump();
+    vm.dismiss();
+    // Seen: it stays in the list, read.
+    arrive(_dm(read: true));
+    await tester.pump();
+    expect(vm.current, isNull);
+    // A new message: the server starts the same entry over, unread.
+    arrive(_dm());
+    await tester.pump();
+    expect(vm.current?.id, 'c1');
+    await tester.pump(vm.showFor);
     await tester.pump(const Duration(milliseconds: 300));
   });
 

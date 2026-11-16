@@ -2,7 +2,7 @@
 import { webRoute } from "@stall10/shared";
 import { limit, orderBy, where } from "firebase/firestore";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { callApi } from "@/lib/client";
 import { type Doc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
@@ -66,9 +66,10 @@ export function useUnreadCount(): number {
 }
 
 /**
- * The notification feed, live: filter by kind, open one (marked read as
- * you go), mark everything shown read, or clear it. New followers can be
- * followed back from here.
+ * The notification feed, live: filter by kind, open one (marked read; it
+ * stays, in lighter type, until cleared), mark everything shown read, or
+ * clear it. Follow requests sit at the top. New followers can be followed
+ * back from here.
  */
 export function Notifications() {
   const { user } = useAuth();
@@ -80,14 +81,12 @@ export function Notifications() {
   const [filter, setFilter] = useState<Filter>("all");
   const list = useMemo(() => (data ?? []).filter((n) => inFilter(n, filter)), [data, filter]);
   const unread = list.filter((n) => !n.read);
-
-  // Opening the page shows what's new; it's marked read after a moment.
-  useEffect(() => {
-    if (!user || unread.length === 0) return;
-    const t = setTimeout(() => void mark(unread.map((n) => n.id)), 2500);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run when the unread set changes
-  }, [user, unread.map((n) => n.id).join(",")]);
+  const requests = useLiveQuery<{ name?: string }>(
+    user ? `profiles/${user.uid}/followRequests` : null,
+    [limit(100)],
+    "requests",
+  );
+  const waiting = requests.data?.length ?? 0;
 
   if (!user) return null;
   const me = user;
@@ -125,6 +124,9 @@ export function Notifications() {
           ))}
         </div>
         <span className="composer-spacer" />
+        <button type="button" className="btn btn-small" disabled={unread.length === 0} onClick={() => void mark(unread.map((n) => n.id))}>
+          Mark all read
+        </button>
         <button
           type="button"
           className="btn btn-small"
@@ -136,6 +138,16 @@ export function Notifications() {
           Clear
         </button>
       </div>
+
+      <Link href="/notifications/requests" className={`notice notice-requests${waiting > 0 ? " unread" : ""}`}>
+        <span className="notice-dot" aria-hidden="true" />
+        <span className="notice-main">
+          <b>Follow requests</b>
+          <span className="notice-body">{waiting === 0 ? "None waiting" : `${waiting} waiting for an answer`}</span>
+        </span>
+        {waiting > 0 && <span className="pill">{waiting}</span>}
+        <span aria-hidden="true">›</span>
+      </Link>
 
       {error && <p className="form-error">{error}</p>}
       {data === undefined && !error && <p className="muted">Loading…</p>}

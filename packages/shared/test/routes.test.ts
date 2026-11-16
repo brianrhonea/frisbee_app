@@ -41,7 +41,8 @@ function functionRoutes(): string[] {
 
 describe("webRoute", () => {
   it("maps app routes to the website's pages", () => {
-    expect(webRoute("/settings/follow-requests")).toBe("/settings/requests");
+    expect(webRoute("/settings/follow-requests")).toBe("/notifications/requests");
+    expect(webRoute("/notifications/follow-requests")).toBe("/notifications/requests");
     expect(webRoute("/posts/p1")).toBe("/posts/p1");
     expect(webRoute("/players/u1")).toBe("/players/u1");
     expect(webRoute("/messages/c1")).toBe("/messages?c=c1");

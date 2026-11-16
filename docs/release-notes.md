@@ -10,6 +10,25 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.25
+
+**Messages**
+- Swipe a message bubble to the right to reply. Swiping beside it no
+  longer starts a reply.
+- Drag the conversation to the left to see every message's time, like
+  on iMessage. Let go and they slide away.
+
+**Profiles**
+- Opening someone's profile from Following, follow requests or a
+  notification now has a back button that returns you there.
+
+**Notifications**
+- Notifications stay in the list after you open them. New ones are bold
+  and larger; ones you've opened are lighter. Clear removes them.
+- Follow requests are now at the top of Notifications, not in Settings.
+
+---
+
 ## 0.0.24
 
 **Keyboard**

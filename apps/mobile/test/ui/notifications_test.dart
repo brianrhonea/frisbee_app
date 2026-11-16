@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/follow.dart';
 import 'package:frisbee_app/domain/models/notification.dart';
 import 'package:frisbee_app/data/services/push_service.dart';
@@ -101,6 +102,13 @@ void main() {
           GoRoute(
             path: '/notifications',
             builder: (_, _) => NotificationsScreen(viewModel: vm),
+            routes: [
+              GoRoute(
+                path: 'follow-requests',
+                builder: (_, _) =>
+                    const Scaffold(body: Text('Follow requests page')),
+              ),
+            ],
           ),
           GoRoute(
             path: '/target',
@@ -204,14 +212,54 @@ void main() {
       expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
     });
 
-    testWidgets('tapping an entry opens it and clears it', (tester) async {
+    testWidgets('tapping an entry opens it and marks it read; it stays', (
+      tester,
+    ) async {
       final repo = await pump(tester, [note('a', route: '/target')]);
       expect(find.text('Title a'), findsOneWidget);
       expect(find.text('Mark all read'), findsOneWidget);
       await tester.tap(find.text('Title a'));
       await tester.pumpAndSettle();
       expect(find.text('Target page'), findsOneWidget);
-      expect(repo.feed, isEmpty);
+      expect(repo.feed.single.read, isTrue);
+    });
+
+    testWidgets('new entries are bold and larger than read ones', (
+      tester,
+    ) async {
+      await pump(tester, [note('a'), note('b', read: true)]);
+      final unread = tester.widget<Text>(find.text('Title a')).style!;
+      final read = tester.widget<Text>(find.text('Title b')).style!;
+      expect(unread.fontWeight, FontWeight.w700);
+      expect(read.fontWeight, FontWeight.w400);
+      expect(unread.fontSize, greaterThan(read.fontSize!));
+    });
+
+    testWidgets('Follow requests sit at the top, with how many wait', (
+      tester,
+    ) async {
+      final follows = FakeFollowRepository();
+      await follows.requestFollow(
+        const AppUser(uid: 'u2', displayName: 'Riley'),
+        testUser.uid,
+      );
+      await pump(tester, [note('a')], follows: follows);
+      expect(find.text('Follow requests'), findsOneWidget);
+      expect(find.text('1 waiting for an answer'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Follow requests')).dy,
+        lessThan(tester.getTopLeft(find.text('Title a')).dy),
+      );
+      await tester.tap(find.text('Follow requests'));
+      await tester.pumpAndSettle();
+      expect(find.text('Follow requests page'), findsOneWidget);
+    });
+
+    testWidgets('Follow requests show above an empty list too', (tester) async {
+      await pump(tester, const [], follows: FakeFollowRepository());
+      expect(find.text('Follow requests'), findsOneWidget);
+      expect(find.text('None waiting'), findsOneWidget);
+      expect(find.text('No notifications'), findsOneWidget);
     });
   });
 

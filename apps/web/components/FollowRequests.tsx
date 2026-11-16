@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { callApi, problem } from "@/lib/client";
 import { useLiveQuery } from "@/lib/live";
-import { useAuth } from "../AuthProvider";
-import { Avatar } from "../Avatar";
-import { LocalTime } from "../LocalTime";
-import { useMyProfile } from "./useMyProfile";
+import { useAuth } from "./AuthProvider";
+import { Avatar } from "./Avatar";
+import { LocalTime } from "./LocalTime";
+import { useMyProfile } from "./settings/useMyProfile";
 
 interface Request {
   name?: string;
@@ -16,7 +16,7 @@ interface Request {
   createdAt?: string;
 }
 
-/** People asking to follow the member's private profile, oldest first. */
+/** People asking to follow the member's private profile, oldest first (from the top of Notifications). */
 export function FollowRequests() {
   const { user } = useAuth();
   const { profile } = useMyProfile();
@@ -46,7 +46,6 @@ export function FollowRequests() {
 
   return (
     <div className="card">
-      <h2 className="card-title">Follow requests</h2>
       {profile && !profile.private && (
         <p className="muted small">
           Your profile is public, so anyone can follow you. <Link href="/settings/privacy">Make it private</Link> to approve

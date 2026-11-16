@@ -31,7 +31,7 @@ import '../ui/messages/widgets/inbox_screen.dart';
 import '../ui/core/ui/status_views.dart';
 import '../ui/core/ui/view_model_host.dart';
 import '../ui/core/ui/slide_over_page.dart';
-import '../ui/settings/widgets/follow_requests_screen.dart';
+import '../ui/notifications/widgets/follow_requests_screen.dart';
 import '../ui/settings/widgets/settings_screen.dart';
 import '../ui/learn/widgets/learn_screen.dart';
 import '../ui/shell/view_models/shell_viewmodel.dart';
@@ -194,7 +194,6 @@ GoRouter router(
               ('general', (vm) => GeneralSettingsScreen(viewModel: vm)),
               ('privacy', (vm) => PrivacySettingsScreen(viewModel: vm)),
               ('account', (vm) => AccountSettingsScreen(viewModel: vm)),
-              ('follow-requests', (vm) => FollowRequestsScreen(viewModel: vm)),
             ])
           GoRoute(
             path: path,
@@ -206,6 +205,11 @@ GoRouter router(
               dim: false,
             ),
           ),
+        // Follow requests moved to Notifications; older notices link here.
+        GoRoute(
+          path: 'follow-requests',
+          redirect: (_, _) => Routes.followRequests,
+        ),
         GoRoute(
           path: 'personal',
           pageBuilder: (context, state) => slideOverPage(
@@ -264,6 +268,12 @@ GoRouter router(
         builder: (_, vm) => NotificationsScreen(viewModel: vm),
       ),
       routes: [
+        // The top of the notifications list.
+        GoRoute(
+          path: 'follow-requests',
+          builder: (_, _) =>
+              _settings((vm) => FollowRequestsScreen(viewModel: vm)),
+        ),
         GoRoute(
           path: 'settings',
           // Usually opened from Settings, so it slides over it the same way.

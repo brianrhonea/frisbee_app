@@ -7,7 +7,7 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart' show PersonAvatar;
 import '../../profile/view_models/profile_viewmodel.dart';
-import 'settings_widgets.dart';
+import '../../settings/widgets/settings_widgets.dart';
 
 /// People asking to follow the user's private profile: Accept or Decline.
 class FollowRequestsScreen extends StatefulWidget {

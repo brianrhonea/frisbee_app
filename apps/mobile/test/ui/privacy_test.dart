@@ -8,7 +8,7 @@ import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/profile/view_models/player_profile_viewmodel.dart';
 import 'package:frisbee_app/ui/profile/view_models/profile_viewmodel.dart';
 import 'package:frisbee_app/ui/profile/widgets/profile_screen.dart';
-import 'package:frisbee_app/ui/settings/widgets/follow_requests_screen.dart';
+import 'package:frisbee_app/ui/notifications/widgets/follow_requests_screen.dart';
 import 'package:frisbee_app/ui/settings/widgets/settings_screen.dart';
 
 import '../testing/fakes.dart';
@@ -150,7 +150,8 @@ void main() {
       await tester.tap(find.text('Private profile'));
       await tester.pumpAndSettle();
       expect(profiles.profiles[testUser.uid]!.isPrivate, isTrue);
-      expect(find.text('Follow requests'), findsOne);
+      // Requests are answered from Notifications now, not Settings.
+      expect(find.text('Follow requests'), findsNothing);
 
       await follows.requestFollow(
         const AppUser(uid: 'u2', email: 'r@x.org', displayName: 'Riley'),

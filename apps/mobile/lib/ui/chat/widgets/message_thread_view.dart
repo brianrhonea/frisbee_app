@@ -26,7 +26,8 @@ import '../../core/ui/skeleton.dart';
 /// Shows [readOnlyNotice] in place of the composer when the user can't post.
 ///
 /// Long-press (or right-click) a message to react, reply, copy or delete
-/// it; swipe one to the right to reply.
+/// it; swipe a message's bubble to the right to reply. Drag anywhere to the
+/// left to see every message's time.
 class MessageThreadView extends StatefulWidget {
   const MessageThreadView({
     super.key,
@@ -55,8 +56,10 @@ class MessageThreadView extends StatefulWidget {
   State<MessageThreadView> createState() => _MessageThreadViewState();
 }
 
-class _MessageThreadViewState extends State<MessageThreadView> {
+class _MessageThreadViewState extends State<MessageThreadView>
+    with SingleTickerProviderStateMixin {
   MessageThreadViewModel get vm => widget.viewModel;
+  late final _reveal = _TimeReveal(this);
 
   /// Starts with whatever was left unsent last time.
   late final _text = TextEditingController(text: vm.draft);
@@ -120,6 +123,7 @@ class _MessageThreadViewState extends State<MessageThreadView> {
     _focus.dispose();
     _undo.dispose();
     _scroll.dispose();
+    _reveal.dispose();
     _unregister?.call();
     super.dispose();
   }
@@ -216,17 +220,21 @@ class _MessageThreadViewState extends State<MessageThreadView> {
             child: ScrollToTop(
               controller: _scroll,
               reverse: true,
-              child: _MessageList(
-                viewModel: vm,
-                controller: _scroll,
-                emptyMessage: widget.emptyMessage,
-                videoPlayer: widget.videoPlayer,
-                actions: _RowActions(
-                  onActions: _actions,
-                  onReply: (m) => _canReply(m) ? _reply(m) : null,
-                  onReact: vm.canReact ? _react : null,
-                  onDelete: _delete,
-                  onProfile: _openProfile,
+              child: _RevealTimes(
+                reveal: _reveal,
+                child: _MessageList(
+                  viewModel: vm,
+                  controller: _scroll,
+                  emptyMessage: widget.emptyMessage,
+                  videoPlayer: widget.videoPlayer,
+                  actions: _RowActions(
+                    onActions: _actions,
+                    onReply: (m) => _canReply(m) ? _reply(m) : null,
+                    onReact: vm.canReact ? _react : null,
+                    onDelete: _delete,
+                    onProfile: _openProfile,
+                    reveal: _reveal,
+                  ),
                 ),
               ),
             ),
@@ -285,6 +293,7 @@ class _RowActions {
     required this.onReact,
     required this.onDelete,
     required this.onProfile,
+    required this.reveal,
   });
 
   /// The long-press sheet.
@@ -297,6 +306,9 @@ class _RowActions {
   final void Function(ChatMessage, String)? onReact;
   final ValueChanged<ChatMessage> onDelete;
   final ValueChanged<String> onProfile;
+
+  /// Every message's time, shown while the thread is dragged left.
+  final _TimeReveal reveal;
 }
 
 /// Long-press on a message: a row of quick reactions, then Reply, Copy
@@ -513,6 +525,7 @@ class _MessageList extends StatelessWidget {
             _apart(m.createdAt, next.createdAt) >= const Duration(minutes: 5);
         final color = vm.nameColorOf(m.authorId);
         final onDelete = vm.canDelete(m) ? () => actions.onDelete(m) : null;
+        final canSwipeReply = vm.canWrite && vm.canReact && m.createdAt != null;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -520,10 +533,13 @@ class _MessageList extends StatelessWidget {
               _DayDivider(label: _dayLabel(m.createdAt!))
             else if (bubbles && gap && m.createdAt != null)
               _TimeLabel(time: m.createdAt!),
-            _SwipeToReply(
+            _TimeSlide(
               key: ValueKey(m.id),
-              enabled: vm.canWrite && vm.canReact && m.createdAt != null,
-              onReply: () => actions.onReply(m),
+              reveal: actions.reveal,
+              time: m.createdAt,
+              // Like a phone's messages app: your own bubbles slide over
+              // to make room; the other person's have room already.
+              moves: !bubbles || vm.isMine(m),
               child: bubbles
                   ? _BubbleRow(
                       message: m,
@@ -534,6 +550,7 @@ class _MessageList extends StatelessWidget {
                       actions: actions,
                       onDelete: onDelete,
                       videoPlayer: videoPlayer,
+                      canSwipeReply: canSwipeReply,
                     )
                   : _FeedRow(
                       message: m,
@@ -543,6 +560,7 @@ class _MessageList extends StatelessWidget {
                       actions: actions,
                       onDelete: onDelete,
                       videoPlayer: videoPlayer,
+                      canSwipeReply: canSwipeReply,
                     ),
             ),
             if (vm.receiptFor(m) case final receipt?)
@@ -579,17 +597,20 @@ class _MessageList extends StatelessWidget {
   }
 }
 
-/// Drag a message to the right to reply to it, as in most messaging apps.
+/// Drag a message's bubble to the right to reply to it, as in most
+/// messaging apps. Dragged to the left, it shows every message's time
+/// instead, as the rest of the thread does ([_RevealTimes]).
 class _SwipeToReply extends StatefulWidget {
   const _SwipeToReply({
-    super.key,
     required this.enabled,
     required this.onReply,
+    required this.reveal,
     required this.child,
   });
 
   final bool enabled;
   final VoidCallback onReply;
+  final _TimeReveal reveal;
   final Widget child;
 
   @override
@@ -602,7 +623,19 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
   double _dx = 0;
   bool _armed = false;
 
+  /// Which way this drag went first: right replies, left shows the times.
+  /// Null until it has moved.
+  bool? _replying;
+
   void _update(DragUpdateDetails d) {
+    if (_replying == null) {
+      if (d.delta.dx == 0) return;
+      _replying = d.delta.dx > 0;
+    }
+    if (_replying == false) {
+      widget.reveal.drag(d.delta.dx);
+      return;
+    }
     final dx = (_dx + d.delta.dx).clamp(0.0, _max);
     final armed = dx >= _trigger;
     if (armed && !_armed) HapticFeedback.selectionClick();
@@ -613,6 +646,12 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
   }
 
   void _end([DragEndDetails? _]) {
+    final replying = _replying;
+    _replying = null;
+    if (replying == false) {
+      widget.reveal.release();
+      return;
+    }
     if (_armed) widget.onReply();
     setState(() {
       _dx = 0;
@@ -624,12 +663,15 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
     final c = AppColors.of(context);
+    // The whole message counts, even beside short text in a feed row.
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onHorizontalDragUpdate: _update,
       onHorizontalDragEnd: _end,
       onHorizontalDragCancel: _end,
       child: Stack(
         alignment: Alignment.centerLeft,
+        fit: StackFit.passthrough,
         children: [
           if (_dx > 0)
             Positioned(
@@ -653,6 +695,106 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// How far every message's time is pulled in from the right: 0 hidden,
+/// 1 shown. Dragging the thread left pulls them in; letting go slides
+/// them away again, as on a phone's messages app.
+class _TimeReveal {
+  _TimeReveal(TickerProvider vsync)
+    : controller = AnimationController(
+        vsync: vsync,
+        duration: const Duration(milliseconds: 200),
+      );
+
+  final AnimationController controller;
+
+  /// The room the times take at the right.
+  static const width = 68.0;
+
+  void drag(double dx) =>
+      controller.value = (controller.value - dx / width).clamp(0.0, 1.0);
+
+  void release() => controller.animateBack(0, curve: Curves.easeOut);
+
+  void dispose() => controller.dispose();
+}
+
+/// The whole thread: a drag to the left that doesn't start on a bubble
+/// (bubbles handle their own, [_SwipeToReply]) shows the times.
+class _RevealTimes extends StatelessWidget {
+  const _RevealTimes({required this.reveal, required this.child});
+
+  final _TimeReveal reveal;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.translucent,
+    onHorizontalDragUpdate: (d) => reveal.drag(d.delta.dx),
+    onHorizontalDragEnd: (_) => reveal.release(),
+    onHorizontalDragCancel: reveal.release,
+    child: child,
+  );
+}
+
+/// One message row, with its time waiting off the right edge to slide in
+/// while the thread is dragged left. [moves]: the row slides over to make
+/// room.
+class _TimeSlide extends StatelessWidget {
+  const _TimeSlide({
+    super.key,
+    required this.reveal,
+    required this.time,
+    required this.moves,
+    required this.child,
+  });
+
+  final _TimeReveal reveal;
+  final DateTime? time;
+  final bool moves;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final t = time;
+    return AnimatedBuilder(
+      animation: reveal.controller,
+      child: child,
+      builder: (context, child) {
+        final r = reveal.controller.value;
+        const w = _TimeReveal.width;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Transform.translate(
+              offset: Offset(moves ? -r * w : 0, 0),
+              child: child,
+            ),
+            if (r > 0 && t != null)
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: w,
+                child: Transform.translate(
+                  offset: Offset((1 - r) * w, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      DateFormat.jm().format(t),
+                      maxLines: 1,
+                      style: TextStyle(fontSize: 11.5, color: c.muted),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -854,6 +996,7 @@ class _FeedRow extends StatelessWidget {
     required this.actions,
     required this.onDelete,
     required this.videoPlayer,
+    required this.canSwipeReply,
   });
 
   final ChatMessage message;
@@ -863,6 +1006,9 @@ class _FeedRow extends StatelessWidget {
   final _RowActions actions;
   final VoidCallback? onDelete;
   final FileVideoPlayerBuilder videoPlayer;
+
+  /// Swiping the message to the right replies to it.
+  final bool canSwipeReply;
 
   /// Photo size, and the gutter it sits in: 16 in, the photo, 12 out.
   static const _avatar = 18.0;
@@ -961,7 +1107,14 @@ class _FeedRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             gutter,
-            Expanded(child: body),
+            Expanded(
+              child: _SwipeToReply(
+                enabled: canSwipeReply,
+                onReply: () => actions.onReply(m),
+                reveal: actions.reveal,
+                child: body,
+              ),
+            ),
           ],
         ),
       ),
@@ -993,6 +1146,7 @@ class _BubbleRow extends StatelessWidget {
     required this.actions,
     required this.onDelete,
     required this.videoPlayer,
+    required this.canSwipeReply,
   });
 
   final ChatMessage message;
@@ -1003,6 +1157,9 @@ class _BubbleRow extends StatelessWidget {
   final _RowActions actions;
   final VoidCallback? onDelete;
   final FileVideoPlayerBuilder videoPlayer;
+
+  /// Swiping the bubble to the right replies to it.
+  final bool canSwipeReply;
 
   @override
   Widget build(BuildContext context) {
@@ -1076,7 +1233,12 @@ class _BubbleRow extends StatelessWidget {
             );
             return Align(
               alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-              child: bubble,
+              child: _SwipeToReply(
+                enabled: canSwipeReply,
+                onReply: () => actions.onReply(m),
+                reveal: actions.reveal,
+                child: bubble,
+              ),
             );
           },
         ),
