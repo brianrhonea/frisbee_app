@@ -296,6 +296,24 @@ everything the app does on the website alone, styled like the website
     invitations (the website's does). Website only (layout): feeds load
     as you scroll (the app keeps "Show older posts"), and a floating
     Post button on phones.
+14. Visitors: tournaments (website only; the app needs an account).
+    [x] Signed-out visitors (parents, friends) browse `/tournaments` and
+    follow any published tournament's or league's page: overview,
+    divisions, the accepted teams, the schedule, scores, standings,
+    brackets and the host's news, server-rendered from
+    `GET /v1/public/tournaments` and `/v1/public/tournaments/:id`
+    (another division with `?division=`; live events reread every
+    minute). [x] A community group's tournament shows outsiders' public
+    listing (`/v1/public/group-tournaments/:groupId/:id`). Hidden from
+    visitors: drafts (the rules' `visible()`), private groups' events,
+    who signed up and the draft, captains, fee instructions and other
+    payment details, and player names (a drafted team named after one
+    of its players shows as "Team N"). Entering a team, signing up,
+    following and the sub-pages (signups, drafts, editing, hosting) need
+    an account: visitors get "Sign up free or log in", which comes back
+    to the page. Tests: API `test/public_tournaments.test.ts` (and the
+    emulator test). Not yet: a group's Tournaments tab and a host's
+    hosted list for visitors.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

@@ -208,6 +208,15 @@ sequenceDiagram
 - Public (no token; the website server): `GET /v1/public/feed`,
   `/players/:uid`, `/posts/:id`, `/teams/:id`, `/events`, `/search`.
   Visitors get one page (`next: null`); paging is for members.
+- Public tournaments (no token; `apps/api/src/tournaments/public_*.ts`):
+  `GET /v1/public/tournaments` (upcoming and running published events,
+  as Find tournaments lists them), `/v1/public/tournaments/:id?division=`
+  (overview, divisions, accepted teams, team names, one division's
+  games) and `/v1/public/group-tournaments/:groupId/:id` (a group
+  tournament's public listing). Drafts (the rules' `visible()`) and
+  private groups' events are 404; answers are built field by field
+  with no uids, captains, signups, fee instructions or player names.
+  Same visitor limit as browse, `public, max-age=30`.
 - Members' views of others (never cached): `GET /v1/players/:uid` → the
   page as the caller may see it (a private profile in full for people it
   approved, else `locked`); `GET /v1/posts/:id` → one post if the caller
