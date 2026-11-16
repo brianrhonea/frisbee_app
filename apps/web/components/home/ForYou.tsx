@@ -127,13 +127,14 @@ export interface OnboardingStep {
 
 /**
  * The new-member checklist's steps (the app's onboardingSteps, same order
- * and rules): a username; joining with a code and finding a team are done
- * once they're on one; following once they follow anything.
+ * and rules): a username; joining or creating a team and finding one are
+ * done once they're on any team (by code, by finding it or by creating it);
+ * following once they follow anything.
  */
 export function onboardingSteps({ needsUsername, onTeam, followsAnything }: { needsUsername: boolean; onTeam: boolean; followsAnything: boolean }): OnboardingStep[] {
   return [
     { id: "username", label: "Pick a username", done: !needsUsername },
-    { id: "join", label: "Join your team with a code", done: onTeam },
+    { id: "join", label: "Join or create a team", done: onTeam },
     { id: "find", label: "Find a team or group near you", done: onTeam },
     { id: "follow", label: "Follow people", done: followsAnything },
   ];
@@ -153,9 +154,7 @@ function GetStarted({ steps }: { steps: OnboardingStep[] }) {
         );
       case "join":
         return (
-          <StartOrJoinButton className="btn btn-small" join>
-            Enter code
-          </StartOrJoinButton>
+          <StartOrJoinButton className="btn btn-small">Join or create</StartOrJoinButton>
         );
       case "find":
         return (

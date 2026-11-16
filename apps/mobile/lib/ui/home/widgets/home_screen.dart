@@ -425,7 +425,11 @@ class _HomeScreenState extends State<HomeScreen> {
             SimpleDialogOption(
               onPressed: () => Navigator.pop(context, value),
               child: Row(
-                children: [Icon(icon), const SizedBox(width: 12), Text(label)],
+                children: [
+                  Icon(icon),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(label)),
+                ],
               ),
             ),
         ],
@@ -444,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onboardingStep(OnboardingStep step) => switch (step) {
     OnboardingStep.username => context.go(Routes.chooseUsername),
-    OnboardingStep.join => _join(),
+    OnboardingStep.join => _newOrJoin(),
     OnboardingStep.find => context.go(
       Routes.explore(only: ExploreFilter.teams),
     ),

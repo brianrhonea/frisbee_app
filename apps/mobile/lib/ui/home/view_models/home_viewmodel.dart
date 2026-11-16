@@ -33,7 +33,7 @@ typedef FeedPostDraft = ({String teamId, PostDraft draft});
 /// website's onboardingSteps: same steps, same rules).
 enum OnboardingStep {
   username('Pick a username'),
-  join('Join your team with a code'),
+  join('Join or create a team'),
   find('Find a team or group near you'),
   follow('Follow people');
 
@@ -264,8 +264,9 @@ class HomeViewModel extends ChangeNotifier {
   bool get needsUsername => _auth.needsUsername;
 
   /// The checklist's steps and whether each is done: a username; joining
-  /// with a code and finding a team are done once on one; following once
-  /// following anything.
+  /// or creating a team and finding one are done once on any team (by
+  /// code, by finding it or by creating it); following once following
+  /// anything.
   List<(OnboardingStep, bool)> get onboarding => [
     (OnboardingStep.username, !needsUsername),
     (OnboardingStep.join, teams.isNotEmpty),

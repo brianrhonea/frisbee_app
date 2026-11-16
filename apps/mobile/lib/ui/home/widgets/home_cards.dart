@@ -101,7 +101,7 @@ class GetStartedCard extends StatelessWidget {
 
   static String _action(OnboardingStep s) => switch (s) {
     OnboardingStep.username => 'Pick one',
-    OnboardingStep.join => 'Enter code',
+    OnboardingStep.join => 'Join or create',
     OnboardingStep.find => 'Find',
     OnboardingStep.follow => 'Find people',
   };

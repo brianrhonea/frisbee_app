@@ -6,32 +6,34 @@ import { Avatar } from "../Avatar";
 import { FollowButton } from "../FollowButton";
 import { roleLabel } from "../ProfileDashboard";
 import { JoinWithCode } from "../CreateTeam";
-import { NavIcon } from "../NavIcons";
 import { Dialog } from "../Dialog";
 import { ShareButton } from "../ShareButton";
 import { InviteButton } from "./InviteDialog";
-import { type TeamDoc, useTeamHub } from "./TeamContext";
+import { type TeamDoc, type TeamViewer, useTeamHub } from "./TeamContext";
 import { JoinButton } from "./TeamNav";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-/** The banner's buttons: Invite (member managers), Join (groups' outsiders), Follow, Share and, for members, the Settings gear. */
+/**
+ * The banner's buttons: Invite (member managers), Join (groups'
+ * outsiders), Follow (people not on it, as in the app: a member's feed
+ * already has every post) and Share. Members' Settings gear is the one
+ * beside the tabs (TeamNav).
+ */
 export function TeamBannerActions() {
   const { teamId, name, viewer } = useTeamHub();
   return (
     <>
       <InviteButton />
       <JoinButton />
-      <FollowButton type="team" targetId={teamId} />
+      {showsFollow(viewer.state) && <FollowButton type="team" targetId={teamId} />}
       <ShareButton url={new URL(`/teams/${encodeURIComponent(teamId)}`, siteUrl).toString()} title={`${name} on Stall 10`} className="btn btn-small" />
-      {viewer.state === "member" && (
-        <Link href={`/teams/${teamId}/settings`} className="icon-btn" aria-label="Settings" title="Settings">
-          <NavIcon name="settings" size={20} />
-        </Link>
-      )}
     </>
   );
 }
+
+/** Whether the banner offers Follow: only once the viewer is known not to be on the team (the app's TeamHomeViewModel.follow). */
+export const showsFollow = (state: TeamViewer["state"]): boolean => state === "outsider" || state === "visitor";
 
 /** The first members by tier then name, as the app's member card lists them. */
 export function membersInOrder(team: TeamDoc): Array<{ uid: string; name: string; tier: string }> {

@@ -558,6 +558,23 @@ void main() {
       },
     );
 
+    test(
+      'creating a team ticks "Join or create a team", as joining does',
+      () async {
+        final vm = await load(withTeam: false);
+        bool joinDone() =>
+            vm.onboarding.firstWhere((s) => s.$1 == OnboardingStep.join).$2;
+        expect(joinDone(), isFalse);
+        expect(OnboardingStep.join.label, 'Join or create a team');
+
+        // A team the user created (owns), never joined with a code.
+        teams.teams['mine'] = team('mine', 'Mine', owner: testUser.uid);
+        teams.changed();
+        await pumpEventQueue();
+        expect(joinDone(), isTrue);
+      },
+    );
+
     test('joins a team by invite code', () async {
       final vm = await load(withTeam: false);
       teams.teams['t9'] = team('t9', 'Other', owner: 'u9');
@@ -717,7 +734,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('1 of 4 done'), findsOneWidget);
     expect(find.text('Join your team.'), findsNothing);
-    await tester.tap(find.text('Enter code'));
+    expect(find.text('Join or create a team'), findsOneWidget);
+    await tester.tap(find.text('Join or create'));
+    await tester.pumpAndSettle();
+    // Every way onto a team: a code, creating one, or finding a group.
+    expect(find.text('Create a team or group'), findsOneWidget);
+    await tester.tap(find.text('Join with a code'));
     await tester.pumpAndSettle();
     expect(find.text('Invite code'), findsOneWidget);
     await tester.tapAt(Offset.zero);

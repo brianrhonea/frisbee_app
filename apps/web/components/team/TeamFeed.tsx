@@ -13,7 +13,7 @@ import { EmptyState, ErrorNote, Loading } from "../StatusViews";
 import { Avatar } from "../Avatar";
 import { InviteButton } from "./InviteDialog";
 import { membersInOrder } from "./TeamBanner";
-import { useTeamHub } from "./TeamContext";
+import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { type TeamPostView, TeamPostCard } from "./TeamPostCard";
 import { TeamPostComposer } from "./TeamPostComposer";
 import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamSchedule";
@@ -110,18 +110,43 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
 }
 
 /**
+ * What the roster card says to someone not on the team, or null when they
+ * can't open it: visitors see only an adult team's roster (rosterIsPublic),
+ * without links to profiles; signed-in outsiders see any roster but a
+ * private group's or a youth team's (the API refuses those), with links.
+ */
+export function rosterCardText(v: {
+  state: TeamViewer["state"];
+  privateGroup: boolean;
+  youth: boolean;
+  publicRoster: boolean;
+}): string | null {
+  switch (v.state) {
+    case "visitor":
+      return v.publicRoster ? "See who's on the team." : null;
+    case "outsider":
+    case "error":
+      return v.privateGroup || v.youth ? null : "See who's on it and open their profiles.";
+    default:
+      return null;
+  }
+}
+
+/**
  * The side column's people: for members, the first few with their role,
  * all of them on the roster, and Invite for member managers; for everyone
- * else, a link to the roster.
+ * else who may open it, a link to the roster (rosterCardText).
  */
 function MemberPreview() {
-  const { teamId, kind, viewer } = useTeamHub();
+  const { teamId, kind, privateGroup, youth, publicRoster, viewer } = useTeamHub();
   const roster = `/teams/${teamId}/roster`;
   if (viewer.state !== "member") {
+    const text = rosterCardText({ state: viewer.state, privateGroup, youth, publicRoster });
+    if (!text) return null;
     return (
       <div className="card">
         <h2 className="card-title">{kind === "team" ? "Roster" : "Members"}</h2>
-        <p className="muted small">See who&apos;s on it and open their profiles.</p>
+        <p className="muted small">{text}</p>
         <Link className="btn btn-small" href={roster}>
           Open the {kind === "team" ? "roster" : "members"}
         </Link>
