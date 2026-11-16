@@ -99,7 +99,9 @@ Plain-language notes for testers are in
 - Home's post box is an inline composer (`InlineComposerViewModel`):
   type and tap Post; Photo, Link and Workout open inside the box, and
   "To" posts to Everyone or a team you manage (replaces the Team post
-  button and the editor popup on Home).
+  button and the editor popup on Home). Nothing can change while it
+  posts, and if the team picked leaves your list the post isn't sent
+  (never to Everyone instead). Links keep a lower-case scheme.
 - Explore's filter chips sit on one row that scrolls sideways.
 - Get started: "Join or create a team"; the create-or-join dialog no
   longer overflows on narrow phones.
