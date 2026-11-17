@@ -7,6 +7,13 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
     function uid() { return request.auth.uid; }
+    // A list query asking for at most [n] documents (security review S4):
+    // anyone signed in may search the directories, posts and comments, but
+    // not download them whole in one go. Every app and website query on
+    // them sets a limit at or under the cap.
+    function capped(n) {
+      return request.query.limit is int && request.query.limit <= n;
+    }
 
     // Rate limits: Cloud Functions (functions/src/api) mute someone who
     // floods messages, posts, comments, follows, join requests or teams,
@@ -1978,7 +1985,9 @@ service cloud.firestore {
           && d.keywords is list && d.keywords.size() <= 100;
       }
 
-      allow read: if signedIn();
+      allow get: if signedIn();
+      // The app's team-name check reads up to 200 listings at once.
+      allow list: if signedIn() && capped(200);
       allow create, update: if signedIn()
         && can(getAfter(teamPath(teamId)).data, 'manageTeam')
         && validListing(request.resource.data, getAfter(teamPath(teamId)).data);
@@ -2223,6 +2232,8 @@ service cloud.firestore {
       // on testers' phones: queries over several authors then ask for
       // `private == false`, and private authors one at a time. App 0.0.28
       // queries without that filter, which a tighter rule would refuse.
+      // Phase B also caps the list (S4) at `capped(50)`: 0.0.28's
+      // community feed asks for posts by id with no limit.
       allow list: if signedIn();
       allow delete: if signedIn() && resource.data.authorId == uid();
       allow create: if signedIn() && notMuted()
@@ -2293,7 +2304,8 @@ service cloud.firestore {
         }
 
         // Seen, and written, by whoever may see the post.
-        allow read: if signedIn() && canSeePost(post());
+        allow get: if signedIn() && canSeePost(post());
+        allow list: if signedIn() && canSeePost(post()) && capped(100);
         allow create: if signedIn() && notMuted() && canSeePost(post())
           && request.resource.data.keys().hasOnly([
                'body', 'authorId', 'authorName', 'authorPhotoUrl',
@@ -2324,9 +2336,10 @@ service cloud.firestore {
     }
 
     // Follower counts per FollowTarget key, plus `following` on user keys.
-    // Cloud Functions keep them; anyone signed in reads them.
+    // Cloud Functions keep them; anyone signed in reads one by its key,
+    // not the whole collection (S4).
     match /followCounts/{key} {
-      allow read: if signedIn();
+      allow get: if signedIn();
     }
 
     // Team rankings (rankings/{level-division}) and recent tournament
@@ -2339,8 +2352,9 @@ service cloud.firestore {
       allow read: if signedIn();
     }
     // Player ratings (playerRankings/all), from public profiles' stats.
+    // Read by name only (S4).
     match /playerRankings/{id} {
-      allow read: if signedIn();
+      allow get: if signedIn();
     }
 
     // ---- Direct messages --------------------------------------------------
@@ -2392,7 +2406,9 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/usernames/$(name)).data.uid == uid();
       }
 
-      allow read: if signedIn();
+      allow get: if signedIn();
+      // Searches by keyword or tag, 40 at a time.
+      allow list: if signedIn() && capped(50);
       allow delete: if signedIn() && uid() == userId;
       allow create: if signedIn() && uid() == userId
         && validProfile(request.resource.data)

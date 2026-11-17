@@ -15,6 +15,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   query,
   serverTimestamp,
   setDoc,
@@ -1646,7 +1647,7 @@ describe("team directory", () => {
     );
     await assertSucceeds(getDoc(ref(OUTSIDER)));
     await assertSucceeds(
-      getDocs(query(collection(db(OUTSIDER), "teamDirectory"), where("keywords", "array-contains", "tea"))),
+      getDocs(query(collection(db(OUTSIDER), "teamDirectory"), where("keywords", "array-contains", "tea"), limit(25))),
     );
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "teamDirectory", TEAM)));
   });
@@ -3330,11 +3331,11 @@ describe("private profiles' posts", () => {
 
   it("let the queries the app and site make through", async () => {
     // One author at a time, unfiltered: the author and followers.
-    await assertSucceeds(getDocs(query(collection(db(FAN), "posts"), where("authorId", "==", AUTHOR))));
-    await assertSucceeds(getDocs(query(collection(db(AUTHOR), "posts"), where("authorId", "==", AUTHOR))));
+    await assertSucceeds(getDocs(query(collection(db(FAN), "posts"), where("authorId", "==", AUTHOR), limit(20))));
+    await assertSucceeds(getDocs(query(collection(db(AUTHOR), "posts"), where("authorId", "==", AUTHOR), limit(20))));
     // Several authors, public posts only.
     await assertSucceeds(
-      getDocs(query(collection(db(OUTSIDER), "posts"), where("authorId", "in", [AUTHOR, OUTSIDER]), where("private", "==", false))),
+      getDocs(query(collection(db(OUTSIDER), "posts"), where("authorId", "in", [AUTHOR, OUTSIDER]), where("private", "==", false), limit(20))),
     );
   });
 
@@ -3344,9 +3345,9 @@ describe("private profiles' posts", () => {
     await assertSucceeds(updateDoc(doc(db(OUTSIDER), "posts", "pub"), { likedBy: arrayUnion(OUTSIDER) }));
 
     await assertSucceeds(getDoc(doc(db(FAN), "posts", "priv", "comments", "c0")));
-    await assertSucceeds(getDocs(collection(db(AUTHOR), "posts", "priv", "comments")));
+    await assertSucceeds(getDocs(query(collection(db(AUTHOR), "posts", "priv", "comments"), limit(100))));
     await assertFails(getDoc(doc(db(OUTSIDER), "posts", "priv", "comments", "c0")));
-    await assertFails(getDocs(collection(db(OUTSIDER), "posts", "priv", "comments")));
+    await assertFails(getDocs(query(collection(db(OUTSIDER), "posts", "priv", "comments"), limit(100))));
     await assertSucceeds(setDoc(doc(db(FAN), "posts", "priv", "comments", "c1"), comment(FAN)));
     await assertFails(setDoc(doc(db(OUTSIDER), "posts", "priv", "comments", "c2"), comment(OUTSIDER)));
     await assertFails(
@@ -4169,5 +4170,56 @@ describe("personal details (API only)", () => {
     await assertFails(setDoc(doc(db(UID), "personalDetails", "new-one"), { ciphertext: "y" }));
     await assertFails(deleteDoc(doc(db(UID), "personalDetails", UID)));
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "personalDetails", UID)));
+  });
+});
+
+describe("list caps (security review S4)", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "profiles", OUTSIDER), { name: "Oz", keywords: ["oz"] });
+      await setDoc(doc(fs, "posts", "pub"), { kind: "text", body: "x", authorId: OUTSIDER, private: false });
+      await setDoc(doc(fs, "posts", "pub", "comments", "c"), { body: "Hi", authorId: OUTSIDER });
+      await setDoc(doc(fs, "teamDirectory", "t"), { name: "T", keywords: ["t"] });
+    });
+  });
+
+  // Each collection and its cap, at or above the largest page the app and
+  // website ask for. Posts get theirs in phase B (posts_phase_b.rules.test.ts).
+  const caps: [string, (uid: string) => ReturnType<typeof collection>, number][] = [
+    ["profiles", (uid) => collection(db(uid), "profiles"), 50],
+    ["a post's comments", (uid) => collection(db(uid), "posts", "pub", "comments"), 100],
+    ["teamDirectory", (uid) => collection(db(uid), "teamDirectory"), 200],
+  ];
+  for (const [name, col, cap] of caps) {
+    it(`lets anyone signed in list ${name} ${cap} at a time, never more or unlimited`, async () => {
+      await assertSucceeds(getDocs(query(col(PLAYER), limit(cap))));
+      await assertFails(getDocs(query(col(PLAYER), limit(cap + 1))));
+      await assertFails(getDocs(col(PLAYER)));
+    });
+  }
+
+  it("still reads single documents without a limit", async () => {
+    await assertSucceeds(getDoc(doc(db(PLAYER), "profiles", OUTSIDER)));
+    await assertSucceeds(getDoc(doc(db(PLAYER), "teamDirectory", "t")));
+    await assertSucceeds(getDoc(doc(db(PLAYER), "posts", "pub", "comments", "c")));
+  });
+
+  it("reads follower counts and player ratings by name only", async () => {
+    await assertSucceeds(getDoc(doc(db(PLAYER), "followCounts", `user_${OUTSIDER}`)));
+    await assertSucceeds(getDoc(doc(db(PLAYER), "playerRankings", "all")));
+    await assertFails(getDocs(query(collection(db(PLAYER), "followCounts"), limit(10))));
+    await assertFails(getDocs(query(collection(db(PLAYER), "playerRankings"), limit(10))));
+  });
+
+  it("keeps the searches the app makes working", async () => {
+    await assertSucceeds(
+      getDocs(query(collection(db(PLAYER), "profiles"), where("keywords", "array-contains", "oz"), limit(40))),
+    );
+    await assertSucceeds(
+      getDocs(
+        query(collection(db(PLAYER), "teamDirectory"), where("keywords", "array-contains-any", ["t"]), limit(200)),
+      ),
+    );
   });
 });

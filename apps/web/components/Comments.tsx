@@ -24,8 +24,11 @@ interface Comment {
   likedBy?: string[];
 }
 
-/** The most comments a post shows (oldest first). */
-const shown = 300;
+/**
+ * The most comments a post shows: the newest 100, oldest first, as the app
+ * does. The rules refuse a comments query for more (security review S4).
+ */
+const commentsShown = 100;
 
 
 /**
@@ -41,7 +44,7 @@ export function Comments({ postId, postAuthorId, autoFocus = false }: {
   const { user } = useAuth();
   const { data, error } = useLiveQuery<Comment>(
     user ? `posts/${postId}/comments` : null,
-    [orderBy("createdAt", "asc"), limit(shown)],
+    [orderBy("createdAt", "desc"), limit(commentsShown)],
     `comments-${postId}`,
   );
   const [replyTo, setReplyTo] = useState<Doc<Comment> | null>(null);
@@ -54,7 +57,7 @@ export function Comments({ postId, postAuthorId, autoFocus = false }: {
       </p>
     );
   }
-  const all = data ?? [];
+  const all = [...(data ?? [])].reverse();
   const top = all.filter((c) => !c.parentId);
   const replies = (id: string) => all.filter((c) => c.parentId === id);
 

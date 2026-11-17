@@ -4,6 +4,15 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.39.1 — 2026-11-17
+
+List caps (security review S4).
+
+**Changed**
+- A post shows its newest 100 comments, oldest first, as the app does
+  (it showed the oldest 300). The database rules now refuse a comments
+  query for more than 100.
+
 ## 0.39.0 — 2026-11-17
 
 Private profiles' posts (security review S1). Works with API 0.31.0.
