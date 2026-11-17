@@ -67,6 +67,18 @@ void main() {
     expect(posts.posts, hasLength(1));
   });
 
+  test("a private profile's post can't be reposted (S1)", () {
+    posts.posts.add(
+      const UserPost(
+        id: 'secret',
+        authorId: 'sam',
+        body: 'Hi',
+        isPrivate: true,
+      ),
+    );
+    expect(actions.canRepost(current('secret')), isFalse);
+  });
+
   test("a repost's likes and reposts go to its original", () async {
     posts.posts.addAll([
       by('p1', 'sam'),

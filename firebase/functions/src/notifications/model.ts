@@ -642,10 +642,12 @@ export const followKey = {
 };
 
 /** Whose followers hear about a post: its author or team, and its tournament. */
-export function followKeys(a: { authorId?: string; teamId?: string; post: Data }): string[] {
+export function followKeys(a: { authorId?: string; teamId?: string; post: Data; privateAuthor?: boolean }): string[] {
+  // A private profile's post is for their accepted followers only, not a
+  // tagged tournament's (S1).
   const keys = [
     a.teamId ? followKey.team(a.teamId) : a.authorId ? followKey.user(a.authorId) : "",
-    typeof a.post.tournamentKey === "string" ? a.post.tournamentKey : "",
+    typeof a.post.tournamentKey === "string" && !a.privateAuthor ? a.post.tournamentKey : "",
   ];
   return [...new Set(keys.filter(Boolean))];
 }

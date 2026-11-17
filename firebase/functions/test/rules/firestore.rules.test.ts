@@ -3270,6 +3270,91 @@ describe("user posts", () => {
   });
 });
 
+// S1: a private profile's posts, their comments and likes are for the
+// author and accepted followers (users/{me}/follows/user_{author}).
+describe("private profiles' posts", () => {
+  const AUTHOR = PLAYER; // private profile
+  const FAN = COACH; // follows AUTHOR
+  const post = (uid: string, extra: Record<string, unknown> = {}) => ({
+    kind: "text",
+    body: "Followers only",
+    links: [],
+    images: [],
+    workout: null,
+    tournamentKey: null,
+    tournamentName: null,
+    authorId: uid,
+    authorName: "P",
+    authorPhotoUrl: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const comment = (uid: string) => ({
+    body: "Nice!",
+    authorId: uid,
+    authorName: "C",
+    authorPhotoUrl: null,
+    createdAt: serverTimestamp(),
+  });
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "profiles", AUTHOR), { name: "Pat", private: true });
+      await setDoc(doc(fs, "profiles", OUTSIDER), { name: "Oz" });
+      await setDoc(doc(fs, "users", FAN, "follows", `user_${AUTHOR}`), { key: `user_${AUTHOR}` });
+      await setDoc(doc(fs, "posts", "priv"), { ...post(AUTHOR), private: true, createdAt: new Date(), likedBy: [] });
+      await setDoc(doc(fs, "posts", "pub"), { ...post(OUTSIDER), private: false, createdAt: new Date(), likedBy: [] });
+      await setDoc(doc(fs, "posts", "priv", "comments", "c0"), { ...comment(FAN), createdAt: new Date() });
+    });
+  });
+
+  it("stamps private to match the author's profile (or leaves it to the functions)", async () => {
+    await assertSucceeds(setDoc(doc(db(AUTHOR), "posts", "a"), post(AUTHOR, { private: true })));
+    await assertFails(setDoc(doc(db(AUTHOR), "posts", "b"), post(AUTHOR, { private: false })));
+    await assertFails(setDoc(doc(db(OUTSIDER), "posts", "c"), post(OUTSIDER, { private: true })));
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "posts", "d"), post(OUTSIDER, { private: false })));
+    await assertSucceeds(setDoc(doc(db(OUTSIDER), "posts", "e"), post(OUTSIDER)));
+    // The author never changes it themselves.
+    await assertFails(updateDoc(doc(db(AUTHOR), "posts", "priv"), { private: false }));
+  });
+
+  it("are read by the author and followers only; a missing post can be asked about", async () => {
+    await assertSucceeds(getDoc(doc(db(AUTHOR), "posts", "priv")));
+    await assertSucceeds(getDoc(doc(db(FAN), "posts", "priv")));
+    await assertFails(getDoc(doc(db(OUTSIDER), "posts", "priv")));
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "posts", "pub")));
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), "posts", "missing")));
+  });
+
+  it("let the queries the app and site make through", async () => {
+    // One author at a time, unfiltered: the author and followers.
+    await assertSucceeds(getDocs(query(collection(db(FAN), "posts"), where("authorId", "==", AUTHOR))));
+    await assertSucceeds(getDocs(query(collection(db(AUTHOR), "posts"), where("authorId", "==", AUTHOR))));
+    // Several authors, public posts only.
+    await assertSucceeds(
+      getDocs(query(collection(db(OUTSIDER), "posts"), where("authorId", "in", [AUTHOR, OUTSIDER]), where("private", "==", false))),
+    );
+  });
+
+  it("are liked and commented on by followers only", async () => {
+    await assertSucceeds(updateDoc(doc(db(FAN), "posts", "priv"), { likedBy: arrayUnion(FAN) }));
+    await assertFails(updateDoc(doc(db(OUTSIDER), "posts", "priv"), { likedBy: arrayUnion(OUTSIDER) }));
+    await assertSucceeds(updateDoc(doc(db(OUTSIDER), "posts", "pub"), { likedBy: arrayUnion(OUTSIDER) }));
+
+    await assertSucceeds(getDoc(doc(db(FAN), "posts", "priv", "comments", "c0")));
+    await assertSucceeds(getDocs(collection(db(AUTHOR), "posts", "priv", "comments")));
+    await assertFails(getDoc(doc(db(OUTSIDER), "posts", "priv", "comments", "c0")));
+    await assertFails(getDocs(collection(db(OUTSIDER), "posts", "priv", "comments")));
+    await assertSucceeds(setDoc(doc(db(FAN), "posts", "priv", "comments", "c1"), comment(FAN)));
+    await assertFails(setDoc(doc(db(OUTSIDER), "posts", "priv", "comments", "c2"), comment(OUTSIDER)));
+    await assertFails(
+      updateDoc(doc(db(OUTSIDER), "posts", "priv", "comments", "c0"), { likedBy: arrayUnion(OUTSIDER) }),
+    );
+  });
+});
+
 describe("tournament directory", () => {
   const GROUP = "group1";
   const ORGANIZER = "organizer";

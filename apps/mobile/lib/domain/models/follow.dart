@@ -72,12 +72,24 @@ class FollowTarget {
 /// A user's follow, stored at `users/{uid}/follows/{key}`. [notify] turns
 /// on push and in-app notifications for the target's new posts.
 class Follow {
-  const Follow({required this.target, this.notify = false, this.createdAt});
+  const Follow({
+    required this.target,
+    this.notify = false,
+    this.approved = false,
+    this.createdAt,
+  });
 
   static const maxNameLength = 100;
 
   final FollowTarget target;
   final bool notify;
+
+  /// A follow of a private profile, accepted by its owner (or kept when
+  /// they turned private: the `follows` functions mark those). Their
+  /// private posts are asked for one author at a time
+  /// ([UserPostRepository.watchPostsByAuthors] `includePrivate`). Only the
+  /// owner's accept or the server writes it.
+  final bool approved;
   final DateTime? createdAt;
 
   String get key => target.key;
@@ -86,6 +98,7 @@ class Follow {
   Follow copyWith({bool? notify}) => Follow(
     target: target,
     notify: notify ?? this.notify,
+    approved: approved,
     createdAt: createdAt,
   );
 
@@ -112,6 +125,7 @@ class Follow {
         photoUrl: map['photoUrl'] as String?,
       ),
       notify: map['notify'] as bool? ?? false,
+      approved: map['approved'] == true,
       createdAt: parseDate(map['createdAt']),
     );
   }

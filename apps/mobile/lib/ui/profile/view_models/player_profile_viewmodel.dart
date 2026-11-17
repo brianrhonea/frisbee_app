@@ -83,23 +83,9 @@ class PlayerProfileViewModel extends ChangeNotifier {
         userPostRepository: posts,
         authRepository: authRepository,
       )..addListener(notifyListeners);
-      _subs.add(
-        posts
-            .watchPostsBy(uid)
-            .listen(
-              (p) {
-                _posts = p;
-                actions?.track(p);
-                _postsLoaded = true;
-                notifyListeners();
-              },
-              onError: (Object e) {
-                _postsError = e;
-                _postsLoaded = true;
-                notifyListeners();
-              },
-            ),
-      );
+      // Someone else's: public posts until their profile says this user
+      // may see more (_watchPosts again from _watchProfile).
+      _watchPosts(includePrivate: isMe);
     }
     if (followRepository != null) {
       _subs.add(
@@ -144,6 +130,35 @@ class PlayerProfileViewModel extends ChangeNotifier {
   Object? _error;
   StreamSubscription<PlayerProfile?>? _profileSub;
 
+  StreamSubscription<List<UserPost>>? _postsSub;
+  bool? _postsIncludePrivate;
+
+  /// Watches the player's posts: every one for the user's own profile or a
+  /// private profile they're an accepted follower of (the rules check the
+  /// follow), else public ones only.
+  void _watchPosts({required bool includePrivate}) {
+    final posts = _userPosts;
+    if (posts == null || _postsIncludePrivate == includePrivate) return;
+    _postsIncludePrivate = includePrivate;
+    _postsSub?.cancel();
+    _postsSub = posts
+        .watchPostsBy(uid, includePrivate: includePrivate)
+        .listen(
+          (p) {
+            _posts = p;
+            _postsError = null;
+            actions?.track(p);
+            _postsLoaded = true;
+            notifyListeners();
+          },
+          onError: (Object e) {
+            _postsError = e;
+            _postsLoaded = true;
+            notifyListeners();
+          },
+        );
+  }
+
   void _watchProfile() {
     _profileSub?.cancel();
     _profileSub = _profiles
@@ -152,6 +167,9 @@ class PlayerProfileViewModel extends ChangeNotifier {
           (p) {
             _profile = p;
             _profileLoaded = true;
+            _watchPosts(
+              includePrivate: isMe || (p != null && p.isPrivate && !p.locked),
+            );
             _syncFollow();
             _maybePublish();
             notifyListeners();
@@ -665,6 +683,7 @@ class PlayerProfileViewModel extends ChangeNotifier {
   void dispose() {
     _publishLater?.cancel();
     _profileSub?.cancel();
+    _postsSub?.cancel();
     _followed?.removeListener(_onFollowChanged);
     if (_watchesAccount) _auth.removeListener(notifyListeners);
     for (final s in [..._subs, ..._rosterSubs.values, ..._gameSubs.values]) {

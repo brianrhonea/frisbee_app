@@ -10,6 +10,17 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.29
+
+**Privacy**
+- If your profile is private, the photos on your posts, single posts and
+  their comments are now locked down on the server, not only hidden in
+  the app: only you and the people you've accepted can open them, like
+  them or comment. (Feeds get the same lock in a later update.)
+- Posts from private profiles can't be reposted.
+
+---
+
 ## 0.0.28
 
 **Works offline**

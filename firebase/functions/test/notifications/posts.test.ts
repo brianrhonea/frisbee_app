@@ -34,6 +34,12 @@ describe("followKeys", () => {
     expect(followKeys({ authorId: "u1", post: { tournamentKey: "event_123" } })).toEqual(["user_u1", "event_123"]);
   });
 
+  it("is only the author's followers for a private profile's post (S1)", () => {
+    expect(followKeys({ authorId: "u1", post: { tournamentKey: "tournament_g1_t1" }, privateAuthor: true })).toEqual([
+      "user_u1",
+    ]);
+  });
+
   it("is the team for a team post, not its author", () => {
     expect(followKeys({ teamId: "g1", authorId: "u1", post: { tournamentKey: "tournament_g1_t1" } })).toEqual([
       "team_g1",

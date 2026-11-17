@@ -37,11 +37,23 @@ export function LivePlayer({ uid }: { uid: string }) {
   const [attempt, setAttempt] = useState(0);
   const unlocked = member ? !member.locked : false;
   const privateDetails = unlocked && member?.profile.private === true;
+  // Every post for the member's own page or a private profile they're an
+  // accepted follower of (the rules check the follow); else public ones
+  // only, which the rules let anyone read (S1).
+  const allPosts = user?.uid === uid || privateDetails;
   const signals: Signal[] | null = user
     ? [
         { doc: `profiles/${uid}` },
         { doc: `users/${user.uid}/follows/user_${uid}` },
-        { collection: "posts", constraints: [where("authorId", "==", uid), orderBy("createdAt", "desc"), limit(20)] },
+        {
+          collection: "posts",
+          constraints: [
+            where("authorId", "==", uid),
+            ...(allPosts ? [] : [where("private", "==", false)]),
+            orderBy("createdAt", "desc"),
+            limit(20),
+          ],
+        },
         // A private profile's details: only once the rules let this member read them.
         ...(privateDetails ? [{ doc: `profiles/${uid}/private/details` }] : []),
       ]
