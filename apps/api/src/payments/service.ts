@@ -275,13 +275,13 @@ export class PaymentService {
         if (event.type === "checkout.session.async_payment_succeeded" || event.object.payment_status === "paid") await this.paid(event);
         break;
       case "checkout.session.expired":
-        await this.setChargeStatus(str(event.object.id), "expired", ["open"]);
+        if (event.account) await this.setChargeStatus(str(event.object.id), "expired", ["open"], event.account);
         break;
       case "charge.refunded":
         await this.refunded(event);
         break;
       case "charge.dispute.created":
-        await this.byIntent(str(event.object.payment_intent), (session) => this.setChargeStatus(session, "disputed", ["paid"]));
+        await this.byIntent(str(event.object.payment_intent), event.account, (session) => this.setChargeStatus(session, "disputed", ["paid"]));
         break;
       case "account.updated":
         await this.accountUpdated(event);
@@ -290,19 +290,27 @@ export class PaymentService {
     await this.store.transact(async (tx) => tx.set(p.event(eventId), { type: event.type.slice(0, 100), at: serverTime }));
   }
 
-  private async setChargeStatus(session: string, status: string, from: string[]) {
+  private async setChargeStatus(session: string, status: string, from: string[], account?: string) {
     if (!storedId(session)) return;
     await this.store.transact(async (tx) => {
       const charge = await tx.get(p.charge(session));
+      if (account !== undefined && charge?.account !== account) return;
       if (charge && from.includes(str(charge.status))) tx.update(p.charge(session), { status, updatedAt: serverTime });
     });
   }
 
-  private async byIntent(pi: string, fn: (session: string) => Promise<void>) {
-    if (!storedId(pi)) return;
+  /**
+   * The charge [pi] paid, when it was made on [account]. Hosts own full
+   * Stripe accounts and could send events of their own making, so only
+   * charges this API created, on the same account, are acted on.
+   */
+  private async byIntent(pi: string, account: string | null, fn: (session: string) => Promise<void>) {
+    if (!storedId(pi) || !account) return;
     const pointer = await this.store.get(p.intent(pi));
-    const session = str(pointer?.charge);
-    if (session) await fn(session);
+    const session = storedId(pointer?.charge);
+    if (!session) return;
+    const charge = await this.store.get(p.charge(session));
+    if (charge?.account === account) await fn(session);
   }
 
   /** Marks the fee paid, or refunds a second payment for something already paid. */
@@ -310,20 +318,21 @@ export class PaymentService {
     const session = storedId(event.object.id);
     const pi = storedId(typeof event.object.payment_intent === "string" ? event.object.payment_intent : "");
     if (!session || !pi) return;
-    const md = (event.object.metadata ?? {}) as Record<string, unknown>;
     const outcome = await this.store.transact(async (tx) => {
+      // Only a session this API made, on the account it made it on: the
+      // event's own metadata is the host's to write, so it's never trusted.
       const charge = await tx.get(p.charge(session));
-      const tournamentId = storedId(charge?.tournamentId ?? md.tournamentId);
-      const payerId = storedId(charge?.payerId ?? md.payerId);
-      const account = str(charge?.account) || str(event.account);
-      if (!tournamentId || !payerId || !account) return null;
-      if (charge && event.account && charge.account !== event.account) return null;
-      const status = str(charge?.status);
+      if (!charge || !event.account || charge.account !== event.account) return null;
+      const tournamentId = storedId(charge.tournamentId);
+      const payerId = storedId(charge.payerId);
+      const account = event.account;
+      if (!tournamentId || !payerId) return null;
+      const status = str(charge.status);
       if (status === "paid" || status === "refunded" || status === "disputed") return null;
       if (status === "duplicate") return { account, refund: true };
       const [t, payment] = await Promise.all([tx.get(p.tournament(tournamentId)), tx.get(p.payment(tournamentId, payerId))]);
       tx.set(p.intent(pi), { charge: session });
-      const base = { tournamentId, payerId, payerKind: str(charge?.payerKind ?? md.payerKind), account, paymentIntent: pi, updatedAt: serverTime };
+      const base = { paymentIntent: pi, updatedAt: serverTime };
       // Paid already (two tabs, or the host marked it by hand), or the event is gone: give it back.
       if (!t || payment?.paid === true) {
         tx.merge(p.charge(session), { ...base, status: "duplicate" });
@@ -345,7 +354,7 @@ export class PaymentService {
     const pi = str(o.payment_intent);
     const full = o.refunded === true;
     const feeId = str(typeof o.application_fee === "string" ? o.application_fee : (o.application_fee as { id?: string } | null)?.id);
-    await this.byIntent(pi, async (session) => {
+    await this.byIntent(pi, event.account, async (session) => {
       const giveFeeBack = await this.store.transact(async (tx) => {
         const charge = await tx.get(p.charge(session));
         if (!charge) return false;

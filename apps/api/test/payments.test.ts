@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import type { CheckoutInput, GatewayEvent, PaymentGateway } from "../src/payments/gateway.js";
 import { platformFeeFromEnv } from "../src/payments/service.js";
+import { stripeFromEnv } from "../src/payments/stripe.js";
+import Stripe from "stripe";
 import { FakeStore, FakeTeamRepository, FakeUsers, FakeVerifier } from "./fakes.js";
 
 const now = Date.UTC(2026, 10, 16, 12);
@@ -322,6 +324,28 @@ describe("the webhook", () => {
     expect(s.store.doc("tournaments/t1/payments/haze")?.note).toBe("Paid cash");
   });
 
+  it("ignores sessions it didn't make, whatever their metadata says", async () => {
+    // Another host makes its own 50-cent session naming this team's fee.
+    ready();
+    const forged = { tournamentId: "t1", payerKind: "team", payerId: "haze", hostId: "host", chargeId: "x" };
+    expect((await s.hook("checkout.session.completed", completed(forged, "cs_forged", "pi_x"), "acct_2")).status).toBe(200);
+    expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
+    expect(s.gateway.refunds).toHaveLength(0);
+  });
+
+  it("ignores events about this charge from another account", async () => {
+    const md = await checkout();
+    await s.hook("checkout.session.completed", completed(md), "acct_2");
+    expect(s.store.doc("tournaments/t1/payments/haze")).toBeUndefined();
+    await s.hook("checkout.session.completed", completed(md));
+    await s.hook("charge.refunded", { id: "ch_1", payment_intent: "pi_1", refunded: true, application_fee: "fee_1" }, "acct_2");
+    await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" }, "acct_2");
+    await s.hook("checkout.session.expired", { id: "cs_1" }, null);
+    expect(s.store.doc("tournaments/t1/payments/haze")?.paid).toBe(true);
+    expect(s.store.doc("charges/cs_1")?.status).toBe("paid");
+    expect(s.gateway.feeRefunds).toEqual([]);
+  });
+
   it("records expired sessions and disputes", async () => {
     const md = await checkout();
     await s.hook("checkout.session.expired", { id: "cs_1" });
@@ -330,5 +354,45 @@ describe("the webhook", () => {
     await s.hook("checkout.session.completed", completed(md));
     await s.hook("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1" });
     expect(s.store.doc("charges/cs_1")?.status).toBe("disputed");
+  });
+});
+
+describe("the real Stripe gateway", () => {
+  // Dummy values, never real keys: nothing here calls Stripe.
+  const env = { STRIPE_SECRET_KEY: "sk_test_dummy", STRIPE_WEBHOOK_SECRET: "whsec_dummy" };
+
+  it("is off without both secrets", () => {
+    expect(stripeFromEnv({})).toBeUndefined();
+    expect(stripeFromEnv({ STRIPE_SECRET_KEY: "sk_test_dummy" })).toBeUndefined();
+  });
+
+  it("checks Stripe's signature on the raw body through the route, App Check or not", async () => {
+    const gateway = stripeFromEnv(env)!;
+    const store = new FakeStore(() => now);
+    const app = buildApp({
+      verifier: new FakeVerifier(),
+      users: new FakeUsers(),
+      teams: new FakeTeamRepository(),
+      store,
+      now: () => now,
+      enforceAppCheck: true,
+      payments: { gateway, fee: { percentBps: 100, fixedCents: 100 }, returnUrl: site },
+    });
+    store.put("payoutAccounts/host", { account: "acct_9", status: "pending" });
+    store.put("stripeAccounts/acct_9", { teamId: "host" });
+    // Spacing Stripe's way: re-serializing would break the signature.
+    const payload = JSON.stringify(
+      { id: "evt_real", object: "event", type: "account.updated", account: "acct_9", data: { object: { id: "acct_9", object: "account", charges_enabled: true, details_submitted: true } } },
+      null,
+      2,
+    );
+    const header = new Stripe("sk_test_dummy").webhooks.generateTestHeaderString({ payload, secret: env.STRIPE_WEBHOOK_SECRET });
+    const post = (signature: string) =>
+      app.inject({ method: "POST", url: "/v1/payments/stripe/webhook", payload, headers: { "content-type": "application/json", "stripe-signature": signature } });
+    expect((await post(header.replace(/v1=[0-9a-f]+/, "v1=00"))).statusCode).toBe(400);
+    expect(store.doc("payoutAccounts/host")?.status).toBe("pending");
+    expect((await post(header)).statusCode).toBe(200);
+    expect(store.doc("payoutAccounts/host")?.status).toBe("ready");
+    expect(store.doc("stripeEvents/evt_real")).toMatchObject({ type: "account.updated" });
   });
 });

@@ -506,7 +506,7 @@ class _OverviewTab extends StatelessWidget {
           if (vm.isManager && (fee != null || t.entryFee != null))
             PayoutsCard(teamId: t.hostId),
           // Each of the user's teams that still owes its bid or spot fee.
-          if (fee != null)
+          if (fee != null && fee.amountCents > 0)
             for (final e in vm.myEntries)
               if (vm.owesSpotFee(e.teamId) &&
                   !vm.isPaid(e.teamId) &&
