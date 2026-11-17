@@ -11,6 +11,8 @@ import '../../services/api_client.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import 'user_post_repository.dart';
+import '../../../domain/models/outbox.dart';
+import '../outbox/outbox_repository.dart';
 
 /// Reads and writes `posts` in Firestore; the community feed comes from
 /// the Stall 10 API ([ApiClient], `GET /v1/feed`), which leaves out private
@@ -20,9 +22,36 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
     ApiClient? api,
+    OutboxRepository? outbox,
   }) : _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
-       _api = api;
+       _api = api,
+       _outbox = outbox {
+    outbox?.register(
+      OutboxKind.userPost,
+      OutboxHandler(
+        send: (job, files, author) async {
+          final post = UserPost.fromMap(
+            '',
+            Map<String, dynamic>.from(job.payload['post'] as Map? ?? const {}),
+          );
+          final r = await _save(
+            UserPostDraft(post: post, newImages: files),
+            author,
+            newId: job.id,
+          );
+          return switch (r) {
+            Ok() => const Result.ok(null),
+            Error(:final error) => Result.error(error),
+          };
+        },
+        sent: (job) => existsOnServer(_posts.doc(job.id)),
+      ),
+    );
+  }
+
+  /// Holds new posts made offline until they can go out.
+  final OutboxRepository? _outbox;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
@@ -205,12 +234,41 @@ class UserPostRepositoryFirebase implements UserPostRepository {
       );
 
   @override
-  Future<Result<String>> savePost(
+  Future<Result<String>> savePost(UserPostDraft draft, AppUser author) async {
+    final outbox = _outbox;
+    // Only new posts wait offline; an edit needs the post as it stands.
+    if (outbox == null ||
+        !draft.post.isNew ||
+        draft.newImages.any((i) => i.tooLarge)) {
+      return _save(draft, author);
+    }
+    final id = _posts.doc().id;
+    final r = await outbox.submit(
+      kind: OutboxKind.userPost,
+      id: id,
+      target: 'posts',
+      label: 'Post',
+      payload: {'post': draft.post.toEditableMap()},
+      files: draft.newImages,
+      sendNow: () async => switch (await _save(draft, author, newId: id)) {
+        Ok() => const Result.ok(null),
+        Error(:final error) => Result.error(error),
+      },
+    );
+    return switch (r) {
+      Ok() => Result.ok(id),
+      Error(:final error) => Result.error(error),
+    };
+  }
+
+  /// Saves [draft]; a new post gets [newId] (the queue's) or a fresh id.
+  Future<Result<String>> _save(
     UserPostDraft draft,
-    AppUser author,
-  ) => guard(() async {
+    AppUser author, {
+    String? newId,
+  }) => guard(() async {
     final post = draft.post;
-    final ref = post.isNew ? _posts.doc() : _posts.doc(post.id);
+    final ref = post.isNew ? _posts.doc(newId) : _posts.doc(post.id);
     final before = post.isNew
         ? const <ChatAttachment>[]
         : UserPost.fromMap(ref.id, plainData((await ref.get()).data())).images;

@@ -2,6 +2,7 @@
 import { type SaveTeamPostRequest, teamPostImagesMax } from "@stall10/shared";
 import { type ClipboardEvent, type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
+import { submitOutbox } from "@/lib/outbox";
 import { newId, photoProblem, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "../AuthProvider";
 import { ComposerPhotos } from "../ComposerPhotos";
@@ -96,7 +97,17 @@ export function TeamPostComposer({
         await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/posts/${encodeURIComponent(post.id)}`, { method: "PATCH", body: req });
         onDone?.();
       } else {
-        await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/posts`, { method: "POST", body: { ...req, id: postId } });
+        // Offline, it waits in the queue (the banner says so) and goes out by itself.
+        await submitOutbox(user, {
+          kind: "teamPost",
+          id: postId,
+          target: teamId,
+          label: "Team post",
+          path: `/v1/teams/${encodeURIComponent(teamId)}/posts`,
+          body: { ...req },
+          preview: req.title || body.trim(),
+          files: req.uploadIds?.length ?? 0,
+        });
         reset();
         onDone?.();
       }

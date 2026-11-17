@@ -54,7 +54,10 @@ import '../data/repositories/user_post/user_post_repository.dart';
 import '../data/repositories/user_post/user_post_repository_firebase.dart';
 import '../data/services/attachment_storage.dart';
 import '../data/services/auth_service.dart';
+import '../data/repositories/outbox/outbox_repository.dart';
 import '../data/services/api_client.dart';
+import '../data/services/connectivity_service.dart';
+import '../data/services/outbox_store.dart';
 import '../data/services/api_search.dart';
 import '../data/services/feature_flags.dart';
 import '../data/services/file_picker_service.dart';
@@ -100,6 +103,18 @@ List<SingleChildWidget> get firebaseProviders => [
       flags: context.read<FeatureFlags>(),
     ),
   ),
+  // Whether Stall 10 can be reached, and what waits to go out until it can.
+  ChangeNotifierProvider<ConnectivityService>(
+    create: (context) => ConnectivityService.device(context.read<ApiClient?>()),
+  ),
+  ChangeNotifierProvider<OutboxRepository>(
+    lazy: false,
+    create: (context) => OutboxRepository(
+      store: FileOutboxStore(),
+      connectivity: context.read<ConnectivityService>(),
+      auth: context.read<AuthRepository>(),
+    ),
+  ),
   Provider<CalendarRepository>(
     create: (context) => CalendarRepositoryApi(api: context.read<ApiClient?>()),
   ),
@@ -129,18 +144,26 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<EventRepository>(create: (_) => EventRepositoryFirebase()),
   Provider<TeamPostRepository>(
+    // Made at start (as are the other four the offline queue sends
+    // through), so queued items go out without opening their screens.
+    lazy: false,
     create: (context) => TeamPostRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
+      outbox: context.read<OutboxRepository>(),
     ),
   ),
   Provider<UserPostRepository>(
+    lazy: false,
     create: (context) => UserPostRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
       api: context.read<ApiClient?>(),
+      outbox: context.read<OutboxRepository>(),
     ),
   ),
   Provider<PostCommentRepository>(
-    create: (_) => PostCommentRepositoryFirebase(),
+    lazy: false,
+    create: (context) =>
+        PostCommentRepositoryFirebase(outbox: context.read<OutboxRepository>()),
   ),
   // Drafts belong to whoever is signed in, and go when they sign out.
   // Made at start (not lazily on the first chat), so it sees every sign-out.
@@ -178,13 +201,18 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<RankingRepository>(create: (_) => RankingRepositoryFirebase()),
   Provider<ChatRepository>(
-    create: (context) =>
-        ChatRepositoryFirebase(attachments: context.read<AttachmentStorage>()),
+    lazy: false,
+    create: (context) => ChatRepositoryFirebase(
+      attachments: context.read<AttachmentStorage>(),
+      outbox: context.read<OutboxRepository>(),
+    ),
   ),
   Provider<DirectMessageRepository>(
+    lazy: false,
     create: (context) => DirectMessageRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
       search: context.read<ApiSearch>(),
+      outbox: context.read<OutboxRepository>(),
     ),
   ),
   Provider(

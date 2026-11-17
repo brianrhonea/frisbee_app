@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'add_photos_button.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/models/chat.dart';
@@ -411,22 +412,12 @@ class _PostComposerState extends State<PostComposer> {
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const Spacer(),
-                    if (vm.canUseCamera)
-                      IconButton(
-                        tooltip: 'Take photo',
-                        onPressed: _picking || _imageCount >= UserPost.maxImages
-                            ? null
-                            : () => _addPhotos(camera: true),
-                        icon: const Icon(Icons.photo_camera_outlined),
-                      ),
-                    TextButton.icon(
-                      onPressed: _picking || _imageCount >= UserPost.maxImages
-                          ? null
-                          : _addPhotos,
-                      icon: const Icon(Icons.add_photo_alternate_outlined),
-                      label: Text(
-                        'Add photos ($_imageCount/${UserPost.maxImages})',
-                      ),
+                    AddPhotosButton(
+                      enabled: !_picking && _imageCount < UserPost.maxImages,
+                      canUseCamera: vm.canUseCamera,
+                      label: 'Photos ($_imageCount/${UserPost.maxImages})',
+                      onUpload: _addPhotos,
+                      onTakePhoto: () => _addPhotos(camera: true),
                     ),
                   ],
                 ),

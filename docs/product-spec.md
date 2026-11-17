@@ -457,6 +457,28 @@ everything the app does on the website alone, styled like the website
     `test/communities/model.test.ts`, app `test/ui/club_age_test.dart`
     and `test/domain/personal_details_test.dart`. The website has no
     test runner yet, so its side is checked by hand.
+18. Offline queue (app 0.0.28, web 0.38.0, api 0.30.0): [x] direct and
+    group messages, team chat, new posts, new team posts and comments
+    sent while Stall 10 can't be reached wait on the device (the app's
+    support folder; the browser's IndexedDB) and send by themselves, in
+    order per thread, once it can. Each keeps the id picked when it was
+    sent; every endpoint answers `already_exists` to a second copy (the
+    app also checks the server before resending), so nothing posts
+    twice. Connection and server errors wait with backoff; anything else
+    is "Not sent", with Try again and Discard, and doesn't hold up the
+    rest. Both show an offline banner opening "Waiting to send", queued
+    messages at the end of their thread, and a notice when something is
+    queued instead of sent. Likes, reactions, RSVPs and edits aren't
+    queued. Shared rules: `packages/shared/src/outbox.ts`, checked
+    against `fixtures/outbox` (app `test/shared_fixtures/
+    outbox_fixtures_test.dart`, shared `test/outbox_fixtures.test.ts`);
+    the app's queue in `test/data/outbox_repository_test.dart` (a lost
+    response, the app closed with items queued, one turned down not
+    holding up the rest, another account's items); the API's comment
+    id in `apps/api/test/post_editor.test.ts`. The website's IndexedDB
+    side is checked by hand. Photos: the app's one "Photos +" button
+    (Take photo or Upload photos) is app design only; the website keeps
+    its photo button, both up to 4 a post.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

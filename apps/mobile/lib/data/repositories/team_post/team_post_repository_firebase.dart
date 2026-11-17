@@ -4,11 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/outbox.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../utils/result.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
+import '../outbox/outbox_repository.dart';
 import 'team_post_repository.dart';
 
 /// Posts live in `teams/{teamId}/posts`; their photos in Cloud Storage
@@ -20,9 +22,35 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
     SharedStreams? sharedStreams,
+    OutboxRepository? outbox,
   }) : _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
-       _shared = sharedStreams ?? SharedStreams.instance;
+       _shared = sharedStreams ?? SharedStreams.instance,
+       _outbox = outbox {
+    outbox?.register(
+      OutboxKind.teamPost,
+      OutboxHandler(
+        send: (job, files, author) => _save(
+          job.target,
+          PostDraft(
+            post: TeamPost.fromMap(
+              '',
+              Map<String, dynamic>.from(
+                job.payload['post'] as Map? ?? const {},
+              ),
+            ),
+            newImages: files,
+          ),
+          author,
+          newId: job.id,
+        ),
+        sent: (job) => existsOnServer(_posts(job.target).doc(job.id)),
+      ),
+    );
+  }
+
+  /// Holds new posts made offline until they can go out.
+  final OutboxRepository? _outbox;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
@@ -107,9 +135,37 @@ class TeamPostRepositoryFirebase implements TeamPostRepository {
     String teamId,
     PostDraft draft,
     AppUser author,
-  ) => guard(() async {
+  ) {
+    final outbox = _outbox;
+    // Only new posts wait offline; an edit needs the post as it stands.
+    if (outbox == null ||
+        !draft.post.isNew ||
+        draft.newImages.any((i) => i.tooLarge)) {
+      return _save(teamId, draft, author);
+    }
+    final id = _posts(teamId).doc().id;
+    return outbox.submit(
+      kind: OutboxKind.teamPost,
+      id: id,
+      target: teamId,
+      label: 'Team post',
+      payload: {'post': draft.post.toEditableMap()},
+      files: draft.newImages,
+      sendNow: () => _save(teamId, draft, author, newId: id),
+    );
+  }
+
+  /// Saves [draft]; a new post gets [newId] (the queue's) or a fresh id.
+  Future<Result<void>> _save(
+    String teamId,
+    PostDraft draft,
+    AppUser author, {
+    String? newId,
+  }) => guard(() async {
     final post = draft.post;
-    final ref = post.isNew ? _posts(teamId).doc() : _posts(teamId).doc(post.id);
+    final ref = post.isNew
+        ? _posts(teamId).doc(newId)
+        : _posts(teamId).doc(post.id);
     final before = post.isNew
         ? const <ChatAttachment>[]
         : TeamPost.fromMap(ref.id, plainData((await ref.get()).data())).images;

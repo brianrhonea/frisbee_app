@@ -7,6 +7,18 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.30.0 — 2026-11-16
+
+The offline queue's comments. Deploy before web 0.38.0, which sends an
+`id` with every new comment (older clients don't, and keep working).
+0.29.0 is the payments branch's.
+
+**Changed**
+- `POST /v1/posts/:id/comments` takes an optional `id` (the app or site
+  picks it when the member sends), so a comment resent from the offline
+  queue is never posted twice: a second send with the same id answers
+  409 `already_exists`.
+
 ## 0.28.0 — 2026-11-16
 
 Public rankings. Deploy before web 0.33.0 and with the `rankings`

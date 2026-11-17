@@ -278,7 +278,8 @@ void main() {
       picker
         ..compressor = const ImageCompressor(enabled: false)
         ..next = [FakeFilePickerService.file('field.png', 10)];
-      await tester.tap(find.text('Photo'));
+      // No camera here: Photos goes straight to the library.
+      await tester.tap(find.text('Photos'));
       await tester.pumpAndSettle();
       expect(find.byTooltip('Remove photo'), findsOneWidget);
       expect(postEnabled(tester), isTrue);
@@ -294,6 +295,34 @@ void main() {
       expect(find.byType(BottomSheet), findsNothing);
       expect(find.byType(Dialog), findsNothing);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Photos + asks Take photo or Upload photos', (tester) async {
+      picker
+        ..canUseCamera = true
+        ..compressor = const ImageCompressor(enabled: false)
+        ..nextPhoto = FakeFilePickerService.file('snap.png', 10)
+        ..next = [
+          for (var i = 0; i < 5; i++) FakeFilePickerService.file('p$i.png', 10),
+        ];
+      await pump(tester);
+      expect(find.byTooltip('Take photo'), findsNothing);
+
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+      expect(find.text('Take photo'), findsOneWidget);
+      expect(find.text('Upload photos'), findsOneWidget);
+      await tester.tap(find.text('Take photo'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Remove photo'), findsOneWidget);
+
+      // Up to 4 in all: the extra picks are left out.
+      await tester.tap(find.text('Photos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Upload photos'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Remove photo'), findsNWidgets(4));
+      expect(find.text('Posts can have up to 4 photos.'), findsOneWidget);
     });
 
     testWidgets('To picks a team: its fields show, Workout goes', (

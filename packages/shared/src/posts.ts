@@ -223,6 +223,11 @@ export interface SavePostResult {
 
 /** `POST /v1/posts/:id/comments`: a comment, or a reply to [replyTo] (a comment id). */
 export const commentRequestSchema = z.strictObject({
+  /** Picked by the app, so a resend (the offline queue) can't post it twice. */
+  id: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,128}$/)
+    .optional(),
   body: z
     .string()
     .trim()

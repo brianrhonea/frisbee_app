@@ -141,6 +141,7 @@ class _Detail extends StatelessWidget {
   Widget build(BuildContext context) => ViewModelHost(
     key: ValueKey('dm-pane-${item.conversation.id}'),
     create: (c) => DirectChatViewModel(
+      outbox: c.read(),
       conversationId: item.conversation.id,
       directMessageRepository: c.read(),
       authRepository: c.read(),

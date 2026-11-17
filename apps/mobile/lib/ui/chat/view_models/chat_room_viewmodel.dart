@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../domain/models/outbox.dart';
 import '../../../data/repositories/chat/chat_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
@@ -25,6 +26,7 @@ class ChatRoomViewModel extends MessageThreadViewModel {
     required super.filePicker,
     super.peopleRepository,
     super.draftRepository,
+    super.outbox,
   }) : _chats = chatRepository,
        super(notificationRepository: notificationRepository) {
     toggleMuted = Command0<void>(
@@ -102,6 +104,12 @@ class ChatRoomViewModel extends MessageThreadViewModel {
 
   /// Members who can manage chats change the room's name and access.
   bool get canManage => _team?.has(uid, TeamPermission.manageChats) ?? false;
+
+  @override
+  OutboxKind get outboxKind => OutboxKind.teamChat;
+
+  @override
+  String get outboxTarget => teamChatTarget(teamId, roomId);
 
   @override
   String get noticeKey => 'chat_${teamId}_$roomId';

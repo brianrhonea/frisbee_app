@@ -564,14 +564,16 @@ class _MessageList extends StatelessWidget {
                       canSwipeReply: canSwipeReply,
                     ),
             ),
-            if (vm.receiptFor(m) case final receipt?)
+            if (vm.statusFor(m) case final receipt?)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
                 child: Text(
                   receipt,
                   textAlign: TextAlign.end,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: vm.isFailed(m)
+                        ? Theme.of(context).colorScheme.error
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),

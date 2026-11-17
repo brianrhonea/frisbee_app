@@ -51,6 +51,7 @@ class ChatTab extends StatelessWidget {
                 : ViewModelHost(
                     key: ValueKey('chat-pane-${vm.teamId}-$selected'),
                     create: (c) => ChatRoomViewModel(
+                      outbox: c.read(),
                       teamId: vm.teamId,
                       roomId: selected,
                       teamRepository: c.read(),

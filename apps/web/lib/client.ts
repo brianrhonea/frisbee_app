@@ -4,7 +4,8 @@ import type { User } from "firebase/auth";
 import { appCheckToken } from "./firebase";
 
 /** The API as the browser reaches it (CORS_ORIGINS on the API must list this site). */
-const base = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8787";
+export const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8787";
+const base = apiBase;
 
 export class ApiError extends Error {
   constructor(
@@ -29,8 +30,18 @@ export function problem(e: unknown, fallback = "Something went wrong. Try again.
  * Calls the API as the signed-in [user]: their Firebase ID token, and an
  * App Check token when this site has one. Answers are never cached.
  */
+const offline = () => new ApiError("Couldn't reach Stall 10. Check your connection and try again.", 0);
+
 export async function callApi<T>(user: User, path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
-  const headers: Record<string, string> = { authorization: `Bearer ${await user.getIdToken()}` };
+  let token: string;
+  try {
+    token = await user.getIdToken();
+  } catch (e) {
+    // Offline, an expired token can't be refreshed: that's the connection, not the account.
+    if ((e as { code?: string }).code === "auth/network-request-failed") throw offline();
+    throw e;
+  }
+  const headers: Record<string, string> = { authorization: `Bearer ${token}` };
   const check = await appCheckToken();
   if (check) headers[appCheckHeader] = check;
   if (init.body !== undefined) headers["content-type"] = "application/json";

@@ -9,6 +9,7 @@ import { LocalTime } from "../LocalTime";
 import { ChatAttachment, type ChatFile } from "../ChatAttachment";
 import { loadAtTop, OlderMessages } from "../OlderMessages";
 import { ChatComposer, MessageActions } from "../ChatComposer";
+import { PendingMessages } from "../PendingMessages";
 import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager";
@@ -224,6 +225,7 @@ function Thread({
             );
           })
         )}
+        <PendingMessages kind="teamChat" target={`${teamId}/${roomId}`} shown={list} />
       </div>
       {canWrite ? (
         <ChatComposer
@@ -233,6 +235,7 @@ function Thread({
           replyTo={replyTo ? { id: replyTo.id, authorName: replyTo.authorName, text: replyTo.text } : null}
           onClearReply={() => setReplyTo(null)}
           draftKey={`chat_${teamId}_${roomId}`}
+          outbox={{ kind: "teamChat", target: `${teamId}/${roomId}` }}
         />
       ) : (
         <footer className="thread-foot muted small">You can read this room but not post in it.</footer>

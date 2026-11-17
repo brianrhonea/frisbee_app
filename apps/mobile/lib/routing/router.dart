@@ -786,6 +786,7 @@ GoRouter router(
                           ViewModelHost(
                             key: ValueKey('chat-$teamId-$roomId'),
                             create: (c) => ChatRoomViewModel(
+                              outbox: c.read(),
                               teamId: teamId,
                               roomId: roomId,
                               teamRepository: c.read(),
@@ -945,6 +946,7 @@ GoRouter router(
                       ViewModelHost(
                         key: ValueKey('dm-$id'),
                         create: (c) => DirectChatViewModel(
+                          outbox: c.read(),
                           conversationId: id,
                           directMessageRepository: c.read(),
                           authRepository: c.read(),

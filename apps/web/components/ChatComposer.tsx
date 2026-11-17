@@ -1,7 +1,9 @@
 "use client";
 import { chatAttachmentsMax, chatReactionChoices, chatTextMax, formatFileSize } from "@stall10/shared";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import type { OutboxKind } from "@stall10/shared";
 import { callApi } from "@/lib/client";
+import { queuedNotice, submitOutbox } from "@/lib/outbox";
 import { loadDraft, saveDraft } from "@/lib/drafts";
 import { chatFileProblem, newId, removeUpload, uploadPhoto } from "@/lib/upload";
 import { useAuth } from "./AuthProvider";
@@ -23,8 +25,11 @@ export function ChatComposer({
   onClearReply,
   onTyping,
   draftKey,
+  outbox,
 }: {
   path: string;
+  /** Where this thread's messages wait while Stall 10 can't be reached (the app's OutboxKind and target). */
+  outbox: { kind: OutboxKind; target: string };
   upload: { targetId: string };
   placeholder: string;
   replyTo?: { id: string; authorName?: string; text?: string } | null;
@@ -40,6 +45,7 @@ export function ChatComposer({
   const [files, setFiles] = useState<Pending[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   /** Files removed while still uploading: deleted once their upload finishes. */
   const dropped = useRef(new Set<string>());
@@ -93,16 +99,24 @@ export function ChatComposer({
     if (!user || !canSend) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      await callApi(user, path, {
-        method: "POST",
+      const done = await submitOutbox(user, {
+        kind: outbox.kind,
+        id: messageId,
+        target: outbox.target,
+        label: "Message",
+        path,
         body: {
-          id: messageId,
           text,
           uploadIds: ready.map((f) => f.uploadId!),
           ...(replyTo && { replyTo: replyTo.id }),
         },
+        preview: text.trim(),
+        files: ready.length,
+        replyTo: replyTo ? { authorName: replyTo.authorName, text: replyTo.text } : null,
       });
+      if (done === "queued") setNotice(queuedNotice("Message"));
       edit("");
       onTyping?.(false);
       setFiles([]);
@@ -140,6 +154,11 @@ export function ChatComposer({
       {error && (
         <p className="form-error" role="alert">
           {error}
+        </p>
+      )}
+      {notice && (
+        <p className="muted small" role="status">
+          {notice}
         </p>
       )}
       <div className="chat-input-row">

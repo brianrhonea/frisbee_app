@@ -250,8 +250,9 @@ export class PostEditor {
     if (!parsed.success) throw fromZod(parsed.error);
     await checkNotMuted(this.store, caller.uid, this.now());
     const me = await authorOf(this.store, this.users, caller);
-    const id = this.store.newId(`posts/${postId}/comments`);
+    const id = parsed.data.id ?? this.store.newId(`posts/${postId}/comments`);
     await this.store.transact(async (tx) => {
+      if (await tx.get(p.comment(postId, id))) throw new ApiError("already_exists", "That comment was already posted.");
       const post = await tx.get(p.post(postId));
       if (!post) throw noPost();
       if (post.repostOf) throw new ApiError("failed_precondition", "Comment on the original post.");
