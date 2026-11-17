@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.28  | 2026-11-16 | `feature/offline-queue`                 |                     |
 | 0.0.26  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.25  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.24  | 2026-11-16 | `feature/web-parity`                    |                     |
@@ -40,6 +41,46 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.28 — Offline queue, one Photos + button
+
+(0.0.27 is the payments branch's.)
+
+- Offline queue (`OutboxRepository`, `lib/data/repositories/outbox/`):
+  direct and group messages, team chat, posts, team posts and comments
+  sent while Stall 10 can't be reached wait on the device
+  (`FileOutboxStore`: the app support folder, `outbox/jobs.json` and
+  each item's photos and files) and send by themselves, in order per
+  thread, once it can, including after the app is closed and opened
+  again. Each item's id is picked when the user sends it and kept, so a
+  retry never posts twice: before resending, the queue checks the server
+  (`existsOnServer`), and `already_exists` counts as sent. Connection or
+  server errors (`unavailable`, 5xx, rate limits, timeouts) wait and try
+  again with backoff (5 s up to 5 min); anything else is "Not sent",
+  with Try again and Discard, and doesn't hold up the rest. Items belong
+  to the account that sent them and only go out while it's signed in.
+  The rules are shared with the website (`packages/shared/src/outbox.ts`,
+  fixtures in `packages/shared/fixtures/outbox`). New posts only; likes,
+  reactions, RSVPs and edits aren't queued.
+- `ConnectivityService`: no network (connectivity_plus) is offline at
+  once; a failed send also marks it offline; then the API's `/health`
+  every 15 seconds until it answers. Firestore writes wait instead of
+  failing offline, so a send that hangs 15 s (2 min with attachments) is
+  queued. Storage uploads give up after a minute
+  (`setMaxUploadRetryTime`) instead of ten. An expired sign-in token that
+  can't refresh offline is a connection error (`ApiClient`).
+- `OfflineBanner` at the top of the app while offline or while anything
+  waits; tap for "Waiting to send" (`OutboxSheet`). Queued messages show
+  in their thread (`MessageThreadViewModel.statusFor`): "Waiting to
+  send", "Sending…" or "Not sent". A snackbar says when something was
+  queued instead of sent.
+- Post composers (Home's box, the full composer, team posts): one
+  "Photos +" button (`AddPhotosButton`) asks Take photo or Upload photos
+  (straight to the library without a camera), instead of separate camera
+  and photo buttons. Still up to 4 photos; extra picks are left out with
+  a note.
+- New packages: `connectivity_plus` 7.3.1 (7.3.2 needs a newer `dbus`
+  than geolocator allows), `path_provider`.
 
 ## 0.0.26 — Clearer workout boxes, scroll while showing times, push back
 

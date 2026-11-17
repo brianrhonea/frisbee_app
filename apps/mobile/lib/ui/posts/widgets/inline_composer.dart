@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'add_photos_button.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/workout.dart';
 import '../../../utils/result.dart';
@@ -345,30 +346,19 @@ class _InlineComposerState extends State<InlineComposer> {
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        TextButton.icon(
+        AddPhotosButton(
           style: compact,
-          onPressed: vm.canAddPhotos
-              ? () async {
-                  await vm.addPhotos();
-                  _reveal(_photosKey);
-                }
-              : null,
-          icon: const Icon(Icons.image_outlined, size: 18),
-          label: const Text('Photo'),
+          enabled: vm.canAddPhotos,
+          canUseCamera: vm.canUseCamera,
+          onUpload: () async {
+            await vm.addPhotos();
+            _reveal(_photosKey);
+          },
+          onTakePhoto: () async {
+            await vm.addPhotos(camera: true);
+            _reveal(_photosKey);
+          },
         ),
-        if (vm.canUseCamera)
-          IconButton(
-            tooltip: 'Take photo',
-            visualDensity: VisualDensity.compact,
-            iconSize: 18,
-            onPressed: vm.canAddPhotos
-                ? () async {
-                    await vm.addPhotos(camera: true);
-                    _reveal(_photosKey);
-                  }
-                : null,
-            icon: const Icon(Icons.photo_camera_outlined),
-          ),
         if (vm.offersWorkout) ...[
           Semantics(
             toggled: vm.workout != null,

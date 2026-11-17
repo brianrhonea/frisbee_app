@@ -6,6 +6,7 @@ import '../../../data/repositories/direct_message/direct_message_repository.dart
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
 import '../../../domain/models/direct_message.dart';
+import '../../../domain/models/outbox.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import '../../chat/view_models/message_thread_viewmodel.dart';
@@ -20,6 +21,7 @@ class DirectChatViewModel extends MessageThreadViewModel {
     super.peopleRepository,
     super.notificationRepository,
     super.draftRepository,
+    super.outbox,
   }) : _dms = directMessageRepository {
     accept = Command0<void>(
       () => _dms.answerRequest(conversationId, uid, accept: true),
@@ -220,6 +222,12 @@ class DirectChatViewModel extends MessageThreadViewModel {
 
   @override
   String get noticeKey => 'dm_$conversationId';
+
+  @override
+  OutboxKind get outboxKind => OutboxKind.directMessage;
+
+  @override
+  String get outboxTarget => conversationId;
 
   @override
   bool get showsTyping => true;

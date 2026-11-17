@@ -220,6 +220,16 @@ describe("comments", () => {
     expect(s.store.doc(`posts/p/comments/${again}`)).toMatchObject({ parentId: top, replyToName: "Sam" });
   });
 
+  it("takes the app's id once, so a resend can't post it twice", async () => {
+    const first = await s.call("POST", "/v1/posts/p/comments", { id: "c-queued", body: "Offline hi" });
+    expect(first.json().id).toBe("c-queued");
+    expect(s.store.doc("posts/p/comments/c-queued")).toMatchObject({ body: "Offline hi", authorId: "me" });
+    const again = await s.call("POST", "/v1/posts/p/comments", { id: "c-queued", body: "Offline hi" });
+    expect(again.statusCode).toBe(409);
+    expect(again.json().error.code).toBe("already_exists");
+    expect((await s.call("POST", "/v1/posts/p/comments", { id: "bad/id", body: "x" })).statusCode).toBe(400);
+  });
+
   it("refuses empty comments, missing posts and reposts", async () => {
     expect((await s.call("POST", "/v1/posts/p/comments", { body: "  " })).statusCode).toBe(400);
     expect((await s.call("POST", "/v1/posts/gone/comments", { body: "hi" })).statusCode).toBe(404);

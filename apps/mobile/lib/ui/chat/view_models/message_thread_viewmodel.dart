@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../../data/repositories/outbox/outbox_repository.dart';
+import '../../../domain/models/outbox.dart';
 import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/draft/message_draft_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
@@ -36,11 +38,14 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
     PeopleRepository? peopleRepository,
     NotificationRepository? notificationRepository,
     MessageDraftRepository? draftRepository,
+    OutboxRepository? outbox,
   }) : _auth = authRepository,
        _picker = filePicker,
        _people = peopleRepository,
        _notices = notificationRepository,
-       _draftStore = draftRepository {
+       _draftStore = draftRepository,
+       _outbox = outbox {
+    outbox?.addListener(_onOutbox);
     if (notificationRepository != null) {
       _lifecycle = _tryLifecycleListener(_markSeen);
     }
@@ -60,6 +65,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   final PeopleRepository? _people;
   final NotificationRepository? _notices;
   final MessageDraftRepository? _draftStore;
+  final OutboxRepository? _outbox;
   AppLifecycleListener? _lifecycle;
 
   /// The newest message from someone else already marked seen.
@@ -185,6 +191,42 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   /// A small note under [message], e.g. "Seen"; null for none.
   String? receiptFor(ChatMessage message) => null;
+
+  /// Where this thread's messages wait in the offline queue; none for
+  /// threads that don't queue (meeting chat).
+  @protected
+  OutboxKind? get outboxKind => null;
+  @protected
+  String? get outboxTarget => null;
+
+  void _onOutbox() {
+    if (!_disposed) notifyListeners();
+  }
+
+  /// The user's messages waiting in the offline queue, by id.
+  Map<String, OutboxJob> get _pending {
+    final kind = outboxKind;
+    final target = outboxTarget;
+    final outbox = _outbox;
+    if (kind == null || target == null || outbox == null) return const {};
+    return {for (final j in outbox.jobsFor(kind, target)) j.id: j};
+  }
+
+  /// Whether [m] is still waiting to go out (sent offline).
+  bool isQueued(ChatMessage m) => _pending.containsKey(m.id);
+
+  /// The line under [m]: whether it's waiting to send or was turned down,
+  /// else its read receipt.
+  String? statusFor(ChatMessage m) => switch (_pending[m.id]) {
+    null => receiptFor(m),
+    OutboxJob(state: OutboxState.failed) =>
+      'Not sent. Open "Waiting to send" to retry.',
+    OutboxJob(state: OutboxState.sending) => 'Sending…',
+    _ => 'Waiting to send',
+  };
+
+  /// Whether [m] was turned down by the server (shown in the error colour).
+  bool isFailed(ChatMessage m) => _pending[m.id]?.state == OutboxState.failed;
 
   /// Whether messages can carry photos and files.
   bool get canAttach => true;
@@ -389,6 +431,30 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
         else
           m,
     ];
+    // Sent offline: shown at the end until the real one arrives (same id).
+    final pending = _pending;
+    if (pending.isNotEmpty) {
+      final shown = {for (final m in all) m.id};
+      final me = _auth.currentUser;
+      for (final j in pending.values) {
+        if (shown.contains(j.id)) continue;
+        final files = j.files.length;
+        all.add(
+          ChatMessage(
+            id: j.id,
+            authorId: uid,
+            authorName: me?.label ?? '',
+            text: [
+              if (j.preview.isNotEmpty) j.preview,
+              if (files > 0)
+                files == 1 ? '📎 1 attachment' : '📎 $files attachments',
+            ].join('\n'),
+            createdAt: j.createdAt,
+            replyTo: MessageReply.fromMap(j.payload['replyTo']),
+          ),
+        );
+      }
+    }
     final after = hiddenBefore;
     if (after == null) return all;
     return [
@@ -429,7 +495,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   bool isMine(ChatMessage m) => m.authorId == uid;
 
-  bool canDelete(ChatMessage m) => isMine(m) || canModerate;
+  bool canDelete(ChatMessage m) => !isQueued(m) && (isMine(m) || canModerate);
 
   /// Starts (or restarts) listening; call from the subclass constructor.
   @protected
@@ -567,6 +633,8 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
   final _reacting = <String, (String?,)>{};
 
   Future<Result<void>> _react(ChatMessage message, String emoji) async {
+    // Not on the server yet.
+    if (isQueued(message)) return const Result.ok(null);
     final current = _reacting[message.id]?.$1 ?? message.reactionOf(uid);
     final next = current == emoji ? null : emoji;
     _reacting[message.id] = (next,);
@@ -647,6 +715,7 @@ abstract class MessageThreadViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _outbox?.removeListener(_onOutbox);
     _disposed = true;
     takePhoto.dispose();
     recordVideo.dispose();

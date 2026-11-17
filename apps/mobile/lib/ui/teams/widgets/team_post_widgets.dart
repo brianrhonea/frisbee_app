@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../../posts/widgets/add_photos_button.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/chat.dart';
@@ -534,28 +535,17 @@ class _PostEditorDialogState extends State<PostEditorDialog> {
                   children: [
                     Text('Photos', style: theme.textTheme.titleSmall),
                     const SizedBox(width: 8),
-                    if (widget.canUseCamera)
-                      IconButton(
-                        tooltip: 'Take photo',
-                        onPressed: _picking || _imageCount >= TeamPost.maxImages
-                            ? null
-                            : () => _addPhotos(camera: true),
-                        icon: const Icon(Icons.photo_camera_outlined),
-                      ),
                     // Shrinks on narrow phones instead of overflowing.
                     Expanded(
                       child: Align(
                         alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed:
-                              _picking || _imageCount >= TeamPost.maxImages
-                              ? null
-                              : _addPhotos,
-                          icon: const Icon(Icons.add_photo_alternate_outlined),
-                          label: Text(
-                            'Add photos ($_imageCount/${TeamPost.maxImages})',
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        child: AddPhotosButton(
+                          enabled:
+                              !_picking && _imageCount < TeamPost.maxImages,
+                          canUseCamera: widget.canUseCamera,
+                          label: 'Photos ($_imageCount/${TeamPost.maxImages})',
+                          onUpload: _addPhotos,
+                          onTakePhoto: () => _addPhotos(camera: true),
                         ),
                       ),
                     ),

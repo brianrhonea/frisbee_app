@@ -8,6 +8,7 @@ import { MeetingAlerts } from "./team/meetings/MeetingAlerts";
 import { HeaderAuth } from "./HeaderAuth";
 import { BrandCard } from "./HomeCards";
 import { NavIcon, type NavIconName } from "./NavIcons";
+import { OfflineBanner } from "./OfflineBanner";
 import { useUnreadCount } from "./Notifications";
 import { SideTeams } from "./SideTeams";
 import { ThemeToggle } from "./ThemeToggle";
@@ -224,6 +225,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
       )}
 
       <div className="frame-main">
+        {user && <OfflineBanner />}
         <main>{children}</main>
         {user && <VoiceBar />}
         {user && <MeetingAlerts />}

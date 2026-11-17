@@ -124,7 +124,8 @@ Explore, Team, Messages and Profile.
 - After you follow someone, the app offers to notify you when they post.
   Change it later from **Following ▾ → Post notifications** on their
   profile.
-- **Write a post**: text, up to 4 photos and 5 links. Anyone signed in can
+- **Write a post**: text, up to 4 photos and 5 links. In the app, tap
+  **Photos +**, then **Take photo** or **Upload photos**. Anyone signed in can
   see your posts on your profile. Optionally tag a tournament you follow, so its followers see the post too.
 - **Share a workout**: pick the activity, then add how long it took, an
   optional distance and effort, and any exercises with sets, reps and
@@ -207,6 +208,21 @@ many conversations have something new.
   it. Turn **Read receipts** off in Settings → Privacy; then they don't
   see yours and you don't see theirs.
 - Search shows names, @usernames and photos only, never email addresses.
+
+### Sending while offline
+
+No signal? Send your message, post or comment anyway. It waits on your
+phone (or in your browser) and sends by itself as soon as you're back,
+even if you close the app in between, and it's never posted twice.
+
+- A strip at the top says you're offline and how many things are
+  waiting. Tap it (on the website, **Waiting to send**) to see them.
+- Messages still waiting show at the end of the chat as **Waiting to
+  send**. If one can't be sent (say you've left that chat), it says
+  **Not sent**: **Try again** or **Discard** it. The rest still go.
+- Things wait for the account that sent them: sign out and they wait
+  until you sign back in.
+- Likes, reactions, RSVPs and edits need a connection.
 
 ### Teams
 

@@ -4,6 +4,34 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.38.0 — 2026-11-16
+
+Needs API 0.30.0: deploy the API first. The site now sends an `id` with
+every new comment, and older APIs turn that down (400). 0.37.0 is the
+payments branch's.
+
+**Added**
+- Offline queue, as in the app: a message (direct or team chat), post,
+  team post or comment sent while Stall 10 can't be reached waits in this
+  browser (IndexedDB, `lib/outbox.ts`) and sends by itself, in order,
+  once it can. Each keeps the id it got when sent, so nothing is posted
+  twice. Photos and files are uploaded when added, so the queued item is
+  the finished request. One tab sends at a time (a Web Lock); other tabs
+  follow along (BroadcastChannel).
+- Whether Stall 10 can be reached (`lib/online.ts`): the browser's
+  offline event, a send that couldn't get through, then `GET /health`
+  every 15 seconds until it answers.
+- A banner at the top while offline or while anything waits: "You're
+  offline. 2 items will send when you're back." It opens "Waiting to
+  send", with Try again (for one the server turned down) and Discard.
+- Messages still waiting show at the end of their thread, faded, with
+  "Waiting to send", "Sending…" or why it wasn't sent.
+- Composers say "Couldn't reach Stall 10. Your message will send by
+  itself once it can." when they queue instead of send.
+
+Likes, reactions, RSVPs and edits aren't queued; they say they couldn't
+reach Stall 10, as before.
+
 ## 0.36.0 — 2026-11-16
 
 Works with API 0.28.0 (no API change).

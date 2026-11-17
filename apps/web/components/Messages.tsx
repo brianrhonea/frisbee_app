@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { callApi } from "@/lib/client";
+import { PendingMessages } from "./PendingMessages";
 import { type Doc, useLiveDoc, useLivePaged, useLiveQuery } from "@/lib/live";
 import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { useAuth } from "./AuthProvider";
@@ -567,6 +568,7 @@ function ConversationView({
             );
           })
         )}
+        <PendingMessages kind="directMessage" target={conv.id} shown={list} />
         {info.seen && <p className="muted small conv-seen">Seen</p>}
         {typing.others.length > 0 && (
           <p className="muted small conv-typing" aria-live="polite">
@@ -599,6 +601,7 @@ function ConversationView({
             onClearReply={() => setReplyTo(null)}
             onTyping={typing.report}
             draftKey={`dm_${conv.id}`}
+            outbox={{ kind: "directMessage", target: conv.id }}
           />
         </>
       )}

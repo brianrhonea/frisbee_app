@@ -1479,3 +1479,19 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
   .frame.has-fab .frame-main { padding-bottom: 72px; }
 }
 /* ==== end Home: social feed ============================================ */
+
+/* Offline queue: the banner, its "Waiting to send" list, and pending messages (OfflineBanner, PendingMessages). */
+.offline-banner {
+  position: sticky; top: 0; z-index: 20; margin: 0 0 12px; padding: 8px 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.offline-banner.failed { border-color: var(--danger); }
+.offline-banner > p { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin: 0; }
+.outbox-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.outbox-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.outbox-list li > div { min-width: 0; overflow-wrap: anywhere; }
+.outbox-list small { display: block; }
+.outbox-actions { display: flex; gap: 10px; flex: none; }
+.message-pending { opacity: 0.75; }
+.message-pending .message-main { grid-column: 2; }
+

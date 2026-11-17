@@ -1,0 +1,77 @@
+{
+  "about": "outboxFailureOf(code)",
+  "cases": [
+    {
+      "code": "unavailable",
+      "failure": "network"
+    },
+    {
+      "code": "network",
+      "failure": "network"
+    },
+    {
+      "code": "network-request-failed",
+      "failure": "network"
+    },
+    {
+      "code": "deadline-exceeded",
+      "failure": "network"
+    },
+    {
+      "code": "retry-limit-exceeded",
+      "failure": "network"
+    },
+    {
+      "code": "unauthenticated",
+      "failure": "permanent"
+    },
+    {
+      "code": "internal",
+      "failure": "retry"
+    },
+    {
+      "code": "unknown",
+      "failure": "retry"
+    },
+    {
+      "code": "aborted",
+      "failure": "retry"
+    },
+    {
+      "code": "resource-exhausted",
+      "failure": "retry"
+    },
+    {
+      "code": "resource_exhausted",
+      "failure": "retry"
+    },
+    {
+      "code": "already_exists",
+      "failure": "sent"
+    },
+    {
+      "code": "already-exists",
+      "failure": "sent"
+    },
+    {
+      "code": "permission_denied",
+      "failure": "permanent"
+    },
+    {
+      "code": "permission-denied",
+      "failure": "permanent"
+    },
+    {
+      "code": "not_found",
+      "failure": "permanent"
+    },
+    {
+      "code": "failed_precondition",
+      "failure": "permanent"
+    },
+    {
+      "code": "invalid_argument",
+      "failure": "permanent"
+    }
+  ]
+}

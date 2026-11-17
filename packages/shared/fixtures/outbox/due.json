@@ -1,0 +1,131 @@
+{
+  "about": "dueJobs(jobs, \"me\", now): ids in order",
+  "cases": [
+    {
+      "name": "oldest first, only mine",
+      "now": "2026-11-16T12:00:00.000Z",
+      "jobs": [
+        {
+          "id": "b",
+          "uid": "me",
+          "target": "x",
+          "createdAt": "2026-11-16T11:02:00.000Z",
+          "state": "waiting",
+          "nextTryAt": null
+        },
+        {
+          "id": "a",
+          "uid": "me",
+          "target": "y",
+          "createdAt": "2026-11-16T11:01:00.000Z",
+          "state": "waiting",
+          "nextTryAt": null
+        },
+        {
+          "id": "other",
+          "uid": "them",
+          "target": "x",
+          "createdAt": "2026-11-16T11:00:00.000Z",
+          "state": "waiting",
+          "nextTryAt": null
+        }
+      ],
+      "due": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "backoff holds its place back, not others",
+      "now": "2026-11-16T12:00:00.000Z",
+      "jobs": [
+        {
+          "id": "a",
+          "uid": "me",
+          "target": "x",
+          "createdAt": "2026-11-16T11:01:00.000Z",
+          "state": "waiting",
+          "nextTryAt": "2026-11-16T12:01:00.000Z"
+        },
+        {
+          "id": "b",
+          "uid": "me",
+          "target": "x",
+          "createdAt": "2026-11-16T11:02:00.000Z",
+          "state": "waiting",
+          "nextTryAt": null
+        },
+        {
+          "id": "c",
+          "uid": "me",
+          "target": "y",
+          "createdAt": "2026-11-16T11:03:00.000Z",
+          "state": "waiting",
+          "nextTryAt": null
+        }
+      ],
+      "due": [
+        "c"
+      ]
+    },
+    {
+      "name": "a due retry goes",
+      "now": "2026-11-16T12:00:00.000Z",
+      "jobs": [
+        {
+          "id": "a",
+          "uid": "me",
+          "target": "x",
+          "createdAt": "2026-11-16T11:01:00.000Z",
+          "state": "waiting",
+          "nextTryAt": "2026-11-16T11:59:59.000Z"
+        },
+        {
+          "id": "b",
+          "uid": "me",
+          "target": "x",
+          "createdAt": "2026-11-16T11:02:00.000Z",
+          "state": "waiting",
+          "nextTryAt": null
+        }
+      ],
+      "due": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "failed and sending don't go or hold back",
+      "now": "2026-11-16T12:00:00.000Z",
+      "jobs": [
+        {
+          "id": "a",
+          "uid": "me",
+          "target": "x",
+          "createdAt": "2026-11-16T11:01:00.000Z",
+          "state": "failed",
+          "nextTryAt": null
+        },
+        {
+          "id": "b",
+          "uid": "me",
+          "target": "x",
+          "createdAt": "2026-11-16T11:02:00.000Z",
+          "state": "sending",
+          "nextTryAt": null
+        },
+        {
+          "id": "c",
+          "uid": "me",
+          "target": "x",
+          "createdAt": "2026-11-16T11:03:00.000Z",
+          "state": "waiting",
+          "nextTryAt": null
+        }
+      ],
+      "due": [
+        "c"
+      ]
+    }
+  ]
+}

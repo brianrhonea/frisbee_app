@@ -5,11 +5,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/outbox.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
 import '../../services/attachment_storage.dart';
 import '../../services/firestore_utils.dart';
 import '../../services/shared_streams.dart';
+import '../outbox/outbox_repository.dart';
 import 'chat_repository.dart';
 
 /// Rooms live at `teams/{teamId}/chats/{roomId}` with messages beneath, and
@@ -22,9 +24,35 @@ class ChatRepositoryFirebase implements ChatRepository {
     required AttachmentStorage attachments,
     FirebaseFirestore? firestore,
     SharedStreams? sharedStreams,
+    OutboxRepository? outbox,
   }) : _files = attachments,
        _db = firestore ?? FirebaseFirestore.instance,
-       _shared = sharedStreams ?? SharedStreams.instance;
+       _shared = sharedStreams ?? SharedStreams.instance,
+       _outbox = outbox {
+    outbox?.register(
+      OutboxKind.teamChat,
+      OutboxHandler(
+        send: (job, files, author) => _send(
+          job.payload['teamId'] as String? ?? '',
+          job.payload['roomId'] as String? ?? '',
+          job.id,
+          author: author,
+          text: job.payload['text'] as String? ?? '',
+          attachments: files,
+          replyTo: MessageReply.fromMap(job.payload['replyTo']),
+        ),
+        sent: (job) => existsOnServer(
+          _messages(
+            job.payload['teamId'] as String? ?? '',
+            job.payload['roomId'] as String? ?? '',
+          ).doc(job.id),
+        ),
+      ),
+    );
+  }
+
+  /// Holds messages sent offline until they can go out.
+  final OutboxRepository? _outbox;
 
   final AttachmentStorage _files;
   final FirebaseFirestore _db;
@@ -262,6 +290,44 @@ class ChatRepositoryFirebase implements ChatRepository {
     required String text,
     List<NewAttachment> attachments = const [],
     MessageReply? replyTo,
+  }) {
+    // The id is picked now and kept, so a retry can't post it twice.
+    final messageId = _messages(teamId, roomId).doc().id;
+    Future<Result<void>> now() => _send(
+      teamId,
+      roomId,
+      messageId,
+      author: author,
+      text: text,
+      attachments: attachments,
+      replyTo: replyTo,
+    );
+    final outbox = _outbox;
+    if (outbox == null || attachments.any((a) => a.tooLarge)) return now();
+    return outbox.submit(
+      kind: OutboxKind.teamChat,
+      id: messageId,
+      target: teamChatTarget(teamId, roomId),
+      label: 'Team chat message',
+      payload: {
+        'teamId': teamId,
+        'roomId': roomId,
+        'text': text,
+        'replyTo': replyTo?.toMap(),
+      },
+      files: attachments,
+      sendNow: now,
+    );
+  }
+
+  Future<Result<void>> _send(
+    String teamId,
+    String roomId,
+    String messageId, {
+    required AppUser author,
+    required String text,
+    List<NewAttachment> attachments = const [],
+    MessageReply? replyTo,
   }) => guard(
     () => muteAware(_db, author.uid, () async {
       for (final a in attachments) {
@@ -272,7 +338,7 @@ class ChatRepositoryFirebase implements ChatRepository {
           );
         }
       }
-      final ref = _messages(teamId, roomId).doc();
+      final ref = _messages(teamId, roomId).doc(messageId);
       final uploaded = await _files.upload(
         'teams/$teamId/chats/$roomId/${author.uid}/${ref.id}',
         attachments,

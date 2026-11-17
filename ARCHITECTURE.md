@@ -508,6 +508,19 @@ Still open:
 7. **Transcode cost.** ffmpeg on Cloud Run (recommended: CPU minutes only)
    vs. the Transcoder API ($0.015/min); revisit if video volume grows.
 
+Decided (2026-11-16):
+
+8. **Offline queue.** Messages, team chat, new posts, new
+   team posts and comments sent while the server can't be reached are
+   kept on the device and replayed in order (app `OutboxRepository`,
+   website `lib/outbox.ts`; shared rules in `packages/shared/src/outbox.ts`).
+   Each item's id is chosen before the first try and is both the
+   Firestore doc id and the API `id`, so a replay is idempotent
+   (`already_exists` counts as sent). The app sends through the same
+   repository code as a direct send, so it follows whatever path (API or
+   Firestore) that repository uses. Unsent items are stored unencrypted
+   in the app's support folder or the browser's IndexedDB.
+
 ## 12. Known issues
 
 - **Punctuated team names escape the name check.** Directory keywords

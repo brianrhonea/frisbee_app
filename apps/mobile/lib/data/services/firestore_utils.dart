@@ -196,3 +196,9 @@ Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> pageAfter(
   }
   return snap.docs;
 }
+
+/// Whether [ref] exists on the server (not just in the local cache): the
+/// offline queue's check that an earlier try already went through.
+Future<bool> existsOnServer(
+  DocumentReference<Map<String, dynamic>> ref,
+) async => (await ref.get(const GetOptions(source: Source.server))).exists;

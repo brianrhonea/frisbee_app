@@ -1,9 +1,11 @@
 "use client";
-import { commentBodyMax, type CommentResult, type LikeResult } from "@stall10/shared";
+import { commentBodyMax, type LikeResult } from "@stall10/shared";
 import { limit, orderBy } from "firebase/firestore";
 import Link from "next/link";
 import { type FormEvent, useRef, useState } from "react";
 import { callApi, problem } from "@/lib/client";
+import { newId } from "@/lib/upload";
+import { queuedNotice, submitOutbox } from "@/lib/outbox";
 import { type Doc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
@@ -210,6 +212,7 @@ function CommentBox({
   const [body, setBody] = useState(editing?.body ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [queued, setQueued] = useState<string | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   if (!user) return null;
   const me = user;
@@ -220,15 +223,22 @@ function CommentBox({
     if (!text || busy) return;
     setBusy(true);
     setError(null);
+    setQueued(null);
     const base = `/v1/posts/${encodeURIComponent(postId)}/comments`;
     try {
       if (editing) {
         await callApi(me, `${base}/${encodeURIComponent(editing.id)}`, { method: "PATCH", body: { body: text } });
       } else {
-        await callApi<CommentResult>(me, base, {
-          method: "POST",
+        const done = await submitOutbox(me, {
+          kind: "comment",
+          id: newId(),
+          target: postId,
+          label: "Comment",
+          path: base,
           body: { body: text, ...(replyTo && { replyTo: replyTo.id }) },
+          preview: text,
         });
+        if (done === "queued") setQueued(queuedNotice("Comment"));
         setBody("");
       }
       onDone?.();
@@ -271,6 +281,11 @@ function CommentBox({
         </button>
       )}
       {error && <p className="post-error">{error}</p>}
+      {queued && (
+        <p className="muted small" role="status">
+          {queued}
+        </p>
+      )}
     </form>
   );
 }

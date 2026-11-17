@@ -10,6 +10,25 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.28
+
+**Works offline**
+- Send a message, post or comment with no signal and it waits on your
+  phone, then sends by itself as soon as you're back online, even if you
+  closed the app in between. Nothing gets posted twice.
+- A strip at the top says when you're offline and how many things are
+  waiting. Tap it to see them, try one again or discard it.
+- Messages that haven't gone out yet show in the chat as "Waiting to
+  send". If the server turns one down (say you left the chat), it says
+  "Not sent" and the rest still go.
+- Likes, reactions, RSVPs and edits still need a connection.
+
+**Posts**
+- One "Photos +" button: tap it, then Take photo or Upload photos. Up
+  to 4 photos a post, as before.
+
+---
+
 ## 0.0.26
 
 **Workouts**
