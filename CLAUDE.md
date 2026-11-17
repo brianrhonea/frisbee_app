@@ -48,7 +48,7 @@ gitignored local files and must never be committed or pushed to GitHub.
   file. It also writes `apps/mobile/firebase.json` (gitignored); the real
   config is `firebase/firebase.json`.
 - Before every commit, check that no secret is staged:
-  `git diff --cached | grep -E "AIza[0-9A-Za-z_-]{20,}|BEGIN (RSA )?PRIVATE KEY|\"private_key\""`
+  `git diff --cached | grep -E "AIza[0-9A-Za-z_-]{20,}|BEGIN (RSA )?PRIVATE KEY|\"private_key\"|sk_live_[0-9A-Za-z]{8,}|sk_test_[0-9A-Za-z]{8,}|rk_live_[0-9A-Za-z]{8,}|whsec_[0-9A-Za-z]{8,}"`
   must print nothing, and `git status` must not list any of the files above.
 - If a secret is ever committed, stop and tell the user. Rotate the key; don't
   just delete it in a follow-up commit.

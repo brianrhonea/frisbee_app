@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.27  | 2026-11-16 | `feature/payments`                      |                     |
 | 0.0.26  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.25  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.24  | 2026-11-16 | `feature/web-parity`                    |                     |
@@ -40,6 +41,23 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.27 — Pay tournament fees online
+
+- Online payments for tournament and league fees through the API
+  (api 0.29.0; Stripe Connect). `PaymentRepository` /
+  `PaymentRepositoryApi` (no API client: off), `PayoutsViewModel`,
+  `PayOnlineViewModel`, `ui/payments/widgets/payment_widgets.dart`.
+- The event page shows the host's owner a "Take payments online" card
+  (`PayoutsCard`, hidden for everyone else and while payments are off),
+  and each of your teams that still owes its bid or spot fee gets a card
+  with the host's instructions and "Pay $400 online"
+  (`PayOnlineButton`). A signed-up player's card gets the same button
+  for their entry fee.
+- Stripe's pages open in the browser (`LaunchMode.externalApplication`);
+  coming back to the app reloads the card and button. The payment record
+  the host marks by hand is the one Stripe marks, so the paid state
+  updates live as before.
 
 ## 0.0.26 — Clearer workout boxes, scroll while showing times, push back
 

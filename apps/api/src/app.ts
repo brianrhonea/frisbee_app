@@ -7,6 +7,7 @@ import { ChatAdmin, chatAdminRoutes } from "./hub/rooms.js";
 import { DiscordService, discordRoutes } from "./discord/service.js";
 import { PlaybookService, playbookRoutes } from "./playbook/service.js";
 import { MeetingService, meetingRoutes } from "./meetings/service.js";
+import { PaymentService, type PaymentsConfig, paymentRoutes } from "./payments/service.js";
 import type { LiveKitSigner } from "./meetings/signer.js";
 import { VideoService, videoRoutes } from "./videos/service.js";
 import { type DraftQueries, listDraftQueries } from "./drafts/repository.js";
@@ -121,6 +122,8 @@ export interface AppDeps {
   revalidate?: Revalidate;
   /** Signs meeting and voice tokens (LIVEKIT_*); without it the token routes answer 412. */
   livekit?: LiveKitSigner;
+  /** Stripe and Stall 10's fee (STRIPE_*, PLATFORM_FEE_*); without it the payment routes say they aren't set up. */
+  payments?: PaymentsConfig;
 }
 
 /**
@@ -210,6 +213,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     statsRoutes(app, new StatsService(deps.store, queries), writes);
     groupTournamentRoutes(app, new GroupTournamentService(deps.store, deps.teams, queries), writes);
     tournamentRoutes(app, new TournamentService(deps.store, queries), writes);
+    paymentRoutes(app, new PaymentService(deps.store, deps.payments, deps.now), deps.writeLimits !== false ? writes : undefined);
     conversationRoutes(app, new ConversationService(deps.store, deps.users, deps.media, deps.now), writes);
     if (deps.calendar) {
       calendarRoutes(app, new CalendarService(deps.store, deps.calendar, deps.now), {

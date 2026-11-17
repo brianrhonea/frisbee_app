@@ -22,6 +22,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FollowButton } from "@/components/FollowButton";
+import { PayOnline, PayoutsCard } from "@/components/payments/Payments";
 import { callApi } from "@/lib/client";
 import { useRenderZone } from "@/lib/renderZone";
 import type { Doc } from "@/lib/live";
@@ -204,6 +205,8 @@ function Overview({ s }: { s: TournamentState }) {
   return (
     <div className="stack">
       {s.manager && <HostChecklist s={s} />}
+      {/* The host's owner connects Stripe here (hidden for others). */}
+      {s.manager && s.user && (fee || (t.entryType === "players" && t.bidFee)) && <PayoutsCard user={s.user} teamId={t.hostId} />}
       {!s.manager && !s.visitor && takesTeams(t) && <YourTeams s={s} />}
       {t.description && (
         <section className="card">
@@ -355,6 +358,7 @@ function YourTeams({ s }: { s: TournamentState }) {
   const { busy, error, run } = useAction();
   const open = t.status === "registration";
   const canApply = open && t.visibility === "public" && s.divisions.length > 0;
+  const fee = spotFee(t);
   if (!s.myEntries.length && !s.myAdminTeams.length && !(mixedEntry(t) && open)) return null;
   return (
     <section className="card">
@@ -373,6 +377,9 @@ function YourTeams({ s }: { s: TournamentState }) {
                   <small className="muted">
                     {d ? divisionLabel(d) : ""} · captains: {e.captainIds.map((c) => team?.memberNames?.[c] ?? "a member").join(", ")}
                   </small>
+                  {fee && s.user && ["applied", "accepted", "waitlisted"].includes(e.status) && (
+                    <PayOnline user={s.user} tournamentId={s.id} teamId={e.id} withStatus />
+                  )}
                 </div>
                 {editing === e.id || e.status === "invited" ? (
                   <EntryForm s={s} team={team} entry={e} onDone={e.status === "invited" ? undefined : () => setEditing(null)} />

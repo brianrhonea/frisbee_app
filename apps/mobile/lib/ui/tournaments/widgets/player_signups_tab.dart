@@ -7,6 +7,7 @@ import '../../../domain/models/live_draft.dart';
 import '../../../routing/routes.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/status_views.dart';
+import '../../payments/widgets/payment_widgets.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
 import 'tournament_dialogs.dart';
@@ -170,6 +171,11 @@ class PlayerSignupCard extends StatelessWidget {
                               '${fee.dueAt == null ? '' : ' Due ${DateFormat.yMMMd().format(fee.dueAt!)}.'}',
                   ),
                 ),
+              if (fee != null &&
+                  !signups.isPaid(mine.uid) &&
+                  (mine.status == SignupStatus.accepted ||
+                      mine.status == SignupStatus.applied))
+                PayOnlineButton(tournamentId: viewModel.tournamentId),
               Wrap(
                 spacing: 8,
                 children: [

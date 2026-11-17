@@ -317,8 +317,9 @@ run it.
 
 1. Tap **Host a tournament**: name, dates, location, about, **Public**
    (any team can apply) or **Invite only** (only teams you invite play),
-   and an optional **bid fee**: amount, how to pay and a due date. Stall
-   10 doesn't take payments; teams pay you and you mark them paid.
+   and an optional **bid fee**: amount, how to pay and a due date. Teams
+   pay you your way and you mark them paid, or take payments online (see
+   **Taking payments online** below).
 2. It starts as a **draft** only your managers see. On its page, **Add**
    divisions: level and division (e.g. Club Mixed), team cap, format and
    game rules (game to, timeouts, length, fields, first game).
@@ -344,7 +345,19 @@ run it.
 A team's owner or captain taps **Apply with a team**, picks the division
 and up to 4 captains (they report scores), or **Accept invite** if
 invited. The Overview tab shows your status and whether your bid fee is
-marked paid.
+marked paid. When the host takes payments online, it also has **Pay
+online** for your team's fee (and on your signup, for your own entry
+fee): a secure Stripe checkout, after which the fee shows as paid.
+
+**Taking payments online**: the owner of the hosting team or community
+sees **Take payments online** on the event's Overview and connects a
+Stripe account (**Set up with Stripe**; **Continue with Stripe** if
+Stripe needs more). After that, teams and players can pay their fees in
+Stall 10. The money goes to your Stripe account: Stripe keeps its card
+fee and Stall 10 keeps 1% + $1 of each payment. Refunds, disputes and
+payouts are in your Stripe Dashboard; a full refund marks the fee unpaid
+again. You can still mark anyone paid by hand. (Online payments aren't
+switched on in test builds yet.)
 
 ### Schools and clubs
 

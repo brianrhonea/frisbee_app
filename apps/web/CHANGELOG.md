@@ -4,6 +4,20 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.37.0 — 2026-11-16
+
+Works with API 0.29.0 (online payments; shows nothing until Stripe is set
+up on the API).
+
+**Added**
+- Hosts: the host's owner sees "Take payments online" on the event page
+  and connects Stripe (`PayoutsCard`); `/payments/payouts` is where
+  Stripe sends them back, and asks for a fresh link when one expired.
+- Payers: "Pay $400 online" on each of your teams' entries (with whether
+  its fee is paid) and on your own signup when the host takes payments
+  (`PayOnline`); Stripe Checkout opens in the tab and comes back to
+  `/payments/done`.
+
 ## 0.36.0 — 2026-11-16
 
 Works with API 0.28.0 (no API change).

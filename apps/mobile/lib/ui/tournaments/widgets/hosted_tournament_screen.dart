@@ -17,6 +17,7 @@ import '../../teams/widgets/team_post_widgets.dart';
 import '../view_models/event_guide.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
+import '../../payments/widgets/payment_widgets.dart';
 import 'event_guide_cards.dart';
 import 'player_signups_tab.dart';
 import 'tournament_dialogs.dart';
@@ -501,6 +502,39 @@ class _OverviewTab extends StatelessWidget {
               onAction: (b) => _act(context, b),
             ),
           ],
+          // The host's owner connects Stripe here (hidden for others).
+          if (vm.isManager && (fee != null || t.entryFee != null))
+            PayoutsCard(teamId: t.hostId),
+          // Each of the user's teams that still owes its bid or spot fee.
+          if (fee != null)
+            for (final e in vm.myEntries)
+              if (vm.owesSpotFee(e.teamId) &&
+                  !vm.isPaid(e.teamId) &&
+                  (e.status == EntryStatus.accepted ||
+                      e.status == EntryStatus.applied ||
+                      e.status == EntryStatus.waitlisted))
+                Card(
+                  margin: const EdgeInsets.only(top: 12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${e.teamName}: ${t.takesPlayers ? 'team fee' : 'bid fee'} '
+                          '${fee.label} to pay',
+                          style: theme.textTheme.titleSmall,
+                        ),
+                        if (fee.instructions.isNotEmpty) Text(fee.instructions),
+                        PayOnlineButton(
+                          key: ValueKey('pay-${e.teamId}'),
+                          tournamentId: vm.tournamentId,
+                          teamId: e.teamId,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
           // Their signup, until they're on a team.
           if (t.takesPlayers &&
               signups != null &&

@@ -15,6 +15,7 @@ import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import type { Doc } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
+import { PayOnline } from "../payments/Payments";
 import {
   attempt,
   dateLabel,
@@ -178,6 +179,7 @@ function MySignup({ user, tournamentId, tournament: t, divisions }: { user: User
               : `Entry fee ${feeLabel(fee)} to pay. ${howToPay(fee)}${fee.dueAt ? ` Due ${dateLabel(fee.dueAt)}.` : ""}`}
         </p>
       )}
+      {fee && !paid && (mine.status === "accepted" || mine.status === "applied") && <PayOnline user={user} tournamentId={tournamentId} />}
       {error && <p className="form-error">{error}</p>}
       <div className="home-actions">
         {t.status === "registration" && mine.status !== "accepted" && (

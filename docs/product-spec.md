@@ -137,8 +137,27 @@ and events; everything else in the hub is for members. A private group
   and pays the rest out to the host. Until then, hosts collect themselves
   and mark teams paid, as today.
 - Yearly memberships are sold only once Stall 10 sanctions events.
-- Likely built on Stripe Connect. Fees, refunds, tax and app-store rules
-  are decided when we get there.
+
+**Tournament fees online (built 2026-11-16, api 0.29.0, web 0.37.0, app
+0.0.27; off until Stripe is set up):**
+- Stripe Connect. The host team's or community's **owner** connects the
+  host's own Stripe account (Stripe collects its card fee from the host
+  and covers losses; the host has the full Stripe Dashboard).
+- A team's admins pay its bid or spot fee and a signed-up player pays
+  their entry fee through Stripe Checkout: a direct charge on the host's
+  account, with Stall 10's fee taken as the application fee. The fee is
+  a server setting (`PLATFORM_FEE_BPS`, `PLATFORM_FEE_FIXED_CENTS`),
+  1% + $1 to start, included in the amount, never added on top. US
+  dollars only; at least 50 cents, and more than the fee.
+- Paying marks the same payment record hosts mark by hand, so their
+  instructions and the paid switch still work beside it. A second
+  payment for something already paid is refunded in full.
+- Refunds and disputes are handled in the host's Stripe Dashboard. A full
+  refund un-marks the fee and Stall 10 gives its fee back.
+- The app opens Stripe's pages in the browser: entry fees are for
+  real-world events, which store rules allow outside in-app purchase.
+- Not yet: team dues (a dues amount a team sets; today only a paid
+  checkbox), refunding from inside Stall 10, memberships, tax.
 
 ## 8. Build order
 
@@ -197,7 +216,7 @@ status, versions and changelogs):
 | W2 | Teams hub | Feed, Schedule, Chat, Roster, More; join, invites, roles, settings; create a team or community | Team posts; membership is already in the API. Built (api 0.5.0, web 0.6.0): the hub's five sections read live; the roster for anyone signed in (`GET /v1/teams/:id/roster`); join or ask to join a group. Api 0.6.0, web 0.7.0: Teams grouped by community, a community's Teams tab, invites by name (team admins, and community admins for its teams). Api 0.10.0, web 0.11.0: team posts, sending chat (photos, replies, reactions, deletes), creating a team, group or community, joining with a code, and a Settings tab (details, invite links, join requests, roles, removing, handing over, leaving). Api 0.12.0, web 0.13.0: custom roles and permissions, chat rooms and folders. Web 0.21.0 (api 0.20.0): voice rooms. Built |
 | W3 | Events | My schedule and a calendar, create and edit events, RSVPs, polls | Events, RSVPs, polls. Built (api 0.10.0, web 0.11.0) in the team Schedule: create, edit, delete, RSVPs, reactions, poll votes, organization audiences |
 | W4 | Messages | DMs and team rooms side by side, reactions, edits, folders, read receipts | Send, edit, react; rooms and folders (reads stay listeners). Built (api 0.10.0, web 0.11.0): `/messages` with inbox, requests and archive, direct and group conversations, photos, reactions, deletes, read receipts. Not yet: editing messages, team rooms beside DMs, folders |
-| W5 | Tournaments and leagues | Find, host, register, divisions, schedules, standings, hat drafts | Move the tournament callables into the API. Built: player signups and captains' drafts (api 0.16.0, web 0.17.0), communities' own tournaments (api 0.18.0, web 0.19.0), hosted tournaments and leagues (api 0.19.0, web 0.20.0). Not yet: payments from the website |
+| W5 | Tournaments and leagues | Find, host, register, divisions, schedules, standings, hat drafts | Move the tournament callables into the API. Built: player signups and captains' drafts (api 0.16.0, web 0.17.0), communities' own tournaments (api 0.18.0, web 0.19.0), hosted tournaments and leagues (api 0.19.0, web 0.20.0), paying fees online (api 0.29.0, web 0.37.0) |
 | W6 | Playbook, videos, stats, workouts | Play editor (drag on a field), video library and player, stat entry and tables, workout log | Plays, videos, stats, workouts |
 | W7 | Meetings and voice | Join team meetings and voice rooms (LiveKit web SDK) | LiveKit tokens from the API instead of a callable |
 | W8 | Cut over | Move the domain to Vercel; keep `/join/:code`, `/g/:id`, `/p/:id` working | Fold the `browse` callables (removable after the next hosting deploy); the Flutter web code (`main_web.dart`, `lib/ui/web`, `lib/ui/browse`, `web_router.dart`) is removed and `build_site.sh` only copies the static pages |
@@ -227,8 +246,9 @@ everything the app does on the website alone, styled like the website
 5. W5: [x] communities' own tournaments (api 0.18.0, web 0.19.0);
    [x] player signups and captains' drafts (api 0.16.0, web 0.17.0);
    [x] hosted tournaments and leagues (find, host, register,
-   divisions, schedules, scores, standings; api 0.19.0, web 0.20.0;
-   payments from the website still to come). The draft callables'
+   divisions, schedules, scores, standings; api 0.19.0, web 0.20.0);
+   [x] paying fees online and the host connecting Stripe (api 0.29.0,
+   web 0.37.0, app 0.0.27). The draft callables'
    logic is ported into the API; the app keeps the callables until it
    switches.
 6. W7: [x] team meetings and voice rooms (LiveKit web SDK, tokens from

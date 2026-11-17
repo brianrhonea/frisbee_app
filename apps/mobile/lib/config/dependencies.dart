@@ -12,6 +12,8 @@ import '../data/services/callable_client.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/auth/auth_repository_firebase.dart';
 import '../data/repositories/personal/personal_repository.dart';
+import '../data/repositories/payment/payment_repository.dart';
+import '../data/repositories/payment/payment_repository_api.dart';
 import '../data/repositories/personal/personal_repository_api.dart';
 import '../data/repositories/chat/chat_repository.dart';
 import '../data/repositories/chat/chat_repository_firebase.dart';
@@ -102,6 +104,9 @@ List<SingleChildWidget> get firebaseProviders => [
   ),
   Provider<CalendarRepository>(
     create: (context) => CalendarRepositoryApi(api: context.read<ApiClient?>()),
+  ),
+  Provider<PaymentRepository>(
+    create: (context) => PaymentRepositoryApi(api: context.read<ApiClient?>()),
   ),
   ChangeNotifierProvider<PersonalDetailsRepository>(
     create: (context) => PersonalDetailsRepositoryApi(

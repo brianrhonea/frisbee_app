@@ -1479,3 +1479,15 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
   .frame.has-fab .frame-main { padding-bottom: 72px; }
 }
 /* ==== end Home: social feed ============================================ */
+
+/* Online payments (components/payments) */
+.pay-online {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 8px;
+}
+.payouts-card p {
+  margin: 0 0 12px;
+}

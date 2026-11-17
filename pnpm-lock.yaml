@@ -28,6 +28,9 @@ importers:
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
+      stripe:
+        specifier: 23.1.0
+        version: 23.1.0(@types/node@22.20.5)
       zod:
         specifier: ^4.6.0
         version: 4.6.7
@@ -2122,6 +2125,15 @@ packages:
   strip-ansi@7.2.0:
     resolution: {integrity: sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w==}
     engines: {node: '>=12'}
+
+  stripe@23.1.0:
+    resolution: {integrity: sha512-fVUfMSfTPoukfoV//MUKAx2+YxyKmYaYtnAL9VkfnHfaPNQylFdWZMD+zgUFerI8rjbaiER8Vzj2XEUQ2AhAsQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@types/node': '>=20'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   strnum@2.5.1:
     resolution: {integrity: sha512-UM4nTLWzQiDBseVxUGxN0wJzIk0UU89Qi7pKXz9qISo+lhviJikTuikBsK/oFRlpvYHvSdz0TVoLyQ+sEpYwxA==}
@@ -4469,6 +4481,10 @@ snapshots:
     dependencies:
       ansi-regex: 6.6.0
     optional: true
+
+  stripe@23.1.0(@types/node@22.20.5):
+    optionalDependencies:
+      '@types/node': 22.20.5
 
   strnum@2.5.1:
     dependencies:
