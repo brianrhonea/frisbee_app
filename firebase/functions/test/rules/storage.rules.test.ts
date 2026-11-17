@@ -324,4 +324,15 @@ describe("user post photos", () => {
     // No profile: hidden.
     await assertFails(visitor(COACH).getMetadata());
   });
+
+  it("a private profile's photos: the author and accepted followers only (S1)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "profiles", OWNER), { name: "Olive", private: true });
+      await setDoc(doc(ctx.firestore(), "users", COACH, "follows", `user_${OWNER}`), { key: `user_${OWNER}` });
+      await ctx.storage().ref(`users/${OWNER}/posts/p1/1/0-photo.png`).put(bytes(10)).then();
+    });
+    await assertSucceeds(photo(OWNER).getMetadata());
+    await assertSucceeds(photo(COACH, OWNER).getMetadata());
+    await assertFails(photo(OUTSIDER, OWNER).getMetadata());
+  });
 });

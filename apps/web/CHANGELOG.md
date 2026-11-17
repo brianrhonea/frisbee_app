@@ -4,6 +4,16 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.39.0 — 2026-11-17
+
+Private profiles' posts (security review S1). Works with API 0.31.0.
+
+**Changed**
+- A player's page listens for new posts with `private == false` unless
+  it's the member's own page or a private profile they're an accepted
+  follower of, as the database rules now require. What the page shows is
+  unchanged (it comes from the API).
+
 ## 0.38.0 — 2026-11-16
 
 Needs API 0.30.0: deploy the API first. The site now sends an `id` with

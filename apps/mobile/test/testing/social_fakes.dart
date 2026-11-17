@@ -187,17 +187,41 @@ class FakeUserPostRepository implements UserPostRepository {
     yield* _changes.stream.map((_) => _where(test, limit));
   }
 
+  /// What each author query asked for: its authors' private posts too
+  /// (`includePrivate`), as the Firebase repository splits them.
+  final includePrivateAsked = <Set<String>>[];
+
+  /// Shown to the query: a public post, or a private one of an author it
+  /// asked for every post of (as the rules let through).
+  static bool _visible(UserPost p, Set<String> includePrivate) =>
+      !p.isPrivate || includePrivate.contains(p.authorId);
+
   @override
-  Stream<List<UserPost>> watchPostsBy(String authorId, {int limit = 50}) =>
-      _watch((p) => p.authorId == authorId, limit);
+  Stream<List<UserPost>> watchPostsBy(
+    String authorId, {
+    int limit = 50,
+    bool includePrivate = false,
+  }) => watchPostsByAuthors(
+    [authorId],
+    limit: limit,
+    includePrivate: includePrivate ? {authorId} : const {},
+  );
 
   @override
   Stream<List<UserPost>> watchPostsByAuthors(
     List<String> authorIds, {
     int limit = 50,
-  }) => authorIds.isEmpty
-      ? Stream.value(const [])
-      : _watch((p) => authorIds.contains(p.authorId), limit);
+    Set<String> includePrivate = const {},
+  }) {
+    includePrivateAsked.add(includePrivate);
+    return authorIds.isEmpty
+        ? Stream.value(const [])
+        : _watch(
+            (p) =>
+                authorIds.contains(p.authorId) && _visible(p, includePrivate),
+            limit,
+          );
+  }
 
   @override
   Stream<List<UserPost>> watchPostsForTournaments(
@@ -205,7 +229,10 @@ class FakeUserPostRepository implements UserPostRepository {
     int limit = 50,
   }) => tournamentKeys.isEmpty
       ? Stream.value(const [])
-      : _watch((p) => tournamentKeys.contains(p.tournamentKey), limit);
+      : _watch(
+          (p) => tournamentKeys.contains(p.tournamentKey) && !p.isPrivate,
+          limit,
+        );
 
   @override
   Stream<List<UserPost>> watchPostsForTeamEvents(
@@ -213,7 +240,7 @@ class FakeUserPostRepository implements UserPostRepository {
     int limit = 50,
   }) => teamIds.isEmpty
       ? Stream.value(const [])
-      : _watch((p) => teamIds.contains(p.event?.teamId), limit);
+      : _watch((p) => teamIds.contains(p.event?.teamId) && !p.isPrivate, limit);
 
   /// Calls to [fetchPostsBefore], for checking reads stay paged.
   int fetches = 0;
@@ -224,12 +251,16 @@ class FakeUserPostRepository implements UserPostRepository {
     List<String> values, {
     required DateTime before,
     int limit = 20,
+    Set<String> includePrivate = const {},
   }) async {
     fetches++;
     bool matches(UserPost p) => switch (filter) {
-      UserPostFilter.authors => values.contains(p.authorId),
-      UserPostFilter.tournaments => values.contains(p.tournamentKey),
-      UserPostFilter.teamEvents => values.contains(p.event?.teamId),
+      UserPostFilter.authors =>
+        values.contains(p.authorId) && _visible(p, includePrivate),
+      UserPostFilter.tournaments =>
+        values.contains(p.tournamentKey) && !p.isPrivate,
+      UserPostFilter.teamEvents =>
+        values.contains(p.event?.teamId) && !p.isPrivate,
     };
     return Result.ok(
       _where(
@@ -269,7 +300,7 @@ class FakeUserPostRepository implements UserPostRepository {
   @override
   Stream<List<UserPost>> watchPostsByIds(List<String> ids) async* {
     await idsGate?.future;
-    yield* _watch((p) => ids.contains(p.id), ids.length);
+    yield* _watch((p) => ids.contains(p.id) && !p.isPrivate, ids.length);
   }
 
   @override

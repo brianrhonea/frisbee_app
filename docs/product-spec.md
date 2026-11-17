@@ -479,6 +479,23 @@ everything the app does on the website alone, styled like the website
     side is checked by hand. Photos: the app's one "Photos +" button
     (Take photo or Upload photos) is app design only; the website keeps
     its photo button, both up to 4 a post.
+19. Private profiles' posts (app 0.0.29, web 0.39.0, api 0.31.0;
+    security review S1): [x] a private profile's posts, photos, comments
+    and likes are for the author and accepted followers, in the rules
+    (`canSeePost`; Storage likewise), not only the UI. Posts carry
+    `private` from the author's profile (app and API write it; the
+    `follows` functions stamp and update it). Both platforms' queries
+    over several authors ask for `private == false`; one author at a
+    time for the user's own and accepted private profiles (app
+    `watchPostsByAuthors` `includePrivate`; web `PlayerPage` signal; the
+    website's feeds come from the API, whose likes, comments and comment
+    likes check the same follow). Neither reposts a private profile's
+    post (app `canRepost`; web `canRepost` from `/v1/posts/state`).
+    Phase B (the rules' list check) is still to come. Checked by the
+    rules tests ("private profiles' posts", `posts_phase_b.rules.test.ts`,
+    storage "user post photos"), the app's `home_test`, `privacy_test`,
+    `post_actions_test` and `community_feed_api_test`, the API's
+    `post_editor`/`posts` tests and the functions' `follows/privacy`.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

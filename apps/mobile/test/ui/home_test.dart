@@ -227,6 +227,50 @@ void main() {
       expect(vm.posts.map((i) => i.id), ['team/t1/p1', 'user/mine']);
     });
 
+    test(
+      "private profiles' posts: mine and accepted follows' only (S1)",
+      () async {
+        final vm = await load();
+        UserPost private(String id, String author, DateTime at) => UserPost(
+          id: id,
+          authorId: author,
+          authorName: 'P',
+          body: 'Post $id',
+          isPrivate: true,
+          createdAt: at,
+        );
+        userPosts.posts.addAll([
+          private('mine', testUser.uid, DateTime(2026, 10, 27)),
+          private('pat', 'pat', DateTime(2026, 10, 28)),
+          // Followed before Pat's request was needed and not marked
+          // approved: the rules wouldn't let a public-only query see it.
+          private('quinn', 'quinn', DateTime(2026, 10, 28, 1)),
+        ]);
+        follows.follows[testUser.uid] = {
+          FollowTarget.userKey('pat'): Follow(
+            target: const FollowTarget.user('pat', 'Pat'),
+            approved: true,
+            createdAt: DateTime(2026, 10),
+          ),
+          FollowTarget.userKey('quinn'): Follow(
+            target: const FollowTarget.user('quinn', 'Quinn'),
+            createdAt: DateTime(2026, 10),
+          ),
+        };
+        await follows.follow(
+          testUser.uid,
+          const FollowTarget.user('sam', 'Sam'),
+        );
+        await pumpEventQueue();
+        expect(vm.posts.map((i) => i.id), [
+          'team/t1/p1',
+          'user/pat',
+          'user/mine',
+        ]);
+        expect(userPosts.includePrivateAsked.last, {testUser.uid, 'pat'});
+      },
+    );
+
     test('older posts load a page at a time, with no gaps', () async {
       final vm = await load();
       // Newer than the team post, so my posts fill the first pages.

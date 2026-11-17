@@ -68,7 +68,15 @@ describe("posts", () => {
       authorId: "me",
       authorName: "Mia Member",
       authorPhotoUrl: "https://img/m.jpg",
+      private: false,
     });
+  });
+
+  it("stamps a private profile's post private (followers only)", async () => {
+    s.store.put("profiles/me", { name: "Mia", private: true });
+    const res = await s.call("POST", "/v1/posts", { body: "Just for followers" });
+    expect(res.statusCode).toBe(201);
+    expect(s.store.doc(`posts/${res.json().id}`)?.private).toBe(true);
   });
 
   it("needs words or a photo, and refuses bad links", async () => {
@@ -203,6 +211,18 @@ describe("posts", () => {
 describe("comments", () => {
   beforeEach(() => {
     s.store.put("posts/p", { kind: "text", authorId: "pat", body: "post" });
+  });
+
+  it("on a private profile's post: its author and accepted followers only (S1)", async () => {
+    s.store.put("posts/secret", { kind: "text", authorId: "pat", body: "post", private: true });
+    s.store.put("posts/secret/comments/c", { body: "Hi", authorId: "pat", likedBy: [] });
+    expect((await s.call("POST", "/v1/posts/secret/comments", { body: "Let me in" })).statusCode).toBe(403);
+    expect((await s.call("PUT", "/v1/posts/secret/comments/c/like")).statusCode).toBe(403);
+    s.store.put("users/me/follows/user_pat", { key: "user_pat" });
+    expect((await s.call("POST", "/v1/posts/secret/comments", { body: "Following now" })).statusCode).toBe(201);
+    expect((await s.call("PUT", "/v1/posts/secret/comments/c/like")).statusCode).toBe(200);
+    // The author's own.
+    expect((await s.call("POST", "/v1/posts/secret/comments", { body: "Thanks" }, "pat")).statusCode).toBe(201);
   });
 
   it("comments and replies one level deep", async () => {

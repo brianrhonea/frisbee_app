@@ -97,10 +97,33 @@ describe("reposts", () => {
       authorId: "me",
       authorName: "Mia Member",
       authorPhotoUrl: "https://img/m.jpg",
+      private: false,
       createdAt: new Date(now),
       updatedAt: new Date(now),
     });
     expect(s.store.doc("posts/orig")!.repostedBy).toEqual(["me"]);
+  });
+
+  it("keeps a private profile's post to its author and accepted followers (S1)", async () => {
+    s.store.put("posts/secret", { kind: "text", authorId: "pat", body: "Followers only", private: true, likedBy: [], repostedBy: [] });
+    const like = await s.call("PUT", "/v1/posts/secret/like");
+    expect(like.statusCode).toBe(403);
+    expect(s.store.doc("posts/secret")!.likedBy).toEqual([]);
+    s.store.put("users/me/follows/user_pat", { key: "user_pat" });
+    expect((await s.call("PUT", "/v1/posts/secret/like")).statusCode).toBe(200);
+    expect(s.store.doc("posts/secret")!.likedBy).toEqual(["me"]);
+    // Never reposted, even by a follower: it would reach their followers.
+    const r = await s.call("PUT", "/v1/posts/secret/repost", { note: "" });
+    expect(r.statusCode).toBe(412);
+    const state = await s.call("GET", "/v1/posts/state?ids=secret");
+    expect(state.json().secret.canRepost).toBe(false);
+    expect(s.store.doc(`posts/${repostId("secret", "me")}`)).toBeUndefined();
+  });
+
+  it("stamps a private reposter's repost private", async () => {
+    s.store.put("profiles/me", { name: "Mia", private: true });
+    await s.call("PUT", "/v1/posts/orig/repost", { note: "" });
+    expect(s.store.doc(mine)!.private).toBe(true);
   });
 
   it("reposting a repost reposts its original", async () => {

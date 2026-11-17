@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../../domain/models/user_post.dart';
 import '../../../domain/models/username.dart';
 import '../../../utils/result.dart';
 
@@ -31,6 +32,7 @@ String errorMessage(Object? error) {
   final e = error is Error ? error.error : error;
   return switch (e) {
     UsernameTakenException() => e.toString(),
+    PostHiddenException() => e.toString(),
     FirebaseAuthException(code: 'invalid-credential' || 'wrong-password') =>
       'Incorrect email or password.',
     FirebaseAuthException(code: 'user-not-found') =>
@@ -47,8 +49,7 @@ String errorMessage(Object? error) {
     FirebaseAuthException(code: 'requires-recent-login') =>
       'Please sign out and sign in again, then retry.',
     _ when isSignInCancelled(e) => 'Sign-in was cancelled.',
-    GoogleSignInException() =>
-      "Couldn't sign in with Google. Try again.",
+    GoogleSignInException() => "Couldn't sign in with Google. Try again.",
     FirebaseAuthException(:final message?) => message,
     FirebaseException(code: 'permission-denied' || 'unauthorized') =>
       "You don't have permission to do that.",

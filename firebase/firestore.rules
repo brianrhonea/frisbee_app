@@ -2141,6 +2141,8 @@ service cloud.firestore {
           && r.authorId != uid()
           && original.authorId == r.authorId
           && original.get('repostOf', null) == null
+          // A private profile's post would reach the reposter's followers.
+          && original.get('private', false) == false
           && uid() in getAfter(/databases/$(database)/documents/posts/$(r.postId))
                         .data.get('repostedBy', []);
       }
@@ -2193,14 +2195,46 @@ service cloud.firestore {
           || (added == existsAfter(repostPath(postId, uid())));
       }
 
-      allow read: if signedIn();
+      // A private profile's posts (private: true, stamped from the
+      // author's profile when posted and kept in step by the follows
+      // functions) are for the author and their accepted followers only.
+      function canSeePost(p) {
+        return p.get('private', false) == false
+          || p.authorId == uid()
+          || followsUser(p.authorId);
+      }
+
+      // The same for queries (S1 phase B), strictly: the rules check a
+      // query against its filters, and `get('private', false)` lets
+      // through queries that don't ask for `private == false`. So a post
+      // without the flag isn't listed; the follows functions stamp every
+      // new one, and backfill-post-privacy.mjs the old ones.
+      function canListPost(p) {
+        return p.private == false
+          || p.authorId == uid()
+          || followsUser(p.authorId);
+      }
+
+      // A missing post can be asked about (the offline queue checks
+      // whether its post arrived).
+      allow get: if signedIn()
+        && (resource == null || canSeePost(resource.data));
+      // TODO(S1 phase B): `canListPost(resource.data)` once app 0.0.29 is
+      // on testers' phones: queries over several authors then ask for
+      // `private == false`, and private authors one at a time. App 0.0.28
+      // queries without that filter, which a tighter rule would refuse.
+      allow list: if signedIn();
       allow delete: if signedIn() && resource.data.authorId == uid();
       allow create: if signedIn() && notMuted()
         && request.resource.data.keys().hasOnly([
              'kind', 'body', 'links', 'images', 'workout', 'event',
              'repostOf', 'tournamentKey', 'tournamentName', 'authorId',
-             'authorName', 'authorPhotoUrl', 'createdAt', 'updatedAt'])
+             'authorName', 'authorPhotoUrl', 'private', 'createdAt',
+             'updatedAt'])
         && request.resource.data.authorId == uid()
+        // Older apps leave it out; the follows functions stamp it then.
+        && (!('private' in request.resource.data)
+            || request.resource.data.private == isPrivateProfile(uid()))
         && validString(request.resource.data.authorName, 80)
         && (request.resource.data.get('authorPhotoUrl', null) == null
             || validString(request.resource.data.authorPhotoUrl, 2000))
@@ -2224,6 +2258,7 @@ service cloud.firestore {
       // Anyone likes it or reposts it (reposts of reposts go to the
       // original, so a repost's own repostedBy never changes).
       allow update: if signedIn()
+        && canSeePost(resource.data)
         && changed().hasOnly(['likedBy', 'repostedBy'])
         && onlySelfToggled('likedBy')
         && onlySelfToggled('repostedBy')
@@ -2257,8 +2292,9 @@ service cloud.firestore {
                     || validString(c.replyToName, 80)));
         }
 
-        allow read: if signedIn();
-        allow create: if signedIn() && notMuted()
+        // Seen, and written, by whoever may see the post.
+        allow read: if signedIn() && canSeePost(post());
+        allow create: if signedIn() && notMuted() && canSeePost(post())
           && request.resource.data.keys().hasOnly([
                'body', 'authorId', 'authorName', 'authorPhotoUrl',
                'createdAt', 'parentId', 'replyToName'])
@@ -2279,7 +2315,7 @@ service cloud.firestore {
           && request.resource.data.body.size() > 0
           && request.resource.data.editedAt == request.time;
         // Anyone likes it or takes their like back.
-        allow update: if signedIn()
+        allow update: if signedIn() && canSeePost(post())
           && changed().hasOnly(['likedBy'])
           && onlySelfToggled('likedBy');
         allow delete: if signedIn()

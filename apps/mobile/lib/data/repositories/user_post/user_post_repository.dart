@@ -6,24 +6,36 @@ import '../../../domain/models/user_post.dart';
 import '../../../utils/result.dart';
 
 /// Posts people write themselves, at `posts/{id}`; photos in Cloud Storage
-/// under `users/{uid}/posts/{postId}/`. Anyone signed in can read them.
+/// under `users/{uid}/posts/{postId}/`. Anyone signed in can read them,
+/// except a private profile's ([UserPost.isPrivate]): those only the author
+/// and their accepted followers. The rules can't check that for a query
+/// over several authors, so those ask for public posts only, and the
+/// authors in `includePrivate` (the user, and private profiles they
+/// follow) are asked for one at a time.
 abstract class UserPostRepository {
-  /// [authorId]'s posts, newest first.
-  Stream<List<UserPost>> watchPostsBy(String authorId, {int limit = 50});
+  /// [authorId]'s posts, newest first: public ones only unless
+  /// [includePrivate] (the user's own, or a private profile they follow).
+  Stream<List<UserPost>> watchPostsBy(
+    String authorId, {
+    int limit = 50,
+    bool includePrivate = false,
+  });
 
-  /// The newest posts by any of [authorIds], newest first.
+  /// The newest posts by any of [authorIds], newest first: public ones,
+  /// plus every post of the authors in [includePrivate].
   Stream<List<UserPost>> watchPostsByAuthors(
     List<String> authorIds, {
     int limit = 50,
+    Set<String> includePrivate = const {},
   });
 
-  /// The newest posts tagged with any of [tournamentKeys].
+  /// The newest public posts tagged with any of [tournamentKeys].
   Stream<List<UserPost>> watchPostsForTournaments(
     List<String> tournamentKeys, {
     int limit = 50,
   });
 
-  /// The newest posts sharing an event on any of [teamIds]' schedules, so
+  /// The newest public posts sharing an event on any of [teamIds]' schedules, so
   /// the team's members see them as well as the author's followers.
   Stream<List<UserPost>> watchPostsForTeamEvents(
     List<String> teamIds, {
@@ -32,14 +44,18 @@ abstract class UserPostRepository {
 
   /// One page of older posts for the home feed: up to [limit] posts made
   /// before [before] matching [filter] on any of [values], newest first.
+  /// Public posts only, plus every post of the authors in [includePrivate]
+  /// ([UserPostFilter.authors]).
   Future<Result<List<UserPost>>> fetchPostsBefore(
     UserPostFilter filter,
     List<String> values, {
     required DateTime before,
     int limit = 20,
+    Set<String> includePrivate = const {},
   });
 
-  /// Null once deleted.
+  /// Null once deleted. Errors with [PostHiddenException] for a private
+  /// profile's post the user may not see.
   Stream<UserPost?> watchPost(String id);
 
   /// Whether this build can read the community feed (it needs the API).
@@ -52,7 +68,7 @@ abstract class UserPostRepository {
   Future<Result<CommunityFeedPage>> fetchCommunityPage({int? before});
 
   /// The posts with these [ids], newest first, kept up to date; deleted
-  /// ones are left out.
+  /// ones, and ones the user may no longer see, are left out.
   Stream<List<UserPost>> watchPostsByIds(List<String> ids);
 
   /// Creates the post when [UserPost.isNew], otherwise updates it. Uploads

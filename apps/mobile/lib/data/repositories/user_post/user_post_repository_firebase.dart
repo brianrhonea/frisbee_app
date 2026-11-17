@@ -65,6 +65,12 @@ class UserPostRepositoryFirebase implements UserPostRepository {
   CollectionReference<Map<String, dynamic>> get _posts =>
       _db.collection('posts');
 
+  /// Whether [uid]'s profile is private: their new posts say so
+  /// (`private`, which the rules check against the profile).
+  Future<bool> _profileIsPrivate(String uid) async =>
+      (await _db.collection('profiles').doc(uid).get()).data()?['private'] ==
+      true;
+
   static String imageFolder(String uid, String postId) =>
       'users/$uid/posts/$postId/${DateTime.now().millisecondsSinceEpoch}';
 
@@ -73,14 +79,36 @@ class UserPostRepositoryFirebase implements UserPostRepository {
   ];
 
   @override
-  Stream<List<UserPost>> watchPostsBy(String authorId, {int limit = 50}) =>
-      watchPostsByAuthors([authorId], limit: limit);
+  Stream<List<UserPost>> watchPostsBy(
+    String authorId, {
+    int limit = 50,
+    bool includePrivate = false,
+  }) => watchPostsByAuthors(
+    [authorId],
+    limit: limit,
+    includePrivate: includePrivate ? {authorId} : const {},
+  );
 
   @override
   Stream<List<UserPost>> watchPostsByAuthors(
     List<String> authorIds, {
     int limit = 50,
-  }) => _watchIn('authorId', authorIds, limit);
+    Set<String> includePrivate = const {},
+  }) {
+    final (:everything, :public) = _splitAuthors(authorIds, includePrivate);
+    final queries = [
+      // One whose follow was taken away (removed, or unfollowed a moment
+      // ago) is refused by the rules: shown as none, not a failed feed.
+      for (final a in everything)
+        _newest(
+          _posts.where('authorId', isEqualTo: a),
+          limit,
+        ).transform(_hiddenIsGone),
+      for (final c in _chunks(public))
+        _newest(_publicOnly.where('authorId', whereIn: c), limit),
+    ];
+    return _merge(queries, limit);
+  }
 
   @override
   Stream<List<UserPost>> watchPostsForTournaments(
@@ -100,26 +128,84 @@ class UserPostRepositoryFirebase implements UserPostRepository {
     List<String> values, {
     required DateTime before,
     int limit = 20,
+    Set<String> includePrivate = const {},
   }) => guard(() async {
-    final field = switch (filter) {
-      UserPostFilter.authors => 'authorId',
-      UserPostFilter.tournaments => 'tournamentKey',
-      UserPostFilter.teamEvents => 'event.teamId',
-    };
-    final unique = values.toSet().toList();
-    final snaps = await Future.wait([
-      for (var i = 0; i < unique.length; i += inLimit)
-        _posts
-            .where(field, whereIn: unique.skip(i).take(inLimit).toList())
-            .where('createdAt', isLessThan: Timestamp.fromDate(before))
-            .orderBy('createdAt', descending: true)
-            .limit(limit)
-            .get(),
-    ]);
-    final all = [for (final s in snaps) ..._list(s)]
+    Future<List<UserPost>> page(Query<Map<String, dynamic>> q) => q
+        .where('createdAt', isLessThan: Timestamp.fromDate(before))
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .get()
+        .then(_list);
+    final List<Future<List<UserPost>>> pages;
+    if (filter == UserPostFilter.authors) {
+      final (:everything, :public) = _splitAuthors(values, includePrivate);
+      pages = [
+        // A follow taken away: none, as in watchPostsByAuthors.
+        for (final a in everything)
+          page(_posts.where('authorId', isEqualTo: a)).catchError(
+            (Object _) => const <UserPost>[],
+            test: (e) =>
+                e is FirebaseException && e.code == 'permission-denied',
+          ),
+        for (final c in _chunks(public))
+          page(_publicOnly.where('authorId', whereIn: c)),
+      ];
+    } else {
+      final field = filter == UserPostFilter.tournaments
+          ? 'tournamentKey'
+          : 'event.teamId';
+      pages = [
+        for (final c in _chunks(values.toSet().toList()))
+          page(_publicOnly.where(field, whereIn: c)),
+      ];
+    }
+    final all = [for (final l in await Future.wait(pages)) ...l]
       ..sort(UserPost.newestFirst);
     return all.take(limit).toList();
   });
+
+  /// Public posts (the rules let anyone read those in any query).
+  Query<Map<String, dynamic>> get _publicOnly =>
+      _posts.where('private', isEqualTo: false);
+
+  /// [authorIds] split into those asked for one at a time, every post
+  /// (the ones in [includePrivate]), and the rest, public posts only.
+  static ({List<String> everything, List<String> public}) _splitAuthors(
+    List<String> authorIds,
+    Set<String> includePrivate,
+  ) {
+    final unique = authorIds.toSet().toList();
+    return (
+      everything: [
+        for (final a in unique)
+          if (includePrivate.contains(a)) a,
+      ],
+      public: [
+        for (final a in unique)
+          if (!includePrivate.contains(a)) a,
+      ],
+    );
+  }
+
+  static List<List<String>> _chunks(List<String> values) => [
+    for (var i = 0; i < values.length; i += inLimit)
+      values.skip(i).take(inLimit).toList(),
+  ];
+
+  Stream<List<UserPost>> _newest(Query<Map<String, dynamic>> q, int limit) => q
+      .orderBy('createdAt', descending: true)
+      .limit(limit)
+      .snapshots()
+      .map(_list);
+
+  static Stream<List<UserPost>> _merge(
+    List<Stream<List<UserPost>>> queries,
+    int limit,
+  ) => switch (queries.length) {
+    0 => Stream.value(const []),
+    1 => queries.single,
+    _ => _combine(queries, limit),
+  };
 
   @override
   bool get hasCommunityFeed => _api != null;
@@ -151,46 +237,42 @@ class UserPostRepositoryFirebase implements UserPostRepository {
   @override
   Stream<List<UserPost>> watchPostsByIds(List<String> ids) {
     final unique = ids.toSet().toList();
-    if (unique.isEmpty) return Stream.value(const []);
-    final queries = [
-      for (var i = 0; i < unique.length; i += inLimit)
+    // One listener a post, not an `in` query: the rules check a query by
+    // id post by post, so one that turned private (and this user doesn't
+    // follow) would fail them all. Such a post just drops out.
+    return _merge([
+      for (final id in unique)
         _posts
-            .where(
-              FieldPath.documentId,
-              whereIn: unique.skip(i).take(inLimit).toList(),
-            )
+            .doc(id)
             .snapshots()
-            .map((s) => _list(s)..sort(UserPost.newestFirst)),
-    ];
-    if (queries.length == 1) return queries.single;
-    return _combine(queries, unique.length);
+            .map(
+              (d) => d.exists
+                  ? [UserPost.fromMap(d.id, plainData(d.data()))]
+                  : const <UserPost>[],
+            )
+            .transform(_hiddenIsGone),
+    ], unique.length);
   }
 
-  /// Newest [limit] posts whose [field] is one of [values], querying in
-  /// chunks of [inLimit] and merging.
+  /// A post the rules won't let this user read is left out.
+  static final _hiddenIsGone =
+      StreamTransformer<List<UserPost>, List<UserPost>>.fromHandlers(
+        handleError: (e, stack, sink) =>
+            e is FirebaseException && e.code == 'permission-denied'
+            ? sink.add(const [])
+            : sink.addError(e, stack),
+      );
+
+  /// Newest [limit] public posts whose [field] is one of [values], querying
+  /// in chunks of [inLimit] and merging.
   Stream<List<UserPost>> _watchIn(
     String field,
     List<String> values,
     int limit,
-  ) {
-    final unique = values.toSet().toList();
-    if (unique.isEmpty) return Stream.value(const []);
-    final chunks = [
-      for (var i = 0; i < unique.length; i += inLimit)
-        unique.skip(i).take(inLimit).toList(),
-    ];
-    final queries = [
-      for (final c in chunks)
-        _posts
-            .where(field, whereIn: c)
-            .orderBy('createdAt', descending: true)
-            .limit(limit)
-            .snapshots()
-            .map(_list),
-    ];
-    if (queries.length == 1) return queries.single;
-    return _combine(queries, limit);
-  }
+  ) => _merge([
+    for (final c in _chunks(values.toSet().toList()))
+      _newest(_publicOnly.where(field, whereIn: c), limit),
+  ], limit);
 
   static Stream<List<UserPost>> _combine(
     List<Stream<List<UserPost>>> streams,
@@ -229,8 +311,11 @@ class UserPostRepositoryFirebase implements UserPostRepository {
   Stream<UserPost?> watchPost(String id) => _posts
       .doc(id)
       .snapshots()
-      .map(
-        (d) => d.exists ? UserPost.fromMap(d.id, plainData(d.data())) : null,
+      .map((d) => d.exists ? UserPost.fromMap(d.id, plainData(d.data())) : null)
+      .handleError(
+        // A private profile's post, for someone they haven't approved.
+        (Object e) => throw const PostHiddenException(),
+        test: (e) => e is FirebaseException && e.code == 'permission-denied',
       );
 
   @override
@@ -283,6 +368,7 @@ class UserPostRepositoryFirebase implements UserPostRepository {
           'authorId': author.uid,
           'authorName': author.label,
           'authorPhotoUrl': author.photoUrl,
+          'private': await _profileIsPrivate(author.uid),
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
@@ -322,6 +408,7 @@ class UserPostRepositoryFirebase implements UserPostRepository {
         final post = UserPost.repost(original, note: note);
         final originalId = post.originalId;
         final id = UserPost.repostId(originalId, me.uid);
+        final private = await _profileIsPrivate(me.uid);
         // Both or neither, so the count matches the reposts.
         final batch = _db.batch()
           ..set(_posts.doc(id), {
@@ -329,6 +416,7 @@ class UserPostRepositoryFirebase implements UserPostRepository {
             'authorId': me.uid,
             'authorName': me.label,
             'authorPhotoUrl': me.photoUrl,
+            'private': private,
             'createdAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
           })

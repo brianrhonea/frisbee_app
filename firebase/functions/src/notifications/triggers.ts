@@ -341,7 +341,9 @@ export const userPost = onDocumentCreated("posts/{postId}", async (event) => {
   const { postId } = event.params;
   const authorId = String(post.authorId ?? "");
   const reposted = repostOf(post);
-  const followers = await notifyingFollowers(followKeys({ authorId, post }));
+  const privateAuthor =
+    post.private === true || (authorId !== "" && (await getFirestore().doc(`profiles/${authorId}`).get()).get("private") === true);
+  const followers = await notifyingFollowers(followKeys({ authorId, post, privateAuthor }));
   await deliver(
     getFirestore(),
     getMessaging(),

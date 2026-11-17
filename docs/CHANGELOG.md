@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.29  | 2026-11-17 | `fix/private-posts`                     |                     |
 | 0.0.28  | 2026-11-16 | `feature/offline-queue`                 |                     |
 | 0.0.26  | 2026-11-16 | `feature/web-parity`                    |                     |
 | 0.0.25  | 2026-11-16 | `feature/web-parity`                    |                     |
@@ -41,6 +42,51 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.29 — Private profiles' posts stay private (S1)
+
+Security review S1: the database rules let anyone signed in read a
+private profile's posts, comments and photos; only the app hid them.
+
+- Every person's post carries `private` (`UserPost.isPrivate`), its
+  author's profile's privacy when posted: the app reads the profile and
+  writes it on new posts and reposts (`UserPostRepositoryFirebase`), the
+  API does the same, and the `follows` functions stamp posts that come
+  without it (`postPrivacy`) and update every post when a profile turns
+  private or public (`profilePrivacy`). `firebase/scripts/
+  backfill-post-privacy.mjs` stamps existing posts.
+- Rules (`canSeePost`): a private post, its comments, and liking or
+  commenting on it are for the author and their accepted followers
+  (`users/{me}/follows/user_{author}`); the author can't change the flag.
+  Storage: a private profile's post photos likewise. A missing post can
+  still be asked about (the offline queue checks).
+- Queries: the rules can't check a follow per post in a query over
+  several authors, so those ask for `private == false`, and the user and
+  private profiles they follow (`Follow.approved`, at most 30, the latest
+  followed) are asked for one author at a time
+  (`watchPostsByAuthors`/`fetchPostsBefore` `includePrivate`). Tournament,
+  team-event and community-feed posts are public ones only. A profile
+  page asks for every post on the user's own or an accepted private
+  profile, else public ones. When a profile turns private, its existing
+  followers' follows are marked `approved` by `profilePrivacy`.
+- Push: a private profile's post tagged with a tournament no longer
+  notifies that tournament's followers, only the author's.
+- The community feed watches each post on its own (`watchPostsByIds`):
+  the rules check a query by id post by post, so one that turned private
+  would fail them all; a post the user may not read just drops out. A
+  private author whose follow was taken away shows no posts instead of
+  failing the feed. A single post the user may not read errors with
+  `PostHiddenException` ("Only people they approve see this post.").
+- A private profile's post can't be reposted (`PostActions.canRepost`;
+  the rules and API refuse it too).
+- Phase A only: the rules still let any post query through (`allow
+  list: if signedIn()`), so this build and 0.0.28 both work, and a
+  query for one private author's posts is still answered to anyone.
+  Phase B switches it to `canListPost` (strict `private == false`, since
+  `get('private', false)` let unfiltered queries through in tests) once
+  this build is on testers' phones;
+  `firebase/functions/test/rules/posts_phase_b.rules.test.ts` runs every
+  query this build makes against that rule.
 
 ## 0.0.28 — Offline queue, one Photos + button
 

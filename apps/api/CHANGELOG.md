@@ -7,6 +7,21 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.31.0 — 2026-11-17
+
+Private profiles' posts (security review S1).
+
+**Changed**
+- `POST /v1/posts` and `PUT /v1/posts/:id/repost` stamp `private` on the
+  new post from the author's profile (the `follows` functions keep it in
+  step when a profile turns private or public).
+- Liking a post, commenting on it and liking its comments check what the
+  rules' `canSeePost` does: a private post is for its author and accepted
+  followers only (403 otherwise; a repost and its original both count).
+- A private profile's post can't be reposted (412), and `GET
+  /v1/posts/state` says `canRepost: false` for one (unless already
+  reposted, so it can be taken back).
+
 ## 0.30.0 — 2026-11-16
 
 The offline queue's comments. Deploy before web 0.38.0, which sends an

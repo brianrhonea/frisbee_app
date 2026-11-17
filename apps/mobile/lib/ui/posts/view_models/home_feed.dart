@@ -73,6 +73,9 @@ class HomeFeed extends ChangeNotifier {
 
   static const pageSize = 20;
 
+  /// Most private profiles whose posts the feed asks for one at a time.
+  static const maxPrivateAuthors = 30;
+
   /// Page fetches per [loadMore] at most, so one tap can't run away.
   static const _maxRounds = 5;
 
@@ -181,12 +184,14 @@ class HomeFeed extends ChangeNotifier {
     UserPostFilter filter,
     List<String> values, {
     bool skipReposts = false,
+    Set<String> includePrivate = const {},
   }) =>
       (before, limit) async => switch (await _userPosts.fetchPostsBefore(
         filter,
         values,
         before: before,
         limit: limit,
+        includePrivate: includePrivate,
       )) {
         Ok(:final value) => [
           for (final post in value)
@@ -229,11 +234,33 @@ class HomeFeed extends ChangeNotifier {
       for (final f in _follows)
         if (f.type == FollowType.user) f.target.id,
     ]..sort();
-    wanted['authors:${authors.join(',')}'] = () => _source(
+    // The user's own posts and those of private profiles they follow are
+    // asked for one author at a time (the rules check each follow); the
+    // rest, public posts only. At most [maxPrivateAuthors] private ones,
+    // the latest followed, so the feed stays a handful of listeners.
+    final privateFollows =
+        [
+          for (final f in _follows)
+            if (f.type == FollowType.user && f.approved) f,
+        ]..sort(
+          (a, b) => (b.createdAt ?? DateTime(0)).compareTo(
+            a.createdAt ?? DateTime(0),
+          ),
+        );
+    final everything = {
+      uid,
+      for (final f in privateFollows.take(maxPrivateAuthors)) f.target.id,
+    };
+    final privateKey = (everything.toList()..sort()).join(',');
+    wanted['authors:${authors.join(',')}|$privateKey'] = () => _source(
       _userPosts
-          .watchPostsByAuthors(authors, limit: pageSize)
+          .watchPostsByAuthors(
+            authors,
+            limit: pageSize,
+            includePrivate: everything,
+          )
           .map((p) => [for (final post in p) UserPostItem(post)]),
-      _userPages(UserPostFilter.authors, authors),
+      _userPages(UserPostFilter.authors, authors, includePrivate: everything),
     );
 
     final tags = [
