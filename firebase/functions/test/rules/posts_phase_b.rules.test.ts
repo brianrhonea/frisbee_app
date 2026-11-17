@@ -1,8 +1,10 @@
 // Security review S1, phase B: firestore.rules still lets any post query
 // through (`allow list: if signedIn()`) so app 0.0.28 keeps working. This
 // loads the rules with the list check phase B turns on,
-// `canListPost(resource.data)`, and runs every query app 0.0.29 and web
-// 0.39.0 make, so that switch is known to be safe before it's made.
+// `canListPost(resource.data)`, and the cap of 50 a query (security review
+// S4: 0.0.28's community feed asks for posts by id with no limit), and runs
+// every query app 0.0.29 and web 0.39.0 make, so that switch is known to be
+// safe before it's made.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -23,7 +25,8 @@ const db = (uid: string) => env.authenticatedContext(uid).firestore();
 const posts = (uid: string) => collection(db(uid), "posts");
 const newest = [orderBy("createdAt", "desc"), limit(20)] as const;
 
-const listLine = "      allow list: if signedIn();\n      allow delete: if signedIn() && resource.data.authorId == uid();";
+const listLine =
+  "      allow list: if signedIn();\n      allow delete: if signedIn() && resource.data.authorId == uid();";
 
 beforeAll(async () => {
   const rules = readFileSync(join(__dirname, "../../../firestore.rules"), "utf8").split("\r\n").join("\n");
@@ -33,7 +36,7 @@ beforeAll(async () => {
     firestore: {
       rules: rules.replace(
         listLine,
-        "      allow list: if signedIn() && canListPost(resource.data);\n      allow delete: if signedIn() && resource.data.authorId == uid();",
+        "      allow list: if signedIn() && capped(50) && canListPost(resource.data);\n      allow delete: if signedIn() && resource.data.authorId == uid();",
       ),
     },
   });
@@ -75,9 +78,10 @@ describe("posts' list rule in phase B", () => {
     "several authors": (uid: string) => query(posts(uid), where("authorId", "in", [AUTHOR, PUB]), pub, ...newest),
     "several authors, older page": (uid: string) =>
       query(posts(uid), where("authorId", "in", [AUTHOR, PUB]), pub, where("createdAt", "<", new Date()), ...newest),
-    "a tournament's": (uid: string) => query(posts(uid), where("tournamentKey", "in", ["tournament_g_t"]), pub, ...newest),
+    "a tournament's": (uid: string) =>
+      query(posts(uid), where("tournamentKey", "in", ["tournament_g_t"]), pub, ...newest),
     "a team's shared events": (uid: string) => query(posts(uid), where("event.teamId", "in", ["t1"]), pub, ...newest),
-    "by id, all public": (uid: string) => query(posts(uid), where(documentId(), "in", ["pub"]), pub),
+    "by id, all public": (uid: string) => query(posts(uid), where(documentId(), "in", ["pub"]), pub, limit(10)),
     "a public profile's page (website)": (uid: string) =>
       query(posts(uid), where("authorId", "==", PUB), pub, ...newest),
   };
@@ -92,7 +96,9 @@ describe("posts' list rule in phase B", () => {
     // Why the app's community feed (watchPostsByIds) watches each post on
     // its own: a filter doesn't help here.
     await assertFails(
-      getDocs(query(posts(STRANGER), where(documentId(), "in", ["priv", "pub"]), where("private", "==", false))),
+      getDocs(
+        query(posts(STRANGER), where(documentId(), "in", ["priv", "pub"]), where("private", "==", false), limit(10)),
+      ),
     );
   });
 
@@ -101,8 +107,15 @@ describe("posts' list rule in phase B", () => {
     await assertFails(getDocs(query(posts(STRANGER), where("tournamentKey", "in", ["tournament_g_t"]), ...newest)));
   });
 
+  it("lists at most 50 posts at a time (S4)", async () => {
+    await assertSucceeds(getDocs(query(posts(STRANGER), pub, limit(50))));
+    await assertFails(getDocs(query(posts(STRANGER), pub, limit(51))));
+    await assertFails(getDocs(query(posts(STRANGER), pub)));
+    await assertFails(getDocs(query(posts(STRANGER), where(documentId(), "in", ["pub"]), pub)));
+  });
+
   it("keeps a private post's comments to the author and followers", async () => {
-    await assertSucceeds(getDocs(collection(db(FAN), "posts", "priv", "comments")));
-    await assertFails(getDocs(collection(db(STRANGER), "posts", "priv", "comments")));
+    await assertSucceeds(getDocs(query(collection(db(FAN), "posts", "priv", "comments"), limit(100))));
+    await assertFails(getDocs(query(collection(db(STRANGER), "posts", "priv", "comments"), limit(100))));
   });
 });
