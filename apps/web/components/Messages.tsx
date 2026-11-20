@@ -20,6 +20,7 @@ import { loadAtTop, OlderMessages } from "./OlderMessages";
 import { type PickedPerson, PersonPicker } from "./PersonPicker";
 import { isTyping, validId } from "@/lib/text";
 import { useTeamChats } from "./useTeamChats";
+import "./member.css";
 
 /** conversations/{id} (Conversation in the app). */
 interface Conversation {

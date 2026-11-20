@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
-import { EventItem } from "../EventItem";
 import { LocalTime } from "../LocalTime";
 import { roleLabel } from "../ProfileDashboard";
 import { useLiveQuery } from "@/lib/live";
@@ -16,11 +15,14 @@ import { membersInOrder } from "./TeamBanner";
 import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { type TeamPostView, TeamPostCard } from "./TeamPostCard";
 import { TeamPostComposer } from "./TeamPostComposer";
+import { DateTile } from "./DateTile";
+import { needsRsvp, RsvpPill } from "../RsvpPill";
 import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamSchedule";
 import { TournamentDayCard } from "../tournaments/TournamentDayCard";
 import { useTournamentDays } from "../tournaments/useTournamentDays";
 
 const postLimit = 30;
+const leads = new Set(["owner", "coach", "captain"]);
 
 /**
  * The hub's front page: posts in the middle (every post, live, for
@@ -86,27 +88,37 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
         {/* On a tournament day the card comes before what's coming up. */}
         {tournamentDay && <TournamentDayCard day={tournamentDay} showTeam={false} />}
         {!hidden && !youthHidden && (
-          <div className="card">
-            <h2 className="card-title">Coming up</h2>
+          <div className="card coming-up">
+            <div className="card-head">
+              <h2 className="card-title">Coming up</h2>
+              <Link className="small" href={`/teams/${teamId}/schedule`}>
+                Full schedule
+              </Link>
+            </div>
             {upcoming.length === 0 ? (
               <p className="muted small">Nothing scheduled.</p>
             ) : (
-              <div className="stack">
-                {upcoming.map((e) => (
-                  <Link key={e.id} href={`/teams/${teamId}/schedule?event=${e.id}`} className="hub-event-link">
-                    <EventItem startsAt={e.startsAt}>
-                      <b>{e.title || "Event"}</b>
-                      <small>
-                        <LocalTime iso={e.startsAt} style="dateTime" />
-                      </small>
-                    </EventItem>
-                  </Link>
-                ))}
+              <div className="coming-list">
+                {upcoming.map((e) => {
+                  const mine = viewer.state === "member" ? (e as { rsvps?: Record<string, string> }).rsvps?.[viewer.uid] : undefined;
+                  return (
+                    <Link key={e.id} href={`/teams/${teamId}/schedule?event=${e.id}`} className="hub-event-link coming-row">
+                      <DateTile startsAt={e.startsAt} />
+                      <span className="sched-main">
+                        <b>
+                          <span className="type-dot" aria-hidden="true" />
+                          {e.title || "Event"}
+                        </b>
+                        <small>
+                          <LocalTime iso={e.startsAt} style="dateTime" />
+                        </small>
+                      </span>
+                      {member && <RsvpPill answer={mine} type={e.type} needs={needsRsvp(mine, e.startsAt, e.endsAt)} />}
+                    </Link>
+                  );
+                })}
               </div>
             )}
-            <p className="small" style={{ margin: "12px 0 0" }}>
-              <Link href={`/teams/${teamId}/schedule`}>Full schedule</Link>
-            </p>
           </div>
         )}
         <MemberPreview />
@@ -162,7 +174,12 @@ function MemberPreview() {
   const people = membersInOrder(viewer.team);
   return (
     <div className="card member-preview">
-      <h2 className="card-title">{kind === "team" ? "The team" : "Members"}</h2>
+      <div className="card-head">
+        <h2 className="card-title">{kind === "team" ? "The team" : "Members"}</h2>
+        <Link href={roster} className="small">
+          All {people.length} {people.length === 1 ? "member" : "members"}
+        </Link>
+      </div>
       <ul className="member-preview-list">
         {people.slice(0, 6).map((p) => (
           <li key={p.uid}>
@@ -170,16 +187,14 @@ function MemberPreview() {
               <Avatar name={p.name} size={32} />
               <span>
                 {p.name}
-                {p.tier !== "player" && <small className="muted"> {roleLabel(p.tier, kind)}</small>}
+                {p.uid === viewer.uid && <small className="muted"> (you)</small>}
               </span>
             </Link>
+            <span className={`role-pill${leads.has(p.tier) ? " lead" : ""}`}>{roleLabel(p.tier, kind)}</span>
           </li>
         ))}
       </ul>
       <div className="member-preview-actions">
-        <Link href={roster} className="small">
-          All {people.length} {people.length === 1 ? "member" : "members"}
-        </Link>
         <InviteButton />
       </div>
     </div>
@@ -206,7 +221,7 @@ function PostAdminActions({ teamId, postId, onEdit }: { teamId: string; postId: 
       <button type="button" className="text-btn" onClick={onEdit} disabled={busy}>
         Edit
       </button>
-      <button type="button" className="text-btn danger" onClick={() => void remove()} disabled={busy}>
+      <button type="button" className="text-btn" onClick={() => void remove()} disabled={busy}>
         Delete
       </button>
       {error && <span className="form-error">{error}</span>}

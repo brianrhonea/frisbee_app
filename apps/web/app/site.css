@@ -1,80 +1,146 @@
 /* Landing page, header, footer and text pages. */
-/* Palette: "Midnight" dark (default) and "Indigo" light, following the
-   visitor's system setting. --accent is the brand indigo, used for text,
-   links and filled buttons (with --on-accent); --amber is the warm call to
-   action on indigo cards; --brand is the solid indigo of promo cards. */
+/* Palette "Turf & Disc" (docs/redesign-plan.md): light by default, dark
+   from the system setting or the top bar's toggle (lib/theme.ts). Turf
+   green for actions, scoreboard navy for live/today, disc amber only for
+   what is the visitor's to do, red only for live games. */
 :root {
-  --bg: #121521;
-  --bg-2: #171a28;
-  --card: #1e2230;
-  --line: #2a3045;
-  --ink: #eceef6;
-  --ink-soft: #c9cce0;
-  --muted: #9398b0;
-  --accent: #a599f8;
-  --on-accent: #16132f;
-  --field: #252a3b;
-  --header-bg: rgba(18, 21, 33, 0.85);
-  --glow: #1f2140;
-  --accent-soft: #2b2846;
-  --amber: #f0d2a2;
-  --on-amber: #2b1e06;
-  --brand: #4b41a8;
-  --on-brand: #ffffff;
-  --danger: #ff8a8a;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.25);
-  --radius: 18px;
-  color-scheme: dark;
+  --bg: #F5F6F1;
+  --bg-2: #EDEFE8;
+  --card: #FFFFFF;
+  --field: #EEF0EA;
+  --line: #E1E4DC;
+  --line-2: #D5D9CF;
+  --ink: #0F1A2A;
+  --ink-soft: #3B4352;
+  --muted: #5E6573;
+  /* Turf: actions, links, selected. */
+  --accent: #12805C;
+  --on-accent: #FFFFFF;
+  --accent-soft: #E3F2EA;
+  --accent-ink: #0B5E43;
+  /* Scoreboard navy: live and today. */
+  --board: #0F1A2A;
+  --on-board: #FFFFFF;
+  --board-muted: #B7C0CE;
+  --board-2: #22324A;
+  /* Disc amber: only what is yours to do, and unread counts. */
+  --disc: #FFB627;
+  --on-disc: #2A1B00;
+  --disc-soft: #FFF1D1;
+  --disc-ink: #8A5A00;
+  /* Red: only live games. */
+  --live: #D93636;
+  --live-soft: #FDE7E7;
+  --live-ink: #B42323;
+  --team: #2C6FB7;
+  --personal: #A8407A;
+  --chip-on: #0F1A2A;
+  --on-chip-on: #FFFFFF;
+  /* Older names, kept so existing rules follow the new palette. */
+  --amber: var(--disc);
+  --on-amber: var(--on-disc);
+  --brand: var(--board);
+  --on-brand: var(--on-board);
+  --glow: var(--accent-soft);
+  --danger: var(--live-ink);
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --shadow: 0 1px 2px rgb(15 26 42 / 0.05);
+  color-scheme: light;
+  --radius: 16px;
+  --radius-control: 12px;
   --wrap: 1160px;
+  --font-score: var(--font-barlow), "Barlow Condensed", "Arial Narrow", sans-serif;
 }
 
-/* Light: the visitor's choice (data-theme, from the top bar's toggle;
-   lib/theme.ts), else their system setting. */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --bg: #f3f5fb;
-    --bg-2: #eceff8;
-    --card: #ffffff;
-    --line: #e3e6f0;
-    --ink: #171a2e;
-    --ink-soft: #383c55;
-    --muted: #686d86;
-    --accent: #5348b2;
-    --on-accent: #ffffff;
-    --field: #f1f2f8;
-    --header-bg: rgba(255, 255, 255, 0.9);
-    --glow: #e8e6fa;
-    --accent-soft: #eae7f9;
-    --amber: #f0d8a8;
-    --on-amber: #3a2a08;
-    --brand: #5348b2;
-    --on-brand: #ffffff;
-    --danger: #b3261e;
-    --shadow: 0 1px 3px rgb(23 26 60 / 0.06), 0 1px 2px rgb(23 26 60 / 0.04);
-    color-scheme: light;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B121D;
+    --bg-2: #101927;
+    --card: #152030;
+    --field: #1B2838;
+    --line: #24324A;
+    --line-2: #2E3D55;
+    --ink: #EAF0F5;
+    --ink-soft: #C4CDD8;
+    --muted: #93A0B2;
+    /* Turf: actions, links, selected. */
+    --accent: #3DBE8B;
+    --on-accent: #06281B;
+    --accent-soft: #133528;
+    --accent-ink: #7FDDB4;
+    /* Scoreboard navy: live and today. */
+    --board: #1A2940;
+    --on-board: #FFFFFF;
+    --board-muted: #A9B6C8;
+    --board-2: #26385A;
+    /* Disc amber: only what is yours to do, and unread counts. */
+    --disc: #FFC24D;
+    --on-disc: #2A1B00;
+    --disc-soft: #3A2C0E;
+    --disc-ink: #FFC24D;
+    /* Red: only live games. */
+    --live: #FF5A5A;
+    --live-soft: #3A1A1E;
+    --live-ink: #FF8A8A;
+    --team: #7FB0EE;
+    --personal: #E08BB8;
+    --chip-on: #EAF0F5;
+    --on-chip-on: #0B121D;
+    /* Older names, kept so existing rules follow the new palette. */
+    --amber: var(--disc);
+    --on-amber: var(--on-disc);
+    --brand: var(--board);
+    --on-brand: var(--on-board);
+    --glow: var(--accent-soft);
+    --danger: var(--live-ink);
+    --header-bg: rgba(11, 18, 29, 0.88);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+    color-scheme: dark;
   }
 }
-:root[data-theme="light"] {
-  --bg: #f3f5fb;
-  --bg-2: #eceff8;
-  --card: #ffffff;
-  --line: #e3e6f0;
-  --ink: #171a2e;
-  --ink-soft: #383c55;
-  --muted: #686d86;
-  --accent: #5348b2;
-  --on-accent: #ffffff;
-  --field: #f1f2f8;
-  --header-bg: rgba(255, 255, 255, 0.9);
-  --glow: #e8e6fa;
-  --accent-soft: #eae7f9;
-  --amber: #f0d8a8;
-  --on-amber: #3a2a08;
-  --brand: #5348b2;
-  --on-brand: #ffffff;
-  --danger: #b3261e;
-  --shadow: 0 1px 3px rgb(23 26 60 / 0.06), 0 1px 2px rgb(23 26 60 / 0.04);
-  color-scheme: light;
+:root[data-theme="dark"] {
+  --bg: #0B121D;
+  --bg-2: #101927;
+  --card: #152030;
+  --field: #1B2838;
+  --line: #24324A;
+  --line-2: #2E3D55;
+  --ink: #EAF0F5;
+  --ink-soft: #C4CDD8;
+  --muted: #93A0B2;
+  /* Turf: actions, links, selected. */
+  --accent: #3DBE8B;
+  --on-accent: #06281B;
+  --accent-soft: #133528;
+  --accent-ink: #7FDDB4;
+  /* Scoreboard navy: live and today. */
+  --board: #1A2940;
+  --on-board: #FFFFFF;
+  --board-muted: #A9B6C8;
+  --board-2: #26385A;
+  /* Disc amber: only what is yours to do, and unread counts. */
+  --disc: #FFC24D;
+  --on-disc: #2A1B00;
+  --disc-soft: #3A2C0E;
+  --disc-ink: #FFC24D;
+  /* Red: only live games. */
+  --live: #FF5A5A;
+  --live-soft: #3A1A1E;
+  --live-ink: #FF8A8A;
+  --team: #7FB0EE;
+  --personal: #E08BB8;
+  --chip-on: #EAF0F5;
+  --on-chip-on: #0B121D;
+  /* Older names, kept so existing rules follow the new palette. */
+  --amber: var(--disc);
+  --on-amber: var(--on-disc);
+  --brand: var(--board);
+  --on-brand: var(--on-board);
+  --glow: var(--accent-soft);
+  --danger: var(--live-ink);
+  --header-bg: rgba(11, 18, 29, 0.88);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -85,8 +151,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
-    sans-serif;
+  font: 16px/1.55 var(--font-inter), Inter, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -116,26 +182,35 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
 
 /* Buttons -------------------------------------------------------------- */
 
+/* Buttons: turf for the main action, outlined for the rest; amber
+   (.btn-amber) only for what is the visitor's to do. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 20px;
-  border: 0;
-  border-radius: 10px;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-control);
+  background: var(--card);
+  color: var(--ink);
   font: inherit;
+  font-size: 15px;
   font-weight: 700;
+  line-height: 1.2;
   text-decoration: none;
   cursor: pointer;
-  transition: transform .15s ease, filter .15s ease;
+  transition: transform .15s ease, filter .15s ease, background-color .15s ease, border-color .15s ease;
 }
-.btn:hover { filter: brightness(1.08); }
-.btn-amber { background: var(--amber); color: var(--on-amber); }
-.btn-primary { background: var(--accent); color: var(--on-accent); }
-.btn-small { padding: 8px 14px; font-size: 14px; border-radius: 9px; }
+/* :where keeps the hover as weak as .btn, so variants keep their colours. */
+.btn:where(:hover) { background: var(--field); }
+.btn-amber { background: var(--disc); color: var(--on-disc); border-color: transparent; }
+.btn-primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.btn-amber:hover, .btn-primary:hover { filter: brightness(1.08); }
+.btn-small { min-height: 36px; padding: 7px 14px; font-size: 14px; border-radius: 10px; }
 
-.link { text-decoration: none; color: var(--muted); font-weight: 600; }
+.link { text-decoration: none; color: var(--ink-soft); font-weight: 600; }
 .link:hover { color: var(--ink); }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -151,6 +226,16 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
   letter-spacing: -0.02em;
   text-decoration: none;
 }
+/* The wordmark: Barlow Condensed 800 italic (top bar, footer). */
+.wordmark, .footer-mark {
+  font-family: var(--font-score);
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0;
+  line-height: 1;
+  text-decoration: none;
+  color: var(--ink);
+}
 .brand img { border-radius: 9px; }
 .header-actions {
   margin-left: auto;
@@ -162,10 +247,7 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
 /* Hero ----------------------------------------------------------------- */
 
 .hero {
-  padding: 88px 0 96px;
-  background:
-    radial-gradient(60% 70% at 85% 10%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 70%),
-    radial-gradient(50% 60% at 0% 0%, var(--glow), transparent 70%);
+  padding: 72px 0 88px;
   overflow: hidden;
 }
 .hero-grid {
@@ -189,9 +271,10 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
   gap: 10px;
   min-width: 176px;
   padding: 10px 18px 10px 14px;
-  border-radius: 14px;
-  background: var(--ink);
-  color: var(--bg);
+  border-radius: var(--radius-control);
+  background: var(--board);
+  color: var(--on-board);
+  box-shadow: inset 0 0 0 1px var(--board-2);
   text-decoration: none;
   font-weight: 700;
   font-size: 18px;
@@ -214,10 +297,10 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
   width: 300px;
   padding: 12px;
   border-radius: 46px;
-  background: linear-gradient(160deg, #2a2f45, #121521);
+  background: var(--board);
   box-shadow:
-    0 40px 80px -20px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    0 40px 80px -24px rgb(0 0 0 / 0.4),
+    0 0 0 1px var(--board-2) inset;
   transform: rotate(-3deg);
 }
 .phone-screen {
@@ -246,7 +329,7 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
   color: var(--muted);
   font-size: 12px;
 }
-.ps-chips .on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; }
+.ps-chips .on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); font-weight: 700; }
 .ps-label {
   margin: 14px 0 6px;
   color: var(--muted);
@@ -267,11 +350,11 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
 .ps-row b { display: block; font-size: 13px; }
 .ps-row small { color: var(--muted); font-size: 11px; }
 .dot { width: 30px; height: 30px; border-radius: 50%; flex: none; }
-.d1 { background: linear-gradient(135deg, #a599f8, #5348b2); }
-.d2 { background: linear-gradient(135deg, #6bc9e3, #3b6ea8); }
-.d3 { background: linear-gradient(135deg, #e3b26b, #a8573b); }
-.d4 { background: linear-gradient(135deg, #b36be3, #5b3ba8); }
-.d5 { background: linear-gradient(135deg, #e36b8f, #a83b5b); border-radius: 9px; }
+.d1 { background: var(--accent); }
+.d2 { background: var(--team); }
+.d3 { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.d4 { background: var(--personal); }
+.d5 { background: var(--board); border-radius: 9px; }
 
 /* Features ------------------------------------------------------------- */
 
@@ -296,8 +379,8 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
   place-items: center;
   width: 48px;
   height: 48px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
   font-size: 24px;
 }
 .feature-grid h3 { margin: 18px 0 8px; font-size: 20px; }
@@ -312,10 +395,8 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
   align-items: center;
   gap: 48px;
   padding: 56px;
-  border-radius: 28px;
-  background:
-    radial-gradient(80% 120% at 100% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
-    var(--card);
+  border-radius: var(--radius);
+  background: var(--card);
   border: 1px solid var(--line);
 }
 .band-inner > * { min-width: 0; }
@@ -350,34 +431,40 @@ h1, h2, h3 { line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
 /* Footer --------------------------------------------------------------- */
 
 .site-footer {
-  padding: 28px 0;
+  padding: 20px 0;
   border-top: 1px solid var(--line);
+  background: var(--card);
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
 }
-.site-footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.site-footer nav { display: flex; flex-wrap: wrap; gap: 6px 20px; }
-.site-footer a { text-decoration: none; }
-.site-footer a:hover { color: var(--ink); }
+.site-footer .wrap { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
+.footer-mark { font-size: 20px; }
+/* Inside the frame the footer sits in the page column, on the page background. */
+.frame .site-footer { background: none; }
+.site-footer nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px 18px; font-weight: 600; }
+.site-footer a { color: var(--ink-soft); text-decoration: none; }
+.site-footer a:hover { color: var(--accent); text-decoration: underline; }
 
 /* Text pages (privacy, terms, cookies, help) ---------------------------- */
 
 .doc { max-width: 720px; padding: 28px 0 64px; }
-.doc h1 { font-size: clamp(1.6rem, 4vw, 2.1rem); margin-bottom: 8px; }
+.doc h1 { font-size: clamp(1.8rem, 4.4vw, 2.6rem); font-weight: 800; letter-spacing: -0.035em; margin-bottom: 8px; }
 .doc h2 { font-size: 1.3rem; margin: 36px 0 10px; }
 .doc h3 { font-size: 18px; margin: 24px 0 6px; letter-spacing: -0.01em; }
-.doc p, .doc li { color: var(--ink-soft); }
+.doc p, .doc li { color: var(--ink-soft); line-height: 1.7; }
 .doc ul { padding-left: 22px; }
 .doc li { margin: 6px 0; }
-.doc a { color: var(--accent); }
+.doc a { color: var(--accent); font-weight: 600; }
+.doc a:hover { color: var(--accent-ink); }
 .doc .updated { color: var(--muted); margin-top: 0; }
 .doc .lead { font-size: 1.05rem; }
 .draft-banner {
-  margin: 0 0 32px;
+  margin: 0 0 28px;
   padding: 12px 16px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line);
+  background: var(--field);
+  font-size: 14px;
 }
 .doc .draft-banner { color: var(--ink); }
 .doc-table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 15px; }

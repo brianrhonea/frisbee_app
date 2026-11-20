@@ -16,7 +16,7 @@ export const metadata: Metadata = {
  */
 export default function Teams() {
   return (
-    <div className="page">
+    <div className="page teams-page">
       <header className="page-head">
         <h1>Teams</h1>
         <p>Your teams, pickup communities and schools or clubs, and any team&apos;s public page.</p>

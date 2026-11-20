@@ -91,7 +91,7 @@ export function VideoPage({ videoId }: { videoId: string }) {
                 <button type="button" className="btn btn-small" disabled={busy} onClick={() => setEditing(true)}>
                   Edit
                 </button>
-                <button type="button" className="btn btn-small btn-danger" disabled={busy} onClick={() => void remove()}>
+                <button type="button" className="btn btn-small btn-quiet" disabled={busy} onClick={() => void remove()}>
                   Remove
                 </button>
               </>

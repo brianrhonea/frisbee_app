@@ -10,6 +10,7 @@ import { useLiveDoc } from "@/lib/live";
 import { signupDraft } from "@/lib/signupDraft";
 import { useAuth } from "./AuthProvider";
 import { PersonalDetailsForm } from "./PersonalDetailsForm";
+import "./member.css";
 import { SignUpSteps } from "./SignUpSteps";
 import { stepAsksName, UsernameStep, usernameStepCopy } from "./UsernameStep";
 
@@ -199,7 +200,7 @@ function FinishSignUp({ user, onDone, onTooYoung }: { user: User; onDone: () => 
         <SignUpSteps at={2} />
         <header className="auth-head">
           <h1>About you</h1>
-          <p>The last step. Like a club membership, Stall 10 needs a few details about you. Your profile shows only your name and username.</p>
+          <p>A few details for club age checks and tournament signups. Your profile shows only your name and username.</p>
         </header>
         {saved ? (
           <PersonalDetailsForm

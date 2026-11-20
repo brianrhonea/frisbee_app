@@ -341,11 +341,11 @@ export function MeetingRoom({ meetingId }: { meetingId: string }) {
               {state.screenSharing ? "Stop sharing" : "Share screen"}
             </button>
           )}
-          <button type="button" className="btn btn-small" onClick={() => void hangUp(null)}>
+          <button type="button" className="btn btn-small call-leave" onClick={() => void hangUp(null)}>
             Leave
           </button>
           {admin && (
-            <button type="button" className="btn btn-small btn-danger" disabled={busy} onClick={end}>
+            <button type="button" className="btn btn-small btn-quiet call-end" disabled={busy} onClick={end}>
               End for everyone
             </button>
           )}

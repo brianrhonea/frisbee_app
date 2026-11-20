@@ -72,8 +72,10 @@ export function JoinRequests({ teamId, requests, card = true }: { teamId: string
       </div>
     );
   }
+  // Amber while someone is waiting: it's the admins' to do.
+  const waiting = (requests.data?.length ?? 0) > 0;
   return (
-    <section className="card">
+    <section className={`card join-requests${waiting ? " waiting" : ""}`}>
       <h2 className="card-title">Asking to join</h2>
       {body}
       {error && <ErrorNote>{error}</ErrorNote>}

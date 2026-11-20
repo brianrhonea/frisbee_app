@@ -2,6 +2,7 @@
 import { type GroupTournamentDoc, groupTournamentFormatInfo, groupTournamentStatusLabels } from "@stall10/shared";
 import { where } from "firebase/firestore";
 import Link from "next/link";
+import { DateTile } from "../DateTile";
 import { useLiveQuery } from "@/lib/live";
 import { useTeamHub } from "../TeamContext";
 import { tournamentView, tournamentWhen } from "./format";
@@ -51,16 +52,17 @@ export function GroupTournamentsList() {
       {rows.map((t) => (
         <Link
           key={t.id}
-          className="row-card"
+          className="row-card gt-list-row"
           href={t.status === "setup" && organizer ? `${base}/${encodeURIComponent(t.id)}/edit` : `${base}/${encodeURIComponent(t.id)}`}
         >
+          <DateTile startsAt={t.settings.startsAt} />
           <span>
             <b>{t.name || "Tournament"}</b>
             <small>
               {tournamentWhen(t.settings.startsAt)} · {groupTournamentFormatInfo[t.settings.format].label} · {t.teams.length} teams
             </small>
           </span>
-          <span className="pill">{groupTournamentStatusLabels[t.status]}</span>
+          <span className={`pill${t.status === "scheduled" ? "" : " pill-soft"}`}>{groupTournamentStatusLabels[t.status]}</span>
         </Link>
       ))}
     </section>

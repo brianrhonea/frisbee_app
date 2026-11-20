@@ -10,6 +10,7 @@ import { Composer } from "./Composer";
 import { LocalTime } from "./LocalTime";
 import { MemberImage } from "./MemberImage";
 import { PostActions } from "./PostActions";
+import "./member.css";
 import { LinkedText } from "./LinkedText";
 
 function workoutLine(w: NonNullable<PublicPost["workout"]>): string {

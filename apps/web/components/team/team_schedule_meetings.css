@@ -4,7 +4,7 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+/* A live meeting: its row is navy (live/today), the words bold. */
 .schedule-meeting-live {
-  color: var(--danger);
-  font-weight: 600;
+  font-weight: 700;
 }

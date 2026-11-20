@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useLiveQuery } from "@/lib/live";
+import { initials } from "@/lib/text";
 import { canOn } from "../tournaments/useTournament";
 import { useMyTeams } from "../useMyTeams";
 
@@ -24,7 +25,7 @@ export function NeedsYou({ uid }: { uid: string }) {
   return (
     <section className="card needs-you" aria-labelledby="needs-you-title" hidden={total === 0}>
       <h2 className="card-title" id="needs-you-title">
-        Needs you
+        Needs you {total > 0 && <span className="needs-count">{total}</span>}
       </h2>
       <ul className="needs-you-list">
         {groups.map((g) => (
@@ -44,8 +45,16 @@ function Requests({ teamId, name, onCount }: { teamId: string; name: string; onC
   return (
     <li>
       <Link href={`/teams/${encodeURIComponent(teamId)}/settings`}>
-        <b>{name}</b>
-        <small>{n === 1 ? "1 person is asking to join" : `${n} people are asking to join`}</small>
+        <span className="needs-tile" aria-hidden="true">
+          {initials(name)}
+        </span>
+        <span className="needs-main">
+          <b>{name}</b>
+          <small>{n === 1 ? "1 person is asking to join" : `${n} people are asking to join`}</small>
+        </span>
+        <span className="needs-action" aria-hidden="true">
+          Review
+        </span>
       </Link>
     </li>
   );

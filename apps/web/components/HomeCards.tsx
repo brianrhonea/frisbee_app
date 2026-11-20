@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { NavIcon } from "./NavIcons";
 
-/** "The field is calling": to Explore, for pickup and teams nearby. */
+/** "The field is calling": to Discover's pickup, for games and communities nearby. */
 export function PickupCard() {
   return (
-    <Link className="card pickup-card" href="/explore">
+    <Link className="card pickup-card" href="/explore?only=pickup">
       <span>
         <small>The field is calling</small>
         <b>Find your next pickup game</b>
@@ -21,7 +21,7 @@ export function LearnPromo({ label = "Level up your game" }: { label?: string })
       <small>{label}</small>
       <b>Your next great throw starts here.</b>
       <p>The rules, the field and the spirit of the game, in five minutes.</p>
-      <Link className="btn btn-amber btn-small" href="/learn">
+      <Link className="btn btn-primary btn-small" href="/learn">
         Learn to play <NavIcon name="external" size={14} />
       </Link>
     </div>

@@ -1,5 +1,5 @@
 /* Explore: search with filter chips, then tournaments, rankings, results and shortcuts. */
-.explore { display: grid; gap: 16px; }
+.explore { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .explore-search-form { margin-bottom: 12px; }
 .explore-chips { margin-bottom: 12px; }
 .explore-results { display: grid; gap: 8px; }
@@ -40,3 +40,34 @@
 .explore-num { font-variant-numeric: tabular-nums; text-align: right; font-size: 0.88rem; }
 .explore-player { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .explore-player span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Discover: the visitor's note under the chips, and the Coming up section (the old Events page). */
+.explore-people-note { margin: 0 0 10px; }
+.explore-coming { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; scroll-margin-top: 80px; }
+.explore-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.explore-section-head .section-title, .explore-section-head p { margin: 0; }
+
+/* Restyle (Turf & Disc): search and chips, Live now on the scoreboard navy. */
+.explore-search .search-form input { background: var(--field); }
+.explore-search .search-form .btn { min-width: 96px; }
+.segmented.explore-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; background: none; border: 0; border-radius: 0; }
+.segmented.explore-chips button {
+  padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--card);
+  color: var(--ink); font-size: 0.88rem; font-weight: 600;
+}
+.segmented.explore-chips button:hover { border-color: var(--ink-soft); color: var(--ink); }
+.segmented.explore-chips button.on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); box-shadow: none; }
+.explore-heading { font-weight: 800; }
+.explore-division { background: var(--card); border-color: var(--line-2); color: var(--ink); }
+.explore-division.on { background: var(--chip-on); color: var(--on-chip-on); border-color: var(--chip-on); }
+.explore-ranks li { border-radius: 10px; }
+.explore-rank { font-family: var(--font-score); font-size: 1.2rem; font-variant-numeric: normal; }
+.explore-card-link { color: var(--accent); font-weight: 700; }
+.explore-coming > .section-title, .explore-section-head .section-title { font-size: 1.15rem; }
+.explore-live { background: var(--board); color: var(--on-board); border-color: transparent; }
+.explore-live .card-title { display: flex; align-items: center; gap: 8px; color: var(--on-board); }
+.live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--live); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 30%, transparent); }
+.explore-live .row-card { background: var(--board-2); border-color: transparent; color: var(--on-board); }
+.explore-live .row-card:hover { border-color: var(--board-muted); }
+.explore-live .row-card small { color: var(--board-muted); }
+.explore-live .event-date { background: var(--board); color: var(--on-board); }

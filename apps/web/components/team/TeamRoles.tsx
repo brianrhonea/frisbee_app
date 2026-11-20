@@ -159,7 +159,7 @@ export function TeamRoles() {
                 >
                   Edit
                 </button>
-                <button type="button" className="text-btn danger" disabled={busy} onClick={() => void remove(id)}>
+                <button type="button" className="text-btn" disabled={busy} onClick={() => void remove(id)}>
                   Delete
                 </button>
               </span>

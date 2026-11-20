@@ -194,7 +194,7 @@ export function GroupTournamentPage({ tournamentId, publicListing }: { tournamen
               </Link>
               <button
                 type="button"
-                className="btn btn-small btn-danger"
+                className="btn btn-small"
                 disabled={busy}
                 onClick={() => {
                   if (!user || !window.confirm(`Delete ${t.name || "this tournament"}? Its teams, schedule and scores are deleted for everyone.`)) return;
@@ -208,7 +208,26 @@ export function GroupTournamentPage({ tournamentId, publicListing }: { tournamen
         </div>
       </div>
       {error && <p className="form-error">{error}</p>}
-      <div className="segmented" role="tablist" aria-label="Tournament">
+      {games.length > 0 && (
+        <div className="gt-stats">
+          <div className="gt-stat">
+            <b>{t.teams.length}</b>
+            <span>Teams</span>
+          </div>
+          <div className="gt-stat">
+            <b>{games.length}</b>
+            <span>Games</span>
+          </div>
+          <div className="gt-stat">
+            <b>
+              {games.filter((g) => g.status === "done").length}
+              <small>/{games.length}</small>
+            </b>
+            <span>Final</span>
+          </div>
+        </div>
+      )}
+      <div className="segmented gt-tabs" role="tablist" aria-label="Tournament">
         {tabs.map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={k === shown} className={k === shown ? "on" : ""} onClick={() => setTab(k)}>
             {label}
@@ -303,6 +322,15 @@ export function GroupTournamentPage({ tournamentId, publicListing }: { tournamen
   );
 }
 
+/** A team's initials for its mark (the app's team mark). */
+const markOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+
 function GameTile({
   game: g,
   number,
@@ -325,33 +353,41 @@ function GameTile({
   const winner = groupEngine.winnerOf(g);
   const side = (team: string | null) => (winner === null ? "" : winner === team ? "gt-won" : "gt-lost");
   const status = skipped ? "Not needed" : g.status === "done" ? "Final" : g.status === "reported" ? "Score reported" : null;
+  // The viewer's to do (report or confirm): amber.
+  const due = badge === "Report score" || badge === "Confirm score";
   const body = (
     <>
       <span className="gt-game-meta">
         {[number !== null ? `Game ${number}` : null, g.startsAt ? gameTime(g.startsAt) : null, `Field ${g.field}`, g.label].filter(Boolean).join(" · ")}
       </span>
       <span className={`gt-side ${side(g.teamA)}`}>
-        <span>{nameA}</span>
+        <span className="gt-mark" aria-hidden>
+          {markOf(nameA)}
+        </span>
+        <span className="gt-name">{nameA}</span>
         {g.status === "done" && <b>{g.scoreA}</b>}
       </span>
       <span className={`gt-side ${side(g.teamB)}`}>
-        <span>{nameB}</span>
+        <span className="gt-mark" aria-hidden>
+          {markOf(nameB)}
+        </span>
+        <span className="gt-name">{nameB}</span>
         {g.status === "done" && <b>{g.scoreB}</b>}
       </span>
       {(status || badge) && (
         <span className="gt-game-status">
           {status && <span className="muted small">{status}</span>}
-          {badge && <span className="gt-badge">{badge}</span>}
+          {badge && <span className={`gt-badge${due ? " gt-due" : ""}`}>{badge}</span>}
         </span>
       )}
     </>
   );
   return onOpen ? (
-    <button type="button" className={`card gt-game${mine ? " gt-mine" : ""}`} onClick={onOpen}>
+    <button type="button" className={`card gt-game${mine ? " gt-mine" : ""}${due ? " gt-game-due" : ""}`} onClick={onOpen}>
       {body}
     </button>
   ) : (
-    <div className={`card gt-game${mine ? " gt-mine" : ""}`}>{body}</div>
+    <div className={`card gt-game${mine ? " gt-mine" : ""}${due ? " gt-game-due" : ""}`}>{body}</div>
   );
 }
 
@@ -363,7 +399,7 @@ function Standings({ games, names, awaiting }: { games: GroupGame[]; names: Map<
       {pools.map(([pool, teams]) => (
         <div key={pool} className="card table-scroll">
           {pools.length > 1 && <h3 className="card-title">Pool {pool}</h3>}
-          <table className="data-table">
+          <table className="data-table gt-standings">
             <thead>
               <tr>
                 <th className="narrow">#</th>
@@ -508,7 +544,7 @@ function GameSheet({
             {action === "report" && (
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn gt-btn-due"
                 disabled={busy}
                 onClick={() => setEntering({ mode: "report", title: "Report the score", message: "The other captain confirms it before it counts." })}
               >
@@ -517,7 +553,7 @@ function GameSheet({
             )}
             {action === "confirm" && r && (
               <>
-                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void send(`${api}/confirm`, "POST", { scoreA: r.scoreA, scoreB: r.scoreB })}>
+                <button type="button" className="btn gt-btn-due" disabled={busy} onClick={() => void send(`${api}/confirm`, "POST", { scoreA: r.scoreA, scoreB: r.scoreB })}>
                   Confirm {r.scoreA}–{r.scoreB}
                 </button>
                 <button

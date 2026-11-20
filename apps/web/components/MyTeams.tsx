@@ -8,6 +8,7 @@ import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { roleLabel, TeamList } from "./ProfileDashboard";
 import { useMyTeams } from "./useMyTeams";
+import "./member.css";
 
 interface MyTeam {
   name?: string;

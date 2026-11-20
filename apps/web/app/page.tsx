@@ -53,8 +53,8 @@ export default async function Home() {
               </Link>
             </div>
             <p className="muted small">
-              Or look around first: <Link href="/teams#find">find a team</Link>,{" "}
-              <Link href="/events">see what&apos;s coming up</Link> or <Link href="/learn">learn to play</Link>.
+              Or look around first: <Link href="/explore?only=teams">find a team</Link>,{" "}
+              <Link href="/explore#coming-up">see what&apos;s coming up</Link> or <Link href="/learn">learn to play</Link>.
             </p>
           </section>
 

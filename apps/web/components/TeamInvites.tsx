@@ -76,7 +76,7 @@ export function TeamInvites() {
                 <button type="button" className="btn btn-small" disabled={busy !== null} onClick={() => void answer(i.id, false)}>
                   Decline
                 </button>
-                <button type="button" className="btn btn-primary btn-small" disabled={busy !== null} onClick={() => void answer(i.id, true)}>
+                <button type="button" className="btn btn-amber btn-small" disabled={busy !== null} onClick={() => void answer(i.id, true)}>
                   Accept
                 </button>
               </span>

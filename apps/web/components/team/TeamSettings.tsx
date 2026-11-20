@@ -238,7 +238,7 @@ function MemberRoles() {
                     {!fixed && (
                       <button
                         type="button"
-                        className="text-btn danger"
+                        className="text-btn"
                         disabled={busy}
                         onClick={() => {
                           if (window.confirm(`Remove ${team.memberNames?.[uid] ?? "this member"}?`)) {
@@ -292,7 +292,7 @@ function TransferOwnership() {
         <Status error={error} ok={ok} />
         <button
           type="button"
-          className="btn btn-danger"
+          className="btn btn-quiet"
           disabled={busy || !to}
           onClick={() => {
             if (window.confirm(`Make ${team.memberNames?.[to] ?? "them"} the owner?`)) {
@@ -337,7 +337,7 @@ function DeleteTeam() {
         <Status error={error} ok={null} />
         <button
           type="button"
-          className="btn btn-danger"
+          className="btn btn-quiet"
           disabled={busy || !matches || others > 0}
           onClick={() => {
             if (!window.confirm(`Delete ${name} for everyone? This can't be undone.`)) return;
@@ -364,7 +364,7 @@ function LeaveTeam({ teamId }: { teamId: string }) {
         <Status error={error} ok={null} />
         <button
           type="button"
-          className="btn btn-danger"
+          className="btn btn-quiet"
           disabled={busy || !user}
           onClick={() => {
             if (!user || !window.confirm("Leave? You'll need a new invite to come back.")) return;

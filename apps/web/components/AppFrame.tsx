@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { type FormEvent, type ReactNode, useEffect } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { type FormEvent, type ReactNode, Suspense, useEffect } from "react";
 import { newPostBox, requestHomeRefresh } from "@/lib/homeRefresh";
 import { useAuth } from "./AuthProvider";
 import { MeetingAlerts } from "./team/meetings/MeetingAlerts";
@@ -13,21 +13,43 @@ import { useUnreadCount } from "./Notifications";
 import { SideTeams } from "./SideTeams";
 import { ThemeToggle } from "./ThemeToggle";
 import { UpcomingAside } from "./UpcomingAside";
+import { useSingleTeam } from "./useMyTeams";
 import { VoiceBar } from "./voice/VoiceBar";
 import { isTyping } from "@/lib/text";
 
-type Tab = { href: string; label: string; icon: NavIconName; also?: string[] };
+type Tab = {
+  href: string;
+  label: string;
+  icon: NavIconName;
+  also?: string[];
+  /** Discover's `?only=` filter this tab opens (visitors' Pickup and Communities). */
+  only?: string;
+};
 
 /**
- * Six tabs: the app's five (docs/product-spec.md §3) and Learn.
+ * Members: the app's five tabs (Home, Discover, Schedule, Teams, Inbox;
+ * docs/redesign-plan.md) and Learn. Discover is /explore, which also
+ * holds what Events and Find tournaments did.
  */
-const tabs: Tab[] = [
-  // The community feed and posts are Home's (its Community tab).
+const memberTabs: Tab[] = [
+  // The community feed and posts are Home's (its Everyone tab).
   { href: "/", label: "Home", icon: "home", also: ["/community", "/posts"] },
-  { href: "/explore", label: "Explore", icon: "explore", also: ["/players", "/rankings"] },
+  { href: "/explore", label: "Discover", icon: "explore", also: ["/players", "/rankings", "/tournaments", "/events", "/discover"] },
+  { href: "/schedule", label: "Schedule", icon: "events" },
   { href: "/teams", label: "Teams", icon: "teams" },
-  { href: "/messages", label: "Messages", icon: "messages" },
-  { href: "/events", label: "Events", icon: "events", also: ["/schedule", "/tournaments"] },
+  { href: "/messages", label: "Inbox", icon: "messages" },
+  { href: "/learn", label: "Learn", icon: "learn" },
+];
+
+/**
+ * Visitors (and everyone while the browser restores a session): what they
+ * can use without an account. No Teams or Inbox; the brand goes Home.
+ */
+const visitorTabs: Tab[] = [
+  { href: "/explore", label: "Discover", icon: "explore", also: ["/players", "/rankings", "/events", "/discover"] },
+  { href: "/tournaments", label: "Tournaments", icon: "events" },
+  { href: "/explore?only=pickup", label: "Pickup", icon: "home", only: "pickup" },
+  { href: "/explore?only=groups", label: "Communities", icon: "teams", only: "groups" },
   { href: "/learn", label: "Learn", icon: "learn" },
 ];
 
@@ -56,13 +78,25 @@ const fullWidth = ["/sign-in", "/sign-up", "/about", "/get-the-app", "/join", "/
 
 /**
  * Site-wide keys: `n` writes a post (Home's composer), `/` searches
- * (Explore), `g` then a tab's first letter goes there.
+ * (Discover), `g` then a tab's first letter goes there (the old `e`, `v`
+ * and `m` too).
  */
 function useShortcuts(signedIn: boolean) {
   const router = useRouter();
   useEffect(() => {
     let pendingG = 0;
-    const go: Record<string, string> = { h: "/", e: "/explore", v: "/events", t: "/teams", m: "/messages", n: "/notifications" };
+    const go: Record<string, string> = {
+      h: "/",
+      d: "/explore",
+      e: "/explore",
+      v: "/explore",
+      s: "/schedule",
+      t: "/teams",
+      i: "/messages",
+      m: "/messages",
+      l: "/learn",
+      n: "/notifications",
+    };
     function onKey(e: KeyboardEvent) {
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
       if (pendingG && Date.now() - pendingG < 1200 && go[e.key]) {
@@ -74,7 +108,7 @@ function useShortcuts(signedIn: boolean) {
       pendingG = e.key === "g" ? Date.now() : 0;
       if (e.key === "/") {
         e.preventDefault();
-        // The site search: the top bar's, or Explore's own (never a list's filter box).
+        // The site search: the top bar's, or Discover's own (never a list's filter box).
         const search = document.querySelector<HTMLInputElement>(".top-search input, input#q");
         if (search) search.focus();
         else router.push("/explore");
@@ -90,9 +124,43 @@ function useShortcuts(signedIn: boolean) {
 
 const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 
-function isActive(path: string, tab: Tab) {
-  if (tab.href === "/" ? path === "/" : under(path, tab.href)) return true;
+/** Whether [tab] is the open one; [only] is Discover's `?only=` filter, which visitors' Pickup and Communities open. */
+function isActive(path: string, tab: Tab, only: string | null, tabs: Tab[]) {
+  const base = tab.href.split("?")[0]!;
+  if (tab.only) return under(path, base) && tab.only === only;
+  // Discover itself isn't the open tab while one of those filters is.
+  const filtered = tabs.some((t) => t.only && t.only === only);
+  if (base === "/" ? path === "/" : under(path, base)) return !(base === "/explore" && filtered);
   return tab.also?.some((p) => under(path, p)) ?? false;
+}
+
+type TabLinksProps = { tabs: Tab[]; className: string; path: string; only: string | null; teamsHref: string };
+
+/** The tabs as links, [teamsHref] in place of Teams' own (a member's only team). */
+function TabLinks({ tabs, className, path, only, teamsHref }: TabLinksProps) {
+  return tabs.map((t) => {
+    const active = isActive(path, t, only, tabs);
+    return (
+      <Link
+        key={t.href}
+        href={t.href === "/teams" ? teamsHref : t.href}
+        className={active ? `${className} active` : className}
+        aria-current={active ? "page" : undefined}
+        onClick={() => {
+          if (t.href === "/" && path === "/") requestHomeRefresh();
+        }}
+      >
+        <NavIcon name={t.icon} />
+        <span>{t.label}</span>
+      </Link>
+    );
+  });
+}
+
+/** [TabLinks] knowing Discover's filter (reading the address needs a Suspense boundary). */
+function TabLinksWithFilter(props: Omit<TabLinksProps, "only">) {
+  const only = useSearchParams()?.get("only") ?? null;
+  return <TabLinks {...props} only={only} />;
 }
 
 /**
@@ -106,8 +174,12 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   const { user } = useAuth();
   // Home and team hubs have their own right column, for visitors and members alike.
   const aside = path !== "/" && !/^\/teams\/[^/]+/.test(path) && !fullWidth.some((p) => under(path, p));
-  // Explore has its own search box.
+  // Discover has its own search box.
   const search = !under(path, "/explore");
+  const tabs = user ? memberTabs : visitorTabs;
+  // On exactly one team or community, Teams opens it (the hub links back to all teams).
+  const single = useSingleTeam(user?.uid);
+  const teamsHref = single ? `/teams/${encodeURIComponent(single)}` : "/teams";
   const unread = useUnreadCount();
   useShortcuts(!!user);
   // Phones' floating Post button, on pages without a composer of their own at the foot.
@@ -117,29 +189,18 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   function onSearch(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const q = String(new FormData(e.currentTarget).get("q") ?? "").trim();
-    // Visitors can't search players (Explore is members-only): they find teams and groups.
-    const where = user ? "/explore" : "/teams";
-    router.push(q ? `${where}?q=${encodeURIComponent(q)}` : user ? where : `${where}#find`);
+    // Everyone searches on Discover; only members also find players there.
+    router.push(q ? `/explore?q=${encodeURIComponent(q)}` : "/explore");
   }
 
-  const tabLinks = (className: string) =>
-    tabs.map((t) => {
-      const active = isActive(path, t);
-      return (
-        <Link
-          key={t.href}
-          href={t.href}
-          className={active ? `${className} active` : className}
-          aria-current={active ? "page" : undefined}
-          onClick={() => {
-            if (t.href === "/" && path === "/") requestHomeRefresh();
-          }}
-        >
-          <NavIcon name={t.icon} />
-          <span>{t.label}</span>
-        </Link>
-      );
-    });
+  const tabLinks = (className: string) => {
+    const props = { tabs, className, path, teamsHref };
+    return (
+      <Suspense fallback={<TabLinks {...props} only={null} />}>
+        <TabLinksWithFilter {...props} />
+      </Suspense>
+    );
+  };
 
   return (
     <div className={`frame${aside ? " with-aside" : ""}${fab ? " has-fab" : ""}`}>
@@ -156,7 +217,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
             <input
               type="search"
               name="q"
-              placeholder={user === null ? "Search teams and communities" : "Search players, teams and upcoming events"}
+              placeholder={user ? "Search players, teams and events" : "Search tournaments, teams and communities"}
               aria-label="Search Stall 10"
               enterKeyHint="search"
             />
@@ -166,7 +227,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
         )}
         <div className="header-actions">
           {search && (
-            <Link href={user === null ? "/teams#find" : "/explore"} className="icon-btn top-search-icon" aria-label="Search">
+            <Link href="/explore" className="icon-btn top-search-icon" aria-label="Search">
               <NavIcon name="search" size={22} />
             </Link>
           )}

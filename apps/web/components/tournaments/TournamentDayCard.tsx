@@ -83,7 +83,7 @@ export function TournamentDayCard({ day: d, showTeam = true }: { day: TeamTourna
       {d.isCaptain && d.day.scoreDueKind === "awaiting" && <p className="muted small">Waiting for the other captain to confirm your score.</p>}
       <div className="home-actions">
         {action && (
-          <Link className="btn btn-primary btn-small" href={tournamentHref(d.tournamentId, { division: d.divisionId, game: action.id })}>
+          <Link className="btn btn-small tournament-day-due" href={tournamentHref(d.tournamentId, { division: d.divisionId, game: action.id })}>
             {d.day.scoreDueKind === "confirm" ? "Confirm score" : "Report score"}
           </Link>
         )}

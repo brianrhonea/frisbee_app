@@ -323,7 +323,12 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
           label={`${name || "Play"} diagram`}
           handlers={playback.t === null ? { onDown, onMove, onUp } : undefined}
         />
-        {caption && <p className="play-caption">{caption}</p>}
+        {caption && (
+          <p className="play-caption">
+            <small>Step {(playback.step ?? 0) + 1} note</small>
+            {caption}
+          </p>
+        )}
 
         <div className="play-steps" role="tablist" aria-label="Steps">
           <button type="button" role="tab" aria-selected={setup} className={`play-step${setup ? " on" : ""}`} onClick={() => { playback.stop(); setStep(0); setSelected(null); }}>
@@ -347,7 +352,7 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
             Add step
           </button>
           {play.steps.length > 0 && (
-            <button type="button" className="btn btn-small" onClick={() => (playback.t === null ? playback.start() : playback.stop())}>
+            <button type="button" className="btn btn-small btn-primary play-btn" onClick={() => (playback.t === null ? playback.start() : playback.stop())}>
               {playback.t === null ? "▶ Play" : "■ Stop"}
             </button>
           )}
@@ -368,7 +373,7 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
             </label>
             <button
               type="button"
-              className="text-btn danger"
+              className="text-btn"
               onClick={() => {
                 change({ ...play, steps: play.steps.filter((_, i) => i !== step - 1) });
                 setStep(step - 1);
@@ -405,7 +410,7 @@ export function PlayEditor({ teamId, id, initial }: { teamId: string; id: string
             {busy ? "Saving…" : dirty ? "Save" : "Saved"}
           </button>
           {id && (
-            <button type="button" className="btn btn-small btn-danger" disabled={busy} onClick={() => void destroy()}>
+            <button type="button" className="btn btn-small btn-quiet" disabled={busy} onClick={() => void destroy()}>
               Delete play
             </button>
           )}
@@ -436,10 +441,15 @@ export function PlayViewer({ play }: { play: PlayDoc }) {
   return (
     <div className="card play-viewer">
       <PlayField elements={play.elements ?? []} arrows={play.arrows ?? []} positions={playback.positions ?? undefined} label={`${play.name ?? "Play"} diagram`} />
-      {caption && <p className="play-caption">{caption}</p>}
+      {caption && (
+        <p className="play-caption">
+          <small>Step {(playback.step ?? 0) + 1} note</small>
+          {caption}
+        </p>
+      )}
       {(play.steps?.length ?? 0) > 0 && (
         <div className="home-actions">
-          <button type="button" className="btn btn-small" onClick={() => (playback.t === null ? playback.start() : playback.stop())}>
+          <button type="button" className="btn btn-small btn-primary play-btn" onClick={() => (playback.t === null ? playback.start() : playback.stop())}>
             {playback.t === null ? "▶ Play" : "■ Stop"}
           </button>
           <span className="muted small">{play.steps!.length + 1} steps</span>

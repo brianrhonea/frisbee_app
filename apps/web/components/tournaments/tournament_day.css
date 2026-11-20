@@ -1,15 +1,21 @@
-/* A team's tournament-day card (TournamentDayCard). */
+/* A team's tournament day (TournamentDayCard): the scoreboard-navy card
+   on Home and the team page, red dot only while it's live, amber Report
+   score for the team's captains. */
 .huddle-side-days { display: grid; gap: 16px; }
-.tournament-day { display: grid; gap: 8px; background: var(--accent-soft); border-color: transparent; }
+.tournament-day { display: grid; gap: 8px; background: var(--board); color: var(--on-board); border-color: transparent; }
+.tournament-day .muted { color: var(--board-muted); }
 .tournament-day-when {
   display: inline-flex; align-items: center; gap: 6px;
-  color: var(--accent); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--board-muted); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
 }
-.tournament-day-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-.tournament-day-name { color: var(--ink); font-weight: 700; text-decoration: none; }
+.tournament-day-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--live); }
+.tournament-day-name { color: var(--on-board); font-weight: 700; text-decoration: none; }
 .tournament-day-name:hover { text-decoration: underline; }
 .tournament-day > div { display: grid; gap: 2px; }
-.tournament-day-vs { font-size: 1.25rem; letter-spacing: -0.01em; }
+.tournament-day-vs { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; }
 .tournament-day-record { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; }
-.tournament-day-record b { color: var(--accent); }
+.tournament-day-record b { font-family: var(--font-score); font-size: 1.1rem; color: var(--on-board); }
 .tournament-day .home-actions { margin-top: 4px; }
+.tournament-day .btn { background: var(--board-2); color: var(--on-board); border-color: transparent; }
+.tournament-day .btn.tournament-day-due { background: var(--disc); color: var(--on-disc); }
+.tournament-day > .home-actions { display: flex; }

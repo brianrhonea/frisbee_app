@@ -83,7 +83,10 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
   return (
     <div className="stack meeting-page">
       {back}
-      <section className="card">
+      <section className="card meeting-summary">
+        <p className="meeting-kind">
+          <span className="meeting-badge">Video meeting</span>
+        </p>
         <div className="card-head">
           <h2 className="card-title">
             {m.title || "Meeting"}{" "}
@@ -92,16 +95,16 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
           </h2>
           {admin && (
             <span className="post-admin">
-              <Link className="text-btn" href={`${meetingHref(teamId, meetingId)}/edit`}>
+              <Link className="btn btn-small btn-quiet" href={`${meetingHref(teamId, meetingId)}/edit`}>
                 Edit
               </Link>{" "}
-              <button type="button" className="text-btn" disabled={busy} onClick={remove}>
+              <button type="button" className="btn btn-small btn-quiet" disabled={busy} onClick={remove}>
                 Delete
               </button>
             </span>
           )}
         </div>
-        <p>{whenLine(m)}</p>
+        <p className="meeting-when">{whenLine(m)}</p>
         <p className="muted small">
           {audienceLine(m)} ·{" "}
           {m.requireApproval
@@ -110,7 +113,6 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
               : "Invitees wait for an admin to let them in."
             : "Invitees can join once it starts."}
         </p>
-        {m.notes && <p className="meeting-notes">{m.notes}</p>}
         {!ended && (
           <div className="home-actions">
             <Link className="btn btn-primary" href={roomHref(teamId, meetingId)}>
@@ -119,10 +121,16 @@ export function MeetingPage({ meetingId }: { meetingId: string }) {
           </div>
         )}
       </section>
+      {m.notes && (
+        <section className="card meeting-agenda">
+          <h2 className="card-title">Agenda</h2>
+          <p className="meeting-notes">{m.notes}</p>
+        </section>
+      )}
       {!ended && (
-        <section className="card">
+        <section className={`card meeting-rsvp${mine ? "" : " needs"}`}>
           <h2 className="card-title">Will you attend?</h2>
-          <div className="segmented" role="group" aria-label="Your answer">
+          <div className="segmented rsvp-buttons" role="group" aria-label="Your answer">
             {meetingRsvps.map((a) => (
               <button key={a} type="button" className={mine === a ? "on" : ""} aria-pressed={mine === a} disabled={busy} onClick={() => void answer(mine === a ? null : a)}>
                 {meetingRsvpLabels[a]}

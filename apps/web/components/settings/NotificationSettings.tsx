@@ -82,7 +82,7 @@ export function NotificationSettings() {
                 <li key={t.id}>
                   <button type="button" className="notify-team-head" aria-expanded={shown} onClick={() => setOpen(shown ? null : t.id)}>
                     <b>{t.name ?? "Team"}</b>
-                    <small className="muted">{custom(t.id) ? "Custom for this team" : "Using your defaults"}</small>
+                    <small className={custom(t.id) ? "notify-custom" : "muted"}>{custom(t.id) ? "Custom for this team" : "Using your defaults"}</small>
                   </button>
                   {shown && (
                     <div className="notify-team-body">

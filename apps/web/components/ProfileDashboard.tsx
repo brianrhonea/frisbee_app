@@ -2,6 +2,7 @@ import type { PublicProfile, StatTotals } from "@stall10/shared";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "./Avatar";
+import "./member.css";
 
 /**
  * The profile dashboard: the person on the left (card, season stats,

@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { deleteOwnAccount } from "@/lib/firebase";
 import { useAuth } from "../AuthProvider";
+import { AppearanceSetting } from "./AppearanceSetting";
 import { ChangePassword } from "./ChangePassword";
 import { isSignInCancelled, popupBlockedMessage } from "@/lib/auth_errors";
 
@@ -71,6 +72,7 @@ export function AccountSettings() {
 
   return (
     <div className="stack">
+      <AppearanceSetting />
       <div className="card">
         <h2 className="card-title">Account</h2>
         <p>
@@ -97,7 +99,7 @@ export function AccountSettings() {
           admin. Messages other people sent you stay, under &quot;Deleted user&quot;. It can&apos;t be undone.
         </p>
         {!open ? (
-          <button className="btn btn-danger" type="button" onClick={() => setOpen(true)}>
+          <button className="btn btn-ink" type="button" onClick={() => setOpen(true)}>
             Delete account…
           </button>
         ) : (
@@ -129,7 +131,7 @@ export function AccountSettings() {
               <button className="btn" type="button" disabled={busy} onClick={() => setOpen(false)}>
                 Cancel
               </button>
-              <button className="btn btn-danger" type="submit" disabled={busy}>
+              <button className="btn btn-ink" type="submit" disabled={busy}>
                 {busy ? "Deleting…" : "Delete my account"}
               </button>
             </div>

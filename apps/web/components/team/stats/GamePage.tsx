@@ -104,7 +104,7 @@ function Game({ gameId }: { gameId: string }) {
             {canDelete && user && (
               <button
                 type="button"
-                className="btn btn-small btn-danger"
+                className="btn btn-small"
                 onClick={async () => {
                   if (await confirmAndDelete(user, apiUrl(teamId, `/stats-games/${encodeURIComponent(g.id)}`), deleteGameMessage(g), setDeleteError)) {
                     router.push(t.tournament ? tournamentUrl(teamId, t.tournament.id) : `/teams/${encodeURIComponent(teamId)}/stats`);
@@ -121,7 +121,7 @@ function Game({ gameId }: { gameId: string }) {
       {panel === "gameTo" && <GameToPanel t={t} act={act} onClose={() => setPanel(null)} />}
       {panel === "timeouts" && <TimeoutsPanel t={t} act={act} onClose={() => setPanel(null)} />}
 
-      <div className="segmented" role="tablist" aria-label="Game">
+      <div className="segmented st-tabs" role="tablist" aria-label="Game">
         {(
           [
             ["track", "Track"],

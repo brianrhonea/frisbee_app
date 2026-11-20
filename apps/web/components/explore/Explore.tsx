@@ -1,48 +1,118 @@
 "use client";
-// Explore (ExploreScreen): one search box for players, teams, groups and
-// tournaments, with the app's filter chips; then upcoming tournaments,
-// recent results, a rankings preview and shortcuts. Players and teams come
-// from /v1/public/search; tournaments are matched in the browser over the
-// upcoming ones the card already reads, as the app's ExploreViewModel does.
-import { orderedRankingKeys, parseRankingKey, type PublicListing, type PublicProfile, rankingsHref, type SearchPage, type TournamentDoc } from "@stall10/shared";
+// Discover (the app's Discover tab, which replaced Explore and Find
+// events): one search box for tournaments, leagues, pickup, teams,
+// communities and (members only) players, with filter chips; then what's
+// live now, what's coming up, rankings, results and shortcuts.
+//
+// Visitors can look around and search without an account: teams and
+// communities come from `/v1/public/teams?q=`, tournaments and leagues
+// from the public list the server rendered (`/v1/public/tournaments`),
+// public team events from `/v1/public/events`. Members search players and
+// teams through `/v1/public/search` with their token and read tournaments
+// live, as the app's ExploreViewModel does.
+import { type EventsPage, hostedType, orderedRankingKeys, parseRankingKey, type PublicHostedCard, type PublicListing, type PublicProfile, rankingsHref, type SearchPage, type TeamSearchPage } from "@stall10/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { callApi } from "@/lib/client";
+import { callApi, getPublicApi } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
 import { listingSubtitle } from "@/lib/site";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
+import { EventItem } from "../EventItem";
+import { EventsBrowser } from "../EventsBrowser";
+import { LocalTime } from "../LocalTime";
 import { type DivisionRanking, isShownRanking, type PlayerRanking, rankingLabel, whole } from "../Rankings";
-import { datesLabel, TournamentCard, tournamentHref, useUpcomingTournaments } from "../tournaments/TournamentLists";
-import { type ExploreFilter, exploreHref, listingsFor, matchTournaments, minQueryLength } from "./filters";
+import { ScheduleLink } from "../ScheduleLink";
+import { type CardTournament, datesLabel, TournamentCard, tournamentHref, useUpcomingTournaments } from "../tournaments/TournamentLists";
+import { usePublicEvents } from "../usePublicEvents";
+import { type ExploreFilter, eventsFor, exploreHref, hostedFor, listingsFor, matchText, matchTournaments, minQueryLength } from "./filters";
 import "./explore.css";
 import { useMyTeams } from "../useMyTeams";
 
 const chips: Array<[string, ExploreFilter | null]> = [
   ["All", null],
-  ["Players", "players"],
+  ["Tournaments", "tournaments"],
+  ["Leagues", "leagues"],
+  ["Pickup", "pickup"],
   ["Teams", "teams"],
   ["Communities", "groups"],
-  ["Tournaments", "tournaments"],
 ];
+/** Members also search players. */
+const playersChip: [string, ExploreFilter] = ["Players", "players"];
+
+/** What a chip searches, for the hint before typing (the app's Discover hint). */
+function searchHint(only: ExploreFilter | null, member: boolean): string {
+  switch (only) {
+    case "tournaments":
+      return "tournaments and hat tournaments";
+    case "leagues":
+      return "leagues";
+    case "pickup":
+      return "pickup communities and pickup games";
+    case "teams":
+      return "teams";
+    case "groups":
+      return "communities, schools and clubs";
+    case "players":
+      return "players by name or username";
+    default:
+      return member ? "players, teams, communities, tournaments and leagues" : "tournaments, leagues, pickup, teams and communities";
+  }
+}
 
 /** Tournaments and results the cards show (ExploreViewModel.previewCount). */
 const previewCount = 4;
 /** Rankings the preview shows (ExploreViewModel.previewTeams). */
 const previewTeams = 5;
-/** Upcoming tournaments Explore reads (watchUpcoming(limit: 30)). */
+/** Upcoming tournaments Discover reads (watchUpcoming(limit: 30)). */
 const upcomingLimit = 30;
 
-export function Explore({ initialQuery, initialFilter }: { initialQuery: string; initialFilter: ExploreFilter | null }) {
+type PublicTeamEvent = EventsPage["events"][number];
+
+/**
+ * Discover. [tournaments] and [events] are the public lists the server
+ * read, so visitors (and everyone while sign-in loads) see them at once;
+ * members then get tournaments live.
+ */
+export function Discover({
+  initialQuery,
+  initialFilter,
+  tournaments,
+  events,
+}: {
+  initialQuery: string;
+  initialFilter: ExploreFilter | null;
+  tournaments: PublicHostedCard[] | null;
+  events: EventsPage | null;
+}) {
   const { user } = useAuth();
   const upcoming = useUpcomingTournaments(upcomingLimit);
   const mine = useMyTeams<{ kind?: string; level?: string; division?: string }>(user?.uid);
+  const fresh = usePublicEvents();
+  const [only, setOnly] = useState<ExploreFilter | null>(initialFilter);
+  useEffect(() => setOnly(initialFilter), [initialFilter]);
+  // Visitors can't filter to people; the chip isn't theirs.
+  const filter = only === "players" && user === null ? null : only;
+
+  // Members' live list once it's in; until then (and for visitors) the server's.
+  const hosted: CardTournament[] | undefined = user && upcoming.list ? upcoming.list : (tournaments ?? (user === null ? [] : undefined));
+  const hostedError = user ? upcoming.error : tournaments === null ? "Couldn't load tournaments. Try again in a minute." : null;
+  const publicEvents = fresh ?? events ?? (fresh === null ? null : undefined);
+
   return (
     <div className="explore">
-      <SearchCard initialQuery={initialQuery} initialFilter={initialFilter} upcoming={upcoming.list} mine={mine.data ?? []} />
-      <UpcomingCard list={upcoming.list} error={upcoming.error} />
-      <RankingsPreview mine={mine.data ?? []} />
+      <SearchCard
+        initialQuery={initialQuery}
+        only={filter}
+        setOnly={setOnly}
+        hosted={hosted ?? []}
+        events={publicEvents ?? null}
+        mine={mine.data ?? []}
+      />
+      <LiveNow list={filter === null || filter === "tournaments" || filter === "leagues" ? hostedFor(hosted ?? [], filter) : []} />
+      <ComingUp only={filter} hosted={hosted} error={hostedError} events={publicEvents} />
+      {user ? <RankingsPreview mine={mine.data ?? []} /> : <RankingsLink />}
       <RecentResults />
       <JumpIn />
     </div>
@@ -51,58 +121,73 @@ export function Explore({ initialQuery, initialFilter }: { initialQuery: string;
 
 type MyTeam = Doc<{ kind?: string; level?: string; division?: string }>;
 
+/** Who's searching: a member's players and teams, or a visitor's teams only. */
+type Found = { q: string; players: PublicProfile[]; teams: PublicListing[] } | { q: string; failed: true };
+
 function SearchCard({
   initialQuery,
-  initialFilter,
-  upcoming,
+  only,
+  setOnly,
+  hosted,
+  events,
   mine,
 }: {
   initialQuery: string;
-  initialFilter: ExploreFilter | null;
-  upcoming: Array<Doc<TournamentDoc>> | undefined;
+  only: ExploreFilter | null;
+  setOnly: (f: ExploreFilter | null) => void;
+  hosted: CardTournament[];
+  events: EventsPage | null;
   mine: MyTeam[];
 }) {
   const { user } = useAuth();
   const router = useRouter();
   const [text, setText] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery.trim());
-  const [only, setOnly] = useState<ExploreFilter | null>(initialFilter);
-  const [found, setFound] = useState<{ q: string; page: SearchPage | null } | null>(null);
+  const [found, setFound] = useState<Found | null>(null);
   // Bumped to rerun a failed search for the same text.
   const [retry, setRetry] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // What this card last put in the address, so its own updates don't rewrite the box.
   const pushed = useRef(initialQuery.trim());
-  // A link or the browser's back button lands here with another ?q=.
+  // A link, the top bar's search or the browser's back button lands here with another ?q=.
   useEffect(() => {
     if (initialQuery.trim() === pushed.current) return;
     pushed.current = initialQuery.trim();
     setText(initialQuery);
     setQuery(initialQuery.trim());
   }, [initialQuery]);
-  useEffect(() => setOnly(initialFilter), [initialFilter]);
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
+  const all = only === null;
+  const peopleShown = !!user && (all || only === "players");
+  const listingsShown = all || only === "teams" || only === "groups" || only === "pickup";
   const ready = query.length >= minQueryLength;
+  // Players and teams come from the API; everything else is matched here.
+  const needsApi = peopleShown || listingsShown;
   useEffect(() => {
-    if (!user || !ready) return;
+    // Still finding out whether someone's signed in.
+    if (user === undefined || !ready || !needsApi) return;
     let live = true;
-    callApi<SearchPage>(user, `/v1/public/search?q=${encodeURIComponent(query)}`).then(
-      (page) => live && setFound({ q: query, page }),
-      () => live && setFound({ q: query, page: null }),
+    const q = encodeURIComponent(query);
+    const page: Promise<{ players: PublicProfile[]; teams: PublicListing[] }> = user
+      ? callApi<SearchPage>(user, `/v1/public/search?q=${q}`)
+      : getPublicApi<TeamSearchPage>(null, `/v1/public/teams?q=${q}`).then((p) => ({ players: [], teams: p.teams }));
+    page.then(
+      (p) => live && setFound({ q: query, players: p.players, teams: p.teams }),
+      () => live && setFound({ q: query, failed: true }),
     );
     return () => {
       live = false;
     };
-  }, [user, query, ready, retry]);
+  }, [user, query, ready, needsApi, retry]);
 
   function search(next: string, filter = only) {
     if (timer.current) clearTimeout(timer.current);
     // The same text after "Couldn't search": try it again.
-    if (next.trim() === query && found?.q === query && found.page === null) {
+    if (next.trim() === query && found?.q === query && "failed" in found) {
       setFound(null);
       setRetry((n) => n + 1);
     }
@@ -120,20 +205,50 @@ function SearchCard({
     router.replace(exploreHref(query, filter), { scroll: false });
   }
 
-  const all = only === null;
-  const teamsShown = all || only === "teams" || only === "groups";
-  const playersShown = all || only === "players";
-  const tournamentsShown = all || only === "tournaments";
   const current = found && found.q === query ? found : null;
-  // Tournaments are matched here, so only players and teams wait on the search.
-  const running = ready && !current && (playersShown || teamsShown);
-  const failed = ready && current?.page === null;
-  const people: PublicProfile[] = ready && playersShown ? (current?.page?.players ?? []) : [];
-  const teams: PublicListing[] = ready && teamsShown ? listingsFor(current?.page?.teams ?? [], only) : [];
-  const events = useMemo(() => (ready && tournamentsShown ? matchTournaments(upcoming ?? [], query) : []), [ready, tournamentsShown, upcoming, query]);
-  const nothing = people.length === 0 && teams.length === 0 && events.length === 0;
-  const sections = [people.length, teams.length, events.length].filter((n) => n > 0).length;
+  const failed = ready && !!current && "failed" in current;
+  const running = ready && needsApi && !current;
+  const people: PublicProfile[] = ready && peopleShown && current && !("failed" in current) ? current.players : [];
+  const teams: PublicListing[] = ready && listingsShown && current && !("failed" in current) ? listingsFor(current.teams, only) : [];
+  const tournaments = useMemo(() => (ready ? matchTournaments(hostedFor(hosted, only), query) : []), [ready, hosted, only, query]);
+  const groupTournaments = useMemo(
+    () => (ready && (all || only === "tournaments") ? matchText(events?.tournaments ?? [], query, (t) => t.name ?? "") : []),
+    [ready, all, only, events, query],
+  );
+  const teamEvents = useMemo(
+    () => (ready ? matchText(eventsFor(events?.events ?? [], only), query, (e) => `${e.title ?? ""} ${e.teamName} ${e.location ?? ""}`) : []),
+    [ready, only, events, query],
+  );
+  // Grouped by kind as the app's Discover: tournaments, leagues, teams, communities, players (then the website's events).
+  const cups = tournaments.filter((t) => hostedType(t) !== "league");
+  const leagues = tournaments.filter((t) => hostedType(t) === "league");
+  const teamListings = teams.filter((t) => (t.kind ?? "team") === "team");
+  const groups = teams.filter((t) => (t.kind ?? "team") !== "team");
+  const counts = [cups.length + groupTournaments.length, leagues.length, teamListings.length, groups.length, people.length, teamEvents.length];
+  const nothing = counts.every((n) => n === 0);
+  const sections = counts.filter((n) => n > 0).length;
   const myIds = new Set(mine.map((t) => t.id));
+  const shownChips = user ? [...chips, playersChip] : chips;
+  const what = searchHint(only, !!user);
+  const heading = (title: string) => (sections > 1 ? <h3 className="explore-heading">{title}</h3> : null);
+  const listingRows = (list: PublicListing[]) => (
+    <div className="stack explore-list">
+      {list.map((t) => {
+        const group = (t.kind ?? "team") !== "team";
+        const sub = listingSubtitle(t);
+        return (
+          <Link key={t.id} className="row-card" href={`/teams/${encodeURIComponent(t.id)}`}>
+            <Avatar name={t.name} />
+            <span>
+              <b>{t.name || "Team"}</b>
+              <small>{group ? [sub, t.requiresApproval ? "Approval required" : "Open to join"].filter(Boolean).join(" · ") : sub}</small>
+            </span>
+            {myIds.has(t.id) && <span className="pill pill-soft explore-mine">{group ? "Your group" : "Your team"}</span>}
+          </Link>
+        );
+      })}
+    </div>
+  );
 
   return (
     <section className="card explore-search" aria-labelledby="explore-search-title">
@@ -157,31 +272,73 @@ function SearchCard({
         </button>
       </form>
       <div className="segmented explore-chips" role="group" aria-label="Show">
-        {chips.map(([label, filter]) => (
+        {shownChips.map(([label, filter]) => (
           <button key={label} type="button" className={only === filter ? "on" : ""} aria-pressed={only === filter} onClick={() => pick(filter)}>
             {label}
           </button>
         ))}
       </div>
+      {user === null && (
+        <p className="muted small explore-people-note">
+          Looking for a player? <Link href={`/sign-in?next=${encodeURIComponent(exploreHref(query, "players"))}`}>Log in to search people</Link>.
+        </p>
+      )}
       <div className="explore-results" aria-live="polite">
         {running && nothing ? (
           <p className="muted" aria-busy="true">
             Searching…
           </p>
-        ) : failed && nothing && (playersShown || teamsShown) ? (
+        ) : failed && nothing ? (
           <p className="form-error">Couldn&apos;t search. Try again.</p>
         ) : ready && nothing ? (
           <div className="empty">
             <b>Nothing found</b>
             <br />
-            Try another word from a name, username, city, school, team or tournament.
+            Try another word from a name, {user ? "username, " : ""}city, school, team, tournament or league.
           </div>
         ) : nothing ? (
-          <p className="muted explore-hint">Type at least {minQueryLength} letters to search players, teams, groups and tournaments.</p>
+          <p className="muted explore-hint">
+            Type at least {minQueryLength} letters to search {what}.
+          </p>
         ) : null}
+        {cups.length + groupTournaments.length > 0 && (
+          <>
+            {heading("Tournaments")}
+            <div className="stack explore-list">
+              {cups.map((t) => (
+                <TournamentCard key={t.id} t={t} />
+              ))}
+              {groupTournaments.map((t) => (
+                <GroupTournamentRow key={t.id} t={t} />
+              ))}
+            </div>
+          </>
+        )}
+        {leagues.length > 0 && (
+          <>
+            {heading("Leagues")}
+            <div className="stack explore-list">
+              {leagues.map((t) => (
+                <TournamentCard key={t.id} t={t} />
+              ))}
+            </div>
+          </>
+        )}
+        {teamListings.length > 0 && (
+          <>
+            {heading("Teams")}
+            {listingRows(teamListings)}
+          </>
+        )}
+        {groups.length > 0 && (
+          <>
+            {heading(only === "pickup" ? "Pickup communities" : "Communities")}
+            {listingRows(groups)}
+          </>
+        )}
         {people.length > 0 && (
           <>
-            {sections > 1 && <h3 className="explore-heading">Players</h3>}
+            {heading("Players")}
             <div className="stack explore-list">
               {people.map((p) => (
                 <Link key={p.id} className="row-card" href={`/players/${encodeURIComponent(p.id)}`}>
@@ -195,33 +352,12 @@ function SearchCard({
             </div>
           </>
         )}
-        {teams.length > 0 && (
+        {teamEvents.length > 0 && (
           <>
-            {sections > 1 && <h3 className="explore-heading">Teams and communities</h3>}
+            {heading(only === "pickup" ? "Pickup games" : "Events")}
             <div className="stack explore-list">
-              {teams.map((t) => {
-                const group = (t.kind ?? "team") !== "team";
-                const sub = listingSubtitle(t);
-                return (
-                  <Link key={t.id} className="row-card" href={`/teams/${encodeURIComponent(t.id)}`}>
-                    <Avatar name={t.name} />
-                    <span>
-                      <b>{t.name || "Team"}</b>
-                      <small>{group ? [sub, t.requiresApproval ? "Approval required" : "Open to join"].filter(Boolean).join(" · ") : sub}</small>
-                    </span>
-                    {myIds.has(t.id) && <span className="pill pill-soft explore-mine">{group ? "Your group" : "Your team"}</span>}
-                  </Link>
-                );
-              })}
-            </div>
-          </>
-        )}
-        {events.length > 0 && (
-          <>
-            {sections > 1 && <h3 className="explore-heading">Tournaments</h3>}
-            <div className="stack explore-list">
-              {events.map((t) => (
-                <TournamentCard key={t.id} t={t} />
+              {teamEvents.map((e) => (
+                <TeamEventRow key={`${e.teamId}/${e.id}`} e={e} />
               ))}
             </div>
           </>
@@ -231,32 +367,150 @@ function SearchCard({
   );
 }
 
-/** The next few published tournaments, with a link to all of them (UpcomingTournamentsCard). */
-function UpcomingCard({ list, error }: { list: Array<Doc<TournamentDoc>> | undefined; error: string | null }) {
-  const shown = (list ?? []).slice(0, previewCount);
+/** A community's own tournament (group tournaments): its page for members, the community's for visitors. */
+function GroupTournamentRow({ t }: { t: EventsPage["tournaments"][number] }) {
+  const { user } = useAuth();
+  const href =
+    t.groupId && t.tournamentId && user
+      ? `/teams/${encodeURIComponent(t.groupId)}/tournaments/${encodeURIComponent(t.tournamentId)}`
+      : t.groupId
+        ? `/teams/${encodeURIComponent(t.groupId)}`
+        : "/explore#coming-up";
+  return (
+    <Link className="row-card" href={href}>
+      <span>
+        <b>{t.name || "Tournament"}</b>
+        <small>
+          <LocalTime iso={t.startsAt} />
+          {t.endsOn && t.endsOn !== t.startsAt?.slice(0, 10) ? ` – ${t.endsOn}` : ""}
+        </small>
+      </span>
+    </Link>
+  );
+}
+
+/** A public team event (a pickup game, a practice open to all) in the results. */
+function TeamEventRow({ e }: { e: PublicTeamEvent }) {
+  return (
+    <EventItem startsAt={e.startsAt}>
+      <Link href={`/teams/${encodeURIComponent(e.teamId)}/schedule?event=${encodeURIComponent(e.id)}`}>
+        <b>{e.title || "Event"}</b>
+      </Link>
+      <small>
+        <LocalTime iso={e.startsAt} style="dateTime" />
+        {e.location ? ` · ${e.location}` : ""}
+      </small>
+      <small>
+        <Link href={`/teams/${encodeURIComponent(e.teamId)}`}>{e.teamName}</Link>
+      </small>
+    </EventItem>
+  );
+}
+
+/** Hosted tournaments and leagues being played right now, with a link to each one's scores; hidden when none are. */
+function LiveNow({ list }: { list: CardTournament[] | undefined }) {
+  const live = (list ?? []).filter((t) => t.status === "live");
+  if (live.length === 0) return null;
+  return (
+    <section className="card explore-live" aria-labelledby="live-now-title">
+      <h2 className="card-title" id="live-now-title">
+        <span className="live-dot" aria-hidden="true" />
+        Live now
+      </h2>
+      <div className="stack explore-list">
+        {live.map((t) => (
+          <TournamentCard key={t.id} t={t} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * What's coming up (the old Events page and Find tournaments): the next
+ * hosted tournaments and leagues, then public team events and community
+ * tournaments on a week strip. The chips narrow it as they do the search.
+ */
+function ComingUp({
+  only,
+  hosted,
+  error,
+  events,
+}: {
+  only: ExploreFilter | null;
+  hosted: CardTournament[] | undefined;
+  error: string | null;
+  events: EventsPage | null | undefined;
+}) {
+  const showHosted = only === null || only === "tournaments" || only === "leagues";
+  const showEvents = only === null || only === "pickup";
+  if (!showHosted && !showEvents) return null;
+  // Live ones are under Live now.
+  const shown = hostedFor(hosted ?? [], only)
+    .filter((t) => t.status !== "live")
+    .slice(0, previewCount);
+  const title = only === "leagues" ? "Leagues" : only === "tournaments" ? "Tournaments" : "Tournaments & leagues";
+  return (
+    <section className="explore-coming" id="coming-up" aria-labelledby="coming-up-title">
+      <div className="explore-section-head">
+        <h2 className="section-title" id="coming-up-title">
+          Coming up
+        </h2>
+        <ScheduleLink />
+      </div>
+      {showHosted && (
+        <section className="card">
+          <div className="card-head">
+            <h3 className="card-title">{title}</h3>
+            <Link href="/tournaments" className="explore-card-link">
+              See all
+            </Link>
+          </div>
+          {error && !hosted ? (
+            <p className="form-error">{error}</p>
+          ) : !hosted ? (
+            <p className="muted" aria-busy="true">
+              Loading…
+            </p>
+          ) : shown.length === 0 ? (
+            <p className="muted small">Nothing coming up yet. Communities and clubs host tournaments and leagues from their Tournaments tab.</p>
+          ) : (
+            <div className="stack explore-list">
+              {shown.map((t) => (
+                <TournamentCard key={t.id} t={t} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+      {showEvents &&
+        (events === undefined ? (
+          <p className="muted" aria-busy="true">
+            Loading events…
+          </p>
+        ) : events === null ? (
+          <p className="form-error">Couldn&apos;t load events. Try again.</p>
+        ) : (
+          <EventsBrowser
+            events={eventsFor(events.events, only)}
+            tournaments={only === "pickup" ? [] : events.tournaments}
+          />
+        ))}
+    </section>
+  );
+}
+
+/** Visitors: the rankings are public, on their own page. */
+function RankingsLink() {
   return (
     <section className="card">
       <div className="card-head">
-        <h2 className="card-title">Tournaments &amp; leagues</h2>
-        <Link href="/tournaments" className="explore-card-link">
-          See all
+        <h2 className="card-title">Rankings</h2>
+        <Link href="/rankings" className="explore-card-link">
+          See rankings
         </Link>
       </div>
-      {error ? (
-        <p className="form-error">{error}</p>
-      ) : !list ? (
-        <p className="muted" aria-busy="true">
-          Loading…
-        </p>
-      ) : shown.length === 0 ? (
-        <p className="muted small">Nothing coming up yet. Communities and clubs host tournaments and leagues from their Tournaments tab.</p>
-      ) : (
-        <div className="stack explore-list">
-          {shown.map((t) => (
-            <TournamentCard key={t.id} t={t} />
-          ))}
-        </div>
-      )}
+      <p className="muted small">Club, college, league and pickup teams ranked by their games in tournaments hosted on Stall 10.</p>
     </section>
   );
 }

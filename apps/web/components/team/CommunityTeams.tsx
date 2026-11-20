@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { callApi, problem } from "@/lib/client";
 import { divisionLabels } from "@/lib/site";
 import { useAuth } from "../AuthProvider";
-import { Avatar } from "../Avatar";
+import { TeamBadge } from "./TeamBadge";
 import { CommunityAdmin } from "./CommunityAdmin";
 import { InvitePeople } from "./InvitePeople";
 import { useTeamHub } from "./TeamContext";
@@ -54,7 +54,7 @@ export function CommunityTeams() {
     <div className="stack">
       {admin && <CommunityAdmin />}
       {inviting && <InvitePeople teamId={inviting.id} teamName={inviting.name} onClose={() => setInviting(null)} />}
-      <section className="card">
+      <section className="card community-teams">
         <h2 className="card-title">
           {teams.length} {teams.length === 1 ? "team" : "teams"}
         </h2>
@@ -62,14 +62,14 @@ export function CommunityTeams() {
           {teams.map((t) => (
             <li key={t.id} className="team-row">
               <Link href={`/teams/${encodeURIComponent(t.id)}`}>
-                <Avatar name={t.name} size={32} />
+                <TeamBadge name={t.name} kind="team" size={40} />
                 <span>
                   <b>{t.name}</b>
                   {t.division && <small>{divisionLabels[t.division] ?? t.division}</small>}
                 </span>
               </Link>
               {canInvite && (
-                <button type="button" className="btn btn-small" onClick={() => setInviting({ id: t.id, name: t.name })}>
+                <button type="button" className="btn btn-small btn-quiet" onClick={() => setInviting({ id: t.id, name: t.name })}>
                   Invite
                 </button>
               )}

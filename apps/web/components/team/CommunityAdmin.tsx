@@ -175,7 +175,7 @@ export function CommunityAdmin() {
                   <button type="button" className="text-btn" disabled={busy || full} onClick={() => void call(`${base}/link-requests/${encodeURIComponent(r.id)}/accept`, "POST", { roles: [] })}>
                     Accept
                   </button>
-                  <button type="button" className="text-btn danger" disabled={busy} onClick={() => void call(`${base}/link-requests/${encodeURIComponent(r.id)}`, "DELETE")}>
+                  <button type="button" className="text-btn" disabled={busy} onClick={() => void call(`${base}/link-requests/${encodeURIComponent(r.id)}`, "DELETE")}>
                     Decline
                   </button>
                 </span>
@@ -204,7 +204,7 @@ export function CommunityAdmin() {
                     </button>
                     <button
                       type="button"
-                      className="text-btn danger"
+                      className="text-btn"
                       disabled={busy}
                       onClick={() => {
                         if (window.confirm(`Take ${t.name || "this team"} out of the community? The team itself stays.`)) void call(`${base}/linked-teams/${encodeURIComponent(id)}`, "DELETE");

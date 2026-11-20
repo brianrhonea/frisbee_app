@@ -61,24 +61,41 @@ function Playbook({ teamId, editor }: { teamId: string; editor: boolean }) {
         </div>
       )}
       <LiveList live={plays} empty={editor ? "No plays yet. Draw your first one." : "No plays yet."}>
-        {(rows) => (
-          <div className="play-grid">
-            {rows
-              .slice()
-              .sort((a, b) => (a.category ?? "").localeCompare(b.category ?? "") || (a.name ?? "").localeCompare(b.name ?? ""))
-              .map((p) => (
-                <Link key={p.id} href={`${base}/${encodeURIComponent(p.id)}`} className="card play-card">
-                  <PlayField elements={p.elements ?? []} arrows={p.arrows ?? []} label={`${p.name ?? "Play"} diagram`} />
-                  <h3>{p.name || "Play"}</h3>
-                  <p className="muted small">
-                    {playCategoryLabels[p.category ?? "offense"] ?? "Play"}
-                    {p.steps?.length ? ` · ${p.steps.length + 1} steps` : ""}
-                  </p>
-                  {p.notes && <p className="small play-notes">{p.notes}</p>}
-                </Link>
-              ))}
-          </div>
-        )}
+        {(rows) => {
+          // Category sections, as the app's playbook: each with its count and a grid of plays.
+          const sorted = rows.slice().sort((a, b) => (a.category ?? "").localeCompare(b.category ?? "") || (a.name ?? "").localeCompare(b.name ?? ""));
+          const sections = [...new Set(sorted.map((p) => p.category ?? "offense"))];
+          return (
+            <div className="playbook-sections">
+              {sections.map((cat) => {
+                const plays = sorted.filter((p) => (p.category ?? "offense") === cat);
+                return (
+                  <section key={cat} className="playbook-section">
+                    <h2 className="playbook-section-head">
+                      {playCategoryLabels[cat] ?? "Plays"}
+                      <span className="muted">
+                        {plays.length} {plays.length === 1 ? "play" : "plays"}
+                      </span>
+                    </h2>
+                    <div className="play-grid">
+                      {plays.map((p) => (
+                        <Link key={p.id} href={`${base}/${encodeURIComponent(p.id)}`} className="card play-card">
+                          <PlayField elements={p.elements ?? []} arrows={p.arrows ?? []} label={`${p.name ?? "Play"} diagram`} />
+                          <h3>{p.name || "Play"}</h3>
+                          <p className="muted small">
+                            {playCategoryLabels[p.category ?? "offense"] ?? "Play"}
+                            {p.steps?.length ? ` · ${p.steps.length + 1} steps` : ""}
+                          </p>
+                          {p.notes && <p className="small play-notes">{p.notes}</p>}
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          );
+        }}
       </LiveList>
     </>
   );

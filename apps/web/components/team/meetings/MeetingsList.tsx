@@ -5,6 +5,7 @@ import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
 import { audienceLine, type Meeting, meetingHref, meetingsHref, roomHref, useTeamMeetings, whenLine } from "./model";
 import "./meetings.css";
+import { DateTile } from "../DateTile";
 import { startOfToday } from "@/lib/dates";
 
 /**
@@ -71,11 +72,14 @@ function MeetingRows({ teamId, meetings, live = false }: { teamId: string; meeti
       {meetings.map((m) => (
         <li key={m.id} className="meeting-row">
           <Link href={meetingHref(teamId, m.id)} className="meeting-row-main">
+            <DateTile startsAt={m.startsAt} />
+            <span className="meeting-row-text">
             <b>{m.title || "Meeting"}</b>
             <small className="muted">
               {whenLine(m)} · {audienceLine(m)}
               {m.status === "ended" ? " · Ended" : ""}
             </small>
+            </span>
           </Link>
           {live && (
             <Link className="btn btn-primary btn-small" href={roomHref(teamId, m.id)}>

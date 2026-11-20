@@ -4,6 +4,42 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.45.0 — 2026-11-20
+
+Navigation and the "Turf & Disc" redesign, with app 0.0.36. Works with
+API 0.33.0. Plan: `docs/redesign-plan.md`.
+
+**Changed**
+- Navigation as the app: Home, Discover, Schedule, Teams, Inbox. Discover
+  (`/explore`) takes in Find events: `/discover`, `/events` and
+  `/schedule?view=find` redirect; chips All, Tournaments, Leagues,
+  Pickup, Teams, Communities, Players (`?only=`). Header "Join free".
+  Home feed tabs Your teams / Following / Everyone (old `?tab=` values
+  still open), no composer on Everyone. The Teams tab opens your only
+  team (`useSingleTeam`) and the team page links back to All teams.
+- New palette and type (light by default, dark from the system or the
+  toggle): turf green for actions, scoreboard navy for live and today,
+  amber only for what is yours to do, red only for live games; Inter and
+  Barlow Condensed (next/font) for scores, dates and the wordmark. New
+  tokens in `site.css` (old names kept as aliases).
+- Every page restyled: frame and public pages (W1), member pages (W2:
+  home "Needs you", schedule grouped by day with "Needs RSVP", inbox,
+  notifications grouped Today / Earlier, settings with an Appearance
+  Light / Dark / System control, create team), team hub (W3: compact
+  header with initials badge and a Message button, schedule with
+  "Directions", a "Notes" card and counts on each RSVP answer, room
+  access None / Read / Read & write, playbook grids, video rows, navy
+  meeting room), tournaments, drafts and stats (W4: navy live header,
+  live days open on Schedule, "Next steps", host chooser "What are you
+  hosting?" / "Host as" in the order Tournament · League · Hat, Teams
+  tab "Accept applications above", publish card with games as a stat,
+  signups Accepted / To decide / Waitlist with an MMP/WMP bar).
+- Delete, leave and other destructive buttons are solid ink or neutral,
+  not red. The finish-sign-up intro no longer mentions USA Ultimate.
+
+**Removed**
+- `/events` page (now Discover's Coming up).
+
 ## 0.44.0 — 2026-11-19
 
 Tournaments tab when one is ahead, with app 0.0.34. Works with API 0.33.0.

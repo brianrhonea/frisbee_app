@@ -173,7 +173,7 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
         {members.length === 0 ? (
           <p className="muted small">No one matches.</p>
         ) : (
-          <ul className="member-grid">
+          <ul className="member-grid member-rows">
             {members.map((m) => (
               <MemberCard key={m.uid} member={m} kind={roster.kind} me={m.uid === user.uid} />
             ))}
@@ -248,28 +248,29 @@ function VisitorRoster({ roster, teamId }: { roster: PublicRoster; teamId: strin
   );
 }
 
+const leads = new Set(["owner", "coach", "captain"]);
+
+/** A member's row: who they are, then their role as a pill (turf for those who run the team, outlined otherwise) and custom roles. */
 function MemberCard({ member, kind, me }: { member: RosterMember; kind: string; me: boolean }) {
-  const tier = member.tier === "player" ? null : roleLabel(member.tier, kind);
+  const tier = roleLabel(member.tier, kind);
   return (
     <li>
       <Link href={`/players/${member.uid}`} className="member-card">
-        <Avatar name={member.name} url={member.photoUrl} size={44} />
+        <Avatar name={member.name} url={member.photoUrl} size={36} />
         <span>
           <b>
             {member.name}
             {me && <span className="muted"> (you)</span>}
           </b>
           {member.username && <small className="muted">@{member.username}</small>}
-          {(tier || member.roles.length > 0) && (
-            <span className="member-roles">
-              {tier && <span className="pill">{tier}</span>}
-              {member.roles.map((r) => (
-                <span key={r} className="pill pill-soft">
-                  {r}
-                </span>
-              ))}
+        </span>
+        <span className="member-roles">
+          <span className={`role-pill${leads.has(member.tier) ? " lead" : ""}`}>{tier}</span>
+          {member.roles.map((r) => (
+            <span key={r} className="pill pill-soft">
+              {r}
             </span>
-          )}
+          ))}
         </span>
       </Link>
     </li>

@@ -88,6 +88,8 @@ function Tournament({ tournamentId }: { tournamentId: string }) {
   const wins = its.filter((g) => gameWon(g) === true).length;
   const losses = its.filter((g) => gameWon(g) === false).length;
   const nameOf = nameMap(players.data);
+  const team = statSheetOfGames(its).team;
+  const pct = (v: number | null) => (v === null ? "–" : `${Math.round(v * 100)}%`);
 
   const update = (change: (x: StatsTournament) => StatsTournament) => {
     if (!access.keepStats) return;
@@ -113,7 +115,7 @@ function Tournament({ tournamentId }: { tournamentId: string }) {
           {access.canDelete && user && (
             <button
               type="button"
-              className="btn btn-small btn-danger"
+              className="btn btn-small"
               onClick={async () => {
                 const ok = await confirmAndDelete(
                   user,
@@ -130,8 +132,25 @@ function Tournament({ tournamentId }: { tournamentId: string }) {
         </div>
       </div>
       {adding && <AddGame teamId={teamId} tournament={t} onClose={() => setAdding(false)} />}
+      {/* The tournament at a glance (the app's summary). */}
+      <section className="card st-numbers st-glance">
+        <div>
+          <b>
+            {wins}–{losses}
+          </b>
+          <small>Record</small>
+        </div>
+        <div>
+          <b>{pct(team.oEfficiency)}</b>
+          <small>O efficiency</small>
+        </div>
+        <div>
+          <b>{pct(team.breakRate)}</b>
+          <small>Break rate</small>
+        </div>
+      </section>
       {error && <p className="form-error">{error}</p>}
-      <div className="segmented" role="tablist" aria-label="Tournament">
+      <div className="segmented st-tabs" role="tablist" aria-label="Tournament">
         {(
           [
             ["games", "Games"],

@@ -20,6 +20,7 @@ import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
 import { VoiceRoom } from "./meetings/VoiceRoom";
+import { useVoice } from "../voice/VoiceProvider";
 import { EmptyState, Loading } from "../StatusViews";
 
 type Room = ManagedRoom & InboxRoom;
@@ -52,6 +53,7 @@ export function TeamChat() {
   const params = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
+  const voice = useVoice();
   const member = viewer.state === "member" ? viewer : null;
   const reads = useLiveDoc<{ rooms?: Record<string, string> }>(member ? `users/${member.uid}/chatReads/${teamId}` : null);
   const all = member?.can("manageChats") ?? false;
@@ -90,28 +92,39 @@ export function TeamChat() {
 
   return (
     <div className="hub-split chat-split">
-      <nav className="hub-list chat-rooms" aria-label="Rooms">
-        {all && (
-          <Link className={`btn btn-small chat-manage-link${managing ? " active" : ""}`} href={managing ? pathname : `${pathname}?manage=1`} scroll={false}>
-            {managing ? "Back to chat" : "Manage rooms"}
-          </Link>
-        )}
+      <nav className="hub-list chat-rooms card" aria-label="Rooms">
+        <div className="chat-rooms-head">
+          <h2 className="card-title">Rooms</h2>
+          {all && (
+            <Link className={`chat-manage-link${managing ? " active" : ""}`} href={managing ? pathname : `${pathname}?manage=1`} scroll={false}>
+              {managing ? "Back to chat" : "Manage rooms"}
+            </Link>
+          )}
+        </div>
         {groups.length === 0 && <EmptyState>No rooms you can read.</EmptyState>}
         {groups.map((g) => (
-          <div key={g.id || "top"}>
+          <div key={g.id || "top"} className="chat-folder-group">
             {g.name && <h3 className="chat-folder">{g.name}</h3>}
             <ul className="hub-items">
               {g.rooms.map((r) => {
                 const unread = r.id !== open?.id && canReadRoom(member.team, member.uid, r) && roomUnread(r, readAt(r.id));
+                // As the app: who's in a voice room shows once you're connected to it.
+                const inVoice = r.kind === "voice" && voice.isIn(teamId, r.id) && voice.state.connected ? voice.state.people.length : 0;
                 return (
                   <li key={r.id}>
                     <Link
                       href={`${pathname}?room=${r.id}`}
                       scroll={false}
-                      className={`chat-room${r.id === open?.id ? " active" : ""}${unread ? " unread" : ""}`}
+                      className={`chat-room${r.id === open?.id ? " active" : ""}${unread ? " unread" : ""}${r.kind === "voice" ? " voice" : ""}`}
                       aria-current={r.id === open?.id ? "true" : undefined}
                     >
-                      <span aria-hidden="true">{r.kind === "voice" ? "🔊" : "#"}</span> {r.name || "Room"}
+                      <span className="chat-room-icon" aria-hidden="true">
+                        {r.kind === "voice" ? "🔊" : "#"}
+                      </span>
+                      <span className="chat-room-name">
+                        {r.name || "Room"}
+                        {inVoice > 0 && <small className="chat-in-voice">{inVoice} in voice</small>}
+                      </span>
                       {unread && <span className="notice-dot" aria-label="Unread" />}
                     </Link>
                   </li>

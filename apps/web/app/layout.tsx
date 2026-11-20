@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Barlow_Condensed, Inter } from "next/font/google";
 import Script from "next/script";
 import type { ReactNode } from "react";
 import { AppFrame } from "@/components/AppFrame";
@@ -9,6 +10,16 @@ import { VoiceProvider } from "@/components/voice/VoiceProvider";
 import { themeScript } from "@/lib/theme";
 import "./site.css";
 import "./app.css";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+// Scores, big numbers, date badges and the wordmark.
+const barlow = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["700", "800"],
+  style: ["normal", "italic"],
+  variable: "--font-barlow",
+  display: "swap",
+});
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -22,15 +33,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#121521" },
-    { media: "(prefers-color-scheme: light)", color: "#f3f5fb" },
+    { media: "(prefers-color-scheme: dark)", color: "#0B121D" },
+    { media: "(prefers-color-scheme: light)", color: "#F5F6F1" },
   ],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     // The theme script sets data-theme before React loads; that's expected.
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${barlow.variable}`} suppressHydrationWarning>
       <body>
         {/* Applies a saved light/dark choice before the page paints. */}
         <Script id="theme" strategy="beforeInteractive">

@@ -40,9 +40,14 @@ export function LearnGuide() {
     <>
       <nav className="card learn-toc" aria-label="On this page">
         <ol>
-          {sections.map(([id, label]) => (
+          {sections.map(([id, label], i) => (
             <li key={id}>
-              <a href={`#${id}`}>{label}</a>
+              <a href={`#${id}`}>
+                <span className="learn-num" aria-hidden="true">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span>{label}</span>
+              </a>
             </li>
           ))}
         </ol>
@@ -198,7 +203,7 @@ export function LearnGuide() {
             <li>
               <b>Find a game:</b> pickup communities and leagues welcome beginners.{" "}
               <Link href="/teams#find">Search for communities and teams near you</Link>, or{" "}
-              <Link href="/events">see what&apos;s coming up</Link>.
+              <Link href="/explore#coming-up">see what&apos;s coming up</Link>.
             </li>
           </ul>
           <p className="muted small">

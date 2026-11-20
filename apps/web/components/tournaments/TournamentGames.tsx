@@ -76,6 +76,21 @@ function slotLabel(s: TournamentState, g: EngineGame, a: boolean): string {
   return `${src.type === "winner" ? "Winner" : "Loser"} of game ${number(src.game)}`;
 }
 
+/** A team's initials in a small square (the app's team mark). */
+export function TeamMark({ name }: { name: string }) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+  return (
+    <span className="hosted-mark" aria-hidden>
+      {initials || "?"}
+    </span>
+  );
+}
+
 type Action = "report" | "confirm" | "awaiting" | null;
 function actionFor(s: TournamentState, g: EngineGame): Action {
   if (!hasTeams(g) || isDone(g)) return null;
@@ -116,7 +131,7 @@ function ScoreForm({ s, g, mode, onDone }: { s: TournamentState; g: EngineGame; 
       <small className="muted">{mode === "report" ? "The other captain confirms it before it counts." : "As the host, this is final right away."}</small>
       {error && <p className="form-error">{error}</p>}
       <div className="home-actions">
-        <button className="btn btn-primary btn-small" disabled={busy}>
+        <button className={`btn btn-small ${mode === "report" ? "hosted-btn-due" : "btn-primary"}`} disabled={busy}>
           {mode === "report" ? "Report score" : isDone(g) ? "Correct the score" : "Set final score"}
         </button>
         <button type="button" className="text-btn" onClick={onDone}>
@@ -148,22 +163,33 @@ export function GameCard({ s, g, focus = false }: { s: TournamentState; g: Engin
   const skipped = skippedGame(g, s.games);
   const canSet = s.manager && hasTeams(g) && !laterGamesPlayed(g, s.games);
   const winner = isDone(g) ? ((g.scoreA ?? 0) > (g.scoreB ?? 0) ? "a" : "b") : null;
+  const due = action === "report" || action === "confirm";
+  const side = (a: boolean) => {
+    const won = winner === (a ? "a" : "b");
+    const name = slotLabel(s, g, a);
+    return (
+      <div className={`hosted-side${winner ? (won ? " hosted-winner" : " hosted-loser") : ""}`}>
+        {(a ? g.teamA : g.teamB) ? <TeamMark name={name} /> : <span className="hosted-mark hosted-mark-tbd" aria-hidden />}
+        <span className="hosted-side-name">{name}</span>
+        <b className="hosted-score">{isDone(g) ? (a ? g.scoreA : g.scoreB) : ""}</b>
+      </div>
+    );
+  };
   const r = g.report;
   const url = `${divisionPath(s.id, s.divisionId ?? "")}/games/${encodeURIComponent(g.id)}`;
   return (
-    <div ref={ref} id={`game-${g.id}`} className={`hosted-game${action === "report" || action === "confirm" ? " hosted-game-you" : ""}${skipped ? " hosted-game-skipped" : ""}`}>
+    <div ref={ref} id={`game-${g.id}`} className={`hosted-game${due ? " hosted-game-you" : ""}${skipped ? " hosted-game-skipped" : ""}`}>
+      {due && <b className="hosted-game-due">{action === "confirm" ? "Your game · confirm the score" : "Your game · needs a score"}</b>}
       <div className="hosted-game-head">
-        <small className="muted">
+        <small>
           Game {g.order + 1} · {g.label}
           {g.startsAt ? ` · ${timeLabel(g.startsAt, zone)}` : ""} · Field {g.field}
         </small>
-        {action && <span className="pill">{badge[action]}</span>}
+        {action ? <span className={`pill ${due ? "hosted-pill-due" : "pill-soft"}`}>{badge[action]}</span> : isDone(g) && <span className="pill pill-soft">Final</span>}
       </div>
       <div className="hosted-game-teams">
-        <span className={winner === "a" ? "hosted-winner" : ""}>{slotLabel(s, g, true)}</span>
-        <b>{isDone(g) ? g.scoreA : ""}</b>
-        <span className={winner === "b" ? "hosted-winner" : ""}>{slotLabel(s, g, false)}</span>
-        <b>{isDone(g) ? g.scoreB : ""}</b>
+        {side(true)}
+        {side(false)}
       </div>
       {skipped && <small className="muted">Not needed: the winners&apos; bracket champion won the final.</small>}
       {r && !isDone(g) && (
@@ -177,13 +203,13 @@ export function GameCard({ s, g, focus = false }: { s: TournamentState; g: Engin
         (action || canSet) && (
           <div className="home-actions hosted-game-actions">
             {action === "report" && (
-              <button type="button" className="btn btn-primary btn-small" onClick={() => setOpen("report")}>
+              <button type="button" className="btn btn-small hosted-btn-due" onClick={() => setOpen("report")}>
                 Report score
               </button>
             )}
             {action === "confirm" && r && (
               <>
-                <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={() => void run(`${url}/confirm`, "POST", { scoreA: r.scoreA, scoreB: r.scoreB })}>
+                <button type="button" className="btn btn-small hosted-btn-due" disabled={busy} onClick={() => void run(`${url}/confirm`, "POST", { scoreA: r.scoreA, scoreB: r.scoreB })}>
                   Confirm {r.scoreA}–{r.scoreB}
                 </button>
                 <button type="button" className="btn btn-small" onClick={() => setOpen("report")}>
@@ -234,18 +260,37 @@ function PublishCard({ s }: { s: TournamentState }) {
       })),
     });
   }
+  const pools = (d.settings.format === "poolsSingleElim" || d.settings.format === "poolsPlacement") && t.kind !== "league";
+  const lastEnd = plan?.days.length ? plan.days[plan.days.length - 1].endsAt : null;
   return (
-    <section className="card">
-      <h2 className="card-title">{s.published ? "Schedule published" : "Schedule"}</h2>
+    <section className="card hosted-publish">
+      <h2 className="card-title">{s.published ? "Schedule published" : plan ? "Schedule is ready to publish" : "Schedule"}</h2>
       {plan ? (
-        <p>
-          {d.seeds.length} teams · {plan.games.length} games
-          {d.settings.format !== "roundRobin" && (d.settings.format === "poolsSingleElim" || d.settings.format === "poolsPlacement") && t.kind !== "league" ? ` · ${d.settings.poolCount} pools` : ""}
-          <br />
-          <small className="muted">
-            {plan.days.map((day) => `${day.startsAt.toLocaleDateString("en-US", { weekday: "short" })} ${timeLabel(day.startsAt)}–${timeLabel(day.endsAt)}`).join(" · ")}
-          </small>
-        </p>
+        <>
+          <p>
+            {d.seeds.length} teams{pools ? ` · ${d.settings.poolCount} pools` : ""}
+            <br />
+            <small className="muted">
+              {plan.days.map((day) => `${day.startsAt.toLocaleDateString("en-US", { weekday: "short" })} ${timeLabel(day.startsAt)}–${timeLabel(day.endsAt)}`).join(" · ")}
+            </small>
+          </p>
+          <div className="hosted-stats">
+            <div className="hosted-stat">
+              <b>{plan.games.length}</b>
+              <span>Games</span>
+            </div>
+            <div className="hosted-stat">
+              <b>{d.settings.fields}</b>
+              <span>{d.settings.fields === 1 ? "Field" : "Fields"}</span>
+            </div>
+            {lastEnd && (
+              <div className="hosted-stat">
+                <b>{lastEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M$/, "")}</b>
+                <span>Last finish</span>
+              </div>
+            )}
+          </div>
+        </>
       ) : (
         <p className="muted">{problem ?? (t.entryType === "players" ? "Draft and save at least two teams first." : "Accept at least two teams first.")}</p>
       )}
@@ -256,7 +301,7 @@ function PublishCard({ s }: { s: TournamentState }) {
       )}
       {error && <p className="form-error">{error}</p>}
       <div className="home-actions">
-        <button type="button" className={`btn btn-small ${s.published && played ? "btn-danger" : "btn-primary"}`} disabled={!plan || busy} onClick={() => void publish()}>
+        <button type="button" className={`btn btn-small ${s.published ? "" : "hosted-btn-due"}`} disabled={!plan || busy} onClick={() => void publish()}>
           {s.published ? "Regenerate schedule" : "Publish schedule"}
         </button>
       </div>
@@ -362,16 +407,17 @@ export function ResultsTab({ s }: { s: TournamentState }) {
       {places.length > 0 && (
         <>
           <section className="card hosted-champion">
+            <small className="hosted-eyebrow">Champion</small>
             <b>{s.teamName(places[0])}</b>
             <span className="muted">{divisionLabel(d)} champion</span>
           </section>
           <section className="card">
             <h2 className="card-title">Final standings</h2>
-            <table className="data-table">
+            <table className="data-table hosted-standings">
               <tbody>
                 {places.map((id, i) => (
-                  <tr key={id}>
-                    <td className="narrow">{ordinal(i + 1)}</td>
+                  <tr key={id} className={s.captainOf.has(id) ? "hosted-mine" : undefined}>
+                    <td className="narrow hosted-rank">{ordinal(i + 1)}</td>
                     <td>{s.teamName(id)}</td>
                     <td className="narrow muted">{d.seeds.includes(id) ? `Seed ${d.seeds.indexOf(id) + 1}` : ""}</td>
                   </tr>
@@ -387,9 +433,10 @@ export function ResultsTab({ s }: { s: TournamentState }) {
           {[...pools.entries()].map(([pool, teams]) => (
             <div key={pool} className="hosted-table-wrap">
               {pools.size > 1 && <h3 className="hosted-heading">Pool {pool}</h3>}
-              <table className="data-table">
+              <table className="data-table hosted-standings">
                 <thead>
                   <tr>
+                    <th className="narrow">#</th>
                     <th>Team</th>
                     <th className="narrow">W</th>
                     <th className="narrow">L</th>
@@ -398,12 +445,13 @@ export function ResultsTab({ s }: { s: TournamentState }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {standings(teams, s.games.filter((g) => g.pool === pool)).map((row) => (
-                    <tr key={row.teamId}>
+                  {standings(teams, s.games.filter((g) => g.pool === pool)).map((row, i) => (
+                    <tr key={row.teamId} className={s.captainOf.has(row.teamId) ? "hosted-mine" : undefined}>
+                      <td className="narrow hosted-rank">{i + 1}</td>
                       <td>{s.teamName(row.teamId)}</td>
                       <td className="narrow">{row.wins}</td>
                       <td className="narrow">{row.losses}</td>
-                      <td className="narrow">{pointDiff(row) > 0 ? `+${pointDiff(row)}` : pointDiff(row)}</td>
+                      <td className={`narrow${pointDiff(row) > 0 ? " hosted-plus" : ""}`}>{pointDiff(row) > 0 ? `+${pointDiff(row)}` : pointDiff(row)}</td>
                       <td className="narrow">{row.pointsFor}</td>
                     </tr>
                   ))}

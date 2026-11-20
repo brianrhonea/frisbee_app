@@ -39,6 +39,8 @@ export interface TeamDoc {
   statKeepers?: string[];
   requiresApproval?: boolean;
   location?: { address?: string } | null;
+  /** When the team was made (an ISO time, as live reads give them): the header's "Est. 2019". */
+  createdAt?: string;
 }
 
 /**

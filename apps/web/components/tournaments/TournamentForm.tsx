@@ -274,7 +274,7 @@ export function TournamentForm({ hostId, tournamentId, type }: { hostId?: string
   );
 
   return (
-    <form className="stack" onSubmit={save}>
+    <form className="stack hosted-form" onSubmit={save}>
       <section className="card settings-form">
         <h2 className="card-title">{host.data?.name ? `Hosted by ${host.data.name}` : "The event"}</h2>
         {isNew ? (

@@ -41,7 +41,7 @@ export function TeamPostCard({
         {showAudience && post.public !== true && <span className="post-tag">Members only</span>}
         {actions}
       </header>
-      {post.location && <p className="muted small" style={{ margin: "4px 0 0" }}>{post.location}</p>}
+      {post.location && <p className="muted small post-place" style={{ margin: "4px 0 0" }}>{post.location}</p>}
       {post.body && <p className="post-body"><LinkedText text={post.body} /></p>}
       {images.length > 0 && (
         <div className={`post-images n${Math.min(images.length, 4)}`}>

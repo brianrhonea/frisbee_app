@@ -6,7 +6,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { callApi, problem } from "@/lib/client";
 import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
-import { NavIcon } from "../NavIcons";
 import { ErrorNote, Loading } from "../StatusViews";
 import { useTeamHub } from "./TeamContext";
 
@@ -26,7 +25,7 @@ export interface HubSection {
  * (Members, for groups); members also get Chat, a team's Playbook, Stats
  * and Videos, and Tournaments and Meetings. Only a school or club
  * (organization) links teams, so only it has Teams (TeamSection._forKind
- * in the app). Settings is the gear beside the tabs. A team with a
+ * in the app). Settings is the gear in the header. A team with a
  * tournament ahead ([tournamentsAhead], hasTournamentAhead in
  * packages/shared) has Tournaments as a tab of its own after Chat, out of
  * More.
@@ -66,7 +65,8 @@ export function inSection(path: string, base: string, section: HubSection): bool
 /**
  * The hub's tabs, sticky under the top bar: up to six in a row (it
  * scrolls sideways on narrow screens, with a fade at the hidden edge),
- * then More ▾ for the rest and the Settings gear, which stay put.
+ * then More ▾ for the rest, which stays put. Members' Settings gear is
+ * in the header (TeamBannerActions).
  */
 export function TeamNav() {
   const { teamId, kind, viewer } = useTeamHub();
@@ -79,7 +79,6 @@ export function TeamNav() {
   const tournamentsAhead = hasTournamentAhead(entered.data ?? [], new Date());
   const { tabs, more } = hubSections(kind, member, { tournamentsAhead });
   const scroller = useScrollEdges<HTMLElement>();
-  const onSettings = path.startsWith(`${base}/settings`);
 
   return (
     <div className="team-tabs-bar">
@@ -94,17 +93,6 @@ export function TeamNav() {
         })}
       </nav>
       {more.length > 0 && <MoreMenu base={base} sections={more} path={path} />}
-      {member && (
-        <Link
-          href={`${base}/settings`}
-          className={`icon-btn team-gear${onSettings ? " on" : ""}`}
-          aria-label="Settings"
-          title="Settings"
-          aria-current={onSettings ? "page" : undefined}
-        >
-          <NavIcon name="settings" size={20} />
-        </Link>
-      )}
     </div>
   );
 }
@@ -167,7 +155,7 @@ function MoreMenu({ base, sections, path }: { base: string; sections: HubSection
         aria-controls="team-more-menu"
         onClick={() => setOpen((o) => !o)}
       >
-        {active ? active.label : "More"} <span aria-hidden="true">▾</span>
+        {active ? `More: ${active.label}` : "More"} <span aria-hidden="true">▾</span>
       </button>
       {open && (
         <ul className="team-more-menu card" id="team-more-menu">

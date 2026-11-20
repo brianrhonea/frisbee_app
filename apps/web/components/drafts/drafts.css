@@ -1,22 +1,25 @@
 /* Signups, the captains' draft board and the team draft editor
-   (components/drafts). Uses the site's tokens (site.css) and cards. */
+   (components/drafts). Uses the site's tokens (site.css) and cards:
+   turf picks, scoreboard navy while a draft runs, amber only on the
+   viewer's own pick (and an auto-pick once time is up). */
 
 .drafts { display: grid; gap: 16px; }
 .drafts .segmented { justify-self: start; max-width: 100%; overflow-x: auto; }
-.draft-title { font-size: 1.25rem; margin: 0; }
-.draft-subtitle { font-size: 1rem; margin: 8px 0 0; }
+.draft-title { font-size: clamp(1.4rem, 3vw, 1.75rem); font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+.draft-subtitle { font-size: 1rem; font-weight: 800; margin: 8px 0 0; }
 .draft-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .draft-head .card-title { margin: 0; }
 .card > .draft-head { margin-bottom: 12px; }
 
 .draft-status { margin-left: 8px; font-size: 0.8rem; vertical-align: middle; }
-.draft-status-accepted { background: var(--accent-soft); color: var(--accent); }
-.draft-status-waitlisted { background: var(--amber); color: var(--on-amber); }
-.draft-status-declined, .draft-status-withdrawn { color: var(--danger); }
+.draft-status-accepted { background: var(--accent-soft); color: var(--accent-ink); }
+.draft-status-waitlisted { background: var(--field); color: var(--ink-soft); }
+.draft-status-declined, .draft-status-withdrawn { background: var(--field); color: var(--muted); }
 
 .draft-callout {
-  border: 1px solid var(--line);
+  border: 1px solid transparent;
   background: var(--accent-soft);
+  color: var(--ink);
   border-radius: var(--radius);
   padding: 14px 16px;
   display: grid;
@@ -32,24 +35,45 @@
 .draft-team-list li { display: grid; gap: 2px; }
 
 /* The board: every team side by side on a wide screen. */
-.draft-board { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-.draft-team { margin: 0; }
-.draft-team ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
-.draft-team.on-clock { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.draft-board { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.draft-team { margin: 0; display: grid; gap: 8px; align-content: start; padding: 14px; }
+.draft-team > p { margin: 0; }
+.draft-team-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.draft-team-head .card-title { margin: 0; font-size: 0.95rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.draft-count { font-family: var(--font-score); font-weight: 800; font-size: 1.3rem; line-height: 1; color: var(--ink-soft); }
+.draft-team.on-clock { border: 2px solid var(--accent); padding: 13px; box-shadow: none; }
+.draft-team.on-clock.mine { border-color: var(--disc); }
+.draft-picks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.draft-picks li, .draft-team .draft-roster li {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 7px 10px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-ink);
+  font-size: 0.9rem; font-weight: 600; border-bottom: 0;
+}
+.draft-picks li > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.draft-cap { margin-left: 6px; font-size: 0.7rem; font-weight: 800; text-decoration: none; color: var(--accent); }
+.draft-skill { font-family: var(--font-score); font-weight: 800; font-size: 1.05rem; line-height: 1; }
 
+/* The banner: navy while the draft runs, amber on the viewer's own pick. */
 .draft-banner {
   border-radius: var(--radius);
-  padding: 14px 16px;
-  display: grid;
-  gap: 2px;
-  background: var(--field);
-  border: 1px solid var(--line);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--board);
+  color: var(--on-board);
 }
-.draft-banner b { font-size: 1.05rem; }
-.draft-banner-mine { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-.draft-banner-live { background: var(--accent-soft); }
-.draft-banner-done { background: var(--amber); color: var(--on-amber); }
+.draft-banner > div { display: grid; gap: 2px; min-width: 0; }
+.draft-banner b { font-size: 1.15rem; font-weight: 800; }
+.draft-banner span { color: var(--board-muted); font-size: 0.9rem; font-weight: 600; }
+.draft-banner .draft-clock { font-family: var(--font-score); font-weight: 800; font-size: 2.4rem; line-height: 1; color: inherit; }
+.draft-banner-mine { background: var(--disc); color: var(--on-disc); }
+.draft-banner-mine span { color: var(--on-disc); }
+.draft-banner-finished { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+.draft-banner-finished span { color: var(--muted); }
 .draft-controls { margin: 0; align-items: center; }
+.btn.draft-btn-due { background: var(--disc); color: var(--on-disc); border-color: var(--disc); }
 
 .draft-pool, .draft-roster { list-style: none; margin: 0; padding: 0; display: grid; }
 .draft-pool li, .draft-roster li {
@@ -61,13 +85,39 @@
   border-bottom: 1px solid var(--line);
 }
 .draft-pool li:last-child, .draft-roster li:last-child { border-bottom: 0; }
+.draft-team .draft-roster { gap: 6px; }
+.draft-team .draft-roster li .muted { color: var(--accent-ink); opacity: 0.8; }
 .draft-roster select, .draft-pool select { max-width: 45%; height: 34px; }
 .draft-filters { margin: 0; align-items: center; }
 
 .draft-captain-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin: 12px 0; }
 .draft-setup-form { max-width: 320px; margin-top: 8px; }
 .draft-stepper { display: flex; align-items: center; gap: 10px; }
+.draft-stepper b, .draft-stepper strong { font-family: var(--font-score); font-size: 1.4rem; }
 
 @media (max-width: 560px) {
   .draft-board { grid-template-columns: 1fr; }
+  .draft-banner { padding: 14px 16px; }
+  .draft-banner .draft-clock { font-size: 2rem; }
 }
+
+/* The host's signup summary (PlayersTab in the app): tiles, the gender
+   split and average skill. "To decide" is amber while signups wait. */
+.draft-summary { display: grid; gap: 10px; margin-bottom: 12px; }
+.draft-summary > b { font-size: 0.95rem; }
+.draft-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.draft-tile { display: grid; gap: 2px; padding: 10px 14px; border-radius: var(--radius-control); background: var(--field); }
+.draft-tile b { font-family: var(--font-score); font-weight: 800; font-size: 1.8rem; line-height: 1; }
+.draft-tile span { font-size: 0.78rem; color: var(--muted); }
+.draft-tile-due { background: var(--disc-soft); }
+.draft-tile-due span { color: var(--disc-ink); font-weight: 700; }
+.draft-split { display: flex; gap: 2px; height: 10px; border-radius: 5px; overflow: hidden; }
+.draft-split i { display: block; min-width: 4px; }
+.draft-dot-mmp { background: var(--accent); }
+.draft-dot-wmp { background: var(--ink-soft); }
+.draft-dot-unset { background: var(--line-2); }
+.draft-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.8rem; color: var(--ink-soft); }
+.draft-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.draft-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.draft-scroll .data-table tr.draft-row-due td { background: var(--disc-soft); }
+.draft-row-due .draft-status-applied { background: var(--disc); color: var(--on-disc); }

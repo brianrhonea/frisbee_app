@@ -23,10 +23,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FollowButton } from "@/components/FollowButton";
 import { callApi } from "@/lib/client";
-import { useRenderZone } from "@/lib/renderZone";
+import { dayKey, useRenderZone } from "@/lib/renderZone";
 import type { Doc } from "@/lib/live";
 import { SignupsSlot } from "./SignupsSlot";
-import { DivisionPicker, NoDivisions, ResultsTab, ScheduleTab } from "./TournamentGames";
+import { DivisionPicker, NoDivisions, ResultsTab, ScheduleTab, TeamMark } from "./TournamentGames";
 import { TournamentNews } from "./TournamentNews";
 import { JoinToTakePart, PublicNews } from "./VisitorParts";
 import { datesLabel, StatusBadge } from "./TournamentLists";
@@ -61,7 +61,9 @@ export function TournamentPage({ tournamentId, fallbackHostId }: { tournamentId:
  * Follow, entering a team and signing up).
  */
 export function TournamentView({ s, open }: { s: TournamentState; open?: { tab?: string; game?: string; division?: string } }) {
-  const [tab, setTab] = useState<Tab>(open?.game ? "schedule" : open?.tab === "schedule" || open?.tab === "results" ? open.tab : "overview");
+  // A game to open or an asked-for tab first; on a live event the
+  // schedule with the viewer's games (startTab in the app).
+  const [tab, setTab] = useState<Tab>(open?.game ? "schedule" : open?.tab === "schedule" || open?.tab === "results" ? open.tab : s.t?.status === "live" ? "schedule" : "overview");
   // The linked division, once the divisions are in.
   const pickedDivision = useRef(false);
   const hasDivision = !!open?.division && s.divisions.some((d) => d.id === open.division);
@@ -85,29 +87,47 @@ export function TournamentView({ s, open }: { s: TournamentState; open?: { tab?:
     ["news", "News"],
   ];
   const current = tabs.some(([k]) => k === tab) ? tab : "overview";
+  const board = boardStatus(t, zone);
+  const host = (
+    <>
+      {hostedTypeLabels[hostedType(t)]} · hosted by <Link href={`/teams/${encodeURIComponent(t.hostId)}`}>{t.hostName}</Link>
+    </>
+  );
+  const where = `${datesLabel(t.startsOn, t.endsOn, zone)}${t.location ? ` · ${t.location}` : ""}`;
   return (
     <div className="stack hosted-page">
-      <header className="hosted-head">
-        <div>
-          <small className="muted">
-            {hostedTypeLabels[hostedType(t)]} · hosted by <Link href={`/teams/${encodeURIComponent(t.hostId)}`}>{t.hostName}</Link>
-          </small>
+      <header className={`hosted-head${board ? " hosted-board" : ""}`}>
+        <div className="hosted-head-main">
+          {board ? (
+            <div className="hosted-head-tags">
+              {t.status === "live" ? (
+                <span className="hosted-live-pill">
+                  <i aria-hidden />
+                  {board}
+                </span>
+              ) : (
+                <span className="hosted-today-pill">{board}</span>
+              )}
+              <small className="hosted-eyebrow">{host}</small>
+            </div>
+          ) : (
+            <div className="hosted-head-tags">
+              <StatusBadge status={t.status} />
+              <small className="muted">{host}</small>
+            </div>
+          )}
           <h1>{t.name}</h1>
-          <p className="muted">
-            {datesLabel(t.startsOn, t.endsOn, zone)}
-            {t.location ? ` · ${t.location}` : ""}
-          </p>
-          <StatusBadge status={t.status} />
+          <p className="hosted-meta">{where}</p>
         </div>
-        <div className="home-actions">
+        <div className="home-actions hosted-head-actions">
           {t.status !== "draft" && !s.visitor && <FollowButton type="tournament" targetId={tournamentId} groupId={t.hostId} />}
           {s.manager && <ManagerMenu s={s} />}
         </div>
       </header>
       {s.visitor && <JoinToTakePart next={s.visitorNext ?? `/tournaments/${encodeURIComponent(tournamentId)}`} />}
-      <nav className="segmented hosted-tabs" aria-label="Sections">
+      <nav className="hosted-tabs" aria-label="Sections">
         {tabs.map(([k, label]) => (
-          <button key={k} type="button" className={k === current ? "on" : ""} onClick={() => setTab(k)}>
+          <button key={k} type="button" className={k === current ? "on" : ""} aria-pressed={k === current} onClick={() => setTab(k)}>
             {label}
           </button>
         ))}
@@ -122,6 +142,25 @@ export function TournamentView({ s, open }: { s: TournamentState; open?: { tab?:
       {current === "news" && (s.visitor ? <PublicNews s={s} /> : <TournamentNews s={s} />)}
     </div>
   );
+}
+
+/**
+ * What the scoreboard-navy header says, or null for the plain one (onBoard
+ * in the app): "Live" while it's live, "Today" on a scheduled event's days,
+ * with "· Week 3 of 8" in a league's season. Days are in [zone]
+ * (useRenderZone), so the server's HTML and the first render agree.
+ */
+function boardStatus(t: NonNullable<TournamentState["t"]>, zone: string | undefined): string | null {
+  if (!t.startsOn || (t.status !== "live" && t.status !== "scheduled")) return t.status === "live" ? "Live" : null;
+  const today = dayKey(new Date(), zone);
+  const start = dayKey(new Date(t.startsOn), zone);
+  const end = dayKey(new Date(t.endsOn ?? t.startsOn), zone);
+  if (t.status !== "live" && (today < start || today > end)) return null;
+  const label = t.status === "live" ? "Live" : "Today";
+  const weeks = t.kind === "league" ? t.season?.weeks : undefined;
+  if (!weeks) return label;
+  const days = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000);
+  return `${label} · Week ${Math.min(Math.max(Math.floor(days / 7) + 1, 1), weeks)} of ${weeks}`;
 }
 
 /**
@@ -162,7 +201,7 @@ function ManagerMenu({ s }: { s: TournamentState }) {
       <Link className="btn btn-small" href={`${`/tournaments/${encodeURIComponent(s.id)}`}/edit`}>
         Edit details
       </Link>
-      <button type="button" className="btn btn-small btn-danger" disabled={busy} onClick={() => void remove()}>
+      <button type="button" className="btn btn-small" disabled={busy} onClick={() => void remove()}>
         Delete
       </button>
       {error && <p className="form-error">{error}</p>}
@@ -176,7 +215,11 @@ const nextSteps: Partial<Record<HostedStatus, Array<{ to: HostedStatus; label: s
   seeding: [{ to: "registration", label: "Reopen registration", hint: "Registration is closed. Seed the teams, then publish the schedule.", quiet: true }],
 };
 
-/** The host's checklist (EventGuide, host side). */
+/**
+ * The host's checklist (HostChecklist in the app): "Next steps", how many
+ * are done, then each step ticked when done and the first one left in
+ * amber (the host's to do), then the status button for where it's at.
+ */
 function HostChecklist({ s }: { s: TournamentState }) {
   const { busy, error, run } = useAction();
   const t = s.t;
@@ -184,17 +227,40 @@ function HostChecklist({ s }: { s: TournamentState }) {
   const steps = nextSteps[t.status] ?? [];
   const accepted = s.entriesWith("accepted").length;
   const waiting = s.entriesWith("applied").length;
+  const items: Array<{ done: boolean; label: string }> = [
+    { done: s.divisions.length > 0, label: s.divisions.length ? `${s.divisions.length} ${s.divisions.length === 1 ? "division" : "divisions"} open` : "Open a division under Edit details" },
+    { done: t.status !== "draft", label: t.status === "draft" ? "Publish it so teams can find it" : "Published" },
+    ...(takesTeams(t) ? [{ done: accepted >= 2, label: `${accepted} ${accepted === 1 ? "team" : "teams"} accepted${waiting ? `, ${waiting} waiting on you` : ""}` }] : []),
+    { done: s.published, label: s.published ? "Schedule published" : "Publish the schedule (Schedule tab)" },
+  ];
+  const done = items.filter((x) => x.done).length;
+  const current = items.findIndex((x) => !x.done);
   return (
-    <section className="card">
-      <h2 className="card-title">Hosting</h2>
-      <ul className="hosted-checklist">
-        <li className={s.divisions.length ? "done" : ""}>{s.divisions.length ? `${s.divisions.length} ${s.divisions.length === 1 ? "division" : "divisions"} open` : "Open a division under Edit details"}</li>
-        <li className={t.status !== "draft" ? "done" : ""}>{t.status === "draft" ? "Publish it so teams can find it" : "Published"}</li>
-        {takesTeams(t) && <li className={accepted >= 2 ? "done" : ""}>{`${accepted} ${accepted === 1 ? "team" : "teams"} accepted${waiting ? `, ${waiting} waiting on you` : ""}`}</li>}
-        <li className={s.published ? "done" : ""}>{s.published ? "Schedule published" : "Publish the schedule (Schedule tab)"}</li>
-      </ul>
+    <section className="card hosted-steps">
+      <div className="card-head">
+        <h2 className="card-title">Next steps</h2>
+        <small className="muted">
+          {done} of {items.length} done
+        </small>
+      </div>
+      <div className="hosted-steps-bar" aria-hidden>
+        <i style={{ width: `${(done / items.length) * 100}%` }} />
+      </div>
+      <ol className="hosted-checklist">
+        {items.map((x, i) => (
+          <li key={i} className={x.done ? "done" : i === current ? "current" : ""}>
+            <span className="hosted-step-mark" aria-hidden>
+              {x.done ? "✓" : i + 1}
+            </span>
+            <span>
+              {x.label}
+              {x.done && <span className="sr-only"> (done)</span>}
+            </span>
+          </li>
+        ))}
+      </ol>
       {steps.map((x) => (
-        <div key={x.to} className="stack">
+        <div key={x.to} className="stack hosted-step-action">
           <small className="muted">{x.hint}</small>
           <div className="home-actions">
             <button type="button" className={`btn btn-small ${x.quiet ? "" : "btn-primary"}`} disabled={busy || (x.to === "registration" && t.status === "draft" && !s.divisions.length)} onClick={() => void run(`${tournamentPath(s.id)}/status`, "PUT", { status: x.to })}>
@@ -496,21 +562,76 @@ function TeamsTab({ s }: { s: TournamentState }) {
   };
   const decide = (teamId: string, status: string) => void run(`${tournamentPath(s.id)}/entries/${encodeURIComponent(teamId)}/status`, "PUT", { status });
   const waiting = s.entriesIn(d.id).filter((e) => e.status === "applied" || e.status === "waitlisted");
+  const applied = waiting.filter((e) => e.status === "applied").length;
   const others = s.entriesIn(d.id).filter((e) => e.status === "invited" || e.status === "declined" || e.status === "withdrawn");
   return (
     <div className="stack">
       <DivisionPicker s={s} />
       {!s.manager && !s.visitor && <YourTeams s={s} />}
+      <div className="hosted-stats">
+        <div className="hosted-stat">
+          <b>
+            {d.seeds.length}
+            <small>/{d.maxTeams}</small>
+          </b>
+          <span>Accepted</span>
+        </div>
+        {/* A visitor's public page has only the accepted teams. */}
+        {!s.visitor && (
+          <>
+            <div className="hosted-stat">
+              <b>{waiting.length - applied}</b>
+              <span>Waitlist</span>
+            </div>
+            <div className={`hosted-stat${s.manager && applied > 0 ? " hosted-stat-due" : ""}`}>
+              <b>{applied}</b>
+              <span>Applied</span>
+            </div>
+          </>
+        )}
+      </div>
+      {s.manager && waiting.length > 0 && (
+        <section className="card">
+          <div className="card-head">
+            <h2 className="card-title">Waiting</h2>
+            {applied > 0 && <small className="hosted-due-note">Waiting on you</small>}
+          </div>
+          <div className="stack">
+            {waiting.map((e) => (
+              <div key={e.id} className={`row-card${e.status === "applied" ? " hosted-row-due" : ""}`}>
+                <span>
+                  <b>{e.teamName}</b> <span className={`pill ${e.status === "applied" ? "hosted-pill-due" : "pill-soft"}`}>{entryStatusLabels[e.status]}</span>
+                </span>
+                <span className="home-actions">
+                  <button type="button" className="btn btn-primary btn-small" disabled={busy || d.seeds.length >= d.maxTeams} onClick={() => decide(e.id, "accepted")}>
+                    Accept
+                  </button>
+                  {e.status !== "waitlisted" && (
+                    <button type="button" className="btn btn-small" disabled={busy} onClick={() => decide(e.id, "waitlisted")}>
+                      Waitlist
+                    </button>
+                  )}
+                  <button type="button" className="text-btn" disabled={busy} onClick={() => decide(e.id, "declined")}>
+                    Decline
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="card">
         <h2 className="card-title">
           {d.seeds.length} of {d.maxTeams} teams
         </h2>
-        {d.seeds.length === 0 && <p className="muted">No teams accepted yet.</p>}
+        {d.seeds.length === 0 && <p className="muted">{s.manager ? "No teams yet. Accept applications above or invite teams." : "No teams accepted yet."}</p>}
         <ol className="hosted-seeds">
           {d.seeds.map((id, i) => (
             <li key={id} className="row-card">
-              <span>
-                <b>{i + 1}</b> {s.teamName(id)}
+              <span className="hosted-seed">
+                <b className="hosted-seed-n">{i + 1}</b>
+                <TeamMark name={s.teamName(id)} />
+                <span>{s.teamName(id)}</span>
               </span>
               {seedable && (
                 <span className="home-actions">
@@ -532,33 +653,6 @@ function TeamsTab({ s }: { s: TournamentState }) {
         </ol>
         {s.manager && s.published && <small className="muted">Seeds are locked once the schedule is published.</small>}
       </section>
-      {s.manager && waiting.length > 0 && (
-        <section className="card">
-          <h2 className="card-title">Waiting on you</h2>
-          <div className="stack">
-            {waiting.map((e) => (
-              <div key={e.id} className="row-card">
-                <span>
-                  <b>{e.teamName}</b> <span className="pill">{entryStatusLabels[e.status]}</span>
-                </span>
-                <span className="home-actions">
-                  <button type="button" className="btn btn-primary btn-small" disabled={busy || d.seeds.length >= d.maxTeams} onClick={() => decide(e.id, "accepted")}>
-                    Accept
-                  </button>
-                  {e.status !== "waitlisted" && (
-                    <button type="button" className="btn btn-small" disabled={busy} onClick={() => decide(e.id, "waitlisted")}>
-                      Waitlist
-                    </button>
-                  )}
-                  <button type="button" className="text-btn" disabled={busy} onClick={() => decide(e.id, "declined")}>
-                    Decline
-                  </button>
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
       {s.manager && others.length > 0 && (
         <section className="card">
           <h2 className="card-title">Invited and others</h2>

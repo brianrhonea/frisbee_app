@@ -177,7 +177,7 @@ export function TeamVideos() {
                   <button type="button" className="text-btn" disabled={busy} onClick={() => setFolderForm({ id: current.id, name: current.name ?? "" })}>
                     Rename &quot;{current.name}&quot;
                   </button>
-                  <button type="button" className="text-btn danger" disabled={busy} onClick={() => deleteFolder(current)}>
+                  <button type="button" className="text-btn" disabled={busy} onClick={() => deleteFolder(current)}>
                     Delete &quot;{current.name}&quot;
                   </button>
                 </>
@@ -227,7 +227,7 @@ export function TeamVideos() {
           </p>
         )
       ) : (
-        <div className="video-grid">
+        <div className="card video-list">
           {visible.map((v) => (
             <VideoCard
               key={v.id}
@@ -290,7 +290,7 @@ function VideoCard({
     (e.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open");
   };
   return (
-    <article className="card video-card">
+    <article className="video-card video-row">
       <Link href={videoHref(teamId, v.id)} className="video-thumb" aria-label={`Watch ${v.title || "video"}`}>
         {v.file ? (
           <span className="video-thumb-file">
@@ -328,7 +328,7 @@ function VideoCard({
                   Move to folder
                 </button>
               )}
-              <button type="button" className="danger" onClick={(e) => { close(e); onRemove(); }}>
+              <button type="button" onClick={(e) => { close(e); onRemove(); }}>
                 Remove
               </button>
             </div>

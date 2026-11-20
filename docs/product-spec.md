@@ -563,6 +563,19 @@ everything the app does on the website alone, styled like the website
     with the tournament-day card on both. One rule: app
     `hasTournamentAhead`, shared `hasTournamentAhead`, vectors
     `fixtures/tournament_day/ahead.json`.
+25. Redesign ("Turf & Disc", `docs/redesign-plan.md`; app 0.0.36, web
+   0.45.0): [x] same tabs on both (Home, Discover, Schedule, Teams,
+   Inbox); [x] Discover merges Explore and Find events on both
+   (`/discover`, `/events` and `/schedule?view=find` redirect; chips All,
+   Tournaments, Leagues, Pickup, Teams, Communities, Players); [x] feed
+   tabs Your teams / Following / Everyone on both (no composer on
+   Everyone); [x] the Teams tab opens your only team on both; [x] live
+   tournament days open on Schedule; "Next steps"; host chooser "What are
+   you hosting?" / "Host as" (Tournament · League · Hat); [x] RSVP counts
+   on each answer, "Needs RSVP", "Directions", "Notes"; [x] compact team
+   header with initials and Message; [x] Light / Dark / System on both.
+   Each platform keeps its own layout. Not yet on the app: public pickup
+   games on Discover (F29).
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

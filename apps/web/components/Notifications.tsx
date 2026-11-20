@@ -9,6 +9,7 @@ import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
 import { FollowButton } from "./FollowButton";
 import { LocalTime } from "./LocalTime";
+import "./member.css";
 
 /** A notification as the functions write it (AppNotification in the app). */
 interface Notice {
@@ -23,6 +24,20 @@ interface Notice {
 }
 
 const shown = 100;
+
+/** Today's notifications, then earlier ones (the app's Today / Earlier groups). */
+function byDay<T extends { createdAt?: string }>(list: T[]): Array<[string, T[]]> {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const today = list.filter((n) => Date.parse(n.createdAt ?? "") >= start.getTime());
+  const earlier = list.filter((n) => !(Date.parse(n.createdAt ?? "") >= start.getTime()));
+  return (
+    [
+      ["Today", today],
+      ["Earlier", earlier],
+    ] as Array<[string, T[]]>
+  ).filter(([, l]) => l.length > 0);
+}
 
 const filters = [
   ["all", "All"],
@@ -124,7 +139,7 @@ export function Notifications() {
           ))}
         </div>
         <span className="composer-spacer" />
-        <button type="button" className="btn btn-small" disabled={unread.length === 0} onClick={() => void mark(unread.map((n) => n.id))}>
+        <button type="button" className="text-btn notice-mark" disabled={unread.length === 0} onClick={() => void mark(unread.map((n) => n.id))}>
           Mark all read
         </button>
         <button
@@ -139,24 +154,35 @@ export function Notifications() {
         </button>
       </div>
 
-      <Link href="/notifications/requests" className={`notice notice-requests${waiting > 0 ? " unread" : ""}`}>
-        <span className="notice-dot" aria-hidden="true" />
-        <span className="notice-main">
-          <b>Follow requests</b>
-          <span className="notice-body">{waiting === 0 ? "None waiting" : `${waiting} waiting for an answer`}</span>
-        </span>
-        {waiting > 0 && <span className="pill">{waiting}</span>}
-        <span aria-hidden="true">›</span>
-      </Link>
+      {/* Follow requests waiting are the member's to do: their own group, in amber. */}
+      <section className={`notice-group${waiting > 0 ? " needs" : ""}`} aria-labelledby="notice-group-requests">
+        <h2 className="notice-group-head" id="notice-group-requests">
+          {waiting > 0 ? "Needs you" : "Requests"}
+        </h2>
+        <Link href="/notifications/requests" className={`notice notice-requests${waiting > 0 ? " unread" : ""}`}>
+          <span className="notice-dot" aria-hidden="true" />
+          <span className="notice-main">
+            <b>Follow requests</b>
+            <span className="notice-body">{waiting === 0 ? "None waiting" : `${waiting} waiting for an answer`}</span>
+          </span>
+          {waiting > 0 && <span className="pill">{waiting}</span>}
+          <span aria-hidden="true">›</span>
+        </Link>
+      </section>
 
       {error && <p className="form-error">{error}</p>}
       {data === undefined && !error && <p className="muted">Loading…</p>}
       {data && list.length === 0 && <p className="empty">You're all caught up.</p>}
-      <ul className="notice-list">
-        {list.map((n) => (
-          <NoticeRow key={n.id} n={n} onOpen={() => !n.read && void mark([n.id])} onClear={() => void clear([n.id])} />
-        ))}
-      </ul>
+      {byDay(list).map(([day, items]) => (
+        <section key={day} className="notice-group" aria-label={day}>
+          <h2 className="notice-group-head">{day}</h2>
+          <ul className="notice-list">
+            {items.map((n) => (
+              <NoticeRow key={n.id} n={n} onOpen={() => !n.read && void mark([n.id])} onClear={() => void clear([n.id])} />
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

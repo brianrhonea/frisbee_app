@@ -8,6 +8,16 @@ const config: NextConfig = {
   reactStrictMode: true,
   // Shown in the footer; bump it in package.json with CHANGELOG.md.
   env: { NEXT_PUBLIC_APP_VERSION: version },
+  async redirects() {
+    // Discover (/explore) replaced Explore and Events; old links and the
+    // new name land there, with any ?q= and ?only= kept.
+    return [
+      { source: "/events", destination: "/explore#coming-up", permanent: false },
+      { source: "/discover", destination: "/explore", permanent: false },
+      // The app's old "Find events" link (Routes.findEvents) opens Discover there too.
+      { source: "/schedule", has: [{ type: "query", key: "view", value: "find" }], destination: "/explore", permanent: false },
+    ];
+  },
   async headers() {
     return [
       {

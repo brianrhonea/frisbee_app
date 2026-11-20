@@ -20,20 +20,38 @@ import { canOn } from "./tournaments/useTournament";
 import { TournamentDayCard } from "./tournaments/TournamentDayCard";
 import { useTournamentDays } from "./tournaments/useTournamentDays";
 import { useMyTeams } from "./useMyTeams";
+import { needsRsvp, RsvpPill } from "./RsvpPill";
+import "./member.css";
 
-const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Not going" };
+const rsvpLabels: Record<string, string> = { going: "Going", maybe: "Maybe", notGoing: "Can't go" };
 
-type Tab = "foryou" | "community" | "teams";
+/**
+ * The feed's tabs, as the app's Home: the member's teams first (the
+ * default), then what they follow (once For you: people, teams and
+ * communities they follow, and their teams), then everyone's posts (once
+ * Community).
+ */
+export type Tab = "teams" | "following" | "everyone";
 const tabs: Array<[Tab, string]> = [
-  ["foryou", "For you"],
-  ["community", "Community"],
   ["teams", "Your teams"],
+  ["following", "Following"],
+  ["everyone", "Everyone"],
 ];
+/** The default tab, which the address leaves out. */
+const defaultTab: Tab = "teams";
+/** Old `?tab=` names, from links made before the tabs were renamed. */
+const oldTabs: Record<string, Tab> = { foryou: "following", community: "everyone" };
+
+/** The tab a `?tab=` value names (old names too); the default for none or an unknown one. */
+export function parseTab(value: string | null | undefined): Tab {
+  if (value === "teams" || value === "following" || value === "everyone") return value;
+  return (value && oldTabs[value]) || defaultTab;
+}
+
 /** The tab in the URL (?tab=), so it's linkable and survives a reload. */
 function tabFromUrl(): Tab {
-  if (typeof window === "undefined") return "foryou";
-  const t = new URLSearchParams(window.location.search).get("tab");
-  return t === "community" || t === "teams" ? t : "foryou";
+  if (typeof window === "undefined") return defaultTab;
+  return parseTab(new URLSearchParams(window.location.search).get("tab"));
 }
 type Feed = { posts: PublicPost[]; next: number | null; busy: boolean; error: boolean };
 const emptyFeed: Feed = { posts: [], next: null, busy: false, error: false };
@@ -59,17 +77,17 @@ function useAudiences(uid: string): Audience[] {
 }
 
 /**
- * A signed-in member's home, like a social feed: a greeting, the composer
- * (to Everyone or a team they run), their teams in a strip, then the feed
- * (For you, the whole Community, or their teams' posts), loading as it
- * scrolls. Beside it: invitations, join requests waiting on them, what's
+ * A signed-in member's home, like a social feed: a greeting, their teams
+ * in a strip (where the sidebar doesn't list them), then the feed (their
+ * teams' posts, what they follow, or everyone's) under the composer (to
+ * Everyone or a team they run), loading as it scrolls. Beside it: invitations, join requests waiting on them, what's
  * coming up and one promo; on phones the invitations and next event come
  * above the feed.
  */
 export function Dashboard({ user }: { user: User }) {
   const [home, setHome] = useState<MeHome | null>(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<Tab>("foryou");
+  const [tab, setTab] = useState<Tab>(defaultTab);
   const [older, setOlder] = useState<Feed>(emptyFeed);
   const [community, setCommunity] = useState<Feed | null>(null);
   const audiences = useAudiences(user.uid);
@@ -132,19 +150,21 @@ export function Dashboard({ user }: { user: User }) {
 
   function pickTab(t: Tab, push = true) {
     setTab(t);
-    if (t === "community" && !community) void loadCommunity();
+    if (t === "everyone" && !community) void loadCommunity();
     if (push) {
       const url = new URL(window.location.href);
-      if (t === "foryou") url.searchParams.delete("tab");
+      if (t === defaultTab) url.searchParams.delete("tab");
       else url.searchParams.set("tab", t);
       history.replaceState(null, "", url.pathname + url.search + url.hash);
     }
   }
 
-  // Open the tab the URL names.
+  // Open the tab the URL names (an old name is rewritten to the new one).
   useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("tab");
     const t = tabFromUrl();
-    if (t !== "foryou") pickTab(t, false);
+    if (t !== defaultTab) pickTab(t, raw !== t);
+    else if (raw) pickTab(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load.
   }, []);
 
@@ -200,16 +220,7 @@ export function Dashboard({ user }: { user: User }) {
           </div>
         )}
 
-        <div className="card composer-card">
-          <Composer
-            audiences={audiences}
-            onSaved={() => {
-              void load();
-              if (community) void loadCommunity();
-            }}
-          />
-        </div>
-
+        {/* Phones and tablets, where the sidebar's team list is hidden. */}
         <TeamStrip uid={user.uid} />
 
         {/* Phones: what needs an answer or is next, before the feed. */}
@@ -220,6 +231,9 @@ export function Dashboard({ user }: { user: User }) {
             ? tournamentDays.map((d) => <TournamentDayCard key={`${d.teamId}/${d.tournamentId}`} day={d} />)
             : events[0] && <NextEvent event={events[0]} />}
         </div>
+
+        {/* What's the member's to do: join requests on groups they approve for. */}
+        <NeedsYou uid={user.uid} />
 
         <div className="feed-tabs" role="tablist" aria-label="Feed">
           {tabs.map(([t, label]) => (
@@ -243,17 +257,30 @@ export function Dashboard({ user }: { user: User }) {
           ))}
         </div>
 
+        {/* As in the app: post from Your teams and Following, not Everyone. */}
+        {tab !== "everyone" && (
+          <div className="card composer-card">
+            <Composer
+              audiences={audiences}
+              onSaved={() => {
+                void load();
+                if (community) void loadCommunity();
+              }}
+            />
+          </div>
+        )}
+
         <div role="tabpanel" id={`feed-panel-${tab}`} aria-labelledby={`feed-tab-${tab}`} className="feed-panel">
-          {tab === "foryou" && (
+          {tab === "following" && (
             <ForYouFeed
               uid={user.uid}
               users={{ posts: following, next: older.next, loadMore: loadOlder, busy: older.busy, error: older.error }}
               needsUsername={profile.needsUsername}
-              onCommunity={() => pickTab("community")}
+              onCommunity={() => pickTab("everyone")}
             />
           )}
-          {tab === "teams" && <TeamsFeed uid={user.uid} />}
-          {tab === "community" &&
+          {tab === "teams" && <TeamsFeed uid={user.uid} needsUsername={profile.needsUsername} />}
+          {tab === "everyone" &&
             (shown.posts.length === 0 ? (
               shown.busy ? (
                 <p className="empty" aria-busy="true">
@@ -289,7 +316,6 @@ export function Dashboard({ user }: { user: User }) {
         <div className="huddle-side-invites">
           <TeamInvites />
         </div>
-        <NeedsYou uid={user.uid} />
         {/* Phones show these above the feed (.huddle-phone). */}
         {tournamentDays.length > 0 && (
           <div className="huddle-side-days">
@@ -299,7 +325,7 @@ export function Dashboard({ user }: { user: User }) {
           </div>
         )}
 
-        <div className="card">
+        <div className="card upcoming-card">
           <div className="card-head">
             <h2 className="card-title">Upcoming events</h2>
             <Link className="see-all" href="/schedule">
@@ -312,14 +338,17 @@ export function Dashboard({ user }: { user: User }) {
             <div className="date-list">
               {events.map((e) => (
                 <EventItem key={`${e.teamId}/${e.id}`} startsAt={e.startsAt} plain>
-                  <b>{e.title || "Event"}</b>
+                  <span className="upcoming-title">
+                    <b>{e.title || "Event"}</b>
+                    <RsvpPill answer={e.rsvp} type={e.type} needs={needsRsvp(e.rsvp, e.startsAt, e.endsAt)} />
+                  </span>
                   <small>
                     <LocalTime iso={e.startsAt} style="dateTime" />
                     {e.location ? ` · ${e.location}` : ""}
                   </small>
-                  <small>
+                  <small className="upcoming-team">
+                    <span className="team-dot" aria-hidden="true" />
                     <Link href={`/teams/${encodeURIComponent(e.teamId)}`}>{e.teamName}</Link>
-                    {e.rsvp ? ` · ${rsvpLabels[e.rsvp] ?? e.rsvp}` : ""}
                   </small>
                 </EventItem>
               ))}
@@ -334,10 +363,17 @@ export function Dashboard({ user }: { user: User }) {
   );
 }
 
-/** The page's heading: one line, "Good evening, Sam". */
+/** The page's heading: one line, "Good evening, Sam", and today's date beside it. */
 function Greeting({ first }: { first: string }) {
   const text = useGreeting(first);
-  return <h1 className="huddle-greeting">{text}</h1>;
+  const [today, setToday] = useState("");
+  useEffect(() => setToday(new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })), []);
+  return (
+    <div className="huddle-head">
+      <h1 className="huddle-greeting">{text}</h1>
+      {today && <span className="huddle-date">{today}</span>}
+    </div>
+  );
 }
 
 /** The next event on the member's teams, for phones above the feed. */
@@ -351,6 +387,7 @@ function NextEvent({ event: e }: { event: MyEvent }) {
         {e.location ? ` · ${e.location}` : ""}
         {e.rsvp ? ` · ${rsvpLabels[e.rsvp] ?? e.rsvp}` : ""}
       </span>
+      {needsRsvp(e.rsvp, e.startsAt, e.endsAt) && <RsvpPill needs />}
     </Link>
   );
 }

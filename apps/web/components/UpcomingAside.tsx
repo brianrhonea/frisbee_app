@@ -21,13 +21,13 @@ export function UpcomingAside() {
       startsAt: t.startsAt,
       title: t.name || "Tournament",
       // A group's tournament has its own page for members; visitors get the group's page (its
-      // tournaments are members-only); anything else is on Events.
+      // tournaments are members-only); anything else is on Discover.
       href:
         t.groupId && t.tournamentId
           ? user
             ? `/teams/${encodeURIComponent(t.groupId)}/tournaments/${encodeURIComponent(t.tournamentId)}`
             : `/teams/${encodeURIComponent(t.groupId)}`
-          : "/events",
+          : "/explore#coming-up",
     })),
     ...(page?.events ?? []).map((e) => ({
       id: `e-${e.id}`,
@@ -45,7 +45,7 @@ export function UpcomingAside() {
       <div className="card">
         <div className="card-head">
           <h2 className="card-title">Upcoming events</h2>
-          <Link className="see-all" href="/events">
+          <Link className="see-all" href="/explore#coming-up">
             View all
           </Link>
         </div>
@@ -75,7 +75,7 @@ export function UpcomingAside() {
           <small>New to Stall 10?</small>
           <b>Good people. Great ultimate.</b>
           <p>Follow players, join teams and communities, and keep up with your season.</p>
-          <Link className="btn btn-amber btn-small" href="/sign-up">
+          <Link className="btn btn-primary btn-small" href="/sign-up">
             Sign up free <NavIcon name="external" size={14} />
           </Link>
         </div>
