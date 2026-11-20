@@ -96,6 +96,10 @@ enum TeamTab {
   feed('Feed'),
   schedule('Schedule'),
   chat('Chat'),
+
+  /// A team's tournaments, out of More while it has one ahead
+  /// (`hasTournamentAhead`); otherwise they stay under More.
+  tournaments('Tournaments'),
   roster('Roster'),
 
   /// A community's teams (a school or club's), beside its members.
@@ -108,30 +112,38 @@ enum TeamTab {
   /// The More tab's `?section=`: a list of the sections it holds.
   static const morePath = 'more';
 
-  /// The tab [section] is under; the feed for the overview (null).
-  static TeamTab of(TeamSection? section) => switch (section) {
-    null => feed,
-    TeamSection.events => schedule,
-    TeamSection.chat => chat,
-    TeamSection.roster || TeamSection.members => roster,
-    TeamSection.teams => teams,
-    TeamSection.playbook ||
-    TeamSection.videos ||
-    TeamSection.stats ||
-    TeamSection.tournaments => more,
-  };
+  /// The tab [section] is under; the feed for the overview (null). With
+  /// [promoted], Tournaments is a tab of its own rather than under More.
+  static TeamTab of(TeamSection? section, {bool promoted = false}) =>
+      switch (section) {
+        null => feed,
+        TeamSection.events => schedule,
+        TeamSection.chat => chat,
+        TeamSection.roster || TeamSection.members => roster,
+        TeamSection.teams => teams,
+        TeamSection.tournaments => promoted ? tournaments : more,
+        TeamSection.playbook || TeamSection.videos || TeamSection.stats => more,
+      };
 
   /// The tabs of a page with [sections] (from [TeamSection.forTeam]), in
-  /// order: the feed, then each tab with a section under it.
-  static List<TeamTab> forSections(List<TeamSection> sections) => [
+  /// order: the feed, then each tab with a section under it. With
+  /// [tournamentsTab] (a team with a tournament ahead), Tournaments
+  /// follows Chat.
+  static List<TeamTab> forSections(
+    List<TeamSection> sections, {
+    bool tournamentsTab = false,
+  }) => [
     feed,
-    for (final t in [schedule, chat, roster, teams, more])
-      if (sections.any((s) => of(s) == t)) t,
+    for (final t in [schedule, chat, tournaments, roster, teams, more])
+      if (sections.any((s) => of(s, promoted: tournamentsTab) == t)) t,
   ];
 
-  /// The sections listed under More on a page with [sections].
-  static List<TeamSection> moreSections(List<TeamSection> sections) =>
-      sections.where((s) => of(s) == more).toList();
+  /// The sections listed under More on a page with [sections]; not
+  /// Tournaments when it's a tab of its own ([tournamentsTab]).
+  static List<TeamSection> moreSections(
+    List<TeamSection> sections, {
+    bool tournamentsTab = false,
+  }) => sections.where((s) => of(s, promoted: tournamentsTab) == more).toList();
 
   /// Where the tab opens. Roster opens on the members, who every kind has;
   /// a team's players are beside them.
@@ -139,6 +151,7 @@ enum TeamTab {
     feed => Routes.team(teamId),
     schedule => TeamSection.events.route(teamId),
     chat => TeamSection.chat.route(teamId),
+    tournaments => TeamSection.tournaments.route(teamId),
     roster => TeamSection.members.route(teamId),
     teams => TeamSection.teams.route(teamId),
     more => Routes.teamSection(teamId, morePath),

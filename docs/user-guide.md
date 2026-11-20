@@ -281,6 +281,9 @@ members, with a count of waiting join requests) and the ⋮ menu.
   the code to read out: a new one every 30 seconds, each working for 45,
   with a countdown. **Hide** stops it.
 - **More**: Playbook, Videos, Stats and Tournaments.
+  While your team has a tournament coming up, **Tournaments** moves out
+  of More to its own tab after Chat, and opens with the team's next game
+  on the day.
   - **Playbook**: the team's plays. Admins draw plays on the field and
     add animation steps (drag a player to record a cut, the disc to
     record a throw); everyone can play them back.

@@ -4,6 +4,17 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.44.0 — 2026-11-19
+
+Tournaments tab when one is ahead, with app 0.0.34. Works with API 0.33.0.
+
+**Changed**
+- A team's hub shows **Tournaments** in its tab row, after Chat, while
+  the team has a tournament ahead (members; `hasTournamentAhead` in
+  `@stall10/shared`, the app's rule), and drops it from More then.
+- The team's Tournaments page starts with its tournament-day card when it
+  has one.
+
 ## 0.43.0 — 2026-11-19
 
 Tournament-day card, with app 0.0.33. Works with API 0.33.0.

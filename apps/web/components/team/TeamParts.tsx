@@ -2,7 +2,10 @@
 import { type PlayDoc, playCategoryLabels } from "@stall10/shared";
 import Link from "next/link";
 import { useLiveQuery } from "@/lib/live";
+import { useAuth } from "../AuthProvider";
 import { LiveList } from "../StatusViews";
+import { TournamentDayCard } from "../tournaments/TournamentDayCard";
+import { useTournamentDays } from "../tournaments/useTournamentDays";
 import { useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
 import { PlayField } from "./playbook/PlayField";
@@ -29,12 +32,20 @@ export function TeamPart({ part }: { part: TeamPartName }) {
       {part === "stats" && <StatsHome />}
       {part === "tournaments" && (
         <>
+          {kind === "team" && <TeamTournamentDay teamId={teamId} />}
           <HostedTournamentsSection teamId={teamId} kind={kind} manager={viewer.can("manageEvents")} member />
           <GroupTournamentsList />
         </>
       )}
     </div>
   );
+}
+
+/** A member's team on a tournament day: its card above the tournaments, as on the feed. */
+function TeamTournamentDay({ teamId }: { teamId: string }) {
+  const { user } = useAuth();
+  const day = useTournamentDays(user?.uid, teamId)[0];
+  return day ? <TournamentDayCard day={day} showTeam={false} /> : null;
 }
 
 function Playbook({ teamId, editor }: { teamId: string; editor: boolean }) {

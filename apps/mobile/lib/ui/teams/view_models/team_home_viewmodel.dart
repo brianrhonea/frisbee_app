@@ -20,6 +20,8 @@ import '../../../data/repositories/group_tournament/group_tournament_repository.
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../domain/models/follow.dart';
 import '../../../domain/models/group_tournament.dart';
+import '../../../domain/models/hosted_tournament.dart';
+import '../../../domain/tournament_engine/tournament_day.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
 
 /// Whether [typed] confirms deleting a team called [name]: the same name,
@@ -49,6 +51,7 @@ class TeamHomeViewModel extends ChangeNotifier {
        _auth = authRepository,
        _picker = filePicker,
        _groupTournaments = groupTournamentRepository,
+       _hosted = tournamentRepository,
        _clock = clock ?? DateTime.now {
     _followSlot = FollowSlot(
       followRepository: followRepository,
@@ -109,6 +112,7 @@ class TeamHomeViewModel extends ChangeNotifier {
   final AuthRepository _auth;
   final FilePickerService _picker;
   final GroupTournamentRepository? _groupTournaments;
+  final HostedTournamentRepository? _hosted;
   StreamSubscription<List<TournamentListing>>? _listingsSub;
   List<TournamentListing> _tournamentListings = const [];
 
@@ -155,6 +159,7 @@ class TeamHomeViewModel extends ChangeNotifier {
 
   void _onChange() {
     _watchListings();
+    _watchEntered();
     _watchContent();
     _watchRequest();
     _watchJoinRequests();
@@ -192,6 +197,29 @@ class TeamHomeViewModel extends ChangeNotifier {
     if (repo == null || _listingsSub != null || !isGroup) return;
     _listingsSub = repo.watchListings(teamId).listen((l) {
       _tournamentListings = l;
+      notifyListeners();
+    }, onError: (Object _) {});
+  }
+
+  StreamSubscription<List<EnteredTournament>>? _enteredSub;
+  List<EnteredTournament> _entered = const [];
+
+  /// Whether Tournaments is a tab of its own on this team's page: a team
+  /// (not a community) with a tournament ahead; members only, as only
+  /// they can read its entries.
+  bool get tournamentsTab => hasTournamentAhead(_entered, _clock());
+
+  /// Watches the tournaments a team has entered while the user is on it.
+  void _watchEntered() {
+    final repo = _hosted;
+    final want = repo != null && _team?.kind == TeamKind.team;
+    if (want == (_enteredSub != null)) return;
+    _enteredSub?.cancel();
+    _enteredSub = null;
+    _entered = const [];
+    if (!want) return;
+    _enteredSub = repo.watchEnteredBy(teamId).listen((e) {
+      _entered = e;
       notifyListeners();
     }, onError: (Object _) {});
   }
@@ -455,6 +483,7 @@ class TeamHomeViewModel extends ChangeNotifier {
     _listingsSub?.cancel();
     _requestSub?.cancel();
     _joinRequestsSub?.cancel();
+    _enteredSub?.cancel();
     _teamSub?.cancel();
     _eventsSub?.cancel();
     _postsSub?.cancel();

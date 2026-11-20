@@ -5,9 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/data/services/api_client.dart';
 import 'package:frisbee_app/domain/models/chat.dart';
+import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/team_post.dart';
+import 'package:frisbee_app/routing/routes.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
 import 'package:frisbee_app/ui/teams/view_models/team_home_viewmodel.dart';
 import 'package:frisbee_app/ui/teams/view_models/team_search_viewmodel.dart';
@@ -16,6 +18,7 @@ import 'package:frisbee_app/ui/teams/widgets/team_section_screen.dart';
 import 'package:frisbee_app/utils/result.dart';
 
 import '../testing/fakes.dart';
+import '../testing/hosted_tournament_fakes.dart';
 import '../testing/social_fakes.dart';
 
 void main() {
@@ -665,5 +668,190 @@ void main() {
     expect(TeamSection.fromLegacyTab('schedule'), TeamSection.events);
     expect(TeamSection.fromLegacyTab('playbook'), TeamSection.playbook);
     expect(TeamSection.fromLegacyTab('nope'), isNull);
+  });
+
+  group('Tournaments tab', () {
+    final teamSections = TeamSection.forKind(TeamKind.team);
+
+    test('stays under More unless promoted', () {
+      expect(TeamTab.of(TeamSection.tournaments), TeamTab.more);
+      expect(TeamTab.forSections(teamSections), [
+        TeamTab.feed,
+        TeamTab.schedule,
+        TeamTab.chat,
+        TeamTab.roster,
+        TeamTab.more,
+      ]);
+      expect(TeamTab.moreSections(teamSections), [
+        TeamSection.playbook,
+        TeamSection.videos,
+        TeamSection.stats,
+        TeamSection.tournaments,
+      ]);
+    });
+
+    test('promoted, it follows Chat and leaves More', () {
+      expect(
+        TeamTab.of(TeamSection.tournaments, promoted: true),
+        TeamTab.tournaments,
+      );
+      expect(
+        TeamTab.of(TeamSection.stats, promoted: true),
+        TeamTab.more,
+        reason: 'only Tournaments moves',
+      );
+      expect(TeamTab.forSections(teamSections, tournamentsTab: true), [
+        TeamTab.feed,
+        TeamTab.schedule,
+        TeamTab.chat,
+        TeamTab.tournaments,
+        TeamTab.roster,
+        TeamTab.more,
+      ]);
+      expect(TeamTab.moreSections(teamSections, tournamentsTab: true), [
+        TeamSection.playbook,
+        TeamSection.videos,
+        TeamSection.stats,
+      ]);
+      expect(TeamTab.tournaments.route('t1'), Routes.teamTournaments('t1'));
+    });
+
+    test('a page without a Tournaments section gets no tab', () {
+      final league = TeamSection.forKind(TeamKind.team, league: true);
+      expect(TeamTab.forSections(league, tournamentsTab: true), [
+        TeamTab.feed,
+        TeamTab.chat,
+        TeamTab.roster,
+      ]);
+    });
+
+    late FakeHostedTournamentRepository hosted;
+    setUp(() => hosted = FakeHostedTournamentRepository());
+
+    EnteredTournament entry(EntryStatus status, DateTime startsOn) =>
+        EnteredTournament(
+          tournamentId: 'x1',
+          name: 'Fall Brawl',
+          status: status,
+          startsOn: startsOn,
+          endsOn: startsOn.add(const Duration(days: 1)),
+        );
+
+    TeamHomeViewModel tournamentVm() => TeamHomeViewModel(
+      teamId: 't1',
+      teamRepository: teams,
+      eventRepository: events,
+      teamPostRepository: posts,
+      authRepository: auth,
+      filePicker: picker,
+      tournamentRepository: hosted,
+      clock: () => now,
+    );
+
+    final nextWeek = DateTime(2026, 11, 6);
+
+    test('members of a team with an entry ahead get the tab', () async {
+      addTeam({testUser.uid: TeamRole.player, 'owner': TeamRole.owner});
+      hosted.entered['t1'] = [entry(EntryStatus.accepted, nextWeek)];
+      final vm = tournamentVm();
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      expect(vm.tournamentsTab, isTrue);
+    });
+
+    test('declined or past entries, and outsiders, do not', () async {
+      addTeam({testUser.uid: TeamRole.player, 'owner': TeamRole.owner});
+      hosted.entered['t1'] = [
+        entry(EntryStatus.declined, nextWeek),
+        entry(EntryStatus.accepted, DateTime(2026, 10, 1)),
+      ];
+      final vm = tournamentVm();
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      expect(vm.tournamentsTab, isFalse);
+
+      addTeam({'owner': TeamRole.owner});
+      hosted.entered['t1'] = [entry(EntryStatus.accepted, nextWeek)];
+      final outsider = tournamentVm();
+      addTearDown(outsider.dispose);
+      await pumpEventQueue();
+      expect(outsider.isMember, isFalse);
+      expect(outsider.tournamentsTab, isFalse);
+    });
+
+    Future<void> pumpPhone(WidgetTester tester, TeamHomeViewModel vm) async {
+      tester.view.physicalSize = const Size(560, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final router = GoRouter(
+        initialLocation: '/teams/t1',
+        routes: [
+          GoRoute(
+            path: '/teams/:teamId',
+            builder: (_, state) => TeamHomeScreen(
+              viewModel: vm,
+              section: TeamSection.fromPath(
+                state.uri.queryParameters['section'],
+              ),
+              more: state.uri.queryParameters['section'] == TeamTab.morePath,
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a team with a tournament next week shows it as a tab', (
+      tester,
+    ) async {
+      addTeam({testUser.uid: TeamRole.player, 'owner': TeamRole.owner});
+      hosted.entered['t1'] = [entry(EntryStatus.accepted, nextWeek)];
+      final vm = tournamentVm();
+      addTearDown(vm.dispose);
+      await pumpPhone(tester, vm);
+
+      final tabLabels = [
+        for (final t in [
+          TeamTab.feed,
+          TeamTab.schedule,
+          TeamTab.chat,
+          TeamTab.tournaments,
+          TeamTab.roster,
+          TeamTab.more,
+        ])
+          tester.getTopLeft(find.text(t.label)).dx,
+      ];
+      expect(tabLabels, orderedEquals([...tabLabels]..sort()));
+
+      // The test font's wide letters push More past the edge of the row.
+      await tester.ensureVisible(find.text('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('More'));
+      await tester.pumpAndSettle();
+      expect(find.text('Playbook'), findsOneWidget);
+      // Just the tab: More doesn't list it.
+      expect(find.text('Tournaments'), findsOneWidget);
+      expect(find.widgetWithText(ListTile, 'Tournaments'), findsNothing);
+    });
+
+    testWidgets('without one, Tournaments stays under More', (tester) async {
+      addTeam({testUser.uid: TeamRole.player, 'owner': TeamRole.owner});
+      hosted.entered['t1'] = [
+        entry(EntryStatus.declined, nextWeek),
+        entry(EntryStatus.accepted, DateTime(2026, 10, 1)),
+      ];
+      final vm = tournamentVm();
+      addTearDown(vm.dispose);
+      await pumpPhone(tester, vm);
+      expect(find.text('Tournaments'), findsNothing);
+
+      await tester.tap(find.text('More'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(ListTile, 'Tournaments'), findsOneWidget);
+    });
   });
 }

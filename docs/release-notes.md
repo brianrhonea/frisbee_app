@@ -10,6 +10,13 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.34
+
+**Tournaments up front**
+- While your team has a tournament coming up, **Tournaments** gets its
+  own tab on the team page, right after Chat, instead of sitting under
+  More. On the day, it opens with your team's next game.
+
 ## 0.0.33
 
 **Tournament day**

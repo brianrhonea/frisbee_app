@@ -556,6 +556,13 @@ everything the app does on the website alone, styled like the website
     `test/tournament_day_fixtures.test.ts` (the website has no test
     runner; its rule is the shared one); rules "an entered team's
     players read an invite-only event's games".
+24. Tournaments tab when one is ahead (app 0.0.34, web 0.44.0):
+    [x] A team's page shows Tournaments as its own tab after Chat on
+    both while the team has a tournament ahead (members), and More drops
+    it; otherwise it stays under More. [x] The Tournaments section starts
+    with the tournament-day card on both. One rule: app
+    `hasTournamentAhead`, shared `hasTournamentAhead`, vectors
+    `fixtures/tournament_day/ahead.json`.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

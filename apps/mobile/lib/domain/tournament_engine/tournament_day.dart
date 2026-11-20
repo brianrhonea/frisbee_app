@@ -1,4 +1,5 @@
 import '../models/group_tournament.dart';
+import '../models/hosted_tournament.dart';
 import 'progress.dart';
 import 'standings.dart';
 
@@ -205,4 +206,20 @@ class TournamentDay {
       awaiting: awaiting,
     );
   }
+}
+
+/// Whether a team entered in [entered] has a tournament ahead (or on):
+/// an entry still in play (accepted, invited, applied or waitlisted)
+/// whose last day (its end, else its start; none counts) is no earlier
+/// than yesterday, as dates are the host's local midnight. The team page
+/// then shows Tournaments as a tab of its own, out of More. The same rule
+/// as hasTournamentAhead in packages/shared/src/tournament_day.ts.
+bool hasTournamentAhead(List<EnteredTournament> entered, DateTime now) {
+  final yesterday = DateTime(now.year, now.month, now.day - 1);
+  return entered.any((e) {
+    if (e.status != EntryStatus.accepted && !e.status.isActive) return false;
+    final last = e.endsOn ?? e.startsOn;
+    if (last == null) return true;
+    return !DateTime(last.year, last.month, last.day).isBefore(yesterday);
+  });
 }

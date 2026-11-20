@@ -139,3 +139,29 @@ export function tournamentDay(games: EngineGame[], teamId: string, now: Date, li
     awaiting,
   };
 }
+
+/** What hasTournamentAhead reads of teams/{id}/tournamentEntries docs. */
+export interface EnteredLike {
+  status: string;
+  startsOn: string | Date | null;
+  endsOn: string | Date | null;
+}
+
+/**
+ * Whether a team entered in [entered] has a tournament ahead (or on): an
+ * entry still in play (accepted, invited, applied or waitlisted) whose
+ * last day (its end, else its start; none counts) is no earlier than
+ * yesterday, as dates are the host's local midnight. The team page then
+ * shows Tournaments as a tab of its own, out of More (hasTournamentAhead
+ * in the app; vectors fixtures/tournament_day/ahead.json).
+ */
+export function hasTournamentAhead(entered: EnteredLike[], now: Date): boolean {
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+  return entered.some((e) => {
+    if (!["accepted", "invited", "applied", "waitlisted"].includes(e.status)) return false;
+    const last = e.endsOn ?? e.startsOn;
+    if (last == null) return true;
+    const d = new Date(last);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() >= yesterday;
+  });
+}

@@ -3,7 +3,7 @@
 // on the vectors in fixtures/tournament_day (written by
 // apps/mobile/test/shared_fixtures/tournament_day_fixtures_test.dart).
 import { describe, expect, it } from "vitest";
-import { engineGame, tournamentDay } from "../src/index.js";
+import { engineGame, type EnteredLike, hasTournamentAhead, tournamentDay } from "../src/index.js";
 import { fixture } from "./shared_fixtures.js";
 
 interface DayCase {
@@ -41,5 +41,18 @@ describe("tournament-day card matches the app (fixtures/tournament_day/day.json)
         awaiting: d.awaiting,
       },
     ).toEqual(c.day);
+  });
+});
+
+interface AheadCase {
+  name: string;
+  entered: EnteredLike[];
+  now: string;
+  ahead: boolean;
+}
+
+describe("tournament ahead matches the app (fixtures/tournament_day/ahead.json)", () => {
+  it.each(fixture<AheadCase>("tournament_day/ahead.json").cases)("$name", (c) => {
+    expect(hasTournamentAhead(c.entered, new Date(c.now))).toBe(c.ahead);
   });
 });

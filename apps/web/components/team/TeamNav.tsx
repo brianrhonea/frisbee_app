@@ -1,9 +1,10 @@
 "use client";
+import { type EnteredTournamentDoc, hasTournamentAhead } from "@stall10/shared";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { callApi, problem } from "@/lib/client";
-import { useLiveDoc } from "@/lib/live";
+import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { NavIcon } from "../NavIcons";
 import { ErrorNote, Loading } from "../StatusViews";
@@ -25,9 +26,16 @@ export interface HubSection {
  * (Members, for groups); members also get Chat, a team's Playbook, Stats
  * and Videos, and Tournaments and Meetings. Only a school or club
  * (organization) links teams, so only it has Teams (TeamSection._forKind
- * in the app). Settings is the gear beside the tabs.
+ * in the app). Settings is the gear beside the tabs. A team with a
+ * tournament ahead ([tournamentsAhead], hasTournamentAhead in
+ * packages/shared) has Tournaments as a tab of its own after Chat, out of
+ * More.
  */
-export function hubSections(kind: Kind, member: boolean): { tabs: HubSection[]; more: HubSection[] } {
+export function hubSections(
+  kind: Kind,
+  member: boolean,
+  { tournamentsAhead = false }: { tournamentsAhead?: boolean } = {},
+): { tabs: HubSection[]; more: HubSection[] } {
   const feed: HubSection = { sub: "", label: "Feed" };
   const schedule: HubSection = { sub: "/schedule", label: "Schedule" };
   const chat: HubSection = { sub: "/chat", label: "Chat" };
@@ -40,7 +48,11 @@ export function hubSections(kind: Kind, member: boolean): { tabs: HubSection[]; 
   const meetings: HubSection = { sub: "/meetings", label: "Meetings" };
   const org = kind === "organization";
   if (!member) return { tabs: [feed, schedule, roster, ...(org ? [teams] : [])], more: [] };
-  if (kind === "team") return { tabs: [feed, schedule, chat, roster, playbook, stats], more: [videos, tournaments, meetings] };
+  if (kind === "team") {
+    return tournamentsAhead
+      ? { tabs: [feed, schedule, chat, tournaments, roster, playbook, stats], more: [videos, meetings] }
+      : { tabs: [feed, schedule, chat, roster, playbook, stats], more: [videos, tournaments, meetings] };
+  }
   if (org) return { tabs: [feed, schedule, chat, roster, teams, tournaments], more: [meetings] };
   return { tabs: [feed, schedule, chat, roster, tournaments, meetings], more: [] };
 }
@@ -61,7 +73,11 @@ export function TeamNav() {
   const path = usePathname();
   const base = `/teams/${teamId}`;
   const member = viewer.state === "member";
-  const { tabs, more } = hubSections(kind, member);
+  const { user } = useAuth();
+  // Only members may read a team's entries; the rule is shared with the app.
+  const entered = useLiveQuery<EnteredTournamentDoc>(user && member && kind === "team" ? `teams/${teamId}/tournamentEntries` : null, [], teamId);
+  const tournamentsAhead = hasTournamentAhead(entered.data ?? [], new Date());
+  const { tabs, more } = hubSections(kind, member, { tournamentsAhead });
   const scroller = useScrollEdges<HTMLElement>();
   const onSettings = path.startsWith(`${base}/settings`);
 

@@ -1,0 +1,112 @@
+{
+  "about": "hasTournamentAhead(entered, now): an entry still in play (accepted, invited, applied, waitlisted) whose last day (endsOn, else startsOn; none counts) is no earlier than yesterday.",
+  "cases": [
+    {
+      "name": "no entries",
+      "entered": [],
+      "now": "2026-11-21T10:00:00.000",
+      "ahead": false
+    },
+    {
+      "name": "accepted, next week",
+      "entered": [
+        {
+          "status": "accepted",
+          "startsOn": "2026-11-28T00:00:00.000",
+          "endsOn": null
+        }
+      ],
+      "now": "2026-11-21T10:00:00.000",
+      "ahead": true
+    },
+    {
+      "name": "applied, next week",
+      "entered": [
+        {
+          "status": "applied",
+          "startsOn": "2026-11-28T00:00:00.000",
+          "endsOn": null
+        }
+      ],
+      "now": "2026-11-21T10:00:00.000",
+      "ahead": true
+    },
+    {
+      "name": "declined, next week",
+      "entered": [
+        {
+          "status": "declined",
+          "startsOn": "2026-11-28T00:00:00.000",
+          "endsOn": null
+        }
+      ],
+      "now": "2026-11-21T10:00:00.000",
+      "ahead": false
+    },
+    {
+      "name": "accepted, on today",
+      "entered": [
+        {
+          "status": "accepted",
+          "startsOn": "2026-11-21T00:00:00.000",
+          "endsOn": null
+        }
+      ],
+      "now": "2026-11-21T10:00:00.000",
+      "ahead": true
+    },
+    {
+      "name": "accepted, ended yesterday (host a day off)",
+      "entered": [
+        {
+          "status": "accepted",
+          "startsOn": "2026-11-19T00:00:00.000",
+          "endsOn": "2026-11-20T00:00:00.000"
+        }
+      ],
+      "now": "2026-11-21T10:00:00.000",
+      "ahead": true
+    },
+    {
+      "name": "accepted, ended two days ago",
+      "entered": [
+        {
+          "status": "accepted",
+          "startsOn": "2026-11-18T00:00:00.000",
+          "endsOn": "2026-11-19T00:00:00.000"
+        }
+      ],
+      "now": "2026-11-21T10:00:00.000",
+      "ahead": false
+    },
+    {
+      "name": "accepted, no dates",
+      "entered": [
+        {
+          "status": "accepted",
+          "startsOn": null,
+          "endsOn": null
+        }
+      ],
+      "now": "2026-11-21T10:00:00.000",
+      "ahead": true
+    },
+    {
+      "name": "one past, one ahead",
+      "entered": [
+        {
+          "status": "accepted",
+          "startsOn": "2026-11-01T00:00:00.000",
+          "endsOn": "2026-11-02T00:00:00.000"
+        },
+        {
+          "status": "invited",
+          "startsOn": "2026-11-30T00:00:00.000",
+          "endsOn": null
+        }
+      ],
+      "now": "2026-11-21T10:00:00.000",
+      "ahead": true
+    }
+  ]
+}

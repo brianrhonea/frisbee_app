@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.34  | 2026-11-19 | `feature/team-first`                    |                     |
 | 0.0.33  | 2026-11-19 | `feature/team-first`                    |                     |
 | 0.0.32  | 2026-11-19 | `feature/team-first`                    |                     |
 | 0.0.31  | 2026-11-19 | `feature/profile-team-stats`            |                     |
@@ -46,6 +47,23 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.34 — Tournaments tab when one is ahead (team-first 3)
+
+Web 0.44.0. No API or rules changes.
+
+- A team's page shows **Tournaments** as a tab of its own, after Chat,
+  while the team has a tournament ahead; More no longer lists it then.
+  Otherwise it stays under More. Members only (they're the ones who read
+  `teams/{id}/tournamentEntries`); communities are unchanged.
+- One rule: `hasTournamentAhead` (`domain/tournament_engine/tournament_day.dart`),
+  ported to `@stall10/shared`, vectors `fixtures/tournament_day/ahead.json`:
+  an entry still in play (accepted, invited, applied, waitlisted) whose
+  last day is no earlier than yesterday.
+- `TeamTab.tournaments`; `TeamHomeViewModel.tournamentsTab` watches the
+  team's entered tournaments.
+- The team's Tournaments section starts with its tournament-day card when
+  it has one.
 
 ## 0.0.33 — Tournament-day card (team-first 2)
 

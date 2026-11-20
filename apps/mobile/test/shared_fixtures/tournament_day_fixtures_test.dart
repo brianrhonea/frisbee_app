@@ -4,6 +4,7 @@
 // tournamentDay in tournament_day.ts. See fixture_file.dart.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/domain/models/group_tournament.dart';
+import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/tournament_engine/tournament_day.dart';
 
 import 'fixture_file.dart';
@@ -241,6 +242,63 @@ void main() {
                     },
             };
           }(),
+      ],
+    );
+  });
+
+  test('tournament ahead (tournament_day/ahead.json)', () {
+    EnteredTournament e(EntryStatus s, DateTime? starts, [DateTime? ends]) =>
+        EnteredTournament(
+          tournamentId: 'x',
+          name: 'X',
+          status: s,
+          startsOn: starts,
+          endsOn: ends,
+        );
+    final now = _at(21, 10);
+    final cases = <(String, List<EnteredTournament>)>[
+      ('no entries', []),
+      ('accepted, next week', [e(EntryStatus.accepted, _at(28, 0))]),
+      ('applied, next week', [e(EntryStatus.applied, _at(28, 0))]),
+      ('declined, next week', [e(EntryStatus.declined, _at(28, 0))]),
+      ('accepted, on today', [e(EntryStatus.accepted, _at(21, 0))]),
+      (
+        'accepted, ended yesterday (host a day off)',
+        [e(EntryStatus.accepted, _at(19, 0), _at(20, 0))],
+      ),
+      (
+        'accepted, ended two days ago',
+        [e(EntryStatus.accepted, _at(18, 0), _at(19, 0))],
+      ),
+      ('accepted, no dates', [e(EntryStatus.accepted, null)]),
+      (
+        'one past, one ahead',
+        [
+          e(EntryStatus.accepted, _at(1, 0), _at(2, 0)),
+          e(EntryStatus.invited, _at(30, 0)),
+        ],
+      ),
+    ];
+    checkFixture(
+      'tournament_day/ahead.json',
+      'hasTournamentAhead(entered, now): an entry still in play (accepted, '
+          'invited, applied, waitlisted) whose last day (endsOn, else '
+          'startsOn; none counts) is no earlier than yesterday.',
+      [
+        for (final (name, list) in cases)
+          {
+            'name': name,
+            'entered': [
+              for (final x in list)
+                {
+                  'status': x.status.name,
+                  'startsOn': x.startsOn,
+                  'endsOn': x.endsOn,
+                },
+            ],
+            'now': now,
+            'ahead': hasTournamentAhead(list, now),
+          },
       ],
     );
   });

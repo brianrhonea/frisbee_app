@@ -380,7 +380,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 actions: [?menu],
               )
             : null;
-        final more = TeamTab.moreSections(sections);
+        final promoted = vm.tournamentsTab;
+        final more = TeamTab.moreSections(sections, tournamentsTab: promoted);
         if (mobile && team != null && vm.isMember) {
           return _phonePage(summary, team, sections, menu);
         }
@@ -406,7 +407,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         if (team != null && section != null && sections.contains(section)) {
           // A team's players sit beside its members under Roster.
           final players =
-              TeamTab.of(section) == TeamTab.roster &&
+              TeamTab.of(section, promoted: promoted) == TeamTab.roster &&
               sections.contains(TeamSection.roster);
           return Scaffold(
             appBar: appBar,
@@ -416,7 +417,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 _SectionHeader(
                   viewModel: vm,
                   summary: summary,
-                  tab: TeamTab.of(section),
+                  tab: TeamTab.of(section, promoted: promoted),
                   menu: mobile ? null : menu,
                 ),
                 if (players)
@@ -460,8 +461,29 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     );
   }
 
-  /// A section's content, e.g. the schedule, with its own view model.
-  Widget _sectionBody(TeamSection section) => ViewModelHost(
+  /// A section's content, e.g. the schedule, with its own view model. A
+  /// team's Tournaments starts with its tournament-day card, if it has one.
+  Widget _sectionBody(TeamSection section) {
+    final body = _sectionHost(section);
+    if (section != TeamSection.tournaments) return body;
+    final day = vm.tournamentDay;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (day != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: ConstrainedContent(
+              maxWidth: 720,
+              child: TournamentDayCard(day: day, showTeam: false),
+            ),
+          ),
+        Expanded(child: body),
+      ],
+    );
+  }
+
+  Widget _sectionHost(TeamSection section) => ViewModelHost(
     key: ValueKey('team-sections-${vm.teamId}'),
     create: (c) => TeamDetailViewModel(
       teamId: vm.teamId,
@@ -504,17 +526,20 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     List<TeamSection> sections,
     Widget? menu,
   ) {
-    final more = TeamTab.moreSections(sections);
+    final promoted = vm.tournamentsTab;
+    final more = TeamTab.moreSections(sections, tournamentsTab: promoted);
     final showMore = widget.more && more.isNotEmpty;
     final section = !showMore && sections.contains(widget.section)
         ? widget.section
         : null;
-    final tab = showMore ? TeamTab.more : TeamTab.of(section);
+    final tab = showMore
+        ? TeamTab.more
+        : TeamTab.of(section, promoted: promoted);
     final feed = tab == TeamTab.feed;
     _settleHeader(feed);
     final players =
         section != null &&
-        TeamTab.of(section) == TeamTab.roster &&
+        TeamTab.of(section, promoted: promoted) == TeamTab.roster &&
         sections.contains(TeamSection.roster);
     final Widget body;
     if (feed) {
@@ -575,6 +600,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                   teamId: vm.teamId,
                   kind: summary.kind,
                   league: team.isLeagueTeam,
+                  tournamentsTab: promoted,
                   selected: tab,
                 ),
               ),
@@ -1185,6 +1211,7 @@ class _Hero extends StatelessWidget {
                     teamId: teamId,
                     kind: summary.kind,
                     league: vm.team?.isLeagueTeam ?? false,
+                    tournamentsTab: vm.tournamentsTab,
                     selected: TeamTab.feed,
                   )
                 else
@@ -1516,10 +1543,14 @@ class _TeamTabs extends StatelessWidget {
     required this.kind,
     required this.selected,
     this.league = false,
+    this.tournamentsTab = false,
   });
 
   /// A league team: just chat and members.
   final bool league;
+
+  /// Tournaments is a tab of its own ([TeamHomeViewModel.tournamentsTab]).
+  final bool tournamentsTab;
 
   final String teamId;
   final TeamKind kind;
@@ -1527,7 +1558,10 @@ class _TeamTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tabs = TeamTab.forSections(TeamSection.forKind(kind, league: league));
+    final tabs = TeamTab.forSections(
+      TeamSection.forKind(kind, league: league),
+      tournamentsTab: tournamentsTab,
+    );
     return UnderlineTabs(
       labels: [for (final t in tabs) t.label],
       selected: tabs.indexOf(selected),
@@ -1618,6 +1652,7 @@ class _SectionHeader extends StatelessWidget {
               teamId: viewModel.teamId,
               kind: summary.kind,
               league: viewModel.team?.isLeagueTeam ?? false,
+              tournamentsTab: viewModel.tournamentsTab,
               selected: tab,
             ),
           ],
