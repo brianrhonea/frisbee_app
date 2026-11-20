@@ -55,6 +55,10 @@ class DeviceCalendarService {
       return CalendarAddResult.unavailable;
     }
     try {
+      // add_2_calendar is pinned at 3.0.1 (3.1 needs Android Gradle Plugin
+      // 9). On iOS 17+ that version opens the editor but never answers,
+      // so this future can stay pending; nothing waits on it (the button
+      // has no busy state), and the editor saves on its own.
       final ok = await native.Add2Calendar.addEvent2Cal(
         native.Event(
           title: entry.title,

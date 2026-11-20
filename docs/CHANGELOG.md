@@ -71,7 +71,7 @@ of Firestore rules + indexes (done), the API, and functions groups
 - Teams tab always opens the list, even with one team (F34; reverses
   the 0.0.36 shortcut, `TeamsTabTap` removed).
 - Add to calendar opens the phone's own new-event screen
-  (`add_2_calendar`, `DeviceCalendarService`); .ics share only as a
+  (`add_2_calendar` 3.0.1, `DeviceCalendarService`); .ics share only as a
   fallback. Info.plist: `NSCalendarsUsageDescription`,
   `NSContactsUsageDescription`; Android `<queries>` for INSERT (F35).
 - Team page: "N going" / "N new in chat" tiles (F18); roster roles,

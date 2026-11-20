@@ -345,6 +345,26 @@ app restyle is done.
   `notifications`, `follows`, `communities`, `account`, `browse`. Until
   then the new API-backed features (video notes, polls, pins, roster
   lines, permissions, join requests) fail on dev.
+- Deploy order for batch 2 (dev): functions first — `communities`
+  (its `mirrorUpdate` now keeps `memberGrants` in `memberPerms`; the old
+  one would wipe a grant set through API 0.35.0), `notifications`,
+  `follows`, `account`, `browse` — then the API.
+- After that deploy, try on dev (fakes and the emulator don't check
+  indexes): a signed-in Download your data (new poll-vote, join-request
+  and roster-line reads), Invites pending as an admin, a visitor's team
+  page with a pinned public post, voting in a poll from two accounts.
+- Website parts changed in batch 2 and only typechecked/built, to try
+  first: the video page (YouTube IFrame API; Watch Together loader
+  moved), the host form steps, the Enter a team page, the Add to
+  calendar menu, the Discord channel picker.
+- Already shipped in the development build without a decision (say if
+  you want any reverted): the app's floating New post button is gone
+  (item 26); Info.plist has `NSContactsUsageDescription` (item 17);
+  community join-request pushes go to every approver, not only the
+  owner (item 32).
+- `add_2_calendar` is pinned at 3.0.1: 3.1.x needs Android Gradle
+  Plugin 9 and broke the Android build (caught by a debug APK build).
+  On iOS 17+ 3.0.1 opens the editor but never reports back; harmless.
 - Left: F11 blocking (needs approval, item 10), F32 team colours (item
   4), F8 Followers audience (item 25); F13 email and F20 clinics are
   out for now. Decisions 1–37 above.
