@@ -66,16 +66,26 @@ draft, and `teams/{id}/tournamentEntries` by the team's members.
 - One rule: `TournamentDay.of` (`domain/tournament_engine/tournament_day.dart`),
   ported as `tournamentDay` in `@stall10/shared`, vectors
   `fixtures/tournament_day/day.json`. Pool place shows once the team has
-  a pool result (before that it's only the seed).
+  a pool result (before that it's only the seed). Between pool play and
+  the bracket the card says **Next game to be decided** while an empty
+  bracket slot comes from the team (`awaiting`: its pool rank, or the
+  winner/loser of a game it played), and **All games played** once it's
+  out. A next game on another day shows the day ("Tomorrow 9:00 AM",
+  "Sun 9:00 AM").
 - `TournamentDays` (`data/repositories/hosted_tournament`) gathers the
-  data: each team's accepted entries from the day before the event to its
-  last day, then the tournament, entries, divisions and the team's
+  data: each team's (not communities') accepted entries from two days
+  before the event to the day after it ends (event dates are the host's
+  local midnight, which can be a day off elsewhere; the games' own times
+  decide), then the tournament, entries, divisions and the team's
   division's games, re-checked each minute while something is on. Used
   by `HomeViewModel` and `TeamHomeViewModel` (optional
   `tournamentRepository`).
 - `Routes.tournament(id, division:, game:, tab:)`: `?game=` opens the
   game's sheet once its division's games load; `?tab=schedule|results`
   picks the tab.
+- Rules test "an entered team's players read an invite-only event's
+  games": a private group's invite-only event is readable by the
+  players of a team it accepted (reads only need the event published).
 - Tests: `test/ui/tournament_day_test.dart`,
   `test/shared_fixtures/tournament_day_fixtures_test.dart`;
   `seedLiveTournament` in `test/testing/hosted_tournament_fakes.dart`

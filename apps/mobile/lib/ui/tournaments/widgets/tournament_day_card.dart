@@ -41,17 +41,14 @@ class TournamentDayCard extends StatelessWidget {
     final String headline;
     final String? detail;
     if (next == null) {
-      headline = 'All games played';
-      detail = null;
+      headline = d.awaiting ? 'Next game to be decided' : 'All games played';
+      detail = d.awaiting ? 'Waiting on the bracket' : null;
     } else {
       final opp = next.opponent;
       headline = opp == null ? next.game.label : 'vs ${day.nameOf(opp)}';
       final at = next.game.startsAt;
       detail = [
-        if (at != null)
-          d.phase == TournamentDayPhase.tomorrow
-              ? 'Tomorrow ${DateFormat.jm().format(at)}'
-              : DateFormat.jm().format(at),
+        if (at != null) _when(at, day.now),
         'Field ${next.game.field}',
         if (opp == null) 'opponent to be decided',
       ].join(' · ');
@@ -189,4 +186,20 @@ class TournamentDayCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "8:30 AM" today, "Tomorrow 8:30 AM", else "Sat 8:30 AM".
+String _when(DateTime at, DateTime now) {
+  final time = DateFormat.jm().format(at);
+  // Calendar days apart (UTC dates, so a DST change doesn't shorten one).
+  final days = DateTime.utc(
+    at.year,
+    at.month,
+    at.day,
+  ).difference(DateTime.utc(now.year, now.month, now.day)).inDays;
+  return switch (days) {
+    0 => time,
+    1 => 'Tomorrow $time',
+    _ => '${DateFormat.E().format(at)} $time',
+  };
 }

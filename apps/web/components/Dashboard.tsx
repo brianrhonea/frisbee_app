@@ -290,9 +290,14 @@ export function Dashboard({ user }: { user: User }) {
           <TeamInvites />
         </div>
         <NeedsYou uid={user.uid} />
-        {tournamentDays.map((d) => (
-          <TournamentDayCard key={`${d.teamId}/${d.tournamentId}`} day={d} />
-        ))}
+        {/* Phones show these above the feed (.huddle-phone). */}
+        {tournamentDays.length > 0 && (
+          <div className="huddle-side-days">
+            {tournamentDays.map((d) => (
+              <TournamentDayCard key={`${d.teamId}/${d.tournamentId}`} day={d} />
+            ))}
+          </div>
+        )}
 
         <div className="card">
           <div className="card-head">

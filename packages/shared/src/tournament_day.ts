@@ -1,4 +1,4 @@
-import { type EngineGame, gamesToPlay, poolTeams, standings, winnerOf } from "./tournament_engine.js";
+import { type EngineGame, gamesToPlay, poolTeams, type SlotSource, standings, winnerOf } from "./tournament_engine.js";
 
 /** When a team's tournament card shows (TournamentDayPhase in the app). */
 export type TournamentDayPhase = "today" | "tomorrow";
@@ -29,6 +29,12 @@ export interface TournamentDay {
   poolSize: number | null;
   scoreDue: EngineGame | null;
   scoreDueKind: ScoreDueKind | null;
+  /**
+   * With no `next` game yet, whether an empty bracket slot comes from this
+   * team (its pool rank, or the winner or loser of a game it played): its
+   * next game is still to be decided. False once it's out.
+   */
+  awaiting: boolean;
 }
 
 const isDone = (g: EngineGame) => g.status === "done";
@@ -78,6 +84,7 @@ export function tournamentDay(games: EngineGame[], teamId: string, now: Date, li
 
   let pool: string | null = null;
   let poolPlace: number | null = null;
+  let poolRank: number | null = null;
   let poolSize: number | null = null;
   for (const [id, teams] of poolTeams(games)) {
     if (!teams.includes(teamId)) continue;
@@ -87,7 +94,8 @@ export function tournamentDay(games: EngineGame[], teamId: string, now: Date, li
     );
     pool = id;
     poolSize = rows.length;
-    if (done.some((g) => g.stage === "pool" && g.pool === id)) poolPlace = rows.findIndex((s) => s.teamId === teamId) + 1;
+    poolRank = rows.findIndex((s) => s.teamId === teamId) + 1;
+    if (done.some((g) => g.stage === "pool" && g.pool === id)) poolPlace = poolRank;
     break;
   }
 
@@ -107,6 +115,16 @@ export function tournamentDay(games: EngineGame[], teamId: string, now: Date, li
     }
   }
 
+  const fromMe = (s: SlotSource | null | undefined): boolean => {
+    if (!s) return false;
+    if (s.type === "pool") return s.pool === pool && s.rank === poolRank;
+    const g = done.find((x) => x.id === s.game);
+    if (!g) return false;
+    return s.type === "winner" ? winnerOf(g) === teamId : winnerOf(g) !== teamId;
+  };
+  const awaiting =
+    next == null && gamesToPlay(games).some((g) => (g.teamA == null && fromMe(g.sourceA)) || (g.teamB == null && fromMe(g.sourceB)));
+
   return {
     phase,
     next: next && teamGame(next, teamId),
@@ -118,5 +136,6 @@ export function tournamentDay(games: EngineGame[], teamId: string, now: Date, li
     poolSize,
     scoreDue,
     scoreDueKind,
+    awaiting,
   };
 }

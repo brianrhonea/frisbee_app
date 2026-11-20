@@ -38,6 +38,7 @@ describe("tournament-day card matches the app (fixtures/tournament_day/day.json)
         poolSize: d.poolSize,
         due: d.scoreDue?.id ?? null,
         dueKind: d.scoreDueKind,
+        awaiting: d.awaiting,
       },
     ).toEqual(c.day);
   });

@@ -22,8 +22,15 @@ export function tournamentHref(id: string, o: { division?: string; game?: string
 export function TournamentDayCard({ day: d, showTeam = true }: { day: TeamTournamentDay; showTeam?: boolean }) {
   const zone = useRenderZone();
   const time = (at: Date) => at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: zone });
+  // "8:30 AM" today, "Tomorrow 8:30 AM", else "Sat 8:30 AM".
+  const when = (at: Date) => {
+    const days = Math.round((Date.UTC(at.getFullYear(), at.getMonth(), at.getDate()) - Date.UTC(d.now.getFullYear(), d.now.getMonth(), d.now.getDate())) / 86_400_000);
+    if (days === 0) return time(at);
+    if (days === 1) return `Tomorrow ${time(at)}`;
+    return `${at.toLocaleDateString("en-US", { weekday: "short", timeZone: zone })} ${time(at)}`;
+  };
   const { next, last } = d.day;
-  const when = d.day.phase === "tomorrow" ? "Tomorrow" : d.status === "live" ? "Live" : "Today";
+  const label = d.day.phase === "tomorrow" ? "Tomorrow" : d.status === "live" ? "Live" : "Today";
   const record = [
     d.day.wins + d.day.losses > 0 ? `${d.day.wins}–${d.day.losses}` : null,
     d.day.poolPlace != null ? `${ordinal(d.day.poolPlace)} in Pool ${d.day.pool}` : null,
@@ -33,10 +40,10 @@ export function TournamentDayCard({ day: d, showTeam = true }: { day: TeamTourna
   const action = actionGame(d);
   const schedule = tournamentHref(d.tournamentId, { division: d.divisionId, tab: "schedule" });
   return (
-    <section className="card tournament-day" aria-label={`${d.tournamentName}: ${when.toLowerCase()}`}>
+    <section className="card tournament-day" aria-label={`${d.tournamentName}: ${label.toLowerCase()}`}>
       <small className="tournament-day-when">
-        {when === "Live" && <span className="tournament-day-dot" aria-hidden />}
-        {[when, showTeam ? d.teamName : null].filter(Boolean).join(" · ")}
+        {label === "Live" && <span className="tournament-day-dot" aria-hidden />}
+        {[label, showTeam ? d.teamName : null].filter(Boolean).join(" · ")}
       </small>
       <Link className="tournament-day-name" href={schedule}>
         {d.tournamentName}
@@ -47,13 +54,18 @@ export function TournamentDayCard({ day: d, showTeam = true }: { day: TeamTourna
           <b className="tournament-day-vs">{next.opponent ? `vs ${nameOf(d, next.opponent)}` : next.game.label}</b>
           <span className="small">
             {[
-              next.game.startsAt ? `${d.day.phase === "tomorrow" ? "Tomorrow " : ""}${time(next.game.startsAt)}` : null,
+              next.game.startsAt ? when(next.game.startsAt) : null,
               `Field ${next.game.field}`,
               next.opponent ? null : "opponent to be decided",
             ]
               .filter(Boolean)
               .join(" · ")}
           </span>
+        </div>
+      ) : d.day.awaiting ? (
+        <div>
+          <b className="tournament-day-vs">Next game to be decided</b>
+          <span className="small">Waiting on the bracket</span>
         </div>
       ) : (
         <b className="tournament-day-vs">All games played</b>

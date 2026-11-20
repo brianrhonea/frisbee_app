@@ -14,7 +14,10 @@ Tournament-day card, with app 0.0.33. Works with API 0.33.0.
   tournament (Live when it is), the next game (opponent, time, field;
   "Tomorrow" from 17:00 the evening before), record and pool place, and
   the last result (`useTournamentDays`, `TournamentDayCard`). One rule
-  with the app: `tournamentDay` in `@stall10/shared`.
+  with the app: `tournamentDay` in `@stall10/shared`. Between pools and
+  the bracket it says **Next game to be decided**; a next game on another
+  day shows the day. Wide screens show it in the side column, phones
+  above the feed.
 - Captains get **Report score** / **Confirm score** on the card. It opens
   `/tournaments/{id}?division=…&game=…`: the Schedule tab with the game
   first under **This game**, its score form open when it's theirs to

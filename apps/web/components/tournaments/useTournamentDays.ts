@@ -36,6 +36,8 @@ export interface TeamTournamentDay {
   names: Record<string, string>;
   /** The viewer captains this team here: they report its scores. */
   isCaptain: boolean;
+  /** When [day] was worked out, for "Tomorrow" and weekday labels. */
+  now: Date;
 }
 
 export const nameOf = (d: TeamTournamentDay, teamId: string | null | undefined) => (teamId ? (d.names[teamId] ?? "TBD") : "TBD");
@@ -46,12 +48,18 @@ export const actionGame = (d: TeamTournamentDay): EngineGame | null =>
 
 const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
-/** Accepted entries from the day before they start to the day they end. */
+/**
+ * Accepted entries from the day before they start to the day they end,
+ * with a day's slack each side: dates are the host's local midnight, which
+ * can fall on the day before (or after) here. Whether a card shows is
+ * still decided by the games' own times.
+ */
 function current(e: EnteredTournamentDoc, now: Date): boolean {
   if (e.status !== "accepted" || !e.startsOn) return false;
   const starts = new Date(e.startsOn);
-  const from = new Date(starts.getFullYear(), starts.getMonth(), starts.getDate() - 1).getTime();
-  const to = day(e.endsOn ? new Date(e.endsOn) : starts);
+  const from = new Date(starts.getFullYear(), starts.getMonth(), starts.getDate() - 2).getTime();
+  const ends = e.endsOn ? new Date(e.endsOn) : starts;
+  const to = new Date(ends.getFullYear(), ends.getMonth(), ends.getDate() + 1).getTime();
   const today = day(now);
   return today >= from && today <= to;
 }
@@ -172,6 +180,7 @@ export function useTournamentDays(uid: string | null | undefined, teamId?: strin
         day: d,
         names: Object.fromEntries((f.entries ?? []).map((e) => [e.id, e.teamName])),
         isCaptain: !!uid && (division?.captains?.[team] ?? []).includes(uid),
+        now,
       });
     }
     const far = Number.MAX_SAFE_INTEGER;

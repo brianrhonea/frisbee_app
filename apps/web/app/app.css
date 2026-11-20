@@ -1469,7 +1469,7 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
 @media (max-width: 760px) {
   .huddle-phone { display: grid; gap: 12px; }
   .huddle-phone:empty { display: none; }
-  .huddle-side-invites { display: none; }
+  .huddle-side-invites, .huddle-side-days { display: none; }
 }
 
 /* The floating Post button, where the side nav is hidden. */

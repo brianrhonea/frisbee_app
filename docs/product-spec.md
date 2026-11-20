@@ -543,7 +543,9 @@ everything the app does on the website alone, styled like the website
     in place of the next event on both: the tournament (Live), next game
     (opponent, time, field; the evening before from 17:00: tomorrow's
     first game), record, pool place (once it has a pool result) and last
-    result. [x] Captains get Report / Confirm score on both, opening the
+    result; "Next game to be decided" between pools and the bracket while
+    a bracket slot comes from the team, the day on a next game that isn't
+    today. [x] Captains get Report / Confirm score on both, opening the
     tournament page on that game with its score form (app: the game
     sheet; web: **This game**, form open); `?game=`, `?division=`,
     `?tab=` on both. One rule: app `TournamentDay.of`, shared
@@ -552,7 +554,8 @@ everything the app does on the website alone, styled like the website
     `TournamentDays`, web `useTournamentDays`). Tests: app
     `test/ui/tournament_day_test.dart`; shared
     `test/tournament_day_fixtures.test.ts` (the website has no test
-    runner; its rule is the shared one).
+    runner; its rule is the shared one); rules "an entered team's
+    players read an invite-only event's games".
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

@@ -23,6 +23,8 @@ GroupGame _g(
   int field = 1,
   GameStage stage = GameStage.pool,
   String? pool = 'A',
+  SlotSource? sourceA,
+  SlotSource? sourceB,
 }) => GroupGame(
   id: id,
   order: order,
@@ -34,6 +36,8 @@ GroupGame _g(
   startsAt: at,
   teamA: a,
   teamB: b,
+  sourceA: sourceA,
+  sourceB: sourceB,
   status: sa != null
       ? GameStatus.done
       : reportedBy != null
@@ -76,6 +80,24 @@ List<GroupGame> _pool({
   _g('4', 3, 'b', 'd', at: _at(21, 10, 30), field: 4),
   _g('5', 4, 'us', 'd', at: _at(21, 12)),
   _g('6', 5, null, null, at: _at(22, 9), stage: GameStage.winners),
+];
+
+/// A finished pool of three on Nov 21 ([wins]: us beat b and c, else lost
+/// both), then an unseeded final on Nov 22 between Pool A's top two.
+List<GroupGame> _poolDone({required bool wins}) => [
+  _g('1', 0, 'us', 'b', at: _at(21, 9), sa: wins ? 13 : 5, sb: wins ? 5 : 13),
+  _g('2', 1, 'b', 'c', at: _at(21, 10), sa: 13, sb: 9),
+  _g('3', 2, 'c', 'us', at: _at(21, 11), sa: wins ? 4 : 13, sb: wins ? 13 : 6),
+  _g(
+    '4',
+    3,
+    null,
+    null,
+    at: _at(22, 9),
+    stage: GameStage.winners,
+    sourceA: const PoolRank('A', 1),
+    sourceB: const PoolRank('A', 2),
+  ),
 ];
 
 final _cases = <Map<String, Object?>>[
@@ -140,6 +162,18 @@ final _cases = <Map<String, Object?>>[
     'live': true,
   },
   {
+    'name': 'pools done, bracket unseeded: next game to be decided',
+    'games': _poolDone(wins: true),
+    'now': _at(21, 13),
+    'live': true,
+  },
+  {
+    'name': 'pools done and out of the bracket: all games played',
+    'games': _poolDone(wins: false),
+    'now': _at(21, 13),
+    'live': true,
+  },
+  {
     'name': 'a team not in the games has no card',
     'games': _pool(),
     'now': _at(21, 9),
@@ -161,7 +195,9 @@ void main() {
           "from the pool's standings (`place` only once it has a pool "
           'result); `due` is the earliest of its games '
           'with both teams that is reported (confirm, or awaiting when it '
-          'reported) or has started unreported (report).',
+          'reported) or has started unreported (report). `awaiting`: no '
+          'next game yet, but an empty bracket slot comes from the team '
+          '(its pool rank, or winner/loser of a game it played).',
       [
         for (final c in _cases)
           () {
@@ -201,6 +237,7 @@ void main() {
                       'poolSize': d.poolSize,
                       'due': d.scoreDue?.id,
                       'dueKind': d.scoreDueKind,
+                      'awaiting': d.awaiting,
                     },
             };
           }(),

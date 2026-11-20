@@ -1,4 +1,5 @@
 /* A team's tournament-day card (TournamentDayCard). */
+.huddle-side-days { display: grid; gap: 16px; }
 .tournament-day { display: grid; gap: 8px; background: var(--accent-soft); border-color: transparent; }
 .tournament-day-when {
   display: inline-flex; align-items: center; gap: 6px;

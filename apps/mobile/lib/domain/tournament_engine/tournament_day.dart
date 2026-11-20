@@ -56,9 +56,15 @@ class TournamentDay {
     this.poolSize,
     this.scoreDue,
     this.scoreDueKind,
+    this.awaiting = false,
   });
 
   final TournamentDayPhase phase;
+
+  /// With no [next] game yet, whether one of the bracket's empty slots
+  /// comes from this team (its pool place, or the winner or loser of a game
+  /// it played): its next game is still to be decided. False once it's
+  /// out, when its games are done.
 
   /// The team's next game still to play, earliest first.
   final TeamGame? next;
@@ -78,6 +84,7 @@ class TournamentDay {
   /// The earliest game whose score the team's captains act on.
   final GroupGame? scoreDue;
   final ScoreDueKind? scoreDueKind;
+  final bool awaiting;
 
   /// The card for [teamId] on [games] at [now], or null when there's
   /// nothing to show: no game today, not live, and not the evening
@@ -128,6 +135,7 @@ class TournamentDay {
 
     String? pool;
     int? place;
+    int? rank;
     int? size;
     for (final MapEntry(key: id, value: teams) in poolTeams(games).entries) {
       if (!teams.contains(teamId)) continue;
@@ -137,10 +145,11 @@ class TournamentDay {
       );
       pool = id;
       size = rows.length;
+      rank = rows.indexWhere((s) => s.teamId == teamId) + 1;
       final played = done.any(
         (g) => g.stage == GameStage.pool && g.poolId == id,
       );
-      if (played) place = rows.indexWhere((s) => s.teamId == teamId) + 1;
+      if (played) place = rank;
       break;
     }
 
@@ -164,6 +173,24 @@ class TournamentDay {
       }
     }
 
+    bool fromMe(SlotSource? s) => switch (s) {
+      PoolRank(:final poolId, rank: final r) => poolId == pool && r == rank,
+      WinnerOf(:final gameId) => done.any(
+        (g) => g.id == gameId && g.winner == teamId,
+      ),
+      LoserOf(:final gameId) => done.any(
+        (g) => g.id == gameId && g.isDone && g.winner != teamId,
+      ),
+      null => false,
+    };
+    final awaiting =
+        next == null &&
+        gamesToPlay(games).any(
+          (g) =>
+              (g.teamA == null && fromMe(g.sourceA)) ||
+              (g.teamB == null && fromMe(g.sourceB)),
+        );
+
     return TournamentDay(
       phase: phase,
       next: next == null ? null : TeamGame(game: next, teamId: teamId),
@@ -175,6 +202,7 @@ class TournamentDay {
       poolSize: size,
       scoreDue: due,
       scoreDueKind: kind,
+      awaiting: awaiting,
     );
   }
 }

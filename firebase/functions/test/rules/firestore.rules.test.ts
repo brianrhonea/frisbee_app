@@ -16,6 +16,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -3932,6 +3933,29 @@ describe("hosted tournaments", () => {
     await assertSucceeds(getDoc(tRef(OUTSIDER)));
     await assertSucceeds(getDoc(divRef(OUTSIDER)));
     await assertSucceeds(getDoc(entryRef(OUTSIDER)));
+  });
+
+  it("an entered team's players read an invite-only event's games for their tournament-day card", async () => {
+    // A private group hosts; PLAYER is on an entered team but not in it.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await updateDoc(doc(fs, "teams", HOST), { requiresApproval: true });
+      await setDoc(doc(fs, "tournaments", T), tournament({ visibility: "inviteOnly", status: "live" }));
+      await setDoc(doc(fs, "tournaments", T, "divisions", DIV), division());
+      await setDoc(doc(fs, "tournaments", T, "entries", TEAM), entry({ status: "accepted" }));
+      await setDoc(doc(fs, "tournaments", T, "divisions", DIV, "games", "g1"), game());
+      await setDoc(doc(fs, "teams", TEAM, "tournamentEntries", T), {
+        name: "Spring Fling", hostId: HOST, hostName: "Denver Ultimate",
+        startsOn: new Date(2027, 4, 1), endsOn: null, location: "", status: "accepted",
+      });
+    });
+    const fs = db(PLAYER);
+    // What TournamentDays / useTournamentDays listen to.
+    await assertSucceeds(getDocs(collection(fs, "teams", TEAM, "tournamentEntries")));
+    await assertSucceeds(getDoc(tRef(PLAYER)));
+    await assertSucceeds(getDocs(collection(fs, "tournaments", T, "entries")));
+    await assertSucceeds(getDocs(collection(fs, "tournaments", T, "divisions")));
+    await assertSucceeds(getDocs(query(collection(fs, "tournaments", T, "divisions", DIV, "games"), orderBy("order"))));
   });
 
   it("team admins apply to public tournaments taking entries; players can't", async () => {

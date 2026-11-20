@@ -16,11 +16,15 @@ class TeamTournamentDay {
     required this.tournament,
     required this.divisionId,
     required this.day,
+    required this.now,
     this.names = const {},
     this.isCaptain = false,
   });
 
   final Team team;
+
+  /// When [day] was worked out, for "Tomorrow" and weekday labels.
+  final DateTime now;
   final HostedTournament tournament;
   final String divisionId;
   final TournamentDay day;
@@ -80,7 +84,12 @@ class TournamentDays extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  void _onTeams(List<Team> teams) {
+  void _onTeams(List<Team> all) {
+    // Only teams enter tournaments; communities host them.
+    final teams = [
+      for (final t in all)
+        if (t.kind == TeamKind.team) t,
+    ];
     final ids = {for (final t in teams) t.id};
     _teams
       ..clear()
@@ -99,15 +108,18 @@ class TournamentDays extends ChangeNotifier {
     _sync();
   }
 
-  /// Accepted entries on (or the day before) today.
+  /// Accepted entries from the day before they start to the day they end,
+  /// with a day's slack each side: dates are the host's local midnight,
+  /// which can fall on the day before (or after) here. Whether a card
+  /// shows is still decided by the games' own times.
   bool _current(EnteredTournament e) {
     final starts = e.startsOn;
     if (e.status != EntryStatus.accepted || starts == null) return false;
     final now = _clock();
     final today = DateTime(now.year, now.month, now.day);
-    final from = DateTime(starts.year, starts.month, starts.day - 1);
+    final from = DateTime(starts.year, starts.month, starts.day - 2);
     final ends = e.endsOn ?? starts;
-    final to = DateTime(ends.year, ends.month, ends.day);
+    final to = DateTime(ends.year, ends.month, ends.day + 1);
     return !today.isBefore(from) && !today.isAfter(to);
   }
 
@@ -169,6 +181,7 @@ class TournamentDays extends ChangeNotifier {
           tournament: t,
           divisionId: entry.divisionId,
           day: day,
+          now: now,
           names: f.names,
           isCaptain: division?.captains[f.teamId]?.contains(uid) ?? false,
         ),

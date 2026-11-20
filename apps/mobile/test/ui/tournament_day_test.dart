@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frisbee_app/data/repositories/hosted_tournament/tournament_days.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
+import 'package:frisbee_app/domain/models/group_tournament.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/domain/models/team.dart';
 import 'package:frisbee_app/domain/tournament_engine/tournament_day.dart';
@@ -99,6 +100,36 @@ void main() {
       expect((await days('pat', at: early)).days, isEmpty);
     });
 
+    test("a host's dates a day off here still follow the event", () async {
+      // Stored as the host's local midnight, which can read as the evening
+      // before here: the card still shows on the day.
+      seedLiveTournament(repo, now: now);
+      final evening = DateTime(now.year, now.month, now.day - 1, 22);
+      repo.entered['t1'] = [
+        EnteredTournament(
+          tournamentId: 'x9',
+          name: 'Mile High Open',
+          status: EntryStatus.accepted,
+          startsOn: evening,
+          endsOn: evening,
+        ),
+      ];
+      expect((await days('pat')).days, hasLength(1));
+    });
+
+    test("communities' entries aren't followed", () async {
+      seedLiveTournament(repo, now: now, teamId: 'host');
+      final d = TournamentDays(
+        repository: repo,
+        teams: Stream.value([teams.teams['host']!]),
+        uid: 'director',
+        clock: () => now,
+      );
+      addTearDown(d.dispose);
+      await pumpEventQueue();
+      expect(d.days, isEmpty);
+    });
+
     test('nothing for a draft tournament', () async {
       seedLiveTournament(repo, now: now, status: HostedStatus.draft);
       expect((await days('pat')).days, isEmpty);
@@ -141,6 +172,60 @@ void main() {
       // Not a captain: no score button.
       expect(find.text('Report score'), findsNothing);
       expect(find.text('Schedule & standings'), findsOneWidget);
+    });
+
+    testWidgets('waiting on the bracket, and a next game on another day', (
+      tester,
+    ) async {
+      seedLiveTournament(repo, now: now);
+      // Every pool game played; the final, tomorrow, waits for Pool A's top
+      // two.
+      final games = repo.games['x9/d1']!;
+      repo.games['x9/d1'] = [
+        for (final g in games)
+          GroupGame.fromMap(g.id, {
+            ...g.toMap(),
+            'status': 'done',
+            'scoreA': g.scoreA ?? 13,
+            'scoreB': g.scoreB ?? 9,
+          }),
+        GroupGame(
+          id: 'f',
+          order: 9,
+          stage: GameStage.winners,
+          round: 1,
+          label: 'Final',
+          field: 1,
+          startsAt: DateTime(now.year, now.month, now.day + 1, 9),
+          sourceA: const PoolRank('A', 1),
+          sourceB: const PoolRank('A', 2),
+        ),
+      ];
+      var d = (await tester.runAsync(() => days('pat')))!.days.single;
+      expect(d.day.awaiting, isTrue);
+      await pumpCard(tester, d);
+      expect(find.text('Next game to be decided'), findsOneWidget);
+      expect(find.text('Waiting on the bracket'), findsOneWidget);
+
+      // Seeded: the final shows with its day.
+      repo.games['x9/d1'] = [
+        ...repo.games['x9/d1']!.where((g) => g.id != 'f'),
+        GroupGame(
+          id: 'f',
+          order: 9,
+          stage: GameStage.winners,
+          round: 1,
+          label: 'Final',
+          field: 1,
+          startsAt: DateTime(now.year, now.month, now.day + 1, 9),
+          teamA: 't1',
+          teamB: 'bg',
+        ),
+      ];
+      d = (await tester.runAsync(() => days('pat')))!.days.single;
+      await pumpCard(tester, d);
+      expect(find.text('vs Boulder Gold'), findsOneWidget);
+      expect(find.textContaining('Tomorrow 9:00'), findsOneWidget);
     });
 
     testWidgets("a captain's Report score opens the game", (tester) async {
