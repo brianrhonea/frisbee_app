@@ -564,35 +564,28 @@ void main() {
     );
   });
 
-  testWidgets('with one team, the Teams tab opens it; back is All teams', (
-    tester,
-  ) async {
+  testWidgets('with one team, the Teams tab shows the list', (tester) async {
     await pumpApp(tester);
     await tapTab(tester, 'Teams');
-    expect(find.byType(TeamHomeScreen), findsOneWidget);
-    final router = GoRouter.of(tester.element(find.byType(TeamHomeScreen)));
-    expect(router.state.uri.path, Routes.team('t1'));
+    // Never opens the only team by itself (F34): the list, with the team.
+    expect(find.byType(TeamsScreen), findsOneWidget);
+    expect(find.byType(TeamHomeScreen), findsNothing);
+    expect(find.text('Northside Flyers'), findsWidgets);
+    final router = GoRouter.of(tester.element(find.byType(TeamsScreen)));
+    await tester.pump(const Duration(seconds: 1));
+    expect(router.state.uri.path, Routes.teams);
 
-    // Back (All teams) shows the list, and it stays there.
+    // Opening the team; back (All teams) is the list again.
+    await tapText(tester, 'Northside Flyers');
+    expect(find.byType(TeamHomeScreen), findsOneWidget);
     await tester.tap(find.byTooltip('All teams'));
     await tester.pumpAndSettle();
     expect(find.byType(TeamsScreen), findsOneWidget);
     expect(find.byType(TeamHomeScreen), findsNothing);
-    await tester.pump(const Duration(seconds: 1));
-    expect(router.state.uri.path, Routes.teams);
 
-    // Away and back by the tab: the team again.
+    // Away and back by the tab: still the list.
     await tapTab(tester, 'Home');
     await tapTab(tester, 'Teams');
-    expect(find.byType(TeamHomeScreen), findsOneWidget);
-
-    // Tapping Teams again on the team also lands on it, not the list.
-    await tapTab(tester, 'Teams');
-    expect(find.byType(TeamHomeScreen), findsOneWidget);
-
-    // A link to the list (e.g. after leaving a team) shows the list.
-    router.go(Routes.teams);
-    await tester.pumpAndSettle();
     expect(find.byType(TeamsScreen), findsOneWidget);
     expect(find.byType(TeamHomeScreen), findsNothing);
   });

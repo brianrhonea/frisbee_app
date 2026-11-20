@@ -5,25 +5,39 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
+import '../../../data/services/synced_video.dart';
 import '../../../domain/models/team_video.dart';
 import '../../core/themes/theme.dart';
+import 'video_controllers.dart';
 
-/// Builds the player for a video; tests swap in a stand-in, since the real
-/// players need a platform web view.
-typedef YouTubePlayerBuilder = Widget Function(String youtubeId);
+/// Builds the player for a video, handing [onController] a controller to
+/// seek it with (a video's notes, F4) once it's ready, and null when it
+/// goes; tests swap in a stand-in, since the real players need a platform
+/// web view.
+typedef YouTubePlayerBuilder =
+    Widget Function(
+      String youtubeId, [
+      ValueChanged<SyncedVideoController?>? onController,
+    ]);
 
 /// YouTube's own embedded player, 16:9: the iframe player on Android and
-/// iOS, elsewhere the thumbnail with a link to YouTube.
-Widget youTubePlayer(String youtubeId) => switch (defaultTargetPlatform) {
-  TargetPlatform.android ||
-  TargetPlatform.iOS => _IframePlayer(youtubeId: youtubeId),
+/// iOS, elsewhere the thumbnail with a link to YouTube (which can't seek).
+Widget youTubePlayer(
+  String youtubeId, [
+  ValueChanged<SyncedVideoController?>? onController,
+]) => switch (defaultTargetPlatform) {
+  TargetPlatform.android || TargetPlatform.iOS => _IframePlayer(
+    youtubeId: youtubeId,
+    onController: onController,
+  ),
   _ => WatchOnYouTube(youtubeId: youtubeId),
 };
 
 class _IframePlayer extends StatefulWidget {
-  const _IframePlayer({required this.youtubeId});
+  const _IframePlayer({required this.youtubeId, this.onController});
 
   final String youtubeId;
+  final ValueChanged<SyncedVideoController?>? onController;
 
   @override
   State<_IframePlayer> createState() => _IframePlayerState();
@@ -39,7 +53,14 @@ class _IframePlayerState extends State<_IframePlayer> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    widget.onController?.call(IframeVideoController(_controller));
+  }
+
+  @override
   void dispose() {
+    widget.onController?.call(null);
     unawaited(_controller.close());
     super.dispose();
   }

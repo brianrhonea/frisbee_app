@@ -1,5 +1,5 @@
 "use client";
-import type { PublicEvent, PublicTeamPost } from "@stall10/shared";
+import { arrangeTeamFeed, isPinnedPost, type PublicEvent, type PublicTeamPost, teamPostPinsMax } from "@stall10/shared";
 import { limit, orderBy } from "firebase/firestore";
 import Link from "next/link";
 import { useState } from "react";
@@ -15,7 +15,11 @@ import { membersInOrder } from "./TeamBanner";
 import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { type TeamPostView, TeamPostCard } from "./TeamPostCard";
 import { TeamPostComposer } from "./TeamPostComposer";
+import { TeamPostComments } from "./TeamPostComments";
+import { Dialog } from "../Dialog";
 import { SectionsHint } from "./SectionsHint";
+import { TeamStatTiles, useTeamChatRooms } from "./TeamStatTiles";
+import { CommunityChat, CommunityOrganizers, NextPickupCard } from "./CommunitySections";
 import { DateTile } from "./DateTile";
 import { needsRsvp, RsvpPill } from "../RsvpPill";
 import { useTeamEvents, useYouthOutsiderPublic, youthVisitorNote } from "./TeamSchedule";
@@ -31,7 +35,7 @@ const leads = new Set(["owner", "coach", "captain"]);
  * them.
  */
 export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTeamPost[]; publicEvents: PublicEvent[] }) {
-  const { teamId, name, privateGroup, privatePage, youth, viewer } = useTeamHub();
+  const { teamId, name, kind, privateGroup, privatePage, youth, viewer } = useTeamHub();
   const member = viewer.state === "member";
   // A youth team's public posts and events, live, for someone signed in who isn't on it (not while its page is off).
   const outsiderYouth = youth && !privatePage && viewer.state === "outsider";
@@ -41,12 +45,26 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
     [orderBy("createdAt", "desc"), limit(postLimit)],
     "feed",
   );
+  // Pinned posts can be older than the newest [postLimit] (redesign F24).
+  const pins = useLiveQuery<TeamPostView>(
+    member ? `teams/${teamId}/posts` : null,
+    [orderBy("pinnedAt", "desc"), limit(teamPostPinsMax)],
+    "feed-pins",
+  );
   const events = useTeamEvents(teamId, viewer);
   const { user } = useAuth();
   const tournamentDay = useTournamentDays(member ? user?.uid : null, teamId)[0];
-  const posts: TeamPostView[] = member ? (live.data ?? []) : outsiderYouth ? (outsider.posts.data ?? []) : publicPosts;
-  const upcoming = (member ? (events.data ?? []) : outsiderYouth ? (outsider.events.data ?? []) : publicEvents).slice(0, 4);
+  const loaded: TeamPostView[] = member ? (live.data ?? []) : outsiderYouth ? (outsider.posts.data ?? []) : publicPosts;
+  // Pinned first: members' from their own query; others' among those loaded (the API sends visitors theirs).
+  const feed = arrangeTeamFeed(member ? (pins.data ?? []) : [], loaded);
+  const posts: TeamPostView[] = [...feed.pinned, ...feed.rest];
+  const ahead = member ? (events.data ?? []) : outsiderYouth ? (outsider.events.data ?? []) : publicEvents;
   const hidden = !member && (privateGroup || privatePage);
+  // A community leads with its next event, RSVP and all (F27); Coming up lists the rest.
+  const community = kind !== "team" && !hidden;
+  const pickup = community && (!member || events.data !== undefined);
+  const upcoming = ahead.slice(community ? 1 : 0, community ? 5 : 4);
+  const chat = useTeamChatRooms();
   // Signed out: a youth team's card only.
   const youthHidden = youth && viewer.state === "visitor";
   const admin = viewer.state === "member" && viewer.can("manageTeam");
@@ -56,7 +74,9 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
     <div className="hub-feed">
       <section className="stack">
         <SectionsHint />
-        {admin && <TeamPostComposer teamId={teamId} />}
+        {pickup && <NextPickupCard event={ahead[0]} />}
+        {member && <TeamStatTiles next={events.data?.[0]} chat={chat} />}
+        {admin && <TeamPostComposer teamId={teamId} prompt={kind === "team" ? "Post to the team…" : "Post to the community…"} />}
         {viewer.state === "loading" || (member && !live.data && !live.error) ? (
           <Loading label="Loading posts…" />
         ) : live.error ? (
@@ -85,7 +105,13 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
                 post={p}
                 teamName={name}
                 showAudience={member}
-                actions={admin ? <PostAdminActions teamId={teamId} postId={p.id} onEdit={() => setEditing(p.id)} /> : undefined}
+                pinned={isPinnedPost(p)}
+                actions={
+                  admin ? (
+                    <PostAdminActions teamId={teamId} post={p} pinned={feed.pinned} onEdit={() => setEditing(p.id)} />
+                  ) : undefined
+                }
+                comments={member ? () => <TeamPostComments teamId={teamId} postId={p.id} moderator={admin} /> : undefined}
               />
             ),
           )
@@ -94,7 +120,9 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
       <aside className="stack">
         {/* On a tournament day the card comes before what's coming up. */}
         {tournamentDay && <TournamentDayCard day={tournamentDay} showTeam={false} />}
-        {!hidden && !youthHidden && (
+        {community && <CommunityChat chat={chat} />}
+        {community && <CommunityOrganizers />}
+        {!hidden && !youthHidden && !(community && upcoming.length === 0) && (
           <div className="card coming-up">
             <div className="card-head">
               <h2 className="card-title">Coming up</h2>
@@ -210,11 +238,39 @@ function MemberPreview() {
   );
 }
 
-/** Edit and delete on a team post, for its admins. */
-function PostAdminActions({ teamId, postId, onEdit }: { teamId: string; postId: string; onEdit: () => void }) {
+/** Pin, edit and delete on a team post, for its admins. Pinning into a full feed asks which pin to take down. */
+function PostAdminActions({
+  teamId,
+  post,
+  pinned,
+  onEdit,
+}: {
+  teamId: string;
+  post: TeamPostView & { id: string };
+  pinned: Array<TeamPostView & { id: string }>;
+  onEdit: () => void;
+}) {
+  const postId = post.id;
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const isPinned = isPinnedPost(post);
+  const pinPath = `/v1/teams/${encodeURIComponent(teamId)}/posts/${encodeURIComponent(postId)}/pin`;
+  async function pin(unpin?: string) {
+    if (!user) return;
+    if (!isPinned && unpin === undefined && pinned.length >= teamPostPinsMax) return setChoosing(true);
+    setChoosing(false);
+    setBusy(true);
+    setError(null);
+    try {
+      await callApi(user, pinPath, isPinned ? { method: "DELETE" } : { method: "PUT", body: unpin ? { unpin } : {} });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function remove() {
     if (!user || !window.confirm("Delete this post? This can't be undone.")) return;
     setBusy(true);
@@ -227,6 +283,9 @@ function PostAdminActions({ teamId, postId, onEdit }: { teamId: string; postId: 
   }
   return (
     <span className="post-admin">
+      <button type="button" className="text-btn" onClick={() => void pin()} disabled={busy}>
+        {isPinned ? "Unpin" : "Pin"}
+      </button>
       <button type="button" className="text-btn" onClick={onEdit} disabled={busy}>
         Edit
       </button>
@@ -234,6 +293,22 @@ function PostAdminActions({ teamId, postId, onEdit }: { teamId: string; postId: 
         Delete
       </button>
       {error && <span className="form-error">{error}</span>}
+      {choosing && (
+        <Dialog label="Unpin one to pin this" onClose={() => setChoosing(false)} className="card pins-dialog" dismissOnBackdrop>
+          <h2 className="card-title">Unpin one to pin this</h2>
+          <p className="muted small">A team keeps up to {teamPostPinsMax} pinned posts.</p>
+          <div className="unpin-choices">
+            {pinned.map((p) => (
+              <button key={p.id} type="button" className="btn" onClick={() => void pin(p.id)}>
+                {(p.title || p.body || "Photo post").slice(0, 80)}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="btn btn-small" onClick={() => setChoosing(false)}>
+            Cancel
+          </button>
+        </Dialog>
+      )}
     </span>
   );
 }

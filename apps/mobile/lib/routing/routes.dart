@@ -216,6 +216,11 @@ abstract final class Routes {
   static String tournamentLiveDraft(String id, String divisionId) =>
       '$tournaments/$id/live-draft/$divisionId';
 
+  /// A division's bracket on its own page (the website's
+  /// `/tournaments/:id/bracket?division=`).
+  static String tournamentBracket(String id, String divisionId) =>
+      '$tournaments/$id/bracket/$divisionId';
+
   // Community group tournament pages open over the tabs, like video pages;
   // use `context.push`.
   static const groupTournamentsPath = '/group-tournaments';

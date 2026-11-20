@@ -10,6 +10,40 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.38
+
+**Teams**
+- The Teams tab always shows your list of teams.
+- Team pages show how many are going to the next event and how many
+  chat rooms have new messages.
+- The roster shows everyone's role and can be grouped into O-line and
+  D-line. Admins see pending invites and can withdraw them.
+- Pin up to 3 posts to the top of the team feed, and comment on team
+  posts.
+- Give someone a role in one tap (Captain, Coach, Admin…) or switch
+  each permission on or off.
+- Teams can let people ask to join; admins approve or decline.
+- Community pages start with the next pickup: RSVP right on the card.
+
+**Chat**
+- Post a poll in a team chat room.
+
+**Videos**
+- Pin notes to a moment in a team video, clip a range, comment, and tag
+  the video to a game.
+
+**Tournaments**
+- A bracket page of its own, bigger score buttons (− / +), leagues a
+  week at a time, and a step-by-step host form with Save draft and
+  Publish. Share a tournament's link.
+
+**Calendar**
+- "Add to calendar" opens your phone's calendar so you pick which
+  calendar it goes in.
+
+**Discord**
+- When importing from Discord, pick which channels to bring.
+
 ## 0.0.37
 
 **Live scores**

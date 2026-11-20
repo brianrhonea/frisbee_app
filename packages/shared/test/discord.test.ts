@@ -4,12 +4,16 @@
 // exactly as the app does.
 import { describe, expect, it } from "vitest";
 import {
+  allChannels,
+  channelGroups,
   emptiedFolders,
   type ImportPlan,
   type ImportTeam,
   importIsEmpty,
   importPlanSchema,
   movingRooms,
+  pickedDestinations,
+  pickRooms,
   planFor,
   planImport,
   splitPlan,
@@ -225,5 +229,52 @@ describe("plan keys", () => {
     ];
     const moving = movingRooms(plan, split, [{ id: "f20", name: "Team" }], rooms);
     expect(moving.map((r) => r.id)).toEqual(["r2"]);
+  });
+});
+
+describe("picking channels (PickedPlan)", () => {
+  it("groups channels as Discord lists them and starts with all ticked", () => {
+    expect(channelGroups(plan).map((g) => [g.name, g.rooms])).toEqual([
+      [null, [3]],
+      ["Info", [0]],
+      ["Team", [1, 2]],
+    ]);
+    expect(allChannels(plan)).toEqual([0, 1, 2, 3]);
+    expect(pickRooms(plan, allChannels(plan)).plan).toEqual(plan);
+  });
+
+  it("imports only the picked rooms, and categories left with none aren't made", () => {
+    const picked = pickRooms(plan, [2, 3]);
+    const i = planImport(picked.plan, {}, [], [], ids);
+    expect(i.rooms.map((r) => r.name)).toEqual(["handlers-only", "off-topic"]);
+    expect(i.folders.map((f) => f.name)).toEqual(["Team"]);
+    expect(i.newRoles).toEqual(["Admin", "Captains", "Handlers"]);
+    // What's sent is still a valid plan.
+    expect(importPlanSchema.safeParse(picked.plan).success).toBe(true);
+    expect(pickRooms(plan, []).plan.rooms).toEqual([]);
+  });
+
+  it("maps destinations to the picked rooms, so an unticked room never moves", () => {
+    const org: ImportTeam = {
+      roles: { a: { name: "Admin", color: 0, position: 0, perms: [] }, h: { name: "Handlers", color: 0, position: 1, perms: [] } },
+      linkedTeams: { woof: { name: "Woof", roles: ["h"] } },
+    };
+    const folders = [{ id: "fT", name: "Team", position: 0 }];
+    const rooms = [{ id: "old", name: "handlers-only", folderId: "fT", position: 0 }];
+    const whole = planImport(plan, org, folders, rooms, ids);
+    expect(movingRooms(plan, splitPlan(plan, org, whole.roleIdsByKey), folders, rooms).map((r) => r.id)).toEqual(["old"]);
+
+    const picked = pickRooms(plan, [0, 1, 3], new Map([[3, "woof"]]));
+    expect(picked.from).toEqual([0, 1, 3]);
+    expect(pickedDestinations(picked)).toEqual([{ room: 2, teamId: "woof" }]);
+    const split = splitPlan(picked.plan, org, whole.roleIdsByKey, picked.overrides);
+    expect(split.destinations).toEqual([null, null, "woof"]);
+    const moving = movingRooms(picked.plan, split, folders, rooms);
+    expect(moving).toEqual([]);
+    expect(emptiedFolders(moving, folders, rooms)).toEqual([]);
+  });
+
+  it("ignores indexes out of range and repeats", () => {
+    expect(pickRooms(plan, [3, 7, -1, 3, 0.5]).from).toEqual([3]);
   });
 });

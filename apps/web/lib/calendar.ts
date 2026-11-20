@@ -3,15 +3,19 @@ import { type CalendarColor, calendarColorHex, icsEvent, icsFileName } from "@st
 
 export const colorOf = (c: CalendarColor | undefined) => calendarColorHex[c ?? "green"] ?? calendarColorHex.green;
 
-/** "Add to calendar": one event as an .ics file, which Outlook, Apple and Google Calendar open (the same file as the app's). */
-export function downloadIcs(e: {
+/** An event to add to someone's calendar: the .ics fields (Google and Outlook links use all but [uid]). */
+export type CalendarFileEvent = {
+  /** Stable per event, so adding the file again updates it. */
   uid: string;
   title: string;
   startsAt: string;
   endsAt?: string | null;
   location?: string;
   description?: string;
-}) {
+};
+
+/** "Apple / other" in Add to calendar: one event as an .ics file, which Apple Calendar and the rest open (the same file as the app's). */
+export function downloadIcs(e: CalendarFileEvent) {
   const ics = icsEvent(e);
   const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
   const a = document.createElement("a");

@@ -184,6 +184,21 @@ class ChatRoomViewModel extends MessageThreadViewModel {
   /// Posts the team event with this id into the room as a card.
   late final Command1<void, String> shareEvent;
 
+  // Polls (redesign F33) ------------------------------------------------------
+
+  /// Whoever can post here asks a poll (through the API).
+  bool get canPoll => _chats.canUseChatExtras && access.canWrite;
+
+  /// The owner and chat managers close anyone's poll.
+  bool get canManagePolls =>
+      access.canRead && (_team?.has(uid, TeamPermission.manageChats) ?? false);
+
+  /// A voter's name on the team.
+  String nameOf(String uid) => _team?.nameOf(uid) ?? 'Member';
+
+  /// The chat repository, for the poll card and form view models.
+  ChatRepository get chatRepository => _chats;
+
   @override
   OutboxKind get outboxKind => OutboxKind.teamChat;
 

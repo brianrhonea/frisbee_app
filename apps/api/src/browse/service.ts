@@ -11,7 +11,7 @@ import type {
   TeamPage,
   TeamSearchPage,
 } from "@stall10/shared";
-import { publicPageOn, searchWords } from "@stall10/shared";
+import { arrangeTeamFeed, publicPageOn, searchWords } from "@stall10/shared";
 import { ApiError } from "../errors.js";
 import { searchKey } from "../limits/model.js";
 import {
@@ -172,6 +172,7 @@ export class BrowseService {
    * by uid.
    */
   async team(id: unknown): Promise<TeamPage> {
+    const isoOf = (v: unknown) => (typeof v === "string" ? v : undefined);
     if (!validId(id)) throw new ApiError("not_found", "No such team.");
     const { listings, teams } = await this.hosts([id]);
     const data = listings.get(id);
@@ -183,7 +184,12 @@ export class BrowseService {
       this.repo.publicTeamPosts(id),
       this.repo.upcomingTeamEvents(id, this.now()),
     ]);
-    const shown = posts.filter((d) => isPublicTeamPost(d.data));
+    // Pinned posts first (F24), then the newest.
+    const { pinned, rest } = arrangeTeamFeed(
+      [],
+      posts.filter((d) => isPublicTeamPost(d.data)).map((d) => ({ ...d, pinnedAt: isoOf(d.data.pinnedAt), createdAt: isoOf(d.data.createdAt) })),
+    );
+    const shown = [...pinned, ...rest];
     const authorOf = (d: Doc) => (typeof d.data.authorId === "string" && d.data.authorId ? d.data.authorId : null);
     const people = await this.repo.profiles(shown.flatMap((d) => authorOf(d) ?? []));
     return {

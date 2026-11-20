@@ -7,6 +7,37 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.35.0 — 2026-11-20
+
+Redesign features, second batch, with app 0.0.38 and web 0.47.0.
+Details in `docs/product-spec.md` §8.1 items 35–44.
+
+**Added**
+- Video notes, clips and comments: `POST /v1/teams/:id/videos/:videoId/comments`,
+  `DELETE .../comments/:commentId` (author or manageTeam); `PUT
+  .../videos/:videoId/event` tags a video to a team event (`{eventId |
+  null}`). Removing a video deletes its comments.
+- Roster lines: `PUT /v1/teams/:id/roster-lines` (manageTeam, teams
+  only). Pending invites: `GET /v1/teams/:id/invites`, `DELETE
+  /v1/teams/:id/invites/:uid`; invites now record `teamId`.
+- Chat polls: `POST /v1/teams/:id/chats/:roomId/polls`, `PUT
+  .../messages/:messageId/vote`, `POST .../messages/:messageId/close-poll`.
+- Team posts: `PUT|DELETE /v1/teams/:id/posts/:postId/pin` (up to 3,
+  swap), `POST /v1/teams/:id/posts/:postId/comments`, `DELETE
+  .../comments/:commentId`. Public team pages list pinned posts first
+  with `pinnedAt`.
+- Permissions: `PUT /v1/teams/:id/members/:uid/permissions` (owner;
+  `memberGrants`, included in `memberPerms`).
+- Team join requests: `PUT /v1/teams/:id/allow-join-requests`; the
+  existing join-request endpoints now serve teams that allow them, with
+  the club age rule at request and approval.
+
+**Changed**
+- Download your data adds video notes/comments (with team, video and
+  times), poll votes and polls posted, roster lines, and waiting join
+  requests.
+- Reply quotes of a poll say "📊 question".
+
 ## 0.34.0 — 2026-11-20
 
 Redesign features, with app 0.0.37 and web 0.46.0. Details in

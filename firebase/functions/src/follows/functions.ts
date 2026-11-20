@@ -103,6 +103,32 @@ export const commentCount = onDocumentWritten("posts/{postId}/comments/{commentI
 });
 
 /**
+ * Keeps a team post's commentCount in step (redesign F24): comments come
+ * from the API and go with their author's account too. A flat thread, so
+ * no replies to clear.
+ */
+export const teamPostCommentCount = onDocumentWritten("teams/{teamId}/posts/{postId}/comments/{commentId}", async (event) => {
+  const by = commentCountChange(event.data?.before.exists ?? false, event.data?.after.exists ?? false);
+  if (by === 0) return;
+  const { teamId, postId } = event.params;
+  try {
+    await getFirestore().doc(`teams/${teamId}/posts/${postId}`).update({ commentCount: FieldValue.increment(by) });
+  } catch (e) {
+    if (!notFound(e)) throw e;
+  }
+});
+
+/**
+ * A team post deleted (by the app, the API or with its team): its comments
+ * go too. The app and the API delete its photos themselves.
+ */
+export const teamPostDeleted = onDocumentDeleted("teams/{teamId}/posts/{postId}", async (event) => {
+  const { teamId, postId } = event.params;
+  const db = getFirestore();
+  await db.recursiveDelete(db.collection(`teams/${teamId}/posts/${postId}/comments`));
+});
+
+/**
  * A new post's `private` flag, when its writer left it out (apps before
  * 0.0.29) or got it wrong: its author's profile's (S1). Until then the
  * rules treat a post without it as public.

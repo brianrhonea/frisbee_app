@@ -2,7 +2,7 @@
 import { formatVideoBytes, type TeamVideoDoc, type VideoFolderDoc, youtubeWatchUrl } from "@stall10/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { LocalTime } from "../../LocalTime";
 import { useAuth } from "../../AuthProvider";
 import { callApi } from "@/lib/client";
@@ -11,10 +11,14 @@ import { useTeamHub } from "../TeamContext";
 import { MembersOnlySection } from "../TeamNav";
 import { VideoEditor } from "./VideoEditor";
 import { byName, bytesUsed, type Folder, removeMessage, type Video, videosApi, videosHref } from "./model";
-import { VideoPlayer } from "./VideoPlayer";
+import { useVideoComments, VideoComments, VideoEventTag, VideoNotes } from "./VideoDiscussion";
+import { VideoPlayer, type VideoSeeker } from "./VideoPlayer";
 import "./videos.css";
 
-/** One video (/teams/:id/videos/:videoId; the app's VideoScreen): the player, who shared it, and for admins edit and remove. */
+/**
+ * One video (/teams/:id/videos/:videoId; the app's VideoScreen): the player, who shared it, and for admins edit and
+ * remove; the event it's tagged to, its notes (click one to play from there) and comments (F4–F6).
+ */
 export function VideoPage({ videoId }: { videoId: string }) {
   const { teamId, viewer } = useTeamHub();
   const { user } = useAuth();
@@ -28,6 +32,9 @@ export function VideoPage({ videoId }: { videoId: string }) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [seeker, setSeeker] = useState<VideoSeeker | null>(null);
+  const onReady = useCallback((s: VideoSeeker | null) => setSeeker(() => s), []);
+  const discussion = useVideoComments(videoId);
   const back = (
     <Link href={videosHref(teamId)} className="text-btn">
       ← Videos
@@ -62,7 +69,7 @@ export function VideoPage({ videoId }: { videoId: string }) {
   return (
     <div className="stack video-page">
       {back}
-      <VideoPlayer video={video} />
+      <VideoPlayer video={video} onReady={onReady} />
       {editing ? (
         <VideoEditor
           teamId={teamId}
@@ -97,6 +104,7 @@ export function VideoPage({ videoId }: { videoId: string }) {
               </>
             )}
           </div>
+          <VideoEventTag videoId={video.id} eventId={video.eventId} />
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -104,6 +112,9 @@ export function VideoPage({ videoId }: { videoId: string }) {
           )}
         </div>
       )}
+      {discussion.error && <p className="form-error">{discussion.error}</p>}
+      <VideoNotes videoId={video.id} notes={discussion.notes} seeker={seeker} />
+      <VideoComments videoId={video.id} comments={discussion.comments} />
     </div>
   );
 }

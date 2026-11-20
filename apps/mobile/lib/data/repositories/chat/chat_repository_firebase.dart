@@ -431,7 +431,8 @@ class ChatRepositoryFirebase implements ChatRepository {
     await _messages(teamId, roomId).doc(message.id).delete();
   });
 
-  static const _noApi = 'Pins and event cards need a connection to Stall 10.';
+  static const _noApi =
+      'Pins, event cards and polls need a connection to Stall 10.';
 
   ApiClient get _client =>
       _api ?? (throw const ApiException('unavailable', _noApi));
@@ -496,6 +497,65 @@ class ChatRepositoryFirebase implements ChatRepository {
     () => _client.post('${_roomPath(teamId, roomId)}/event-shares', {
       'eventId': eventId,
     }),
+  );
+
+  static String _messagePath(String teamId, String roomId, String id) =>
+      '${_roomPath(teamId, roomId)}/messages/${Uri.encodeComponent(id)}';
+
+  @override
+  Future<Result<void>> createPoll(
+    String teamId,
+    String roomId,
+    NewChatPoll poll,
+  ) => guard(
+    () => _client.post('${_roomPath(teamId, roomId)}/polls', {
+      'question': poll.question,
+      'options': poll.options,
+      'multiple': poll.multiple,
+      if (poll.closesAt case final at?)
+        'closesAt': at.toUtc().toIso8601String(),
+    }),
+  );
+
+  @override
+  Future<Result<void>> votePoll(
+    String teamId,
+    String roomId,
+    String messageId,
+    List<int> options,
+  ) => guard(
+    () => _client.put('${_messagePath(teamId, roomId, messageId)}/vote', {
+      'options': options,
+    }),
+  );
+
+  @override
+  Future<Result<void>> closePoll(
+    String teamId,
+    String roomId,
+    String messageId,
+  ) => guard(
+    () => _client.post(
+      '${_messagePath(teamId, roomId, messageId)}/close-poll',
+      const {},
+    ),
+  );
+
+  @override
+  Stream<ChatMessage?> watchMessage(
+    String teamId,
+    String roomId,
+    String messageId,
+  ) => _shared.get(
+    'message/$teamId/$roomId/$messageId',
+    () =>
+        countedDocSnapshots(
+          _messages(teamId, roomId).doc(messageId),
+          'chatPoll',
+        ).map(
+          (d) =>
+              d.exists ? ChatMessage.fromMap(d.id, plainData(d.data())) : null,
+        ),
   );
 
   @override

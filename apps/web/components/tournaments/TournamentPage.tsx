@@ -15,22 +15,21 @@ import {
   spotFee,
   takesPlayers,
   takesTeams,
-  type EntryDoc,
   type HostedStatus,
 } from "@stall10/shared";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FollowButton } from "@/components/FollowButton";
+import { ShareButton, tournamentUrl } from "@/components/ShareButton";
 import { callApi } from "@/lib/client";
 import { dayKey, useRenderZone } from "@/lib/renderZone";
-import type { Doc } from "@/lib/live";
 import { SignupsSlot } from "./SignupsSlot";
 import { DivisionPicker, NoDivisions, ResultsTab, ScheduleTab, TeamMark } from "./TournamentGames";
 import { TournamentNews } from "./TournamentNews";
 import { JoinToTakePart, PublicNews } from "./VisitorParts";
 import { datesLabel, StatusBadge } from "./TournamentLists";
-import { type MyTeam, type TournamentState, divisionPath, tournamentPath, useAction, useTournament } from "./useTournament";
+import { type TournamentState, divisionPath, tournamentPath, useAction, useTournament } from "./useTournament";
 import "./tournaments.css";
 
 type Tab = "overview" | "players" | "teams" | "schedule" | "results" | "news";
@@ -122,6 +121,8 @@ export function TournamentView({ s, open }: { s: TournamentState; open?: { tab?:
         </div>
         <div className="home-actions hosted-head-actions">
           {t.status !== "draft" && !s.visitor && <FollowButton type="tournament" targetId={tournamentId} groupId={t.hostId} />}
+          {/* A draft has no public page to link to yet. */}
+          {t.status !== "draft" && <ShareButton url={tournamentUrl(tournamentId)} title={`${t.name} on Stall 10`} className="btn btn-small btn-quiet" />}
           {s.manager && <ManagerMenu s={s} />}
         </div>
       </header>
@@ -383,76 +384,13 @@ function Overview({ s }: { s: TournamentState }) {
   );
 }
 
-/** Captain picker: the team's members, as the app's entry sheet offers them. */
-function CaptainPicker({ team, value, onChange }: { team: MyTeam | undefined; value: string[]; onChange: (v: string[]) => void }) {
-  const names = Object.entries(team?.memberNames ?? {}).sort((a, b) => a[1].localeCompare(b[1]));
-  if (!names.length) return <p className="muted small">The team&apos;s members show up here to pick captains.</p>;
-  return (
-    <fieldset className="hosted-captains">
-      <legend>Captains (they report scores; up to 4)</legend>
-      {names.map(([uid, name]) => (
-        <label key={uid} className="switch-row">
-          <input
-            type="checkbox"
-            checked={value.includes(uid)}
-            onChange={(e) => onChange(e.target.checked ? [...value, uid].slice(0, 4) : value.filter((x) => x !== uid))}
-          />
-          {name}
-        </label>
-      ))}
-    </fieldset>
-  );
-}
-
-/** Apply, accept an invite or change captains for one of the viewer's teams. */
-function EntryForm({ s, team, entry, onDone }: { s: TournamentState; team: MyTeam | undefined; entry: Doc<EntryDoc> | null; onDone?: () => void }) {
-  const [div, setDiv] = useState(entry?.divisionId ?? s.divisions[0]?.id ?? "");
-  const [captains, setCaptains] = useState<string[]>(entry?.captainIds ?? (s.uid ? [s.uid] : []));
-  const { busy, error, run } = useAction();
-  if (!team) return null;
-  const label = entry?.status === "invited" ? "Accept the invite" : entry && entry.status !== "withdrawn" ? "Save captains" : "Apply";
-  return (
-    <form
-      className="settings-form"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        const r = await run(`${tournamentPath(s.id)}/entries/${encodeURIComponent(team.id)}`, "PUT", { divisionId: div, captainIds: captains });
-        if (r.ok) onDone?.();
-      }}
-    >
-      {(!entry || entry.status === "withdrawn") && s.divisions.length > 1 && (
-        <label>
-          Division
-          <select value={div} onChange={(e) => setDiv(e.target.value)}>
-            {s.divisions.map((d) => (
-              <option key={d.id} value={d.id}>
-                {divisionLabel(d)}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <CaptainPicker team={team} value={captains} onChange={setCaptains} />
-      {error && <p className="form-error">{error}</p>}
-      <div className="home-actions">
-        <button className="btn btn-primary btn-small" disabled={busy || !div || captains.length === 0}>
-          {label}
-        </button>
-        {onDone && (
-          <button type="button" className="text-btn" onClick={onDone}>
-            Cancel
-          </button>
-        )}
-      </div>
-    </form>
-  );
-}
+/** Entering a team, accepting an invite or changing captains ([teamId]) happens on its own page (EnterTeam). */
+const enterHref = (tournamentId: string, teamId?: string) =>
+  `/tournaments/${encodeURIComponent(tournamentId)}/enter${teamId ? `?team=${encodeURIComponent(teamId)}` : ""}`;
 
 /** "Your teams" (EventGuide, team side): entries of teams the viewer runs. */
 function YourTeams({ s }: { s: TournamentState }) {
   const t = s.t!;
-  const [applying, setApplying] = useState<string>("");
-  const [editing, setEditing] = useState<string | null>(null);
   const { busy, error, run } = useAction();
   const open = t.status === "registration";
   const canApply = open && t.visibility === "public" && s.divisions.length > 0;
@@ -475,14 +413,16 @@ function YourTeams({ s }: { s: TournamentState }) {
                     {d ? divisionLabel(d) : ""} · captains: {e.captainIds.map((c) => team?.memberNames?.[c] ?? "a member").join(", ")}
                   </small>
                 </div>
-                {editing === e.id || e.status === "invited" ? (
-                  <EntryForm s={s} team={team} entry={e} onDone={e.status === "invited" ? undefined : () => setEditing(null)} />
+                {e.status === "invited" ? (
+                  <Link className="btn btn-primary btn-small" href={enterHref(s.id, e.id)}>
+                    Accept the invite
+                  </Link>
                 ) : (
                   e.status !== "declined" && (
                     <div className="home-actions">
-                      <button type="button" className="text-btn" onClick={() => setEditing(e.id)}>
+                      <Link className="text-btn" href={enterHref(s.id, e.id)}>
                         Captains
-                      </button>
+                      </Link>
                       <button
                         type="button"
                         className="text-btn"
@@ -500,19 +440,10 @@ function YourTeams({ s }: { s: TournamentState }) {
             );
           })}
         {canApply && s.teamsToEnter.length > 0 && !s.myActiveEntry && (
-          <div className="stack">
-            <label>
+          <div className="home-actions">
+            <Link className="btn btn-primary btn-small" href={enterHref(s.id)}>
               Enter a team
-              <select value={applying} onChange={(e) => setApplying(e.target.value)}>
-                <option value="">Pick one of your teams</option>
-                {s.teamsToEnter.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {applying && <EntryForm key={applying} s={s} team={s.teamsToEnter.find((m) => m.id === applying)} entry={s.entryOf(applying)} onDone={() => setApplying("")} />}
+            </Link>
           </div>
         )}
         {mixedEntry(t) && open && t.visibility === "public" && s.divisions.length > 0 && !s.myActiveEntry && <ReserveSpot s={s} />}

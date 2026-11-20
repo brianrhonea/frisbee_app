@@ -12,6 +12,7 @@ import {
   saveTeamPostRequestSchema,
   sendChatMessageRequestSchema,
   sharedEventPreview,
+  chatPollPreview,
   teamPostImagesMax,
   teamPostTournamentKeyMax,
 } from "@stall10/shared";
@@ -354,8 +355,16 @@ export class HubService {
         id: req.replyTo,
         authorId: clip(String(quoted.authorId ?? ""), 128),
         authorName: clip(String(quoted.authorName ?? ""), 80),
-        // A shared event has no text: quote its card's title (F3).
-        text: clip(String(quoted.text ?? "") || (quoted.event ? sharedEventPreview(String(mapOf(quoted.event).title ?? "")) : ""), 200),
+        // A shared event or a poll has no text: quote its card's title (F3) or question (F33).
+        text: clip(
+          String(quoted.text ?? "") ||
+            (quoted.event
+              ? sharedEventPreview(String(mapOf(quoted.event).title ?? ""))
+              : quoted.poll
+                ? chatPollPreview(String(mapOf(quoted.poll).question ?? ""))
+                : ""),
+          200,
+        ),
       };
     }
     const me = await authorOf(this.store, this.users, caller);

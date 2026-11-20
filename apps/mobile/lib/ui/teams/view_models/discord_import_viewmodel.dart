@@ -23,7 +23,8 @@ class _TeamChats {
 }
 
 /// The owner pastes a Discord server template link, previews the roles,
-/// folders and rooms it would add, and imports them.
+/// folders and rooms it would add, picks which text channels to bring
+/// (all to start with), and imports them.
 ///
 /// In a school or club community with teams, rooms only one team's roles
 /// can read go to that team's chat instead ([split]), with copies of the
@@ -75,7 +76,12 @@ class DiscordImportViewModel extends ChangeNotifier {
   bool _done = false;
   Object? _error;
   final _linked = <String, _TeamChats>{};
+
+  /// Where rooms go, by index into the whole plan.
   final _overrides = <int, String?>{};
+
+  /// The channels ticked, by index into the whole plan.
+  final _picked = <int>{};
 
   String get uid => _auth.currentUser?.uid ?? '';
   Team? get team => _team;
@@ -84,7 +90,47 @@ class DiscordImportViewModel extends ChangeNotifier {
   Object? get error => _error;
 
   String get link => _link;
+
+  /// The whole template, every channel in it.
   DiscordImportPlan? get plan => _plan;
+
+  /// The template cut down to the channels ticked; null before a preview.
+  PickedPlan? get picking {
+    final plan = _plan;
+    return plan == null
+        ? null
+        : PickedPlan.of(plan, _picked, overrides: _overrides);
+  }
+
+  /// The template's text channels by category, for the picker.
+  List<ChannelGroup> get channelGroups =>
+      _plan == null ? const [] : ChannelGroup.of(_plan!);
+
+  /// Whether room [index] of the whole plan is ticked.
+  bool isPicked(int index) => _picked.contains(index);
+
+  int get pickedCount => _picked.length;
+
+  /// Ticks or unticks room [index] of the whole plan.
+  void setPicked(int index, bool picked) => _pick([index], picked);
+
+  /// Ticks or unticks every channel in [group].
+  void setGroupPicked(ChannelGroup group, bool picked) =>
+      _pick(group.rooms, picked);
+
+  /// Ticks every channel (true) or none (false).
+  void setAllPicked(bool picked) =>
+      _pick([for (var i = 0; i < (_plan?.rooms.length ?? 0); i++) i], picked);
+
+  void _pick(Iterable<int> indexes, bool picked) {
+    final count = _plan?.rooms.length ?? 0;
+    for (final i in indexes) {
+      if (i < 0 || i >= count) continue;
+      picked ? _picked.add(i) : _picked.remove(i);
+    }
+    _done = false;
+    notifyListeners();
+  }
 
   /// True once the import is written.
   bool get done => _done;
@@ -112,9 +158,9 @@ class DiscordImportViewModel extends ChangeNotifier {
       _linked[id]?.ready == true &&
       _linked[id]!.team!.roleOf(uid) == TeamRole.owner;
 
-  /// Everything in the plan mapped onto the community, for its role ids.
+  /// Everything picked mapped onto the community, for its role ids.
   DiscordImport? get _whole {
-    final plan = _plan;
+    final plan = picking?.plan;
     final team = _team;
     final rooms = _rooms;
     final folders = _folders;
@@ -124,19 +170,21 @@ class DiscordImportViewModel extends ChangeNotifier {
     return DiscordImport.of(plan, team: team, folders: folders, rooms: rooms);
   }
 
-  /// Where each room goes; null when there are no teams to sort into.
+  /// Where each picked room goes (by index into [PickedPlan.plan]); null
+  /// when there are no teams to sort into.
   DiscordTeamSplit? get split {
-    final plan = _plan;
+    final picking = this.picking;
     final team = _team;
     final whole = _whole;
-    if (!sortsIntoTeams || plan == null || team == null || whole == null) {
+    if (!sortsIntoTeams || picking == null || team == null || whole == null) {
       return null;
     }
+    final plan = picking.plan;
     final first = DiscordTeamSplit.of(
       plan,
       org: team,
       roleIds: whole.roleIdsByKey,
-      overrides: _overrides,
+      overrides: picking.overrides,
     );
     // Rooms for teams the owner can't write to stay here.
     return DiscordTeamSplit.of(
@@ -144,16 +192,19 @@ class DiscordImportViewModel extends ChangeNotifier {
       org: team,
       roleIds: whole.roleIdsByKey,
       overrides: {
-        ..._overrides,
+        ...picking.overrides,
         for (var i = 0; i < first.destinations.length; i++)
           if (first.destinations[i] case final t? when !_owns(t)) i: null,
       },
     );
   }
 
-  /// Sends room [index] of the plan to [teamId] (null: the community).
+  /// Sends picked room [index] (of [PickedPlan.plan]) to [teamId] (null:
+  /// the community).
   void setDestination(int index, String? teamId) {
-    _overrides[index] = teamId;
+    final from = picking?.from ?? const <int>[];
+    if (index < 0 || index >= from.length) return;
+    _overrides[from[index]] = teamId;
     _done = false;
     notifyListeners();
   }
@@ -161,7 +212,7 @@ class DiscordImportViewModel extends ChangeNotifier {
   /// What importing [plan] would add to this team (in a community with
   /// teams, the rooms that stay here).
   DiscordImport? get import {
-    final plan = _plan;
+    final plan = picking?.plan;
     final team = _team;
     final rooms = _rooms;
     final folders = _folders;
@@ -200,7 +251,7 @@ class DiscordImportViewModel extends ChangeNotifier {
   /// now go to a team, so they're deleted here once the team has them.
   List<ChatRoom> get moving {
     final split = this.split;
-    final plan = _plan;
+    final plan = picking?.plan;
     final rooms = _rooms;
     final folders = _folders;
     if (split == null || plan == null || rooms == null || folders == null) {
@@ -257,6 +308,7 @@ class DiscordImportViewModel extends ChangeNotifier {
       _plan = null;
       _done = false;
       _overrides.clear();
+      _picked.clear();
     }
     notifyListeners();
   }
@@ -312,7 +364,12 @@ class DiscordImportViewModel extends ChangeNotifier {
     _done = false;
     _overrides.clear();
     final result = await _discord.preview(teamId, _link.trim());
-    if (result case Ok(:final value)) _plan = value;
+    if (result case Ok(:final value)) {
+      _plan = value;
+      _picked
+        ..clear()
+        ..addAll([for (var i = 0; i < value.rooms.length; i++) i]);
+    }
     notifyListeners();
     return result;
   }

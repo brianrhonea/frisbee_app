@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import {
+  cleanMemberGrants,
   cleanMemberRoles,
   createTeamRequestSchema,
   optionalTeamSections,
@@ -87,11 +88,11 @@ describe("directory listings match the app (fixtures/team_listing.json)", () => 
 });
 
 describe("saved custom roles match the app (fixtures/team_roles.json)", () => {
-  const cases: Array<{ case: string; members: string[]; roles: unknown; memberRoles: unknown; saved: unknown }> =
+  const cases: Array<{ case: string; members: string[]; roles: unknown; memberRoles: unknown; grants?: unknown; saved: unknown }> =
     fixture("team_roles.json");
   it.each(cases)("$case", (c) => {
     const input = saveRolesRequestSchema.parse({ roles: c.roles, memberRoles: c.memberRoles });
     const memberRoles = cleanMemberRoles(input.memberRoles, input.roles, c.members);
-    expect(rolesData(input.roles, memberRoles)).toEqual(c.saved);
+    expect(rolesData(input.roles, memberRoles, cleanMemberGrants(c.grants, c.members))).toEqual(c.saved);
   });
 });

@@ -29,6 +29,7 @@ import 'package:frisbee_app/domain/models/chat.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/invite_code.dart';
 import 'package:frisbee_app/domain/models/notification.dart';
+import 'package:frisbee_app/domain/models/pending_invite.dart';
 import 'package:frisbee_app/domain/models/play.dart';
 import 'package:frisbee_app/domain/models/player_profile.dart';
 import 'package:frisbee_app/domain/models/roster_player.dart';
@@ -384,7 +385,7 @@ class FakeTeamRepository implements TeamRepository {
     }
     teams[teamId] = t.copyWith(
       memberRoles: memberRoles,
-      memberPerms: memberPermsFor(memberRoles, t.roles),
+      memberPerms: memberPermsFor(memberRoles, t.roles, t.memberGrants),
     );
   }
 
@@ -743,6 +744,22 @@ class FakeTeamRepository implements TeamRepository {
     return const Result.ok(null);
   }
 
+  /// Every [setAllowJoinRequests] call, in order.
+  final allowJoinRequestsChanges = <bool>[];
+
+  @override
+  Future<Result<void>> setAllowJoinRequests(String teamId, bool on) async {
+    final t = teams[teamId];
+    if (t == null) return Result.error(Exception('No such team.'));
+    allowJoinRequestsChanges.add(on);
+    teams[teamId] = t.copyWith(allowJoinRequests: on);
+    if (listings.containsKey(teamId)) {
+      listings[teamId] = TeamListing.of(teams[teamId]!);
+    }
+    _emit();
+    return const Result.ok(null);
+  }
+
   /// Every [setPublicPage] call, in order.
   final publicPageChanges = <bool>[];
 
@@ -830,6 +847,36 @@ class FakeTeamRepository implements TeamRepository {
     TeamRole role,
   ) async => const Result.ok(null);
 
+  /// Every [setMemberPermissions] call, in order.
+  final permissionCalls =
+      <({String teamId, String uid, Set<TeamPermission> perms})>[];
+
+  @override
+  Future<Result<void>> setMemberPermissions(
+    String teamId,
+    String uid,
+    Set<TeamPermission> permissions,
+  ) async {
+    permissionCalls.add((teamId: teamId, uid: uid, perms: permissions));
+    final t = teams[teamId];
+    if (t == null) return Result.error(Exception('No team'));
+    final grants = {...t.memberGrants};
+    if (permissions.isEmpty) {
+      grants.remove(uid);
+    } else {
+      grants[uid] = permissions;
+    }
+    teams[teamId] = t.copyWith(
+      memberGrants: grants,
+      memberPerms: memberPermsFor(t.memberRoles, t.roles, grants),
+      statKeepers: permissions.contains(TeamPermission.keepStats)
+          ? t.statKeepers
+          : ({...t.statKeepers}..remove(uid)),
+    );
+    _emit();
+    return const Result.ok(null);
+  }
+
   @override
   Future<Result<void>> setStatKeeper(
     String teamId,
@@ -900,7 +947,7 @@ class FakeTeamRepository implements TeamRepository {
     teams[team.id] = t.copyWith(
       roles: roles,
       memberRoles: cleaned,
-      memberPerms: memberPermsFor(cleaned, roles),
+      memberPerms: memberPermsFor(cleaned, roles, t.memberGrants),
     );
     rolesSaved++;
     _emit();
@@ -925,7 +972,7 @@ class FakeTeamRepository implements TeamRepository {
     teams[team.id] = t.copyWith(
       roles: roles,
       memberRoles: cleaned,
-      memberPerms: memberPermsFor(cleaned, roles),
+      memberPerms: memberPermsFor(cleaned, roles, t.memberGrants),
       members: {
         for (final e in t.members.entries)
           e.key: tierRoles.containsKey(e.value) ? TeamRole.player : e.value,
@@ -975,6 +1022,7 @@ class FakeTeamRepository implements TeamRepository {
               number: p.number,
               position: p.position,
               userId: p.userId,
+              line: p.line,
             ),
   ];
 
@@ -1008,6 +1056,7 @@ class FakeTeamRepository implements TeamRepository {
                 position: p.position,
                 userId: uid,
                 paid: p.paid,
+                line: p.line,
               )
             : p,
     ];
@@ -1026,6 +1075,7 @@ class FakeTeamRepository implements TeamRepository {
             position: player.position,
             userId: player.userId,
             paid: player.paid,
+            line: player.line,
           )
         : player;
     roster[teamId] = [
@@ -1040,6 +1090,49 @@ class FakeTeamRepository implements TeamRepository {
   @override
   Future<Result<void>> deletePlayer(String teamId, String playerId) async =>
       const Result.ok(null);
+
+  /// Every [setRosterLines] call's lines, in order.
+  final lineChanges = <Map<String, RosterLine?>>[];
+
+  @override
+  Future<Result<void>> setRosterLines(
+    String teamId,
+    Map<String, RosterLine?> lines,
+  ) async {
+    lineChanges.add(lines);
+    roster[teamId] = [
+      for (final p in roster[teamId] ?? const <RosterPlayer>[])
+        lines.containsKey(p.id)
+            ? RosterPlayer(
+                id: p.id,
+                name: p.name,
+                number: p.number,
+                position: p.position,
+                userId: p.userId,
+                paid: p.paid,
+                line: lines[p.id],
+              )
+            : p,
+    ];
+    _rosterChanges.add(null);
+    return const Result.ok(null);
+  }
+
+  /// Pending invites by team, for [pendingInvites].
+  final pending = <String, List<PendingInvite>>{};
+
+  @override
+  Future<Result<List<PendingInvite>>> pendingInvites(String teamId) async =>
+      Result.ok([...?pending[teamId]]);
+
+  @override
+  Future<Result<void>> withdrawInvite(String teamId, String uid) async {
+    pending[teamId] = [
+      for (final i in pending[teamId] ?? const <PendingInvite>[])
+        if (i.uid != uid) i,
+    ];
+    return const Result.ok(null);
+  }
 }
 
 class FakePlayRepository implements PlayRepository {
@@ -1714,6 +1807,124 @@ class FakeChatRepository implements ChatRepository {
     emit();
     return const Result.ok(null);
   }
+
+  // Polls (redesign F33), as the API keeps them.
+
+  /// (roomId, poll) for each createPoll call.
+  final polls = <(String, NewChatPoll)>[];
+
+  /// (messageId, options) for each votePoll call.
+  final votes = <(String, List<int>)>[];
+
+  /// The uid votePoll and closePoll act as.
+  String pollUid = 'u1';
+
+  ChatMessage? _find(String roomId, String id) =>
+      messages[roomId]?.where((m) => m.id == id).firstOrNull;
+
+  void _replace(String roomId, ChatMessage m, ChatPoll poll) {
+    final list = messages[roomId]!;
+    list[list.indexOf(m)] = ChatMessage(
+      id: m.id,
+      authorId: m.authorId,
+      authorName: m.authorName,
+      text: m.text,
+      createdAt: m.createdAt,
+      reactions: m.reactions,
+      poll: poll,
+    );
+    emit();
+  }
+
+  @override
+  Future<Result<void>> createPoll(
+    String teamId,
+    String roomId,
+    NewChatPoll poll,
+  ) async {
+    polls.add((roomId, poll));
+    (messages[roomId] ??= []).add(
+      ChatMessage(
+        id: 'poll${polls.length}',
+        authorId: pollUid,
+        authorName: 'Test User',
+        createdAt: DateTime(2026, 11, 1),
+        poll: ChatPoll(
+          question: poll.question,
+          options: poll.options,
+          multiple: poll.multiple,
+          closesAt: poll.closesAt,
+        ),
+      ),
+    );
+    emit();
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> votePoll(
+    String teamId,
+    String roomId,
+    String messageId,
+    List<int> options,
+  ) async {
+    votes.add((messageId, options));
+    final m = _find(roomId, messageId);
+    final p = m?.poll;
+    if (m == null || p == null) {
+      return Result.error(const ApiException('not_found', 'Poll deleted.'));
+    }
+    _replace(
+      roomId,
+      m,
+      ChatPoll(
+        question: p.question,
+        options: p.options,
+        multiple: p.multiple,
+        closesAt: p.closesAt,
+        closedAt: p.closedAt,
+        closedBy: p.closedBy,
+        votes: {
+          for (final e in p.votes.entries)
+            if (e.key != pollUid) e.key: e.value,
+          if (options.isNotEmpty) pollUid: options,
+        },
+      ),
+    );
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> closePoll(
+    String teamId,
+    String roomId,
+    String messageId,
+  ) async {
+    final m = _find(roomId, messageId);
+    final p = m?.poll;
+    if (m == null || p == null) return const Result.ok(null);
+    _replace(
+      roomId,
+      m,
+      ChatPoll(
+        question: p.question,
+        options: p.options,
+        multiple: p.multiple,
+        closesAt: p.closesAt,
+        closedAt: DateTime(2026, 11, 2),
+        closedBy: pollUid,
+        votes: p.votes,
+      ),
+    );
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<ChatMessage?> watchMessage(
+    String teamId,
+    String roomId,
+    String messageId,
+  ) => _watch(() => _find(roomId, messageId));
 }
 
 class FakeFilePickerService implements FilePickerService {
@@ -2451,6 +2662,127 @@ class FakeTeamPostRepository implements TeamPostRepository {
   @override
   Future<Result<void>> deletePost(String teamId, String postId) async {
     posts[teamId]?.removeWhere((p) => p.id == postId);
+    comments.remove('$teamId/$postId');
+    _changes.add(null);
+    return const Result.ok(null);
+  }
+
+  // Pins and comments (redesign F24), held as the API holds them.
+
+  @override
+  bool canUseFeedExtras = true;
+
+  /// Pin calls, as "pin p1", "pin p4 unpin p2" or "unpin p1".
+  final pinCalls = <String>[];
+
+  /// "teamId/postId" → comments, oldest first.
+  final comments = <String, List<TeamPostComment>>{};
+
+  /// The signed-in user comments as this uid.
+  String commenter = 'u1';
+
+  TeamPost _withPin(TeamPost p, DateTime? at) => TeamPost(
+    id: p.id,
+    title: p.title,
+    body: p.body,
+    location: p.location,
+    links: p.links,
+    images: p.images,
+    isPublic: p.isPublic,
+    tournamentKey: p.tournamentKey,
+    authorId: p.authorId,
+    authorName: p.authorName,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+    pinnedAt: at,
+    commentCount: p.commentCount,
+  );
+
+  void _setPin(String teamId, String postId, DateTime? at) {
+    final list = posts[teamId] ?? [];
+    final i = list.indexWhere((p) => p.id == postId);
+    if (i >= 0) list[i] = _withPin(list[i], at);
+  }
+
+  @override
+  Stream<List<TeamPost>> watchPinnedPosts(
+    String teamId, {
+    bool publicOnly = false,
+  }) async* {
+    List<TeamPost> pinned() =>
+        _of(teamId, publicOnly).where((p) => p.isPinned).toList()
+          ..sort((a, b) => b.pinnedAt!.compareTo(a.pinnedAt!));
+    yield pinned().take(TeamPost.pinsMax).toList();
+    yield* _changes.stream.map((_) => pinned().take(TeamPost.pinsMax).toList());
+  }
+
+  @override
+  Future<Result<void>> pinPost(
+    String teamId,
+    String postId, {
+    String? unpin,
+  }) async {
+    pinCalls.add(['pin $postId', if (unpin != null) 'unpin $unpin'].join(' '));
+    if (unpin != null) _setPin(teamId, unpin, null);
+    final pinned = _of(
+      teamId,
+      false,
+    ).where((p) => p.isPinned && p.id != postId);
+    if (pinned.length >= TeamPost.pinsMax) {
+      return Result.error(
+        const ApiException('failed_precondition', 'Unpin one first.'),
+      );
+    }
+    _setPin(teamId, postId, DateTime.now());
+    _changes.add(null);
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> unpinPost(String teamId, String postId) async {
+    pinCalls.add('unpin $postId');
+    _setPin(teamId, postId, null);
+    _changes.add(null);
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<List<TeamPostComment>> watchComments(
+    String teamId,
+    String postId,
+  ) async* {
+    List<TeamPostComment> of() => [...?comments['$teamId/$postId']];
+    yield of();
+    yield* _changes.stream.map((_) => of());
+  }
+
+  @override
+  Future<Result<void>> addComment(
+    String teamId,
+    String postId,
+    String body,
+  ) async {
+    final list = comments.putIfAbsent('$teamId/$postId', () => []);
+    list.add(
+      TeamPostComment(
+        id: 'c${list.length + 1}',
+        authorId: commenter,
+        authorName: 'Me',
+        body: body.trim(),
+        createdAt: DateTime.now(),
+      ),
+    );
+    _changes.add(null);
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> deleteComment(
+    String teamId,
+    String postId,
+    String commentId,
+  ) async {
+    comments['$teamId/$postId']?.removeWhere((c) => c.id == commentId);
     _changes.add(null);
     return const Result.ok(null);
   }

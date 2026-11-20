@@ -350,11 +350,15 @@ export function chatNotice(a: {
   messageId?: string;
 }): Notice {
   const author = String(a.message.authorName ?? "") || "Someone";
-  // A shared event (redesign F3) says so, with its title as it was shared.
+  // A shared event (redesign F3) or a poll (F33) says so, with its title
+  // as it was shared, or its question.
   const event = a.message.event && typeof a.message.event === "object" ? (a.message.event as Data) : null;
+  const poll = a.message.poll && typeof a.message.poll === "object" ? (a.message.poll as Data) : null;
   const line = event
     ? `${author} shared an event: ${String(event.title ?? "") || "Event"}`
-    : `${author}: ${messagePreview(a.message)}`;
+    : poll
+      ? `${author} posted a poll: ${String(poll.question ?? "") || "Poll"}`
+      : `${author}: ${messagePreview(a.message)}`;
   return {
     category: "chat",
     teamId: a.teamId,
@@ -520,6 +524,43 @@ export function playNotice(a: {
 }
 
 /**
+ * Who hears of a comment on a team video (redesign F5): the video's author,
+ * while still on the team, unless they wrote it. Notes pinned to a time
+ * (F4) don't notify: they're film study, often many at once.
+ */
+export function videoCommentRecipients(team: TeamDoc, video: Data | undefined, comment: Data): string[] {
+  if (typeof comment.atMs === "number") return [];
+  const author = typeof video?.authorId === "string" ? video.authorId : "";
+  if (!author || author === comment.authorId || !(team.memberIds ?? []).includes(author)) return [];
+  return [author];
+}
+
+/** "<name> commented on your video"; one entry per video until it's read. */
+export function videoCommentNotice(a: {
+  teamId: string;
+  videoId: string;
+  teamName: string;
+  video: Data;
+  comment: Data;
+  commentId: string;
+}): Notice {
+  const name = String(a.comment.authorName ?? "") || "Someone";
+  const text = String(a.comment.body ?? "").trim().replace(/\s+/g, " ");
+  const title = String(a.video.title ?? "") || "Video";
+  return {
+    category: "teamActivity",
+    teamId: a.teamId,
+    route: `/team-videos/${a.teamId}/${a.videoId}`,
+    collapseId: `videoComments_${a.teamId}_${a.videoId}`,
+    check: { path: `teams/${a.teamId}/videos/${a.videoId}/comments/${a.commentId}` },
+    text: () => ({
+      title: `${a.teamName}: ${name} commented on your video`,
+      body: clip(`${title}: ${text}`, 120),
+    }),
+  };
+}
+
+/**
  * Someone asked to join a group that needs approval. Repeats fold into one
  * entry per group until it's read.
  */
@@ -533,6 +574,44 @@ export function joinRequestNotice(a: { teamId: string; teamName: string; request
     text: (_, count) => ({
       title: `${a.teamName}: request to join`,
       body: count > 1 ? `${count} people want to join · ${name}` : `${name} wants to join`,
+    }),
+  };
+}
+
+/**
+ * Who hears of a join request (a group's that approves who joins, or a
+ * team's that allows requests, F26): the owner and everyone who may answer
+ * it (coaches, captains and members with manageMembers, as `can` in the
+ * rules), never the asker.
+ */
+export function joinRequestRecipients(team: TeamDoc, askerId: string): string[] {
+  const members = team.members ?? {};
+  const ids = new Set(team.memberIds ?? []);
+  const out = new Set<string>();
+  if (team.ownerId && team.ownerId !== askerId) out.add(team.ownerId);
+  for (const uid of ids) {
+    if (uid === askerId) continue;
+    const tier = members[uid];
+    if (tier === "owner" || tier === "coach" || tier === "captain" || (team.memberPerms?.[uid] ?? []).includes("manageMembers")) {
+      out.add(uid);
+    }
+  }
+  return [...out];
+}
+
+/**
+ * A join request went and the asker is now a member: approved (F26). Also
+ * when they joined another way while it waited (an invite clears it).
+ */
+export function joinApprovedNotice(a: { teamId: string; teamName: string; group: boolean }): Notice {
+  return {
+    category: "teamActivity",
+    teamId: a.teamId,
+    route: `/teams/${a.teamId}`,
+    collapseId: `joinApproved_${a.teamId}`,
+    text: () => ({
+      title: `You're in: ${a.teamName}`,
+      body: a.group ? "Your request to join was approved." : "Your request to join the team was approved.",
     }),
   };
 }

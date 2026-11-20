@@ -36,6 +36,8 @@ export interface TeamDoc {
   memberNames?: Record<string, string>;
   memberRoles?: Record<string, string[]>;
   memberPerms?: Record<string, TeamPermission[]>;
+  /** Each member's own permissions (the owner's per-person switches, F25); memberPerms counts them. API-written. */
+  memberGrants?: Record<string, TeamPermission[]>;
   statKeepers?: string[];
   requiresApproval?: boolean;
   location?: { address?: string } | null;
@@ -50,6 +52,8 @@ export interface TeamDoc {
   leagueId?: string | null;
   /** The "Public team page" switch: false when outsiders see its card only (publicPageOn in packages/shared). */
   publicPage?: boolean;
+  /** "Allow join requests" (F26, teams only): true when signed-in outsiders may ask to join. API-written. */
+  allowJoinRequests?: boolean;
 }
 
 /**
@@ -81,6 +85,8 @@ interface TeamHubInfo {
   privateGroup: boolean;
   /** A team whose "Public team page" is off (its listing's publicPage): only members see inside, as a private group. */
   privatePage: boolean;
+  /** A team that takes join requests (its listing's allowJoinRequests, F26): signed-in outsiders get "Request to join". */
+  joinRequests?: boolean;
   /** A youth team (isYouthTeam): visitors see its card only, and only members its roster. */
   youth: boolean;
   /** Visitors may see the roster (rosterIsPublic: an adult team's), without links to profiles. */
@@ -119,6 +125,7 @@ export function TeamProvider({
   kind,
   privateGroup,
   privatePage,
+  joinRequests = false,
   youth,
   publicRoster,
   children,
@@ -137,7 +144,11 @@ export function TeamProvider({
   // Members see their team as it is: the public page hides a drafted
   // league team's name (its players') from everyone else.
   const shownName = viewer.state === "member" ? viewer.team.name || name : name;
-  return <TeamContext.Provider value={{ teamId, name: shownName, kind, privateGroup, privatePage, youth, publicRoster, viewer }}>{children}</TeamContext.Provider>;
+  return (
+    <TeamContext.Provider value={{ teamId, name: shownName, kind, privateGroup, privatePage, joinRequests, youth, publicRoster, viewer }}>
+      {children}
+    </TeamContext.Provider>
+  );
 }
 
 export function useTeamHub(): TeamHubInfo {
@@ -145,3 +156,6 @@ export function useTeamHub(): TeamHubInfo {
   if (!info) throw new Error("useTeamHub outside TeamProvider");
   return info;
 }
+
+/** What a member is asked before leaving (Settings › Leave and the team page's More menu). */
+export const LEAVE_CONFIRM = "Leave? You'll need a new invite to come back.";

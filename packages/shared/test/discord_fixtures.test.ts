@@ -4,6 +4,8 @@
 // apps/mobile/test/shared_fixtures/discord_fixtures_test.dart).
 import { describe, expect, it } from "vitest";
 import {
+  type ChannelGroup,
+  channelGroups,
   type DiscordImport,
   type ExistingFolder,
   type ExistingRoom,
@@ -11,6 +13,7 @@ import {
   type ImportTeam,
   importIsEmpty,
   planFor,
+  pickRooms,
   planImport,
   rolesData,
   splitPlan,
@@ -31,7 +34,7 @@ const ids = () => {
  * CustomRole.toMap, which trims names, and the API writes them through
  * rolesData, which does too.
  */
-const importJson = (i: DiscordImport) => ({ ...i, roles: rolesData(i.roles, {}).roles, isEmpty: importIsEmpty(i) });
+const importJson = (i: DiscordImport) => ({ ...i, roles: rolesData(i.roles, {}, {}).roles, isEmpty: importIsEmpty(i) });
 
 describe("importing a plan matches the app (fixtures/discord/import.json)", () => {
   it.each(
@@ -89,5 +92,28 @@ describe("a linked team's share matches the app (fixtures/discord/team_chat.json
     const split = splitPlan(c.plan, c.org, c.roleIds);
     const t = teamChatImport(planFor(c.plan, split, c.teamId), c.org, c.teamId, c.team, c.roleIds, c.folders, c.rooms, ids());
     expect({ import: importJson(t.import), orgRoles: t.orgRoles, isEmpty: teamChatImportIsEmpty(t, c.team) }).toEqual(c.expected);
+  });
+});
+
+describe("picking channels matches the app (fixtures/discord/pick.json)", () => {
+  it.each(
+    fixture<{
+      name: string;
+      plan: ImportPlan;
+      picked: number[];
+      overrides: Array<[number, string | null]>;
+      groups: ChannelGroup[];
+      expected: { folders: string[]; rooms: string[]; roles: string[]; from: number[]; overrides: Array<[number, string | null]> };
+    }>("discord/pick.json").cases,
+  )("$name", (c) => {
+    expect(channelGroups(c.plan)).toEqual(c.groups);
+    const p = pickRooms(c.plan, c.picked, new Map(c.overrides));
+    expect({
+      folders: p.plan.folders.map((f) => f.key),
+      rooms: p.plan.rooms.map((r) => r.name),
+      roles: p.plan.roles.map((r) => r.key),
+      from: p.from,
+      overrides: [...p.overrides],
+    }).toEqual(c.expected);
   });
 });

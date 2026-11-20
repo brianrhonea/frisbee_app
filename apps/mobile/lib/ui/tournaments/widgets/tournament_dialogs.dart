@@ -113,8 +113,9 @@ class _ReserveDialogState extends State<_ReserveDialog> {
   }
 }
 
-/// A team admin enters one of [teams] (or answers an invite for it):
-/// picks the division and who reports scores.
+/// A team admin enters one of [teams] (or answers an invite for it, or
+/// changes its captains): picks the team, the division and who reports
+/// scores, on a full screen over the event page ([EnterTeamScreen]).
 Future<EntryApplication?> showApplyDialog(
   BuildContext context, {
   required List<Team> teams,
@@ -122,19 +123,25 @@ Future<EntryApplication?> showApplyDialog(
   required String uid,
   TournamentEntry? invite,
   TournamentEntry? editing,
-}) => showDialog<EntryApplication>(
-  context: context,
-  builder: (_) => _ApplyDialog(
-    teams: teams,
-    divisions: divisions,
-    uid: uid,
-    invite: invite,
-    editing: editing,
+}) => Navigator.of(context, rootNavigator: true).push(
+  MaterialPageRoute<EntryApplication>(
+    fullscreenDialog: true,
+    builder: (_) => EnterTeamScreen(
+      teams: teams,
+      divisions: divisions,
+      uid: uid,
+      invite: invite,
+      editing: editing,
+    ),
   ),
 );
 
-class _ApplyDialog extends StatefulWidget {
-  const _ApplyDialog({
+/// Entering a team, full screen: "Apply to play" (pick a team, its
+/// division and captains), "Accept the invite" (division and captains) or
+/// "Captains" (an entry's captains). Closing it enters nothing.
+class EnterTeamScreen extends StatefulWidget {
+  const EnterTeamScreen({
+    super.key,
     required this.teams,
     required this.divisions,
     required this.uid,
@@ -149,10 +156,10 @@ class _ApplyDialog extends StatefulWidget {
   final TournamentEntry? editing;
 
   @override
-  State<_ApplyDialog> createState() => _ApplyDialogState();
+  State<EnterTeamScreen> createState() => _EnterTeamScreenState();
 }
 
-class _ApplyDialogState extends State<_ApplyDialog> {
+class _EnterTeamScreenState extends State<EnterTeamScreen> {
   late Team? team = widget.teams.firstOrNull;
   late String? divisionId =
       widget.editing?.divisionId ??
@@ -264,21 +271,68 @@ class _ApplyDialogState extends State<_ApplyDialog> {
       );
     }
 
-    return AlertDialog(
-      title: Text(
-        widget.editing != null
-            ? 'Captains'
-            : widget.invite != null
-            ? 'Accept the invite'
-            : 'Apply to play',
+    final ready = t != null && divisionId != null && captains.isNotEmpty;
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Cancel',
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          widget.editing != null
+              ? 'Captains'
+              : widget.invite != null
+              ? 'Accept the invite'
+              : 'Apply to play',
+        ),
       ),
-      content: SizedBox(
-        width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          color: c.card,
+          border: Border(top: BorderSide(color: c.border)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: FilledButton(
+              onPressed: ready
+                  ? () => Navigator.pop(context, (
+                      teamId: t.id,
+                      divisionId: divisionId!,
+                      captainIds: captains.toList(),
+                    ))
+                  : null,
+              child: Text(
+                widget.editing != null
+                    ? 'Save'
+                    : widget.invite != null
+                    ? 'Accept'
+                    : 'Apply',
+              ),
+            ),
+          ),
+        ),
+      ),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
             children: [
+              if (fixed && t != null) ...[
+                heading('Team'),
+                Text(
+                  t.name,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: c.ink,
+                  ),
+                ),
+              ],
               if (!fixed) ...[
                 heading('Team'),
                 for (final x in widget.teams) teamRow(x),
@@ -328,28 +382,6 @@ class _ApplyDialogState extends State<_ApplyDialog> {
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: t == null || divisionId == null || captains.isEmpty
-              ? null
-              : () => Navigator.pop(context, (
-                  teamId: t.id,
-                  divisionId: divisionId!,
-                  captainIds: captains.toList(),
-                )),
-          child: Text(
-            widget.editing != null
-                ? 'Save'
-                : widget.invite != null
-                ? 'Accept'
-                : 'Apply',
-          ),
-        ),
-      ],
     );
   }
 }

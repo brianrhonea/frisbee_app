@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:frisbee_app/data/repositories/video/video_repository.dart';
+import 'package:frisbee_app/data/services/synced_video.dart';
 import 'package:frisbee_app/data/services/youtube_info_service.dart';
 import 'package:frisbee_app/domain/models/app_user.dart';
 import 'package:frisbee_app/domain/models/team_video.dart';
+import 'package:frisbee_app/domain/models/video_comment.dart';
 import 'package:frisbee_app/domain/models/video_folder.dart';
 import 'package:frisbee_app/utils/result.dart';
 
@@ -99,6 +101,7 @@ class FakeVideoRepository implements VideoRepository {
   @override
   Future<Result<void>> deleteVideo(String teamId, String videoId) async {
     videos[teamId]?.removeWhere((v) => v.id == videoId);
+    comments.remove('$teamId/$videoId');
     _changes.add(null);
     return const Result.ok(null);
   }
@@ -159,6 +162,121 @@ class FakeVideoRepository implements VideoRepository {
     _folderChanges.add(null);
     return const Result.ok(null);
   }
+
+  /// Off for a build without the API.
+  bool extras = true;
+
+  /// The signed-in user's id and name, for comments the fake adds.
+  String uid = 'me';
+  String name = 'Me';
+
+  /// Set to make the next write fail with it.
+  Object? failWith;
+
+  /// "teamId/videoId" -> its notes and comments.
+  final comments = <String, List<VideoComment>>{};
+  final _commentChanges = StreamController<void>.broadcast();
+
+  /// Tags sent, as (videoId, eventId).
+  final tagged = <(String, String?)>[];
+
+  @override
+  bool get canUseVideoExtras => extras;
+
+  @override
+  Stream<List<VideoComment>> watchComments(
+    String teamId,
+    String videoId,
+  ) async* {
+    List<VideoComment> of() => [...?comments['$teamId/$videoId']];
+    yield of();
+    yield* _commentChanges.stream.map((_) => of());
+  }
+
+  Result<void>? _failure() {
+    final e = failWith;
+    if (e == null) return null;
+    failWith = null;
+    return Result.error(e is Exception ? e : Exception('$e'));
+  }
+
+  @override
+  Future<Result<void>> addComment(
+    String teamId,
+    String videoId, {
+    required String body,
+    int? atMs,
+    int? endMs,
+  }) async {
+    if (_failure() case final f?) return f;
+    comments
+        .putIfAbsent('$teamId/$videoId', () => [])
+        .add(
+          VideoComment(
+            id: 'c${++_next}',
+            authorId: uid,
+            authorName: name,
+            body: body,
+            atMs: atMs,
+            endMs: endMs,
+            createdAt: DateTime(2026, 11, 20, 12, _next),
+          ),
+        );
+    _commentChanges.add(null);
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> deleteComment(
+    String teamId,
+    String videoId,
+    String commentId,
+  ) async {
+    if (_failure() case final f?) return f;
+    comments['$teamId/$videoId']?.removeWhere((c) => c.id == commentId);
+    _commentChanges.add(null);
+    return const Result.ok(null);
+  }
+
+  @override
+  Future<Result<void>> tagEvent(
+    String teamId,
+    String videoId,
+    String? eventId,
+  ) async {
+    if (_failure() case final f?) return f;
+    tagged.add((videoId, eventId));
+    final list = videos[teamId] ?? [];
+    final i = list.indexWhere((v) => v.id == videoId);
+    if (i < 0) return Result.error(Exception('No such video'));
+    final v = list[i];
+    list[i] = TeamVideo(
+      id: v.id,
+      youtubeId: v.youtubeId,
+      file: v.file,
+      folderId: v.folderId,
+      title: v.title,
+      description: v.description,
+      authorId: v.authorId,
+      authorName: v.authorName,
+      createdAt: v.createdAt,
+      updatedAt: v.updatedAt,
+      eventId: eventId ?? '',
+    );
+    _changes.add(null);
+    return const Result.ok(null);
+  }
+
+  @override
+  Stream<List<TeamVideo>> watchEventVideos(
+    String teamId,
+    String eventId,
+  ) async* {
+    List<TeamVideo> of() =>
+        _of(teamId).where((v) => v.eventId == eventId).toList();
+    yield of();
+    yield* _changes.stream.map((_) => of());
+  }
 }
 
 /// Answers lookups from [videos]; ids not in it can't be embedded.
@@ -178,8 +296,81 @@ class FakeYouTubeInfoService implements YouTubeInfoService {
   }
 }
 
-/// Stands in for YouTube's player, which needs a platform web view.
-Widget fakePlayer(String youtubeId) => Text('player:$youtubeId');
+/// Stands in for YouTube's player, which needs a platform web view. Hands
+/// [onController] a [FakeVideoController].
+Widget fakePlayer(
+  String youtubeId, [
+  ValueChanged<SyncedVideoController?>? onController,
+]) => _FakePlayer(label: 'player:$youtubeId', onController: onController);
 
 /// Stands in for media_kit's player, which needs native libraries.
-Widget fakeFilePlayer(String url) => Text('file player:$url');
+Widget fakeFilePlayer(
+  String url, [
+  ValueChanged<SyncedVideoController?>? onController,
+]) => _FakePlayer(label: 'file player:$url', onController: onController);
+
+/// A player a test moves by hand: set [position]; seeks and plays are kept.
+class FakeVideoController implements SyncedVideoController {
+  /// The last one a fake player handed over.
+  static FakeVideoController? last;
+
+  Duration position = Duration.zero;
+  final seeks = <Duration>[];
+  bool playing = false;
+
+  /// False: not loaded yet, so [status] is null (YouTube before it plays).
+  bool ready = true;
+
+  @override
+  Future<void> play() async => playing = true;
+
+  @override
+  Future<void> pause() async => playing = false;
+
+  @override
+  Future<void> seekTo(Duration to) async {
+    seeks.add(to);
+    position = to;
+  }
+
+  @override
+  Future<void> setVolume(double volume) async {}
+
+  @override
+  Future<PlayerStatus?> status() async => ready
+      ? (
+          position: position,
+          duration: const Duration(hours: 1),
+          playing: playing,
+        )
+      : null;
+}
+
+class _FakePlayer extends StatefulWidget {
+  const _FakePlayer({required this.label, this.onController});
+
+  final String label;
+  final ValueChanged<SyncedVideoController?>? onController;
+
+  @override
+  State<_FakePlayer> createState() => _FakePlayerState();
+}
+
+class _FakePlayerState extends State<_FakePlayer> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.onController case final on?) {
+      on(FakeVideoController.last = FakeVideoController());
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.onController?.call(null);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(widget.label);
+}

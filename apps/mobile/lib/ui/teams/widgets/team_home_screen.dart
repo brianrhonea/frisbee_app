@@ -9,6 +9,7 @@ import '../../tournaments/widgets/tournament_day_card.dart';
 import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
+import '../../../domain/models/team_page.dart';
 import '../../../domain/models/team_post.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
@@ -22,14 +23,17 @@ import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../../follow/widgets/follow_button.dart';
 import '../../groups/widgets/group_map.dart';
+import '../../schedule/widgets/event_editor_screen.dart';
 import '../../schedule/widgets/event_style.dart';
 import '../../schedule/widgets/team_events_tab.dart';
 import '../view_models/team_detail_viewmodel.dart';
 import '../view_models/team_home_viewmodel.dart';
+import 'community_sections.dart';
 import 'invite_members_dialog.dart';
 import 'join_team_dialog.dart';
 import 'team_form.dart';
 import 'team_initials.dart';
+import 'team_post_comments_sheet.dart';
 import 'team_post_widgets.dart';
 import 'team_community_sheet.dart';
 import 'team_section_screen.dart';
@@ -106,8 +110,11 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     vm.deleteTeam,
     vm.savePost,
     vm.deletePost,
+    vm.pinPost,
+    vm.unpinPost,
     vm.joinGroup,
     vm.cancelJoinRequest,
+    vm.setNextRsvp,
   ];
 
   @override
@@ -117,6 +124,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       c.addListener(_onCommand);
     }
     vm.joinTeam.addListener(_onJoin);
+    vm.messageOrganizer.addListener(_onMessage);
   }
 
   @override
@@ -125,6 +133,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       c.removeListener(_onCommand);
     }
     vm.joinTeam.removeListener(_onJoin);
+    vm.messageOrganizer.removeListener(_onMessage);
     _scroll.dispose();
     super.dispose();
   }
@@ -199,6 +208,22 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         cmd.clearResult();
         // The code may have been for another team.
         if (value != vm.teamId) context.go(Routes.team(value));
+      case Error<String>():
+        showErrorSnackBar(context, cmd.result);
+        cmd.clearResult();
+      case null:
+        break;
+    }
+  }
+
+  /// An organizer's Message button: on to the conversation, as a
+  /// profile's Message does.
+  void _onMessage() {
+    final cmd = vm.messageOrganizer;
+    switch (cmd.result) {
+      case Ok<String>(:final value):
+        cmd.clearResult();
+        context.push(Routes.conversation(value));
       case Error<String>():
         showErrorSnackBar(context, cmd.result);
         cmd.clearResult();
@@ -335,6 +360,31 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     if (draft != null) vm.savePost.execute(draft);
   }
 
+  /// Pins [post]; with [TeamPost.pinsMax] pinned, asks which to take down.
+  Future<void> _pinPost(TeamPost post) async {
+    final pinned = vm.pinnedPosts;
+    String? unpin;
+    if (pinned.length >= TeamPost.pinsMax) {
+      unpin = await showDialog<String>(
+        context: context,
+        builder: (_) => UnpinPostDialog(pinned: pinned),
+      );
+      if (unpin == null) return;
+    }
+    vm.pinPost.execute((postId: post.id, unpin: unpin));
+  }
+
+  Future<void> _openComments(TeamPost post) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    useSafeArea: true,
+    builder: (_) => TeamPostCommentsSheet(
+      create: () => vm.commentsFor(post),
+      title: post.title.isNotEmpty ? post.title : 'Comments',
+    ),
+  );
+
   Future<void> _deletePost(TeamPost post) async {
     if (await confirmDialog(
       context,
@@ -368,6 +418,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         vm.joinGroup,
         vm.cancelJoinRequest,
         vm.savePost,
+        vm.setNextRsvp,
+        vm.messageOrganizer,
       ]),
       builder: (context, _) {
         final mobile = ScreenSize.of(context).isMobile;
@@ -423,6 +475,11 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                     sections: more,
                     meetings:
                         team?.hasSection(OptionalSection.meetings) ?? false,
+                    manageLabel: team == null ? null : _manageLabel(team),
+                    onManage: team == null ? null : _manageAction(team),
+                    leaveLabel: team == null ? null : 'Leave ${team.kind.noun}',
+                    onLeave: team == null ? null : _leaveAction(team),
+                    ownerNote: team == null ? null : _ownerNote(team),
                   ),
                 ),
               ],
@@ -458,13 +515,6 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         return Scaffold(
           // The hero below has the name.
           appBar: mobile ? AppBar(leading: leading, actions: [?menu]) : null,
-          floatingActionButton: mobile && vm.canPost
-              ? FloatingActionButton.extended(
-                  onPressed: vm.savePost.running ? null : _editPost,
-                  icon: const Icon(Icons.post_add),
-                  label: const Text('New post'),
-                )
-              : null,
           body: PageScroll(
             children: [
               if (vm.savePost.running)
@@ -478,6 +528,10 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 menu: mobile ? null : menu,
                 onJoin: _join,
               ),
+              if (vm.isMember) ...[
+                const SizedBox(height: 12),
+                _StatTiles(viewModel: vm, onOpenEvent: _openEvent),
+              ],
               const SizedBox(height: 16),
               _feed(summary, team),
             ],
@@ -578,6 +632,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
               child: LinearProgressIndicator(),
             ),
           _HeroDetails(viewModel: vm, summary: summary),
+          const SizedBox(height: 12),
+          _StatTiles(viewModel: vm, onOpenEvent: _openEvent),
           const SizedBox(height: 16),
           _feed(summary, team),
         ],
@@ -587,6 +643,11 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         teamId: vm.teamId,
         sections: more,
         meetings: team.hasSection(OptionalSection.meetings),
+        manageLabel: _manageLabel(team),
+        onManage: _manageAction(team),
+        leaveLabel: 'Leave ${team.kind.noun}',
+        onLeave: _leaveAction(team),
+        ownerNote: _ownerNote(team),
       );
     } else {
       body = Column(
@@ -602,13 +663,6 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       );
     }
     return Scaffold(
-      floatingActionButton: feed && vm.canPost
-          ? FloatingActionButton.extended(
-              onPressed: vm.savePost.running ? null : _editPost,
-              icon: const Icon(Icons.post_add),
-              label: const Text('New post'),
-            )
-          : null,
       body: NestedScrollView(
         controller: _scroll,
         // The absorber keeps the scroll to the header's collapse, and its
@@ -671,6 +725,10 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
   Widget _feed(TeamListing summary, Team? team) {
     return Builder(
       builder: (context) {
+        final pickup = _pickupCard(summary);
+        // The pickup card carries an outsider's Join when it shows.
+        final showJoinCard = !vm.isMember && pickup == null;
+        final community = _communitySections(summary, team);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -699,8 +757,9 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
             else
               SideColumnLayout(
                 main: [
+                  ?pickup,
                   _about(summary),
-                  if (!vm.isMember) _joinCard(summary),
+                  if (showJoinCard) _joinCard(summary),
                   if (vm.youthRosterPrivate) const YouthRosterNote(),
                   if (vm.contentError != null)
                     Text(
@@ -714,13 +773,16 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 ],
                 side: [
                   ..._events(context),
+                  ...community,
                   ..._tournaments(context),
                   _details(summary),
                 ],
                 narrow: [
+                  ?pickup,
                   _about(summary),
-                  if (!vm.isMember) _joinCard(summary),
+                  if (showJoinCard) _joinCard(summary),
                   if (vm.youthRosterPrivate) const YouthRosterNote(),
+                  ...community,
                   ..._events(context),
                   ..._tournaments(context),
                   if (team != null) _MembersCard(team: team),
@@ -766,6 +828,25 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       ],
     ),
   );
+
+  /// More's "Manage team" row: the settings the header's menu opens, for
+  /// the same people (admins of a team that isn't a league's).
+  VoidCallback? _manageAction(Team team) =>
+      vm.canEdit && team.kind == TeamKind.team && !team.isLeagueTeam
+      ? () => _onMenu(_MenuAction.settings, team)
+      : null;
+
+  String _manageLabel(Team team) => manageRowLabel(group: team.isCommunity);
+
+  /// More's Leave button: the header menu's leave flow and confirm. Not
+  /// for the owner, who hands the team on first.
+  VoidCallback? _leaveAction(Team team) =>
+      vm.isOwner ? null : () => _onMenu(_MenuAction.leave, team);
+
+  String? _ownerNote(Team team) => vm.isOwner
+      ? "Owners can't leave. To leave, make someone else the owner first "
+            '(Roster › Members).'
+      : null;
 
   Widget _menu(Team team) {
     final noun = team.kind.noun;
@@ -871,6 +952,17 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           onJoin: vm.joinGroup.execute,
           onCancel: vm.cancelJoinRequest.execute,
         )
+      : summary.takesRequests
+      ? _TeamRequestCard(
+          pending: vm.requestPending,
+          busy:
+              vm.joinGroup.running ||
+              vm.cancelJoinRequest.running ||
+              vm.joinTeam.running,
+          onRequest: vm.joinGroup.execute,
+          onCancel: vm.cancelJoinRequest.execute,
+          onCode: _join,
+        )
       : _JoinCard(joining: vm.joinTeam.running, onJoin: _join);
 
   Widget _details(TeamListing summary) {
@@ -916,6 +1008,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 ? (summary.requiresApproval
                       ? "The community's admins approve new members."
                       : 'Open to new players. Join any time.')
+                : summary.takesRequests
+                ? 'Ask to join, or use an invite code from a coach or captain.'
                 : 'Joining takes an invite code from a coach or captain.',
             style: TextStyle(fontSize: 11.5, color: c.muted),
           ),
@@ -931,11 +1025,14 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     final next = events.firstOrNull;
     final rest = events.skip(1).take(TeamHomeViewModel.upcomingLimit).toList();
     final day = vm.tournamentDay;
+    // A community's next event is its pickup card, at the top (F27).
+    final pickupShown = _showsPickupCard(vm.summary);
+    if (pickupShown && rest.isEmpty && day == null) return const [];
     return [
       // On a tournament day the card takes the next event's place.
       if (day != null)
         TournamentDayCard(day: day, showTeam: false)
-      else if (next != null)
+      else if (next != null && !pickupShown)
         _UpNextCard(
           event: next,
           teamName: vm.summary?.name ?? '',
@@ -943,6 +1040,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
         ),
       SectionCard(
         title: next == null ? 'Up next' : 'Coming up',
+        key: const ValueKey('coming-up'),
         action: vm.isMember
             ? CardLink(
                 label: 'All events',
@@ -964,6 +1062,65 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
               _EventRow(event: e, onTap: () => _openEvent(e)),
           ],
         ),
+      ),
+    ];
+  }
+
+  /// Whether the page leads with the community's next-event card (F27): a
+  /// community's page that isn't private to the viewer, for members, and
+  /// for outsiders while there's a public event to show.
+  bool _showsPickupCard(TeamListing? summary) =>
+      summary != null &&
+      summary.isCommunity &&
+      !vm.isPrivateToMe &&
+      (vm.isMember || vm.nextEvent != null);
+
+  /// The community's next event with RSVP (F27), or null.
+  Widget? _pickupCard(TeamListing summary) {
+    if (!_showsPickupCard(summary)) return null;
+    final next = vm.nextEvent;
+    return NextPickupCard(
+      key: const ValueKey('next-pickup'),
+      kind: summary.kind,
+      event: next,
+      member: vm.isMember,
+      mine: vm.myNextRsvp,
+      needsRsvp: vm.nextNeedsRsvp,
+      busy: vm.setNextRsvp.running,
+      onAnswer: vm.answerNext,
+      onOpen: next == null ? null : () => _openEvent(next),
+      onNewEvent: vm.canAddEvents
+          ? () => showEventEditor(context, teamId: vm.teamId)
+          : null,
+      join: vm.isMember
+          ? null
+          : PickupJoinPrompt(
+              requiresApproval: summary.requiresApproval,
+              pending: vm.requestPending,
+              busy: vm.joinGroup.running || vm.cancelJoinRequest.running,
+              onJoin: vm.joinGroup.execute,
+              onCancel: vm.cancelJoinRequest.execute,
+            ),
+    );
+  }
+
+  /// A community member's Chat and Organizers sections (F27).
+  List<Widget> _communitySections(TeamListing summary, Team? team) {
+    if (team == null || !summary.isCommunity) return const [];
+    final chat = vm.chatSection;
+    return [
+      CommunityChatSection(
+        rooms: chat.rooms,
+        more: chat.more,
+        onOpenRoom: (r) => context.push(Routes.chatRoom(team.id, r.id)),
+        onOpenChat: () =>
+            goWithinTeam(context, TeamSection.chat.route(team.id)),
+      ),
+      CommunityOrganizersSection(
+        organizers: vm.organizers,
+        me: vm.uid,
+        busy: vm.messageOrganizer.running,
+        onMessage: vm.canMessage ? vm.messageOrganizer.execute : null,
       ),
     ];
   }
@@ -1066,15 +1223,14 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
                 ),
               ),
             ),
-            if (vm.canPost && !ScreenSize.of(context).isMobile)
-              TextButton.icon(
-                onPressed: vm.savePost.running ? null : _editPost,
-                icon: const Icon(Icons.post_add, size: 18),
-                label: const Text('New post'),
-              ),
           ],
         ),
       ),
+      if (vm.canPost)
+        PostToTeamBox(
+          label: vm.isGroup ? 'Post to the community' : 'Post to the team',
+          onTap: vm.savePost.running ? null : _editPost,
+        ),
       if (posts.isEmpty)
         _Note(
           vm.canPost
@@ -1088,8 +1244,14 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           post: p,
           loadImage: vm.imageData,
           showVisibility: vm.isMember,
+          pinned: p.isPinned,
           onEdit: vm.canPost ? () => _editPost(p) : null,
           onDelete: vm.canPost ? () => _deletePost(p) : null,
+          onPin: vm.canPin && !p.isPinned ? () => _pinPost(p) : null,
+          onUnpin: vm.canPin && p.isPinned
+              ? () => vm.unpinPost.execute(p.id)
+              : null,
+          onComments: vm.isMember ? () => _openComments(p) : null,
         ),
     ];
   }
@@ -1348,8 +1510,8 @@ class _HeroDetails extends StatelessWidget {
   }
 }
 
-/// Back to the Teams tab's list of the user's teams. With one team the
-/// tab opens it straight away, so this is the way to the list.
+/// Back to the Teams tab's list of the user's teams (the tab itself
+/// always opens that list).
 class _AllTeamsButton extends StatelessWidget {
   const _AllTeamsButton();
 
@@ -1592,13 +1754,19 @@ class _SectionsHint extends StatelessWidget {
   }
 }
 
-/// The More tab: the team's other sections, one row each, then its
-/// Meetings list when the team has Meetings on.
+/// The More tab: the team's other sections, one row each with a line on
+/// what's there, then its Meetings list when the team has Meetings on,
+/// "Manage team" for admins (Settings), and Leave at the bottom.
 class _MoreList extends StatelessWidget {
   const _MoreList({
     required this.teamId,
     required this.sections,
     this.meetings = false,
+    this.manageLabel,
+    this.onManage,
+    this.leaveLabel,
+    this.onLeave,
+    this.ownerNote,
   });
 
   final String teamId;
@@ -1608,9 +1776,78 @@ class _MoreList extends StatelessWidget {
   /// of their own.
   final bool meetings;
 
+  /// "Manage team" (or group) and what it opens: the settings, for those
+  /// who see them in the header's menu; null for no row.
+  final String? manageLabel;
+  final VoidCallback? onManage;
+
+  /// "Leave team" and the header menu's leave flow (its confirm); null for
+  /// the owner, who can't leave without handing the team on.
+  final String? leaveLabel;
+  final VoidCallback? onLeave;
+
+  /// In Leave's place for the owner: why they can't leave yet.
+  final String? ownerNote;
+
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
+    Widget row({
+      required IconData icon,
+      required String title,
+      required String subtitle,
+      required VoidCallback onTap,
+    }) => ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+      leading: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: c.accentSoft,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 19, color: c.accentInk),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 15,
+          color: c.ink,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontSize: 12.5, color: c.muted),
+      ),
+      trailing: Icon(Icons.chevron_right, color: c.muted),
+      onTap: onTap,
+    );
+    final rows = [
+      for (final s in sections)
+        row(
+          icon: s.icon,
+          title: s.label,
+          subtitle: teamMoreSubtitle(s.path),
+          onTap: () => goWithinTeam(context, s.route(teamId)),
+        ),
+      if (meetings)
+        row(
+          icon: Icons.videocam_outlined,
+          title: 'Meetings',
+          subtitle: teamMoreSubtitle('meetings'),
+          onTap: () => context.push(Routes.teamMeetings(teamId)),
+        ),
+      if (onManage case final manage?)
+        row(
+          icon: Icons.settings_outlined,
+          title: manageLabel ?? 'Manage team',
+          subtitle: teamMoreSubtitle('manage'),
+          onTap: manage,
+        ),
+    ];
     return ConstrainedContent(
       maxWidth: 720,
       child: ListView(
@@ -1622,64 +1859,169 @@ class _MoreList extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                for (final (i, s) in sections.indexed) ...[
+                for (final (i, r) in rows.indexed) ...[
                   if (i > 0) Divider(height: 1, color: c.border),
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                    leading: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: c.accentSoft,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(s.icon, size: 19, color: c.accentInk),
-                    ),
-                    title: Text(
-                      s.label,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        color: c.ink,
-                      ),
-                    ),
-                    trailing: Icon(Icons.chevron_right, color: c.muted),
-                    onTap: () => goWithinTeam(context, s.route(teamId)),
-                  ),
-                ],
-                if (meetings) ...[
-                  if (sections.isNotEmpty) Divider(height: 1, color: c.border),
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                    leading: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: c.accentSoft,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.videocam_outlined,
-                        size: 19,
-                        color: c.accentInk,
-                      ),
-                    ),
-                    title: Text(
-                      'Meetings',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        color: c.ink,
-                      ),
-                    ),
-                    trailing: Icon(Icons.chevron_right, color: c.muted),
-                    onTap: () => context.push(Routes.teamMeetings(teamId)),
-                  ),
+                  r,
                 ],
               ],
             ),
           ),
+          if (onLeave case final leave?) ...[
+            const SizedBox(height: 20),
+            Center(
+              child: OutlinedButton.icon(
+                onPressed: leave,
+                icon: const Icon(Icons.logout, size: 18),
+                label: Text(leaveLabel ?? 'Leave team'),
+              ),
+            ),
+          ] else if (ownerNote case final note?) ...[
+            const SizedBox(height: 20),
+            Text(
+              note,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: c.muted),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// A member's quick numbers under the team header: how many are going to
+/// the next event, and how many rooms have messages they haven't read
+/// (amber while there are any: theirs to read). No win–loss record: the
+/// team's results aren't kept anywhere cheap to read.
+class _StatTiles extends StatelessWidget {
+  const _StatTiles({required this.viewModel, required this.onOpenEvent});
+
+  final TeamHomeViewModel viewModel;
+  final ValueChanged<TeamEvent> onOpenEvent;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final next = vm.nextEvent;
+    final unread = vm.newInChat;
+    return Row(
+      children: [
+        if (next != null) ...[
+          Expanded(
+            child: _StatTile(
+              value: '${vm.nextGoing}',
+              label: 'going',
+              detail: next.title.isEmpty ? 'Next event' : next.title,
+              semantics: '${vm.nextGoing} going to ${next.title}',
+              onTap: () => onOpenEvent(next),
+            ),
+          ),
+          const SizedBox(width: 10),
+        ],
+        Expanded(
+          child: _StatTile(
+            value: '$unread',
+            label: 'new in chat',
+            detail: unread == 0
+                ? 'All caught up'
+                : unread == 1
+                ? '1 room'
+                : '$unread rooms',
+            semantics: unread == 0
+                ? 'No new messages'
+                : '$unread ${unread == 1 ? 'room has' : 'rooms have'} '
+                      'new messages',
+            highlight: unread > 0,
+            onTap: () =>
+                goWithinTeam(context, TeamSection.chat.route(vm.teamId)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.value,
+    required this.label,
+    required this.detail,
+    required this.semantics,
+    required this.onTap,
+    this.highlight = false,
+  });
+
+  final String value;
+  final String label;
+  final String detail;
+  final String semantics;
+  final VoidCallback onTap;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final ink = highlight ? c.highlightInk : c.ink;
+    return Semantics(
+      button: true,
+      label: semantics,
+      excludeSemantics: true,
+      child: Material(
+        color: highlight ? c.highlightSoft : c.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(controlRadius),
+          side: BorderSide(
+            color: highlight ? c.highlight.withValues(alpha: 0.45) : c.border,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      value,
+                      style: TextStyle(
+                        fontFamily: scoreFont,
+                        fontSize: 26,
+                        height: 1.05,
+                        fontWeight: FontWeight.w800,
+                        color: ink,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: ink,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: c.muted),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1980,6 +2322,70 @@ class _JoinCard extends StatelessWidget {
         FilledButton(
           onPressed: joining ? null : onJoin,
           child: const Text('Join'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// A team that takes join requests (F26), for a signed-in outsider:
+/// Request to join (the team's member managers approve it), or Cancel
+/// request while it waits; an invite code still works.
+class _TeamRequestCard extends StatelessWidget {
+  const _TeamRequestCard({
+    required this.pending,
+    required this.busy,
+    required this.onRequest,
+    required this.onCancel,
+    required this.onCode,
+  });
+
+  final bool pending;
+  final bool busy;
+  final VoidCallback onRequest;
+  final VoidCallback onCancel;
+  final VoidCallback onCode;
+
+  @override
+  Widget build(BuildContext context) => SectionCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(pending ? Icons.hourglass_top : Icons.how_to_reg_outlined),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                pending
+                    ? "Request sent. You'll hear when the team lets you in."
+                    : "You're not on this team. Ask to join, or use an "
+                          'invite code from a coach or captain.',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            TextButton(
+              onPressed: busy ? null : onCode,
+              child: const Text('Use a code'),
+            ),
+            if (pending)
+              OutlinedButton(
+                onPressed: busy ? null : onCancel,
+                child: const Text('Cancel request'),
+              )
+            else
+              FilledButton(
+                onPressed: busy ? null : onRequest,
+                child: const Text('Request to join'),
+              ),
+          ],
         ),
       ],
     ),

@@ -87,7 +87,7 @@ function VisitorTournament({ page, news }: { page: PublicHostedPage; news: Publi
 }
 
 /** The page's state as useTournament keeps it, from the public answer: read-only, nobody's teams. */
-function usePublicTournamentState(page: PublicHostedPage, news: PublicTeamPost[], next: string, select: (id: string) => void): TournamentState {
+export function usePublicTournamentState(page: PublicHostedPage, news: PublicTeamPost[], next: string, select: (id: string) => void): TournamentState {
   return useMemo(() => {
     const p = page.tournament;
     const t: Doc<TournamentDoc> = {

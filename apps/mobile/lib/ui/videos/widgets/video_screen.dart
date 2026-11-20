@@ -12,10 +12,12 @@ import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/video_viewmodel.dart';
 import 'file_video_player.dart';
+import 'video_discussion.dart';
 import 'youtube_player_view.dart';
 
 /// A team video: the player (YouTube's, or media_kit for uploads), its
-/// title and description.
+/// title and description, the event it's tagged to, its notes (tap one to
+/// play from there) and comments.
 class VideoScreen extends StatefulWidget {
   const VideoScreen({
     super.key,
@@ -26,7 +28,7 @@ class VideoScreen extends StatefulWidget {
 
   final VideoViewModel viewModel;
   final YouTubePlayerBuilder player;
-  final FileVideoPlayerBuilder filePlayer;
+  final SeekableFilePlayerBuilder filePlayer;
 
   @override
   State<VideoScreen> createState() => _VideoScreenState();
@@ -39,12 +41,45 @@ class _VideoScreenState extends State<VideoScreen> {
   void initState() {
     super.initState();
     vm.deleteVideo.addListener(_onDelete);
+    vm.addComment.addListener(_onAdd);
+    vm.deleteComment.addListener(_onDeleteComment);
+    vm.tagEvent.addListener(_onTag);
   }
 
   @override
   void dispose() {
     vm.deleteVideo.removeListener(_onDelete);
+    vm.addComment.removeListener(_onAdd);
+    vm.deleteComment.removeListener(_onDeleteComment);
+    vm.tagEvent.removeListener(_onTag);
     super.dispose();
+  }
+
+  void _onAdd() {
+    final cmd = vm.addComment;
+    if (cmd.error) {
+      showErrorSnackBar(context, cmd.result);
+      cmd.clearResult();
+    }
+  }
+
+  void _onDeleteComment() {
+    final cmd = vm.deleteComment;
+    if (cmd.completed) {
+      cmd.clearResult();
+      showSnackBar(context, 'Deleted');
+    } else if (cmd.error) {
+      showErrorSnackBar(context, cmd.result);
+      cmd.clearResult();
+    }
+  }
+
+  void _onTag() {
+    final cmd = vm.tagEvent;
+    if (cmd.error) {
+      showErrorSnackBar(context, cmd.result);
+      cmd.clearResult();
+    }
   }
 
   void _onDelete() {
@@ -79,8 +114,12 @@ class _VideoScreenState extends State<VideoScreen> {
   }
 
   Widget _player(TeamVideo video) {
-    if (video.isYouTube) return widget.player(video.youtubeId);
-    if (vm.fileUrl case final url?) return widget.filePlayer(url);
+    if (video.isYouTube) {
+      return widget.player(video.youtubeId, vm.attachPlayer);
+    }
+    if (vm.fileUrl case final url?) {
+      return widget.filePlayer(url, vm.attachPlayer);
+    }
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: ColoredBox(
@@ -218,8 +257,21 @@ class _VideoScreenState extends State<VideoScreen> {
                             ),
                           ),
                         ),
+                      const SizedBox(height: 12),
+                      VideoEventTag(viewModel: vm),
                     ],
                   ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: VideoNotes(
+                    viewModel: vm,
+                    watchUrl: video.isYouTube ? video.watchUrl : null,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: VideoComments(viewModel: vm),
                 ),
               ],
             ),

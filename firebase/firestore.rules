@@ -78,8 +78,10 @@ service cloud.firestore {
     //
     // Custom roles (CustomRole in lib/domain/models/team_role.dart) live in
     // the team's `roles`; `memberRoles` says who has which, and
-    // `memberPerms` is the union of each member's role permissions, which
-    // only the owner writes (setRoles). Permissions (TeamPermission):
+    // `memberPerms` is the union of each member's role permissions and
+    // their own (`memberGrants`: the owner's per-person switches, written
+    // only through the API), which only the owner writes (setRoles).
+    // Permissions (TeamPermission):
     // manageTeam, manageMembers, manageChats, manageEvents, moderate,
     // keepStats.
     function roleIn(team) { return team.members.get(uid(), ''); }
@@ -345,7 +347,8 @@ service cloud.firestore {
           && canInvite()
           && !(userId in team().memberIds)
           && request.resource.data.keys().hasOnly([
-               'teamName', 'kind', 'invitedBy', 'invitedByName', 'createdAt'])
+               'teamId', 'teamName', 'kind', 'invitedBy', 'invitedByName', 'createdAt'])
+          && request.resource.data.get('teamId', teamId) == teamId
           && request.resource.data.teamName == team().name
           && request.resource.data.kind == team().get('kind', 'team')
           && request.resource.data.invitedBy == uid()
@@ -731,8 +734,9 @@ service cloud.firestore {
 
       // Member leaves, owner removes anyone but themself, coaches, captains
       // and members with manageMembers remove players who have no
-      // permissions of their own. Stats access and custom roles go with
-      // them.
+      // permissions of their own. Stats access, custom roles and their own
+      // permissions (memberGrants, which only the API writes: the owner's
+      // per-person switches) go with them, so rejoining brings none back.
       function removeMember() {
         let diff = request.resource.data.members.diff(resource.data.members);
         // Lists (unlike sets) can be indexed, so find who left via memberIds.
@@ -740,7 +744,7 @@ service cloud.firestore {
         let target = gone[0];
         return changed().hasOnly(['members', 'memberIds', 'memberNames',
                                   'statKeepers', 'memberRoles', 'memberPerms',
-                                  'orgMembers'])
+                                  'memberGrants', 'orgMembers'])
           && gone.size() == 1
           && !(target in request.resource.data.get('orgMembers', []))
           && request.resource.data.get('orgMembers', []).toSet()
@@ -749,6 +753,9 @@ service cloud.firestore {
           && !(target in request.resource.data.get('statKeepers', []))
           && !(target in request.resource.data.get('memberRoles', {}))
           && !(target in request.resource.data.get('memberPerms', {}))
+          && !(target in request.resource.data.get('memberGrants', {}))
+          && request.resource.data.get('memberGrants', {}).diff(
+               resource.data.get('memberGrants', {})).affectedKeys().hasOnly([target])
           && request.resource.data.get('memberRoles', {}).diff(
                resource.data.get('memberRoles', {})).affectedKeys().hasOnly([target])
           && request.resource.data.get('memberPerms', {}).diff(
@@ -808,7 +815,11 @@ service cloud.firestore {
 
       // Requests to join a group that requires approval. Each user writes
       // only their own; owners and organizers read them and approve
-      // (approveRequest) or decline (delete) them.
+      // (approveRequest) or decline (delete) them. A team that allows join
+      // requests (allowJoinRequests, F26) takes them through the API only:
+      // asking and approving check a club team's age rule there
+      // (apps/api/src/teams/club_age.ts), so no client creates or approves
+      // one; the asker and its member managers still read and delete them.
       match /joinRequests/{userId} {
         function team() { return get(teamPath(teamId)).data; }
 
@@ -852,8 +863,17 @@ service cloud.firestore {
       // userId links a spot to a member's account, so the spot's stats
       // count on their profile. Admins link anyone on the team; a member
       // claims an unlinked spot for themselves or lets go of their own.
+      // line (O-line, D-line or both) is the API's to set (PUT
+      // /v1/teams/:id/roster-lines): a client write keeps it as it was or
+      // drops it (an app build from before lines rewrites the whole spot).
       match /roster/{playerId} {
         function linkedTo(d) { return d.get('userId', null); }
+
+        function keepsLine() {
+          let after = request.resource.data.get('line', null);
+          return after == null
+            || (resource != null && after == resource.data.get('line', null));
+        }
 
         // Admins may link a member, or keep the link to someone who left.
         function validLink(t) {
@@ -868,7 +888,8 @@ service cloud.firestore {
         allow create, update: if signedIn()
           && can(get(teamPath(teamId)).data, 'manageTeam')
           && validLink(get(teamPath(teamId)).data)
-          && request.resource.data.keys().hasOnly(['name', 'number', 'position', 'userId'])
+          && request.resource.data.keys().hasOnly(['name', 'number', 'position', 'userId', 'line'])
+          && keepsLine()
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.name.size() <= 80
@@ -1245,6 +1266,15 @@ service cloud.firestore {
                'title', 'body', 'location', 'links', 'images', 'public',
                'tournamentKey', 'updatedAt'])
           && validPost(request.resource.data);
+
+        // Pins and comments (redesign F24) are the API's: pinnedAt,
+        // pinnedBy and commentCount are in neither key list above (the
+        // follows functions keep commentCount), and no client writes a
+        // comment. Members read the thread, newest 100 at a time.
+        match /comments/{commentId} {
+          allow get: if signedIn() && isMember(team());
+          allow list: if signedIn() && isMember(team()) && capped(100);
+        }
       }
 
       // Videos section (TeamVideo in lib/domain/models/team_video.dart):
@@ -1297,6 +1327,17 @@ service cloud.firestore {
                'youtubeId', 'folderId', 'title', 'description', 'updatedAt'])
           && request.resource.data.updatedAt == request.time
           && validVideo(request.resource.data);
+
+        // Notes, clips and comments on the video (redesign F4, F5; the
+        // API's videos/extras.ts): members read them; only the API writes
+        // them (the author or a manager deletes through it). Managers may
+        // delete them here too, so the app's own removal of a video can
+        // clear them first. The video's `eventId` tag (F6) is the API's
+        // too: it's in neither key list above.
+        match /comments/{commentId} {
+          allow read: if signedIn() && isMember(team());
+          allow delete: if signedIn() && can(team(), 'manageTeam');
+        }
       }
 
       // Folders in the Videos section (VideoFolder in
@@ -2053,7 +2094,7 @@ service cloud.firestore {
         return d.keys().hasOnly([
                  'name', 'division', 'level', 'city', 'keywords', 'kind',
                  'description', 'requiresApproval', 'location', 'official',
-                 'publicPage'])
+                 'publicPage', 'allowJoinRequests'])
           && d.name == team.name
           && d.get('official', false) == team.get('official', false)
           && d.division == team.division
@@ -2063,6 +2104,7 @@ service cloud.firestore {
           && d.get('description', '') == team.get('description', '')
           && d.get('requiresApproval', false) == team.get('requiresApproval', false)
           && d.get('publicPage', true) == team.get('publicPage', true)
+          && d.get('allowJoinRequests', false) == team.get('allowJoinRequests', false)
           && d.get('location', null)
                == (isPrivateGroup(team) ? null : team.get('location', null))
           && d.keywords is list && d.keywords.size() <= 100;

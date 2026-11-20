@@ -1,13 +1,20 @@
 "use client";
-import { type EnteredTournamentDoc, hasTournamentAhead, type OptionalTeamSection } from "@stall10/shared";
+import {
+  type EnteredTournamentDoc,
+  hasTournamentAhead,
+  manageRowLabel,
+  type OptionalTeamSection,
+  type TeamMoreRow,
+  teamMoreSubtitles,
+} from "@stall10/shared";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { callApi, problem } from "@/lib/client";
 import { useLiveDoc, useLiveQuery } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { ErrorNote, Loading } from "../StatusViews";
-import { useTeamHub, viewerSectionOn } from "./TeamContext";
+import { LEAVE_CONFIRM, useTeamHub, viewerSectionOn } from "./TeamContext";
 
 type Kind = "team" | "community" | "organization";
 
@@ -128,8 +135,44 @@ function useScrollEdges<T extends HTMLElement>() {
   return { ref, edges, update };
 }
 
-/** More ▾: the sections that don't fit in the row. Closes on Esc, a click outside, or opening a page. */
+/** More's line under a section (teamMoreSubtitles, as in the app), if it has one. */
+function moreSubtitle(section: HubSection): string | undefined {
+  const row = section.sub.slice(1);
+  return row in teamMoreSubtitles ? teamMoreSubtitles[row as TeamMoreRow] : undefined;
+}
+
+/**
+ * More ▾: the sections that don't fit in the row, each with a line on
+ * what's there; then, as in the app's More, "Manage team" for the team's
+ * admins (Settings, as the header's gear) and Leave for everyone but the
+ * owner (who hands the team on first, in Settings, and is told so),
+ * with Settings' own confirm (LEAVE_CONFIRM). Closes on Esc, a click
+ * outside, or opening a page.
+ */
 function MoreMenu({ base, sections, path }: { base: string; sections: HubSection[]; path: string }) {
+  const { teamId, kind, viewer } = useTeamHub();
+  const { user } = useAuth();
+  const router = useRouter();
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const member = viewer.state === "member" ? viewer : null;
+  // The app's Settings menu item: a team's admins, not a league's drafted team.
+  const manage = !!member && kind === "team" && member.can("manageTeam") && !member.team.leagueId;
+  const canLeave = !!member && member.tier !== "owner";
+  const noun = kind === "team" ? "team" : "community";
+  const onSettings = path.startsWith(`${base}/settings`);
+  async function leave() {
+    if (!user || !window.confirm(LEAVE_CONFIRM)) return;
+    setLeaving(true);
+    setLeaveError(null);
+    try {
+      await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(user.uid)}`, { method: "DELETE" });
+      router.push("/teams");
+    } catch (e) {
+      setLeaveError(problem(e));
+      setLeaving(false);
+    }
+  }
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -174,10 +217,34 @@ function MoreMenu({ base, sections, path }: { base: string; sections: HubSection
               <li key={s.sub}>
                 <Link href={base + s.sub} className={on ? "active" : undefined} aria-current={on ? "page" : undefined}>
                   {s.label}
+                  {moreSubtitle(s) && <small>{moreSubtitle(s)}</small>}
                 </Link>
               </li>
             );
           })}
+          {manage && (
+            <li>
+              <Link href={`${base}/settings`} className={onSettings ? "active" : undefined} aria-current={onSettings ? "page" : undefined}>
+                {manageRowLabel(kind)}
+                <small>{teamMoreSubtitles.manage}</small>
+              </Link>
+            </li>
+          )}
+          {canLeave && (
+            <li>
+              <div className="team-more-sep" role="separator" />
+              <button type="button" className="team-more-leave" disabled={leaving || !user} onClick={() => void leave()}>
+                {leaving ? "Leaving…" : `Leave ${noun}`}
+              </button>
+              {leaveError && <span className="post-error">{leaveError}</span>}
+            </li>
+          )}
+          {member?.tier === "owner" && (
+            <li>
+              <div className="team-more-sep" role="separator" />
+              <small className="team-more-note">Owners can&apos;t leave. To leave, make someone else the owner first (Settings).</small>
+            </li>
+          )}
         </ul>
       )}
     </div>
@@ -186,18 +253,20 @@ function MoreMenu({ base, sections, path }: { base: string; sections: HubSection
 
 /**
  * Join from the page: a community anyone may join, or ask to join one that
- * approves members. A team takes members by invite only, so its outsiders
- * get the invite-only hint (TeamBanner) instead. Members see their role
- * beside the member count (MemberCount).
+ * approves members, or a team that takes join requests (F26: "Request to
+ * join", the club age rule checked by the API). Other teams take members
+ * by invite only, so their outsiders get the invite-only hint (TeamBanner)
+ * instead. Members see their role beside the member count (MemberCount).
  */
 export function JoinButton() {
-  const { teamId, kind, privateGroup, viewer } = useTeamHub();
+  const { teamId, kind, privateGroup, joinRequests, viewer } = useTeamHub();
   const { user } = useAuth();
-  const request = useLiveDoc(viewer.state === "outsider" && privateGroup ? `teams/${teamId}/joinRequests/${viewer.uid}` : null);
+  const asks = kind === "team" ? joinRequests === true : privateGroup;
+  const request = useLiveDoc(viewer.state === "outsider" && asks ? `teams/${teamId}/joinRequests/${viewer.uid}` : null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (viewer.state !== "outsider" || kind === "team" || !user) return null;
+  if (viewer.state !== "outsider" || (kind === "team" && !asks) || !user) return null;
 
   async function run(method: string, path: string) {
     setBusy(true);
@@ -212,7 +281,7 @@ export function JoinButton() {
   }
 
   let button;
-  if (!privateGroup) {
+  if (!asks) {
     button = (
       <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={() => void run("POST", `/v1/teams/${teamId}/members`)}>
         Join
@@ -238,7 +307,7 @@ export function JoinButton() {
         disabled={busy || request.data === undefined}
         onClick={() => void run("POST", `/v1/teams/${teamId}/join-requests`)}
       >
-        Ask to join
+        {kind === "team" ? "Request to join" : "Ask to join"}
       </button>
     );
   }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/tournament_engine/generator.dart';
+import '../../../domain/tournament_engine/league_weeks.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
@@ -24,6 +25,7 @@ import 'event_guide_cards.dart';
 import 'event_page_header.dart';
 import 'live_score_sheet.dart';
 import 'player_signups_tab.dart';
+import 'share_tournament.dart';
 import 'tournament_dialogs.dart';
 import 'tournament_parts.dart';
 
@@ -107,9 +109,13 @@ class HostedTournamentScreen extends StatefulWidget {
     this.openGameId,
     this.openDivisionId,
     this.initialTab,
+    this.share = shareTournament,
   });
 
   final HostedTournamentViewModel viewModel;
+
+  /// Share in the app bar: the share sheet (tests pass their own).
+  final ShareTournament share;
 
   /// A game to open (from a tournament-day card's Report score): the page
   /// starts on Schedule, in [openDivisionId], with the game's sheet up.
@@ -278,6 +284,18 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
               actions: [
                 if (follow != null && t.status.isPublished)
                   actions(FollowControl(viewModel: follow, compact: true)),
+                // A draft has no public page to link to yet.
+                if (t.status.isPublished)
+                  Builder(
+                    builder: (context) => IconButton(
+                      tooltip: 'Share',
+                      icon: const Icon(Icons.ios_share_rounded),
+                      onPressed: () {
+                        final s = tournamentShare(t);
+                        widget.share(context, s.text, s.link);
+                      },
+                    ),
+                  ),
                 if (vm.isManager)
                   PopupMenuButton<_Menu>(
                     onSelected: _onMenu,
@@ -1491,43 +1509,148 @@ class _ScheduleTab extends StatelessWidget {
                 ),
               ),
             if (games.isNotEmpty) const _Section('All games'),
-            for (final day in days) ...[
-              if (day.first.startsAt case final at?)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6, bottom: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        league
-                            ? '${day.first.stage == GameStage.pool ? 'Week ${day.first.round}' : 'Playoffs'} · ${gameDay(at)}'
-                            : gameDay(at),
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: c.ink2,
-                        ),
+            // A league's season, a night at a time.
+            if (league && games.isNotEmpty)
+              _LeagueWeeks(viewModel: vm, division: d, games: games),
+            // A tournament's, a card per day.
+            if (!league)
+              for (final day in days) ...[
+                if (day.first.startsAt case final at?)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6, bottom: 8),
+                    child: Text(
+                      gameDay(at),
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: c.ink2,
                       ),
-                      if (league && day.first.stage == GameStage.pool)
-                        if (byesIn(d.seeds, games, day.first.round)
-                            case final byes when byes.isNotEmpty)
-                          Text(
-                            'Bye: ${byes.map(vm.teamName).join(', ')}',
-                            style: TextStyle(fontSize: 12.5, color: c.muted),
-                          ),
-                    ],
+                    ),
                   ),
+                RowsCard(
+                  children: [
+                    for (final g in day)
+                      _HostedGameTile(viewModel: vm, game: g),
+                  ],
                 ),
-              RowsCard(
-                children: [
-                  for (final g in day) _HostedGameTile(viewModel: vm, game: g),
-                ],
-              ),
-              const SizedBox(height: 12),
-            ],
+                const SizedBox(height: 12),
+              ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A league's games a night at a time: "‹ Week 3 ›" with the night's
+/// date and byes, then its games. Opens on tonight's night, else the next
+/// one (the last once the season is over).
+class _LeagueWeeks extends StatefulWidget {
+  const _LeagueWeeks({
+    required this.viewModel,
+    required this.division,
+    required this.games,
+  });
+
+  final HostedTournamentViewModel viewModel;
+  final TournamentDivision division;
+  final List<GroupGame> games;
+
+  @override
+  State<_LeagueWeeks> createState() => _LeagueWeeksState();
+}
+
+class _LeagueWeeksState extends State<_LeagueWeeks> {
+  int? _picked;
+  String? _divisionId;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = widget.viewModel;
+    final d = widget.division;
+    final c = AppColors.of(context);
+    final weeks = leagueWeeks(widget.games);
+    if (weeks.isEmpty) return const SizedBox.shrink();
+    // Another division starts over on its own current week.
+    if (_divisionId != d.id) {
+      _divisionId = d.id;
+      _picked = null;
+    }
+    final i = (_picked ?? currentWeekIndex(weeks, vm.now())).clamp(
+      0,
+      weeks.length - 1,
+    );
+    final week = weeks[i];
+    final rounds = {
+      for (final g in week.games)
+        if (g.stage == GameStage.pool) g.round,
+    };
+    final byes = {for (final r in rounds) ...byesIn(d.seeds, widget.games, r)};
+    final arrows = IconButton.styleFrom(foregroundColor: c.accent);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            IconButton(
+              key: const Key('week-previous'),
+              tooltip: 'Previous week',
+              style: arrows,
+              onPressed: i > 0 ? () => setState(() => _picked = i - 1) : null,
+              icon: const Icon(Icons.chevron_left_rounded, size: 28),
+            ),
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    week.labelOf(leagueNights(weeks)),
+                    key: const Key('week-label'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: scoreFont,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      height: 1.1,
+                      color: c.ink,
+                    ),
+                  ),
+                  if (week.day case final day?)
+                    Text(
+                      gameDay(day),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12.5, color: c.muted),
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              key: const Key('week-next'),
+              tooltip: 'Next week',
+              style: arrows,
+              onPressed: i < weeks.length - 1
+                  ? () => setState(() => _picked = i + 1)
+                  : null,
+              icon: const Icon(Icons.chevron_right_rounded, size: 28),
+            ),
+          ],
+        ),
+        if (byes.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 2),
+            child: Text(
+              'Bye: ${byes.map(vm.teamName).join(', ')}',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: c.muted),
+            ),
+          ),
+        const SizedBox(height: 8),
+        RowsCard(
+          children: [
+            for (final g in week.games) _HostedGameTile(viewModel: vm, game: g),
+          ],
+        ),
+        const SizedBox(height: 12),
+      ],
     );
   }
 }
@@ -2153,10 +2276,7 @@ class _ResultsTab extends StatelessWidget {
     final places = vm.placements;
     final pools = vm.poolStandings;
     final mine = vm.myTeamIds;
-    final columns = <(GameStage, int), List<GroupGame>>{};
-    for (final g in vm.bracketGames) {
-      columns.putIfAbsent((g.stage, g.round), () => []).add(g);
-    }
+    final hasBracket = vm.bracketGames.isNotEmpty;
     return ConstrainedContent(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
@@ -2279,44 +2399,71 @@ class _ResultsTab extends StatelessWidget {
               const SizedBox(height: 8),
             ],
           ],
-          if (columns.isNotEmpty) ...[
-            const _Section('Bracket'),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final e in columns.entries)
-                    SizedBox(
-                      width: 260,
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Eyebrow(
-                              e.value.map((g) => g.label).toSet().length == 1
-                                  ? e.value.first.label
-                                  : 'Round ${e.key.$2}',
-                            ),
-                            const SizedBox(height: 8),
-                            for (final g in e.value)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: RowsCard(
-                                  children: [
-                                    _HostedGameTile(viewModel: vm, game: g),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
+          if (hasBracket) ...[
+            _Section(
+              'Bracket',
+              trailing: TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: c.accent),
+                onPressed: () => context.push(
+                  Routes.tournamentBracket(vm.tournamentId, d.id),
+                ),
+                icon: const Icon(Icons.open_in_full_rounded, size: 18),
+                label: const Text('Open bracket'),
               ),
             ),
+            HostedBracket(viewModel: vm),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The selected division's bracket: a column per round, left to right,
+/// each game a tile that opens its sheet (Report score and the rest).
+/// On the Results tab and the bracket's own page.
+class HostedBracket extends StatelessWidget {
+  const HostedBracket({super.key, required this.viewModel});
+
+  final HostedTournamentViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final columns = <(GameStage, int), List<GroupGame>>{};
+    for (final g in vm.bracketGames) {
+      columns.putIfAbsent((g.stage, g.round), () => []).add(g);
+    }
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final e in columns.entries)
+            SizedBox(
+              width: 300,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Eyebrow(
+                      e.value.map((g) => g.label).toSet().length == 1
+                          ? e.value.first.label
+                          : 'Round ${e.key.$2}',
+                    ),
+                    const SizedBox(height: 8),
+                    for (final g in e.value)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: RowsCard(
+                          children: [_HostedGameTile(viewModel: vm, game: g)],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

@@ -16,6 +16,7 @@ import {
   type Data,
   deletedUserName,
   eventResponsesOf,
+  votedInPoll,
   nextOwner,
   postFolder,
   signedInRecently,
@@ -84,7 +85,7 @@ export const signInEmail = onCall({ secrets: [webApiKey], enforceAppCheck }, asy
 
 /**
  * Deletes the caller's account and everything they put in the app: their
- * posts, chat and direct messages (with attachments), event responses,
+ * posts, chat and direct messages (with attachments), event responses, chat poll votes,
  * join requests, profile (with its photos), personal details and private data. They leave every team; a team
  * they own passes to its next admin, or is deleted if nobody else is on
  * it. Messages other people sent them stay, under "Deleted user".
@@ -145,7 +146,8 @@ async function deleteAuthored(db: Firestore, uid: string): Promise<void> {
     if (folder) await deleteFolder(folder);
     void writer.delete(d.ref);
   }
-  // Comments on anyone's posts; the posts' counts follow (follows-commentCount).
+  // Comments on anyone's posts (the posts' counts follow: follows-commentCount),
+  // and notes, clips and comments on team videos (teams/{t}/videos/{v}/comments).
   const comments = await db.collectionGroup("comments").where("authorId", "==", uid).get();
   for (const d of comments.docs) void writer.delete(d.ref);
   const messages = await db.collectionGroup("messages").where("authorId", "==", uid).get();
@@ -236,6 +238,7 @@ async function leaveTeams(db: Firestore, uid: string): Promise<void> {
       ["statKeepers", FieldValue.arrayRemove(uid)],
       [new FieldPath("memberRoles", uid), FieldValue.delete()],
       [new FieldPath("memberPerms", uid), FieldValue.delete()],
+      [new FieldPath("memberGrants", uid), FieldValue.delete()],
     ];
     if (heir) {
       update.push(["ownerId", heir], [new FieldPath("members", heir), "owner"]);
@@ -269,6 +272,15 @@ async function scrubTeam(db: Firestore, teamId: string, uid: string): Promise<vo
     void writer.update(m.ref, first[0], first[1], ...rest.flat());
   }
 
+  // Their votes in chat polls (F33), room by room (poll.voterIds' automatic index).
+  for (const room of (await ref.collection("chats").select().get()).docs) {
+    const polls = await room.ref.collection("messages").where("poll.voterIds", "array-contains", uid).get();
+    for (const m of polls.docs) {
+      if (!votedInPoll(m.data(), uid)) continue;
+      void writer.update(m.ref, new FieldPath("poll", "votes", uid), FieldValue.delete(), new FieldPath("poll", "voterIds"), FieldValue.arrayRemove(uid));
+    }
+  }
+
   const tournaments = await ref.collection("groupTournaments").where("participantIds", "array-contains", uid).get();
   for (const t of tournaments.docs) {
     const next = tournamentWithout(t.data(), uid);
@@ -292,16 +304,23 @@ async function deleteTeam(db: Firestore, teamId: string): Promise<void> {
   logger.info("Deleted team with no other members", { teamId });
 }
 
-/** Requests to join groups the user never got into. */
+/**
+ * Requests to join groups (that approve who joins) and teams (that allow
+ * join requests, F26) the user never got into. A team that turns requests
+ * off declines those waiting (the API deletes them), so only these hold any.
+ */
 async function deleteJoinRequests(db: Firestore, uid: string): Promise<void> {
-  const groups = await db
-    .collection("teams")
-    .where("kind", "in", ["community", "organization"])
-    .where("requiresApproval", "==", true)
-    .select()
-    .get();
-  if (groups.empty) return;
-  const refs = groups.docs.map((g) => g.ref.collection("joinRequests").doc(uid));
+  const [groups, teams] = await Promise.all([
+    db
+      .collection("teams")
+      .where("kind", "in", ["community", "organization"])
+      .where("requiresApproval", "==", true)
+      .select()
+      .get(),
+    db.collection("teams").where("allowJoinRequests", "==", true).select().get(),
+  ]);
+  if (groups.empty && teams.empty) return;
+  const refs = [...groups.docs, ...teams.docs].map((g) => g.ref.collection("joinRequests").doc(uid));
   const writer = db.bulkWriter();
   for (let i = 0; i < refs.length; i += 300) {
     for (const r of await db.getAll(...refs.slice(i, i + 300))) {

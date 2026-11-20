@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../calendar/widgets/add_to_calendar.dart';
+import '../../../data/repositories/video/video_repository.dart';
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
@@ -36,6 +37,7 @@ Future<void> showEventDetails(
       teamRepository: c.read(),
       authRepository: c.read(),
       tournamentRepository: c.read(),
+      videoRepository: readOptional<VideoRepository>(c),
     ),
     builder: (_, vm) => EventDetailScreen(viewModel: vm, popup: true),
   );
@@ -214,6 +216,32 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (e.notes.isNotEmpty) ...[
       const SizedBox(height: 12),
       EventNotes(notes: e.notes),
+    ],
+    if (vm.videos.isNotEmpty) ...[
+      const SizedBox(height: 12),
+      SectionCard(
+        title: 'Videos',
+        icon: Icons.smart_display_outlined,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+        child: Column(
+          children: [
+            for (final v in vm.videos)
+              ListTile(
+                key: ValueKey('event-video-${v.id}'),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: const Icon(Icons.play_circle_outline),
+                title: Text(
+                  v.title.isEmpty ? 'Video' : v.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _open(Routes.video(vm.teamId, v.id)),
+              ),
+          ],
+        ),
+      ),
     ],
   ];
 

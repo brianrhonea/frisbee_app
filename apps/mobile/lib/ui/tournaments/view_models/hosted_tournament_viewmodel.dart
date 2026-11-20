@@ -148,6 +148,9 @@ class HostedTournamentViewModel extends ChangeNotifier {
   final TeamRepository _teams;
   final TeamPostRepository? _posts;
   final DateTime Function() _now;
+
+  /// The page's clock (tests set it): which league week opens first.
+  DateTime now() => _now();
   final AuthRepository _auth;
   final String _uid;
   final FollowSlot _followSlot;

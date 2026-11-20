@@ -134,6 +134,39 @@ abstract class ChatRepository {
   /// Posts team event [eventId] into the room as a card.
   Future<Result<void>> shareEvent(String teamId, String roomId, String eventId);
 
+  // Polls (redesign F33), through the API too.
+
+  /// Posts [poll] into the room as a card.
+  Future<Result<void>> createPoll(
+    String teamId,
+    String roomId,
+    NewChatPoll poll,
+  );
+
+  /// Sets the user's whole choice on a poll (option indexes); empty takes
+  /// their vote back.
+  Future<Result<void>> votePoll(
+    String teamId,
+    String roomId,
+    String messageId,
+    List<int> options,
+  );
+
+  /// Closes a poll early (its author, or the room's chat managers).
+  Future<Result<void>> closePoll(
+    String teamId,
+    String roomId,
+    String messageId,
+  );
+
+  /// One message, live; null once it's deleted. A poll card listens to its
+  /// own message: older pages of a thread aren't live.
+  Stream<ChatMessage?> watchMessage(
+    String teamId,
+    String roomId,
+    String messageId,
+  );
+
   /// A URL to stream a video attachment from.
   Future<Result<String>> attachmentUrl(ChatAttachment attachment);
 }

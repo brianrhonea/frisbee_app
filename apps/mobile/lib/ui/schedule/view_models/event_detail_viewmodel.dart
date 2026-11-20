@@ -6,9 +6,11 @@ import '../../../data/repositories/auth/auth_repository.dart';
 import '../../../data/repositories/event/event_repository.dart';
 import '../../../data/repositories/group_tournament/group_tournament_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
+import '../../../data/repositories/video/video_repository.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../../domain/models/team.dart';
 import '../../../domain/models/team_event.dart';
+import '../../../domain/models/team_video.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 
@@ -23,9 +25,11 @@ class EventDetailViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required AuthRepository authRepository,
     GroupTournamentRepository? tournamentRepository,
+    VideoRepository? videoRepository,
   }) : _events = eventRepository,
        _auth = authRepository,
-       _tournaments = tournamentRepository {
+       _tournaments = tournamentRepository,
+       _videoRepo = videoRepository {
     setRsvp = Command1<void, RsvpStatus?>(
       (s) => _events.setRsvp(teamId, eventId, uid, s),
     );
@@ -43,6 +47,7 @@ class EventDetailViewModel extends ChangeNotifier {
       teamRepository.watchTeam(teamId).listen((t) {
         _team = t;
         _watchTournament();
+        _watchVideos();
         notifyListeners();
       }, onError: _onError),
     ];
@@ -53,8 +58,30 @@ class EventDetailViewModel extends ChangeNotifier {
   final EventRepository _events;
   final AuthRepository _auth;
   final GroupTournamentRepository? _tournaments;
+  final VideoRepository? _videoRepo;
   late final List<StreamSubscription<Object?>> _subs;
   StreamSubscription<Object?>? _tournamentSub;
+  StreamSubscription<Object?>? _videosSub;
+
+  List<TeamVideo> _videos = const [];
+
+  /// The team's videos tagged to this event (F6), newest first: members
+  /// see them while the team's Videos section is on.
+  List<TeamVideo> get videos => _videos;
+
+  void _watchVideos() {
+    final repo = _videoRepo;
+    final team = _team;
+    if (repo == null || team == null || _videosSub != null) return;
+    if (team.roleOf(uid) == null ||
+        !team.hasSection(OptionalSection.videos)) {
+      return;
+    }
+    _videosSub = repo.watchEventVideos(teamId, eventId).listen((list) {
+      _videos = list;
+      notifyListeners();
+    }, onError: (Object _) {});
+  }
 
   GroupTournament? _tournament;
 
@@ -239,6 +266,7 @@ class EventDetailViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _tournamentSub?.cancel();
+    _videosSub?.cancel();
     for (final s in _subs) {
       s.cancel();
     }

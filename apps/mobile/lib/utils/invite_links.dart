@@ -33,6 +33,12 @@ abstract final class InviteLinks {
   static Uri post(String postId) =>
       Uri.https(host, '/p/${Uri.encodeComponent(postId)}');
 
+  /// A hosted tournament or league's public page on the website (anyone
+  /// can read a published one). The app doesn't claim these links yet, so
+  /// they open the website.
+  static Uri tournament(String tournamentId) =>
+      Uri.https(host, '/tournaments/${Uri.encodeComponent(tournamentId)}');
+
   /// The in-app route for [uri] if it's one of these links, else null.
   static String? inAppPath(Uri uri) {
     final ours =

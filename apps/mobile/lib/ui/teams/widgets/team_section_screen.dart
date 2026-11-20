@@ -196,10 +196,13 @@ class _TeamSectionBodyState extends State<TeamSectionBody> {
     vm.setMemberRole,
     vm.transferOwnership,
     vm.setStatKeeper,
+    vm.setMemberPermissions,
     vm.removeMember,
     vm.deletePlay,
     vm.approveJoinRequest,
     vm.declineJoinRequest,
+    vm.saveLines,
+    vm.withdrawInvite,
   ];
 
   @override
@@ -207,6 +210,10 @@ class _TeamSectionBodyState extends State<TeamSectionBody> {
     super.initState();
     for (final c in _commands) {
       c.addListener(_onCommand);
+    }
+    // Invites pending, under Members, for those who invite people.
+    if (widget.section == TeamSection.members && vm.canSeeInvites) {
+      vm.loadInvites.execute();
     }
   }
 

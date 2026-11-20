@@ -321,6 +321,19 @@ describe("public reads", () => {
     expect(body.events).toEqual([{ id: "e", title: "Game", startsAt: iso(now + 1000) }]);
   });
 
+  it("puts a team's pinned public posts first, without who pinned them (F24)", async () => {
+    t.repo.listed("t", { name: "Haze", level: "club" });
+    t.repo.teamPosts.set("t", [
+      { id: "new", data: { title: "New", public: true, createdAt: iso(now) } },
+      { id: "old", data: { title: "Old", public: true, createdAt: iso(now - 9000), pinnedAt: iso(now - 10), pinnedBy: "coach" } },
+      { id: "mid", data: { title: "Mid", public: true, createdAt: iso(now - 5000) } },
+    ]);
+    const res = await t.get("/v1/public/teams/t");
+    expect(res.json().posts.map((x: Data) => x.id)).toEqual(["old", "new", "mid"]);
+    expect(res.json().posts[0].pinnedAt).toBe(iso(now - 10));
+    expect(res.body).not.toContain("pinnedBy");
+  });
+
   it("lists events and tournaments, without private groups'", async () => {
     t.repo.listed("t", { name: "Haze" });
     t.repo.listed("g", { name: "Secret", kind: "community", requiresApproval: true });

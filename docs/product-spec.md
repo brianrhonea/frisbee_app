@@ -569,7 +569,8 @@ everything the app does on the website alone, styled like the website
    (`/discover`, `/events` and `/schedule?view=find` redirect; chips All,
    Tournaments, Leagues, Pickup, Teams, Communities, Players); [x] feed
    tabs Your teams / Following / Everyone on both (no composer on
-   Everyone); [x] the Teams tab opens your only team on both; [x] live
+   Everyone); [x] the Teams tab always shows your teams' list on both
+   (it opened your only team until F34, item 37); [x] live
    tournament days open on Schedule; "Next steps"; host chooser "What are
    you hosting?" / "Host as" (Tournament · League · Hat); [x] RSVP counts
    on each answer, "Needs RSVP", "Directions", "Notes"; [x] compact team
@@ -709,7 +710,7 @@ everything the app does on the website alone, styled like the website
     <title>". Both are API-only from the start (`PUT|DELETE
     .../messages/:id/pin`, `POST .../event-shares`; firestore.rules
     already keeps clients from setting these fields), so the app needs
-    `API_BASE_URL` for them. Chat polls are not built (backlog). Tests:
+    `API_BASE_URL` for them. Chat polls: item 39 (F33). Tests:
     API `test/chat_extras.test.ts`; functions
     `test/notifications/model.test.ts`; app `test/ui/chat_extras_test.dart`.
     The website's side is checked by typecheck and by hand.
@@ -773,6 +774,375 @@ everything the app does on the website alone, styled like the website
     `discover_public_test.dart`, `test/shared_fixtures/discover_fixtures_test.dart`.
     The website's side is checked by typecheck and by hand.
 
+35. Tournament extras (F30): [x] app; [x] website. **Bracket page:**
+    Results' Bracket has "Open bracket", the division's bracket on its own
+    page (app `/tournaments/:id/bracket/:divisionId`; website
+    `/tournaments/:id/bracket?division=`, server-rendered for visitors of
+    a published event, members-only otherwise; `webRoute` maps the app's),
+    with the division chips and each game opening as usual. **Score
+    steppers:** the score form (report, confirm a different score, set or
+    correct the final, group tournaments too) has − and + around each
+    score in the scoreboard face; it can still be typed; an untouched
+    score stays empty ("Enter both scores."), + starts at 1, 0–99, and
+    the usual checks (no ties) apply. **League weeks:** a league's
+    Schedule shows one game night at a time, "‹ Week N ›" with its date,
+    "of N" and byes; it opens on tonight's night, else the next, else
+    the last. Weeks are nights, not rounds (two games a night, skipped
+    weeks), a night of bracket games is "Week N · Playoffs", unscheduled
+    games come last (`leagueWeeks`, `currentWeekIndex`,
+    `leagueWeekLabel` in `@stall10/shared`; the app's
+    `domain/tournament_engine/league_weeks.dart` matches). Tournaments
+    keep the list by day. **Enter a team:** Apply to play, Accept the
+    invite and Captains open full screen (app) or on their own page
+    (website `/tournaments/:id/enter`, `?team=` for an invite or
+    captains), with the team, division and captains as before; the
+    website's page offers only what the event page would (registration
+    open, public, divisions, no team already in). Reserving a spot stays
+    a small form. **Form steps:** hosting or editing an event goes Details
+    → When & where → Who can play → Format & divisions → Fees → Review
+    (Edit on each part); "Save draft" at any step and "Publish" on Review
+    while it's a draft (new or saved as one): Publish saves and opens
+    registration (`status: registration`, as "Publish and open
+    registration" does). A published event has one Save. If a new event
+    is created but publishing fails, it opens as the draft. **Share:** a
+    published event's page (tournament or league; visitors too on the
+    website) has Share: the app's share sheet, the website's
+    `navigator.share` or copy link, both sending
+    `https://<site>/tournaments/:id` (not a draft). The app doesn't claim
+    `/tournaments/` links yet, so they open the website. No data or rules
+    changes. Tests: app `test/ui/tournament_extras_test.dart`,
+    `test/domain/league_weeks_test.dart`, `host_event_test.dart` (form
+    steps); shared `league_weeks.test.ts`, `routes.test.ts`. The
+    website's side is checked by typecheck and by hand.
+36. Video notes, comments and game tags (F4, F5, F6): [x] app; [x]
+    website. On a team video's page, below the player: **Notes:** members
+    pin a note to a moment ("Mark start" takes the player's time, or the
+    current time when Post is pressed without one) and make it a clip
+    with "Mark end (clip)" (after the start; "No end" takes it back).
+    Notes list by time with a turf time chip ("1:23", a clip "1:23–1:40");
+    a tap or click plays from there. **Comments:** a thread, oldest first,
+    with a composer. Both are up to 1000 characters (trimmed), show
+    the author's name and date, and are deleted by their author or
+    an admin (manageTeam), with a confirm. A comment (not a note) pushes
+    "<team>: <name> commented on your video" to the video's author while
+    they're on the team. **Game tag:** admins tag the video to one of the
+    team's events from the last year or the next month (newest first; a
+    community's for everyone only): "Tag a game or event", then Change
+    event / Remove tag; everyone sees the event's date tile, type, date
+    and title, opening the event ("Tagged event not available" once it's
+    deleted). The event's page lists the videos tagged to it (members,
+    with Videos on). Data: `teams/{id}/videos/{videoId}/comments/{id}`
+    (`authorId`, `authorName`, `body`, `createdAt`, and `atMs` / `endMs`
+    for notes and clips) and `eventId` on the video;
+    `videoCommentRequestSchema`, `tagVideoEventRequestSchema`,
+    `videoCommentLimits`, `splitVideoComments`, `formatVideoTime` in
+    `@stall10/shared` (the app's `VideoComment` matches). API-only from
+    the start (`POST .../videos/:id/comments`, `DELETE
+    .../videos/:id/comments/:commentId`, `PUT .../videos/:id/event`;
+    `apps/api/src/videos/extras.ts`), so the app needs `API_BASE_URL` to
+    write them (it still reads them). Rules: members read comments; no
+    client creates them; admins may delete them so the app's own video
+    removal clears them first (the API's removal does the same);
+    `eventId` is in neither of the video's key lists. Account deletion
+    and Download your data cover them (collection group `comments`).
+    Tests: app `test/ui/video_extras_test.dart`; API
+    `test/video_extras.test.ts`, `data_export.test.ts`; shared
+    `videos.test.ts`; rules "only the API tags a video" and "members read
+    notes and comments"; functions `notifications/model.test.ts`. The
+    website's side is checked by typecheck and by hand.
+
+37. Teams tab and Add to calendar (F34, F35): [x] app; [x] website.
+    **Teams tab:** always opens the list of your teams (invitations, your
+    teams, find and start one), even when you're on exactly one; the
+    redesign's shortcut that opened your only team is gone (app
+    `TeamsTabTap` / `TeamsViewModel.single`, web `useSingleTeam`). A
+    team's page keeps its "All teams" back to the list. **Add to
+    calendar** adds the event to a calendar the person picks: the app
+    opens the phone's own new-event editor filled in (`add_2_calendar`:
+    iOS's event editor, which needs no calendar access from iOS 17 and
+    asks first on iOS 15–16; Android's calendar insert screen, no
+    permission), where they choose the calendar and save, and shares the
+    .ics file only where there's no editor (no calendar app, or the
+    plugin fails). The website's "Add to calendar" is a menu: **Google
+    Calendar** and **Outlook** open their new-event pages filled in, and
+    **Apple / other (.ics)** downloads the file. Both send the title,
+    start, end (an hour after the start without one), location and
+    notes; times are fixed instants shown in the person's own time zone
+    (events have no all-day form). On every event that offers it: team
+    events, My calendar and shared-calendar events. The subscription
+    feed (`/v1/ical/:token.ics`) is unchanged. Data:
+    `googleCalendarUrl`, `outlookCalendarUrl`, `calendarEventEnd` in
+    `@stall10/shared` (`calendar_links.ts`); app
+    `DeviceCalendarService` (`data/services/device_calendar_service.dart`)
+    and `Ics.endOf`. Tests: app `test/ui/add_to_calendar_test.dart`,
+    `test/ui/event_navigation_test.dart` ("with one team, the Teams tab
+    shows the list"); shared `calendar_links.test.ts`. The website's
+    side is checked by typecheck and by hand; the native editor only on
+    a device.
+
+38. Team page: stat tiles, roster lines, invites pending, More (F18,
+    F23, F28): [x] app; [x] website. **Stat tiles** (members, under the
+    header on the app, atop the feed on the website): "N going" to the
+    next event (its Going answers; opens it) and "N new in chat" (the
+    team's rooms the member can read with messages they haven't read,
+    rooms not messages; amber while any; opens Chat), from data the page
+    already reads (the app's shared room and read listeners; the
+    website's chat-page room queries and one `chatReads` doc). No
+    win–loss tile: results aren't kept anywhere cheap to read.
+    **Roster:** each player's row shows the linked member's role (a staff
+    tier as a tag/pill, custom roles after it). Once anyone has a line the
+    roster is grouped O-line, D-line, Both lines, Unassigned; a team's
+    admins (manageTeam) get "Edit lines" (O / D / Both on every row,
+    tapping the picked one clears it; Save lines / Cancel). Lines are a
+    roster spot's `line` (`o`, `d`, `both`), not a position and not a
+    stats game's lines; `PUT /v1/teams/:id/roster-lines` writes them
+    (teams only; every spot must exist); the rules let a client keep or
+    drop a line when it saves a spot, never set one, and the API's
+    `roster-players` save keeps it. It's in Download your data (roster
+    spots' `line`) and goes with the spot. **Invites pending** (those who
+    invite people: manageMembers, or the linked school or club's member
+    managers): who's invited and hasn't answered, with who invited them
+    and when, newest first, and Withdraw ("Withdraw the invite to …?");
+    neutral, not amber. `GET /v1/teams/:id/invites` finds them by
+    `teamId`, which invites now carry (rules allow it, only the team's
+    own); invites sent before that aren't listed. **More:** each row has
+    a line on what's there (Playbook "Plays and whiteboards", Videos
+    "Game film and highlights", Stats "Games, lines and player stats",
+    Tournaments "Events your team has entered", Meetings "Video calls
+    with the team"); a team's admins get "Manage team" ("Details,
+    sections and visibility", opens Settings) and everyone but the owner
+    "Leave team" at the bottom with the usual confirm (the owner is told
+    to make someone else the owner first). The website's More menu has
+    the same rows and Settings' own leave confirm; Leave also stays in
+    Settings, and in the header menu on the app, for pages with no
+    More. "Manage team" is for teams only: groups have no Settings
+    screen on the app (their admins use Edit community). Data:
+    `rosterLines`, `groupByLine`, `setRosterLinesRequestSchema`,
+    `PendingInvites`, `goingCount`, `newInChatDescription`,
+    `teamMoreSubtitles`, `manageRowLabel` in `@stall10/shared`; app
+    `RosterLine`, `groupByLine`, `teamMoreSubtitle`. Tests: app
+    `test/ui/team_page_slice_test.dart`, `test/domain/team_page_test.dart`;
+    API `roster_lines.test.ts`, `data_export.test.ts`,
+    `membership.test.ts`; shared `team_page.test.ts`; rules "a spot's
+    line is the API's" and "an invite may name its team". The website's
+    side is checked by typecheck and by hand.
+39. Polls in team rooms (F33): [x] app; [x] website. Anyone who can post
+    in a room picks "Poll" in the composer's attach menu (app: the +
+    menu; website: 📎): a question (up to 200 characters), 2–6 options
+    (up to 80 each, all different), "Allow multiple answers" and an
+    optional closing time (in the future). It posts a message carrying
+    `poll` (question, options, multiple, closesAt, votes, voterIds),
+    shown as a card: the question, "Pick one" / "Pick any", each option
+    with its count and bar (the viewer's picks in turf, ticked), the
+    number of votes, "Closes …" or "Poll closed", and an amber "Vote"
+    while it's open and the viewer hasn't voted. Anyone who can read the
+    room votes: click an option, again to take it back; a single-choice
+    poll swaps. "See votes" lists who picked each option by name: votes
+    aren't anonymous (they sit on the message every reader reads; an
+    anonymous mode would need a separate store, not built). Its author,
+    the owner and chat managers who can read the room close it early
+    ("Close poll", confirmed); a closed or past-closing poll takes no
+    votes. Deleting the message deletes the poll. The card listens to
+    its own message (older pages of a thread aren't live). The push says
+    "<name> posted a poll: <question>"; previews and reply quotes say
+    "📊 <question>"; votes don't push. API-only (`POST
+    /v1/teams/:id/chats/:room/polls`, `PUT .../messages/:id/vote` with
+    the whole choice, `[]` taking it back, `POST
+    .../messages/:id/close-poll`), each re-checking membership and room
+    access in a transaction; firestore.rules already keeps clients from
+    setting `poll` (message create lists its fields; updates may only
+    react), so no rules change. The app needs `API_BASE_URL` for them.
+    Votes are user data: Download your data has `pollVotes` (each poll
+    they voted in with their own picks) and the question and options of
+    polls they posted; deleting the account removes their votes from
+    their teams' rooms (`poll.votes.<uid>` and `poll.voterIds`, room by
+    room) and their own polls with their messages. Team rooms only, not
+    direct messages. Data: `createChatPollRequestSchema`,
+    `voteChatPollRequestSchema`, `chatPollTally`, `chatPollToggle`,
+    `chatPollClosed` and the limits in `@stall10/shared`
+    (`chat_extras.ts`); app `ChatPoll`. Tests: API
+    `test/chat_extras.test.ts` ("polls"), `data_export.test.ts`; shared
+    `chat_polls.test.ts`; functions `test/notifications/model.test.ts`,
+    `test/account/model.test.ts`; app `test/ui/chat_polls_test.dart`,
+    `test/data/chat_extras_api_test.dart`. The website's side is checked
+    by typecheck and by hand.
+40. Team feed: pinned posts, comments and the post box (F24): [x] app;
+    [x] website. **Pinned:** a team's admins (manageTeam, who post for it)
+    pin a post (app: the post's ⋯ menu "Pin to the top" / "Unpin";
+    website: Pin / Unpin beside Edit). Pinned posts come first in the
+    team feed, newest pin first, each with a "Pinned" label, then the rest
+    newest first; at most 3 a team: pinning a 4th asks which pin to take
+    down and swaps them in one write. A deleted post's pin goes with it.
+    Pinned posts load with their own query (orderBy `pinnedAt`, limit 3;
+    non-members add `public == true`), so an old pinned post still shows;
+    outsiders see only public pinned posts, and visitors' team page
+    (`GET /v1/public/teams/:id`) sends them first with `pinnedAt` (never
+    who pinned). Home's feeds stay newest first. **Comments:** each post on
+    the team page ends with "Comment" / "1 comment" / "N comments", for
+    members; it opens the thread (app: a sheet; website: under the post),
+    oldest first, the newest 100, with a box to add one (up to 1000
+    characters, trimmed). Members comment on any of the team's posts,
+    public or not; outsiders and visitors see neither the thread nor the
+    count. Its author or a team admin deletes a comment (confirmed); no
+    editing, likes, replies or pushes. The count is the post's
+    `commentCount`, kept by the `follows-teamPostCommentCount` function
+    (missing reads as 0, so posts read "Comment" until it runs);
+    `follows-teamPostDeleted` deletes a post's comments with it (by the
+    app, the API or its team). **Post box:** admins get a "Post to the
+    team…" box ("Post to the community…" for a community) at the top of
+    the posts, opening the existing editor (app: the New post dialog, in
+    place of the old New post buttons; website: the composer opens in
+    place). Data: `teams/{id}/posts/{postId}`: `pinnedAt`, `pinnedBy`,
+    `commentCount`; `.../comments/{id}` (`authorId`, `authorName`, `body`,
+    `createdAt`); `teams/{id}/feed/pins` (`ids`, server-only, for the
+    limit). `teamPostPinsMax`, `pinTeamPostRequestSchema`,
+    `teamPostCommentRequestSchema`, `teamPostCommentLimits`,
+    `arrangeTeamFeed`, `teamPostCommentLabel` in `@stall10/shared`
+    (`team_posts.ts`); the app's `arrangeTeamFeed`,
+    `teamPostCommentLabel`, `TeamPostComment` match. API-only (`PUT|DELETE
+    /v1/teams/:id/posts/:postId/pin` with `{unpin?}`, `POST
+    .../posts/:postId/comments`, `DELETE .../comments/:commentId`), so
+    the app needs `API_BASE_URL` to pin or comment (it still reads
+    them). Rules: the post's key lists leave out the three fields;
+    members get and list comments (`capped(100)`), no client writes
+    them. Index: posts `public` + `pinnedAt` desc. Account deletion and
+    Download your data cover comments (collection group `comments`).
+    **Audience picker (F8), checked:** both platforms' Home box posts to
+    Everyone or a team the member manages ("To" chip); a team post is
+    members-only unless Public (no Public for a private group). There's
+    no Followers choice on either: not built (redesign-plan "Waiting for
+    you"). Tests: API `test/team_post_extras.test.ts`, `browse.test.ts`
+    (pinned first); shared `team_posts.test.ts`; rules "team post pins
+    and comments"; app `test/ui/team_feed_extras_test.dart`,
+    `team_home_test.dart` (the box). The website's side is checked by
+    typecheck and by hand.
+41. Role presets and per-person permissions (F25): [x] app; [x] website.
+    The owner opens a member's permissions (app: the member's menu in
+    Members, "Permissions"; website: Settings › Roles, the "Permissions"
+    column's Edit) and picks a preset in one tap: Member (none), Stat
+    keeper (Keep stats), Captain (Manage chats, Manage events, Moderate,
+    Keep stats), Coach (Manage team, Manage members, Manage events, Keep
+    stats) or Admin (all); a group's are Member, Moderator, Organizer and
+    Admin (no Keep stats). Below, a switch per permission with its
+    one-line description; a mix no preset matches reads "Custom".
+    Permissions a custom role already gives show on and locked, naming
+    the role. The member's row shows "Player · <preset or Custom>".
+    Only the owner, never on themselves (the owner has everything) nor
+    on a legacy coach or captain (make them a player first). Data:
+    `memberGrants.{uid}` on the team doc, API-only (`PUT
+    /v1/teams/:id/members/:uid/permissions` `{perms}`); `memberPerms` (what
+    the rules, the API, the functions and both apps check) is the union
+    of the person's roles' permissions and their own, recomputed by every
+    writer (roles save, Discord import, the communities mirror); Keep
+    stats also keeps `statKeepers` in step. Removing a member drops their
+    grants (the rule requires it). No client writes `memberGrants`, so
+    nobody grants themselves anything. `teamRolePresets`,
+    `groupRolePresets`, `presetMatching`, `cleanMemberGrants`,
+    `memberPermsFor` (with grants), `setMemberPermissionsRequestSchema`
+    in `@stall10/shared` (`membership.ts`); the app's `RolePreset`,
+    `memberPermsFor` match (fixtures `team_roles.json`,
+    `role_presets.json`). Download your data lists them with the
+    person's permissions. Tests: API `test/membership.test.ts`
+    ("per-person permissions"); shared `role_presets.test.ts`; rules
+    "custom roles" (memberGrants); functions
+    `test/communities/model.test.ts`; app `test/ui/member_permissions_test.dart`,
+    `test/domain/team_role_test.dart`, `test/data/shared_fixtures_test.dart`.
+    The website's side is checked by typecheck and by hand.
+42. Team join requests (F26): [x] app; [x] website. A team's admins
+    (Manage team) turn on "Allow join requests" in Settings › Visibility
+    (off by default; not on a league's team; groups keep "Approve who
+    joins"). Turning it off asks first and declines everyone waiting.
+    While on, a signed-in outsider sees "Request to join" on the team's
+    page (app: a card with Request to join / Cancel request and Use a
+    code; website: the banner's button, "Requested" with Cancel, and
+    "Ask to join, or have a code?"). Member managers see the requests
+    (app: Members tab and Home's Needs you; website: the invite dialog's
+    Requests pane and Home's Needs you) and Approve or Decline; the
+    requester can cancel. Approval runs the same server checks as any
+    join: already a member, the flood mute and, for a club team, the age
+    rule (16+, birth date needed), checked at the request too. A new
+    request pushes to the owner, coaches, captains and Manage members
+    holders (groups too); approval pushes "You're in: <team>" to the
+    requester. Data: `allowJoinRequests: true` on the team doc and its
+    listing (removed when off), via `PUT
+    /v1/teams/:id/allow-join-requests` `{on}`;
+    `teams/{id}/joinRequests/{uid}` (`name`, `createdAt`), written for
+    teams only by the API (the rules' create and approve stay
+    group-only); the asker and member managers read and delete it.
+    Account deletion deletes the person's requests and Download your
+    data lists them (`joinRequests`). `allowsJoinRequests`,
+    `takesJoinRequests`, `allowJoinRequestsDescription`,
+    `setAllowJoinRequestsRequestSchema` in `@stall10/shared` (`team.ts`);
+    the app's `TeamListing.takesRequests` matches (fixture
+    `team_listing.json`). Tests: API `test/membership.test.ts` ("allow
+    join requests", "team join requests", club age "join requests"),
+    `data_export.test.ts`; shared `join_requests.test.ts`; rules "team
+    join requests (allowJoinRequests)"; functions
+    `test/notifications/model.test.ts` ("join requests"); app
+    `test/ui/team_join_requests_test.dart`. The website's side is checked
+    by typecheck and by hand.
+43. Discord import: pick channels (F15): [x] app; [x] website. After
+    Preview, a "Pick channels" list shows the template's text channels
+    grouped by category as Discord lists them (no category first), each
+    with a box, a box per category (all / some / none of its channels)
+    and All / None; everything starts ticked and a new preview starts
+    over. Only ticked channels become rooms; roles all come across. A
+    category whose channels are all unticked isn't made (one with no
+    channels in the template still is, as before). In a community with
+    teams, "Where rooms go" lists only the ticked rooms, keeps a choice
+    made for a room while it's unticked, and an unticked room never goes
+    to a team or moves out of the community chat. No API or data change:
+    the client cuts the plan down before mapping it (app: writes as
+    before; website: sends the cut-down plan, with destinations by its
+    room indexes, to `POST /v1/teams/:id/discord/import`, which checks
+    it as any plan). `channelGroups`, `allChannels`, `pickRooms`,
+    `pickedDestinations` in `@stall10/shared` (`discord.ts`); the app's
+    `ChannelGroup.of`, `PickedPlan.of` match (fixture
+    `discord/pick.json`). Tests: shared `discord.test.ts` ("picking
+    channels"), `discord_fixtures.test.ts`; app
+    `test/ui/discord_import_test.dart`,
+    `test/shared_fixtures/discord_fixtures_test.dart`. The website's side
+    is checked by typecheck and by hand.
+
+44. Community page (F27): [x] app; [x] website. A pickup community's or
+    a school or club's page (not a team's) leads with its next event
+    (the first one the viewer can see that isn't over): "Next pickup"
+    ("Next event" for a school or club) with the date tile, title, time,
+    place and "N going", and Going / Maybe / Can't go with counts (the
+    event screen's control; the same `setRsvp` / `PUT
+    .../events/:id/rsvp` path and rules as the schedule; picking the
+    current answer takes it back, and its note with it) and an amber "RSVP
+    needed" while the member hasn't answered. Tapping it opens the event.
+    It takes the dark Up next card's place; Coming up lists the events
+    after it (and hides when there are none). With nothing ahead, members
+    see a quiet "No pickup scheduled" ("No events scheduled"), with New
+    event for those who manage events (app: the event editor; website:
+    the schedule's editor via `?new=event`). Outsiders of a group that
+    isn't private see the public event (no answers, no count) with "Join
+    the community to RSVP." and Join (the page's join path, so the
+    separate join card goes while it shows; a group that approves members
+    is private to outsiders, so they never see the card);
+    with no public event ahead they keep the join card; signed-out
+    visitors on the website get "Log in to join". A private group shows
+    outsiders nothing new. **Chat rooms** (members): the rooms they can read,
+    unread ones first (newest first) with an amber dot, then the rest in
+    order, up to 5, each opening its room; "All chat" (with "+N" when
+    more) opens Chat. From the listeners the stat tiles already use (the
+    website's tiles and section now share one `useTeamChatRooms`).
+    **Organizers** (members): the owner, then anyone with a coach or
+    captain tier, or Manage team, members or events from their roles or
+    their own switches (F25), by name, labelled Owner, by tier, or by the
+    group preset their permissions match (Admin, Organizer), else
+    Organizer; chat moderators alone aren't listed. Initials avatars (the
+    team doc has names only) and Message for everyone but the viewer
+    (the profile's direct-message flow: `openConversation` / `POST
+    /v1/conversations`). The stat tiles stay. No new data, API or rules.
+    Data: `chatSectionRooms`, `chatSectionMax`, `communityOrganizers`,
+    `organizerPermissions`, `nextEventCardText` in `@stall10/shared`
+    (`team_page.ts`); the app's twins in `team_page.dart`. Tests: shared
+    `team_page.test.ts` ("community page"); app
+    `test/ui/community_page_test.dart`, `test/domain/team_page_test.dart`.
+    The website's side is checked by typecheck and by hand.
 Out of scope: payments, meeting recording, USA Ultimate data.
 
 Libraries the website may add (none today): a small data cache for API

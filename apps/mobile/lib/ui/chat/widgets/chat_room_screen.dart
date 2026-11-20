@@ -14,6 +14,7 @@ import '../view_models/chat_list_viewmodel.dart';
 import '../view_models/chat_room_viewmodel.dart';
 import '../view_models/voice_channel_viewmodel.dart';
 import 'chat_extras.dart';
+import 'chat_polls.dart';
 import 'chat_layout.dart';
 import 'chat_tab.dart';
 import 'message_thread_view.dart';
@@ -236,9 +237,9 @@ class ChatRoomView extends StatelessWidget {
 
 enum _RoomAction { mute, settings }
 
-/// A text room's thread, with its pins (redesign F2) and event cards (F3):
-/// the pinned strip on top, Pin in each message's long-press sheet for
-/// chat managers, and Share an event in the attach menu.
+/// A text room's thread, with its pins (redesign F2), event cards (F3) and
+/// polls (F33): the pinned strip on top, Pin in each message's long-press
+/// sheet for chat managers, and Share an event and Poll in the attach menu.
 class _RoomThread extends StatefulWidget {
   const _RoomThread({required this.viewModel, required this.handle});
 
@@ -296,9 +297,11 @@ class _RoomThreadState extends State<_RoomThread> {
     header: PinnedStrip(viewModel: vm),
     isPinned: vm.isPinned,
     eventCard: (_, ChatEventRef e) => ChatEventCard(teamId: vm.teamId, ref: e),
+    pollCard: (m, _) => ChatPollCard(room: vm, message: m),
     onTogglePin: vm.canPin ? vm.togglePin.execute : null,
     onShareEvent: vm.canShareEvents
         ? () => showShareEventSheet(context, vm)
         : null,
+    onCreatePoll: vm.canPoll ? () => showCreatePollSheet(context, vm) : null,
   );
 }

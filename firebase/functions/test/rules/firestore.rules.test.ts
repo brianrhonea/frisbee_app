@@ -446,6 +446,11 @@ describe("team invites", () => {
     await assertFails(setDoc(doc(db(CAPTAIN), ...invitePath()), { ...invite(), teamName: "Other" }));
   });
 
+  it("an invite may name its team (so admins can list who's invited), but only its own", async () => {
+    await assertSucceeds(setDoc(doc(db(CAPTAIN), ...invitePath()), { ...invite(), teamId: TEAM }));
+    await assertFails(setDoc(doc(db(CAPTAIN), ...invitePath()), { ...invite(), teamId: "other" }));
+  });
+
   it("a community's member managers invite to the teams it accepted", async () => {
     const BOSS = "boss";
     const FAN = "fan";
@@ -1180,6 +1185,24 @@ describe("roster and plays", () => {
     await assertSucceeds(updateDoc(spot(PLAYER, "r1"), { userId: PLAYER }));
     await assertSucceeds(updateDoc(spot(PLAYER, "r1"), { userId: null }));
   });
+
+  it("a spot's line is the API's: editing keeps it, no client sets or changes it", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "roster", "r1"), { name: "Sam", number: 7, position: "handler", userId: null, line: "o" }),
+    );
+    const ref = (uid: string, id = "r1") => doc(db(uid), "teams", TEAM, "roster", id);
+    const spot = { name: "Sam B", number: 8, position: "cutter", userId: null };
+    // Editing the player keeps their line (or, from an older app, drops it).
+    await assertSucceeds(setDoc(ref(COACH), { ...spot, line: "o" }));
+    await assertSucceeds(updateDoc(ref(PLAYER), { userId: PLAYER }));
+    await assertSucceeds(updateDoc(ref(PLAYER), { userId: null }));
+    await assertFails(setDoc(ref(COACH), { ...spot, line: "d" }));
+    await assertFails(updateDoc(ref(COACH), { line: "both" }));
+    await assertFails(updateDoc(ref(PLAYER), { line: "d" }));
+    await assertFails(setDoc(ref(COACH, "r9"), { ...spot, line: "o" }));
+    await assertSucceeds(setDoc(ref(COACH), spot));
+    await assertFails(updateDoc(ref(COACH), { line: "o" }));
+  });
 });
 
 describe("roster status", () => {
@@ -1688,6 +1711,35 @@ describe("videos", () => {
     await assertFails(deleteDoc(ref(PLAYER)));
     await assertSucceeds(deleteDoc(ref(CAPTAIN)));
   });
+
+  it("only the API tags a video to an event (F6)", async () => {
+    await seed();
+    await assertFails(updateDoc(ref(COACH), { eventId: "e1", updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref(COACH, "v2"), video(COACH, { eventId: "e1" })));
+  });
+
+  it("members read notes and comments; only the API writes them; editors clear them (F4, F5)", async () => {
+    await seed();
+    const c = (uid: string, id = "c1") => doc(db(uid), "teams", TEAM, "videos", "v1", "comments", id);
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "videos", "v1", "comments", "c1"), {
+        authorId: PLAYER,
+        authorName: "P",
+        body: "Watch the mark",
+        atMs: 83000,
+        createdAt: new Date(),
+      }),
+    );
+    await assertSucceeds(getDoc(c(PLAYER)));
+    await assertSucceeds(getDocs(collection(db(PLAYER), "teams", TEAM, "videos", "v1", "comments")));
+    await assertFails(getDoc(c(OUTSIDER)));
+    await assertFails(getDocs(collection(db(OUTSIDER), "teams", TEAM, "videos", "v1", "comments")));
+    await assertFails(setDoc(c(PLAYER, "c2"), { authorId: PLAYER, authorName: "P", body: "Hi", createdAt: serverTimestamp() }));
+    await assertFails(updateDoc(c(PLAYER), { body: "Edited" }));
+    // The author deletes through the API; editors may here, to clear a removed video's.
+    await assertFails(deleteDoc(c(PLAYER)));
+    await assertSucceeds(deleteDoc(c(CAPTAIN)));
+  });
 });
 
 describe("video folders", () => {
@@ -1842,6 +1894,59 @@ describe("public team page switch (publicPage)", () => {
     await turnOff();
     await assertFails(setDoc(doc(db(COACH), "teamDirectory", TEAM), listing()));
     await assertSucceeds(setDoc(doc(db(COACH), "teamDirectory", TEAM), listing({ publicPage: false })));
+  });
+});
+
+// F26: teams that allow join requests take them through the API only.
+describe("team join requests (allowJoinRequests)", () => {
+  const listing = (extra: Record<string, unknown> = {}) => ({
+    name: "Team",
+    division: "mixed",
+    level: "college",
+    city: "",
+    keywords: ["t", "te", "tea", "team"],
+    ...extra,
+  });
+  const turnOn = () =>
+    env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), "teams", TEAM), { allowJoinRequests: true }));
+  const request = (uid: string, who = OUTSIDER) => doc(db(uid), "teams", TEAM, "joinRequests", who);
+
+  it("only the API switches it: no member writes it on the team doc", async () => {
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { allowJoinRequests: true }));
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { name: "Team", level: "college", city: "", allowJoinRequests: true }));
+  });
+
+  it("the listing says what the team doc says", async () => {
+    await assertFails(setDoc(doc(db(COACH), "teamDirectory", TEAM), listing({ allowJoinRequests: true })));
+    await turnOn();
+    await assertFails(setDoc(doc(db(COACH), "teamDirectory", TEAM), listing()));
+    await assertSucceeds(setDoc(doc(db(COACH), "teamDirectory", TEAM), listing({ allowJoinRequests: true })));
+  });
+
+  it("no client asks to join a team, even with requests on (the API checks club ages)", async () => {
+    await turnOn();
+    await assertFails(setDoc(request(OUTSIDER), { name: "N", createdAt: serverTimestamp() }));
+  });
+
+  it("no client approves a team's request; the asker and member managers read and delete it", async () => {
+    await turnOn();
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), "teams", TEAM, "joinRequests", OUTSIDER), { name: "N" }),
+    );
+    const coach = db(COACH);
+    const batch = writeBatch(coach);
+    batch.update(doc(coach, "teams", TEAM), {
+      [`members.${OUTSIDER}`]: "player",
+      memberIds: arrayUnion(OUTSIDER),
+      [`memberNames.${OUTSIDER}`]: "N",
+    });
+    batch.delete(doc(coach, "teams", TEAM, "joinRequests", OUTSIDER));
+    await assertFails(batch.commit());
+    await assertSucceeds(getDoc(request(OUTSIDER)));
+    await assertSucceeds(getDocs(collection(db(COACH), "teams", TEAM, "joinRequests")));
+    await assertFails(getDocs(collection(db(PLAYER), "teams", TEAM, "joinRequests")));
+    await assertFails(deleteDoc(request(PLAYER)));
+    await assertSucceeds(deleteDoc(request(OUTSIDER)));
   });
 });
 
@@ -2313,6 +2418,42 @@ describe("custom roles", () => {
     // Coaches can't remove someone who holds permissions.
     await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), removal(STATS)));
     await assertSucceeds(updateDoc(doc(db(OWNER), "teams", TEAM), removal(STATS)));
+  });
+
+  // F25: a member's own permissions (memberGrants) are the API's
+  // (setMemberPermissions, owner only), never a client's.
+  it("no client writes memberGrants, not even the owner, and nobody grants themself", async () => {
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), { [`memberGrants.${PLAYER}`]: ["manageTeam"] }));
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), {
+      [`memberGrants.${PLAYER}`]: ["manageTeam"], [`memberPerms.${PLAYER}`]: ["manageTeam"],
+    }));
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), { [`memberPerms.${PLAYER}`]: ["manageTeam"] }));
+    await assertFails(updateDoc(doc(db(COACH), "teams", TEAM), { [`memberGrants.${PLAYER}`]: ["moderate"] }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { [`memberGrants.${PLAYER}`]: ["moderate"] }));
+    await assertFails(updateDoc(doc(db(OWNER), "teams", TEAM), { ...assign({}, {}), memberGrants: { [PLAYER]: ["moderate"] } }));
+  });
+
+  it("removing a member takes their own permissions too, so rejoining brings none back", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), "teams", TEAM), {
+        memberGrants: { [PLAYER]: ["moderate"] },
+        memberPerms: { [PLAYER]: ["moderate"] },
+      });
+    });
+    const base = {
+      [`members.${PLAYER}`]: deleteField(),
+      [`memberNames.${PLAYER}`]: deleteField(),
+      memberIds: arrayRemove(PLAYER),
+      statKeepers: arrayRemove(PLAYER),
+      [`memberRoles.${PLAYER}`]: deleteField(),
+      [`memberPerms.${PLAYER}`]: deleteField(),
+    };
+    // Leaving the grant behind isn't allowed, nor touching someone else's.
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), base));
+    await assertFails(updateDoc(doc(db(PLAYER), "teams", TEAM), {
+      ...base, [`memberGrants.${PLAYER}`]: deleteField(), [`memberGrants.${STATS}`]: ["manageTeam"],
+    }));
+    await assertSucceeds(updateDoc(doc(db(PLAYER), "teams", TEAM), { ...base, [`memberGrants.${PLAYER}`]: deleteField() }));
   });
 });
 
@@ -3470,6 +3611,69 @@ describe("user posts", () => {
     });
     await assertSucceeds(setDoc(doc(db(COACH), "teams", TEAM, "posts", "a"), teamPost(`tournament_${TEAM}_t1`)));
     await assertFails(setDoc(doc(db(COACH), "teams", TEAM, "posts", "b"), teamPost("tournament_other_t1")));
+  });
+});
+
+// Redesign F24: pinned team posts and comments on them are the API's.
+describe("team post pins and comments", () => {
+  const ref = (uid: string, id = "tp1") => doc(db(uid), "teams", TEAM, "posts", id);
+  const teamPost = (extra: Record<string, unknown> = {}) => ({
+    title: "",
+    body: "Practice moved",
+    public: false,
+    authorId: COACH,
+    authorName: "C",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const comments = (uid: string) => collection(db(uid), "teams", TEAM, "posts", "tp1", "comments");
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, "teams", TEAM, "posts", "tp1"), { ...teamPost(), createdAt: new Date(), updatedAt: new Date(), commentCount: 1 });
+      await setDoc(doc(fs, "teams", TEAM, "posts", "tp1", "comments", "c1"), {
+        authorId: PLAYER,
+        authorName: "P",
+        body: "See you there",
+        createdAt: new Date(),
+      });
+    });
+  });
+
+  it("only the API pins a post or counts its comments", async () => {
+    await assertFails(setDoc(ref(COACH, "tp2"), teamPost({ pinnedAt: serverTimestamp(), pinnedBy: COACH })));
+    await assertFails(setDoc(ref(COACH, "tp3"), teamPost({ commentCount: 0 })));
+    await assertFails(updateDoc(ref(COACH), { pinnedAt: serverTimestamp(), pinnedBy: COACH }));
+    await assertFails(updateDoc(ref(COACH), { commentCount: 5 }));
+    // Editing the post keeps working, and keeps the API's fields.
+    await assertSucceeds(updateDoc(ref(COACH), { body: "Practice moved to 6", updatedAt: serverTimestamp() }));
+    // Nobody reads or writes the API's pin list.
+    await assertFails(getDoc(doc(db(OWNER), "teams", TEAM, "feed", "pins")));
+    await assertFails(setDoc(doc(db(OWNER), "teams", TEAM, "feed", "pins"), { ids: ["tp1"] }));
+  });
+
+  it("members list pinned posts", async () => {
+    const pinned = (uid: string) => query(collection(db(uid), "teams", TEAM, "posts"), orderBy("pinnedAt", "desc"), limit(3));
+    await assertSucceeds(getDocs(pinned(PLAYER)));
+    await assertFails(getDocs(pinned(OUTSIDER)));
+    const publicPinned = query(collection(db(OUTSIDER), "teams", TEAM, "posts"), where("public", "==", true), orderBy("pinnedAt", "desc"), limit(3));
+    await assertSucceeds(getDocs(publicPinned));
+  });
+
+  it("members read comments, 100 at a time; no client writes them", async () => {
+    const c = (uid: string, id = "c1") => doc(db(uid), "teams", TEAM, "posts", "tp1", "comments", id);
+    await assertSucceeds(getDoc(c(PLAYER)));
+    await assertSucceeds(getDocs(query(comments(PLAYER), orderBy("createdAt", "desc"), limit(100))));
+    await assertFails(getDocs(query(comments(PLAYER), orderBy("createdAt", "desc"), limit(101))));
+    await assertFails(getDocs(comments(PLAYER)));
+    await assertFails(getDoc(c(OUTSIDER)));
+    await assertFails(getDocs(query(comments(OUTSIDER), limit(10))));
+    await assertFails(setDoc(c(PLAYER, "c2"), { authorId: PLAYER, authorName: "P", body: "Hi", createdAt: serverTimestamp() }));
+    await assertFails(updateDoc(c(PLAYER), { body: "Edited" }));
+    await assertFails(deleteDoc(c(PLAYER)));
+    await assertFails(deleteDoc(c(OWNER)));
   });
 });
 

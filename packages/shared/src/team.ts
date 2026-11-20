@@ -121,6 +121,39 @@ export const publicPageDescription =
 export const setPublicPageRequestSchema = z.strictObject({ public: z.boolean() });
 export type SetPublicPageRequest = z.input<typeof setPublicPageRequestSchema>;
 
+/** The team or listing fields join requests go by. */
+type JoinRequestFields = { kind?: unknown; requiresApproval?: unknown; allowJoinRequests?: unknown };
+
+/**
+ * A team's "Allow join requests" switch (F26; `allowJoinRequests` on the
+ * team doc and its directory listing, Team.allowJoinRequests in the app).
+ * Off unless stored as true: a team takes members by invite only until its
+ * admins (manageTeam) turn it on. Teams only (not a league's team); groups
+ * use requiresApproval.
+ */
+export function allowsJoinRequests(team: JoinRequestFields | null | undefined): boolean {
+  const t = team ?? {};
+  return (t.kind === undefined || t.kind === "team") && t.allowJoinRequests === true;
+}
+
+/**
+ * Whether signed-in outsiders may ask to join: a group that approves who
+ * joins, or a team with join requests allowed (TeamListing.takesRequests).
+ */
+export function takesJoinRequests(team: JoinRequestFields | null | undefined): boolean {
+  const t = team ?? {};
+  const group = t.kind === "community" || t.kind === "organization";
+  return group ? t.requiresApproval === true : allowsJoinRequests(t);
+}
+
+/** What the switch does, as both apps say it (allowJoinRequestsDescription in team_settings_screen.dart). */
+export const allowJoinRequestsDescription =
+  "People who find the team can ask to join from its page. Admins who manage members approve or decline each request; club teams still need players to be 16 or over.";
+
+/** Body of `PUT /v1/teams/:id/allow-join-requests` (manageTeam admins). */
+export const setAllowJoinRequestsRequestSchema = z.strictObject({ on: z.boolean() });
+export type SetAllowJoinRequestsRequest = z.input<typeof setAllowJoinRequestsRequestSchema>;
+
 export type CreateTeamRequest = z.input<typeof createTeamRequestSchema>;
 export type CreateTeamInput = z.output<typeof createTeamRequestSchema>;
 

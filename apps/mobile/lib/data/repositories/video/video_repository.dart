@@ -1,5 +1,6 @@
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/team_video.dart';
+import '../../../domain/models/video_comment.dart';
 import '../../../domain/models/video_folder.dart';
 import '../../../utils/result.dart';
 
@@ -37,7 +38,8 @@ abstract class VideoRepository {
   /// never stored: Storage download URLs work for anyone who has them.
   Future<Result<String>> fileUrl(VideoFile file);
 
-  /// Removes the video, and its file if it was uploaded.
+  /// Removes the video, its notes and comments, and its file if it was
+  /// uploaded.
   Future<Result<void>> deleteVideo(String teamId, String videoId);
 
   /// Files the video in [folderId]; empty to unsort it.
@@ -56,4 +58,37 @@ abstract class VideoRepository {
 
   /// Deletes the folder; its videos become unsorted, not deleted.
   Future<Result<void>> deleteFolder(String teamId, String folderId);
+
+  // Notes, comments and event tags (redesign F4-F6): written through the API.
+
+  /// Whether this build can add notes and comments and tag events: they
+  /// go through the API, so not without `API_BASE_URL`.
+  bool get canUseVideoExtras;
+
+  /// The video's notes, clips and comments (at most
+  /// `videoCommentLimits.list`, newest kept). Members only.
+  Stream<List<VideoComment>> watchComments(String teamId, String videoId);
+
+  /// Adds a comment, a note at [atMs], or a clip from [atMs] to [endMs].
+  Future<Result<void>> addComment(
+    String teamId,
+    String videoId, {
+    required String body,
+    int? atMs,
+    int? endMs,
+  });
+
+  /// Its author, or someone who manages the team, deletes it.
+  Future<Result<void>> deleteComment(
+    String teamId,
+    String videoId,
+    String commentId,
+  );
+
+  /// Tags the video to one of the team's events; null untags it. Managers
+  /// only.
+  Future<Result<void>> tagEvent(String teamId, String videoId, String? eventId);
+
+  /// The team's videos tagged to [eventId], newest first. Members only.
+  Stream<List<TeamVideo>> watchEventVideos(String teamId, String eventId);
 }

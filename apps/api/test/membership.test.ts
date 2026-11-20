@@ -174,11 +174,15 @@ describe("join requests", () => {
     expect(s.store.doc(R)).toBeUndefined();
   });
 
-  it("only for a group that needs approval", async () => {
+  it("only for a group that needs approval, or a team that allows requests", async () => {
     s.store.put(T, group({ requiresApproval: false }));
     expect((await s.call("POST", "/v1/teams/t1/join-requests", "new", {})).statusCode).toBe(412);
     s.store.put(T, seedTeam());
     expect((await s.call("POST", "/v1/teams/t1/join-requests", "new", {})).statusCode).toBe(412);
+    s.store.put(T, seedTeam({ allowJoinRequests: true, leagueId: "lg1" }));
+    expect((await s.call("POST", "/v1/teams/t1/join-requests", "new", {})).statusCode).toBe(412);
+    s.store.put(T, seedTeam({ allowJoinRequests: true }));
+    expect((await s.call("POST", "/v1/teams/t1/join-requests", "new", {})).statusCode).toBe(200);
   });
 
   it("not from a member", async () => {
@@ -215,10 +219,11 @@ describe("join requests", () => {
     expect((await s.call("POST", "/v1/teams/t1/join-requests/new/approve", "owner", {})).statusCode).toBe(404);
   });
 
-  it("approving is for groups only", async () => {
+  it("a team that doesn't allow requests can't approve one", async () => {
     s.store.put(T, seedTeam());
     s.store.put(R, { name: "Nia" });
     expect((await s.call("POST", "/v1/teams/t1/join-requests/new/approve", "owner", {})).statusCode).toBe(412);
+    expect(team().memberIds).not.toContain("new");
   });
 
   it("the asker withdraws; a manager declines; nobody else", async () => {
@@ -241,6 +246,7 @@ describe("invites (teamInvites, acceptInvite)", () => {
     s.users.records.set("mgr", { name: "Max Real" });
     expect((await s.call("POST", "/v1/teams/t1/invites", "mgr", { uid: "new" })).statusCode).toBe(200);
     expect(s.store.doc(I)).toEqual({
+      teamId: "t1",
       teamName: "The Haze",
       kind: "team",
       invitedBy: "mgr",
@@ -489,6 +495,65 @@ describe("custom roles (setRoles)", () => {
   });
 });
 
+describe("per-person permissions (setMemberPermissions, API only)", () => {
+  beforeEach(() => s.store.put(T, seedTeam()));
+  const set = (who: string, by: string, perms: string[]) => s.call("PUT", `/v1/teams/t1/members/${who}/permissions`, by, { perms });
+
+  it("the owner gives a player a preset's permissions; memberPerms adds them to their roles'", async () => {
+    expect((await set("mgr", "owner", ["moderate", "manageChats", "manageEvents", "keepStats"])).statusCode).toBe(200);
+    const t = team();
+    expect(t.memberGrants).toEqual({ mgr: ["manageChats", "manageEvents", "moderate", "keepStats"] });
+    expect(t.memberPerms).toEqual({ mgr: ["manageMembers", "manageChats", "manageEvents", "moderate", "keepStats"] });
+  });
+
+  it("a role save keeps them", async () => {
+    await set("p1", "owner", ["manageEvents"]);
+    await s.call("PUT", "/v1/teams/t1/roles", "owner", { roles: { r1: { name: "Manager", perms: ["manageMembers"] } }, memberRoles: {} });
+    expect(team().memberGrants).toEqual({ p1: ["manageEvents"] });
+    expect(team().memberPerms).toEqual({ p1: ["manageEvents"] });
+  });
+
+  it("[] takes them away, and turning Keep stats off ends stats access too", async () => {
+    await set("p1", "owner", ["moderate"]);
+    expect(team().statKeepers).toEqual([]);
+    await set("p1", "owner", []);
+    expect(team().memberGrants).toEqual({});
+    expect(team().memberPerms).toEqual({ mgr: ["manageMembers"] });
+  });
+
+  it("only the owner: not a coach, nor someone with manageMembers, nor for themself", async () => {
+    expect((await set("p1", "coach", ["moderate"])).statusCode).toBe(403);
+    expect((await set("p1", "mgr", ["moderate"])).statusCode).toBe(403);
+    expect((await set("mgr", "mgr", ["manageTeam"])).statusCode).toBe(403);
+    expect(team().memberGrants).toBeUndefined();
+  });
+
+  it("never the owner's own, nor a legacy coach's", async () => {
+    expect((await set("owner", "owner", [])).statusCode).toBe(412);
+    expect((await set("coach", "owner", [])).statusCode).toBe(412);
+  });
+
+  it("known permissions only; groups keep no stats; members only", async () => {
+    expect((await set("p1", "owner", ["owner"])).statusCode).toBe(400);
+    expect((await set("ghost", "owner", ["moderate"])).statusCode).toBe(404);
+    s.store.put(T, group());
+    expect((await set("p1", "owner", ["keepStats"])).statusCode).toBe(400);
+    expect((await set("p1", "owner", ["moderate"])).statusCode).toBe(200);
+  });
+
+  it("go when the member leaves, so rejoining doesn't bring them back", async () => {
+    await set("p1", "owner", ["manageTeam"]);
+    expect((await s.call("DELETE", "/v1/teams/t1/members/p1", "p1")).statusCode).toBe(200);
+    expect(team().memberGrants).toEqual({});
+    expect(team().memberPerms).not.toHaveProperty("p1");
+  });
+
+  it("a manageMembers admin can't remove someone who has their own permissions", async () => {
+    await set("p1", "owner", ["moderate"]);
+    expect((await s.call("DELETE", "/v1/teams/t1/members/p1", "mgr")).statusCode).toBe(403);
+  });
+});
+
 describe("edit details (editDetails) and the listing", () => {
   const edit = (body: object, by = "owner") => s.call("PATCH", "/v1/teams/t1", by, body);
 
@@ -639,6 +704,85 @@ describe("public team page (setPublicPage)", () => {
 
   it("a missing team is not found", async () => {
     expect((await put({ public: false })).statusCode).toBe(404);
+  });
+});
+
+describe("allow join requests (setAllowJoinRequests, F26)", () => {
+  const put = (body: object, by = "owner") => s.call("PUT", "/v1/teams/t1/allow-join-requests", by, body);
+  const listing = () => s.store.doc("teamDirectory/t1")!;
+
+  it("off by default; an admin turns it on and off, the listing with it", async () => {
+    s.store.put(T, seedTeam());
+    expect((await put({ on: true }, "coach")).statusCode).toBe(200);
+    expect(team().allowJoinRequests).toBe(true);
+    expect(listing()).toMatchObject({ name: "The Haze", allowJoinRequests: true });
+    s.store.put("teams/t1/joinRequests/a", { name: "A" });
+    s.store.put("teams/t1/joinRequests/b", { name: "B" });
+    expect((await put({ on: false })).statusCode).toBe(200);
+    expect("allowJoinRequests" in team()).toBe(false);
+    expect("allowJoinRequests" in listing()).toBe(false);
+    // Off declines the requests waiting.
+    expect(s.store.doc("teams/t1/joinRequests/a")).toBeUndefined();
+    expect(s.store.doc("teams/t1/joinRequests/b")).toBeUndefined();
+  });
+
+  it("manageTeam only: not manageMembers, players or outsiders", async () => {
+    s.store.put(T, seedTeam({ memberPerms: { mgr: ["manageMembers"], p1: ["manageTeam"] } }));
+    expect((await put({ on: true }, "p1")).statusCode).toBe(200);
+    for (const by of ["mgr", "old", "stranger"]) expect((await put({ on: false }, by)).statusCode).toBe(403);
+    expect(team().allowJoinRequests).toBe(true);
+  });
+
+  it("teams only: not groups (they approve who joins) nor a league's team; a boolean", async () => {
+    s.store.put(T, group());
+    expect((await put({ on: true })).statusCode).toBe(412);
+    s.store.put(T, seedTeam({ leagueId: "lg1" }));
+    expect((await put({ on: true })).statusCode).toBe(412);
+    s.store.put(T, seedTeam());
+    expect((await put({ on: "yes" })).statusCode).toBe(400);
+  });
+
+  it("editing the details keeps it in the listing", async () => {
+    s.store.put(T, seedTeam({ allowJoinRequests: true }));
+    expect((await s.call("PATCH", "/v1/teams/t1", "owner", { name: "The Haze", level: "club", city: "Dallas" })).statusCode).toBe(200);
+    expect(listing()).toMatchObject({ city: "Dallas", allowJoinRequests: true });
+  });
+});
+
+describe("team join requests (F26)", () => {
+  beforeEach(() => s.store.put(T, seedTeam({ allowJoinRequests: true, level: "college" })));
+  const R = "teams/t1/joinRequests/new";
+
+  it("a signed-in outsider asks; a manageMembers admin approves as a player", async () => {
+    s.users.records.set("new", { name: "Nia" });
+    expect((await s.call("POST", "/v1/teams/t1/join-requests", "new", {})).statusCode).toBe(200);
+    expect(s.store.doc(R)).toEqual({ name: "Nia", createdAt: new Date(now) });
+    expect((await s.call("POST", "/v1/teams/t1/join-requests/new/approve", "mgr", {})).statusCode).toBe(200);
+    expect(team().members).toMatchObject({ new: "player" });
+    expect(team().memberNames).toMatchObject({ new: "Nia" });
+    expect(s.store.doc(R)).toBeUndefined();
+  });
+
+  it("not while muted, not from a member", async () => {
+    s.store.put("limits/new", { mutedUntil: new Date(now + 60_000) });
+    expect((await s.call("POST", "/v1/teams/t1/join-requests", "new", {})).statusCode).toBe(429);
+    expect((await s.call("POST", "/v1/teams/t1/join-requests", "p1", {})).statusCode).toBe(409);
+  });
+
+  it("players can't approve or decline; the asker cancels their own", async () => {
+    s.store.put(R, { name: "Nia" });
+    expect((await s.call("POST", "/v1/teams/t1/join-requests/new/approve", "p1", {})).statusCode).toBe(403);
+    expect((await s.call("DELETE", "/v1/teams/t1/join-requests/new", "p1")).statusCode).toBe(403);
+    expect((await s.call("DELETE", "/v1/teams/t1/join-requests/new", "new")).statusCode).toBe(200);
+    expect(s.store.doc(R)).toBeUndefined();
+  });
+
+  it("a request from someone who joined since just clears", async () => {
+    s.store.put(R, { name: "Pat" });
+    s.store.put("teams/t1/joinRequests/p1", { name: "Pat" });
+    expect((await s.call("POST", "/v1/teams/t1/join-requests/p1/approve", "owner", {})).statusCode).toBe(200);
+    expect(s.store.doc("teams/t1/joinRequests/p1")).toBeUndefined();
+    expect(team().members).toMatchObject({ p1: "player" });
   });
 });
 
@@ -915,11 +1059,54 @@ describe("club teams are for players 16 and over", () => {
     });
   });
 
-  it("join requests are for groups only, so they never reach a club team", async () => {
+  describe("join requests (F26)", () => {
+    beforeEach(() => s.store.put(T, seedTeam({ allowJoinRequests: true })));
+    const ask = (uid: string) => s.call("POST", "/v1/teams/t1/join-requests", uid, {});
+    const approve = (uid: string) => s.call("POST", `/v1/teams/t1/join-requests/${uid}/approve`, "mgr", {});
+
+    it("someone under 16 is told when they ask, and nothing is written", async () => {
+      await born("kid", turns16Tomorrow);
+      const res = await ask("kid");
+      expect(res.statusCode).toBe(412);
+      expect(err(res)).toEqual(tooYoung);
+      expect(s.store.doc("teams/t1/joinRequests/kid")).toBeUndefined();
+    });
+
+    it("asking needs a date of birth on file", async () => {
+      expect(err(await ask("nobirth"))).toEqual(noBirthDate);
+    });
+
+    it("approving checks again: a request from before is refused, naming them", async () => {
+      s.store.put("teams/t1/joinRequests/kid", { name: "Kid" });
+      await born("kid", turns16Tomorrow);
+      const res = await approve("kid");
+      expect(res.statusCode).toBe(412);
+      expect(err(res).message).toContain("Kid");
+      expect(team().memberIds).not.toContain("kid");
+      // Still there, to approve once they're 16 or decline.
+      expect(s.store.doc("teams/t1/joinRequests/kid")).toBeDefined();
+      s.store.put("teams/t1/joinRequests/nobirth", { name: "Nobody" });
+      expect((await approve("nobirth")).statusCode).toBe(412);
+    });
+
+    it("on their 16th birthday they ask and are approved", async () => {
+      await born("kid", turns16Today);
+      expect((await ask("kid")).statusCode).toBe(200);
+      expect((await approve("kid")).statusCode).toBe(200);
+      expect(team().members).toMatchObject({ kid: "player" });
+      expect(s.store.doc("teams/t1/joinRequests/kid")).toBeUndefined();
+    });
+
+    it("other levels take anyone", async () => {
+      s.store.put(T, seedTeam({ allowJoinRequests: true, level: "college" }));
+      await born("kid", "2012-06-01");
+      expect((await ask("kid")).statusCode).toBe(200);
+      expect((await approve("kid")).statusCode).toBe(200);
+    });
+  });
+
+  it("a group that approves who joins takes anyone, club level or not", async () => {
     s.store.put("teams/t1/joinRequests/kid", { name: "Kid" });
-    expect((await s.call("POST", "/v1/teams/t1/join-requests", "kid", {})).statusCode).toBe(412);
-    expect((await s.call("POST", "/v1/teams/t1/join-requests/kid/approve", "owner", {})).statusCode).toBe(412);
-    // A group that approves who joins takes anyone, club level or not.
     s.store.put(T, group({ level: "club", requiresApproval: true }));
     await born("kid", "2012-06-01");
     expect((await s.call("POST", "/v1/teams/t1/join-requests/kid/approve", "mgr", {})).statusCode).toBe(200);

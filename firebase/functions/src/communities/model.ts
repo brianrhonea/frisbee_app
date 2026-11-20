@@ -28,6 +28,8 @@ export type TeamDoc = {
   memberNames?: Record<string, string>;
   memberRoles?: Record<string, string[]>;
   memberPerms?: Record<string, string[]>;
+  /** Permissions members have of their own (the owner's per-person switches; the API writes them). */
+  memberGrants?: Record<string, string[]>;
   statKeepers?: string[];
   orgId?: string | null;
   orgName?: string;
@@ -115,6 +117,7 @@ export function membershipUpdate(
   const memberNames = { ...(team.memberNames ?? {}) };
   const memberRoles = { ...(team.memberRoles ?? {}) };
   const memberPerms = { ...(team.memberPerms ?? {}) };
+  const memberGrants = { ...(team.memberGrants ?? {}) };
   let statKeepers = [...(team.statKeepers ?? [])];
   const orgMembers = new Set(team.orgMembers ?? []);
   let changed = false;
@@ -136,6 +139,7 @@ export function membershipUpdate(
     delete memberNames[uid];
     delete memberRoles[uid];
     delete memberPerms[uid];
+    delete memberGrants[uid];
     statKeepers = statKeepers.filter((u) => u !== uid);
     const i = memberIds.indexOf(uid);
     if (i >= 0) memberIds.splice(i, 1);
@@ -147,6 +151,7 @@ export function membershipUpdate(
     memberNames,
     memberRoles,
     memberPerms,
+    ...(team.memberGrants && { memberGrants }),
     statKeepers,
     orgMembers: [...orgMembers],
   };
@@ -167,8 +172,9 @@ const sameLists = (a: Record<string, string[]>, b: Record<string, string[]>): bo
  * Who holds the team's copies of community roles (`orgRoles`, e.g. Woof
  * Captain): exactly the team's members holding the community role, so a
  * captain there is a captain here. Other roles are left alone, and
- * memberPerms is worked out again from every role (as the app's
- * memberPermsFor does). Null when nothing changes.
+ * memberPerms is worked out again from every role and each member's own
+ * permissions (memberGrants), as the app's memberPermsFor does. Null when
+ * nothing changes.
  */
 export function mirrorUpdate(team: TeamDoc, org: OrgDoc | undefined): Data | null {
   const copies = Object.entries(team.orgRoles ?? {}).filter(([id]) => team.roles?.[id]);
@@ -183,9 +189,8 @@ export function mirrorUpdate(team: TeamDoc, org: OrgDoc | undefined): Data | nul
       ...(team.memberRoles?.[uid] ?? []).filter((r) => !copyIds.has(r) && team.roles?.[r]),
       ...copies.filter(([, source]) => held.includes(source)).map(([id]) => id),
     ];
-    if (roles.length === 0) continue;
-    memberRoles[uid] = roles;
-    const perms = new Set(roles.flatMap((r) => team.roles?.[r]?.perms ?? []));
+    if (roles.length > 0) memberRoles[uid] = roles;
+    const perms = new Set([...roles.flatMap((r) => team.roles?.[r]?.perms ?? []), ...(team.memberGrants?.[uid] ?? [])]);
     if (perms.size > 0) memberPerms[uid] = [...perms].sort();
   }
   if (sameLists(memberRoles, team.memberRoles ?? {}) && sameLists(memberPerms, team.memberPerms ?? {})) {

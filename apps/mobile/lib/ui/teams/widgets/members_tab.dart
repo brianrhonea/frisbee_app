@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/models/team.dart';
@@ -13,6 +14,7 @@ import '../view_models/invite_code_viewmodel.dart';
 import '../view_models/team_detail_viewmodel.dart';
 import 'invite_code_card.dart';
 import 'invite_members_dialog.dart';
+import 'member_permissions_dialog.dart';
 import 'roles_screen.dart';
 
 class MembersTab extends StatelessWidget {
@@ -39,7 +41,11 @@ class MembersTab extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
-                onPressed: () => showInviteMembers(context, team),
+                onPressed: () async {
+                  await showInviteMembers(context, team);
+                  // Anyone just invited shows under Invites pending.
+                  viewModel.loadInvites.execute();
+                },
                 icon: const Icon(Icons.person_search),
                 label: Text(
                   team.isCommunity ? 'Invite members' : 'Invite players',
@@ -59,7 +65,7 @@ class MembersTab extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ],
-          if (team.isCommunity && viewModel.joinRequests.isNotEmpty) ...[
+          if (viewModel.joinRequests.isNotEmpty) ...[
             _JoinRequests(viewModel: viewModel),
             const SizedBox(height: 16),
           ],
@@ -122,13 +128,97 @@ class MembersTab extends StatelessWidget {
               ],
             ),
           ),
+          if (viewModel.canSeeInvites &&
+              viewModel.pendingInvites.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            _PendingInvites(viewModel: viewModel),
+          ],
         ],
       ),
     );
   }
 }
 
-/// People waiting to join a group that requires approval.
+/// "Invites pending": who's been invited and hasn't answered, for those
+/// who invite people, each with who invited them and Withdraw. Neutral:
+/// it's the invitees' move, not the admin's.
+class _PendingInvites extends StatelessWidget {
+  const _PendingInvites({required this.viewModel});
+
+  final TeamDetailViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final invites = viewModel.pendingInvites;
+    final day = DateFormat.MMMd();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 8),
+          child: Eyebrow('Invites pending · ${invites.length}'),
+        ),
+        Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (final (i, invite) in invites.indexed) ...[
+                if (i > 0) Divider(height: 1, color: c.border),
+                ListTile(
+                  contentPadding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
+                  leading: PersonAvatar(
+                    name: invite.name,
+                    photoUrl: invite.photoUrl,
+                    radius: 18,
+                  ),
+                  title: Text(
+                    invite.name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: c.ink,
+                    ),
+                  ),
+                  subtitle: Text(
+                    [
+                      if (invite.invitedByName.isNotEmpty)
+                        'Invited by ${invite.invitedByName}'
+                      else
+                        'Invited',
+                      if (invite.invitedAt case final at?) day.format(at),
+                    ].join(' · '),
+                  ),
+                  trailing: TextButton(
+                    onPressed: viewModel.withdrawInvite.running
+                        ? null
+                        : () async {
+                            if (await confirmDialog(
+                              context,
+                              title: 'Withdraw the invite to ${invite.name}?',
+                              message:
+                                  "They won't be able to join with it any more.",
+                              confirmLabel: 'Withdraw',
+                            )) {
+                              viewModel.withdrawInvite.execute(invite.uid);
+                            }
+                          },
+                    child: const Text('Withdraw'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// People waiting to join a group that requires approval, or a team that
+/// allows join requests (F26). Approving runs the server's join checks
+/// (a club team's age rule among them), so it can be refused.
 class _JoinRequests extends StatelessWidget {
   const _JoinRequests({required this.viewModel});
 
@@ -215,12 +305,19 @@ class _MemberRoles extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final roles = team.rolesOf(uid);
-    final label = team.isStatKeeper(uid)
-        ? '${team.roleLabel(tier)} · Stats'
-        : team.roleLabel(tier);
-    // Staff tiers (owner, coach, captain) and stat keepers stand out as a
-    // tag; a plain player or member is just text.
-    final Widget tierLabel = tier == TeamRole.player && !team.isStatKeeper(uid)
+    // Their own permissions (the owner's switches) by preset name, or
+    // Custom; stats access alone reads as before.
+    final own = tier == TeamRole.player
+        ? team.ownPermissionsOf(uid)
+        : const <TeamPermission>{};
+    final preset = RolePreset.matching(own, team.isCommunity);
+    final label = own.isEmpty
+        ? team.roleLabel(tier)
+        : '${team.roleLabel(tier)} · '
+              '${preset?.id == 'statKeeper' ? 'Stats' : preset?.name ?? 'Custom'}';
+    // Staff tiers (owner, coach, captain) and members with permissions of
+    // their own stand out as a tag; a plain player or member is just text.
+    final Widget tierLabel = tier == TeamRole.player && own.isEmpty
         ? Text(label)
         : Tag(label);
     if (roles.isEmpty) {
@@ -355,6 +452,15 @@ class _MemberMenu extends StatelessWidget {
             if (picked != null) {
               vm.setMemberRoles.execute((uid: uid, roleIds: picked));
             }
+          case 'perms':
+            final picked = await showMemberPermissions(
+              context,
+              team: team,
+              uid: uid,
+            );
+            if (picked != null) {
+              vm.setMemberPermissions.execute((uid: uid, permissions: picked));
+            }
           case 'stats':
             vm.setStatKeeper.execute((uid: uid, on: !statKeeper));
           case 'owner':
@@ -390,6 +496,10 @@ class _MemberMenu extends StatelessWidget {
           // captains from before roles can still be moved down.
           if (role != TeamRole.player)
             const PopupMenuItem(value: 'role', child: Text('Change role')),
+          // A preset or per-person switches (players and members only:
+          // the owner and legacy coaches and captains have everything).
+          if (vm.canSetPermissions(uid))
+            const PopupMenuItem(value: 'perms', child: Text('Permissions')),
           if (team.roles.isNotEmpty)
             const PopupMenuItem(value: 'roles', child: Text('Assign roles')),
           // Every other role already keeps stats; groups don't keep any.

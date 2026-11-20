@@ -102,6 +102,17 @@ export function eventResponsesOf(event: Data, uid: string): string[] {
   });
 }
 
+/**
+ * Whether `uid` voted in a chat message's poll (redesign F33): their entry
+ * in `poll.votes` and `poll.voterIds` comes off when their account goes.
+ */
+export function votedInPoll(message: Data, uid: string): boolean {
+  const poll = message.poll;
+  if (typeof poll !== "object" || poll === null) return false;
+  const { votes, voterIds } = poll as Data;
+  return (Array.isArray(voterIds) && voterIds.includes(uid)) || (typeof votes === "object" && votes !== null && uid in (votes as Data));
+}
+
 interface TournamentTeamDoc extends Data {
   id?: string;
   captainId?: string | null;

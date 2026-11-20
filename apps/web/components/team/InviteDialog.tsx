@@ -57,8 +57,11 @@ export function useInvite(): InviteHub {
 export function InviteProvider({ children }: { children: ReactNode }) {
   const { teamId, kind, viewer } = useTeamHub();
   const canInvite = viewer.state === "member" && viewer.can("manageMembers");
-  // As Settings had it: a group that approves who joins.
-  const hasRequests = canInvite && kind !== "team" && viewer.state === "member" && viewer.team.requiresApproval === true;
+  // As Settings had it: a group that approves who joins, or a team that allows join requests (F26).
+  const hasRequests =
+    canInvite &&
+    viewer.state === "member" &&
+    (kind !== "team" ? viewer.team.requiresApproval === true : viewer.team.allowJoinRequests === true);
   const requests = useLiveQuery<{ name?: string }>(hasRequests ? `teams/${teamId}/joinRequests` : null, [], teamId);
   const [pane, setPane] = useState<Pane | null>(null);
   const link = useTeamLink(teamId, kind === "team" && canInvite);

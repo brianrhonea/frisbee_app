@@ -1,5 +1,7 @@
 import '../data/repositories/chat/chat_repository.dart';
 import '../data/repositories/team/team_repository.dart';
+import '../data/repositories/event/event_repository.dart';
+import '../data/repositories/video/video_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/draft/message_draft_repository.dart';
 import '../data/repositories/people/people_repository.dart';
@@ -342,6 +344,7 @@ GoRouter router(
                 teamRepository: c.read(),
                 authRepository: c.read(),
                 tournamentRepository: c.read(),
+                videoRepository: readOptional<VideoRepository>(c),
               ),
               builder: (_, vm) => EventDetailScreen(viewModel: vm),
             );
@@ -392,6 +395,7 @@ GoRouter router(
                 videoRepository: c.read(),
                 teamRepository: c.read(),
                 authRepository: c.read(),
+                eventRepository: readOptional<EventRepository>(c),
               ),
               builder: (_, vm) => VideoScreen(viewModel: vm),
             );

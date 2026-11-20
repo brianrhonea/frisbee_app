@@ -31,8 +31,13 @@ import {
   divisionLabel,
   leagueTeamPrefix,
   pointDiff,
+  currentWeekIndex,
+  leagueNights,
+  leagueWeekLabel,
+  leagueWeeks,
 } from "@stall10/shared";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Dialog } from "@/components/Dialog";
 import { dayKey, useRenderZone } from "@/lib/renderZone";
 import { type TournamentState, divisionPath, useAction } from "./useTournament";
@@ -103,6 +108,41 @@ function actionFor(s: TournamentState, g: EngineGame): Action {
 }
 const badge: Record<Exclude<Action, null>, string> = { report: "Report score", confirm: "Confirm score", awaiting: "Waiting for the other captain" };
 
+/**
+ * One team's score in the score form: its name, then −, the score in the
+ * scoreboard face (still typed straight in) and + (ScoreStepper in the
+ * app). An untouched score stays empty, so "Enter both scores." still
+ * shows; + starts it at 1, and the steppers keep it from 0 to 99.
+ */
+export function ScoreStepper({ name, value, onChange }: { name: string; value: string; onChange: (v: string) => void }) {
+  const n = value.trim() === "" ? null : Number(value);
+  const step = (by: number) => onChange(String(Math.min(99, Math.max(0, (n != null && Number.isFinite(n) ? n : 0) + by))));
+  return (
+    <div className="score-step">
+      <span className="score-step-name">{name}</span>
+      <div className="score-step-row">
+        <button type="button" className="btn score-step-btn" aria-label={`One less for ${name}`} title={`One less for ${name}`} disabled={n == null || !(n > 0)} onClick={() => step(-1)}>
+          −
+        </button>
+        <input
+          type="number"
+          className="score-step-input"
+          min={0}
+          max={99}
+          inputMode="numeric"
+          placeholder="–"
+          aria-label={`Score for ${name}`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <button type="button" className="btn btn-primary score-step-btn" aria-label={`One more for ${name}`} title={`One more for ${name}`} disabled={n != null && n >= 99} onClick={() => step(1)}>
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** [g]'s score form; it starts from the game's score, its report, else its running score. [onSent] (else [onDone]) once it's sent. */
 function ScoreForm({ s, g, mode, onDone, onSent }: { s: TournamentState; g: EngineGame; mode: "report" | "final"; onDone: () => void; onSent?: () => void }) {
   const running = s.liveOf(g);
@@ -121,15 +161,9 @@ function ScoreForm({ s, g, mode, onDone, onSent }: { s: TournamentState; g: Engi
   }
   return (
     <form className="settings-form hosted-score-form" onSubmit={submit}>
-      <div className="form-grid">
-        <label>
-          {slotLabel(s, g, true)}
-          <input type="number" min={0} max={99} inputMode="numeric" value={a} onChange={(e) => setA(e.target.value)} />
-        </label>
-        <label>
-          {slotLabel(s, g, false)}
-          <input type="number" min={0} max={99} inputMode="numeric" value={b} onChange={(e) => setB(e.target.value)} />
-        </label>
+      <div className="score-steps">
+        <ScoreStepper name={slotLabel(s, g, true)} value={a} onChange={setA} />
+        <ScoreStepper name={slotLabel(s, g, false)} value={b} onChange={setB} />
       </div>
       <small className="muted">{mode === "report" ? "The other captain confirms it before it counts." : "As the host, this is final right away."}</small>
       {error && <p className="form-error">{error}</p>}
@@ -490,23 +524,83 @@ export function ScheduleTab({ s, focusGame }: { s: TournamentState; focusGame?: 
       )}
       {s.games.length === 0 && !s.manager && <p className="empty">The schedule appears here once the host publishes it.</p>}
       {s.games.length > 0 && <h3 className="hosted-heading">All games</h3>}
-      {s.games.map((g) => {
+      {/* A league's season, a night at a time. */}
+      {league && s.games.length > 0 && <LeagueWeeks key={d.id} s={s} />}
+      {!league && s.games.map((g) => {
         const day = g.startsAt ? dayKey(g.startsAt, zone) : "";
         const head = day && day !== lastDay;
         lastDay = day || lastDay;
-        const byes = league && g.stage === "pool" && head ? byesIn(d.seeds, s.games, g.round) : [];
         return (
           <div key={g.id} className="stack hosted-game-row">
-            {head && g.startsAt && (
-              <div>
-                <h4 className="hosted-day">{league ? `${g.stage === "pool" ? `Week ${g.round}` : "Playoffs"} · ${dayLabel(g.startsAt, zone)}` : dayLabel(g.startsAt, zone)}</h4>
-                {byes.length > 0 && <small className="muted">Bye: {byes.map(s.teamName).join(", ")}</small>}
-              </div>
-            )}
+            {head && g.startsAt && <h4 className="hosted-day">{dayLabel(g.startsAt, zone)}</h4>}
             <GameCard s={s} g={g} />
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * A league's games a night at a time (the app's _LeagueWeeks): "‹ Week 3 ›"
+ * with the night's date and byes, then its games. Opens on tonight's
+ * night, else the next one (the last once the season is over). Keyed by
+ * division, so another division starts on its own current week.
+ */
+function LeagueWeeks({ s }: { s: TournamentState }) {
+  const zone = useRenderZone();
+  const [picked, setPicked] = useState<number | null>(null);
+  const d = s.division;
+  const weeks = leagueWeeks(s.games, (x) => dayKey(x, zone));
+  if (!d || weeks.length === 0) return null;
+  const i = Math.min(Math.max(picked ?? currentWeekIndex(weeks, dayKey(new Date(), zone)), 0), weeks.length - 1);
+  const week = weeks[i];
+  const rounds = new Set(week.games.filter((g) => g.stage === "pool").map((g) => g.round));
+  const byes = [...new Set([...rounds].flatMap((r) => byesIn(d.seeds, s.games, r)))];
+  const first = week.games[0]?.startsAt;
+  return (
+    <section className="stack league-weeks" aria-label="Schedule by week">
+      <div className="league-week-nav">
+        <button type="button" className="icon-btn league-week-arrow" aria-label="Previous week" title="Previous week" disabled={i === 0} onClick={() => setPicked(i - 1)}>
+          ‹
+        </button>
+        <div className="league-week-title" aria-live="polite">
+          <b>{leagueWeekLabel(week, leagueNights(weeks))}</b>
+          {first && <small className="muted">{dayLabel(first, zone)}</small>}
+        </div>
+        <button type="button" className="icon-btn league-week-arrow" aria-label="Next week" title="Next week" disabled={i === weeks.length - 1} onClick={() => setPicked(i + 1)}>
+          ›
+        </button>
+      </div>
+      {byes.length > 0 && <small className="muted league-week-byes">Bye: {byes.map(s.teamName).join(", ")}</small>}
+      {week.games.map((g) => (
+        <GameCard key={g.id} s={s} g={g} />
+      ))}
+    </section>
+  );
+}
+
+/** A division's bracket on its own page (the app's HostedBracketScreen). */
+export const bracketHref = (tournamentId: string, divisionId: string) =>
+  `/tournaments/${encodeURIComponent(tournamentId)}/bracket?division=${encodeURIComponent(divisionId)}`;
+
+/** The selected division's bracket: a column per round, each game's card with what the viewer can do. On Results and the bracket's own page. */
+export function BracketView({ s }: { s: TournamentState }) {
+  const columns = new Map<string, EngineGame[]>();
+  for (const g of s.games.filter((x) => isBracketStage(x.stage))) {
+    const key = `${g.stage}:${g.round}`;
+    columns.set(key, [...(columns.get(key) ?? []), g]);
+  }
+  return (
+    <div className="hosted-bracket">
+      {[...columns.values()].map((games) => (
+        <div key={`${games[0].stage}${games[0].round}`} className="hosted-bracket-col">
+          <h3 className="hosted-heading">{new Set(games.map((g) => g.label)).size === 1 ? games[0].label : `Round ${games[0].round}`}</h3>
+          {games.map((g) => (
+            <GameCard key={g.id} s={s} g={g} />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -517,11 +611,7 @@ export function ResultsTab({ s }: { s: TournamentState }) {
   const league = s.t.kind === "league";
   const places = d.placements.length > 0 ? d.placements : placementsOf(formatOf(s.t, d), d.seeds, s.games);
   const pools = poolTeams(s.games);
-  const columns = new Map<string, EngineGame[]>();
-  for (const g of s.games.filter((x) => isBracketStage(x.stage))) {
-    const key = `${g.stage}:${g.round}`;
-    columns.set(key, [...(columns.get(key) ?? []), g]);
-  }
+  const hasBracket = s.games.some((x) => isBracketStage(x.stage));
   return (
     <div className="stack">
       <DivisionPicker s={s} />
@@ -584,19 +674,15 @@ export function ResultsTab({ s }: { s: TournamentState }) {
           {awaitingSeeds(s.games) && <p className="muted small">The bracket fills from these once every pool game is in.</p>}
         </section>
       )}
-      {columns.size > 0 && (
+      {hasBracket && (
         <section className="card">
-          <h2 className="card-title">Bracket</h2>
-          <div className="hosted-bracket">
-            {[...columns.values()].map((games) => (
-              <div key={`${games[0].stage}${games[0].round}`} className="hosted-bracket-col">
-                <h3 className="hosted-heading">{new Set(games.map((g) => g.label)).size === 1 ? games[0].label : `Round ${games[0].round}`}</h3>
-                {games.map((g) => (
-                  <GameCard key={g.id} s={s} g={g} />
-                ))}
-              </div>
-            ))}
+          <div className="hosted-card-head">
+            <h2 className="card-title">Bracket</h2>
+            <Link className="text-btn" href={bracketHref(s.id, d.id)}>
+              Open bracket
+            </Link>
           </div>
+          <BracketView s={s} />
         </section>
       )}
     </div>

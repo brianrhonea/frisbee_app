@@ -41,4 +41,33 @@ abstract class TeamPostRepository {
 
   /// A post photo's bytes.
   Future<Result<Uint8List>> downloadImage(ChatAttachment image);
+
+  // Pins and comments (redesign F24): written through the API only.
+
+  /// Whether pins and comments can be written (the app has the API).
+  bool get canUseFeedExtras;
+
+  /// The team's pinned posts, newest pin first (at most
+  /// [TeamPost.pinsMax]); [publicOnly] as for [watchPosts].
+  Stream<List<TeamPost>> watchPinnedPosts(
+    String teamId, {
+    bool publicOnly = false,
+  });
+
+  /// Pins [postId]. A feed with [TeamPost.pinsMax] pins refuses
+  /// (`failed_precondition`) unless [unpin] names one to take down.
+  Future<Result<void>> pinPost(String teamId, String postId, {String? unpin});
+
+  Future<Result<void>> unpinPost(String teamId, String postId);
+
+  /// A post's comments, oldest first (the newest [TeamPostComment.shown]).
+  Stream<List<TeamPostComment>> watchComments(String teamId, String postId);
+
+  Future<Result<void>> addComment(String teamId, String postId, String body);
+
+  Future<Result<void>> deleteComment(
+    String teamId,
+    String postId,
+    String commentId,
+  );
 }

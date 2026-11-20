@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.38  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.37  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.36  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.35  | 2026-11-19 | `feature/redesign`                      |                     |
@@ -50,6 +51,49 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.38 — Redesign features, second batch (redesign 4)
+
+With web 0.47.0 and API 0.35.0. Details and tests per feature in
+`docs/product-spec.md` §8.1 items 35–44; open questions in
+`docs/redesign-plan.md` ("Waiting for you" 12–37). Needs the dev deploy
+of Firestore rules + indexes (done), the API, and functions groups
+`notifications`, `follows`, `communities`, `account`, `browse`.
+
+- Tournament extras (F30): standalone bracket page
+  (`/tournaments/:id/bracket/:divisionId`), −/+ score steppers, league
+  week stepper (`league_weeks.dart`, shared `league_weeks.ts`),
+  full-screen Enter a team, host form in steps with Save draft /
+  Publish, Share on tournament pages.
+- Team videos (F4–F6): notes pinned to a moment and clips, a comment
+  thread (push to the video's author), tag a video to a team event
+  (`teams/{t}/videos/{v}/comments`, `eventId`; API-only writes).
+- Teams tab always opens the list, even with one team (F34; reverses
+  the 0.0.36 shortcut, `TeamsTabTap` removed).
+- Add to calendar opens the phone's own new-event screen
+  (`add_2_calendar`, `DeviceCalendarService`); .ics share only as a
+  fallback. Info.plist: `NSCalendarsUsageDescription`,
+  `NSContactsUsageDescription`; Android `<queries>` for INSERT (F35).
+- Team page: "N going" / "N new in chat" tiles (F18); roster roles,
+  O-line / D-line groups and Edit lines (roster spot `line`, API-only),
+  Invites pending with Withdraw (F23); More rows with subtitles, Manage
+  team and Leave (F28).
+- Chat polls in team rooms (F33): question, 2–6 options, multiple
+  answers, closing time; vote, see votes, close (`poll` on the message,
+  API-only).
+- Team feed (F24): pin up to 3 posts, comments on team posts with
+  counts (`teams/{t}/posts/{p}/comments`, `commentCount` kept by the
+  `follows` group), "Post to the team…" box replaces New post. F8
+  audience picker verified (Everyone or a team you manage).
+- Roles (F25): presets (Member, Stat keeper, Captain, Coach, Admin;
+  groups Moderator, Organizer) and per-person permission switches
+  (`memberGrants`, owner only, API-only; `memberPerms` includes them).
+- Team join requests (F26): "Allow join requests" (off by default),
+  Request to join, approve/decline in Members, club age rule checked at
+  request and approval, push "You're in".
+- Discord import: pick which text channels to bring (F15).
+- Community page (F27): Next pickup card with RSVP, Chat rooms with
+  unread dots, Organizers with Message.
 
 ## 0.0.37 — Redesign features, first batch (redesign 4)
 

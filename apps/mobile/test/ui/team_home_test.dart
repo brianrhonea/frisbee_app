@@ -363,9 +363,10 @@ void main() {
       expect(find.text('Teams'), findsNothing);
       expect(find.text('Playbook'), findsNothing);
       expect(find.text('Members'), findsNothing);
-      expect(find.text('Practice'), findsOneWidget);
+      // The up-next card and the going tile.
+      expect(find.text('Practice'), findsNWidgets(2));
       expect(find.text('Fees due Friday.'), findsOneWidget);
-      expect(find.text('New post'), findsOneWidget);
+      expect(find.text('Post to the team…'), findsOneWidget);
       expect(find.byIcon(Icons.lock_outline), findsOneWidget);
     });
 
@@ -486,7 +487,7 @@ void main() {
       expect(find.text('Practice'), findsNothing);
       expect(find.text('Tryouts Saturday'), findsOneWidget);
       expect(find.text('Fees due Friday.'), findsNothing);
-      expect(find.text('New post'), findsNothing);
+      expect(find.text('Post to the team…'), findsNothing);
 
       await tester.tap(find.text('Open tryouts'));
       await tester.pumpAndSettle();
@@ -604,8 +605,9 @@ void main() {
       posts.posts.clear();
       await pump(tester, homeVm());
 
-      await tester.tap(find.text('New post'));
+      await tester.tap(find.text('Post to the team…'));
       await tester.pumpAndSettle();
+      expect(find.text('New post'), findsOneWidget);
       await tester.enterText(find.byType(TextFormField).at(1), 'Pickup Sunday');
       await tester.enterText(find.byType(TextFormField).at(2), 'Wash Park');
       // No link field: links go in the words.

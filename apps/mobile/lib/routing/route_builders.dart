@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../data/repositories/hosted_tournament/hosted_tournament_repository.dart';
 import '../data/repositories/calendar/calendar_repository.dart';
+import '../data/repositories/chat/chat_repository.dart';
+import '../data/repositories/direct_message/direct_message_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/auth/auth_repository.dart';
 import '../data/repositories/meeting/meeting_repository.dart';
@@ -208,6 +210,8 @@ Widget teamPage(GoRouterState state) {
       groupTournamentRepository: c.read(),
       tournamentRepository: c.read<HostedTournamentRepository?>(),
       hints: c.read<TeamHintsRepository?>(),
+      chatRepository: c.read<ChatRepository?>(),
+      directMessageRepository: c.read<DirectMessageRepository?>(),
     ),
     builder: (_, vm) => TeamHomeScreen(
       viewModel: vm,

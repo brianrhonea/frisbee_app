@@ -65,3 +65,48 @@
   .video-row { grid-template-columns: 104px minmax(0, 1fr); gap: 10px; }
   .video-row .video-thumb { width: 104px; height: 58px; }
 }
+
+/* A video's extras (F4-F6): its tagged event, notes and comments (VideoDiscussion). */
+.watch-youtube > div, .watch-youtube iframe { width: 100%; height: 100%; display: block; border: 0; }
+.video-event { display: grid; gap: 8px; margin-top: 14px; }
+.video-event-link {
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--radius-control);
+  background: var(--field); color: var(--ink); text-decoration: none; max-width: 480px;
+}
+.video-event-link:hover { outline: 1px solid var(--accent); }
+.video-event-link > span { display: grid; min-width: 0; }
+.video-event-link b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-event-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+.video-event-picker { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 360px; overflow-y: auto; max-width: 480px; }
+.video-event-picker button {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 6px 10px; text-align: left;
+  border: 1px solid transparent; border-radius: var(--radius-control); background: none; color: var(--ink); font: inherit; cursor: pointer;
+}
+.video-event-picker button:hover { background: var(--field); }
+.video-event-picker button.on { border-color: var(--accent); background: var(--accent-soft); }
+.video-event-picker button > span { display: grid; min-width: 0; }
+.video-notes { display: grid; gap: 10px; }
+.video-notes h2 { font-size: 1.05rem; margin: 0; }
+.video-comments { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.video-comment { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; }
+.video-comment + .video-comment { border-top: 1px solid var(--line); }
+.video-comment-main { min-width: 0; flex: 1; }
+.video-comment-main p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.video-comment-main .text-btn { font-size: inherit; }
+.video-time {
+  flex: none; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink);
+  font: inherit; font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.video-time:hover:not(:disabled) { outline: 1px solid var(--accent); }
+.video-time:disabled { cursor: default; }
+.video-marks { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.video-mark {
+  padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink);
+  font: inherit; font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.video-mark:hover { border-color: var(--accent); }
+.video-mark.on { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.event-videos h3 { font-size: 0.95rem; margin: 12px 0 4px; }
+.event-videos ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.event-videos a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.event-videos a:hover { text-decoration: underline; }

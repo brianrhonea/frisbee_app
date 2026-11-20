@@ -446,3 +446,79 @@
 }
 .team-hub .sections-hint-close:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
 .team-hub .sections-hint a:focus-visible, .team-hub .sections-hint-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Quick stat tiles at the top of the feed (F18): amber only while there's chat to read. */
+.team-hub .stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.team-hub .stat-tile {
+  display: grid; gap: 2px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-control);
+  background: var(--card); color: var(--ink); text-decoration: none; min-width: 0;
+}
+.team-hub .stat-tile:hover { background: var(--field); }
+.team-hub .stat-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.team-hub .stat-tile-top { font-weight: 700; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.team-hub .stat-tile-top b { font-family: var(--font-score); font-size: 1.65rem; font-weight: 800; line-height: 1; margin-right: 4px; }
+.team-hub .stat-tile small { color: var(--muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.team-hub .stat-tile-new { background: var(--disc-soft); border-color: color-mix(in srgb, var(--disc) 45%, transparent); color: var(--disc-ink); }
+.team-hub .stat-tile-new:hover { background: var(--disc-soft); filter: brightness(0.98); }
+
+/* The roster's O-line / D-line groups, Edit lines and invites pending (F23). */
+.team-hub .line-group-title { margin: 14px 0 6px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.team-hub .line-group-title:first-of-type { margin-top: 4px; }
+.team-hub .lines-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.team-hub .lines-bar p { flex: 1; margin: 0; min-width: 12em; }
+.team-hub .line-picker { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; overflow: hidden; }
+.team-hub .line-picker button {
+  border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 0.8rem; font-weight: 700; padding: 5px 11px; cursor: pointer;
+}
+.team-hub .line-picker button + button { border-left: 1px solid var(--line-2); }
+.team-hub .line-picker button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.team-hub .line-picker button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.team-hub .roster-role { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.team-hub .invite-rows { list-style: none; margin: 0; padding: 0; }
+.team-hub .invite-rows li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.team-hub .invite-rows li:first-child { border-top: 0; }
+.team-hub .invite-rows li > span { flex: 1; min-width: 0; display: grid; }
+
+/* More's rows: a line on what's there, then Manage and Leave (F28). */
+.team-hub .team-more-menu a small { display: block; color: var(--muted); font-weight: 500; font-size: 0.78rem; margin-top: 1px; }
+.team-hub .team-more-menu a.active small { color: inherit; opacity: 0.8; }
+.team-hub .team-more-menu { min-width: 240px; }
+.team-hub .team-more-menu .team-more-sep { border-top: 1px solid var(--line); margin: 4px 0; }
+.team-hub .team-more-leave {
+  display: block; width: 100%; text-align: left; border: 0; background: transparent; font: inherit; font-weight: 600;
+  color: var(--ink); padding: 9px 12px; border-radius: 10px; cursor: pointer;
+}
+.team-hub .team-more-leave:hover { background: var(--field); }
+.team-hub .team-more-leave:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.team-hub .team-more-menu .post-error { display: block; padding: 4px 12px; }
+.team-hub .team-more-note { display: block; padding: 6px 12px; color: var(--muted); font-size: 0.78rem; max-width: 240px; }
+/* The community page (F27): the next pickup card, its chat rooms and organizers. Amber only for "RSVP needed" and unread rooms. */
+.team-hub .pickup-card .card-head { align-items: center; }
+.team-hub .pickup-event { display: flex; gap: 14px; align-items: center; color: inherit; text-decoration: none; padding: 4px 0; }
+.team-hub .pickup-event:hover b { text-decoration: underline; }
+.team-hub .pickup-event .date-tile { flex-shrink: 0; }
+.team-hub .pickup-info { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.team-hub .pickup-info b { font-size: 1rem; font-weight: 700; }
+.team-hub .pickup-info small { font-size: 0.8rem; color: var(--muted); }
+.team-hub .pickup-info small.pickup-going { color: var(--accent-ink); font-weight: 700; }
+.team-hub .pickup-card .rsvp-ask { margin: 12px 0 0; }
+.team-hub .pickup-empty { display: grid; gap: 8px; justify-items: start; }
+.team-hub .pickup-empty p { margin: 0; }
+.team-hub .pickup-join { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 12px 0 0; }
+.team-hub .community-rooms { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.team-hub .community-rooms a {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: var(--radius-control);
+  color: var(--ink-soft); text-decoration: none; font-size: 0.9rem;
+}
+.team-hub .community-rooms a:hover { background: var(--field); }
+.team-hub .community-rooms a.unread { color: var(--ink); font-weight: 700; }
+.team-hub .community-rooms .room-hash { color: var(--muted); font-weight: 700; }
+.team-hub .community-rooms .room-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-hub .community-rooms .unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--disc); flex: none; }
+.team-hub .organizer-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.team-hub .organizer-list li { display: flex; align-items: center; gap: 10px; }
+.team-hub .organizer-list .person { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
+.team-hub .organizer-list .person > span { display: grid; min-width: 0; }
+.team-hub .organizer-list .person b { font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-hub .organizer-role { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.team-hub .organizer-message { display: grid; justify-items: end; gap: 4px; }

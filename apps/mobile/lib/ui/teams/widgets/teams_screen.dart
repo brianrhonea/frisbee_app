@@ -9,7 +9,7 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/scoreboard.dart' show SectionHeader;
 import '../../core/ui/status_views.dart';
-import '../../shell/widgets/app_shell.dart' show ProfileButton, TeamsTabTap;
+import '../../shell/widgets/app_shell.dart' show ProfileButton;
 import '../view_models/teams_viewmodel.dart';
 import 'join_team_dialog.dart';
 import 'team_initials.dart';
@@ -32,9 +32,6 @@ class _TeamsScreenState extends State<TeamsScreen> {
     vm.joinTeam.addListener(_onJoin);
     vm.acceptInvite.addListener(_onAccept);
     vm.declineInvite.addListener(_onDecline);
-    vm.addListener(_openSingle);
-    TeamsTabTap.requests.addListener(_openSingle);
-    _openSingle();
   }
 
   @override
@@ -42,24 +39,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
     vm.joinTeam.removeListener(_onJoin);
     vm.acceptInvite.removeListener(_onAccept);
     vm.declineInvite.removeListener(_onDecline);
-    vm.removeListener(_openSingle);
-    TeamsTabTap.requests.removeListener(_openSingle);
     super.dispose();
-  }
-
-  /// The Teams tab was tapped and the list is showing: with exactly one
-  /// team or community and no invitation waiting, opens it straight away
-  /// (back returns to this list). Waits for the teams and invitations to
-  /// load first.
-  void _openSingle() {
-    if (!TeamsTabTap.pending) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !TeamsTabTap.pending) return;
-      if (vm.loading || !vm.invitesLoaded) return;
-      TeamsTabTap.done();
-      if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
-      if (vm.single case final team?) context.go(Routes.team(team.id));
-    });
   }
 
   void _onAccept() {

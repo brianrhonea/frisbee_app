@@ -25,27 +25,6 @@ abstract final class HomeRefresh {
   static void request() => _requests.value++;
 }
 
-/// The Teams tab was tapped: with exactly one team or community (and no
-/// invitation waiting), its list opens that team straight away. Only the
-/// tap asks; arriving at the list any other way (back from the team, a
-/// "Teams" link, after leaving a team) shows the list.
-abstract final class TeamsTabTap {
-  static final _requests = ValueNotifier<int>(0);
-  static bool _pending = false;
-  static Listenable get requests => _requests;
-
-  /// Whether a tap is waiting for the list to handle it.
-  static bool get pending => _pending;
-
-  static void request() {
-    _pending = true;
-    _requests.value++;
-  }
-
-  /// The list handled the tap (or wasn't the page showing).
-  static void done() => _pending = false;
-}
-
 enum ShellSection {
   community('Home', 'Home', Icons.home_outlined, Icons.home_rounded),
   explore('Discover', 'Discover', Icons.explore_outlined, Icons.explore),
@@ -104,7 +83,6 @@ class AppShell extends StatelessWidget {
     if (again) ScrollToTop.request();
     if (again && s == ShellSection.community) HomeRefresh.request();
     navigationShell.goBranch(s.index, initialLocation: again);
-    if (s == ShellSection.team) TeamsTabTap.request();
   }
 
   List<PaletteCommand> _commands() => paletteCommands(

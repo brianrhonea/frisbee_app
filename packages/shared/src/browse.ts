@@ -152,6 +152,8 @@ export interface PublicListing {
   location?: { address: string; lat: number; lng: number } | null;
   /** Present (false) when the team's "Public team page" is off (publicPageOn in team.ts): its card only. */
   publicPage?: false;
+  /** Present (true) when a team takes join requests (allowsJoinRequests in team.ts, F26). */
+  allowJoinRequests?: true;
 }
 
 export interface PublicTeamPost {
@@ -166,6 +168,8 @@ export interface PublicTeamPost {
   tournamentKey?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** Pinned by the team's admins (F24, team_posts.ts): shown first under "Pinned". */
+  pinnedAt?: string;
 }
 
 export interface PublicEvent {

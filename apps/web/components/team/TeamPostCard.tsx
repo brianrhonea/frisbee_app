@@ -1,5 +1,6 @@
-import type { PublicTeamPost } from "@stall10/shared";
-import type { ReactNode } from "react";
+"use client";
+import { type PublicTeamPost, teamPostCommentLabel } from "@stall10/shared";
+import { type ReactNode, useState } from "react";
 import { LocalTime } from "../LocalTime";
 import { MemberImage } from "../MemberImage";
 import { LinkedText } from "../LinkedText";
@@ -9,27 +10,43 @@ export type TeamPostView = PublicTeamPost & {
   public?: boolean;
   images?: Array<{ path: string; name?: string; url?: string }>;
   location?: string;
+  /** Kept by the follows functions (F24); missing reads as 0. Members only. */
+  commentCount?: number;
 };
 
 const isWebLink = (url: string) => /^https?:\/\//i.test(url);
 
-/** A team's post or announcement (TeamPost in the app). */
+/**
+ * A team's post or announcement (TeamPost in the app). A [pinned] post
+ * says so on top (redesign F24); with [comments] (members) it ends with
+ * its comment count, which opens the thread [comments] renders.
+ */
 export function TeamPostCard({
   post,
   teamName,
   showAudience,
   actions,
+  pinned = false,
+  comments,
 }: {
   post: TeamPostView;
   teamName: string;
   showAudience?: boolean;
-  /** Edit and delete, for the team's admins. */
+  /** Edit, delete and pin, for the team's admins. */
   actions?: ReactNode;
+  pinned?: boolean;
+  comments?: () => ReactNode;
 }) {
   const images = post.images ?? [];
   const links = (post.links ?? []).filter(isWebLink);
+  const [open, setOpen] = useState(false);
   return (
-    <article className="post">
+    <article className={`post${pinned ? " post-pinned" : ""}`}>
+      {pinned && (
+        <p className="post-pinned-label">
+          <span aria-hidden="true">📌</span> Pinned
+        </p>
+      )}
       <header className="post-head">
         <div className="team-post-who">
           <b>{post.title || teamName}</b>
@@ -61,6 +78,14 @@ export function TeamPostCard({
           ))}
         </ul>
       )}
+      {comments && (
+        <div className="post-actions team-post-actions">
+          <button type="button" className="text-btn" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+            {teamPostCommentLabel(post.commentCount)}
+          </button>
+        </div>
+      )}
+      {comments && open && comments()}
     </article>
   );
 }

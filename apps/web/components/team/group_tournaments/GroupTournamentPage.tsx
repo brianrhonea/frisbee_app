@@ -37,6 +37,8 @@ import {
   tournamentView,
   tournamentWhen,
 } from "./format";
+import { ScoreStepper } from "../../tournaments/TournamentGames";
+import "../../tournaments/tournaments.css";
 import "./group_tournaments.css";
 
 type Tab = "schedule" | "standings" | "bracket" | "teams";
@@ -633,15 +635,9 @@ function ScoreForm({
     <form className="settings-form" onSubmit={submit}>
       <h3 className="card-title">{title}</h3>
       {message && <p className="small muted">{message}</p>}
-      <div className="form-grid">
-        <label>
-          {nameA}
-          <input inputMode="numeric" value={a} autoFocus onChange={(e) => setA(e.target.value.replace(/\D/g, ""))} />
-        </label>
-        <label>
-          {nameB}
-          <input inputMode="numeric" value={b} onChange={(e) => setB(e.target.value.replace(/\D/g, ""))} />
-        </label>
+      <div className="score-steps">
+        <ScoreStepper name={nameA} value={a} onChange={(v) => setA(v.replace(/\D/g, ""))} />
+        <ScoreStepper name={nameB} value={b} onChange={(v) => setB(v.replace(/\D/g, ""))} />
       </div>
       {why && <p className="form-error">{why}</p>}
       <div className="home-actions">

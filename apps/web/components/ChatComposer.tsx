@@ -27,6 +27,7 @@ export function ChatComposer({
   draftKey,
   outbox,
   onShareEvent,
+  onCreatePoll,
 }: {
   path: string;
   /** Where this thread's messages wait while Stall 10 can't be reached (the app's OutboxKind and target). */
@@ -39,8 +40,10 @@ export function ChatComposer({
   onTyping?: (typing: boolean) => void;
   /** Where this thread's unsent text is kept (`dm_<id>`, `chat_<team>_<room>`). */
   draftKey?: string;
-  /** "Share an event" beside files in the attach menu (team rooms, F3); none hides the menu. */
+  /** "Share an event" beside files in the attach menu (team rooms, F3). */
   onShareEvent?: () => void;
+  /** "Poll" in the attach menu (team rooms, F33). Without either, there's no menu. */
+  onCreatePoll?: () => void;
 }) {
   const { user } = useAuth();
   const [text, setText] = useState("");
@@ -176,7 +179,7 @@ export function ChatComposer({
             e.target.value = "";
           }}
         />
-        {onShareEvent ? (
+        {onShareEvent || onCreatePoll ? (
           <span className="attach-menu">
             <button
               type="button"
@@ -184,7 +187,7 @@ export function ChatComposer({
               aria-label="Attach"
               aria-haspopup="menu"
               aria-expanded={attachMenu}
-              title="Attach files or share an event"
+              title={onShareEvent ? "Attach files, share an event or ask a poll" : "Attach files or ask a poll"}
               onClick={() => setAttachMenu(!attachMenu)}
             >
               📎
@@ -201,16 +204,30 @@ export function ChatComposer({
                 >
                   Photo, video or file
                 </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setAttachMenu(false);
-                    onShareEvent();
-                  }}
-                >
-                  Share an event
-                </button>
+                {onShareEvent && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setAttachMenu(false);
+                      onShareEvent();
+                    }}
+                  >
+                    Share an event
+                  </button>
+                )}
+                {onCreatePoll && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setAttachMenu(false);
+                      onCreatePoll();
+                    }}
+                  >
+                    Poll
+                  </button>
+                )}
               </span>
             )}
           </span>

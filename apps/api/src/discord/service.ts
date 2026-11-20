@@ -11,6 +11,7 @@
 import { randomInt } from "node:crypto";
 import {
   chatRoomLimits,
+  cleanMemberGrants,
   cleanMemberRoles,
   type DiscordImport,
   type DiscordImportResult,
@@ -290,7 +291,11 @@ export class DiscordService {
       if (chats.folders.length + i.folders.length > chatRoomLimits.folders) throw new ApiError("failed_precondition", `A team can have ${chatRoomLimits.folders} folders.`);
       const ids = new Set(strings(team.memberIds));
       const members = Object.keys(mapOf(team.members)).filter((u) => ids.has(u));
-      const roles = rolesData(i.roles, cleanMemberRoles(memberRolesOf(team), i.roles, members));
+      const roles = rolesData(
+        i.roles,
+        cleanMemberRoles(memberRolesOf(team), i.roles, members),
+        cleanMemberGrants(team.memberGrants, members),
+      );
       tx.update(p.team(teamId), { ...roles, ...(orgRoles && { orgRoles }) });
       tx.set(p.mark(teamId), { seq: chats.seq + 1, updatedAt: serverTime });
       for (const f of i.folders) {

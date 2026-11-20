@@ -63,6 +63,8 @@ const rules: Rule[] = [
   [new RegExp(`^/tournaments/${id}/(edit|signups)$`), (m) => `/tournaments/${m[1]}/${m[2]}`],
   // The host's balanced draft, and the captains' live draft.
   [new RegExp(`^/tournaments/${id}/(draft|live-draft)/${id}$`), (m) => `/tournaments/${m[1]}/${m[2]}/${m[3]}`],
+  // A division's bracket on its own page.
+  [new RegExp(`^/tournaments/${id}/bracket/${id}$`), (m) => `/tournaments/${m[1]}/bracket?division=${enc(m[2]!)}`],
 ];
 
 /** A query string's values (the first of each key), decoded. */

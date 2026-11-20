@@ -78,7 +78,10 @@ permission, the first time the owner opens the team, and chat rooms that
 were open to them stay open.
 
 You can also **import roles and channels from a Discord server template**
-link. In a school or club community with teams, see
+link. After the preview, untick any text channels you don't want (by
+channel or a whole category, or All / None); only the ticked ones become
+rooms, and the roles all come across. In a school or club community with
+teams, see
 [Schools and clubs](#schools-and-clubs) for how rooms are sorted into
 teams.
 
@@ -451,8 +454,11 @@ with a men's team and a women's team. Start one from Teams → **New** →
   **Decline**. Events on other calendars show in that calendar's color;
   tap one for its details, **Add to calendar**, and **Edit** if you can.
   Pull down to refresh them.
-- **Add to calendar** (on any event's page too) opens the share sheet to
-  put the event in Apple Calendar, Outlook or Google Calendar.
+- **Add to calendar** (on any event's page too) opens your phone's
+  new-event screen filled in: pick the calendar (iCloud, Google,
+  Outlook...) and save. Where the phone has no calendar app it shares an
+  .ics file instead. On the website, **Add to calendar** offers Google
+  Calendar, Outlook, or an .ics file for Apple Calendar and others.
 
 #### Calendars (Settings → Calendars)
 

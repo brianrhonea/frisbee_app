@@ -157,7 +157,18 @@
 .hosted-game-you .hosted-game-head { margin: 0 -14px; padding: 10px 14px; background: var(--disc-soft); }
 .hosted-game-you .hosted-game-head small { color: var(--disc-ink); }
 .hosted-game-actions { margin: 0; }
-.hosted-score-form input { max-width: 7rem; font-family: var(--font-score); font-size: 1.4rem; text-align: center; }
+/* The score form: −, the score in the scoreboard face (typed or stepped), +. */
+.score-steps { display: grid; gap: 12px; }
+.score-step { display: grid; gap: 6px; }
+.score-step-name { font-weight: 700; overflow-wrap: anywhere; }
+.score-step-row { display: flex; align-items: center; gap: 8px; }
+.score-step-btn { flex: none; min-width: 48px; height: 48px; padding: 0; justify-content: center; font-size: 1.4rem; }
+.score-step-row input.score-step-input {
+  flex: 1 1 auto; min-width: 0; max-width: 8rem; height: 56px; text-align: center;
+  font-family: var(--font-score); font-weight: 800; font-size: 2.4rem; line-height: 1;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.score-step-input::-webkit-outer-spin-button, .score-step-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* Results: champion, standings with Barlow numbers, the bracket. */
 .hosted-champion { display: grid; gap: 2px; text-align: center; background: var(--accent-soft); border-color: transparent; }
@@ -233,3 +244,45 @@ dialog.dialog:has(.live-dialog) { width: min(100% - 32px, 480px); }
 /* Spots left on a tournament card (F10): turf while there is room, neutral when full; never amber. */
 .row-card small.spots-left { color: var(--accent-ink); font-weight: 700; }
 .row-card small.spots-left.spots-full { color: var(--muted); font-weight: 500; }
+
+/* A league's schedule a week at a time: ‹ Week 3 › (turf arrows). */
+.league-week-nav { display: flex; align-items: center; gap: 8px; }
+.league-week-title { flex: 1; display: grid; justify-items: center; text-align: center; gap: 2px; }
+.league-week-title b { font-family: var(--font-score); font-weight: 800; font-size: 1.6rem; line-height: 1.1; }
+.league-week-arrow { flex: none; width: 44px; height: 44px; font-size: 1.8rem; line-height: 1; color: var(--accent); }
+.league-week-arrow:disabled { color: var(--line-2); cursor: default; }
+.league-week-byes { text-align: center; }
+
+/* A card's title with a link beside it (Bracket · Open bracket). */
+.hosted-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.hosted-card-head .text-btn { color: var(--accent); font-weight: 600; }
+/* The bracket on its own page. */
+.bracket-page-head { display: grid; gap: 4px; }
+.bracket-page-head h1 { margin: 0; }
+
+/* Entering a team: one of the viewer's teams to pick, turf when picked. */
+.enter-team-option {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-control, 12px); background: var(--card); cursor: pointer;
+}
+.enter-team-option.on { border: 2px solid var(--accent); background: var(--accent-soft); }
+.enter-team-option > span { display: grid; min-width: 0; }
+.enter-team-option input[type="radio"] { accent-color: var(--accent); }
+
+/* The event form a step at a time: "Step 2 of 6 · When & where" over a
+   turf bar of the steps, then Back / Next (Save draft / Publish). */
+.form-steps { display: grid; gap: 8px; }
+.form-steps-title { font-size: 0.85rem; color: var(--ink-soft); }
+.form-steps-bar { display: flex; gap: 4px; }
+.form-steps-bar button {
+  flex: 1; height: 16px; padding: 6px 0; border: 0; background: none; cursor: pointer;
+  background-clip: content-box; background-color: var(--line); border-radius: 999px;
+}
+.form-steps-bar button.on { background-color: var(--accent); }
+.hosted-form-nav { flex-wrap: wrap; }
+.hosted-form-problem { margin: 0; color: var(--disc-ink); font-weight: 600; }
+.form-review { display: grid; gap: 10px; margin: 0; }
+.form-review-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.form-review-row dt { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.form-review-row dd { margin: 0; overflow-wrap: anywhere; }
+.form-review-row .text-btn { color: var(--accent); font-weight: 600; flex: none; }

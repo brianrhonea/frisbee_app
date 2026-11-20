@@ -207,12 +207,14 @@ class HomeViewModel extends ChangeNotifier {
   final _requestSubs = <String, StreamSubscription<List<GroupJoinRequest>>>{};
   final _requestCounts = <String, int>{};
 
-  /// Groups that approve who joins and the user may approve for (Manage
-  /// members), by name: the only ones with join requests, and the rules
-  /// let these members read them.
+  /// Groups that approve who joins and teams that allow join requests
+  /// (F26) the user may approve for (Manage members), by name: the only
+  /// ones with join requests, and the rules let these members read them.
   List<Team> get _approvingGroups => ([
     for (final t in teams)
-      if (t.isPrivateGroup && t.has(_uid, TeamPermission.manageMembers)) t,
+      if ((t.isPrivateGroup || t.allowJoinRequests) &&
+          t.has(_uid, TeamPermission.manageMembers))
+        t,
   ]..sort((a, b) => a.name.compareTo(b.name))).take(needsYouGroups).toList();
 
   void _watchJoinRequests() {

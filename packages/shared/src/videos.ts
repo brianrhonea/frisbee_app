@@ -134,6 +134,8 @@ export interface TeamVideoDoc {
   authorName?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** The team event it's tagged to (F6), set through the API only. */
+  eventId?: string;
 }
 
 /** A stored folder (VideoFolder). */
@@ -153,4 +155,84 @@ export function formatVideoBytes(bytes: number): string {
 export function videoFileFormat(name: string): string {
   const dot = name.lastIndexOf(".");
   return dot < 0 ? "Video" : name.substring(dot + 1).toUpperCase() || "Video";
+}
+
+// Notes, clips and comments on a team video (redesign F4, F5):
+// teams/{id}/videos/{videoId}/comments. One collection: a comment pinned to
+// a time (`atMs`) is a note, and a note with an end (`endMs`) is a clip.
+// Members read and write them; the author or a manager (manageTeam) deletes.
+// API-only (firestore.rules lets clients read them, and managers delete
+// them only to clear a removed video's).
+
+export const videoCommentLimits = {
+  body: 1000,
+  /** Times are within a day of the start (as watch together's positions). */
+  maxMs: 24 * 3600 * 1000,
+  /** Most a video page lists (newest kept). */
+  list: 500,
+} as const;
+
+const videoMs = z.number().int().min(0).max(videoCommentLimits.maxMs);
+
+/**
+ * `POST /v1/teams/:teamId/videos/:videoId/comments`: a comment, a note at
+ * `atMs`, or a clip from `atMs` to `endMs`.
+ */
+export const videoCommentRequestSchema = z
+  .strictObject({
+    body: z
+      .string()
+      .trim()
+      .min(1, "Write something first.")
+      .max(videoCommentLimits.body, `Keep it under ${videoCommentLimits.body} characters.`),
+    atMs: videoMs.optional(),
+    endMs: videoMs.optional(),
+  })
+  .refine((v) => v.endMs === undefined || (v.atMs !== undefined && v.endMs > v.atMs), {
+    message: "A clip ends after it starts.",
+    path: ["endMs"],
+  });
+export type VideoCommentRequest = z.infer<typeof videoCommentRequestSchema>;
+
+/** `PUT /v1/teams/:teamId/videos/:videoId/event`: tags the video to a team event; null untags it. */
+export const tagVideoEventRequestSchema = z.strictObject({
+  eventId: z.string().min(1).max(100).nullable(),
+});
+
+/** A stored note, clip or comment (VideoComment). */
+export interface VideoCommentDoc {
+  authorId?: string;
+  authorName?: string;
+  body?: string;
+  atMs?: number;
+  endMs?: number;
+  createdAt?: string;
+}
+
+/** Pinned to a time: a note (or clip), not a plain comment. */
+export const isVideoNote = (c: VideoCommentDoc) => typeof c.atMs === "number";
+
+/** "0:07", "1:23", "1:02:03" (VideoComment.formatTime). */
+export function formatVideoTime(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = String(total % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
+
+/** "1:23", or "1:23–1:40" for a clip. */
+export const videoNoteTime = (c: VideoCommentDoc) =>
+  typeof c.endMs === "number" ? `${formatVideoTime(c.atMs ?? 0)}–${formatVideoTime(c.endMs)}` : formatVideoTime(c.atMs ?? 0);
+
+const createdMs = (c: VideoCommentDoc) => (c.createdAt ? Date.parse(c.createdAt) : Number.MAX_SAFE_INTEGER);
+
+/**
+ * A video's notes by time (ties oldest first) and its comments oldest
+ * first (unsaved ones last), as both pages list them.
+ */
+export function splitVideoComments<T extends VideoCommentDoc>(all: T[]): { notes: T[]; comments: T[] } {
+  const notes = all.filter(isVideoNote).sort((a, b) => (a.atMs ?? 0) - (b.atMs ?? 0) || createdMs(a) - createdMs(b));
+  const comments = all.filter((c) => !isVideoNote(c)).sort((a, b) => createdMs(a) - createdMs(b));
+  return { notes, comments };
 }

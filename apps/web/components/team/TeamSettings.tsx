@@ -1,11 +1,13 @@
 "use client";
 import {
+  allowJoinRequestsDescription,
   competitionLevels,
   type EditTeamRequest,
   optionalTeamSections,
   publicPageDescription,
   publicPageOn,
   sectionOn,
+  type SetAllowJoinRequestsRequest,
   type SetPublicPageRequest,
   type SetTeamSectionsRequest,
 } from "@stall10/shared";
@@ -19,9 +21,11 @@ import { InviteButton, useInvite } from "./InviteDialog";
 import { JoinRequests } from "./JoinRequests";
 import { useTeamHub } from "./TeamContext";
 import { TeamRoles } from "./TeamRoles";
+import { MemberPermissions, ownPermissionsLabel } from "./MemberPermissions";
 import { DiscordImport } from "./DiscordImport";
 import { TeamCommunity } from "./CommunityAdmin";
 import { MembersOnlySection } from "./TeamNav";
+import { LEAVE_CONFIRM } from "./TeamContext";
 import { optionalSectionInfo } from "./SectionGate";
 
 /** The team doc's editable details (Team.toEditableMap in the app). */
@@ -219,8 +223,16 @@ function PublicPageCard() {
   const { act, busy, error } = useAct();
   // The switch in flight, until the live team doc shows it.
   const [pending, setPending] = useState<boolean | null>(null);
+  const [asking, setAsking] = useState<boolean | null>(null);
   if (viewer.state !== "member") return null;
   const admin = viewer.can("manageTeam");
+  // "Allow join requests" (F26): off declines those waiting, so it asks first.
+  function setRequests(on: boolean) {
+    if (!on && !window.confirm("Stop taking join requests? Anyone still waiting is declined. People can still join with an invite.")) return;
+    const body: SetAllowJoinRequestsRequest = { on };
+    setAsking(on);
+    void act(`/v1/teams/${encodeURIComponent(teamId)}/allow-join-requests`, "PUT", body).finally(() => setAsking(null));
+  }
   return (
     <section className="card settings-form team-sections team-visibility" id="visibility">
       <h2 className="card-title">Visibility</h2>
@@ -239,6 +251,19 @@ function PublicPageCard() {
             setPending(e.target.checked);
             void act(`/v1/teams/${encodeURIComponent(teamId)}/public-page`, "PUT", body).finally(() => setPending(null));
           }}
+        />
+      </label>
+      <label className={`switch-row${admin ? "" : " switch-row-locked"}`}>
+        <span>
+          <b>Allow join requests</b>
+          <small className="muted">{allowJoinRequestsDescription}</small>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={asking ?? viewer.team.allowJoinRequests === true}
+          disabled={!admin || busy}
+          onChange={(e) => setRequests(e.target.checked)}
         />
       </label>
       {!admin && <p className="muted small">Only the team&apos;s admins can change this.</p>}
@@ -271,6 +296,8 @@ function InviteCard() {
 function MemberRoles() {
   const { teamId, kind, viewer } = useTeamHub();
   const { act, busy, error } = useAct();
+  // Whose permission switches are open (F25; the owner's).
+  const [editing, setEditing] = useState<string | null>(null);
   if (viewer.state !== "member") return null;
   const team = viewer.team;
   const me = viewer.uid;
@@ -287,6 +314,7 @@ function MemberRoles() {
               <th>Member</th>
               <th>Role</th>
               {owner && kind === "team" && <th>Keeps stats</th>}
+              {owner && <th>Permissions</th>}
               <th />
             </tr>
           </thead>
@@ -331,6 +359,22 @@ function MemberRoles() {
                       />
                     </td>
                   )}
+                  {owner && (
+                    <td>
+                      {tier === "player" || tier === "stats" ? (
+                        <>
+                          <span className="muted">{ownPermissionsLabel(team, uid, kind !== "team") ?? "None"}</span>{" "}
+                          {tier === "player" && uid !== me && (
+                            <button type="button" className="text-btn" disabled={busy} aria-label={`Permissions for ${team.memberNames?.[uid] ?? "member"}`} onClick={() => setEditing(uid)}>
+                              Edit
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="muted">All</span>
+                      )}
+                    </td>
+                  )}
                   <td>
                     {!fixed && (
                       <button
@@ -353,8 +397,13 @@ function MemberRoles() {
           </tbody>
         </table>
       </div>
+      {owner && editing && (team.memberIds ?? []).includes(editing) && (
+        <MemberPermissions key={editing} teamId={teamId} team={team} uid={editing} group={kind !== "team"} onClose={() => setEditing(null)} />
+      )}
       <p className="muted small">
-        {owner ? "Give members custom roles and permissions under Roles below." : "The owner sets custom roles and their permissions."}
+        {owner
+          ? "Give someone a preset or their own permissions with Edit, or custom roles under Roles below."
+          : "The owner sets custom roles and their permissions."}
       </p>
       <Status error={error} ok={null} />
     </section>
@@ -464,7 +513,7 @@ function LeaveTeam({ teamId }: { teamId: string }) {
           className="btn btn-quiet"
           disabled={busy || !user}
           onClick={() => {
-            if (!user || !window.confirm("Leave? You'll need a new invite to come back.")) return;
+            if (!user || !window.confirm(LEAVE_CONFIRM)) return;
             void act(`/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(user.uid)}`, "DELETE").then((r) => {
               if (r !== null) router.push("/teams");
             });

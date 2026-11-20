@@ -230,15 +230,21 @@ class _ScoreDialogState extends State<_ScoreDialog> {
     Navigator.pop(context, (a!, b!));
   }
 
-  Widget _field(String label, TextEditingController c, {bool last = false}) =>
-      TextField(
-        controller: c,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        textInputAction: last ? TextInputAction.done : TextInputAction.next,
-        onSubmitted: last ? (_) => _submit() : null,
-        decoration: InputDecoration(labelText: label),
-      );
+  Widget _field(
+    String label,
+    TextEditingController c, {
+    required String side,
+    bool last = false,
+  }) => ScoreStepper(
+    label: label,
+    controller: c,
+    side: side,
+    last: last,
+    onSubmitted: last ? _submit : null,
+    onChanged: () {
+      if (_error != null) setState(() => _error = null);
+    },
+  );
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -253,9 +259,9 @@ class _ScoreDialogState extends State<_ScoreDialog> {
             Text(widget.message!),
             const SizedBox(height: 12),
           ],
-          _field(widget.nameA, _a),
-          const SizedBox(height: 8),
-          _field(widget.nameB, _b, last: true),
+          _field(widget.nameA, _a, side: 'a'),
+          const SizedBox(height: 12),
+          _field(widget.nameB, _b, side: 'b', last: true),
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -274,6 +280,128 @@ class _ScoreDialogState extends State<_ScoreDialog> {
       FilledButton(onPressed: _submit, child: Text(widget.submitLabel)),
     ],
   );
+}
+
+/// One team's score in the score form: its name, then −, the score in the
+/// scoreboard face (still typed straight in) and +. An untouched score
+/// stays empty (so "Enter both scores." still shows); + starts it at 1,
+/// and the steppers keep it from 0 to [max].
+class ScoreStepper extends StatelessWidget {
+  const ScoreStepper({
+    super.key,
+    required this.label,
+    required this.controller,
+    required this.side,
+    this.last = false,
+    this.max = 99,
+    this.onSubmitted,
+    this.onChanged,
+  });
+
+  final String label;
+  final TextEditingController controller;
+
+  /// `a` or `b`, for the buttons' keys.
+  final String side;
+  final bool last;
+  final int max;
+  final VoidCallback? onSubmitted;
+  final VoidCallback? onChanged;
+
+  void _step(int by) {
+    final now = int.tryParse(controller.text.trim());
+    final next = ((now ?? 0) + by).clamp(0, max);
+    controller.text = '$next';
+    onChanged?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, _) {
+        final n = int.tryParse(value.text.trim());
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: c.ink,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                IconButton.outlined(
+                  key: Key('score-minus-$side'),
+                  tooltip: 'One less for $label',
+                  onPressed: n != null && n > 0 ? () => _step(-1) : null,
+                  icon: const Icon(Icons.remove),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(2),
+                    ],
+                    textAlign: TextAlign.center,
+                    textInputAction: last
+                        ? TextInputAction.done
+                        : TextInputAction.next,
+                    onSubmitted: onSubmitted == null
+                        ? null
+                        : (_) => onSubmitted!(),
+                    onChanged: (_) => onChanged?.call(),
+                    style: TextStyle(
+                      fontFamily: scoreFont,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 40,
+                      height: 1.1,
+                      color: c.ink,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '–',
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                      hintStyle: TextStyle(
+                        fontFamily: scoreFont,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 40,
+                        color: c.muted,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 56,
+                  height: 48,
+                  child: FilledButton(
+                    key: Key('score-plus-$side'),
+                    style: FilledButton.styleFrom(padding: EdgeInsets.zero),
+                    onPressed: n == null || n < max ? () => _step(1) : null,
+                    child: Icon(
+                      Icons.add,
+                      semanticLabel: 'One more for $label',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 /// "Pool play + single elimination · 5v5 · to 11 · ...".

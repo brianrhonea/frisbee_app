@@ -3,15 +3,22 @@
 // the owner pastes a server template link, previews the roles, folders and
 // rooms it would add, and imports them. The preview maps the plan onto the
 // team with the same shared functions the API applies, so what's shown is
-// what's written. In a community with teams, rooms only one team's roles
-// read go to that team's chat (teams the owner also owns), and the owner
-// can send any room elsewhere.
+// what's written. The owner picks which text channels come across (all to
+// start with; pickRooms cuts the plan down before anything else sees it, so
+// unticked rooms are never made or moved). In a community with teams, rooms
+// only one team's roles read go to that team's chat (teams the owner also
+// owns), and the owner can send any room elsewhere.
 import {
+  allChannels,
   audienceLabel,
+  type ChannelGroup,
+  channelGroups,
   type DiscordImportResult,
   type ImportPlan,
   importIsEmpty,
   movingRooms,
+  pickedDestinations,
+  pickRooms,
   planFor,
   planImport,
   splitPlan,
@@ -19,7 +26,7 @@ import {
 } from "@stall10/shared";
 import { doc, getDoc } from "firebase/firestore";
 import Link from "next/link";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { callApi, problem } from "@/lib/client";
 import { firestoreDb } from "@/lib/firebase";
 import { useLiveQuery } from "@/lib/live";
@@ -42,7 +49,10 @@ export function DiscordImport() {
   const [busy, setBusy] = useState<"preview" | "import" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<DiscordImportResult | null>(null);
+  /** Where rooms go, by index into the whole plan. */
   const [overrides, setOverrides] = useState<Map<number, string | null>>(new Map());
+  /** The channels ticked, by index into the whole plan. */
+  const [picked, setPicked] = useState<Set<number>>(new Set());
   const folders = useLiveQuery<ManagedFolder>(owner && open ? `teams/${teamId}/chatFolders` : null, [], `${teamId}-folders`);
   const rooms = useLiveQuery<ManagedRoom>(owner && open ? `teams/${teamId}/chats` : null, [], `${teamId}-rooms`);
   const team = member?.team;
@@ -59,19 +69,22 @@ export function DiscordImport() {
   );
   const view = useMemo(() => {
     if (!plan || !team) return null;
-    const whole = planImport(plan, team, existing.folders, existing.rooms);
+    const picking = pickRooms(plan, picked, overrides);
+    const chosen = picking.plan;
+    const whole = planImport(chosen, team, existing.folders, existing.rooms);
     let split = null;
     if (sortsIntoTeams) {
-      const forced = new Map(overrides);
-      splitPlan(plan, team, whole.roleIdsByKey, overrides).destinations.forEach((d, i) => {
+      const forced = new Map(picking.overrides);
+      splitPlan(chosen, team, whole.roleIdsByKey, picking.overrides).destinations.forEach((d, i) => {
         if (d !== null && !owned.has(d)) forced.set(i, null);
       });
-      split = splitPlan(plan, team, whole.roleIdsByKey, forced);
+      split = splitPlan(chosen, team, whole.roleIdsByKey, forced);
     }
-    const here = split ? planImport(planFor(plan, split, null), team, existing.folders, existing.rooms) : whole;
-    const moving = split ? movingRooms(plan, split, existing.folders, existing.rooms) : [];
-    return { split, here, moving, toTeams: split ? split.destinations.filter((d) => d !== null).length : 0 };
-  }, [plan, team, existing, sortsIntoTeams, overrides, owned]);
+    const here = split ? planImport(planFor(chosen, split, null), team, existing.folders, existing.rooms) : whole;
+    const moving = split ? movingRooms(chosen, split, existing.folders, existing.rooms) : [];
+    return { picking, split, here, moving, toTeams: split ? split.destinations.filter((d) => d !== null).length : 0 };
+  }, [plan, team, existing, sortsIntoTeams, overrides, owned, picked]);
+  const groups = useMemo(() => (plan ? channelGroups(plan) : []), [plan]);
 
   if (!owner) return null;
 
@@ -83,7 +96,9 @@ export function DiscordImport() {
     setDone(null);
     setOverrides(new Map());
     try {
-      setPlan(await callApi<ImportPlan>(user, `/v1/teams/${encodeURIComponent(teamId)}/discord/preview`, { method: "POST", body: { link: link.trim() } }));
+      const next = await callApi<ImportPlan>(user, `/v1/teams/${encodeURIComponent(teamId)}/discord/preview`, { method: "POST", body: { link: link.trim() } });
+      setPicked(new Set(allChannels(next)));
+      setPlan(next);
     } catch (err) {
       setPlan(null);
       setError(problem(err, "Couldn't read that template. Try again."));
@@ -105,8 +120,9 @@ export function DiscordImport() {
     setBusy("import");
     setError(null);
     try {
-      const destinations = [...overrides].map(([room, id]) => ({ room, teamId: id }));
-      setDone(await callApi<DiscordImportResult>(user, `/v1/teams/${encodeURIComponent(teamId)}/discord/import`, { method: "POST", body: { plan, destinations } }));
+      // Only the picked channels, with destinations by their index there.
+      const body = { plan: view.picking.plan, destinations: pickedDestinations(view.picking) };
+      setDone(await callApi<DiscordImportResult>(user, `/v1/teams/${encodeURIComponent(teamId)}/discord/import`, { method: "POST", body }));
     } catch (err) {
       setError(problem(err, "Couldn't import. Try again."));
     } finally {
@@ -140,6 +156,15 @@ export function DiscordImport() {
   };
   const nothing = !!view && importIsEmpty(view.here) && view.toTeams === 0 && view.moving.length === 0;
   const teamName = (id: string) => linked.find(([tid]) => tid === id)?.[1]?.name ?? "Team";
+  const pick = (indexes: number[], on: boolean) => {
+    const next = new Set(picked);
+    for (const i of indexes) {
+      if (on) next.add(i);
+      else next.delete(i);
+    }
+    setPicked(next);
+    setDone(null);
+  };
 
   return (
     <section className="card discord-import">
@@ -162,6 +187,7 @@ export function DiscordImport() {
           onChange={(e) => {
             setLink(e.target.value);
             setPlan(null);
+            setPicked(new Set());
             setDone(null);
           }}
         />
@@ -171,23 +197,24 @@ export function DiscordImport() {
       </form>
       {error && <p className="form-error">{error}</p>}
 
-      {plan && here && (
+      {plan && here && view && (
         <div className="discord-preview">
           <h3>{plan.serverName}</h3>
-          {view?.split && (
+          <ChannelPicker plan={plan} groups={groups} picked={picked} disabled={busy !== null} onPick={pick} />
+          {view.split && view.picking.plan.rooms.length > 0 && (
             <div className="discord-split">
               <h4>Where rooms go</h4>
               <p className="muted small">Rooms only one team&apos;s roles can read go to that team&apos;s chat. Teams you don&apos;t own keep theirs here.</p>
               <ul>
-                {plan.rooms.map((r, i) => (
-                  <li key={i}>
+                {view.picking.plan.rooms.map((r, i) => (
+                  <li key={view.picking.from[i]}>
                     <span>#{r.name}</span>
                     <select
                       aria-label={`Where #${r.name} goes`}
                       value={view.split!.destinations[i] ?? ""}
                       onChange={(e) => {
                         const next = new Map(overrides);
-                        next.set(i, e.target.value || null);
+                        next.set(view.picking.from[i]!, e.target.value || null);
                         setOverrides(next);
                         setDone(null);
                       }}
@@ -260,6 +287,80 @@ export function DiscordImport() {
         </div>
       )}
     </section>
+  );
+}
+
+/** The template's text channels by category, a box each: only ticked ones become rooms. */
+function ChannelPicker({
+  plan,
+  groups,
+  picked,
+  disabled,
+  onPick,
+}: {
+  plan: ImportPlan;
+  groups: ChannelGroup[];
+  picked: Set<number>;
+  disabled: boolean;
+  onPick: (indexes: number[], on: boolean) => void;
+}) {
+  const total = plan.rooms.length;
+  const all = allChannels(plan);
+  return (
+    <fieldset className="discord-pick" disabled={disabled}>
+      <legend>
+        <h4>Pick channels</h4>
+      </legend>
+      {total === 0 ? (
+        <p className="muted small">This template has no text channels.</p>
+      ) : (
+        <>
+          <div className="discord-pick-head">
+            <span className="muted small">
+              {picked.size} of {total} text channel{total === 1 ? "" : "s"} picked. Only these become rooms; roles all come across.
+            </span>
+            <span className="discord-pick-all">
+              <button type="button" className="text-btn" disabled={picked.size === total} onClick={() => onPick(all, true)}>
+                All
+              </button>
+              <button type="button" className="text-btn" disabled={picked.size === 0} onClick={() => onPick(all, false)}>
+                None
+              </button>
+            </span>
+          </div>
+          {groups.map((g) => (
+            <div key={g.folderKey ?? ""} className="discord-pick-group">
+              {g.name !== null && <GroupBox name={g.name} rooms={g.rooms} picked={picked} onPick={onPick} />}
+              <ul className={g.name !== null ? "discord-pick-rooms nested" : "discord-pick-rooms"}>
+                {g.rooms.map((i) => (
+                  <li key={i}>
+                    <label className="check-row">
+                      <input type="checkbox" checked={picked.has(i)} onChange={(e) => onPick([i], e.target.checked)} /># {plan.rooms[i]!.name}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </>
+      )}
+    </fieldset>
+  );
+}
+
+/** A category's box: ticked when all its channels are, a dash when some are. */
+function GroupBox({ name, rooms, picked, onPick }: { name: string; rooms: number[]; picked: Set<number>; onPick: (indexes: number[], on: boolean) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const all = rooms.every((i) => picked.has(i));
+  const some = !all && rooms.some((i) => picked.has(i));
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = some;
+  }, [some]);
+  return (
+    <label className="check-row discord-pick-folder">
+      <input ref={ref} type="checkbox" checked={all} onChange={() => onPick(rooms, !all)} />
+      {name}
+    </label>
   );
 }
 

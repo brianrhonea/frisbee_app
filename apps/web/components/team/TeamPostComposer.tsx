@@ -22,10 +22,13 @@ export function TeamPostComposer({
   teamId,
   post,
   onDone,
+  prompt = "Post to the team…",
 }: {
   teamId: string;
   post?: TeamPostView & { id: string };
   onDone?: () => void;
+  /** The closed box's words (redesign F24: "Post to the team…"). */
+  prompt?: string;
 }) {
   const { user } = useAuth();
   const [postId, setPostId] = useState(() => post?.id ?? newId());
@@ -121,7 +124,7 @@ export function TeamPostComposer({
   if (!open) {
     return (
       <button type="button" className="card composer-card team-compose-open" onClick={() => setOpen(true)}>
-        Post an update to the team…
+        {prompt}
       </button>
     );
   }

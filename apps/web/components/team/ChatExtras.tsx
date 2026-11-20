@@ -1,14 +1,28 @@
 "use client";
-// Pins and event cards in team rooms (redesign F2, F3), as the app's
-// chat_extras.dart: the pinned strip with every pin a click away, the
-// card a shared event shows as (RSVPs through the event's own endpoint),
-// and the "Share an event" picker. Pins and shares are API-only.
-import { chatPinsMax, sharedEventPreview } from "@stall10/shared";
+// Pins, event cards and polls in team rooms (redesign F2, F3, F33), as the
+// app's chat_extras.dart and chat_polls.dart: the pinned strip with every
+// pin a click away, the card a shared event shows as (RSVPs through the
+// event's own endpoint), the "Share an event" picker, and poll cards with
+// the "Poll" form. Pins, shares and polls are API-only.
+import {
+  type ChatPoll,
+  chatPinsMax,
+  chatPollClosed,
+  chatPollOptionMax,
+  chatPollOptionsMax,
+  chatPollOptionsMin,
+  chatPollPreview,
+  chatPollQuestionMax,
+  chatPollTally,
+  chatPollToggle,
+  sharedEventPreview,
+} from "@stall10/shared";
 import { limit, orderBy } from "firebase/firestore";
 import Link from "next/link";
-import { useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { ApiError, callApi } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQuery } from "@/lib/live";
+import { fromLocalInput } from "@/lib/dates";
 import { useAuth } from "../AuthProvider";
 import { Dialog } from "../Dialog";
 import { LocalTime } from "../LocalTime";
@@ -26,6 +40,8 @@ export interface ExtrasMessage {
   attachments?: unknown[];
   createdAt?: string;
   event?: { id?: string; title?: string };
+  /** A poll asked in the room (F33). */
+  poll?: ChatPoll;
   pinnedAt?: string;
 }
 
@@ -38,6 +54,7 @@ export function previewOf(m: ExtrasMessage): string {
   const t = (m.text ?? "").trim().replace(/\s+/g, " ");
   if (t) return t.length > 120 ? `${t.slice(0, 117)}…` : t;
   if (m.event) return sharedEventPreview(m.event.title ?? "");
+  if (m.poll) return chatPollPreview(m.poll.question ?? "");
   const n = m.attachments?.length ?? 0;
   return n === 0 ? "" : n === 1 ? "📎 File" : `📎 ${n} files`;
 }
@@ -311,6 +328,262 @@ export function ShareEventDialog({
           Cancel
         </button>
       </div>
+    </Dialog>
+  );
+}
+
+/**
+ * A poll asked in the room (F33), as a card: the question, each option
+ * with its count and bar (the viewer's picks marked), the total, and "Poll
+ * closed" once it's over. Click an option to vote, again to take it back
+ * (a single-choice poll swaps). "See votes" lists who picked what: votes
+ * aren't anonymous. The card listens to its own message, since older pages
+ * of a thread aren't live.
+ */
+export function ChatPollCard({
+  teamId,
+  roomId,
+  messageId,
+  authorId,
+  initial,
+  uid,
+  canManage,
+  nameOf,
+}: {
+  teamId: string;
+  roomId: string;
+  messageId: string;
+  authorId?: string;
+  initial: ChatPoll;
+  uid: string;
+  /** The owner and chat managers close anyone's poll. */
+  canManage: boolean;
+  nameOf: (uid: string) => string;
+}) {
+  const { user } = useAuth();
+  const live = useLiveDoc<{ poll?: ChatPoll }>(`teams/${teamId}/chats/${roomId}/messages/${messageId}`);
+  const [sending, setSending] = useState<number[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [voters, setVoters] = useState(false);
+  // The vote being sent has landed (or someone else's change has).
+  useEffect(() => setSending(null), [live.data]);
+  if (live.data === null) return <div className="chat-event-card gone">Poll no longer available</div>;
+  const poll = live.data?.poll ?? initial;
+  const options = poll.options ?? [];
+  const mine = sending ?? poll.votes?.[uid] ?? [];
+  // Counts the viewer's choice as sent.
+  const { counts, voters: total } = chatPollTally({ options, votes: { ...(poll.votes ?? {}), [uid]: mine } });
+  const closed = chatPollClosed(poll, Date.now());
+  const needs = !closed && mine.length === 0;
+  const canClose = !closed && (authorId === uid || canManage);
+  const path = `${roomPath(teamId, roomId)}/messages/${encodeURIComponent(messageId)}`;
+  async function run(fn: () => Promise<unknown>): Promise<boolean> {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      return true;
+    } catch (e) {
+      setError((e as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+  function vote(i: number) {
+    if (!user || closed || busy) return;
+    const next = chatPollToggle(mine, i, poll.multiple === true);
+    setSending(next);
+    // On success the choice stays shown until the live message brings it back, so it doesn't flash back.
+    void run(() => callApi(user, `${path}/vote`, { method: "PUT", body: { options: next } })).then((ok) => {
+      if (!ok) setSending(null);
+    });
+  }
+  function close() {
+    if (!user || !window.confirm("Close this poll? Nobody can vote or change their vote after.")) return;
+    void run(() => callApi(user, `${path}/close-poll`, { method: "POST", body: {} }));
+  }
+  const votersOf = (i: number) =>
+    Object.entries(poll.votes ?? {})
+      .filter(([, v]) => Array.isArray(v) && v.includes(i))
+      .map(([u]) => nameOf(u))
+      .sort((a, b) => a.localeCompare(b));
+  return (
+    <div className="chat-event-card chat-poll-card">
+      <p className="chat-poll-head">
+        <b>📊 Poll · {poll.multiple ? "pick any" : "pick one"}</b>
+        {needs && <span className="rsvp-pill needs">Vote</span>}
+      </p>
+      <p className="chat-poll-question">{poll.question || "Poll"}</p>
+      <div className="chat-poll-options">
+        {options.map((o, i) => {
+          const picked = mine.includes(i);
+          const pct = total ? Math.round((counts[i] / total) * 100) : 0;
+          return (
+            <button
+              key={i}
+              type="button"
+              className={`poll-option${picked ? " on" : ""}`}
+              disabled={closed || busy}
+              aria-pressed={picked}
+              onClick={() => vote(i)}
+            >
+              <span className="poll-bar" style={{ width: `${pct}%` }} />
+              <span>
+                {picked ? "✓ " : ""}
+                {o}
+              </span>
+              <b>{counts[i]}</b>
+            </button>
+          );
+        })}
+      </div>
+      <div className="chat-poll-foot">
+        <small>
+          {total === 1 ? "1 vote" : `${total} votes`}
+          {closed ? (
+            " · Poll closed"
+          ) : poll.closesAt ? (
+            <>
+              {" · Closes "}
+              <LocalTime iso={poll.closesAt} style="dateTime" />
+            </>
+          ) : null}
+        </small>
+        {total > 0 && (
+          <button type="button" className="text-btn" aria-expanded={voters} onClick={() => setVoters(!voters)}>
+            {voters ? "Hide votes" : "See votes"}
+          </button>
+        )}
+        {canClose && (
+          <button type="button" className="text-btn" disabled={busy} onClick={close}>
+            Close poll
+          </button>
+        )}
+      </div>
+      {voters && (
+        <ul className="chat-poll-voters">
+          {options.map((o, i) => {
+            const names = votersOf(i);
+            return (
+              <li key={i}>
+                <b>
+                  {o} · {names.length}
+                </b>
+                <span>{names.length ? names.join(", ") : "No votes"}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {error && <p className="form-error">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * "Poll" in a room's attach menu (F33): a question, 2–6 options, "Allow
+ * multiple answers" and an optional closing time, checked as the API
+ * checks them; posting adds it to the room as a card.
+ */
+export function CreatePollDialog({ teamId, roomId, onClose }: { teamId: string; roomId: string; onClose: () => void }) {
+  const { user } = useAuth();
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState(() => [
+    { id: 0, text: "" },
+    { id: 1, text: "" },
+  ]);
+  const [nextId, setNextId] = useState(2);
+  const [multiple, setMultiple] = useState(false);
+  const [closesAt, setClosesAt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const texts = options.map((o) => o.text.trim());
+  const closes = fromLocalInput(closesAt);
+  const problem = !question.trim()
+    ? "Ask a question."
+    : texts.some((t) => !t)
+      ? "Fill in every option, or remove it."
+      : new Set(texts.map((t) => t.toLowerCase())).size !== texts.length
+        ? "Each option must be different."
+        : closes && Date.parse(closes) <= Date.now()
+          ? "Pick a closing time in the future."
+          : null;
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!user || problem) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await callApi(user, `${roomPath(teamId, roomId)}/polls`, {
+        method: "POST",
+        body: { question: question.trim(), options: texts, multiple, ...(closes && { closesAt: closes }) },
+      });
+      onClose();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog label="New poll" onClose={onClose} className="card pins-dialog" dismissOnBackdrop>
+      <form className="chat-poll-form" onSubmit={(e) => void submit(e)}>
+        <h2>New poll</h2>
+        <label>
+          Question
+          <input value={question} required maxLength={chatPollQuestionMax} autoFocus onChange={(e) => setQuestion(e.target.value)} />
+        </label>
+        {options.map((o, i) => (
+          <div key={o.id} className="input-row">
+            <input
+              aria-label={`Option ${i + 1}`}
+              placeholder={`Option ${i + 1}`}
+              value={o.text}
+              maxLength={chatPollOptionMax}
+              onChange={(e) => setOptions(options.map((x) => (x.id === o.id ? { ...x, text: e.target.value } : x)))}
+            />
+            {options.length > chatPollOptionsMin && (
+              <button type="button" className="text-btn" onClick={() => setOptions(options.filter((x) => x.id !== o.id))}>
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+        {options.length < chatPollOptionsMax && (
+          <p>
+            <button
+              type="button"
+              className="btn btn-small"
+              onClick={() => {
+                setOptions([...options, { id: nextId, text: "" }]);
+                setNextId(nextId + 1);
+              }}
+            >
+              Add option
+            </button>
+          </p>
+        )}
+        <label className="switch-row">
+          <input type="checkbox" checked={multiple} onChange={(e) => setMultiple(e.target.checked)} /> Allow multiple answers
+        </label>
+        <label>
+          Closes <small className="muted">(optional; otherwise when someone closes it)</small>
+          <input type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} />
+        </label>
+        {problem && question.trim() && texts.every(Boolean) && <p className="form-error">{problem}</p>}
+        {error && <p className="form-error">{error}</p>}
+        <p className="muted small">Everyone in the room sees who voted for what.</p>
+        <div className="form-actions">
+          <button type="button" className="btn btn-small" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary btn-small" disabled={busy || problem !== null}>
+            {busy ? "Posting…" : "Post poll"}
+          </button>
+        </div>
+      </form>
     </Dialog>
   );
 }

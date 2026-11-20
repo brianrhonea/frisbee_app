@@ -6,23 +6,30 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/team_video.dart';
+import '../../../domain/models/video_comment.dart';
 import '../../../domain/models/video_folder.dart';
 import '../../../utils/result.dart';
+import '../../services/api_client.dart';
 import '../../services/firestore_utils.dart';
 import 'video_repository.dart';
 
 /// Videos live in `teams/{teamId}/videos`; uploaded video files in Cloud Storage
 /// under `teams/{teamId}/videos/{videoId}/`. firestore.rules and
 /// storage.rules let members watch and owners, coaches and captains write.
+/// Notes, comments and event tags (F4-F6) are written through the API
+/// ([api]); without one they're read-only.
 class VideoRepositoryFirebase implements VideoRepository {
   VideoRepositoryFirebase({
     FirebaseFirestore? firestore,
     FirebaseStorage? storage,
+    ApiClient? api,
   }) : _db = firestore ?? FirebaseFirestore.instance,
-       _storage = storage ?? FirebaseStorage.instance;
+       _storage = storage ?? FirebaseStorage.instance,
+       _api = api;
 
   final FirebaseFirestore _db;
   final FirebaseStorage _storage;
+  final ApiClient? _api;
 
   CollectionReference<Map<String, dynamic>> _videos(String teamId) =>
       _db.collection('teams').doc(teamId).collection('videos');
@@ -132,6 +139,10 @@ class VideoRepositoryFirebase implements VideoRepository {
           videoId,
           plainData((await ref.get()).data()),
         ).file?.path;
+        // Its notes and comments first: once the video's gone nobody can
+        // see them. firestore.rules lets editors delete them for this; if
+        // that fails (say, rules not yet deployed) the video still goes.
+        await _clearComments(teamId, videoId).catchError((Object _) {});
         await ref.delete();
         // The listing goes first so a failed file delete never leaves a
         // video pointing at nothing.
@@ -197,4 +208,101 @@ class VideoRepositoryFirebase implements VideoRepository {
         }
         await _folders(teamId).doc(folderId).delete();
       });
+
+  CollectionReference<Map<String, dynamic>> _comments(
+    String teamId,
+    String videoId,
+  ) => _videos(teamId).doc(videoId).collection('comments');
+
+  Future<void> _clearComments(String teamId, String videoId) async {
+    const chunk = 400;
+    for (;;) {
+      final snap = await _comments(teamId, videoId).limit(chunk).get();
+      if (snap.docs.isEmpty) return;
+      final batch = _db.batch();
+      for (final d in snap.docs) {
+        batch.delete(d.reference);
+      }
+      await batch.commit();
+      if (snap.docs.length < chunk) return;
+    }
+  }
+
+  static const _noApi = 'Notes and comments need a connection to Stall 10.';
+
+  ApiClient get _client =>
+      _api ?? (throw const ApiException('unavailable', _noApi));
+
+  static String _videoPath(String teamId, String videoId) =>
+      '/v1/teams/${Uri.encodeComponent(teamId)}/videos/'
+      '${Uri.encodeComponent(videoId)}';
+
+  /// `videoCommentLimits.list` in packages/shared.
+  static const _commentsMax = 500;
+
+  @override
+  bool get canUseVideoExtras => _api != null;
+
+  @override
+  Stream<List<VideoComment>> watchComments(String teamId, String videoId) =>
+      _comments(teamId, videoId)
+          .orderBy('createdAt', descending: true)
+          .limit(_commentsMax)
+          .snapshots()
+          .map(
+            (snap) => [
+              for (final d in snap.docs)
+                VideoComment.fromMap(d.id, plainData(d.data())),
+            ],
+          );
+
+  @override
+  Future<Result<void>> addComment(
+    String teamId,
+    String videoId, {
+    required String body,
+    int? atMs,
+    int? endMs,
+  }) => guard(
+    () => _client.post('${_videoPath(teamId, videoId)}/comments', {
+      'body': body,
+      'atMs': ?atMs,
+      'endMs': ?endMs,
+    }),
+  );
+
+  @override
+  Future<Result<void>> deleteComment(
+    String teamId,
+    String videoId,
+    String commentId,
+  ) => guard(
+    () => _client.delete(
+      '${_videoPath(teamId, videoId)}/comments/'
+      '${Uri.encodeComponent(commentId)}',
+    ),
+  );
+
+  @override
+  Future<Result<void>> tagEvent(
+    String teamId,
+    String videoId,
+    String? eventId,
+  ) => guard(
+    () => _client.put('${_videoPath(teamId, videoId)}/event', {
+      'eventId': eventId,
+    }),
+  );
+
+  @override
+  Stream<List<TeamVideo>> watchEventVideos(String teamId, String eventId) =>
+      _videos(teamId)
+          .where('eventId', isEqualTo: eventId)
+          .snapshots()
+          .map(
+            (snap) => [
+              for (final d in snap.docs)
+                TeamVideo.fromMap(d.id, plainData(d.data())),
+            ]..sort(TeamVideo.newestFirst),
+          );
 }

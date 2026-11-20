@@ -7,6 +7,7 @@
 // Admin SDK skips the rules, so every conjunct is checked here.
 import {
   linkRosterPlayerSchema,
+  rosterLineOf,
   type SaveStatsGameInput,
   type SaveStatsTournamentInput,
   saveRosterPlayerSchema,
@@ -188,7 +189,10 @@ export class StatsService {
       if (p.userId !== null && !strings(team.memberIds).includes(p.userId) && p.userId !== kept) {
         throw new ApiError("invalid_argument", "Link the spot to someone on the team.");
       }
-      const fields = { name: p.name, number: p.number, position: p.position, userId: p.userId };
+      const fields: Data = { name: p.name, number: p.number, position: p.position, userId: p.userId };
+      // Its line is set apart (PUT .../roster-lines); editing keeps it.
+      const line = rosterLineOf(existing?.line);
+      if (line) fields.line = line;
       if (creating) tx.create(paths.player(teamId, id), fields);
       else tx.set(paths.player(teamId, id), fields);
       if (p.paid !== undefined) tx.set(paths.status(teamId, id), { paid: p.paid });
@@ -250,7 +254,7 @@ export class StatsService {
  */
 function adminSpotValid(d: Data): boolean {
   const keys = Object.keys(d);
-  const allowed = ["name", "number", "position", "userId"];
+  const allowed = ["name", "number", "position", "userId", "line"];
   return (
     keys.every((k) => allowed.includes(k)) &&
     typeof d.name === "string" &&
@@ -258,6 +262,7 @@ function adminSpotValid(d: Data): boolean {
     d.name.length <= 80 &&
     "number" in d &&
     (d.number === null || Number.isInteger(d.number)) &&
-    ["handler", "cutter", "hybrid"].includes(own(d, "position") as string)
+    ["handler", "cutter", "hybrid"].includes(own(d, "position") as string) &&
+    (!("line" in d) || rosterLineOf(d.line) !== undefined)
   );
 }

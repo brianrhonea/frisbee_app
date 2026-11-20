@@ -346,6 +346,73 @@ export function storedAccess(a: PlannedAccess) {
   };
 }
 
+// Picking channels (PickedPlan in discord_import.dart) -----------------------
+
+/** A category of the template's text channels, for the channel picker. */
+export interface ChannelGroup {
+  /** The folder's key, or null for channels in no category. */
+  folderKey: string | null;
+  /** The category's name, or null for channels in no category. */
+  name: string | null;
+  /** Indexes into plan.rooms, in the plan's order. */
+  rooms: number[];
+}
+
+/**
+ * The template's text channels by category, as Discord lists them: those
+ * in no category first, then each category in order. A room naming a
+ * folder the plan doesn't have counts as in no category; categories with
+ * no channels aren't listed.
+ */
+export function channelGroups(plan: ImportPlan): ChannelGroup[] {
+  const keys = new Set(plan.folders.map((f) => f.key));
+  const inFolder = (r: PlannedRoom) => (r.folderKey !== null && keys.has(r.folderKey) ? r.folderKey : null);
+  const groups: ChannelGroup[] = [{ folderKey: null, name: null, rooms: [] }, ...plan.folders.map((f) => ({ folderKey: f.key, name: f.name, rooms: [] as number[] }))];
+  plan.rooms.forEach((r, i) => groups.find((g) => g.folderKey === inFolder(r))!.rooms.push(i));
+  return groups.filter((g) => g.rooms.length > 0);
+}
+
+/** Every channel of [plan] ticked: what the picker starts with. */
+export const allChannels = (plan: ImportPlan): number[] => plan.rooms.map((_, i) => i);
+
+/** The plan cut down to the channels picked, and room indexes mapped across. */
+export interface PickedPlan {
+  plan: ImportPlan;
+  /** Picked room index → its index in the whole plan. */
+  from: number[];
+  /** [overrides] (by whole-plan index) for the picked rooms, by picked index. */
+  overrides: Map<number, string | null>;
+}
+
+/**
+ * Only the rooms in [picked] (indexes into plan.rooms; ones out of range
+ * or repeated are ignored), in the plan's order. A category goes too when
+ * a picked room is in it, or when it had no channels in the template (as
+ * importing everything does), so unticking all of a category's channels
+ * leaves it out. Roles are all kept. [overrides] say where rooms go in a
+ * community with teams, by whole-plan index; they come back by picked
+ * index, for splitPlan.
+ */
+export function pickRooms(plan: ImportPlan, picked: Iterable<number>, overrides: ReadonlyMap<number, string | null> = new Map()): PickedPlan {
+  const chosen = new Set(picked);
+  const from = allChannels(plan).filter((i) => chosen.has(i));
+  const rooms = from.map((i) => plan.rooms[i]!);
+  const used = new Set(rooms.flatMap((r) => (r.folderKey === null ? [] : [r.folderKey])));
+  const hadRooms = new Set(plan.rooms.flatMap((r) => (r.folderKey === null ? [] : [r.folderKey])));
+  const moved = new Map<number, string | null>();
+  from.forEach((whole, i) => {
+    if (overrides.has(whole)) moved.set(i, overrides.get(whole)!);
+  });
+  return {
+    plan: { ...plan, folders: plan.folders.filter((f) => used.has(f.key) || !hadRooms.has(f.key)), rooms },
+    from,
+    overrides: moved,
+  };
+}
+
+/** Destinations for the import request: [overrides] by picked index. */
+export const pickedDestinations = (picked: PickedPlan) => [...picked.overrides].map(([room, teamId]) => ({ room, teamId }));
+
 // Communities with teams (DiscordTeamSplit, TeamChatImport) ------------------
 
 /** Where each room goes in a community with teams: its own chat (null) or a linked team's (an id). */

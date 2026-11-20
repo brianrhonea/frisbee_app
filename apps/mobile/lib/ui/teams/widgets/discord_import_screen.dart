@@ -14,7 +14,7 @@ import '../view_models/discord_import_viewmodel.dart';
 import 'roles_screen.dart';
 
 /// Imports roles, categories and text channels from a Discord server
-/// template link.
+/// template link; the owner picks which text channels come across.
 class DiscordImportScreen extends StatefulWidget {
   const DiscordImportScreen({super.key, required this.viewModel});
 
@@ -150,12 +150,19 @@ class _DiscordImportScreenState extends State<DiscordImportScreen> {
                       ),
                     ],
                     if (vm.plan case final plan? when import != null) ...[
-                      if (vm.split case final split?) ...[
-                        const SizedBox(height: 24),
-                        _TeamSorting(viewModel: vm, plan: plan, split: split),
-                      ],
+                      const SizedBox(height: 16),
+                      _ChannelPicker(viewModel: vm, plan: plan),
+                      if (vm.split case final split?)
+                        if (split.destinations.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          _TeamSorting(
+                            viewModel: vm,
+                            plan: vm.picking!.plan,
+                            split: split,
+                          ),
+                        ],
                       const SizedBox(height: 24),
-                      if (vm.split != null)
+                      if (vm.split?.destinations.isNotEmpty ?? false)
                         Text(
                           'Community chat',
                           style: TextStyle(
@@ -198,6 +205,94 @@ class _DiscordImportScreenState extends State<DiscordImportScreen> {
       );
     },
   );
+}
+
+/// The template's text channels by category, with a box each: only the
+/// ticked ones become rooms.
+class _ChannelPicker extends StatelessWidget {
+  const _ChannelPicker({required this.viewModel, required this.plan});
+
+  final DiscordImportViewModel viewModel;
+  final DiscordImportPlan plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final c = AppColors.of(context);
+    final total = plan.rooms.length;
+    final busy = vm.preview.running || vm.apply.running;
+    return SectionCard(
+      title: 'Pick channels',
+      padding: const EdgeInsets.all(16),
+      action: total == 0
+          ? null
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: busy || vm.pickedCount == total
+                      ? null
+                      : () => vm.setAllPicked(true),
+                  child: const Text('All'),
+                ),
+                TextButton(
+                  onPressed: busy || vm.pickedCount == 0
+                      ? null
+                      : () => vm.setAllPicked(false),
+                  child: const Text('None'),
+                ),
+              ],
+            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            total == 0
+                ? 'This template has no text channels.'
+                : '${vm.pickedCount} of $total text channel'
+                      '${total == 1 ? '' : 's'} picked. Only these become '
+                      'rooms; roles all come across.',
+            style: TextStyle(color: c.muted, fontSize: 13),
+          ),
+          for (final g in vm.channelGroups) ...[
+            if (g.name != null)
+              CheckboxListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                tristate: true,
+                value: g.rooms.every(vm.isPicked)
+                    ? true
+                    : g.rooms.any(vm.isPicked)
+                    ? null
+                    : false,
+                onChanged: busy
+                    ? null
+                    : (_) => vm.setGroupPicked(g, !g.rooms.every(vm.isPicked)),
+                title: Text(
+                  g.name!.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                    color: c.muted,
+                  ),
+                ),
+              ),
+            for (final i in g.rooms)
+              CheckboxListTile(
+                dense: true,
+                contentPadding: EdgeInsets.only(left: g.name == null ? 0 : 24),
+                controlAffinity: ListTileControlAffinity.leading,
+                value: vm.isPicked(i),
+                onChanged: busy ? null : (v) => vm.setPicked(i, v ?? false),
+                title: Text('# ${plan.rooms[i].name}'),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 /// What the import would add, with each room's access.

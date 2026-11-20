@@ -54,6 +54,8 @@ _To come._
   roles or removes people at any time; anyone can leave. New events go
   on a calendar picked in the editor (the app also offers team
   schedules; the website, calendars only for now). For other calendar
-  apps: **Add to calendar** on each event (an .ics file) and a private
+  apps: **Add to calendar** on each event (the app opens the phone's
+  new-event editor to pick a calendar; the website offers Google
+  Calendar, Outlook or an .ics file) and a private
   subscription link (webcal/ICS) of every calendar the player is on,
   which they can reset or turn off.

@@ -582,6 +582,17 @@ void main() {
         teams.changed();
         await pumpEventQueue();
         expect(vm.needsYou, isEmpty);
+
+        // A team that allows join requests (F26) has them too.
+        teams.teams['t1'] = teams.teams['t1']!.copyWith(
+          allowJoinRequests: true,
+        );
+        teams.changed();
+        await pumpEventQueue();
+        expect(
+          [for (final r in vm.needsYou) (r.team.id, r.count)],
+          [('t1', 1)],
+        );
       },
     );
 

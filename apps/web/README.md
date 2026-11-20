@@ -11,7 +11,7 @@ Firebase Hosting used to serve (Hosting now has only the static pages in
 | `/` | Visitors: a preview (a few community posts, locked cards, sign-up prompts). Members: their dashboard from `GET /v1/me/home`, with the feed's tabs Your teams (default), Following (once For you) and Everyone (once Community); `?tab=` takes the old names too |
 | `/learn` | Everyone (server-rendered): beginner's guide to the rules of ultimate (an original summary, not the official text) |
 | `/community`, `/posts/[id]` | The public feed and one post |
-| `/teams` | Members: invitations and their teams (the Teams tab opens a member's only team or community straight away, with **All teams** back to this list). Everyone: the team finder (`GET /v1/public/teams?q=`) |
+| `/teams` | Members: invitations and their teams (the Teams tab always opens this list; a hub has **All teams** back to it). Everyone: the team finder (`GET /v1/public/teams?q=`) |
 | `/teams/[id]` | Team and group pages; members get the hub (Feed, Schedule, Chat, Roster, More, Settings). Visitors get the feed, public events and, for adult teams (`rosterIsPublic`), the roster's players (`GET /v1/public/teams/:id/roster`, server-rendered) |
 | `/players/[uid]` | Members: profiles (private ones show only their card) |
 | `/teams/new` | Members: create a team, group or school/club community |

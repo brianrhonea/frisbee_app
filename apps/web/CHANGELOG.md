@@ -4,6 +4,35 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.47.0 — 2026-11-20
+
+Redesign features, second batch, with app 0.0.38. Needs API 0.35.0.
+Details in `docs/product-spec.md` §8.1 items 35–44.
+
+**Added**
+- Tournaments: bracket page (`/tournaments/:id/bracket`), −/+ score
+  steppers, league week stepper, Enter a team page
+  (`/tournaments/:id/enter`), host form in steps with Save draft /
+  Publish, Share (or copy link).
+- Team videos: notes and clips pinned to moments (YouTube now plays
+  through YouTube's IFrame API so notes can seek), comments, tag to an
+  event; events list their tagged videos.
+- "Add to calendar" menu: Google Calendar, Outlook, Apple / other
+  (.ics).
+- Team page: Going and New in chat tiles; roster Role column, O-line /
+  D-line groups, Edit lines, Invites pending; More rows with
+  descriptions, Manage team and Leave.
+- Chat polls in team rooms.
+- Team feed: Pin / Unpin (up to 3), comments with counts, "Post to the
+  team…".
+- Settings › Roles: per-person permissions with presets. Settings ›
+  Visibility: Allow join requests; Request to join for outsiders.
+- Discord import: Pick channels.
+- Community pages: Next pickup card with RSVP, Chat rooms, Organizers.
+
+**Changed**
+- The Teams tab always opens `/teams` (`useSingleTeam` removed).
+
 ## 0.46.0 — 2026-11-20
 
 Redesign features, with app 0.0.37. Needs API 0.34.0. Details in

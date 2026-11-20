@@ -117,4 +117,66 @@ void main() {
     expect(pins.map((m) => m.id), ['c', 'a']);
     expect(pins.first.isPinned, isTrue);
   });
+
+  test('polls (F33) post, vote and close through the API', () async {
+    final r = repo();
+    answer = () => http.Response(jsonEncode({'id': 'q1'}), 201);
+    final closes = DateTime.utc(2026, 11, 21, 18);
+    expect(
+      await r.createPoll('t1', 'general', (
+        question: 'Which day?',
+        options: ['Sat', 'Sun'],
+        multiple: true,
+        closesAt: closes,
+      )),
+      isA<Ok<void>>(),
+    );
+    answer = () => http.Response('', 204);
+    expect(await r.votePoll('t1', 'general', 'q1', [0, 1]), isA<Ok<void>>());
+    expect(await r.closePoll('t1', 'general', 'q1'), isA<Ok<void>>());
+    expect(sent, [
+      {
+        'method': 'POST',
+        'path': '/v1/teams/t1/chats/general/polls',
+        'body': {
+          'question': 'Which day?',
+          'options': ['Sat', 'Sun'],
+          'multiple': true,
+          'closesAt': '2026-11-21T18:00:00.000Z',
+        },
+      },
+      {
+        'method': 'PUT',
+        'path': '/v1/teams/t1/chats/general/messages/q1/vote',
+        'body': {
+          'options': [0, 1],
+        },
+      },
+      {
+        'method': 'POST',
+        'path': '/v1/teams/t1/chats/general/messages/q1/close-poll',
+        'body': <String, Object?>{},
+      },
+    ]);
+  });
+
+  test('a poll card reads its own message, live', () async {
+    final doc = db.doc('teams/t1/chats/general/messages/q1');
+    await doc.set({
+      'authorId': 'p',
+      'text': '',
+      'poll': {
+        'question': 'Which day?',
+        'options': ['Sat', 'Sun'],
+        'multiple': false,
+        'votes': {
+          'p': [1],
+        },
+        'voterIds': ['p'],
+      },
+    });
+    final m = await repo().watchMessage('t1', 'general', 'q1').first;
+    expect(m?.poll?.counts, [0, 1]);
+    expect(await repo().watchMessage('t1', 'general', 'gone').first, isNull);
+  });
 }

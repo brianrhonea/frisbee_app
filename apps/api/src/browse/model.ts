@@ -161,6 +161,7 @@ export function listingView(listing: Data): Data {
     "description",
     "requiresApproval",
     "location",
+    "allowJoinRequests",
   ]);
 }
 
@@ -185,7 +186,7 @@ export function isPublicTeamPost(post: Data): boolean {
   return post.public === true;
 }
 
-const teamPostFields = ["title", "body", "location", "links", "images", "authorId", "authorName", "public", "tournamentKey", "createdAt", "updatedAt"] as const;
+const teamPostFields = ["title", "body", "location", "links", "images", "authorId", "authorName", "public", "tournamentKey", "createdAt", "updatedAt", "pinnedAt"] as const;
 
 /** A team's public home-page post, without who reacted. */
 export function teamPostView(post: Data): Data {

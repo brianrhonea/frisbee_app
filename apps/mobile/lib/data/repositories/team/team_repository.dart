@@ -1,5 +1,6 @@
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/invite_code.dart';
+import '../../../domain/models/pending_invite.dart';
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
@@ -74,6 +75,11 @@ abstract class TeamRepository {
   /// ([Team.publicPage]), its listing with it. Through the API only.
   Future<Result<void>> setPublicPage(String teamId, bool on);
 
+  /// Admins (manageTeam) turn a team's "Allow join requests" on or off
+  /// ([Team.allowJoinRequests]), its listing with it; off declines the
+  /// requests waiting. Through the API only.
+  Future<Result<void>> setAllowJoinRequests(String teamId, bool on);
+
   /// Teams in the public directory whose name or city words start with the
   /// words of [query].
   Future<Result<List<TeamListing>>> searchTeams(String query);
@@ -99,6 +105,15 @@ abstract class TeamRepository {
   );
 
   Future<Result<void>> setMemberRole(String teamId, String uid, TeamRole role);
+
+  /// Owner only: the permissions [uid] has of their own (the per-person
+  /// switches; a [RolePreset] is a set of them), on top of their roles.
+  /// Through the API only (`PUT /v1/teams/:id/members/:uid/permissions`).
+  Future<Result<void>> setMemberPermissions(
+    String teamId,
+    String uid,
+    Set<TeamPermission> permissions,
+  );
 
   /// Gives a player stats access, or takes it away.
   Future<Result<void>> setStatKeeper(
@@ -199,6 +214,21 @@ abstract class TeamRepository {
   Future<Result<void>> savePlayer(String teamId, RosterPlayer player);
 
   Future<Result<void>> deletePlayer(String teamId, String playerId);
+
+  /// Admins (manageTeam) only: puts each roster spot in [lines] (by id) on
+  /// the O-line, D-line or both, or takes its line away (null). Through
+  /// the API only (`PUT /v1/teams/:id/roster-lines`).
+  Future<Result<void>> setRosterLines(
+    String teamId,
+    Map<String, RosterLine?> lines,
+  );
+
+  /// Who's invited to the team and hasn't answered, newest first, for
+  /// those who may invite people. Through the API only.
+  Future<Result<List<PendingInvite>>> pendingInvites(String teamId);
+
+  /// Takes back the invite to [uid] (someone who may invite people).
+  Future<Result<void>> withdrawInvite(String teamId, String uid);
 
   /// Links roster player [playerId] to the account [uid], or unlinks it
   /// when null, so their stats show on that player's profile. Members may

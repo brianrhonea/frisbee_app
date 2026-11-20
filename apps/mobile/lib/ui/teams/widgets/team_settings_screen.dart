@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/models/team.dart';
+import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
@@ -29,6 +30,13 @@ const publicPageDescription =
     "for an adult team, its roster. Turned off, people outside the team "
     'see only its name and city. Chat always stays private.';
 
+/// What the "Allow join requests" switch does (allowJoinRequestsDescription
+/// in packages/shared; the website says the same).
+const allowJoinRequestsDescription =
+    'People who find the team can ask to join from its page. Admins who '
+    'manage members approve or decline each request; club teams still '
+    'need players to be 16 or over.';
+
 /// A team's settings: the Sections card, a switch for each optional
 /// section with what it's for. The owner turns them on or off; new teams
 /// start with them off. Then Visibility: the "Public team page" switch,
@@ -50,17 +58,23 @@ class _TeamSettingsScreenState extends State<TeamSettingsScreen> {
     super.initState();
     vm.setSection.addListener(_onCommand);
     vm.setPublicPage.addListener(_onCommand);
+    vm.setAllowJoinRequests.addListener(_onCommand);
   }
 
   @override
   void dispose() {
     vm.setSection.removeListener(_onCommand);
     vm.setPublicPage.removeListener(_onCommand);
+    vm.setAllowJoinRequests.removeListener(_onCommand);
     super.dispose();
   }
 
   void _onCommand() {
-    for (final c in [vm.setSection, vm.setPublicPage]) {
+    for (final c in [
+      vm.setSection,
+      vm.setPublicPage,
+      vm.setAllowJoinRequests,
+    ]) {
       if (c.error) {
         showErrorSnackBar(context, c.result);
         c.clearResult();
@@ -68,12 +82,33 @@ class _TeamSettingsScreenState extends State<TeamSettingsScreen> {
     }
   }
 
+  /// Off declines the requests waiting, so it asks first.
+  Future<void> _setJoinRequests(bool on) async {
+    if (!on &&
+        !await confirmDialog(
+          context,
+          title: 'Stop taking join requests?',
+          message:
+              'Anyone still waiting is declined. People can still join '
+              'with an invite.',
+          confirmLabel: 'Turn off',
+        )) {
+      return;
+    }
+    vm.setAllowJoinRequests.execute(on);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: settingsAppBar(context, title: const Text('Team settings')),
       body: ListenableBuilder(
-        listenable: Listenable.merge([vm, vm.setSection, vm.setPublicPage]),
+        listenable: Listenable.merge([
+          vm,
+          vm.setSection,
+          vm.setPublicPage,
+          vm.setAllowJoinRequests,
+        ]),
         builder: (context, _) {
           if (!vm.loaded) return const LoadingView();
           final team = vm.team;
@@ -129,6 +164,17 @@ class _TeamSettingsScreenState extends State<TeamSettingsScreen> {
                             ? vm.setPublicPage.execute
                             : null,
                       ),
+                      if (vm.hasJoinRequests)
+                        SwitchListTile(
+                          key: const ValueKey('allow-join-requests'),
+                          title: const Text('Allow join requests'),
+                          subtitle: const Text(allowJoinRequestsDescription),
+                          value: vm.allowJoinRequests,
+                          onChanged:
+                              vm.canManage && !vm.setAllowJoinRequests.running
+                              ? _setJoinRequests
+                              : null,
+                        ),
                     ],
                   ),
               ],

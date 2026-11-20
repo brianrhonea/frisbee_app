@@ -12,6 +12,7 @@ import '../ui/tournaments/view_models/player_signups_viewmodel.dart';
 import '../ui/tournaments/view_models/host_event_viewmodel.dart';
 import '../ui/tournaments/view_models/live_draft_viewmodel.dart';
 import '../ui/tournaments/view_models/team_draft_viewmodel.dart';
+import '../ui/tournaments/widgets/hosted_bracket_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournament_form_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournament_screen.dart';
 import '../ui/tournaments/widgets/hosted_tournaments_list.dart';
@@ -130,6 +131,27 @@ List<GoRoute> hostedTournamentRoutes() => [
                   authRepository: c.read(),
                 ),
                 builder: (_, vm) => LiveDraftScreen(viewModel: vm),
+              );
+            },
+          ),
+          GoRoute(
+            path: 'bracket/:divisionId',
+            builder: (_, state) {
+              final id = state.pathParameters['tournamentId']!;
+              final division = state.pathParameters['divisionId']!;
+              return ViewModelHost(
+                key: ValueKey('bracket-$id-$division'),
+                create: (c) => HostedTournamentViewModel(
+                  tournamentId: id,
+                  tournamentRepository: c.read(),
+                  teamRepository: c.read(),
+                  authRepository: c.read(),
+                  postRepository: c.read(),
+                  followRepository: c.read(),
+                  notificationRepository: c.read(),
+                ),
+                builder: (_, vm) =>
+                    HostedBracketScreen(viewModel: vm, divisionId: division),
               );
             },
           ),

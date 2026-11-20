@@ -40,9 +40,11 @@ class MessageThreadView extends StatefulWidget {
     this.videoPlayer = fileVideoPlayer,
     this.header,
     this.eventCard,
+    this.pollCard,
     this.isPinned,
     this.onTogglePin,
     this.onShareEvent,
+    this.onCreatePoll,
   });
 
   final MessageThreadViewModel viewModel;
@@ -64,6 +66,9 @@ class MessageThreadView extends StatefulWidget {
   /// Draws a message's shared event (team rooms); null shows nothing.
   final Widget Function(ChatMessage message, ChatEventRef event)? eventCard;
 
+  /// Draws a message's poll (team rooms); null shows nothing.
+  final Widget Function(ChatMessage message, ChatPoll poll)? pollCard;
+
   /// Whether a message is pinned (team rooms); marks it in the thread.
   final bool Function(ChatMessage message)? isPinned;
 
@@ -73,6 +78,9 @@ class MessageThreadView extends StatefulWidget {
 
   /// "Share an event" in the attach menu; null hides it.
   final VoidCallback? onShareEvent;
+
+  /// "Poll" in the attach menu; null hides it.
+  final VoidCallback? onCreatePoll;
 
   @override
   State<MessageThreadView> createState() => _MessageThreadViewState();
@@ -263,6 +271,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
                     onProfile: _openProfile,
                     reveal: _reveal,
                     eventCard: widget.eventCard,
+                    pollCard: widget.pollCard,
                     isPinned: widget.isPinned,
                   ),
                 ),
@@ -281,6 +290,7 @@ class _MessageThreadViewState extends State<MessageThreadView>
               onSend: _send,
               hintText: widget.hintText,
               onShareEvent: widget.onShareEvent,
+              onCreatePoll: widget.onCreatePoll,
             )
           else
             _ReadOnlyBar(text: widget.readOnlyNotice),
@@ -330,6 +340,7 @@ class _RowActions {
     required this.onProfile,
     required this.reveal,
     this.eventCard,
+    this.pollCard,
     this.isPinned,
   });
 
@@ -349,6 +360,9 @@ class _RowActions {
 
   /// A shared event's card (team rooms).
   final Widget Function(ChatMessage, ChatEventRef)? eventCard;
+
+  /// A poll's card (team rooms).
+  final Widget Function(ChatMessage, ChatPoll)? pollCard;
 
   /// Whether a message is pinned (team rooms).
   final bool Function(ChatMessage)? isPinned;
@@ -1217,6 +1231,8 @@ class _FeedRow extends StatelessWidget {
           ),
         if (m.event case final e?)
           if (actions.eventCard case final card?) card(m, e),
+        if (m.poll case final p?)
+          if (actions.pollCard case final card?) card(m, p),
         _Attachments(message: m, viewModel: vm, videoPlayer: videoPlayer),
         _ReactionChips(message: m, uid: vm.uid, onReact: actions.onReact),
       ],
@@ -1785,7 +1801,7 @@ class _ReadOnlyBar extends StatelessWidget {
   }
 }
 
-enum _AttachKind { camera, video, photo, file, event }
+enum _AttachKind { camera, video, photo, file, event, poll }
 
 /// The text box's menu: the usual cut, copy, paste and select all, plus
 /// Undo and Redo while there's something to undo or redo.
@@ -1902,6 +1918,7 @@ class _Composer extends StatelessWidget {
     required this.onSend,
     required this.hintText,
     this.onShareEvent,
+    this.onCreatePoll,
   });
 
   final MessageThreadViewModel viewModel;
@@ -1913,6 +1930,9 @@ class _Composer extends StatelessWidget {
 
   /// "Share an event" in the attach menu (team rooms).
   final VoidCallback? onShareEvent;
+
+  /// "Poll" in the attach menu (team rooms).
+  final VoidCallback? onCreatePoll;
 
   // Its buttons (send, attach) keep the keyboard open.
   @override
@@ -2087,6 +2107,7 @@ class _Composer extends StatelessWidget {
       _AttachKind.photo => vm.pickFiles.execute(true),
       _AttachKind.file => vm.pickFiles.execute(false),
       _AttachKind.event => onShareEvent?.call(),
+      _AttachKind.poll => onCreatePoll?.call(),
     },
     itemBuilder: (_) => [
       if (vm.canUseCamera)
@@ -2125,6 +2146,14 @@ class _Composer extends StatelessWidget {
           child: ListTile(
             leading: Icon(Icons.event_outlined),
             title: Text('Share an event'),
+          ),
+        ),
+      if (onCreatePoll != null)
+        const PopupMenuItem(
+          value: _AttachKind.poll,
+          child: ListTile(
+            leading: Icon(Icons.poll_outlined),
+            title: Text('Poll'),
           ),
         ),
     ],

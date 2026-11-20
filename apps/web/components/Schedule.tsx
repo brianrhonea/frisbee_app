@@ -23,7 +23,8 @@ import {
 } from "@stall10/shared";
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { colorOf, downloadIcs, loadHidden, saveHidden } from "@/lib/calendar";
+import { colorOf, loadHidden, saveHidden } from "@/lib/calendar";
+import { AddToCalendar } from "./AddToCalendar";
 import { callApi, problem } from "@/lib/client";
 import { type Doc, useLiveQueries } from "@/lib/live";
 import { type Meeting, type MeetingData, meetingHref, teamBase, teamMeetingQueries } from "./team/meetings/model";
@@ -333,22 +334,16 @@ export function Schedule() {
                 </button>
               </>
             )}
-            <button
-              type="button"
-              className="text-btn"
-              onClick={() =>
-                downloadIcs({
-                  uid: `${e.calendarId}-${e.id}@stall10.app`,
-                  title: e.title,
-                  startsAt: e.startsAt,
-                  endsAt: e.endsAt,
-                  location: e.location,
-                  description: e.notes,
-                })
-              }
-            >
-              Add to calendar
-            </button>
+            <AddToCalendar
+              event={{
+                uid: `${e.calendarId}-${e.id}@stall10.app`,
+                title: e.title,
+                startsAt: e.startsAt,
+                endsAt: e.endsAt,
+                location: e.location,
+                description: e.notes,
+              }}
+            />
           </span>
         </span>
       </li>

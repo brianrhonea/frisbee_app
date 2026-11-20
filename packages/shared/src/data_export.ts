@@ -17,9 +17,13 @@ export const dataExportLimits = {
   teams: 200,
   /** Events and meetings read per team for the caller's answers. */
   eventsPerTeam: 1000,
+  /** Chat polls (F33) per team the caller voted in. */
+  pollVotesPerTeam: 1000,
   conversations: 1000,
   personalEvents: 2000,
   rosterSpots: 500,
+  /** Requests to join groups and teams still waiting (F26). */
+  joinRequests: 500,
 } as const;
 
 /** What "Download your data" gives, as both apps say it (downloadDataDescription in download_data_group.dart). */
@@ -55,11 +59,19 @@ export interface DataExportMessage {
   attachments?: Json[];
   /** The id of the message it answered (not that message's text). */
   replyToId?: string;
+  /** A poll they posted (F33): its question and options, not who voted. */
+  poll?: { question: string; options: string[] };
 }
 
+/** A comment on a post, or a note, clip or comment on a team video (then teamId and videoId, no postId). */
 export interface DataExportComment {
   id: string;
-  postId: string;
+  postId?: string;
+  teamId?: string;
+  videoId?: string;
+  /** A video note's time, and a clip's end, in ms. */
+  atMs?: number;
+  endMs?: number;
   body?: string;
   parentId?: string;
   createdAt?: string;
@@ -74,7 +86,7 @@ export interface DataExportTeam {
   tier: string;
   /** The names of the custom roles the caller has. */
   roles: string[];
-  /** The permissions those roles give. */
+  /** The permissions those roles give, and any the owner gave them of their own (F25). */
   permissions: string[];
   statKeeper: boolean;
 }
@@ -110,6 +122,30 @@ export interface DataExportRosterSpot {
   name?: string;
   number?: number;
   position?: string;
+  /** Which line the team put them on: "o", "d" or "both". */
+  line?: string;
+}
+
+/** The caller's vote in a team chat poll (F33): the poll and the options they picked, never anyone else's. */
+export interface DataExportPollVote {
+  teamId: string;
+  teamName: string;
+  roomId: string;
+  messageId: string;
+  question: string;
+  options: string[];
+  /** Indexes into options. */
+  picked: number[];
+}
+
+/** A request of theirs to join a group or team, still waiting (F26): which, as whom, and when. */
+export interface DataExportJoinRequest {
+  teamId: string;
+  teamName: string;
+  kind: "team" | "community" | "organization";
+  /** The name they asked as. */
+  name?: string;
+  createdAt?: string;
 }
 
 /** The whole file. Dates are ISO 8601 strings. */
@@ -140,6 +176,10 @@ export interface DataExport {
   conversations: DataExportSection<DataExportConversation>;
   teams: DataExportSection<DataExportTeam>;
   responses: DataExportSection<DataExportResponse>;
+  /** Their votes in team chat polls (F33). */
+  pollVotes: DataExportSection<DataExportPollVote>;
   personalEvents: DataExportSection<Json>;
   rosterSpots: DataExportSection<DataExportRosterSpot>;
+  /** Their requests to join groups and teams, still waiting (F26). */
+  joinRequests: DataExportSection<DataExportJoinRequest>;
 }

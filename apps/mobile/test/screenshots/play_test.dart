@@ -181,7 +181,7 @@ final _plays = [
   ),
 ];
 
-Widget _fakeYouTube(String id) => const AspectRatio(
+Widget _fakeYouTube(String id, [Object? _]) => const AspectRatio(
   aspectRatio: 16 / 9,
   child: ColoredBox(
     color: Colors.black,

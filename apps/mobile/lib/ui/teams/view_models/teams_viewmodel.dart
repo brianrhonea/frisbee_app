@@ -26,11 +26,6 @@ class TeamsViewModel extends ChangeNotifier {
   StreamSubscription<List<TeamInvite>>? _invitesSub;
 
   List<TeamInvite> _invites = const [];
-  bool _invitesLoaded = false;
-
-  /// Whether the invitations have loaded (or failed to), so [single] can
-  /// tell there are none.
-  bool get invitesLoaded => _invitesLoaded;
 
   /// Invitations from owners and organizers, newest first.
   List<TeamInvite> get invites => _invites;
@@ -94,13 +89,6 @@ class TeamsViewModel extends ChangeNotifier {
         (c) => c.id == team.orgId && c.linkedTeams.containsKey(team.id),
       );
 
-  /// The user's only team or community, when they're on exactly one and
-  /// have no invitation waiting: the Teams tab opens it straight away.
-  Team? get single =>
-      _items.length == 1 && _invitesLoaded && _invites.isEmpty && _error == null
-      ? _items.single
-      : null;
-
   /// Whether the user is on the community's team [teamId].
   bool isOn(String teamId) => _items.any((t) => t.id == teamId);
 
@@ -130,12 +118,10 @@ class TeamsViewModel extends ChangeNotifier {
         .listen(
           (invites) {
             _invites = invites;
-            _invitesLoaded = true;
             _watchInviteListings();
             notifyListeners();
           },
           onError: (Object _) {
-            _invitesLoaded = true;
             notifyListeners();
           },
         );

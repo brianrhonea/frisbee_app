@@ -1,4 +1,4 @@
-import { isYouthTeam, publicPageOn, rosterIsPublic } from "@stall10/shared";
+import { allowsJoinRequests, isYouthTeam, publicPageOn, rosterIsPublic } from "@stall10/shared";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -43,9 +43,11 @@ export default async function TeamLayout({ params, children }: Props) {
   // A team whose "Public team page" is off (publicPageOn): its card only.
   const privatePage = !group && !publicPageOn(team);
   const subtitle = listingSubtitle(team);
+  // "Allow join requests" (F26): outsiders may ask to join this team.
+  const joinRequests = !group && allowsJoinRequests(team);
 
   return (
-    <TeamProvider teamId={teamId} name={name} kind={kind} privateGroup={privateGroup} privatePage={privatePage} youth={isYouthTeam(team)} publicRoster={rosterIsPublic(team)}>
+    <TeamProvider teamId={teamId} name={name} kind={kind} privateGroup={privateGroup} privatePage={privatePage} joinRequests={joinRequests} youth={isYouthTeam(team)} publicRoster={rosterIsPublic(team)}>
       <InviteProvider>
         <div className="page page-wide team-hub">
           <AllTeamsLink />

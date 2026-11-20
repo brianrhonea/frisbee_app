@@ -13,7 +13,6 @@ import { useUnreadCount } from "./Notifications";
 import { SideTeams } from "./SideTeams";
 import { ThemeToggle } from "./ThemeToggle";
 import { UpcomingAside } from "./UpcomingAside";
-import { useSingleTeam } from "./useMyTeams";
 import { VoiceBar } from "./voice/VoiceBar";
 import { isTyping } from "@/lib/text";
 
@@ -134,16 +133,16 @@ function isActive(path: string, tab: Tab, only: string | null, tabs: Tab[]) {
   return tab.also?.some((p) => under(path, p)) ?? false;
 }
 
-type TabLinksProps = { tabs: Tab[]; className: string; path: string; only: string | null; teamsHref: string };
+type TabLinksProps = { tabs: Tab[]; className: string; path: string; only: string | null };
 
-/** The tabs as links, [teamsHref] in place of Teams' own (a member's only team). */
-function TabLinks({ tabs, className, path, only, teamsHref }: TabLinksProps) {
+/** The tabs as links. Teams always opens the list of your teams, even with only one. */
+function TabLinks({ tabs, className, path, only }: TabLinksProps) {
   return tabs.map((t) => {
     const active = isActive(path, t, only, tabs);
     return (
       <Link
         key={t.href}
-        href={t.href === "/teams" ? teamsHref : t.href}
+        href={t.href}
         className={active ? `${className} active` : className}
         aria-current={active ? "page" : undefined}
         onClick={() => {
@@ -177,9 +176,6 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   // Discover has its own search box.
   const search = !under(path, "/explore");
   const tabs = user ? memberTabs : visitorTabs;
-  // On exactly one team or community, Teams opens it (the hub links back to all teams).
-  const single = useSingleTeam(user?.uid);
-  const teamsHref = single ? `/teams/${encodeURIComponent(single)}` : "/teams";
   const unread = useUnreadCount();
   useShortcuts(!!user);
   // Phones' floating Post button, on pages without a composer of their own at the foot.
@@ -194,7 +190,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
   }
 
   const tabLinks = (className: string) => {
-    const props = { tabs, className, path, teamsHref };
+    const props = { tabs, className, path };
     return (
       <Suspense fallback={<TabLinks {...props} only={null} />}>
         <TabLinksWithFilter {...props} />

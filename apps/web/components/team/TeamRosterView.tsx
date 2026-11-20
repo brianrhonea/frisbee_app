@@ -1,5 +1,17 @@
 "use client";
-import type { PublicRoster, RosterMember, TeamRoster } from "@stall10/shared";
+import {
+  groupByLine,
+  type PendingInvites,
+  type PublicRoster,
+  type RosterLine,
+  rosterLineLabels,
+  rosterLines,
+  type RosterMember,
+  type RosterPlayer,
+  type SetRosterLinesRequest,
+  type TeamRoster,
+  unassignedLineLabel,
+} from "@stall10/shared";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { callApi, problem } from "@/lib/client";
@@ -7,6 +19,7 @@ import { type Signal, useChangeSignal } from "@/lib/live";
 import { useAuth } from "../AuthProvider";
 import { Avatar } from "../Avatar";
 import { roleLabel } from "../ProfileDashboard";
+import { LocalTime } from "../LocalTime";
 import { ErrorNote, Loading } from "../StatusViews";
 import { InviteButton } from "./InviteDialog";
 import { useTeamHub } from "./TeamContext";
@@ -15,6 +28,8 @@ import { useTeamHub } from "./TeamContext";
 export const youthRosterNote = "Rosters of youth teams are private: only members see them.";
 
 const positionLabels: Record<string, string> = { handler: "Handler", cutter: "Cutter", hybrid: "Hybrid" };
+/** The line picker's buttons (RosterLine.short in the app). */
+const lineShort: Record<RosterLine, string> = { o: "O", d: "D", both: "Both" };
 
 /**
  * Who's on the team, for anyone signed in (`GET /v1/teams/:id/roster`):
@@ -32,6 +47,8 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
   // A youth team's roster is its members' (and its school or club's admins'): the API refuses anyone else.
   const [youthPrivate, setYouthPrivate] = useState(false);
   const [filter, setFilter] = useState("");
+  // Bumped after saving lines: they're on the roster docs, not the team doc.
+  const [reload, setReload] = useState(0);
 
   // Members refetch when the team doc changes (someone joins, leaves or
   // changes role); outsiders can't read it, so theirs loads once.
@@ -61,7 +78,7 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
       live = false;
       clearTimeout(timer);
     };
-  }, [user, teamId, version, youth, member]);
+  }, [user, teamId, version, youth, member, reload]);
   // Another team, or another account: don't show the last one's roster.
   useEffect(() => setRoster(null), [user, teamId]);
 
@@ -124,49 +141,15 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
       </div>
 
       {roster.kind === "team" && (
-        <section className="card">
-          <h2 className="card-title">Roster</h2>
-          {roster.players.length === 0 ? (
-            <p className="muted small">No players on the roster yet.</p>
-          ) : (
-            <div className="table-scroll">
-              <table className="data-table roster-table">
-                <thead>
-                  <tr>
-                    <th className="num">#</th>
-                    <th>Player</th>
-                    <th>Position</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {players.map((p) => (
-                    <tr key={p.id}>
-                      <td className="num">{p.number ?? "–"}</td>
-                      <td>
-                        {p.person ? (
-                          <Link className="person" href={`/players/${p.person.uid}`}>
-                            <Avatar name={p.person.name} url={p.person.photoUrl} size={28} />
-                            <span>
-                              {p.name}
-                              {p.person.username && <small className="muted"> @{p.person.username}</small>}
-                            </span>
-                          </Link>
-                        ) : (
-                          <span className="person">
-                            <Avatar name={p.name} size={28} />
-                            <span>{p.name}</span>
-                          </span>
-                        )}
-                      </td>
-                      <td>{positionLabels[p.position ?? ""] ?? "–"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <PlayersCard
+          roster={roster}
+          players={players}
+          canEditLines={viewer.state === "member" && viewer.can("manageTeam")}
+          onSaved={() => setReload((n) => n + 1)}
+        />
       )}
+
+      {viewer.state === "member" && viewer.can("manageMembers") && <PendingInvitesCard teamId={teamId} version={version} />}
 
       <section className="card">
         <h2 className="card-title">Members</h2>
@@ -249,6 +232,235 @@ function VisitorRoster({ roster, teamId }: { roster: PublicRoster; teamId: strin
 }
 
 const leads = new Set(["owner", "coach", "captain"]);
+
+/**
+ * The roster's players: one table, or one per line (O-line, D-line, Both
+ * lines, Unassigned; groupByLine) once anyone has a line. Each row has
+ * the linked member's role (their tier as a pill when they run the team,
+ * then custom roles). The team's admins (manageTeam) get "Edit lines":
+ * O / D / Both on every row, saved together (`PUT .../roster-lines`).
+ */
+function PlayersCard({
+  roster,
+  players,
+  canEditLines,
+  onSaved,
+}: {
+  roster: TeamRoster;
+  players: RosterPlayer[];
+  canEditLines: boolean;
+  onSaved: () => void;
+}) {
+  const { teamId, kind } = useTeamHub();
+  const { user } = useAuth();
+  const [draft, setDraft] = useState<Record<string, RosterLine | null> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const members = new Map(roster.members.map((m) => [m.uid, m]));
+  const editing = draft !== null;
+  const lineOf = (p: RosterPlayer): RosterLine | undefined => (draft && p.id in draft ? (draft[p.id] ?? undefined) : p.line);
+  const groups = editing ? [] : groupByLine(players);
+
+  async function save() {
+    if (!user || !draft) return;
+    const lines: SetRosterLinesRequest["lines"] = {};
+    for (const p of roster.players) if (p.id in draft && (draft[p.id] ?? undefined) !== p.line) lines[p.id] = draft[p.id];
+    if (Object.keys(lines).length === 0) return setDraft(null);
+    setSaving(true);
+    setError("");
+    try {
+      await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/roster-lines`, { method: "PUT", body: { lines } satisfies SetRosterLinesRequest });
+      setDraft(null);
+      onSaved();
+    } catch (e) {
+      setError(problem(e, "Couldn't save the lines. Try again."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const table = (rows: RosterPlayer[]) => (
+    <div className="table-scroll">
+      <table className="data-table roster-table">
+        <thead>
+          <tr>
+            <th className="num">#</th>
+            <th>Player</th>
+            <th>Role</th>
+            <th>Position</th>
+            {editing && <th>Line</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((p) => {
+            const m = p.person ? members.get(p.person.uid) : undefined;
+            return (
+              <tr key={p.id}>
+                <td className="num">{p.number ?? "–"}</td>
+                <td>
+                  {p.person ? (
+                    <Link className="person" href={`/players/${p.person.uid}`}>
+                      <Avatar name={p.person.name} url={p.person.photoUrl} size={28} />
+                      <span>
+                        {p.name}
+                        {p.person.username && <small className="muted"> @{p.person.username}</small>}
+                      </span>
+                    </Link>
+                  ) : (
+                    <span className="person">
+                      <Avatar name={p.name} size={28} />
+                      <span>{p.name}</span>
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {m && (leads.has(m.tier) || m.roles.length > 0) ? (
+                    <span className="roster-role">
+                      {leads.has(m.tier) && <span className="role-pill lead">{roleLabel(m.tier, kind)}</span>}
+                      {m.roles.map((r) => (
+                        <span key={r} className="pill pill-soft">
+                          {r}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="muted">{m ? roleLabel(m.tier, kind) : "–"}</span>
+                  )}
+                </td>
+                <td>{positionLabels[p.position ?? ""] ?? "–"}</td>
+                {editing && (
+                  <td>
+                    <span className="line-picker" role="group" aria-label={`Line for ${p.name}`}>
+                      {rosterLines.map((l) => {
+                        const on = lineOf(p) === l;
+                        return (
+                          <button
+                            key={l}
+                            type="button"
+                            aria-pressed={on}
+                            title={rosterLineLabels[l]}
+                            onClick={() => setDraft((d) => ({ ...d, [p.id]: on ? null : l }))}
+                          >
+                            {lineShort[l]}
+                          </button>
+                        );
+                      })}
+                    </span>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <section className="card">
+      <h2 className="card-title">Roster</h2>
+      {canEditLines && roster.players.length > 0 && (
+        <div className="lines-bar">
+          <p className="muted small">{editing ? "Pick O, D or Both for each player." : "Group the roster into O-line and D-line."}</p>
+          {editing ? (
+            <>
+              <button type="button" className="btn btn-small btn-quiet" disabled={saving} onClick={() => setDraft(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-small btn-primary" disabled={saving} onClick={() => void save()}>
+                {saving ? "Saving…" : "Save lines"}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn-small" onClick={() => setDraft({})}>
+              Edit lines
+            </button>
+          )}
+        </div>
+      )}
+      {error && <p className="form-error">{error}</p>}
+      {roster.players.length === 0 ? (
+        <p className="muted small">No players on the roster yet.</p>
+      ) : groups.length === 0 ? (
+        table(players)
+      ) : (
+        groups.map((g) => (
+          <div key={g.line ?? "none"}>
+            <h3 className="line-group-title">
+              {g.line ? rosterLineLabels[g.line] : unassignedLineLabel} · {g.players.length}
+            </h3>
+            {table(g.players)}
+          </div>
+        ))
+      )}
+    </section>
+  );
+}
+
+/**
+ * "Invites pending": who's invited and hasn't answered
+ * (`GET /v1/teams/:id/invites`), for those who invite people, each with
+ * who invited them and Withdraw. Neutral: it's the invitees' move.
+ * Refetches when the team doc changes ([version]: someone joins).
+ */
+function PendingInvitesCard({ teamId, version }: { teamId: string; version: number }) {
+  const { user } = useAuth();
+  const [invites, setInvites] = useState<PendingInvites["invites"] | null>(null);
+  const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    callApi<PendingInvites>(user, `/v1/teams/${encodeURIComponent(teamId)}/invites`).then(
+      (r) => live && setInvites(r.invites),
+      () => live && setInvites([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [user, teamId, version, reload]);
+  if (!invites || invites.length === 0) return null;
+
+  async function withdraw(uid: string, name: string) {
+    if (!user || !window.confirm(`Withdraw the invite to ${name}?\n\nThey won't be able to join with it any more.`)) return;
+    setError("");
+    try {
+      await callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/invites/${encodeURIComponent(uid)}`, { method: "DELETE" });
+      setReload((n) => n + 1);
+    } catch (e) {
+      setError(problem(e, "Couldn't withdraw the invite. Try again."));
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2 className="card-title">Invites pending · {invites.length}</h2>
+      {error && <p className="form-error">{error}</p>}
+      <ul className="invite-rows">
+        {invites.map((i) => (
+          <li key={i.uid}>
+            <Avatar name={i.name} url={i.photoUrl} size={32} />
+            <span>
+              <b>{i.name}</b>
+              <small className="muted">
+                {i.invitedByName ? `Invited by ${i.invitedByName}` : "Invited"}
+                {i.invitedAt && (
+                  <>
+                    {" · "}
+                    <LocalTime iso={i.invitedAt} style="date" />
+                  </>
+                )}
+              </small>
+            </span>
+            <button type="button" className="btn btn-small btn-quiet" onClick={() => void withdraw(i.uid, i.name)}>
+              Withdraw
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 /** A member's row: who they are, then their role as a pill (turf for those who run the team, outlined otherwise) and custom roles. */
 function MemberCard({ member, kind, me }: { member: RosterMember; kind: string; me: boolean }) {

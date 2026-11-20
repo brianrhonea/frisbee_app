@@ -4,7 +4,7 @@ import { where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { type InboxRoom, roomUnread } from "@stall10/shared";
+import { type ChatPoll, type InboxRoom, roomUnread } from "@stall10/shared";
 import { callApi } from "@/lib/client";
 import { useAuth } from "../AuthProvider";
 import { canReadRoom } from "../useTeamChats";
@@ -17,7 +17,7 @@ import { PendingMessages } from "../PendingMessages";
 import { type Doc, useLiveDoc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager";
-import { ChatEventCard, PinnedStrip, ShareEventDialog, usePinActions, useRoomPins } from "./ChatExtras";
+import { ChatEventCard, ChatPollCard, CreatePollDialog, PinnedStrip, ShareEventDialog, usePinActions, useRoomPins } from "./ChatExtras";
 import { type TeamViewer, useTeamHub } from "./TeamContext";
 import { MembersOnlySection } from "./TeamNav";
 import { VoiceRoom } from "./meetings/VoiceRoom";
@@ -36,6 +36,8 @@ interface Message {
   reactions?: Record<string, string>;
   /** A shared team event, shown as a card (F3). */
   event?: { id?: string; title?: string };
+  /** A poll, shown as a card (F33). */
+  poll?: ChatPoll;
   /** Pinned to the room (F2). */
   pinnedAt?: string;
 }
@@ -194,7 +196,7 @@ function Thread({
   me: string;
   canWrite: boolean;
   canModerate: boolean;
-  /** The owner and chat managers pin messages (F2). */
+  /** The owner and chat managers pin messages (F2) and close anyone's poll (F33). */
   canPin: boolean;
   /** Members who add the team's events share them here as cards (F3). */
   canShareEvents: boolean;
@@ -202,6 +204,9 @@ function Thread({
 }) {
   const [replyTo, setReplyTo] = useState<Doc<Message> | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const names = viewer.state === "member" ? (viewer.team.memberNames ?? {}) : {};
+  const nameOf = (uid: string) => names[uid] || "Member";
   const pins = useRoomPins<Message>(teamId, roomId);
   const pinActions = usePinActions(teamId, roomId);
   // From the live pins only: older pages of messages aren't live.
@@ -258,6 +263,18 @@ function Thread({
                   )}
                   {m.text && <p className="message-text">{m.text}</p>}
                   {m.event?.id && <ChatEventCard teamId={teamId} eventId={m.event.id} uid={me} />}
+                  {m.poll && (
+                    <ChatPollCard
+                      teamId={teamId}
+                      roomId={roomId}
+                      messageId={m.id}
+                      authorId={m.authorId}
+                      initial={m.poll}
+                      uid={me}
+                      canManage={canPin}
+                      nameOf={nameOf}
+                    />
+                  )}
                   {(m.attachments ?? []).map((a) => (
                     <ChatAttachment key={a.path} file={a} />
                   ))}
@@ -301,11 +318,13 @@ function Thread({
           draftKey={`chat_${teamId}_${roomId}`}
           outbox={{ kind: "teamChat", target: `${teamId}/${roomId}` }}
           onShareEvent={canShareEvents ? () => setSharing(true) : undefined}
+          onCreatePoll={() => setPolling(true)}
         />
       ) : (
         <footer className="thread-foot muted small">You can read this room but not post in it.</footer>
       )}
       {sharing && <ShareEventDialog teamId={teamId} roomId={roomId} viewer={viewer} onClose={() => setSharing(false)} />}
+      {polling && <CreatePollDialog teamId={teamId} roomId={roomId} onClose={() => setPolling(false)} />}
     </div>
   );
 }

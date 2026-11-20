@@ -146,13 +146,13 @@ export function TeamAbout({ text }: { text: string }) {
  * signed in who isn't on it is told so and can type in a code or link.
  */
 export function InviteOnlyHint() {
-  const { teamId, kind, viewer } = useTeamHub();
+  const { teamId, kind, joinRequests, viewer } = useTeamHub();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   if (kind !== "team" || viewer.state !== "outsider") return null;
   return (
     <div className="invite-only">
-      <span>Invite-only — have a code?</span>
+      <span>{joinRequests ? "Ask to join, or have a code?" : "Invite-only — have a code?"}</span>
       <button type="button" className="btn btn-small" onClick={() => setOpen(true)}>
         Join with a code
       </button>

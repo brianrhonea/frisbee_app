@@ -7,6 +7,7 @@ import '../data/repositories/discord/discord_import_repository.dart';
 import '../data/repositories/discord/discord_import_repository_firebase.dart';
 import '../data/repositories/voice/voice_repository.dart';
 import '../data/repositories/voice/voice_repository_livekit.dart';
+import '../data/services/device_calendar_service.dart';
 import '../data/services/device_permissions.dart';
 import '../data/services/callable_client.dart';
 import '../data/repositories/auth/auth_repository.dart';
@@ -154,6 +155,7 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (context) => TeamPostRepositoryFirebase(
       attachments: context.read<AttachmentStorage>(),
       outbox: context.read<OutboxRepository>(),
+      api: context.read<ApiClient?>(),
     ),
   ),
   Provider<UserPostRepository>(
@@ -185,8 +187,12 @@ List<SingleChildWidget> get firebaseProviders => [
     create: (_) => PeopleRepositoryFirebase(),
   ),
   Provider(create: (_) => const DevicePermissions()),
+  Provider(create: (_) => const DeviceCalendarService()),
   Provider<FollowRepository>(create: (_) => FollowRepositoryFirebase()),
-  Provider<VideoRepository>(create: (_) => VideoRepositoryFirebase()),
+  Provider<VideoRepository>(
+    create: (context) =>
+        VideoRepositoryFirebase(api: context.read<ApiClient?>()),
+  ),
   Provider<YouTubeInfoService>(create: (_) => YouTubeInfoService()),
   Provider<GeocodingService>(create: (_) => GeocodingService()),
   Provider<LocationService>(create: (_) => GeolocatorLocationService()),

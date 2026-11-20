@@ -14,15 +14,17 @@ import '../../core/ui/linkified_text.dart';
 import '../../core/ui/skeleton.dart';
 import '../../core/ui/user_avatar.dart';
 
-enum _PostAction { edit, delete }
+enum _PostAction { pin, unpin, edit, delete }
 
 /// Loads a post photo's bytes.
 typedef ImageLoader = Future<Result<Uint8List>> Function(ChatAttachment image);
 
 /// A post: author and team, title, text, photos, place and links.
-/// [teamName] names the team it's from (on the community feed); [onEdit]
-/// and [onDelete] are for team admins; [showVisibility] marks each post
-/// public or members-only.
+/// [teamName] names the team it's from (on the community feed); [onEdit],
+/// [onDelete], [onPin] and [onUnpin] are for team admins; [showVisibility]
+/// marks each post public or members-only. A [pinned] post says so on top
+/// (redesign F24); with [onComments] (members) the card ends with its
+/// comment count, which opens the thread.
 class TeamPostCard extends StatelessWidget {
   const TeamPostCard({
     super.key,
@@ -33,6 +35,10 @@ class TeamPostCard extends StatelessWidget {
     this.showVisibility = false,
     this.onEdit,
     this.onDelete,
+    this.pinned = false,
+    this.onPin,
+    this.onUnpin,
+    this.onComments,
     this.now,
   });
 
@@ -45,6 +51,10 @@ class TeamPostCard extends StatelessWidget {
   final bool showVisibility;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final bool pinned;
+  final VoidCallback? onPin;
+  final VoidCallback? onUnpin;
+  final VoidCallback? onComments;
 
   /// For "2 hours ago"; defaults to the current time.
   final DateTime? now;
@@ -74,6 +84,24 @@ class TeamPostCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (pinned)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.push_pin, size: 14, color: c.accent),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Pinned',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: c.accentInk,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Row(
               children: [
                 UserAvatar(uid: post.authorId, name: author, radius: 18),
@@ -114,15 +142,30 @@ class TeamPostCard extends StatelessWidget {
                       color: c.muted,
                     ),
                   ),
-                if (onEdit != null || onDelete != null)
+                if (onEdit != null ||
+                    onDelete != null ||
+                    onPin != null ||
+                    onUnpin != null)
                   PopupMenuButton<_PostAction>(
                     tooltip: 'Post options',
                     icon: Icon(Icons.more_horiz, color: c.muted),
                     onSelected: (a) => switch (a) {
+                      _PostAction.pin => onPin?.call(),
+                      _PostAction.unpin => onUnpin?.call(),
                       _PostAction.edit => onEdit?.call(),
                       _PostAction.delete => onDelete?.call(),
                     },
                     itemBuilder: (_) => [
+                      if (onPin != null)
+                        const PopupMenuItem(
+                          value: _PostAction.pin,
+                          child: Text('Pin to the top'),
+                        ),
+                      if (onUnpin != null)
+                        const PopupMenuItem(
+                          value: _PostAction.unpin,
+                          child: Text('Unpin'),
+                        ),
                       if (onEdit != null)
                         const PopupMenuItem(
                           value: _PostAction.edit,
@@ -208,6 +251,22 @@ class TeamPostCard extends StatelessWidget {
                       tooltip: l,
                       onTap: () => _open(context, Uri.parse(l)),
                     ),
+                  if (onComments != null) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: c.muted,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: onComments,
+                        icon: const Icon(Icons.mode_comment_outlined, size: 16),
+                        label: Text(teamPostCommentLabel(post.commentCount)),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -218,6 +277,90 @@ class TeamPostCard extends StatelessWidget {
   }
 
   static String _short(String link) => shortLink(link);
+}
+
+/// The "Post to the team" box at the top of a team's feed, for those who
+/// post (redesign F24): a tap opens the post editor.
+class PostToTeamBox extends StatelessWidget {
+  const PostToTeamBox({super.key, required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.field,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$label…',
+                    style: TextStyle(fontSize: 14, color: c.muted),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.post_add, color: c.accent),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The feed has [TeamPost.pinsMax] pinned posts: pick one to unpin so the
+/// new one takes its place. Pops with its id, or null.
+class UnpinPostDialog extends StatelessWidget {
+  const UnpinPostDialog({super.key, required this.pinned});
+
+  final List<TeamPost> pinned;
+
+  static String _label(TeamPost p) {
+    final text = p.title.isNotEmpty ? p.title : p.body;
+    return text.isEmpty ? 'Photo post' : text;
+  }
+
+  @override
+  Widget build(BuildContext context) => SimpleDialog(
+    title: const Text('Unpin one to pin this'),
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+        child: Text('A team keeps up to ${TeamPost.pinsMax} pinned posts.'),
+      ),
+      for (final p in pinned)
+        SimpleDialogOption(
+          onPressed: () => Navigator.pop(context, p.id),
+          child: Text(_label(p), maxLines: 2, overflow: TextOverflow.ellipsis),
+        ),
+      Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 /// Opens a post link in the browser, or says it couldn't.

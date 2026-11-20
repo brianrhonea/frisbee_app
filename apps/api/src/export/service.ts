@@ -10,14 +10,17 @@ import {
   type DataExport,
   type DataExportComment,
   type DataExportConversation,
+  type DataExportJoinRequest,
   dataExportIntervalMs,
   dataExportLimits,
   type DataExportMessage,
   type DataExportMessagePlace,
+  type DataExportPollVote,
   type DataExportResponse,
   type DataExportRosterSpot,
   type DataExportSection,
   type DataExportTeam,
+  rosterLineOf,
 } from "@stall10/shared";
 import type { Caller, UserLookup } from "../auth.js";
 import { ApiError } from "../errors.js";
@@ -74,13 +77,35 @@ function message(d: PathDoc): DataExportMessage {
   }
   const reply = mapOf(d.data.replyTo);
   if (str(reply.id)) out.replyToId = str(reply.id);
+  const poll = mapOf(d.data.poll);
+  if (str(poll.question) !== undefined) out.poll = { question: str(poll.question) ?? "", options: strings(poll.options) };
   return out;
+}
+
+/** The caller's own vote on a poll message (teams/{t}/chats/{r}/messages/{id}), or null. */
+function pollVote(d: PathDoc, uid: string, teamName: string): DataExportPollVote | null {
+  const s = d.path.split("/");
+  const poll = mapOf(d.data.poll);
+  const picked = own(mapOf(poll.votes), uid);
+  if (!Array.isArray(picked)) return null;
+  return {
+    teamId: s[1] ?? "",
+    teamName,
+    roomId: s[3] ?? "",
+    messageId: d.id,
+    question: str(poll.question) ?? "",
+    options: strings(poll.options),
+    picked: picked.filter((x): x is number => typeof x === "number"),
+  };
 }
 
 function comment(d: PathDoc): DataExportComment {
   const s = d.path.split("/");
-  // posts/{postId}/comments/{id}, or teams/{t}/posts/{postId}/comments/{id}.
-  const out: DataExportComment = { id: d.id, postId: s.length >= 4 ? s[s.length - 3] : "" };
+  // posts/{postId}/comments/{id}, teams/{t}/posts/{postId}/comments/{id},
+  // or a video's note, clip or comment: teams/{t}/videos/{videoId}/comments/{id}.
+  const video = s.length === 6 && s[0] === "teams" && s[2] === "videos";
+  const out: DataExportComment = video ? { id: d.id, teamId: s[1], videoId: s[3] } : { id: d.id, postId: s.length >= 4 ? s[s.length - 3] : "" };
+  if (video) for (const k of ["atMs", "endMs"] as const) if (typeof d.data[k] === "number") out[k] = d.data[k] as number;
   for (const k of ["body", "parentId"] as const) if (str(d.data[k]) !== undefined) out[k] = str(d.data[k]);
   const created = isoOf(d.data.createdAt);
   if (created) out.createdAt = created;
@@ -147,6 +172,16 @@ function rosterSpot(d: PathDoc): DataExportRosterSpot {
   if (str(d.data.name)) out.name = str(d.data.name);
   if (typeof d.data.number === "number") out.number = d.data.number;
   if (str(d.data.position)) out.position = str(d.data.position);
+  const line = rosterLineOf(d.data.line);
+  if (line) out.line = line;
+  return out;
+}
+
+/** A waiting request to join (teams/{t}/joinRequests/{uid}, F26), with its team's name and kind. */
+function joinRequest(d: PathDoc & { team: Data }): DataExportJoinRequest {
+  const out: DataExportJoinRequest = { teamId: d.path.split("/")[1] ?? "", teamName: str(d.team.name) ?? "", kind: kindOf(d.team) };
+  if (str(d.data.name)) out.name = str(d.data.name);
+  if (str(d.data.createdAt)) out.createdAt = str(d.data.createdAt);
   return out;
 }
 
@@ -210,6 +245,27 @@ export class ExportService {
     return { items: out.sort((a, b) => (b.startsAt ?? "").localeCompare(a.startsAt ?? "")), truncated };
   }
 
+  /** The caller's votes in their teams' chat polls (F33). */
+  private async pollVotes(uid: string, teams: DataExportTeam[]): Promise<DataExportSection<DataExportPollVote>> {
+    const max = dataExportLimits.pollVotesPerTeam;
+    const out: DataExportPollVote[] = [];
+    let truncated = false;
+    for (let i = 0; i < teams.length; i += 5) {
+      const found = await Promise.all(
+        teams.slice(i, i + 5).map(async (t) => {
+          const docs = await this.repo.pollVotes(t.id, uid, max);
+          if (docs.length > max) truncated = true;
+          return docs
+            .slice(0, max)
+            .map((d) => pollVote(d, uid, t.name))
+            .filter((v): v is DataExportPollVote => v !== null);
+        }),
+      );
+      out.push(...found.flat());
+    }
+    return { items: out, truncated };
+  }
+
   async export(caller: Caller): Promise<DataExport> {
     const uid = caller.uid;
     await this.admit(uid);
@@ -222,7 +278,7 @@ export class ExportService {
       this.repo.own(`users/${uid}/settings/notifications`),
       this.personalDetails(caller),
     ]);
-    const [follows, personalEvents, posts, comments, messages, conversations, teamDocs, spots] = await Promise.all([
+    const [follows, personalEvents, posts, comments, messages, conversations, teamDocs, spots, requests] = await Promise.all([
       this.repo.ownCollection(`users/${uid}/follows`, L.follows),
       this.repo.ownCollection(`users/${uid}/events`, L.personalEvents),
       this.repo.authored("posts", uid, L.posts),
@@ -231,9 +287,10 @@ export class ExportService {
       this.repo.conversationsOf(uid, L.conversations),
       this.repo.teamsOf(uid, L.teams),
       this.repo.rosterSpots(uid, L.rosterSpots),
+      this.repo.joinRequestsOf(uid, L.joinRequests),
     ]);
     const teams = section(teamDocs.map((d) => team(d, uid)), L.teams);
-    const answers = await this.responses(uid, teams.items);
+    const [answers, pollVotes] = await Promise.all([this.responses(uid, teams.items), this.pollVotes(uid, teams.items)]);
     const own = (d: PathDoc) => ({ id: d.id, ...withoutSecrets(d.data) });
     return {
       format: "stall10-data-export",
@@ -257,8 +314,10 @@ export class ExportService {
       conversations: section(conversations.map(conversation), L.conversations),
       teams,
       responses: answers,
+      pollVotes,
       personalEvents: section(personalEvents.map(own), L.personalEvents),
       rosterSpots: section(spots.map(rosterSpot), L.rosterSpots),
+      joinRequests: section(requests.map(joinRequest), L.joinRequests),
     };
   }
 }

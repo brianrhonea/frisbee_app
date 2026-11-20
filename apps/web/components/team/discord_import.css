@@ -9,6 +9,16 @@
 .discord-import .discord-split li { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .discord-import .discord-split select { max-width: 50%; }
 .discord-import .discord-done { margin-top: 12px; }
+.discord-import .discord-pick { border: 1px solid var(--line); border-radius: 12px; margin: 12px 0 0; padding: 4px 14px 12px; min-width: 0; }
+.discord-import .discord-pick legend { padding: 0 6px; margin-left: -6px; }
+.discord-import .discord-pick legend h4 { margin: 0; }
+.discord-import .discord-pick-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 4px 0 8px; }
+.discord-import .discord-pick-all { display: inline-flex; gap: 14px; }
+.discord-import .discord-pick-group + .discord-pick-group { margin-top: 8px; }
+.discord-import .discord-pick-folder { font-size: 12px; font-weight: 800 !important; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.discord-import .discord-pick-rooms { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+.discord-import .discord-pick-rooms.nested { padding-left: 24px; }
+.discord-import .discord-pick input[type="checkbox"] { width: auto; height: auto; accent-color: var(--accent); }
 .discord-import .btn-primary { margin-top: 14px; }
 @media (max-width: 560px) {
   .discord-import .discord-link { flex-direction: column; }

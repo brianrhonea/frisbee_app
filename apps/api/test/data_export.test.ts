@@ -64,6 +64,27 @@ class FakeExportRepository implements ExportRepository {
   async rosterSpots(uid: string, limit: number) {
     return this.where((d, s) => s[s.length - 2] === "roster" && d.data.userId === uid, limit);
   }
+  async pollVotes(teamId: string, uid: string, limit: number) {
+    const docs = this.where((d, s) => {
+      const poll = d.data.poll as Data | undefined;
+      return s.length === 6 && s[0] === "teams" && s[1] === teamId && s[2] === "chats" && ((poll?.voterIds as string[]) ?? []).includes(uid);
+    }, limit);
+    return docs.map((d) => {
+      const poll = d.data.poll as Data;
+      return { ...d, data: { poll: { question: poll.question, options: poll.options, votes: { [uid]: (poll.votes as Data)[uid] } } } };
+    });
+  }
+  async joinRequestsOf(uid: string, limit: number) {
+    // Groups that approve who joins and teams that allow requests, as the Firestore queries find them.
+    const hosts = this.where((d, s) => {
+      if (s.length !== 2 || s[0] !== "teams") return false;
+      const group = d.data.kind === "community" || d.data.kind === "organization";
+      return group ? d.data.requiresApproval === true : d.data.allowJoinRequests === true;
+    }, 10_000);
+    return hosts
+      .flatMap((h) => this.where((d) => d.path === `${h.path}/joinRequests/${uid}`, 1).map((r) => ({ ...r, team: h.data })))
+      .slice(0, limit + 1);
+  }
 }
 
 let now = Date.UTC(2026, 10, 20, 12);
@@ -136,7 +157,7 @@ function seed() {
   });
   s.store.put("teams/t1/events/e2", { title: "Not answered", rsvps: { you: "going" } });
   s.store.put("teams/t1/meetings/mt1", { title: "Film", rsvps: { me: "going" } });
-  s.store.put("teams/t1/roster/r1", { name: "Mia", number: 7, position: "cutter", userId: "me" });
+  s.store.put("teams/t1/roster/r1", { name: "Mia", number: 7, position: "cutter", userId: "me", line: "d" });
   s.store.put("teams/t1/roster/r2", { name: "Yan", number: 8, userId: "you" });
 }
 
@@ -173,6 +194,17 @@ describe("GET /v1/me/export", () => {
       { id: "tp1", teamId: "t1", authorId: "me", title: "Practice moved", public: true },
     ]);
     expect(data.comments.items).toEqual([{ id: "c1", postId: "p2", body: "Nice", createdAt: new Date(now - 3600_000).toISOString() }]);
+  });
+
+  it("has their notes, clips and comments on team videos (F4, F5)", async () => {
+    s.store.put("teams/t1/videos/v1/comments/n1", { authorId: "me", authorName: "Mia", body: "Watch the mark", atMs: 83_000, endMs: 90_000 });
+    s.store.put("teams/t1/videos/v1/comments/c3", { authorId: "me", authorName: "Mia", body: "Great game" });
+    s.store.put("teams/t1/videos/v1/comments/c4", { authorId: "you", body: "Not mine" });
+    const data = (await s.get()).json() as DataExport;
+    expect(data.comments.items).toEqual([
+      { id: "c3", teamId: "t1", videoId: "v1", body: "Great game" },
+      { id: "n1", teamId: "t1", videoId: "v1", atMs: 83_000, endMs: 90_000, body: "Watch the mark" },
+    ]);
   });
 
   it("has the messages they sent, never anyone else's, nor a conversation's last message", async () => {
@@ -212,7 +244,7 @@ describe("GET /v1/me/export", () => {
       { teamId: "t1", teamName: "The Haze", kind: "event", id: "e1", title: "Practice", startsAt: new Date(now - 3600_000).toISOString(), rsvp: "going", note: "Late" },
       { teamId: "t1", teamName: "The Haze", kind: "meeting", id: "mt1", title: "Film", rsvp: "going" },
     ]);
-    expect(data.rosterSpots.items).toEqual([{ teamId: "t1", name: "Mia", number: 7, position: "cutter" }]);
+    expect(data.rosterSpots.items).toEqual([{ teamId: "t1", name: "Mia", number: 7, position: "cutter", line: "d" }]);
   });
 
   it("decrypts their personal details; without the key they're marked unavailable", async () => {
@@ -227,9 +259,42 @@ describe("GET /v1/me/export", () => {
     expect(((await none.get()).json() as DataExport).personalDetails).toBeNull();
   });
 
+  it("has their chat poll votes (F33) and polls they posted, never others' votes", async () => {
+    seed();
+    const poll = (votes: Record<string, number[]>) => ({ question: "Which day?", options: ["Sat", "Sun"], multiple: true, votes, voterIds: Object.keys(votes) });
+    s.store.put("teams/t1/chats/general/messages/p1", { authorId: "you", authorName: "Yan", text: "", attachments: [], poll: poll({ me: [0, 1], you: [1] }) });
+    s.store.put("teams/t1/chats/general/messages/p2", { authorId: "you", text: "", attachments: [], poll: poll({ you: [0] }) });
+    s.store.put("teams/t1/chats/general/messages/p3", { authorId: "me", text: "", attachments: [], poll: poll({ you: [0] }) });
+    const data = (await s.get()).json() as DataExport;
+    expect(data.pollVotes).toEqual({
+      items: [{ teamId: "t1", teamName: "The Haze", roomId: "general", messageId: "p1", question: "Which day?", options: ["Sat", "Sun"], picked: [0, 1] }],
+      truncated: false,
+    });
+    expect(data.messages.items.find((m) => m.id === "p3")).toMatchObject({ text: "", poll: { question: "Which day?", options: ["Sat", "Sun"] } });
+    expect(JSON.stringify(data.messages.items.find((m) => m.id === "p3"))).not.toContain("you");
+  });
+
+  it("has their requests to join groups and teams (F26), never anyone else's", async () => {
+    const at = new Date(now - 60_000);
+    s.store.put("teams/t3", { name: "Rival", allowJoinRequests: true, memberIds: ["you"] });
+    s.store.put("teams/t3/joinRequests/me", { name: "Mia", createdAt: at });
+    s.store.put("teams/t3/joinRequests/you", { name: "Yan", createdAt: at });
+    s.store.put("teams/g1", { name: "Pickup", kind: "community", requiresApproval: true, memberIds: ["you"] });
+    s.store.put("teams/g1/joinRequests/me", { name: "Mia" });
+    const data = (await s.get()).json() as DataExport;
+    expect(data.joinRequests).toEqual({
+      items: [
+        { teamId: "g1", teamName: "Pickup", kind: "community", name: "Mia" },
+        { teamId: "t3", teamName: "Rival", kind: "team", name: "Mia", createdAt: at.toISOString() },
+      ],
+      truncated: false,
+    });
+  });
+
   it("an empty account still downloads, with empty sections", async () => {
     const data = (await s.get("new")).json() as DataExport;
     expect(data.profile).toBeNull();
+    expect(data.joinRequests).toEqual({ items: [], truncated: false });
     expect(data.posts).toEqual({ items: [], truncated: false });
     expect(data.teams).toEqual({ items: [], truncated: false });
   });

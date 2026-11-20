@@ -30,7 +30,9 @@ import {
   eventChange,
   eventChangeNotice,
   eventViewers,
+  joinApprovedNotice,
   joinRequestNotice,
+  joinRequestRecipients,
   teamInviteNotice,
   calendarInviteNotice,
   meetingCancelledNotice,
@@ -57,6 +59,8 @@ import {
   type TeamDoc,
   teamPostNotice,
   userPostNotice,
+  videoCommentNotice,
+  videoCommentRecipients,
 } from "./model";
 
 const hour = 60 * 60 * 1000;
@@ -231,20 +235,69 @@ export const teamPlay = onDocumentWrittenWithAuthContext(
   },
 );
 
-/** A request to join a group that needs approval: the group's owner. */
+/** A comment on a team video (F5): the video's author (videoCommentRecipients). */
+export const videoComment = onDocumentCreated(
+  "teams/{teamId}/videos/{videoId}/comments/{commentId}",
+  async (event) => {
+    const comment = event.data?.data();
+    if (!comment) return;
+    const { teamId, videoId, commentId } = event.params;
+    const [team, video] = await Promise.all([
+      liveTeam(teamId),
+      getFirestore().doc(`teams/${teamId}/videos/${videoId}`).get(),
+    ]);
+    const videoData = video.data();
+    if (!team || !videoData) return;
+    const recipients = videoCommentRecipients(team, videoData, comment);
+    if (recipients.length === 0) return;
+    await deliver(
+      getFirestore(),
+      getMessaging(),
+      recipients,
+      videoCommentNotice({ teamId, videoId, teamName: teamName(team), video: videoData, comment, commentId }),
+    );
+  },
+);
+
+/**
+ * A request to join a group that needs approval, or a team that allows
+ * requests (F26): the owner and the admins who answer them.
+ */
 export const groupJoinRequest = onDocumentCreated(
   "teams/{teamId}/joinRequests/{userId}",
   async (event) => {
     const request = event.data?.data();
     if (!request) return;
-    const { teamId } = event.params;
+    const { teamId, userId } = event.params;
     const team = await liveTeam(teamId);
-    if (!team?.ownerId) return;
+    if (!team) return;
+    const recipients = joinRequestRecipients(team, userId);
+    if (recipients.length === 0) return;
     await deliver(
       getFirestore(),
       getMessaging(),
-      [team.ownerId],
+      recipients,
       joinRequestNotice({ teamId, teamName: teamName(team), request }),
+    );
+  },
+);
+
+/**
+ * A join request went (F26): if the asker is now a member it was approved
+ * (approving adds them and clears it in one write), so tell them. Declined
+ * or withdrawn requests leave them outside: no push.
+ */
+export const joinRequestApproved = onDocumentDeleted(
+  "teams/{teamId}/joinRequests/{userId}",
+  async (event) => {
+    const { teamId, userId } = event.params;
+    const team = await liveTeam(teamId);
+    if (!team || !(team.memberIds ?? []).includes(userId)) return;
+    await deliver(
+      getFirestore(),
+      getMessaging(),
+      [userId],
+      joinApprovedNotice({ teamId, teamName: teamName(team), group: team.kind === "community" || team.kind === "organization" }),
     );
   },
 );

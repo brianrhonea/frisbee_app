@@ -1,8 +1,12 @@
-// Team chat extras (redesign F2, F3): pinned messages and event cards.
-// API-only: firestore.rules lets no client set a message's pinnedAt,
-// pinnedBy or event, nor a room's pins, so these checks are the only ones.
+// Team chat extras (redesign F2, F3, F33): pinned messages, event cards
+// and polls. API-only: firestore.rules lets no client set a message's
+// pinnedAt, pinnedBy, event or poll, nor a room's pins, so these checks
+// are the only ones.
 import {
   chatEventTitleMax,
+  chatPollClosed,
+  createChatPollRequestSchema,
+  voteChatPollRequestSchema,
   chatPinsFullMessage,
   chatPinsMax,
   pinChatMessageRequestSchema,
@@ -28,6 +32,7 @@ const p = {
 const denied = (m: string) => new ApiError("permission_denied", m);
 const noRoom = () => new ApiError("not_found", "That chat doesn't exist anymore.");
 const noMessage = () => new ApiError("not_found", "This message was deleted.");
+const noPoll = () => new ApiError("not_found", "This poll was deleted.");
 
 /** Who pins in a room: the owner, and chat managers who can read it (they manage its settings). */
 export const canPin = (team: Data, uid: string, room: Data) =>
@@ -42,6 +47,18 @@ export const pinsOf = (room: Data) => strings(room.pins).slice(0, chatPinsMax * 
  * reader, in the message and its push).
  */
 const sharedWithAll = (team: Data, event: Data) => !isOrg(team) || strings(event.audience).includes("everyone");
+
+/** A message's poll, or null when it has none. */
+const pollOf = (message: Data | null): Data | null =>
+  message && message.poll && typeof message.poll === "object" ? (message.poll as Data) : null;
+
+/** The poll's votes as stored, uid → option indexes. */
+const votesOf = (poll: Data): Record<string, number[]> => {
+  const out: Record<string, number[]> = {};
+  const raw = poll.votes && typeof poll.votes === "object" ? (poll.votes as Data) : {};
+  for (const [uid, v] of Object.entries(raw)) if (Array.isArray(v)) out[uid] = v.filter((x): x is number => typeof x === "number");
+  return out;
+};
 
 export class ChatExtrasService {
   constructor(
@@ -146,5 +163,95 @@ export class ChatExtrasService {
       tx.merge(p.reads(caller.uid, teamId), { rooms: { [roomId]: serverTime } });
     });
     return { id };
+  }
+
+  /**
+   * Posts a poll into a room (F33): anyone who can post there. Options are
+   * voted on by index; nobody has voted yet.
+   */
+  async createPoll(caller: Caller, rawTeam: unknown, rawRoom: unknown, body: unknown): Promise<SendChatMessageResult> {
+    const teamId = docIdParam(rawTeam);
+    const roomId = docIdParam(rawRoom);
+    const req = parseBody(createChatPollRequestSchema, body);
+    const closesAt = req.closesAt ? new Date(req.closesAt) : null;
+    if (closesAt && closesAt.getTime() <= this.now()) throw new ApiError("invalid_argument", "Pick a closing time in the future.");
+    const lower = req.options.map((o) => o.toLowerCase());
+    if (new Set(lower).size !== lower.length) throw new ApiError("invalid_argument", "Each option must be different.");
+    await checkNotMuted(this.store, caller.uid, this.now());
+    const me = await authorOf(this.store, this.users, caller);
+    const id = req.id ?? this.store.newId(`teams/${teamId}/chats/${roomId}/messages`);
+    await this.store.transact(async (tx) => {
+      const [team, room, existing] = await Promise.all([
+        tx.get(p.team(teamId)),
+        tx.get(p.room(teamId, roomId)),
+        tx.get(p.message(teamId, roomId, id)),
+      ]);
+      if (!team || !room || !isMember(team, caller.uid) || !canReadRoom(team, caller.uid, room)) throw noRoom();
+      if (!canWriteRoom(team, caller.uid, room)) throw denied("You can read this room but not post in it.");
+      if (existing) throw new ApiError("already_exists", "That message was already sent.");
+      tx.create(p.message(teamId, roomId, id), {
+        authorId: caller.uid,
+        authorName: me.name,
+        text: "",
+        attachments: [],
+        poll: { question: req.question, options: req.options, multiple: req.multiple, closesAt, votes: {}, voterIds: [] },
+        createdAt: serverTime,
+      });
+      tx.update(p.room(teamId, roomId), { lastAt: serverTime });
+      tx.merge(p.reads(caller.uid, teamId), { rooms: { [roomId]: serverTime } });
+    });
+    return { id };
+  }
+
+  /**
+   * Sets the caller's whole choice on a poll ([] takes their vote back):
+   * anyone who can read the room, while it's open. A single-choice poll
+   * takes one option.
+   */
+  async vote(caller: Caller, rawTeam: unknown, rawRoom: unknown, rawMessage: unknown, body: unknown): Promise<void> {
+    const teamId = docIdParam(rawTeam);
+    const roomId = docIdParam(rawRoom);
+    const id = docIdParam(rawMessage);
+    const picks = [...new Set(parseBody(voteChatPollRequestSchema, body).options)].sort((a, b) => a - b);
+    await this.store.transact(async (tx) => {
+      const [team, room, message] = await Promise.all([
+        tx.get(p.team(teamId)),
+        tx.get(p.room(teamId, roomId)),
+        tx.get(p.message(teamId, roomId, id)),
+      ]);
+      if (!team || !room || !isMember(team, caller.uid) || !canReadRoom(team, caller.uid, room)) throw noRoom();
+      const poll = pollOf(message);
+      if (!poll) throw noPoll();
+      if (chatPollClosed(poll, this.now())) throw new ApiError("failed_precondition", "This poll is closed.");
+      const options = Array.isArray(poll.options) ? poll.options.length : 0;
+      if (picks.some((i) => i >= options)) throw new ApiError("invalid_argument", "That option isn't in this poll.");
+      if (poll.multiple !== true && picks.length > 1) throw new ApiError("invalid_argument", "Pick one option.");
+      const votes = votesOf(poll);
+      if (picks.length === 0) delete votes[caller.uid];
+      else votes[caller.uid] = picks;
+      tx.update(p.message(teamId, roomId, id), { poll: { ...poll, votes, voterIds: Object.keys(votes) } });
+    });
+  }
+
+  /** Closes a poll early: its author, or the room's chat managers. Closing a closed one is a no-op. */
+  async closePoll(caller: Caller, rawTeam: unknown, rawRoom: unknown, rawMessage: unknown): Promise<void> {
+    const teamId = docIdParam(rawTeam);
+    const roomId = docIdParam(rawRoom);
+    const id = docIdParam(rawMessage);
+    await this.store.transact(async (tx) => {
+      const [team, room, message] = await Promise.all([
+        tx.get(p.team(teamId)),
+        tx.get(p.room(teamId, roomId)),
+        tx.get(p.message(teamId, roomId, id)),
+      ]);
+      if (!team || !room || !isMember(team, caller.uid) || !canReadRoom(team, caller.uid, room)) throw noRoom();
+      const poll = pollOf(message);
+      if (!poll) throw noPoll();
+      if (message?.authorId !== caller.uid && !canPin(team, caller.uid, room)) {
+        throw denied("Only whoever asked and the team's chat managers close a poll.");
+      }
+      if (chatPollClosed(poll, this.now())) return;
+      tx.update(p.message(teamId, roomId, id), { poll: { ...poll, closedAt: serverTime, closedBy: caller.uid } });
+    });
   }
 }

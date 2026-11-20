@@ -9,7 +9,7 @@ import '../../../utils/command.dart';
 
 /// A team's settings, for its owner: which optional sections (Playbook,
 /// Videos, Stats, Meetings) the team shows; and, for its admins, whether
-/// it has a public page.
+/// it has a public page and takes join requests.
 class TeamSettingsViewModel extends ChangeNotifier {
   TeamSettingsViewModel({
     required this.teamId,
@@ -22,6 +22,9 @@ class TeamSettingsViewModel extends ChangeNotifier {
     );
     setPublicPage = Command1<void, bool>(
       (on) => _teams.setPublicPage(teamId, on),
+    );
+    setAllowJoinRequests = Command1<void, bool>(
+      (on) => _teams.setAllowJoinRequests(teamId, on),
     );
     _teamSub = _teams
         .watchTeam(teamId)
@@ -70,6 +73,18 @@ class TeamSettingsViewModel extends ChangeNotifier {
 
   /// Whether people outside the team see its public page ([Team.publicPage]).
   bool get publicPage => _team?.publicPage ?? true;
+
+  /// Turns "Allow join requests" on (true) or off (false; declines the
+  /// requests waiting).
+  late final Command1<void, bool> setAllowJoinRequests;
+
+  /// Whether the team shows the "Allow join requests" switch: teams only,
+  /// not a league's team (groups approve who joins instead).
+  bool get hasJoinRequests =>
+      _team?.kind == TeamKind.team && !(_team?.isLeagueTeam ?? true);
+
+  /// Whether signed-in outsiders may ask to join ([Team.allowJoinRequests]).
+  bool get allowJoinRequests => _team?.allowJoinRequests ?? false;
 
   /// Admins (manageTeam) switch the public page, as they edit the details.
   bool get canManage => _team?.canEdit(_uid) ?? false;

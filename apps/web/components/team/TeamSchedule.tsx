@@ -7,12 +7,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { useAuth } from "../AuthProvider";
 import { LocalTime } from "../LocalTime";
-import { downloadIcs } from "@/lib/calendar";
+import { AddToCalendar } from "../AddToCalendar";
 import { callApi } from "@/lib/client";
 import { type Doc, useLiveDoc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { type Meeting, meetingHref, meetingsHref, useTeamMeetings } from "./meetings/model";
 import { type TeamViewer, useTeamHub, viewerSectionOn } from "./TeamContext";
 import { TeamEventEditor } from "./TeamEventEditor";
+import { EventVideos } from "./videos/EventVideos";
 import { DateTile, isToday } from "./DateTile";
 import { needsRsvp, RsvpPill } from "../RsvpPill";
 import { NoteQuote, RsvpNoteField } from "../RsvpNote";
@@ -34,7 +35,7 @@ export interface TeamEventDoc extends PublicEvent {
   tournamentId?: string;
 }
 
-const typeLabels: Record<string, string> = {
+export const typeLabels: Record<string, string> = {
   practice: "Practice",
   game: "Game",
   tournament: "Tournament",
@@ -173,6 +174,8 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
   const router = useRouter();
   const [editing, setEditing] = useState<string | null>(null);
   const manager = member?.can("manageEvents") ?? false;
+  // ?new=event (the community page's New event, F27) opens the editor for those who add events.
+  const shownEditor = editing ?? (manager && params.get("new") === "event" ? "new" : null);
   // ?event= for an event that isn't in the list showing (a past one, say): read it by id.
   const wanted = validId(params.get("event"));
   const listed = !!wanted && (member ? (live.data ?? []) : publicEvents).some((e) => e.id === wanted);
@@ -284,12 +287,13 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
         )}
       </div>
       <div className="hub-detail">
-        {editing ? (
+        {shownEditor ? (
           <TeamEventEditor
-            event={editing === "new" ? undefined : (events.find((e) => e.id === editing) ?? (open?.id === editing ? open : undefined))}
+            event={shownEditor === "new" ? undefined : (events.find((e) => e.id === shownEditor) ?? (open?.id === shownEditor ? open : undefined))}
             onDone={(id) => {
               setEditing(null);
-              if (id) router.replace(link({ event: id }), { scroll: false });
+              if (id) router.replace(link({ event: id, new: null }), { scroll: false });
+              else if (params.get("new")) router.replace(link({ new: null }), { scroll: false });
             }}
           />
         ) : open ? (
@@ -431,27 +435,22 @@ function EventDetail({ event, onEdit }: { event: Doc<TeamEventDoc>; onEdit?: () 
         </div>
       )}
       {event.startsAt && (
-        <p>
-          <button
-            type="button"
-            className="text-btn"
-            onClick={() =>
-              downloadIcs({
-                uid: `team-${teamId}-${event.id}@stall10.app`,
-                title: event.title || typeLabels[event.type ?? ""] || "Event",
-                startsAt: event.startsAt!,
-                endsAt: event.endsAt,
-                location: event.location,
-                description: event.notes,
-              })
-            }
-          >
-            Add to calendar
-          </button>
-        </p>
+        <div className="event-cal">
+          <AddToCalendar
+            event={{
+              uid: `team-${teamId}-${event.id}@stall10.app`,
+              title: event.title || typeLabels[event.type ?? ""] || "Event",
+              startsAt: event.startsAt,
+              endsAt: event.endsAt,
+              location: event.location,
+              description: event.notes,
+            }}
+          />
+        </div>
       )}
 
       <EventTournamentLink event={event} />
+      <EventVideos eventId={event.id} />
 
       {member && (
         <>

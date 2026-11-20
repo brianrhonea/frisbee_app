@@ -10,6 +10,7 @@ import {
   signInHandle,
   tournamentWithout,
   userFolder,
+  votedInPoll,
 } from "../../src/account/model";
 
 describe("nextOwner", () => {
@@ -42,6 +43,16 @@ describe("signedInRecently", () => {
     expect(signedInRecently(now / 1000 - 301, now)).toBe(false);
     expect(signedInRecently(undefined, now)).toBe(false);
     expect(signedInRecently("123", now)).toBe(false);
+  });
+});
+
+describe("votedInPoll", () => {
+  it("finds the user's vote in a chat poll (F33)", () => {
+    const poll = (votes: Record<string, number[]>) => ({ poll: { question: "Q", options: ["a", "b"], votes, voterIds: Object.keys(votes) } });
+    expect(votedInPoll(poll({ me: [0], you: [1] }), "me")).toBe(true);
+    expect(votedInPoll(poll({ you: [1] }), "me")).toBe(false);
+    expect(votedInPoll({ poll: { votes: { me: [0] } } }, "me")).toBe(true);
+    expect(votedInPoll({ text: "hi" }, "me")).toBe(false);
   });
 });
 
