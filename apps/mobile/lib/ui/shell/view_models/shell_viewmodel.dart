@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../data/repositories/auth/auth_repository.dart';
+import '../../../data/repositories/chat/chat_repository.dart';
+import '../../../data/repositories/chat/team_chat_activity.dart';
 import '../../../data/repositories/direct_message/direct_message_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
@@ -22,12 +24,20 @@ class ShellViewModel extends ChangeNotifier {
     required TeamRepository teamRepository,
     required DirectMessageRepository directMessageRepository,
     required NotificationRepository notificationRepository,
+    ChatRepository? chatRepository,
   }) : _auth = authRepository,
        _notifications = notificationRepository {
     answerPushOffer = Command1<PushStatus?, bool>(_answerPushOffer);
     answerTeamOffer = Command1<PushStatus?, bool?>(_answerTeamOffer);
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
+    if (chatRepository != null) {
+      _teamChats = TeamChatActivity(
+        teamRepository: teamRepository,
+        chatRepository: chatRepository,
+        uid: uid,
+      )..addListener(_onTeamChats);
+    }
     unawaited(_checkPushOffer());
     _subs
       ..add(
@@ -74,9 +84,19 @@ class ShellViewModel extends ChangeNotifier {
       _teams.where((t) => t.id == id).firstOrNull?.name;
 
   int _unreadMessages = 0;
+  TeamChatActivity? _teamChats;
+  int _unreadTeamChats = 0;
 
-  /// Direct-message conversations with a message the user hasn't opened.
-  int get unreadMessages => _unreadMessages;
+  void _onTeamChats() {
+    final n = _teamChats?.unreadCount ?? 0;
+    if (n == _unreadTeamChats) return;
+    _unreadTeamChats = n;
+    notifyListeners();
+  }
+
+  /// Conversations and team chats with a message the user hasn't opened:
+  /// the Messages tab's badge.
+  int get unreadMessages => _unreadMessages + _unreadTeamChats;
 
   int _unreadNotifications = 0;
 
@@ -174,6 +194,9 @@ class ShellViewModel extends ChangeNotifier {
     }
     answerPushOffer.dispose();
     answerTeamOffer.dispose();
+    _teamChats
+      ?..removeListener(_onTeamChats)
+      ..dispose();
     super.dispose();
   }
 }

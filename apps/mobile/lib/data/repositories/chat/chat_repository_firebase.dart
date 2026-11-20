@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../domain/models/app_user.dart';
 import '../../../domain/models/chat.dart';
+import '../../../domain/models/model_utils.dart';
 import '../../../domain/models/outbox.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
@@ -70,6 +71,36 @@ class ChatRepositoryFirebase implements ChatRepository {
     String teamId,
     String roomId,
   ) => _rooms(teamId).doc(roomId).collection('messages');
+
+  /// users/{uid}/chatReads/{teamId}: rooms.{roomId} → when [uid] last
+  /// read it.
+  CollectionReference<Map<String, dynamic>> _reads(String uid) =>
+      _db.collection('users').doc(uid).collection('chatReads');
+
+  @override
+  Stream<Map<String, Map<String, DateTime>>> watchReads(
+    String uid,
+  ) => _shared.get(
+    'chatReads/$uid',
+    () => _reads(uid).snapshots().map(
+      (snap) => {
+        for (final d in snap.docs)
+          d.id: {
+            for (final e
+                in ((plainData(d.data())['rooms'] as Map?) ?? const {}).entries)
+              '${e.key}': ?parseDate(e.value),
+          },
+      },
+    ),
+  );
+
+  @override
+  Future<Result<void>> markRead(String teamId, String roomId, String uid) =>
+      guard(
+        () => _reads(uid).doc(teamId).set({
+          'rooms': {roomId: FieldValue.serverTimestamp()},
+        }, SetOptions(merge: true)),
+      );
 
   @override
   Stream<List<ChatRoom>> watchRooms(Team team, String uid) {
@@ -344,14 +375,24 @@ class ChatRepositoryFirebase implements ChatRepository {
         attachments,
       );
       try {
-        await ref.set({
-          'authorId': author.uid,
-          'authorName': author.label,
-          'text': text.trim(),
-          'attachments': [for (final a in uploaded) a.toMap()],
-          'createdAt': FieldValue.serverTimestamp(),
-          'replyTo': ?replyTo?.toMap(),
-        });
+        // One batch: the message, the room's lastAt (a time, never the
+        // text) for everyone's unread dots, and the author's own read.
+        await (_db.batch()
+              ..set(ref, {
+                'authorId': author.uid,
+                'authorName': author.label,
+                'text': text.trim(),
+                'attachments': [for (final a in uploaded) a.toMap()],
+                'createdAt': FieldValue.serverTimestamp(),
+                'replyTo': ?replyTo?.toMap(),
+              })
+              ..update(_rooms(teamId).doc(roomId), {
+                'lastAt': FieldValue.serverTimestamp(),
+              })
+              ..set(_reads(author.uid).doc(teamId), {
+                'rooms': {roomId: FieldValue.serverTimestamp()},
+              }, SetOptions(merge: true)))
+            .commit();
       } catch (_) {
         // Don't leave files behind for a message that was never posted.
         await _files.delete(uploaded.map((a) => a.path));

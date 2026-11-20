@@ -10,6 +10,16 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.32
+
+**Every chat in Messages**
+- Your teams' and communities' chats are now in the **Messages** tab,
+  above your private messages. Each shows which rooms have something new
+  ("New in #general") with a dot; tap it to jump straight into that room.
+- The Messages badge counts team chats with something new, and a team's
+  room list shows new rooms in bold with a dot.
+- Rooms start showing as new from their next message.
+
 ## 0.0.31
 
 **Stats by team**

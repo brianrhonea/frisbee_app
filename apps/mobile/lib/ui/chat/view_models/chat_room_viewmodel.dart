@@ -45,11 +45,13 @@ class ChatRoomViewModel extends MessageThreadViewModel {
       teamRepository.watchTeam(teamId).listen((t) {
         _team = t;
         _teamLoaded = true;
+        _markRead();
         notifyListeners();
       }, onError: _onError),
       _chats.watchRoom(teamId, roomId).listen((r) {
         _room = r;
         _roomLoaded = true;
+        _markRead();
         notifyListeners();
       }, onError: _onError),
     ];
@@ -69,6 +71,19 @@ class ChatRoomViewModel extends MessageThreadViewModel {
   NotificationPreferences? _prefs;
 
   Team? get team => _team;
+
+  /// The room's lastAt when it was last marked read from here.
+  DateTime? _markedAt;
+
+  /// While the room is open, each new message counts as read (the inbox's
+  /// and the room list's unread dots).
+  void _markRead() {
+    final last = _room?.lastAt;
+    if (last == null || !access.canRead) return;
+    if (_markedAt case final m? when !last.isAfter(m)) return;
+    _markedAt = last;
+    unawaited(_chats.markRead(teamId, roomId, uid));
+  }
 
   /// Whether this room's notifications are silenced for the user.
   bool get muted => _prefs?.isRoomMuted(teamId, roomId) ?? false;

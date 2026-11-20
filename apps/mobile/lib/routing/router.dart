@@ -1,3 +1,5 @@
+import '../data/repositories/chat/chat_repository.dart';
+import '../data/repositories/team/team_repository.dart';
 import '../data/repositories/notification/notification_repository.dart';
 import '../data/repositories/draft/message_draft_repository.dart';
 import '../data/repositories/people/people_repository.dart';
@@ -633,6 +635,7 @@ GoRouter router(
           teamRepository: c.read(),
           directMessageRepository: c.read(),
           notificationRepository: c.read(),
+          chatRepository: c.read<ChatRepository?>(),
         ),
         builder: (_, vm) => AppShell(
           viewModel: vm,
@@ -904,6 +907,8 @@ GoRouter router(
                   directMessageRepository: c.read(),
                   authRepository: c.read(),
                   notificationRepository: c.read<NotificationRepository?>(),
+                  teamRepository: c.read<TeamRepository?>(),
+                  chatRepository: c.read<ChatRepository?>(),
                 ),
                 builder: (_, vm) => InboxScreen(viewModel: vm),
               ),

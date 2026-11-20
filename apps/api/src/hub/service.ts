@@ -30,6 +30,8 @@ const p = {
   publicEvent: (t: string, id: string) => `teams/${t}/publicEvents/${id}`,
   room: (t: string, r: string) => `teams/${t}/chats/${r}`,
   message: (t: string, r: string, id: string) => `teams/${t}/chats/${r}/messages/${id}`,
+  /** The caller's read times for a team's rooms (rooms.{roomId}); private to them. */
+  reads: (uid: string, t: string) => `users/${uid}/chatReads/${t}`,
 };
 
 const denied = (m: string) => new ApiError("permission_denied", m);
@@ -364,8 +366,23 @@ export class HubService {
         createdAt: serverTime,
         ...(replyTo && { replyTo }),
       });
+      // The inbox's unread dots: when the room last had a message (a time,
+      // never the text), and the sender has read their own.
+      tx.update(p.room(teamId, roomId), { lastAt: serverTime });
+      tx.merge(p.reads(caller.uid, teamId), { rooms: { [roomId]: serverTime } });
     });
     return { id };
+  }
+
+  /** Marks a room read for the caller (users/{uid}/chatReads/{teamId}), for their unread dots. */
+  async markRoomRead(caller: Caller, rawTeam: unknown, rawRoom: unknown): Promise<void> {
+    const teamId = docIdParam(rawTeam);
+    const roomId = docIdParam(rawRoom);
+    const [team, room] = await Promise.all([this.store.get(p.team(teamId)), this.store.get(p.room(teamId, roomId))]);
+    if (!team || !room || !isMember(team, caller.uid) || !canReadRoom(team, caller.uid, room)) throw noRoom();
+    await this.store.transact(async (tx) => {
+      tx.merge(p.reads(caller.uid, teamId), { rooms: { [roomId]: serverTime } });
+    });
   }
 
   /** reactsOnlyAsMe(): anyone who can read the room sets or clears their own emoji. */

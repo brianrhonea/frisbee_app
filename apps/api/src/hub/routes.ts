@@ -63,6 +63,10 @@ export function hubRoutes(app: FastifyInstance, hub: HubService, limiter: Memory
   app.post<RoomP>("/v1/teams/:teamId/chats/:roomId/messages", async (req, reply) =>
     reply.code(201).send(await hub.sendMessage(caller(req, "chat"), req.params.teamId, req.params.roomId, req.body)),
   );
+  app.put<RoomP>("/v1/teams/:teamId/chats/:roomId/read", async (req, reply) => {
+    await hub.markRoomRead(caller(req, "respond"), req.params.teamId, req.params.roomId);
+    return reply.code(204).send();
+  });
   app.put<MessageP>("/v1/teams/:teamId/chats/:roomId/messages/:messageId/reaction", async (req, reply) => {
     await hub.setMessageReaction(caller(req, "respond"), req.params.teamId, req.params.roomId, req.params.messageId, req.body);
     return reply.code(204).send();

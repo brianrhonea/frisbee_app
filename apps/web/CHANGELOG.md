@@ -4,6 +4,20 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.42.0 — 2026-11-19
+
+Team chats in Messages, with app 0.0.32. Needs API 0.33.0.
+
+**Added**
+- Messages' Inbox lists the member's team and community chats above
+  their conversations (`useTeamChats`): which rooms have new messages, the
+  newest's time, an unread dot. A click opens the team's Chat on the only
+  unread room, else the newest. Search matches team names. One rule with
+  the app: `teamChatSummary` in `@stall10/shared`.
+- A team's room list shows rooms with unread messages bold with a dot;
+  the open room is marked read (`PUT /v1/teams/:id/chats/:room/read`) as
+  messages arrive.
+
 ## 0.41.0 — 2026-11-19
 
 Stats per team on profiles, with app 0.0.31. Works with API 0.32.0.

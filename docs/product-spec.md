@@ -522,6 +522,22 @@ everything the app does on the website alone, styled like the website
     `test/data/profile_api_test.dart`; shared
     `test/profile_stats_fixtures.test.ts`; API `test/profiles.test.ts`,
     `test/browse.model.test.ts`; rules "per-team stats".
+22. Team chats in Messages (app 0.0.32, web 0.42.0, api 0.33.0):
+    [x] Messages lists every team and community chat above direct
+    messages on both (reversing item 3's "team chats live on team
+    pages"): rooms with new messages, the newest's time, an unread dot; a
+    tap opens the only unread room, else the newest. [x] A team's room
+    list shows unread rooms bold with a dot on both; an open room is
+    marked read. Rooms carry `lastAt` (a time, never text), stamped by
+    senders; read times are private `users/{uid}/chatReads/{teamId}`.
+    App only (design): the Unread filter and the Messages badge count
+    them (the website has neither for messages). One rule: app
+    `TeamChatSummary.fromReadable`, shared `teamChatSummary`, vectors
+    `fixtures/team_chats/summary.json`. Tests: app
+    `test/ui/messages_test.dart`, `test/ui/chat_test.dart`,
+    `test/data/chat_reads_test.dart`; shared
+    `test/team_chats_fixtures.test.ts`; API `test/hub.test.ts`; rules
+    "stamps its lastAt", "chat read times".
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

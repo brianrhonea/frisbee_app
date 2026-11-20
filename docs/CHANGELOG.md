@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.32  | 2026-11-19 | `feature/team-first`                    |                     |
 | 0.0.31  | 2026-11-19 | `feature/profile-team-stats`            |                     |
 | 0.0.30  | 2026-11-19 | `fix/ui-wording`                        |                     |
 | 0.0.29  | 2026-11-17 | `fix/private-posts`                     |                     |
@@ -44,6 +45,44 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.32 — Team chats in Messages (team-first 1)
+
+Web 0.42.0, api 0.33.0. Rules change (deploy to dev; done).
+
+- Messages lists every team and community chat above direct messages
+  (`TeamChatActivity` in `data/repositories/chat`, used by
+  `InboxViewModel` and `ShellViewModel`), unread first: which rooms have
+  new messages ("New in #general"), when the newest was sent, and an
+  unread dot. A tap opens the only unread room, else the newest. The
+  Unread filter and search include them; the Messages badge counts teams
+  with unread chat. This reverses the spec's "team chats live on team
+  pages" (§8.1 item 3).
+- `ChatRoom.lastAt`: when the room's last message was sent, stamped by
+  the sender in the same batch as the message (`_send`; the API's
+  `sendMessage` in its transaction). Only a time, never the text: chat
+  managers read rooms' docs even when they can't read the messages.
+  Rooms only get it from their next message.
+- Read times are private, `users/{uid}/chatReads/{teamId}`
+  (`rooms.{roomId}`): `watchReads` / `markRead`. A sender's own message
+  counts as read; an open room is marked read as messages arrive
+  (`ChatRoomViewModel`). The team's room list shows unread rooms bold
+  with a dot. Account deletion already removes `users/{uid}`.
+- One rule for the inbox row: `TeamChatSummary.fromReadable`, ported as
+  `teamChatSummary` in `@stall10/shared`, vectors
+  `fixtures/team_chats/summary.json`.
+- Rules: anyone who can post in a room may set only `lastAt`, and only to
+  `request.time`; `chatReads` docs are their owner's, `rooms` a map of at
+  most 300.
+- Fix: Home's "Complete your details" card no longer notifies after it's
+  disposed (leaving Home before its preference loaded threw).
+- `test/screenshots/screens_test.dart`: phone screenshots of the main
+  screens on fake data, skipped unless
+  `--dart-define=SCREENSHOTS=<dir>` is passed.
+- Tests: `data/chat_reads_test`, `ui/messages_test` (team chats),
+  `ui/chat_test` (marking read, room dots),
+  `shared_fixtures/team_chats_fixtures_test`; rules "stamps its lastAt",
+  "chat read times"; API `hub` (stamp, `PUT .../read`).
 
 ## 0.0.31 — Stats per team on profiles
 

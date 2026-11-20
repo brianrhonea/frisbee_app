@@ -55,6 +55,12 @@ class ChatListViewModel extends ChangeNotifier {
       _folders = f;
       notifyListeners();
     }, onError: (Object _) {});
+    if (uid.isNotEmpty) {
+      _readSub = _chats.watchReads(uid).listen((r) {
+        _reads = r[teamId] ?? const {};
+        notifyListeners();
+      }, onError: (Object _) {});
+    }
   }
 
   /// Creates or renames a folder (and sets its default access).
@@ -89,6 +95,10 @@ class ChatListViewModel extends ChangeNotifier {
   late final StreamSubscription<Team?> _teamSub;
   late final StreamSubscription<List<ChatFolder>> _folderSub;
   StreamSubscription<List<ChatRoom>>? _roomSub;
+  StreamSubscription<Object?>? _readSub;
+
+  /// Room id → when the user last read it.
+  Map<String, DateTime> _reads = const {};
   String? _watchedKey;
   bool _ensuredGeneral = false;
   bool _ensuredVoice = false;
@@ -116,6 +126,10 @@ class ChatListViewModel extends ChangeNotifier {
   bool get canManage => _team?.has(uid, TeamPermission.manageChats) ?? false;
 
   bool isCollapsed(String folderId) => _collapsed.contains(folderId);
+
+  /// A room the user can read with a message they haven't seen.
+  bool isUnread(ChatRoom room) =>
+      accessTo(room).canRead && room.unreadSince(_reads[room.id]);
 
   // Voice --------------------------------------------------------------------
 
@@ -353,6 +367,7 @@ class ChatListViewModel extends ChangeNotifier {
     _teamSub.cancel();
     _folderSub.cancel();
     _roomSub?.cancel();
+    _readSub?.cancel();
     super.dispose();
   }
 }

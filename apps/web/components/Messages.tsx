@@ -19,6 +19,7 @@ import { LoadMore } from "./LoadMore";
 import { loadAtTop, OlderMessages } from "./OlderMessages";
 import { type PickedPerson, PersonPicker } from "./PersonPicker";
 import { isTyping, validId } from "@/lib/text";
+import { useTeamChats } from "./useTeamChats";
 
 /** conversations/{id} (Conversation in the app). */
 interface Conversation {
@@ -87,7 +88,9 @@ function describe(c: Doc<Conversation>, mine: Mine | undefined, me: string) {
 
 /**
  * Messages, like a desktop mail client: the inbox (or requests, or
- * archived) down the left, the open conversation (?c=) beside it. Read
+ * archived) down the left, the open conversation (?c=) beside it. The
+ * inbox lists the member's team and community chats first; each opens
+ * on its team's Chat page. Read
  * live from Firestore as the app does; every write goes through the API.
  */
 export function Messages() {
@@ -125,6 +128,10 @@ export function Messages() {
   );
   const requests = all.filter(({ d }) => d.inRequests).length;
   const open = all.find(({ c }) => c.id === openId);
+  const teamChats = useTeamChats(user?.uid);
+  const shownTeams =
+    view === "inbox" ? (teamChats.chats ?? []).filter((c) => !q || (c.team.name ?? "").toLowerCase().includes(q)) : [];
+  const headed = shownTeams.length > 0 && shown.length > 0;
 
   const go = (q: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
@@ -211,11 +218,37 @@ export function Messages() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        {shownTeams.length > 0 && (
+          <>
+            {headed && <h3 className="conv-heading">Team chats</h3>}
+            <ul className="hub-items conv-list" aria-label="Team chats">
+              {shownTeams.map((c) => (
+                <li key={c.team.id}>
+                  <Link
+                    href={`/teams/${encodeURIComponent(c.team.id)}/chat${c.open ? `?room=${encodeURIComponent(c.open.id)}` : ""}`}
+                    className={`conv-row${c.unread.length > 0 ? " unread" : ""}`}
+                  >
+                    <Avatar name={c.team.name ?? "Team"} size={36} />
+                    <span className="conv-main">
+                      <b>{c.team.name ?? "Team"}</b>
+                      <small>{c.subtitle}</small>
+                    </span>
+                    <small className="conv-time">
+                      <LocalTime iso={c.lastAt ?? undefined} style="relative" />
+                    </small>
+                    {c.unread.length > 0 && <span className="notice-dot" aria-label="Unread" />}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {headed && <h3 className="conv-heading">Direct messages</h3>}
+          </>
+        )}
         {!convs.data ? (
           <p className="muted" aria-busy="true">
             Loading…
           </p>
-        ) : shown.length === 0 ? (
+        ) : shown.length === 0 && shownTeams.length > 0 && !q ? null : shown.length === 0 ? (
           <p className="empty">
             {q
               ? "No conversations match your search."

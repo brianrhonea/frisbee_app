@@ -263,6 +263,17 @@ service cloud.firestore {
                    .hasAll(resource.data.keys().toSet()));
       }
 
+      // When the user last read each team chat room: one doc per team,
+      // rooms.{roomId} → time. Private to them; it only drives their own
+      // unread dots, so any times they write only mislead themselves.
+      match /chatReads/{teamId} {
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create, update: if signedIn() && uid() == userId
+          && request.resource.data.keys().hasOnly(['rooms'])
+          && request.resource.data.rooms is map
+          && request.resource.data.rooms.size() <= 300;
+      }
+
       // Personal schedule: private to its owner, no polls or responses.
       match /events/{eventId} {
         function validMine() {
@@ -1445,6 +1456,14 @@ service cloud.firestore {
                'name', 'readRoles', 'writeRoles', 'readUsers', 'writeUsers',
                'folderId', 'position'])
           && validRoom(request.resource.data);
+        // lastAt: when the room's last message was sent, stamped by whoever
+        // sends it (in the same batch), for unread dots in the inbox. Only
+        // a time, never the text: chat managers read rooms' docs even when
+        // they can't read the messages.
+        allow update: if signedIn() && notMuted() && isMember(team())
+          && canWriteRoom(team(), resource.data)
+          && changed().hasOnly(['lastAt'])
+          && request.resource.data.lastAt == request.time;
         allow delete: if signedIn() && can(team(), 'manageChats')
           && canReadRoom(team(), resource.data);
 

@@ -38,6 +38,13 @@ abstract class ChatRepository {
 
   Stream<ChatRoom?> watchRoom(String teamId, String roomId);
 
+  /// When [uid] last read each room: team id → room id → time. Private to
+  /// them; compared with [ChatRoom.lastAt] for unread dots.
+  Stream<Map<String, Map<String, DateTime>>> watchReads(String uid);
+
+  /// Marks [roomId] on [teamId] read by [uid] now.
+  Future<Result<void>> markRead(String teamId, String roomId, String uid);
+
   /// Creates the room when [ChatRoom.isNew], otherwise updates its name and
   /// access. Returns the room id.
   Future<Result<String>> saveRoom(String teamId, ChatRoom room, String uid);
@@ -69,7 +76,8 @@ abstract class ChatRepository {
     required int limit,
   });
 
-  /// Uploads [attachments], then posts the message.
+  /// Uploads [attachments], then posts the message, stamping the room's
+  /// [ChatRoom.lastAt] and marking it read for the author.
   Future<Result<void>> sendMessage(
     String teamId,
     String roomId, {

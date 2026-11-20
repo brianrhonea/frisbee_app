@@ -687,6 +687,160 @@ void main() {
     expect(find.byIcon(Icons.circle), findsOneWidget);
   });
 
+  group('team chats in the inbox', () {
+    final at = DateTime(2026, 11, 1, 9);
+
+    void seed() {
+      teams.teams['t1'] = Team(
+        id: 't1',
+        name: 'Northside Flyers',
+        division: Division.mixed,
+        level: CompetitionLevel.club,
+        ownerId: 'coach',
+        members: {'coach': TeamRole.owner, testUser.uid: TeamRole.player},
+      );
+      teams.teams['t2'] = Team(
+        id: 't2',
+        name: 'Quiet Pickup',
+        kind: TeamKind.community,
+        division: Division.mixed,
+        level: CompetitionLevel.pickup,
+        ownerId: 'org',
+        members: {'org': TeamRole.owner, testUser.uid: TeamRole.player},
+      );
+      chats
+        ..rooms['general'] = ChatRoom.general()
+        ..teamOf['r:general'] = 't1'
+        ..rooms['rides'] = const ChatRoom(
+          id: 'rides',
+          name: 'Carpool',
+          readRoles: {ChatAudience.everyone},
+          writeRoles: {ChatAudience.everyone},
+        )
+        ..teamOf['r:rides'] = 't1'
+        // Coaches only: never listed or counted for a player.
+        ..rooms['staff'] = const ChatRoom(
+          id: 'staff',
+          name: 'Staff',
+          readRoles: {'coach'},
+          writeRoles: {'coach'},
+        )
+        ..teamOf['r:staff'] = 't1'
+        ..rooms['lobby'] = ChatRoom.general().withName('Lobby')
+        ..teamOf['r:lobby'] = 't2';
+      chats
+        ..stampRoom('general', at)
+        ..stampRoom('rides', at.add(const Duration(minutes: 5)))
+        ..stampRoom('staff', at.add(const Duration(minutes: 9)));
+    }
+
+    InboxViewModel withTeams() => InboxViewModel(
+      directMessageRepository: dms,
+      authRepository: auth,
+      teamRepository: teams,
+      chatRepository: chats,
+    );
+
+    test('lists every team chat, unread first, with the rooms that have '
+        'new messages; reading a room clears it', () async {
+      seed();
+      final vm = withTeams();
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      expect(vm.teamChats.map((s) => s.team.name), [
+        'Northside Flyers',
+        'Quiet Pickup',
+      ]);
+      final flyers = vm.teamChats.first;
+      expect(flyers.subtitle, 'New in #carpool and #general');
+      expect(flyers.rooms.map((r) => r.id), isNot(contains('staff')));
+      expect(flyers.lastAt, at.add(const Duration(minutes: 5)));
+      expect(vm.teamChats.last.subtitle, 'No messages yet');
+      expect(vm.unreadCount, 1);
+
+      await chats.markRead('t1', 'rides', testUser.uid);
+      await pumpEventQueue();
+      expect(vm.teamChats.first.subtitle, 'New in #general');
+      expect(vm.teamChats.first.openRoom!.id, 'general');
+      await chats.markRead('t1', 'general', testUser.uid);
+      await pumpEventQueue();
+      expect(vm.teamChats.first.subtitle, 'Team chat');
+      expect(vm.unreadCount, 0);
+    });
+
+    test('the Unread filter keeps unread team chats; search matches team '
+        'names; requests and archived list none', () async {
+      seed();
+      final vm = withTeams();
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      vm.setFilter(InboxFilter.unread);
+      expect(vm.teamChats.map((s) => s.team.id), ['t1']);
+      vm
+        ..setFilter(InboxFilter.all)
+        ..setQuery('pickup');
+      expect(vm.teamChats.map((s) => s.team.id), ['t2']);
+      vm
+        ..setQuery('')
+        ..setFilter(InboxFilter.archived);
+      expect(vm.teamChats, isEmpty);
+    });
+
+    testWidgets('the inbox shows team chats above direct messages; a tap '
+        'opens the room and back returns', (tester) async {
+      tester.view.physicalSize = const Size(390, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      seed();
+      dms.conversations['a_u1'] = Conversation(
+        id: 'a_u1',
+        participants: const ['a', 'u1'],
+        names: const {'a': 'Avery Jones'},
+        lastMessage: 'See you at practice',
+        lastMessageAt: DateTime(2026, 10, 1),
+        lastSenderId: 'a',
+      );
+      final vm = withTeams();
+      addTearDown(vm.dispose);
+      final router = GoRouter(
+        initialLocation: '/messages',
+        routes: [
+          GoRoute(
+            path: '/messages',
+            builder: (_, _) => InboxScreen(viewModel: vm),
+          ),
+          GoRoute(
+            path: '/teams/:t/chats/:r',
+            builder: (_, s) => Scaffold(
+              appBar: AppBar(),
+              body: Text('room ${s.pathParameters['r']}'),
+            ),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        withRepos(
+          MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('TEAM CHATS'), findsOneWidget);
+      expect(find.text('DIRECT MESSAGES'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Northside Flyers')).dy,
+        lessThan(tester.getTopLeft(find.text('Avery Jones')).dy),
+      );
+      expect(find.text('New in #carpool and #general'), findsOneWidget);
+      await tester.tap(find.text('Northside Flyers'));
+      await tester.pumpAndSettle();
+      // Two unread rooms: the newest.
+      expect(find.text('room rides'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('TEAM CHATS'), findsOneWidget);
+    });
+  });
+
   testWidgets('a request shows Accept and Delete instead of the composer, '
       'and sits under Requests', (tester) async {
     tester.view.physicalSize = const Size(390, 800);

@@ -19,6 +19,7 @@ class PersonalPromptViewModel extends ChangeNotifier {
   final PersonalDetailsRepository _personal;
   final AuthRepository _auth;
   bool _dismissed = true;
+  bool _disposed = false;
 
   String get _key => 'personalPrompt.${_auth.currentUser?.uid}';
 
@@ -31,7 +32,8 @@ class PersonalPromptViewModel extends ChangeNotifier {
     } on Exception {
       _dismissed = false;
     }
-    notifyListeners();
+    // Home can be left before the preference loads.
+    if (!_disposed) notifyListeners();
   }
 
   Future<void> dismiss() async {
@@ -46,6 +48,7 @@ class PersonalPromptViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _personal.removeListener(notifyListeners);
     super.dispose();
   }

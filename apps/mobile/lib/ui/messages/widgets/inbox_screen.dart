@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../data/repositories/chat/team_chat_activity.dart';
 import '../../../data/repositories/draft/message_draft_repository.dart';
 import '../../../data/repositories/notification/notification_repository.dart';
 import '../../../data/repositories/people/people_repository.dart';
+import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../chat/widgets/chat_layout.dart';
@@ -300,6 +302,22 @@ class _InboxListState extends State<InboxList> {
       final c = AppColors.of(context);
       if (!vm.loaded) return const LoadingView();
       final items = vm.items;
+      final teamChats = vm.teamChats;
+      // Section headings only when both kinds are listed.
+      final headed = teamChats.isNotEmpty && items.isNotEmpty;
+      final lead = teamChats.isEmpty ? 0 : teamChats.length + (headed ? 1 : 0);
+      Widget heading(String text) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+            color: c.muted,
+          ),
+        ),
+      );
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -330,7 +348,7 @@ class _InboxListState extends State<InboxList> {
             ),
           Divider(height: 1, color: c.border),
           Expanded(
-            child: items.isEmpty
+            child: items.isEmpty && teamChats.isEmpty
                 ? vm.error != null
                       ? ErrorView(error: vm.error)
                       : EmptyView(
@@ -345,8 +363,8 @@ class _InboxListState extends State<InboxList> {
                               vm.allItems.isEmpty &&
                                   vm.filter == InboxFilter.all
                               ? 'Message anyone on Stall 10 privately. Tap '
-                                    'New message and search by name. Team '
-                                    "chats are on each team's page."
+                                    'New message and search by name. Your '
+                                    "teams' chats show here too."
                               : null,
                         )
                 : ScrollToTop(
@@ -354,9 +372,28 @@ class _InboxListState extends State<InboxList> {
                     child: ListView.builder(
                       controller: _scroll,
                       padding: const EdgeInsets.only(bottom: 16),
-                      itemCount: items.length,
+                      itemCount: lead + (headed ? 1 : 0) + items.length,
                       itemBuilder: (context, i) {
-                        final item = items[i];
+                        if (headed && i == 0) return heading('TEAM CHATS');
+                        if (i < lead) {
+                          final s = teamChats[i - (headed ? 1 : 0)];
+                          return _TeamChatTile(
+                            summary: s,
+                            onTap: () {
+                              _openSwipe.value = null;
+                              final room = s.openRoom;
+                              context.push(
+                                room == null
+                                    ? Routes.teamChat(s.team.id)
+                                    : Routes.chatRoom(s.team.id, room.id),
+                              );
+                            },
+                          );
+                        }
+                        if (headed && i == lead) {
+                          return heading('DIRECT MESSAGES');
+                        }
+                        final item = items[i - lead - (headed ? 1 : 0)];
                         final tile = _InboxTile(
                           item: item,
                           selected: item.key == selectedKey,
@@ -618,6 +655,98 @@ class _SwipeActionsState extends State<_SwipeActions>
           );
         },
         child: widget.child,
+      ),
+    );
+  }
+}
+
+/// A team's or community's chat in the inbox: its name, which rooms have
+/// new messages, and when the newest was sent.
+class _TeamChatTile extends StatelessWidget {
+  const _TeamChatTile({required this.summary, required this.onTap});
+
+  final TeamChatSummary summary;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final unread = summary.unread;
+    final when = summary.lastAt;
+    return Material(
+      color: Theme.of(context).cardColor,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Row(
+            children: [
+              TeamBadge(
+                size: 48,
+                community: summary.team.kind == TeamKind.community,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            summary.team.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: unread
+                                  ? FontWeight.w800
+                                  : FontWeight.w700,
+                              color: c.ink,
+                            ),
+                          ),
+                        ),
+                        if (when != null)
+                          Text(
+                            _InboxTile._when(when),
+                            style: TextStyle(fontSize: 11, color: c.muted),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            summary.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: unread ? c.ink : c.muted,
+                              fontWeight: unread
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                        if (unread) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.circle,
+                            size: 10,
+                            color: c.ink,
+                            semanticLabel: 'Unread',
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

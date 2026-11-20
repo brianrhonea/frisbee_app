@@ -209,8 +209,11 @@ Notifications):
 
 ### Messages
 
-Open the **Messages** tab for your private messages. A badge shows how
-many conversations have something new.
+Open the **Messages** tab for all your chats. Your teams' and
+communities' chats are at the top: each shows which rooms have something
+new ("New in #general"), and a tap takes you straight into that room.
+Your private messages are below them. A badge shows how many chats have
+something new.
 
 - **New message**: search for anyone on Stall 10 by name or @username,
   then tap them to start a conversation. You don't need to share a team.

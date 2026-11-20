@@ -7,6 +7,18 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.33.0 — 2026-11-19
+
+**Added**
+- `PUT /v1/teams/:teamId/chats/:roomId/read`: marks a room read for the
+  caller (`users/{uid}/chatReads/{teamId}`, `rooms.{roomId}`), only in
+  rooms they can read.
+
+**Changed**
+- Sending a team chat message also stamps the room's `lastAt` (a time,
+  never the text) and marks the room read for the sender, in the same
+  transaction.
+
 ## 0.32.0 — 2026-11-19
 
 **Added**

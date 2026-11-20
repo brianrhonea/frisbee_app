@@ -1822,6 +1822,34 @@ describe("chat", () => {
     await assertFails(updateDoc(m1(COACH), { [`reactions.${COACH}`]: "😂", text: "x" }));
   });
 
+  it("whoever posts in a room stamps its lastAt with the server time, and nothing else", async () => {
+    const fs = db(CAPTAIN);
+    const batch = writeBatch(fs);
+    batch.set(doc(collection(fs, "teams", TEAM, "chats", "r1", "messages")), message(CAPTAIN));
+    batch.update(doc(fs, "teams", TEAM, "chats", "r1"), { lastAt: serverTimestamp() });
+    await assertSucceeds(batch.commit());
+    await assertFails(updateDoc(roomRef(CAPTAIN), { lastAt: new Date(2030, 0, 1) }));
+    await assertFails(updateDoc(roomRef(CAPTAIN), { lastAt: serverTimestamp(), name: "Renamed" }));
+    // Readers who can't post, members who can't read, and outsiders can't.
+    await assertFails(updateDoc(roomRef(STATS), { lastAt: serverTimestamp() }));
+    await assertFails(updateDoc(roomRef(PLAYER), { lastAt: serverTimestamp() }));
+    await assertFails(updateDoc(roomRef(OUTSIDER), { lastAt: serverTimestamp() }));
+    // A rename by a chat manager keeps it.
+    await assertSucceeds(updateDoc(roomRef(COACH), { name: "Leaders" }));
+  });
+
+  it("each member keeps their own chat read times, one doc per team", async () => {
+    const reads = (uid: string, owner = uid) => doc(db(uid), "users", owner, "chatReads", TEAM);
+    await assertSucceeds(setDoc(reads(PLAYER), { rooms: { general: serverTimestamp() } }, { merge: true }));
+    await assertSucceeds(setDoc(reads(PLAYER), { rooms: { r1: serverTimestamp() } }, { merge: true }));
+    await assertSucceeds(getDoc(reads(PLAYER)));
+    await assertFails(getDoc(reads(COACH, PLAYER)));
+    await assertFails(setDoc(reads(COACH, PLAYER), { rooms: { general: serverTimestamp() } }));
+    await assertFails(setDoc(reads(PLAYER), { rooms: {}, extra: 1 }));
+    await assertFails(setDoc(reads(PLAYER), { rooms: "general" }));
+    await assertSucceeds(deleteDoc(reads(PLAYER)));
+  });
+
   it("a chat reply carries a valid quote", async () => {
     const quote = { id: "m1", authorId: CAPTAIN, authorName: "Cap", text: "Hi" };
     await assertSucceeds(setDoc(doc(messages(CAPTAIN)), message(CAPTAIN, { replyTo: quote })));

@@ -34,3 +34,4 @@ export * from "./discord.js";
 export * from "./schedule.js";
 export * from "./rankings.js";
 export * from "./profile_stats.js";
+export * from "./team_chats.js";

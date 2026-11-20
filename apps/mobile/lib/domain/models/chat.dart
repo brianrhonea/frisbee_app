@@ -195,6 +195,7 @@ class ChatRoom with ChatAccessLists {
     this.position = 0,
     this.createdBy = '',
     this.createdAt,
+    this.lastAt,
   });
 
   /// A room every member can read and write; each team gets one.
@@ -285,8 +286,21 @@ class ChatRoom with ChatAccessLists {
   final String createdBy;
   final DateTime? createdAt;
 
+  /// When its last message was sent, stamped by the sender; null for a
+  /// room with no message since unread dots began. Only a time, never the
+  /// text: chat managers read rooms they can't read the messages of.
+  final DateTime? lastAt;
+
   bool get isNew => id.isEmpty;
   bool get isGeneral => id == generalId;
+
+  /// Whether it has a message newer than [readAt], the user's last read of
+  /// it (null: never read). Voice channels have no messages to read.
+  bool unreadSince(DateTime? readAt) {
+    final last = lastAt;
+    if (isVoice || last == null) return false;
+    return readAt == null || last.isAfter(readAt);
+  }
 
   ChatRoom withRoleAccess(String roleId, ChatAccess access) => _copy(
     readRoles: _apply(readRoles, roleId, access.canRead),
@@ -354,6 +368,7 @@ class ChatRoom with ChatAccessLists {
     position: position ?? this.position,
     createdBy: createdBy,
     createdAt: createdAt,
+    lastAt: lastAt,
   );
 
   factory ChatRoom.fromMap(String id, Map<String, dynamic> map) => ChatRoom(
@@ -368,9 +383,10 @@ class ChatRoom with ChatAccessLists {
     position: (map['position'] as num?)?.toInt() ?? 0,
     createdBy: map['createdBy'] as String? ?? '',
     createdAt: parseDate(map['createdAt']),
+    lastAt: parseDate(map['lastAt']),
   );
 
-  /// Name, place and access lists.
+  /// Name, place and access lists (never [lastAt], which senders stamp).
   Map<String, dynamic> toMap() => {
     'name': name.trim(),
     ...accessMap(),

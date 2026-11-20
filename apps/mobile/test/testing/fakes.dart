@@ -1362,6 +1362,57 @@ class FakeChatRepository implements ChatRepository {
   Stream<ChatRoom?> watchRoom(String teamId, String roomId) =>
       _watch(() => rooms[roomId]);
 
+  /// uid → team id → room id → when they last read it.
+  final reads = <String, Map<String, Map<String, DateTime>>>{};
+
+  /// The clock markRead stamps with.
+  DateTime Function() now = DateTime.now;
+
+  /// (teamId, roomId) for each markRead call.
+  final marked = <(String, String)>[];
+
+  @override
+  Stream<Map<String, Map<String, DateTime>>> watchReads(String uid) => _watch(
+    () => {
+      for (final e in (reads[uid] ?? const {}).entries) e.key: Map.of(e.value),
+    },
+  );
+
+  @override
+  Future<Result<void>> markRead(
+    String teamId,
+    String roomId,
+    String uid,
+  ) async {
+    marked.add((teamId, roomId));
+    _read(uid, teamId, roomId, now());
+    emit();
+    return const Result.ok(null);
+  }
+
+  void _read(String uid, String teamId, String roomId, DateTime at) =>
+      ((reads[uid] ??= {})[teamId] ??= {})[roomId] = at;
+
+  /// [roomId] with its lastAt set to [at], as a sender stamps it.
+  void stampRoom(String roomId, DateTime at) {
+    final r = rooms[roomId];
+    if (r == null) return;
+    rooms[roomId] = ChatRoom(
+      id: r.id,
+      name: r.name,
+      kind: r.kind,
+      readRoles: r.readRoles,
+      writeRoles: r.writeRoles,
+      readUsers: r.readUsers,
+      writeUsers: r.writeUsers,
+      folderId: r.folderId,
+      position: r.position,
+      createdBy: r.createdBy,
+      createdAt: r.createdAt,
+      lastAt: at,
+    );
+  }
+
   @override
   Future<Result<String>> saveRoom(
     String teamId,
@@ -1462,6 +1513,9 @@ class FakeChatRepository implements ChatRepository {
     for (final (i, a) in attachments.indexed) {
       files['$roomId/$id/$i'] = a.bytes;
     }
+    final at = list.last.createdAt!;
+    stampRoom(roomId, at);
+    _read(author.uid, teamId, roomId, at);
     emit();
     return const Result.ok(null);
   }

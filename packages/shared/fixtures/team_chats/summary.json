@@ -1,0 +1,242 @@
+{
+  "about": "TeamChatSummary.fromReadable: a team's chat in the inbox. Of the rooms the user can read (canRead), voice channels are left out; a room is unread when lastAt is after its read time (or never read). `unread` is newest first; `open` is the room a tap opens (the only unread one, else the newest, else the first); `subtitle` is what the row says.",
+  "cases": [
+    {
+      "name": "no messages yet",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": null,
+          "canRead": true
+        }
+      ],
+      "reads": {},
+      "summary": {
+        "rooms": [
+          "general"
+        ],
+        "unread": [],
+        "lastAt": null,
+        "open": "general",
+        "subtitle": "No messages yet"
+      }
+    },
+    {
+      "name": "one unread room opens it",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:00:00.000",
+          "canRead": true
+        },
+        {
+          "id": "rides",
+          "name": "Car Pool",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:05:00.000",
+          "canRead": true
+        }
+      ],
+      "reads": {
+        "rides": "2026-11-01T09:05:00.000"
+      },
+      "summary": {
+        "rooms": [
+          "general",
+          "rides"
+        ],
+        "unread": [
+          "general"
+        ],
+        "lastAt": "2026-11-01T09:05:00.000",
+        "open": "general",
+        "subtitle": "New in #general"
+      }
+    },
+    {
+      "name": "two unread: newest first, the newest opens",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:00:00.000",
+          "canRead": true
+        },
+        {
+          "id": "rides",
+          "name": "Car Pool",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:05:00.000",
+          "canRead": true
+        }
+      ],
+      "reads": {},
+      "summary": {
+        "rooms": [
+          "general",
+          "rides"
+        ],
+        "unread": [
+          "rides",
+          "general"
+        ],
+        "lastAt": "2026-11-01T09:05:00.000",
+        "open": "rides",
+        "subtitle": "New in #car-pool and #general"
+      }
+    },
+    {
+      "name": "more than two unread are counted",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:00:00.000",
+          "canRead": true
+        },
+        {
+          "id": "rides",
+          "name": "Car Pool",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:05:00.000",
+          "canRead": true
+        },
+        {
+          "id": "lines",
+          "name": "Lines",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:09:00.000",
+          "canRead": true
+        },
+        {
+          "id": "film",
+          "name": "Film",
+          "kind": "text",
+          "lastAt": "2026-11-01T10:00:00.000",
+          "canRead": true
+        }
+      ],
+      "reads": {},
+      "summary": {
+        "rooms": [
+          "general",
+          "rides",
+          "lines",
+          "film"
+        ],
+        "unread": [
+          "film",
+          "lines",
+          "rides",
+          "general"
+        ],
+        "lastAt": "2026-11-01T10:00:00.000",
+        "open": "film",
+        "subtitle": "New in #film, #lines and 2 more"
+      }
+    },
+    {
+      "name": "all read: the newest room opens",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:05:00.000",
+          "canRead": true
+        },
+        {
+          "id": "rides",
+          "name": "Car Pool",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:00:00.000",
+          "canRead": true
+        }
+      ],
+      "reads": {
+        "general": "2026-11-01T09:05:00.000",
+        "rides": "2026-11-01T09:09:00.000"
+      },
+      "summary": {
+        "rooms": [
+          "general",
+          "rides"
+        ],
+        "unread": [],
+        "lastAt": "2026-11-01T09:05:00.000",
+        "open": "general",
+        "subtitle": "Team chat"
+      }
+    },
+    {
+      "name": "rooms the user cannot read and voice channels are left out",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:00:00.000",
+          "canRead": true
+        },
+        {
+          "id": "staff",
+          "name": "Staff",
+          "kind": "text",
+          "lastAt": "2026-11-01T10:00:00.000",
+          "canRead": false
+        },
+        {
+          "id": "lounge",
+          "name": "Lounge",
+          "kind": "voice",
+          "lastAt": "2026-11-01T10:00:00.000",
+          "canRead": true
+        }
+      ],
+      "reads": {
+        "general": "2026-11-01T09:00:00.000"
+      },
+      "summary": {
+        "rooms": [
+          "general"
+        ],
+        "unread": [],
+        "lastAt": "2026-11-01T09:00:00.000",
+        "open": "general",
+        "subtitle": "Team chat"
+      }
+    },
+    {
+      "name": "a read before the last message is unread",
+      "rooms": [
+        {
+          "id": "general",
+          "name": "General",
+          "kind": "text",
+          "lastAt": "2026-11-01T09:05:00.000",
+          "canRead": true
+        }
+      ],
+      "reads": {
+        "general": "2026-11-01T09:00:00.000"
+      },
+      "summary": {
+        "rooms": [
+          "general"
+        ],
+        "unread": [
+          "general"
+        ],
+        "lastAt": "2026-11-01T09:05:00.000",
+        "open": "general",
+        "subtitle": "New in #general"
+      }
+    }
+  ]
+}

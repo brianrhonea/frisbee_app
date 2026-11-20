@@ -3,14 +3,18 @@ import { MuteButton } from "../MuteButton";
 import { where } from "firebase/firestore";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { type InboxRoom, roomUnread } from "@stall10/shared";
+import { callApi } from "@/lib/client";
+import { useAuth } from "../AuthProvider";
+import { canReadRoom } from "../useTeamChats";
 import { Avatar } from "../Avatar";
 import { LocalTime } from "../LocalTime";
 import { ChatAttachment, type ChatFile } from "../ChatAttachment";
 import { loadAtTop, OlderMessages } from "../OlderMessages";
 import { ChatComposer, MessageActions } from "../ChatComposer";
 import { PendingMessages } from "../PendingMessages";
-import { type Doc, useLiveQueries, useLiveQuery } from "@/lib/live";
+import { type Doc, useLiveDoc, useLiveQueries, useLiveQuery } from "@/lib/live";
 import { usePagedMessages, useThreadScroll } from "@/lib/messages";
 import { ChatManager, type ManagedFolder, type ManagedRoom } from "./ChatManager";
 import { useTeamHub } from "./TeamContext";
@@ -18,7 +22,7 @@ import { MembersOnlySection } from "./TeamNav";
 import { VoiceRoom } from "./meetings/VoiceRoom";
 import { EmptyState, Loading } from "../StatusViews";
 
-type Room = ManagedRoom;
+type Room = ManagedRoom & InboxRoom;
 type Folder = ManagedFolder;
 interface Message {
   authorId?: string;
@@ -39,14 +43,17 @@ const byPosition = (a: { position?: number; name?: string }, b: { position?: num
  * The team's chat: rooms by folder down the left, the open room (?room=)
  * beside them, live. A member sees the rooms their tier, roles or name
  * open to, asked once per audience id as the rules require; chat managers
- * see every room.
+ * see every room. Rooms with messages the member hasn't read are bold
+ * with a dot; the open one is marked read as messages arrive.
  */
 export function TeamChat() {
   const { teamId, viewer } = useTeamHub();
+  const { user } = useAuth();
   const params = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
   const member = viewer.state === "member" ? viewer : null;
+  const reads = useLiveDoc<{ rooms?: Record<string, string> }>(member ? `users/${member.uid}/chatReads/${teamId}` : null);
   const all = member?.can("manageChats") ?? false;
   const queries = !member
     ? []
@@ -55,6 +62,15 @@ export function TeamChat() {
       : [...member.audience.map((id) => [where("readRoles", "array-contains", id)]), [where("readUsers", "array-contains", member.uid)]];
   const rooms = useLiveQueries<Room>(member ? `teams/${teamId}/chats` : null, queries, all ? "all" : (member?.audience.join(",") ?? ""));
   const folders = useLiveQuery<Folder>(member ? `teams/${teamId}/chatFolders` : null, [], "folders");
+  const readAt = (id: string) => reads.data?.rooms?.[id];
+  const openRoom = (rooms.data ?? []).find((r) => r.id === params.get("room")) ?? (rooms.data ?? []).slice().sort(byPosition).find((r) => r.kind !== "voice");
+  const openUnread = !!member && !!openRoom && reads.data !== undefined && canReadRoom(member.team, member.uid, openRoom) && roomUnread(openRoom, readAt(openRoom.id));
+  // The open room counts as read, now and as each message arrives.
+  useEffect(() => {
+    if (!user || !openRoom || !openUnread) return;
+    void callApi(user, `/v1/teams/${encodeURIComponent(teamId)}/chats/${encodeURIComponent(openRoom.id)}/read`, { method: "PUT" }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per new message in the open room.
+  }, [user, teamId, openRoom?.id, openRoom?.lastAt, openUnread]);
 
   if (!member) return <MembersOnlySection what="chat" />;
   if (rooms.error) return <p className="form-error">{rooms.error}</p>;
@@ -85,18 +101,22 @@ export function TeamChat() {
           <div key={g.id || "top"}>
             {g.name && <h3 className="chat-folder">{g.name}</h3>}
             <ul className="hub-items">
-              {g.rooms.map((r) => (
-                <li key={r.id}>
-                  <Link
-                    href={`${pathname}?room=${r.id}`}
-                    scroll={false}
-                    className={`chat-room${r.id === open?.id ? " active" : ""}`}
-                    aria-current={r.id === open?.id ? "true" : undefined}
-                  >
-                    <span aria-hidden="true">{r.kind === "voice" ? "🔊" : "#"}</span> {r.name || "Room"}
-                  </Link>
-                </li>
-              ))}
+              {g.rooms.map((r) => {
+                const unread = r.id !== open?.id && canReadRoom(member.team, member.uid, r) && roomUnread(r, readAt(r.id));
+                return (
+                  <li key={r.id}>
+                    <Link
+                      href={`${pathname}?room=${r.id}`}
+                      scroll={false}
+                      className={`chat-room${r.id === open?.id ? " active" : ""}${unread ? " unread" : ""}`}
+                      aria-current={r.id === open?.id ? "true" : undefined}
+                    >
+                      <span aria-hidden="true">{r.kind === "voice" ? "🔊" : "#"}</span> {r.name || "Room"}
+                      {unread && <span className="notice-dot" aria-label="Unread" />}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ))}

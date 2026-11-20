@@ -177,6 +177,9 @@ class _RoomListState extends State<RoomList> {
                                 access: vm.accessTo(room),
                                 audience: vm.audienceOf(room),
                                 selected: room.id == widget.selectedId,
+                                unread:
+                                    room.id != widget.selectedId &&
+                                    vm.isUnread(room),
                                 onTap: () => widget.onOpen(room.id),
                                 drag: drag,
                                 menu: vm.canManage
@@ -605,6 +608,7 @@ class _RoomRow extends StatefulWidget {
     required this.selected,
     required this.onTap,
     required this.drag,
+    this.unread = false,
     this.menu,
   });
 
@@ -612,6 +616,9 @@ class _RoomRow extends StatefulWidget {
   final ChatAccess access;
   final String audience;
   final bool selected;
+
+  /// It has messages the user hasn't read: bold, with a dot.
+  final bool unread;
   final VoidCallback onTap;
   final _DragHooks drag;
   final Widget? menu;
@@ -632,7 +639,8 @@ class _RoomRowState extends State<_RoomRow> {
       _ when room.isVoice => Icons.volume_up_rounded,
       _ => Icons.tag,
     };
-    final color = widget.selected || _hover ? c.ink : c.muted;
+    final unread = widget.unread;
+    final color = widget.selected || _hover || unread ? c.ink : c.muted;
     Widget row({bool lifted = false}) => Row(
       children: [
         Icon(icon, size: 20, color: lifted ? c.ink : color),
@@ -644,11 +652,23 @@ class _RoomRowState extends State<_RoomRow> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 14.5,
-              fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
+              fontWeight: widget.selected || unread
+                  ? FontWeight.w700
+                  : FontWeight.w500,
               color: lifted ? c.ink : color,
             ),
           ),
         ),
+        if (!lifted && unread)
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: Icon(
+              Icons.circle,
+              size: 9,
+              color: c.ink,
+              semanticLabel: 'Unread',
+            ),
+          ),
         if (!lifted && widget.access == ChatAccess.read && !room.isVoice)
           Tooltip(
             message: 'Read only',

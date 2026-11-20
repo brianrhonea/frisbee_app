@@ -214,6 +214,23 @@ describe("team chat", () => {
     });
   });
 
+  it("stamps the room's lastAt and marks it read for the sender, never storing the text on the room", async () => {
+    await s.call("POST", "/v1/teams/t1/chats/general/messages", { text: "hi" }, "player");
+    const room = s.store.doc("teams/t1/chats/general")!;
+    expect(room.lastAt).toEqual(new Date(now));
+    expect(Object.keys(room)).not.toContain("lastMessage");
+    expect(s.store.doc("users/player/chatReads/t1")).toEqual({ rooms: { general: new Date(now) } });
+  });
+
+  it("marks a room read for the caller, only in rooms they can read", async () => {
+    s.store.put("users/player/chatReads/t1", { rooms: { news: new Date(1) } });
+    expect((await s.call("PUT", "/v1/teams/t1/chats/general/read", undefined, "player")).statusCode).toBe(204);
+    expect(s.store.doc("users/player/chatReads/t1")).toEqual({ rooms: { news: new Date(1), general: new Date(now) } });
+    expect((await s.call("PUT", "/v1/teams/t1/chats/coaches/read", undefined, "player")).statusCode).toBe(404);
+    expect((await s.call("PUT", "/v1/teams/t1/chats/general/read", undefined, "stranger")).statusCode).toBe(404);
+    expect((await s.call("PUT", "/v1/teams/t1/chats/gone/read", undefined, "player")).statusCode).toBe(404);
+  });
+
   it("refuses rooms the caller can't read or write, outsiders and muted members", async () => {
     expect((await s.call("POST", "/v1/teams/t1/chats/coaches/messages", { text: "hi" }, "player")).statusCode).toBe(404);
     expect((await s.call("POST", "/v1/teams/t1/chats/news/messages", { text: "hi" }, "player")).statusCode).toBe(403);
