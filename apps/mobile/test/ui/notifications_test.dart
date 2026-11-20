@@ -207,7 +207,7 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(home: Scaffold(appBar: MobileTopBar())),
       );
-      expect(find.text('Stall 10'), findsOneWidget);
+      expect(find.text('STALL 10'), findsOneWidget);
       expect(find.byType(AppLogo), findsNothing);
       expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
     });

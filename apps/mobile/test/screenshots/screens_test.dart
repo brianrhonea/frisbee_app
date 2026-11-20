@@ -1,6 +1,7 @@
 // Phone screenshots of the main screens, on fake data, for design review.
 // Skipped unless asked for:
 //   flutter test test/screenshots --dart-define=SCREENSHOTS=<out dir>
+// (add --dart-define=SHOT_THEME=dark for the dark theme)
 // writes <out dir>/<name>.png at 390x844 (iPhone 14/15) with the app's
 // Inter font and Material icons, so the text is real, not test boxes.
 import 'dart:io';
@@ -57,6 +58,7 @@ import '../testing/video_fakes.dart';
 import '../ui/explore_test.dart' show FakeRankingRepository;
 
 const _out = String.fromEnvironment('SCREENSHOTS');
+const _dark = String.fromEnvironment('SHOT_THEME') == 'dark';
 
 Future<void> _loadFonts() async {
   Future<void> family(String name, List<String> files) async {
@@ -69,8 +71,12 @@ Future<void> _loadFonts() async {
   }
 
   await family('Inter', [
-    for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold'])
+    for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold'])
       'assets/fonts/Inter-$w.ttf',
+  ]);
+  await family('Barlow Condensed', [
+    for (final w in ['Bold', 'ExtraBold', 'ExtraBoldItalic'])
+      'assets/fonts/BarlowCondensed-$w.ttf',
   ]);
   // The test runs under <flutter>/bin/cache/...; find the SDK's icon font.
   var dir = File(Platform.resolvedExecutable).parent;
@@ -269,7 +275,7 @@ void main() {
           ],
           child: MaterialApp.router(
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.light,
+            theme: _dark ? AppTheme.dark : AppTheme.light,
             routerConfig: appRouter,
           ),
         ),

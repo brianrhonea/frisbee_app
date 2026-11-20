@@ -6,16 +6,16 @@ import 'package:flutter/material.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/brand.dart';
 
-/// The website's palette: a Midnight sky over an indigo field, and an
-/// amber disc.
+/// The "Turf & Disc" palette: a scoreboard-navy night sky over a turf
+/// field, and a disc-amber disc.
 abstract final class _Palette {
-  static const skyTop = Color(0xFF121521);
-  static const field = Color(0xFF3B3290);
-  static const fieldDeep = Color(0xFF2C2570);
-  static const chalk = Color(0xFFF3F5FB);
-  static const disc = Color(0xFFF0D8A8);
-  static const discRim = Color(0xFFB98A3E);
-  static const discLine = Color(0xFFC99D54);
+  static const skyTop = Color(0xFF0B121D);
+  static const field = Color(0xFF12805C);
+  static const fieldDeep = Color(0xFF0B5E43);
+  static const chalk = Color(0xFFF5F6F1);
+  static const disc = Color(0xFFFFB627);
+  static const discRim = Color(0xFFB97C00);
+  static const discLine = Color(0xFFD99A10);
 }
 
 /// The background colour at the bottom of the hero, for whatever sits
@@ -361,7 +361,7 @@ class DiscThrowPainter extends CustomPainter {
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [_Palette.skyTop, Color(0x00121521)],
+          colors: [_Palette.skyTop, Color(0x000B121D)],
         ).createShader(fadeRect),
     );
   }
@@ -438,7 +438,7 @@ class DiscThrowPainter extends CustomPainter {
             const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFFBEFD6), _Palette.disc, Color(0xFFDDB878)],
+              colors: [Color(0xFFFFE3A3), _Palette.disc, Color(0xFFE09A12)],
               stops: [0, 0.35, 1],
             ).createShader(
               Rect.fromCenter(

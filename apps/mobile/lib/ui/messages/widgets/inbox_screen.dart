@@ -415,7 +415,7 @@ class _InboxListState extends State<InboxList> {
                                 icon: item.muted
                                     ? Icons.notifications_active_outlined
                                     : Icons.notifications_off_outlined,
-                                color: const Color(0xFF6E56CF),
+                                color: AppColors.of(context).ink2,
                                 onTap: () => vm.toggleMute.execute(item),
                               ),
                             _SwipeAction(

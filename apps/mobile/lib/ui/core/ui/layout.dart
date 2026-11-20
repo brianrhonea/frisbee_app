@@ -266,8 +266,8 @@ class SectionCard extends StatelessWidget {
                   child: Text(
                     title!,
                     style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
                       letterSpacing: -0.2,
                       color: c.ink,
                     ),
@@ -289,7 +289,7 @@ class SectionCard extends StatelessWidget {
   }
 }
 
-/// A small "See all →" style link for card headers.
+/// A small turf "See all" link for card headers.
 class CardLink extends StatelessWidget {
   const CardLink({super.key, required this.label, required this.onTap});
 
@@ -303,29 +303,21 @@ class CardLink extends StatelessWidget {
       borderRadius: BorderRadius.circular(6),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: c.ink,
-              ),
-            ),
-            const SizedBox(width: 3),
-            Icon(Icons.arrow_forward, size: 13, color: c.ink),
-          ],
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: c.accent,
+          ),
         ),
       ),
     );
   }
 }
 
-/// A dark green card for the most important thing on a page, e.g. the next
-/// game.
+/// A scoreboard-navy card for what is live or today, e.g. the next game.
 class FeatureCard extends StatelessWidget {
   const FeatureCard({
     super.key,
@@ -394,7 +386,7 @@ class Tag extends StatelessWidget {
 
   final String text;
 
-  /// Lime instead of the soft tint.
+  /// For use on navy: the secondary navy fill with white text.
   final bool strong;
 
   @override
@@ -403,7 +395,7 @@ class Tag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: strong ? c.highlight : c.accentSoft,
+        color: strong ? c.featureHighlight : c.accentSoft,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -412,7 +404,7 @@ class Tag extends StatelessWidget {
           fontSize: 10.5,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.2,
-          color: strong ? c.onHighlight : c.ink,
+          color: strong ? c.onFeature : c.accentInk,
         ),
       ),
     );
@@ -476,9 +468,10 @@ class StatBlock extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontSize: 26,
+            fontFamily: scoreFont,
+            fontSize: 30,
+            height: 1.05,
             fontWeight: FontWeight.w800,
-            letterSpacing: -0.8,
             color: c.ink,
           ),
         ),
@@ -503,9 +496,8 @@ class DateBadge extends StatelessWidget {
       width: size,
       height: size + 4,
       decoration: BoxDecoration(
-        color: c.card,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: c.border),
+        color: c.accentSoft,
+        borderRadius: BorderRadius.circular(size * 0.25),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -516,16 +508,17 @@ class DateBadge extends StatelessWidget {
               fontSize: size * 0.2,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
-              color: c.muted,
+              color: c.accentInk,
             ),
           ),
           Text(
             DateFormat('dd').format(date),
             style: TextStyle(
-              fontSize: size * 0.42,
-              height: 1.05,
+              fontFamily: scoreFont,
+              fontSize: size * 0.5,
+              height: 1.0,
               fontWeight: FontWeight.w800,
-              color: c.ink,
+              color: c.accentInk,
             ),
           ),
         ],
@@ -596,25 +589,25 @@ class TeamBadge extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: c.feature,
-        borderRadius: BorderRadius.circular(size * 0.24),
+        color: c.accentSoft,
+        borderRadius: BorderRadius.circular(size * 0.28),
       ),
       child: Icon(
         community ? Icons.diversity_3_outlined : Icons.landscape_outlined,
         size: size * 0.56,
-        color: c.highlight,
+        color: c.accentInk,
       ),
     );
   }
 }
 
-/// A count in a lime pill, for navigation items and list rows.
+/// An unread count in a disc-amber pill, for navigation items and rows.
 class CountPill extends StatelessWidget {
   const CountPill(this.count, {super.key, this.dark = false});
 
   final int count;
 
-  /// Dark green with white text, e.g. on a lime background.
+  /// Navy with white text, e.g. on a selected nav item.
   final bool dark;
 
   @override

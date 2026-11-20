@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.35  | 2026-11-19 | `feature/redesign`                      |                     |
 | 0.0.34  | 2026-11-19 | `feature/team-first`                    |                     |
 | 0.0.33  | 2026-11-19 | `feature/team-first`                    |                     |
 | 0.0.32  | 2026-11-19 | `feature/team-first`                    |                     |
@@ -47,6 +48,25 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.35 — "Turf & Disc" redesign foundation (redesign 1)
+
+App only; no API, rules or data changes. Plan: `docs/redesign-plan.md`.
+
+- New palette in `AppColors` (light and dark): turf green actions,
+  scoreboard navy for live/today, disc amber only for what is yours to
+  do, red only for live games. Existing token names kept; new tokens
+  `border2`, `ink2`, `accentInk`, `highlightSoft`, `highlightInk`, `live`,
+  `liveSoft`, `liveInk`, `chipOn`, `onChipOn`, `badge`.
+- Barlow Condensed (OFL) bundled for scores, big numbers, date badges
+  and the italic "STALL 10" wordmark (`scoreFont`).
+- Radii 16 (cards) / 12 (controls); outlined filter chips, navy when
+  selected; turf tab underline; amber unread badges; turf "See all".
+- New shared widgets in `ui/core/ui/scoreboard.dart`: `ScoreText`,
+  `LiveDot`, `LivePill`, `NeedsYouPill`, `TeamDot`, `SectionHeader`,
+  `ScoreLine`, `BoardLabel`.
+- Sign-in artwork recoloured; screenshot harness takes
+  `--dart-define=SHOT_THEME=dark`.
 
 ## 0.0.34 — Tournaments tab when one is ahead (team-first 3)
 

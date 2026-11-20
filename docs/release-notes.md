@@ -10,6 +10,14 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.35
+
+**A new look**
+- New colours across the app, in light and dark mode: green for
+  buttons and links, navy for anything live or happening today, and
+  amber only for things that need you (report a score, RSVP, unread).
+- Scores, dates and big numbers use a bold sports typeface.
+
 ## 0.0.34
 
 **Tournaments up front**
