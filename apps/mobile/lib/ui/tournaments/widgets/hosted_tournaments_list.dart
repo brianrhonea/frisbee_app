@@ -4,12 +4,15 @@ import 'package:intl/intl.dart';
 
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../routing/routes.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/tone.dart';
 import '../view_models/hosted_tournaments_viewmodel.dart';
 import 'hosted_status_badge.dart';
 import 'hosted_tournament_screen.dart';
+import 'tournament_parts.dart';
 
 /// "All" and each status the list has, when it has more than one.
 class HostedStatusFilterBar extends StatelessWidget {
@@ -56,34 +59,24 @@ class HostedTournamentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tournament;
     final divisions = t.divisions.map((d) => d.label).join(', ');
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.emoji_events_outlined)),
-        title: Row(
-          children: [
-            Flexible(child: Text(t.name)),
-            if (t.hostOfficial) ...[
-              const SizedBox(width: 6),
-              const OfficialBadge(label: null),
-            ],
-          ],
-        ),
-        subtitle: Text(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: _EventRow(
+        startsOn: t.startsOn,
+        endsOn: t.isLeague ? null : t.endsOn,
+        title: t.name,
+        official: t.hostOfficial,
+        lines: [
+          [hostedDates(t), if (t.location.isNotEmpty) t.location].join(' · '),
           [
-            [hostedDates(t), if (t.location.isNotEmpty) t.location].join(' · '),
-            [
-              if (t.type != HostedType.tournament) t.type.label,
-              if (showHost) t.hostName,
-              if (divisions.isNotEmpty) divisions,
-              if (t.visibility == TournamentVisibility.inviteOnly)
-                'Invite only',
-              if (t.bidFee case final f?)
-                '${f.label} ${t.takesPlayers ? 'to play' : 'bid'}',
-            ].join(' · '),
-          ].join('\n'),
-        ),
-        isThreeLine: true,
+            if (t.type != HostedType.tournament) t.type.label,
+            if (showHost) t.hostName,
+            if (divisions.isNotEmpty) divisions,
+            if (t.visibility == TournamentVisibility.inviteOnly) 'Invite only',
+            if (t.bidFee case final f?)
+              '${f.label} ${t.takesPlayers ? 'to play' : 'bid'}',
+          ].join(' · '),
+        ],
         trailing: HostedStatusBadge(status: t.status),
         onTap: () => context.push(Routes.tournament(t.id)),
       ),
@@ -262,9 +255,98 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
-    child: Text(text, style: Theme.of(context).textTheme.titleSmall),
+    padding: const EdgeInsets.only(top: 12),
+    child: SectionHeader(text),
   );
+}
+
+/// An event in a list: its date badge, name, a line or two about it, and
+/// [trailing] (its status).
+class _EventRow extends StatelessWidget {
+  const _EventRow({
+    required this.title,
+    required this.lines,
+    required this.onTap,
+    this.startsOn,
+    this.endsOn,
+    this.official = false,
+    this.trailing,
+  });
+
+  final DateTime? startsOn;
+  final DateTime? endsOn;
+  final String title;
+  final bool official;
+  final List<String> lines;
+  final Widget? trailing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final start = startsOn;
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Row(
+            children: [
+              if (start != null)
+                EventDateBadge(startsOn: start, endsOn: endsOn, size: 48)
+              else
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: c.accentSoft,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.emoji_events_outlined, color: c.accentInk),
+                ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: c.ink,
+                            ),
+                          ),
+                        ),
+                        if (official) ...[
+                          const SizedBox(width: 6),
+                          const OfficialBadge(label: null),
+                        ],
+                      ],
+                    ),
+                    for (final line in lines)
+                      if (line.isNotEmpty)
+                        Text(
+                          line,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12.5, color: c.muted),
+                        ),
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// A tournament the team entered: its dates, where, and where the entry
@@ -277,32 +359,33 @@ class _EnteredCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final e = entry;
-    final scheme = Theme.of(context).colorScheme;
-    final accepted = e.status == EntryStatus.accepted;
     final when = switch ((e.startsOn, e.endsOn)) {
       (final s?, final end?) when !DateUtils.isSameDay(s, end) =>
         '${DateFormat.MMMd().format(s)} – ${DateFormat.MMMd().format(end)}',
       (final s?, _) => DateFormat.yMMMd().format(s),
       _ => '',
     };
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.emoji_events_outlined)),
-        title: Text(e.name),
-        subtitle: Text(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: _EventRow(
+        startsOn: e.startsOn,
+        endsOn: e.endsOn,
+        title: e.name,
+        lines: [
           [
-            [
-              when,
-              if (e.location.isNotEmpty) e.location,
-            ].where((x) => x.isNotEmpty).join(' · '),
-            if (e.hostName.isNotEmpty) 'Hosted by ${e.hostName}',
-          ].where((x) => x.isNotEmpty).join('\n'),
-        ),
-        trailing: Chip(
-          label: Text(e.status.label),
-          backgroundColor: accepted ? scheme.primaryContainer : null,
-          visualDensity: VisualDensity.compact,
+            when,
+            if (e.location.isNotEmpty) e.location,
+          ].where((x) => x.isNotEmpty).join(' · '),
+          if (e.hostName.isNotEmpty) 'Hosted by ${e.hostName}',
+        ],
+        trailing: Pill(
+          e.status.label,
+          // An invite is the team's to answer.
+          tone: switch (e.status) {
+            EntryStatus.accepted => PillTone.turf,
+            EntryStatus.invited => PillTone.needsYou,
+            _ => PillTone.neutral,
+          },
         ),
         onTap: () => context.push(Routes.tournament(e.tournamentId)),
       ),

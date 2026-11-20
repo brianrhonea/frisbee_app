@@ -15,6 +15,7 @@ import '../../core/ui/brand.dart';
 import '../../core/ui/undo_snack_bar.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../posts/widgets/post_widgets.dart';
 import '../../schedule/widgets/event_editor_screen.dart';
 import '../../schedule/widgets/event_style.dart';
@@ -28,22 +29,24 @@ import '../../posts/widgets/inline_composer.dart';
 import '../../posts/widgets/post_composer.dart';
 import '../../core/ui/skeleton.dart';
 
+/// The feed's tabs, in order; Your teams first and open by default.
 enum _Tab {
-  forYou('For you'),
-  community('Community'),
-  teams('Your teams');
+  teams('Your teams'),
+  following('Following'),
+  everyone('Everyone');
 
   const _Tab(this.label);
 
   final String label;
 }
 
-/// The home feed: the user's posts, their teams' and those of what they
-/// follow, with what's up next beside them (below the header on narrow
-/// screens); a Community tab of every public profile's posts (as on the
-/// website); and a Your teams tab of their teams' posts. Under the
-/// composer, a strip of their teams; on an empty feed, a "Get started"
-/// checklist (both as on the website).
+/// The home feed, in three tabs: Your teams (the default: every post of
+/// the user's teams and communities, with a strip of their teams), Following
+/// (the user's posts, their teams' and those of who and what they follow)
+/// and Everyone (every public profile's posts, with the API). The composer
+/// tops Your teams and Following; on an empty feed, a "Get started"
+/// checklist. What's up next sits beside the feed (above the tabs on narrow
+/// screens: a tournament-day card or one Coming up card).
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.viewModel, this.prompt});
 
@@ -58,7 +61,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   HomeViewModel get vm => widget.viewModel;
-  var _tab = _Tab.forYou;
+  var _tab = _Tab.teams;
   final _composerKey = GlobalKey();
 
   late final List<Command<void>> _commands = [
@@ -68,13 +71,15 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   void _onHomeAgain() {
-    if (_tab != _Tab.forYou) setState(() => _tab = _Tab.forYou);
+    if (_tab != _Tab.teams) setState(() => _tab = _Tab.teams);
     vm.refreshFeed();
   }
 
   @override
   void initState() {
     super.initState();
+    // Your teams is the first tab open.
+    vm.openTeams();
     HomeRefresh.requests.addListener(_onHomeAgain);
     vm.joinTeam.addListener(_onJoin);
     for (final c in _commands) {
@@ -204,16 +209,47 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               // On bigger screens the top bar has the same box.
               if (mobile) ...[const SearchField(), const SizedBox(height: 12)],
+              // Narrow screens: what's today or next above the tabs, kept
+              // light: a tournament-day card, or one Coming up card with
+              // the next event first.
+              LayoutBuilder(
+                builder: (context, constraints) =>
+                    constraints.maxWidth >= sideColumnBreakpoint
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: spaced([
+                            // On a tournament day its card takes the next
+                            // event's place.
+                            for (final d in vm.tournamentDays)
+                              TournamentDayCard(day: d),
+                            // What's the user's to do comes before what's
+                            // coming up.
+                            if (vm.needsYou.isNotEmpty) _needsYou(),
+                            _ComingUpCard(
+                              events: [
+                                if (vm.tournamentDays.isEmpty)
+                                  ?vm.nextTeamEvent,
+                                ...vm.upcomingEvents.take(2),
+                              ],
+                              onAdd: _newEvent,
+                            ),
+                          ]),
+                        ),
+                      ),
+              ),
               _TabRow(
                 tabs: [
-                  _Tab.forYou,
-                  if (vm.hasCommunity) _Tab.community,
                   _Tab.teams,
+                  _Tab.following,
+                  if (vm.hasCommunity) _Tab.everyone,
                 ],
                 selected: _tab,
                 onSelect: (t) {
                   setState(() => _tab = t);
-                  if (t == _Tab.community) vm.openCommunity();
+                  if (t == _Tab.everyone) vm.openCommunity();
                   if (t == _Tab.teams) vm.openTeams();
                 },
               ),
@@ -223,27 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: EdgeInsets.only(bottom: 10),
                   child: LinearProgressIndicator(),
                 ),
-              SideColumnLayout(
-                main: _main(),
-                side: _side(),
-                narrow: [
-                  if (_tab == _Tab.forYou) ...[
-                    if (vm.needsYou.isNotEmpty) _needsYou(),
-                    // On a tournament day the card takes the next
-                    // event's place.
-                    if (vm.tournamentDays.isNotEmpty)
-                      for (final d in vm.tournamentDays)
-                        TournamentDayCard(day: d)
-                    else if (vm.nextTeamEvent case final next?)
-                      _NextEventStrip(entry: next),
-                    _ComingUpCard(
-                      events: vm.upcomingEvents.take(2).toList(),
-                      onAdd: _newEvent,
-                    ),
-                  ],
-                  ..._main(),
-                ],
-              ),
+              SideColumnLayout(main: _main(), side: _side(), narrow: _main()),
             ],
           );
         },
@@ -251,31 +267,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// The personal details prompt and the composer, atop Your teams and
+  /// Following.
+  List<Widget> _composer() => [
+    ?widget.prompt,
+    // Kept across rebuilds (cards appearing above it on phones) and tabs;
+    // the draft itself is in the view model.
+    InlineComposer(
+      key: _composerKey,
+      viewModel: vm.composer,
+      name: vm.user?.label ?? '',
+      photoUrl: vm.user?.photoUrl,
+    ),
+  ];
+
   List<Widget> _main() => switch (_tab) {
-    _Tab.forYou => [
-      ?widget.prompt,
-      // Kept across rebuilds (cards appearing above it on phones); the
-      // draft itself is in the view model.
-      InlineComposer(
-        key: _composerKey,
-        viewModel: vm.composer,
-        name: vm.user?.label ?? '',
-        photoUrl: vm.user?.photoUrl,
-      ),
-      if (vm.teamsLoaded)
-        TeamStrip(
-          teams: vm.stripTeams,
-          onOpen: (t) => context.go(Routes.team(t.id)),
-          onNewOrJoin: _newOrJoin,
-        ),
-      // An empty feed has the checklist, which covers joining.
-      if (vm.teamsLoaded && vm.teams.isEmpty && !vm.showOnboarding)
-        _JoinCard(
-          joining: vm.joinTeam.running,
-          onJoin: _join,
-          onCreate: () => context.go(Routes.createTeam),
-          onFind: () => context.go(Routes.explore(only: ExploreFilter.groups)),
-        ),
+    _Tab.teams => [..._composer(), ..._teamPosts()],
+    _Tab.following => [
+      ..._composer(),
       if (!vm.postsLoaded)
         const Skeleton(
           child: Column(
@@ -307,8 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
       else if (vm.postsLoaded)
         _CaughtUp(empty: vm.posts.isEmpty, followsAnything: vm.followsAnything),
     ],
-    _Tab.community => _community(),
-    _Tab.teams => _teamPosts(),
+    _Tab.everyone => _community(),
   };
 
   Widget _teamPostCard(TeamPostItem p) => TeamPostCard(
@@ -323,22 +331,33 @@ class _HomeScreenState extends State<HomeScreen> {
     onDelete: vm.canEditPost(p) ? () => _remove(p) : null,
   );
 
-  /// Every post of the user's teams and groups, newest first; no team yet,
-  /// the join card.
+  /// A strip of the user's teams, then every post of their teams and
+  /// groups, newest first. No team yet: the "Get started" checklist while
+  /// it has steps left (it covers joining), else the join card.
   List<Widget> _teamPosts() {
     final feed = vm.teamFeed;
     final posts = vm.teamPosts;
     if (vm.teamsLoaded && vm.teams.isEmpty) {
       return [
-        _JoinCard(
-          joining: vm.joinTeam.running,
-          onJoin: _join,
-          onCreate: () => context.go(Routes.createTeam),
-          onFind: () => context.go(Routes.explore(only: ExploreFilter.groups)),
-        ),
+        if (vm.showOnboarding)
+          GetStartedCard(steps: vm.onboarding, onStep: _onboardingStep)
+        else
+          _JoinCard(
+            joining: vm.joinTeam.running,
+            onJoin: _join,
+            onCreate: () => context.go(Routes.createTeam),
+            onFind: () =>
+                context.go(Routes.explore(only: ExploreFilter.groups)),
+          ),
       ];
     }
     return [
+      if (vm.teamsLoaded)
+        TeamStrip(
+          teams: vm.stripTeams,
+          onOpen: (t) => context.go(Routes.team(t.id)),
+          onNewOrJoin: _newOrJoin,
+        ),
       if (!vm.teamPostsLoaded)
         const Skeleton(
           child: Column(
@@ -600,16 +619,18 @@ class _JoinCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    return FeatureCard(
+    // A plain card with one turf action: amber is only for what's the
+    // user's to do, navy only for live or today.
+    return SectionCard(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Eyebrow('No team yet', color: c.onFeatureMuted),
+          const Eyebrow('No team yet'),
           const SizedBox(height: 8),
           Text(
             'Join your team.',
             style: TextStyle(
-              color: c.onFeature,
+              color: c.ink,
               fontSize: 22,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.6,
@@ -620,36 +641,33 @@ class _JoinCard extends StatelessWidget {
             'Get the schedule, playbook and stats your team shares. Ask a '
             'coach for the invite code, find a pickup community, or start your '
             'own.',
-            style: TextStyle(color: c.onFeatureMuted, fontSize: 13),
+            style: TextStyle(color: c.ink2, fontSize: 13.5, height: 1.4),
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
+          FilledButton.icon(
+            onPressed: joining ? null : onJoin,
+            icon: const Icon(Icons.group_add_outlined, size: 18),
+            label: const Text('Join with code'),
+          ),
+          const SizedBox(height: 10),
+          Row(
             children: [
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: c.highlight,
-                  foregroundColor: c.onHighlight,
-                ),
-                onPressed: joining ? null : onJoin,
-                icon: const Icon(Icons.group_add_outlined, size: 18),
-                label: const Text('Join with code'),
-              ),
-              for (final (label, icon, onTap) in [
+              for (final (i, (label, icon, onTap)) in [
                 ('Find a community', Icons.search, onFind),
                 ('Create team', Icons.add, onCreate),
-              ])
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: c.onFeature,
-                    backgroundColor: Colors.transparent,
-                    side: BorderSide(color: c.onFeatureMuted),
+              ].indexed) ...[
+                if (i > 0) const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    onPressed: onTap,
+                    icon: Icon(icon, size: 18),
+                    label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
                   ),
-                  onPressed: onTap,
-                  icon: Icon(icon, size: 18),
-                  label: Text(label),
                 ),
+              ],
             ],
           ),
         ],
@@ -684,13 +702,13 @@ class _UpNextCard extends StatelessWidget {
                   color: c.onFeatureMuted,
                 ),
               ),
-              Icon(Icons.north_east, size: 15, color: c.highlight),
+              Icon(Icons.north_east, size: 15, color: c.onFeatureMuted),
             ],
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(e.type.icon, color: c.highlight, size: 22),
+              Icon(e.type.icon, color: c.onFeature, size: 22),
               const SizedBox(width: 8),
               Text(
                 e.type.label,
@@ -728,76 +746,27 @@ class _UpNextCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: c.onFeatureMuted, fontSize: 12),
             ),
-          const SizedBox(height: 14),
-          HighlightButton(label: 'View details', onPressed: open),
-        ],
-      ),
-    );
-  }
-}
-
-/// The next event on the feed for narrow screens, in place of the side
-/// column.
-class _NextEventStrip extends StatelessWidget {
-  const _NextEventStrip({required this.entry});
-
-  final ScheduleEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    final e = entry.event;
-    return Material(
-      color: c.accentSoft,
-      borderRadius: BorderRadius.circular(cardRadius),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(cardRadius),
-        onTap: () => context.push(Routes.scheduleEvent(entry)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
+          // Amber is only for what's the user's to do; opening the event
+          // is a plain link along the card's foot (as on the team page).
+          const SizedBox(height: 12),
+          Divider(height: 1, color: c.featureHighlight),
+          const SizedBox(height: 10),
+          Row(
             children: [
-              DateBadge(date: e.startsAt, size: 38),
-              const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      e.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13.5,
-                        color: c.ink,
-                      ),
-                    ),
-                    Text(
-                      [
-                        eventTimeRange(e),
-                        if (e.location.isNotEmpty) e.location,
-                        ?entry.team?.name,
-                      ].join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11.5, color: c.muted),
-                    ),
-                  ],
+                child: Text(
+                  'View details',
+                  style: TextStyle(
+                    color: c.onFeature,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12.5,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  minimumSize: const Size(0, 34),
-                ),
-                onPressed: () => context.push(Routes.scheduleEvent(entry)),
-                child: const Text('Open'),
-              ),
+              Icon(Icons.chevron_right, size: 18, color: c.onFeature),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -834,7 +803,7 @@ class _ComingUpCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    DateBadge(date: entry.event.startsAt, size: 34),
+                    DateBadge(date: entry.event.startsAt, size: 38),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -845,17 +814,33 @@ class _ComingUpCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
                               color: c.ink,
                             ),
                           ),
-                          Text(
-                            '${eventTimeRange(entry.event)} · '
-                            '${entry.team?.name ?? 'Personal'}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 11, color: c.muted),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              // Team blue or personal magenta.
+                              TeamDot(
+                                color: entry.team == null ? c.personal : c.team,
+                                size: 7,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '${eventTimeRange(entry.event)} · '
+                                  '${entry.team?.name ?? 'Personal'}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: c.muted,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

@@ -113,7 +113,6 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Group name (optional)',
                       hintText: 'e.g. Hat league carpool',
-                      border: OutlineInputBorder(),
                     ),
                     onChanged: vm.setName,
                   ),
@@ -134,6 +133,15 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                             radius: 12,
                           ),
                           label: Text(p.name),
+                          labelStyle: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: c.accentInk,
+                          ),
+                          backgroundColor: c.accentSoft,
+                          deleteIconColor: c.accentInk,
+                          side: BorderSide.none,
+                          shape: const StadiumBorder(),
                           onDeleted: () => vm.toggle(p),
                         ),
                     ],
@@ -200,9 +208,24 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         return CheckboxListTile(
           value: picked,
           enabled: picked || vm.room > 0,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          activeColor: c.accent,
+          checkColor: c.onAccent,
           secondary: UserAvatar(uid: p.uid, name: p.name, photoUrl: p.photoUrl),
-          title: Text(p.name),
-          subtitle: p.username == null ? null : Text('@${p.username}'),
+          title: Text(
+            p.name,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: c.ink,
+            ),
+          ),
+          subtitle: p.username == null
+              ? null
+              : Text(
+                  '@${p.username}',
+                  style: TextStyle(fontSize: 13, color: c.muted),
+                ),
           onChanged: (_) => vm.toggle(p),
         );
       },

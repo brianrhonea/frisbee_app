@@ -11,11 +11,14 @@ import '../../../utils/command.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
-import '../../core/ui/layout.dart' show ScreenSize;
+import '../../core/themes/theme.dart';
+import '../../core/ui/layout.dart' show DateBadge, ScreenSize, SectionCard;
+import '../../core/ui/scoreboard.dart' show NeedsYouPill, TeamDot;
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/event_detail_viewmodel.dart';
 import 'event_style.dart';
+import 'rsvp_widgets.dart';
 
 /// Opens a team event's full details and RSVP over the current page: a
 /// dialog on wide screens, a sheet that slides up on phones.
@@ -151,11 +154,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   List<Widget> _actions(TeamEvent e) => [
-    AddToCalendarButton(
-      event: e,
-      uid: 'team-${vm.teamId}-${e.id}@stall10.app',
-      asIcon: true,
-    ),
     if (vm.canEdit) ...[
       IconButton(
         tooltip: 'Edit',
@@ -171,7 +169,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   ];
 
   List<Widget> _details(TeamEvent e) => [
-    EventHeader(event: e),
+    EventHeader(
+      event: e,
+      owner: vm.teamName,
+      calendarButton: AddToCalendarButton(
+        event: e,
+        uid: 'team-${vm.teamId}-${e.id}@stall10.app',
+      ),
+    ),
     if (e.tournamentId case final id?) ...[
       const SizedBox(height: 12),
       FilledButton.icon(
@@ -195,16 +200,20 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         label: const Text('Set up tournament'),
       ),
     ],
-    const SizedBox(height: 20),
+    const SizedBox(height: 12),
     _RsvpSection(viewModel: vm),
-    const SizedBox(height: 16),
+    const SizedBox(height: 12),
     _Reactions(viewModel: vm),
     if (e.poll != null) ...[
-      const SizedBox(height: 20),
+      const SizedBox(height: 12),
       _PollCard(viewModel: vm, poll: e.poll!),
     ],
-    const SizedBox(height: 20),
+    const SizedBox(height: 12),
     _Responses(viewModel: vm),
+    if (e.notes.isNotEmpty) ...[
+      const SizedBox(height: 12),
+      EventNotes(notes: e.notes),
+    ],
   ];
 
   /// The popup's frame: a title row with the actions and Close, then [body].
@@ -217,13 +226,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+        padding: const EdgeInsets.fromLTRB(20, 0, 8, 4),
         child: Row(
           children: [
             Expanded(
               child: Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.of(context).ink,
+                ),
               ),
             ),
             ...actions,
@@ -266,8 +279,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         final list = ListView(
           shrinkWrap: popup,
           padding: popup
-              ? const EdgeInsets.fromLTRB(20, 4, 20, 24)
-              : const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              ? const EdgeInsets.fromLTRB(16, 4, 16, 24)
+              : const EdgeInsets.fromLTRB(16, 14, 16, 32),
           children: _details(e!),
         );
         if (popup) {
@@ -292,11 +305,28 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 }
 
-/// Icon, title, time, location and notes of an event.
+/// An event's summary card: whose schedule it's on and its type, the
+/// title, the day and time, the location (tap for directions) and
+/// [calendarButton]. Notes go in [EventNotes].
 class EventHeader extends StatelessWidget {
-  const EventHeader({super.key, required this.event});
+  const EventHeader({
+    super.key,
+    required this.event,
+    this.owner,
+    this.personal = false,
+    this.calendarButton,
+  });
 
   final TeamEvent event;
+
+  /// Whose schedule it's on, e.g. the team's name, before the type.
+  final String? owner;
+
+  /// A personal event: its dot is the personal colour.
+  final bool personal;
+
+  /// "Add to calendar", under the details.
+  final Widget? calendarButton;
 
   Future<void> _openMap() => launchUrl(
     Uri.https('www.google.com', '/maps/search/', {
@@ -307,48 +337,160 @@ class EventHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final e = event;
-    final color = e.type.color(theme.colorScheme);
+    return SectionCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              TeamDot(color: personal ? c.personal : c.team),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  [?owner, e.type.label].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: c.muted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            e.title,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+              height: 1.2,
+              color: c.ink,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              DateBadge(date: e.startsAt, size: 48),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DetailLines(
+                  DateFormat.yMMMMEEEEd().format(e.startsAt),
+                  eventTimeRange(e),
+                ),
+              ),
+            ],
+          ),
+          if (e.location.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: _openMap,
+              borderRadius: BorderRadius.circular(controlRadius),
+              child: Row(
+                children: [
+                  DetailIcon(Icons.place_outlined),
+                  const SizedBox(width: 12),
+                  Expanded(child: DetailLines(e.location, null)),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 12, 0, 12),
+                    child: Text(
+                      'Directions',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: c.accent,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (calendarButton case final button?) ...[
+            const SizedBox(height: 14),
+            button,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A field-coloured icon tile, beside [DetailLines] in a summary card.
+class DetailIcon extends StatelessWidget {
+  const DetailIcon(this.icon, {super.key});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Container(
+      width: 48,
+      height: 44,
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: BorderRadius.circular(controlRadius),
+      ),
+      child: Icon(icon, color: c.ink2),
+    );
+  }
+}
+
+/// A bold line over a muted one, beside a badge or icon tile.
+class DetailLines extends StatelessWidget {
+  const DetailLines(this.title, this.subtitle, {super.key});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: color.withValues(alpha: 0.15),
-              foregroundColor: color,
-              child: Icon(e.type.icon),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(e.title, style: theme.textTheme.headlineSmall),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.schedule),
-          title: Text(DateFormat.yMMMMEEEEd().format(e.startsAt)),
-          subtitle: Text(eventTimeRange(e)),
-        ),
-        if (e.location.isNotEmpty)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.place_outlined),
-            title: Text(e.location),
-            trailing: const Icon(Icons.open_in_new, size: 18),
-            onTap: _openMap,
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: c.ink,
           ),
-        if (e.notes.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(e.notes, style: theme.textTheme.bodyMedium),
-          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 2),
+          Text(subtitle!, style: TextStyle(fontSize: 13, color: c.muted)),
+        ],
       ],
     );
   }
+}
+
+/// An event's notes, in a card of their own.
+class EventNotes extends StatelessWidget {
+  const EventNotes({super.key, required this.notes});
+
+  final String notes;
+
+  @override
+  Widget build(BuildContext context) => SectionCard(
+    title: 'Notes',
+    padding: const EdgeInsets.all(14),
+    child: Text(
+      notes,
+      style: TextStyle(
+        fontSize: 14,
+        height: 1.5,
+        color: AppColors.of(context).ink2,
+      ),
+    ),
+  );
 }
 
 class _RsvpSection extends StatelessWidget {
@@ -359,46 +501,19 @@ class _RsvpSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final theme = Theme.of(context);
-    final mine = vm.myRsvp;
     final r = vm.responses;
     final type = vm.event?.type ?? EventType.other;
-    return Card.filled(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Are you in?', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
-            SegmentedButton<RsvpStatus>(
-              segments: [
-                for (final s in RsvpStatus.values)
-                  ButtonSegment(
-                    value: s,
-                    label: Text(s.labelFor(type)),
-                    icon: Icon(s.icon),
-                  ),
-              ],
-              selected: {?mine},
-              emptySelectionAllowed: true,
-              showSelectedIcon: false,
-              onSelectionChanged: vm.setRsvp.running
-                  ? null
-                  : (s) => vm.setRsvp.execute(s.firstOrNull),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              [
-                for (final s in RsvpStatus.values)
-                  '${r[s]!.length} ${s.labelFor(type).toLowerCase()}',
-                '${vm.noResponse.length} no reply',
-              ].join(' · '),
-              style: theme.textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return SectionCard(
+      title: 'Are you in?',
+      action: vm.needsRsvp ? const NeedsYouPill('Needs RSVP') : null,
+      padding: const EdgeInsets.all(14),
+      child: RsvpChoice<RsvpStatus>(
+        options: [
+          for (final s in RsvpStatus.values)
+            (value: s, label: s.labelFor(type), count: r[s]!.length),
+        ],
+        selected: vm.myRsvp,
+        onChanged: vm.setRsvp.running ? null : vm.setRsvp.execute,
       ),
     );
   }
@@ -452,24 +567,27 @@ class _PollCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = AppColors.of(context);
     final tally = vm.pollTally;
     final total = vm.event?.voterCount ?? 0;
-    return Card.outlined(
+    return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Icon(Icons.poll_outlined, color: scheme.primary),
+                Icon(Icons.poll_outlined, color: c.accent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     poll.question,
-                    style: theme.textTheme.titleMedium,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: c.ink,
+                    ),
                   ),
                 ),
               ],
@@ -478,7 +596,7 @@ class _PollCard extends StatelessWidget {
             Text(
               '${poll.multiple ? 'Pick any' : 'Pick one'} · '
               '$total of ${vm.memberCount} voted',
-              style: theme.textTheme.bodySmall,
+              style: TextStyle(fontSize: 12, color: c.muted),
             ),
             const SizedBox(height: 12),
             for (final t in tally)
@@ -487,17 +605,15 @@ class _PollCard extends StatelessWidget {
                 child: Tooltip(
                   message: t.voters.isEmpty ? 'No votes' : t.voters.join(', '),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(controlRadius),
                     onTap: vm.vote.running || !vm.canRespond
                         ? null
                         : () => vm.vote.execute(t.option.id),
                     child: Container(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(controlRadius),
                         border: Border.all(
-                          color: t.mine
-                              ? scheme.primary
-                              : scheme.outlineVariant,
+                          color: t.mine ? c.accent : c.border2,
                           width: t.mine ? 2 : 1,
                         ),
                       ),
@@ -510,9 +626,7 @@ class _PollCard extends StatelessWidget {
                               widthFactor: total == 0
                                   ? 0
                                   : t.voters.length / total,
-                              child: ColoredBox(
-                                color: scheme.primary.withValues(alpha: 0.14),
-                              ),
+                              child: ColoredBox(color: c.accentSoft),
                             ),
                           ),
                           Padding(
@@ -531,13 +645,28 @@ class _PollCard extends StatelessWidget {
                                             ? Icons.check_box_outline_blank
                                             : Icons.radio_button_unchecked),
                                   size: 20,
-                                  color: t.mine ? scheme.primary : null,
+                                  color: t.mine ? c.accent : c.muted,
                                 ),
                                 const SizedBox(width: 10),
-                                Expanded(child: Text(t.option.text)),
+                                Expanded(
+                                  child: Text(
+                                    t.option.text,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: t.mine
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: c.ink,
+                                    ),
+                                  ),
+                                ),
                                 Text(
                                   '${t.voters.length}',
-                                  style: theme.textTheme.labelLarge,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: t.mine ? c.accentInk : c.ink2,
+                                  ),
                                 ),
                               ],
                             ),
@@ -562,38 +691,22 @@ class _Responses extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final r = viewModel.responses;
     final type = viewModel.event?.type ?? EventType.other;
-    final groups = [
-      for (final s in RsvpStatus.values)
-        (s.labelFor(type), s.icon, s.color(scheme), r[s]!),
-      ('No reply', Icons.hourglass_empty, scheme.outline, viewModel.noResponse),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Responses', style: Theme.of(context).textTheme.titleMedium),
-        for (final (label, icon, color, names) in groups)
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            leading: Icon(icon, color: color),
-            title: Text('$label (${names.length})'),
-            initiallyExpanded: label == RsvpStatus.going.labelFor(type),
-            expandedAlignment: Alignment.centerLeft,
-            childrenPadding: const EdgeInsets.only(bottom: 8),
-            children: [
-              if (names.isEmpty)
-                const Text('Nobody yet.')
-              else
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [for (final n in names) Chip(label: Text(n))],
-                ),
-            ],
-          ),
-      ],
+    return SectionCard(
+      title: 'Responses',
+      padding: const EdgeInsets.all(14),
+      child: RsvpResponses(
+        groups: [
+          for (final s in RsvpStatus.values)
+            (
+              label: s.labelFor(type),
+              names: r[s]!,
+              tone: s == RsvpStatus.going ? RsvpTone.yes : RsvpTone.other,
+            ),
+          (label: 'No reply', names: viewModel.noResponse, tone: RsvpTone.none),
+        ],
+      ),
     );
   }
 }

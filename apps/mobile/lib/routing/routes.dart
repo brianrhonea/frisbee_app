@@ -18,11 +18,9 @@ abstract final class Routes {
   static const createCommunity = '/teams/new?kind=organization';
   static const searchTeams = '/teams/search';
 
-  /// The Events tab: the user's schedule.
+  /// The Schedule tab: the user's own calendar. The old
+  /// `/schedule?view=find` (events to find) opens Discover.
   static const schedule = '/schedule';
-
-  /// The Events tab's tournaments and leagues to find.
-  static const findEvents = '/schedule?view=find';
   static const profile = '/profile';
 
   /// People asking to follow the user's private profile, from the top of
@@ -48,7 +46,10 @@ abstract final class Routes {
   /// `context.push`, so back returns to it.
   static String personOver(String uid) => '/people/$uid';
 
-  /// Explore, the app-wide search: players, teams and groups. [query] fills the search; [only] picks a filter.
+  /// Discover, the app-wide search and the place to find tournaments,
+  /// leagues, teams, communities and players. [query] fills the search;
+  /// [only] picks a filter. Its path is still `/explore` (old links), and
+  /// `/discover` opens it too.
   static String explore({String? query, ExploreFilter? only}) {
     final q = query?.trim() ?? '';
     final params = {'q': ?(q.isEmpty ? null : q), 'only': ?only?.name};
@@ -59,6 +60,9 @@ abstract final class Routes {
   }
 
   static const explorePath = '/explore';
+
+  /// Another name for [explorePath], as the website calls the tab.
+  static const discoverPath = '/discover';
 
   /// Stall 10's rankings, as the website links them: [query] is
   /// `{level: club, division: mixed}` for a team ranking, or
@@ -281,5 +285,8 @@ abstract final class Routes {
   static String seasonStats(String teamId) => '/teams/$teamId/stats/season';
 }
 
-/// Explore's result filters.
-enum ExploreFilter { teams, groups, players, tournaments }
+/// Discover's filters, by their `?only=` names (kept for old links):
+/// [tournaments] (tournaments and hat tournaments), [leagues], [pickup]
+/// (pickup communities), [teams], [groups] (shown as Communities: pickup
+/// communities, schools and clubs) and [players].
+enum ExploreFilter { teams, groups, players, tournaments, leagues, pickup }

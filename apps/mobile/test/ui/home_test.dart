@@ -12,6 +12,7 @@ import 'package:frisbee_app/domain/models/team_event.dart';
 import 'package:frisbee_app/domain/models/team_post.dart';
 import 'package:frisbee_app/domain/models/user_post.dart';
 import 'package:frisbee_app/ui/core/themes/theme.dart';
+import 'package:frisbee_app/ui/core/ui/layout.dart' show UnderlineTabs;
 import 'package:frisbee_app/ui/home/view_models/home_viewmodel.dart';
 import 'package:frisbee_app/ui/home/widgets/home_screen.dart';
 import 'package:frisbee_app/ui/posts/widgets/inline_composer.dart';
@@ -27,6 +28,10 @@ import '../testing/social_fakes.dart';
 
 TeamEvent event(String id, String title, EventType type, DateTime at) =>
     TeamEvent(id: id, title: title, type: type, startsAt: at);
+
+/// The feed tab labelled [label] (not the composer's "Everyone").
+Finder feedTab(String label) =>
+    find.descendant(of: find.byType(UnderlineTabs), matching: find.text(label));
 
 void main() {
   // A Wednesday.
@@ -653,9 +658,15 @@ void main() {
 
       // No page header; the composer is the way to post.
       expect(find.text('Good things fly together.'), findsNothing);
-      // The next event sits above the feed in place of the side column.
+      // The feed opens on Your teams, then Following and Everyone.
+      final tabs = tester.widget<UnderlineTabs>(find.byType(UnderlineTabs));
+      expect(tabs.labels, ['Your teams', 'Following', 'Everyone']);
+      expect(tabs.selected, 0);
+      // The next event sits above the feed in place of the side column,
+      // first in the one Coming up card.
       expect(find.text('Thursday practice'), findsOneWidget);
       expect(find.text('Coming up'), findsOneWidget);
+      expect(find.text('Add event'), findsOneWidget);
       expect(find.text("What's happening on your sideline?"), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('Next stop: the postseason'),
@@ -669,13 +680,14 @@ void main() {
       expect(find.text('Northside Flyers'), findsOneWidget);
       expect(find.text('New / Join'), findsOneWidget);
 
-      await tester.ensureVisible(find.text('Your teams'));
+      await tester.ensureVisible(feedTab('Following'));
       await tester.pump();
-      await tester.tap(find.text('Your teams'));
+      await tester.tap(feedTab('Following'));
       await tester.pump();
       await tester.pump();
-      // The Your teams tab is the teams' posts, not a list of them.
+      // Following has the teams' posts too, and the composer, but no strip.
       expect(find.text('Next stop: the postseason'), findsOneWidget);
+      expect(find.text("What's happening on your sideline?"), findsOneWidget);
       expect(find.text('New / Join'), findsNothing);
       expect(tester.takeException(), isNull);
     });
@@ -699,7 +711,13 @@ void main() {
     // The box is the composer: no popup, and the user's team is a "To".
     expect(find.byType(InlineComposer), findsOneWidget);
     expect(find.text('Team post'), findsNothing);
-    expect(find.text('Everyone'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(InlineComposer),
+        matching: find.text('Everyone'),
+      ),
+      findsOneWidget,
+    );
     final box = find.descendant(
       of: find.byType(InlineComposer),
       matching: find.byType(TextField),
@@ -721,13 +739,13 @@ void main() {
     await tester.enterText(box.first, 'Half a thought');
     await tester.pump();
 
-    await tester.ensureVisible(find.text('Your teams'));
-    await tester.tap(find.text('Your teams'));
+    await tester.ensureVisible(feedTab('Everyone'));
+    await tester.tap(feedTab('Everyone'));
     await tester.pump();
     expect(find.byType(InlineComposer), findsNothing);
     expect(vm.composer.body, 'Half a thought');
-    await tester.ensureVisible(find.text('For you'));
-    await tester.tap(find.text('For you'));
+    await tester.ensureVisible(feedTab('Following'));
+    await tester.tap(feedTab('Following'));
     await tester.pumpAndSettle();
     expect(find.text('Half a thought'), findsOneWidget);
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Post'));
@@ -797,12 +815,12 @@ void main() {
     await tester.pump();
     expect(find.text('Pickup at the lake, all welcome'), findsNothing);
 
-    await tester.tap(find.text('Community'));
+    await tester.tap(feedTab('Everyone'));
     await tester.pump();
     await tester.pump();
     expect(find.text('Pickup at the lake, all welcome'), findsOneWidget);
     expect(find.text('Zed Park'), findsOneWidget);
-    // Not the For you tab: no composer.
+    // Not Your teams or Following: no composer.
     expect(find.text("What's happening on your sideline?"), findsNothing);
 
     await tester.tap(find.byIcon(Icons.favorite_border));
@@ -852,12 +870,52 @@ void main() {
     await tester.tapAt(Offset.zero);
     await tester.pumpAndSettle();
 
-    // The Your teams tab, with no team yet: the join card.
-    await tester.ensureVisible(find.text('Your teams'));
-    await tester.tap(find.text('Your teams'));
+    // Following, empty too: the same checklist.
+    await tester.ensureVisible(feedTab('Following'));
+    await tester.tap(feedTab('Following'));
     await tester.pumpAndSettle();
+    expect(find.text('Get started'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Your teams offers to join once there are posts to read', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final vm = await tester.runAsync(() async {
+      final vm = await load(withTeam: false);
+      userPosts.posts.add(
+        UserPost(
+          id: 'sam1',
+          authorId: 'sam',
+          authorName: 'Sam',
+          body: 'Pickup Thursday',
+          createdAt: now.subtract(const Duration(hours: 1)),
+        ),
+      );
+      await follows.follow(testUser.uid, const FollowTarget.user('sam', 'Sam'));
+      await pumpEventQueue();
+      return vm;
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: HomeScreen(viewModel: vm!),
+      ),
+    );
+    await tester.pump();
+
+    // No team yet, but a feed to read: Your teams has the join card.
+    expect(find.text('Get started'), findsNothing);
     expect(find.text('Join your team.'), findsOneWidget);
     expect(find.text('Join with code'), findsOneWidget);
+    expect(find.text('Pickup Thursday'), findsNothing);
+    await tester.tap(feedTab('Following'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pickup Thursday'), findsOneWidget);
+    expect(find.text('Join your team.'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

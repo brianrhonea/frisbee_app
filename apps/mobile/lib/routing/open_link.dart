@@ -78,7 +78,8 @@ String? pushParent(String location) {
     'posts' => Routes.home,
     'team-events' || 'team-meetings' when id != null => Routes.teamEvents(id),
     'group-tournaments' when id != null => Routes.team(id),
-    'my-events' || 'tournaments' => Routes.schedule,
+    'my-events' => Routes.schedule,
+    'tournaments' => Routes.explorePath,
     _ => null,
   };
 }

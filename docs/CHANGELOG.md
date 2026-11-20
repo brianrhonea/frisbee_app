@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.36  | 2026-11-20 | `feature/redesign`                      |                     |
 | 0.0.35  | 2026-11-19 | `feature/redesign`                      |                     |
 | 0.0.34  | 2026-11-19 | `feature/team-first`                    |                     |
 | 0.0.33  | 2026-11-19 | `feature/team-first`                    |                     |
@@ -48,6 +49,41 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.36 — Navigation and every screen restyled (redesign 2–3)
+
+Web navigation changes land in the web 0.45.0 commit that follows. No
+API, rules or data changes.
+
+- Navigation (redesign 2): tabs Home, Discover, Schedule, Teams, Inbox.
+  Discover merges Explore and Find events (`/discover`,
+  `/schedule?view=find` redirect to `/explore`; chips All, Tournaments,
+  Leagues, Pickup, Teams, Communities, Players). The Teams tab opens
+  your team straight away when you have exactly one and no invite. Feed
+  tabs Your teams / Following / Everyone. `events_tabs.dart` removed.
+- Every area restyled in the Turf & Disc look (redesign 3a–3i):
+  tournaments and leagues (navy live header, live days open on
+  Schedule, amber "your game needs a score", "Next steps"), teams and
+  communities (compact team header, initials badges, Teams list rows,
+  invitations in amber), schedule, events and meetings (RSVP segmented
+  control with counts, "Needs RSVP", summary cards), Inbox and chat
+  (Team chats above Direct messages, turf own bubbles, room access
+  segmented control), Home, Discover, profiles, posts and notifications,
+  sign-in and settings (grouped settings cards, Light/Dark/System
+  control), playbook and videos (category grids, tool tiles, step
+  timeline, video rows), hat tournaments, drafts and stats.
+- Colour rules applied: no red Delete/Leave (destructive confirms are
+  solid ink), red only for live games, amber only for what's yours to
+  do. Event-type colours are turf (field time) or neutral. Play
+  diagrams: defence navy instead of red.
+- Shared: `TeamBadge(name:)` draws initials; `TeamInitials`; switch
+  theme; new area parts (`tournament_parts.dart`, `hat_parts.dart`,
+  `rsvp_widgets.dart`, `settings_widgets.dart` additions).
+- Fixes: the sign-up details intro no longer mentions USA Ultimate;
+  leaving Record workout no longer notifies the recorder mid-teardown;
+  text styles with no font in the profile dropdowns and "Follow back".
+- Temporary screenshot tests in `test/screenshots/` (skipped unless
+  `--dart-define=SCREENSHOTS=<dir>`).
 
 ## 0.0.35 — "Turf & Disc" redesign foundation (redesign 1)
 

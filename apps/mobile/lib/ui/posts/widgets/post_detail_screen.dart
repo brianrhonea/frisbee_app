@@ -6,6 +6,7 @@ import '../../../domain/models/post_comment.dart';
 import '../../../routing/open_link.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/scroll_to_top.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
@@ -510,8 +511,11 @@ class _CommentBox extends StatelessWidget {
 
   Widget _box(BuildContext context) {
     final empty = controller.text.trim().isEmpty;
+    final c = AppColors.of(context);
+    // Flat, with a hairline on top, like the app's other bottom bars.
     return Material(
-      elevation: 3,
+      color: c.card,
+      shape: Border(top: BorderSide(color: c.border)),
       child: SafeArea(
         top: false,
         child: ConstrainedContent(
@@ -560,14 +564,15 @@ class _CommentBox extends StatelessWidget {
                           hintText: replyingTo != null
                               ? 'Add a reply…'
                               : 'Add a comment…',
-                          border: OutlineInputBorder(),
                           isDense: true,
                           counterText: '',
                         ),
                         onSubmitted: (_) => onSend(),
                       ),
                     ),
-                    IconButton(
+                    const SizedBox(width: 4),
+                    // A round turf send button.
+                    IconButton.filled(
                       tooltip: editing ? 'Save comment' : 'Post comment',
                       onPressed: empty || sending ? null : onSend,
                       icon: sending

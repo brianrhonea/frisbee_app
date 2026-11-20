@@ -8,8 +8,11 @@ import '../../../domain/tournament_engine/generator.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
 import '../../follow/widgets/follow_button.dart';
 import '../../group_tournaments/widgets/tournament_widgets.dart';
@@ -18,8 +21,10 @@ import '../view_models/event_guide.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
 import 'event_guide_cards.dart';
+import 'event_page_header.dart';
 import 'player_signups_tab.dart';
 import 'tournament_dialogs.dart';
+import 'tournament_parts.dart';
 
 enum _Menu { edit, delete }
 
@@ -45,6 +50,50 @@ List<EventTab> eventTabs(HostedTournament t, {required bool hasSignups}) => [
   EventTab.results,
   EventTab.news,
 ];
+
+/// The tab [t]'s page opens on: a game to open or an asked-for tab
+/// (`schedule` or `results`) first; on a live event, the schedule with the
+/// user's game; otherwise the first tab (null).
+EventTab? startTab(
+  HostedTournament t, {
+  String? openGameId,
+  String? initialTab,
+}) => openGameId != null
+    ? EventTab.schedule
+    : switch (initialTab) {
+        'schedule' => EventTab.schedule,
+        'results' => EventTab.results,
+        _ when t.status == HostedStatus.live => EventTab.schedule,
+        _ => null,
+      };
+
+/// Whether [t]'s page wears the scoreboard-navy header: it's live, or its
+/// schedule is out and it's on today.
+bool onBoard(HostedTournament t, DateTime now) {
+  if (t.status == HostedStatus.live) return true;
+  if (t.status != HostedStatus.scheduled) return false;
+  final today = DateUtils.dateOnly(now);
+  final end = DateUtils.dateOnly(t.endsOn ?? t.startsOn);
+  return !today.isBefore(DateUtils.dateOnly(t.startsOn)) && !today.isAfter(end);
+}
+
+/// Buttons on the navy header: the lighter navy, white text.
+ThemeData _boardTheme(ThemeData theme, AppColors c) {
+  final style = ButtonStyle(
+    backgroundColor: WidgetStatePropertyAll(c.featureHighlight),
+    foregroundColor: WidgetStatePropertyAll(c.onFeature),
+    iconColor: WidgetStatePropertyAll(c.onFeature),
+    side: const WidgetStatePropertyAll(BorderSide.none),
+  );
+  return theme.copyWith(
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: style.merge(theme.outlinedButtonTheme.style),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: style.merge(theme.filledButtonTheme.style),
+    ),
+  );
+}
 
 /// A hosted tournament: overview and bids, teams and seeds, schedule,
 /// results and news, by division.
@@ -207,22 +256,27 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
         }
         final follow = vm.follow;
         final tabs = eventTabs(t, hasSignups: signups != null);
-        final start = widget.openGameId != null
-            ? EventTab.schedule
-            : switch (widget.initialTab) {
-                'schedule' => EventTab.schedule,
-                'results' => EventTab.results,
-                _ => null,
-              };
+        final start = startTab(
+          t,
+          openGameId: widget.openGameId,
+          initialTab: widget.initialTab,
+        );
+        final c = AppColors.of(context);
+        final board = onBoard(t, DateTime.now());
+        Widget actions(Widget child) => board
+            ? Theme(data: _boardTheme(Theme.of(context), c), child: child)
+            : child;
         return DefaultTabController(
           length: tabs.length,
           initialIndex: start == null ? 0 : tabs.indexOf(start).clamp(0, 99),
           child: Scaffold(
             appBar: AppBar(
-              title: Text(t.name),
+              toolbarHeight: 48,
+              backgroundColor: board ? c.feature : c.background,
+              foregroundColor: board ? c.onFeature : c.ink,
               actions: [
                 if (follow != null && t.status.isPublished)
-                  FollowControl(viewModel: follow, compact: true),
+                  actions(FollowControl(viewModel: follow, compact: true)),
                 if (vm.isManager)
                   PopupMenuButton<_Menu>(
                     onSelected: _onMenu,
@@ -234,24 +288,50 @@ class _HostedTournamentScreenState extends State<HostedTournamentScreen> {
                       PopupMenuItem(value: _Menu.delete, child: Text('Delete')),
                     ],
                   ),
+                const SizedBox(width: 4),
               ],
-              bottom: TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                tabs: [
-                  for (final tab in tabs)
-                    Tab(
-                      text: switch (tab) {
-                        EventTab.overview => 'Overview',
-                        EventTab.players => 'Players',
-                        EventTab.teams => 'Teams',
-                        EventTab.schedule => 'Schedule',
-                        EventTab.results =>
-                          t.isLeague ? 'Standings' : 'Results',
-                        EventTab.news => 'News',
-                      },
-                    ),
-                ],
+              bottom: EventPageHeader.of(
+                context,
+                tournament: t,
+                board: board,
+                tabs: TabBar(
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 10),
+                  labelColor: board ? c.onFeature : null,
+                  unselectedLabelColor: board ? c.onFeatureMuted : null,
+                  indicator: board
+                      ? UnderlineTabIndicator(
+                          borderSide: BorderSide(color: c.onFeature, width: 3),
+                        )
+                      : null,
+                  dividerColor: board ? Colors.transparent : null,
+                  labelStyle: const TextStyle(
+                    fontFamily: appFont,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontFamily: appFont,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                  ),
+                  tabs: [
+                    for (final tab in tabs)
+                      Tab(
+                        text: switch (tab) {
+                          EventTab.overview => 'Overview',
+                          EventTab.players => 'Players',
+                          EventTab.teams => 'Teams',
+                          EventTab.schedule => 'Schedule',
+                          EventTab.results =>
+                            t.isLeague ? 'Standings' : 'Results',
+                          EventTab.news => 'News',
+                        },
+                      ),
+                  ],
+                ),
               ),
             ),
             body: TabBarView(
@@ -308,11 +388,22 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 20, bottom: 8),
+    padding: const EdgeInsets.only(top: 18, bottom: 8),
     child: Row(
       children: [
         Expanded(
-          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          child: Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
+                color: AppColors.of(context).ink,
+              ),
+            ),
+          ),
         ),
         ?trailing,
       ],
@@ -530,7 +621,7 @@ class _OverviewTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     final t = vm.tournament!;
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final fee = t.spotFee;
     final guide = EventGuide.of(vm, signups);
     return ConstrainedContent(
@@ -538,7 +629,7 @@ class _OverviewTab extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
         children: [
           EventHeader(tournament: t),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           GuideCard(guide: guide, onAction: (b) => _act(context, b)),
           if (vm.isManager && guide.steps.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -561,8 +652,9 @@ class _OverviewTab extends StatelessWidget {
             'Divisions',
             trailing: vm.isManager
                 ? TextButton.icon(
+                    style: TextButton.styleFrom(foregroundColor: c.accent),
                     onPressed: () => _editFormat(context),
-                    icon: const Icon(Icons.tune),
+                    icon: const Icon(Icons.tune, size: 18),
                     label: const Text('Format & divisions'),
                   )
                 : null,
@@ -573,151 +665,32 @@ class _OverviewTab extends StatelessWidget {
                   ? 'Tick the divisions you run, e.g. Mixed and Women. They '
                         'all play the format you set.'
                   : 'No divisions yet.',
-              style: theme.textTheme.bodyMedium,
+              style: TextStyle(color: c.ink2, fontSize: 14),
             ),
-          for (final d in vm.divisions)
-            Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(d.label),
-                subtitle: Text(
-                  [
-                    if (!t.takesPlayers)
-                      '${d.seeds.length} of ${d.maxTeams} teams'
-                    else if (d.teams.isNotEmpty)
-                      '${d.teams.length} teams',
-                    '${d.settings.playersOnField}v${d.settings.playersOnField}',
-                    if (!t.takesPlayers) '${d.effectiveMinRoster}+ roster',
-                    t.isLeague ? 'weekly' : d.settings.format.label,
-                    d.settings.scoreLabel,
-                  ].join(' · '),
-                ),
-                trailing: vm.isManager
-                    ? PopupMenuButton<String>(
-                        onSelected: (v) async {
-                          if (v == 'edit') {
-                            _editFormat(context);
-                          } else if (await confirmDialog(
-                            context,
-                            title: 'Remove ${d.label}?',
-                            message: 'Its schedule and scores are deleted.',
-                            confirmLabel: 'Remove',
-                            destructive: true,
-                          )) {
-                            vm.deleteDivision.execute(d.id);
-                          }
-                        },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: Text('Format & divisions'),
-                          ),
-                          PopupMenuItem(value: 'delete', child: Text('Remove')),
-                        ],
-                      )
-                    : null,
-              ),
+          if (vm.divisions.isNotEmpty)
+            RowsCard(
+              children: [
+                for (final d in vm.divisions)
+                  _DivisionRow(
+                    division: d,
+                    tournament: t,
+                    viewModel: vm,
+                    onEdit: () => _editFormat(context),
+                  ),
+              ],
             ),
           if (t.takesTeams &&
               (vm.myEntries.isNotEmpty || vm.canApply || vm.canReserve)) ...[
             const _Section('Your teams'),
             for (final e in vm.myEntries)
-              Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(e.teamName, style: theme.textTheme.titleSmall),
-                      Text(
-                        [
-                          e.status.label,
-                          if (vm.divisionById(e.divisionId) case final d?)
-                            d.label,
-                          if (fee != null && e.status == EntryStatus.accepted)
-                            vm.isPaid(e.teamId)
-                                ? 'Bid paid'
-                                : vm.isOverdue(e.teamId)
-                                ? 'Bid fee overdue'
-                                : 'Bid fee unpaid',
-                        ].join(' · '),
-                      ),
-                      if (e.captainIds.isNotEmpty)
-                        Text(
-                          'Captains: ${[for (final c in e.captainIds) vm.myTeam(e.teamId)?.nameOf(c) ?? 'Member'].join(', ')}',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      if (vm.playersShort(e.teamId) case final short?
-                          when short > 0 && e.status != EntryStatus.withdrawn)
-                        Text(
-                          'Needs $short more '
-                          '${short == 1 ? 'player' : 'players'} for the '
-                          'roster minimum.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.error,
-                          ),
-                        ),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          if (e.status == EntryStatus.invited &&
-                              t.status.acceptsEntries)
-                            FilledButton(
-                              onPressed: () => _apply(context, invite: e),
-                              child: const Text('Accept invite'),
-                            ),
-                          if (e.status != EntryStatus.invited &&
-                              (e.status.isActive ||
-                                  e.status == EntryStatus.accepted))
-                            TextButton(
-                              onPressed: () => _apply(context, editing: e),
-                              child: const Text('Captains'),
-                            ),
-                          if (e.status.isActive ||
-                              e.status == EntryStatus.accepted)
-                            TextButton(
-                              onPressed: () =>
-                                  context.push(Routes.teamMembers(e.teamId)),
-                              child: const Text('Invite players'),
-                            ),
-                          if (e.status.isActive ||
-                              e.status == EntryStatus.accepted)
-                            TextButton(
-                              onPressed: () async {
-                                if (await confirmDialog(
-                                  context,
-                                  title: e.status == EntryStatus.invited
-                                      ? 'Decline the invite?'
-                                      : 'Withdraw ${e.teamName}?',
-                                  message: e.status == EntryStatus.invited
-                                      ? "${e.teamName} won't play. The host "
-                                            'can invite you again.'
-                                      : '${e.teamName} is taken out of '
-                                            '${t.name} and off your schedule. '
-                                            'To play after all, you would '
-                                            'have to apply again.',
-                                  confirmLabel: e.status == EntryStatus.invited
-                                      ? 'Decline'
-                                      : 'Withdraw',
-                                  destructive: true,
-                                )) {
-                                  vm.decide.execute((
-                                    entry: e,
-                                    status: EntryStatus.withdrawn,
-                                  ));
-                                }
-                              },
-                              child: Text(
-                                e.status == EntryStatus.invited
-                                    ? 'Decline'
-                                    : 'Withdraw',
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _MyEntryCard(
+                  entry: e,
+                  viewModel: vm,
+                  fee: fee,
+                  onApply: () => _apply(context, invite: e),
+                  onCaptains: () => _apply(context, editing: e),
                 ),
               ),
             if (vm.canReserve && vm.myActiveEntry == null) ...[
@@ -746,7 +719,7 @@ class _OverviewTab extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
                   _rosterNote(vm.divisions),
-                  style: theme.textTheme.bodySmall,
+                  style: TextStyle(color: c.muted, fontSize: 12.5),
                 ),
               ),
             ],
@@ -758,10 +731,266 @@ class _OverviewTab extends StatelessWidget {
             Text(
               'Invite only: teams the host invites can play. Follow along '
               'for the schedule and results.',
-              style: theme.textTheme.bodyMedium,
+              style: TextStyle(color: c.ink2, fontSize: 14),
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// A division on the overview: its name, how full it is (a turf bar for
+/// events teams enter) and its format, with the host's menu.
+class _DivisionRow extends StatelessWidget {
+  const _DivisionRow({
+    required this.division,
+    required this.tournament,
+    required this.viewModel,
+    required this.onEdit,
+  });
+
+  final TournamentDivision division;
+  final HostedTournament tournament;
+  final HostedTournamentViewModel viewModel;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final d = division;
+    final t = tournament;
+    final vm = viewModel;
+    final filled = d.maxTeams == 0
+        ? 0.0
+        : (d.seeds.length / d.maxTeams).clamp(0.0, 1.0);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  d.label,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: c.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    if (!t.takesPlayers)
+                      '${d.seeds.length} of ${d.maxTeams} teams'
+                    else if (d.teams.isNotEmpty)
+                      '${d.teams.length} teams',
+                    '${d.settings.playersOnField}v${d.settings.playersOnField}',
+                    if (!t.takesPlayers) '${d.effectiveMinRoster}+ roster',
+                    t.isLeague ? 'weekly' : d.settings.format.label,
+                    d.settings.scoreLabel,
+                  ].join(' · '),
+                  style: TextStyle(fontSize: 12.5, color: c.muted),
+                ),
+                if (!t.takesPlayers) ...[
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: filled,
+                      minHeight: 6,
+                      color: d.isFull ? c.ink2 : c.accent,
+                      backgroundColor: c.field,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (vm.isManager)
+            PopupMenuButton<String>(
+              onSelected: (v) async {
+                if (v == 'edit') {
+                  onEdit();
+                } else if (await confirmDialog(
+                  context,
+                  title: 'Remove ${d.label}?',
+                  message: 'Its schedule and scores are deleted.',
+                  confirmLabel: 'Remove',
+                  destructive: true,
+                )) {
+                  vm.deleteDivision.execute(d.id);
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'edit', child: Text('Format & divisions')),
+                PopupMenuItem(value: 'delete', child: Text('Remove')),
+              ],
+            )
+          else
+            const SizedBox(width: 10),
+        ],
+      ),
+    );
+  }
+}
+
+/// One of the user's teams entered here: where its entry stands, its fee,
+/// captains and roster, and what its admins can do.
+class _MyEntryCard extends StatelessWidget {
+  const _MyEntryCard({
+    required this.entry,
+    required this.viewModel,
+    required this.fee,
+    required this.onApply,
+    required this.onCaptains,
+  });
+
+  final TournamentEntry entry;
+  final HostedTournamentViewModel viewModel;
+  final BidFee? fee;
+  final VoidCallback onApply;
+  final VoidCallback onCaptains;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final vm = viewModel;
+    final e = entry;
+    final t = vm.tournament!;
+    final accepted = e.status == EntryStatus.accepted;
+    final (String, PillTone)? feePill = fee != null && accepted
+        ? vm.isPaid(e.teamId)
+              ? ('Bid paid', PillTone.turf)
+              : vm.isOverdue(e.teamId)
+              ? ('Bid fee overdue', PillTone.needsYou)
+              : ('Bid fee unpaid', PillTone.needsYou)
+        : null;
+    final active = e.status.isActive || accepted;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                TeamMark(name: e.teamName, mine: true),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        e.teamName,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: c.ink,
+                        ),
+                      ),
+                      Text(
+                        [
+                          e.status.label,
+                          if (vm.divisionById(e.divisionId) case final d?)
+                            d.label,
+                        ].join(' · '),
+                        style: TextStyle(fontSize: 12.5, color: c.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (feePill != null) ...[
+              const SizedBox(height: 8),
+              Pill(feePill.$1, tone: feePill.$2),
+            ],
+            if (e.captainIds.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Captains: ${[for (final id in e.captainIds) vm.myTeam(e.teamId)?.nameOf(id) ?? 'Member'].join(', ')}',
+                style: TextStyle(fontSize: 12.5, color: c.ink2),
+              ),
+            ],
+            if (vm.playersShort(e.teamId) case final short?
+                when short > 0 && e.status != EntryStatus.withdrawn)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Needs $short more '
+                  '${short == 1 ? 'player' : 'players'} for the '
+                  'roster minimum.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: c.highlightInk,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (e.status == EntryStatus.invited && t.status.acceptsEntries)
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: c.highlight,
+                      foregroundColor: c.onHighlight,
+                    ),
+                    onPressed: onApply,
+                    child: const Text('Accept invite'),
+                  ),
+                if (e.status != EntryStatus.invited && active)
+                  TextButton(
+                    style: TextButton.styleFrom(foregroundColor: c.accent),
+                    onPressed: onCaptains,
+                    child: const Text('Captains'),
+                  ),
+                if (active)
+                  TextButton(
+                    style: TextButton.styleFrom(foregroundColor: c.accent),
+                    onPressed: () => context.push(Routes.teamMembers(e.teamId)),
+                    child: const Text('Invite players'),
+                  ),
+                if (active)
+                  TextButton(
+                    style: TextButton.styleFrom(foregroundColor: c.muted),
+                    onPressed: () async {
+                      if (await confirmDialog(
+                        context,
+                        title: e.status == EntryStatus.invited
+                            ? 'Decline the invite?'
+                            : 'Withdraw ${e.teamName}?',
+                        message: e.status == EntryStatus.invited
+                            ? "${e.teamName} won't play. The host "
+                                  'can invite you again.'
+                            : '${e.teamName} is taken out of '
+                                  '${t.name} and off your schedule. '
+                                  'To play after all, you would '
+                                  'have to apply again.',
+                        confirmLabel: e.status == EntryStatus.invited
+                            ? 'Decline'
+                            : 'Withdraw',
+                        destructive: true,
+                      )) {
+                        vm.decide.execute((
+                          entry: e,
+                          status: EntryStatus.withdrawn,
+                        ));
+                      }
+                    },
+                    child: Text(
+                      e.status == EntryStatus.invited ? 'Decline' : 'Withdraw',
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -784,6 +1013,7 @@ class _TeamsTabState extends State<_TeamsTab> {
   HostedTournamentViewModel get vm => widget.viewModel;
 
   Widget _entryTile(TournamentEntry e) {
+    final c = AppColors.of(context);
     final fee = vm.owesSpotFee(e.teamId) ? vm.tournament?.spotFee : null;
     final menu = <(String, EntryStatus)>[
       if (e.status != EntryStatus.accepted) ('Accept', EntryStatus.accepted),
@@ -791,24 +1021,61 @@ class _TeamsTabState extends State<_TeamsTab> {
         ('Waitlist', EntryStatus.waitlisted),
       if (e.status != EntryStatus.declined) ('Decline', EntryStatus.declined),
     ];
-    return ListTile(
-      title: Text(e.teamName),
-      subtitle: Text(
-        [
-          e.status.label,
-          if (fee != null && e.status == EntryStatus.accepted)
-            vm.isPaid(e.teamId)
-                ? 'Paid'
-                : vm.isOverdue(e.teamId)
-                ? 'Overdue'
-                : 'Unpaid',
-        ].join(' · '),
-      ),
-      trailing: PopupMenuButton<EntryStatus>(
-        onSelected: (s) => vm.decide.execute((entry: e, status: s)),
-        itemBuilder: (_) => [
-          for (final (label, s) in menu)
-            PopupMenuItem(value: s, child: Text(label)),
+    final decide = e.status == EntryStatus.applied;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  e.teamName,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: c.ink,
+                  ),
+                ),
+                Text(
+                  [
+                    e.status.label,
+                    if (fee != null && e.status == EntryStatus.accepted)
+                      vm.isPaid(e.teamId)
+                          ? 'Paid'
+                          : vm.isOverdue(e.teamId)
+                          ? 'Overdue'
+                          : 'Unpaid',
+                  ].join(' · '),
+                  style: TextStyle(fontSize: 12.5, color: c.muted),
+                ),
+              ],
+            ),
+          ),
+          if (decide) ...[
+            const SizedBox(width: 8),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+              ),
+              onPressed: vm.decide.running
+                  ? null
+                  : () => vm.decide.execute((
+                      entry: e,
+                      status: EntryStatus.accepted,
+                    )),
+              child: const Text('Accept'),
+            ),
+          ],
+          PopupMenuButton<EntryStatus>(
+            onSelected: (s) => vm.decide.execute((entry: e, status: s)),
+            itemBuilder: (_) => [
+              for (final (label, s) in menu)
+                PopupMenuItem(value: s, child: Text(label)),
+            ],
+          ),
         ],
       ),
     );
@@ -825,7 +1092,7 @@ class _TeamsTabState extends State<_TeamsTab> {
   Widget build(BuildContext context) {
     final d = vm.division;
     if (d == null) return _noDivisions(vm);
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final spotFee = vm.tournament?.spotFee;
     final fee = spotFee;
     final seeds = vm.seedsOf(d.id);
@@ -834,13 +1101,12 @@ class _TeamsTabState extends State<_TeamsTab> {
         if (!_unpaidOnly || !vm.isPaid(id)) id,
     ];
     final locked = vm.isPublished;
+    final applied = vm.entriesIn(d.id, status: EntryStatus.applied);
+    final waitlisted = vm.entriesIn(d.id, status: EntryStatus.waitlisted);
     final pending = [
-      for (final s in [
-        EntryStatus.applied,
-        EntryStatus.invited,
-        EntryStatus.waitlisted,
-      ])
-        ...vm.entriesIn(d.id, status: s),
+      ...applied,
+      ...vm.entriesIn(d.id, status: EntryStatus.invited),
+      ...waitlisted,
     ];
     // Teams that withdrew (or were removed) are out: the host doesn't
     // decide on them again. They can apply again, or be invited.
@@ -851,72 +1117,116 @@ class _TeamsTabState extends State<_TeamsTab> {
           ? null
           : spotFee;
       final overdue = fee != null && vm.isOverdue(id);
-      return ListTile(
+      final mine = vm.myEntries.any((e) => e.teamId == id);
+      final showFee = fee != null && (vm.isManager || mine);
+      return Material(
         key: ValueKey(id),
-        leading: CircleAvatar(child: Text('${seeds.indexOf(id) + 1}')),
-        title: Text(vm.teamName(id)),
-        subtitle:
-            fee == null ||
-                !(vm.isManager || vm.myEntries.any((e) => e.teamId == id))
-            ? null
-            : Text(
-                vm.isPaid(id)
-                    ? 'Bid paid'
-                    : overdue
-                    ? 'Bid fee overdue'
-                    : 'Bid fee unpaid',
-                style: overdue
-                    ? TextStyle(color: theme.colorScheme.error)
-                    : null,
+        color: Colors.transparent,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(14, 8, vm.isManager ? 4 : 14, 8),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: c.field,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ScoreText(
+                  '${seeds.indexOf(id) + 1}',
+                  size: 17,
+                  color: c.ink,
+                ),
               ),
-        trailing: vm.isManager
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (fee != null) _paidSwitch(id),
-                  PopupMenuButton<EntryStatus>(
-                    onSelected: (s) async {
-                      final e = vm.entryOf(id);
-                      if (e == null) return;
-                      if (s == EntryStatus.withdrawn &&
-                          !await confirmDialog(
-                            context,
-                            title: 'Remove ${e.teamName}?',
-                            message:
-                                "They're taken out of the tournament and off "
-                                'their schedule. They can apply again, or '
-                                'you can invite them.',
-                            confirmLabel: 'Remove',
-                            destructive: true,
-                          )) {
-                        return;
-                      }
-                      vm.decide.execute((entry: e, status: s));
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
-                        value: EntryStatus.waitlisted,
-                        child: Text('Move to waitlist'),
-                      ),
-                      PopupMenuItem(
-                        value: EntryStatus.withdrawn,
-                        child: Text('Remove'),
-                      ),
-                    ],
-                  ),
-                  if (!locked && !_unpaidOnly)
-                    ReorderableDragStartListener(
-                      index: index,
-                      child: const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: Icon(Icons.drag_handle),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      vm.teamName(id),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: c.ink,
                       ),
                     ),
-                ],
-              )
-            : null,
+                    if (showFee) ...[
+                      const SizedBox(height: 4),
+                      Pill(
+                        vm.isPaid(id)
+                            ? 'Bid paid'
+                            : overdue
+                            ? 'Bid fee overdue'
+                            : 'Bid fee unpaid',
+                        // The user's own unpaid fee is theirs to do.
+                        tone: vm.isPaid(id)
+                            ? PillTone.turf
+                            : mine
+                            ? PillTone.needsYou
+                            : PillTone.neutral,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (vm.isManager) ...[
+                if (fee != null) _paidSwitch(id),
+                PopupMenuButton<EntryStatus>(
+                  onSelected: (s) async {
+                    final e = vm.entryOf(id);
+                    if (e == null) return;
+                    if (s == EntryStatus.withdrawn &&
+                        !await confirmDialog(
+                          context,
+                          title: 'Remove ${e.teamName}?',
+                          message:
+                              "They're taken out of the tournament and off "
+                              'their schedule. They can apply again, or '
+                              'you can invite them.',
+                          confirmLabel: 'Remove',
+                          destructive: true,
+                        )) {
+                      return;
+                    }
+                    vm.decide.execute((entry: e, status: s));
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: EntryStatus.waitlisted,
+                      child: Text('Move to waitlist'),
+                    ),
+                    PopupMenuItem(
+                      value: EntryStatus.withdrawn,
+                      child: Text('Remove'),
+                    ),
+                  ],
+                ),
+                if (!locked && !_unpaidOnly)
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(Icons.drag_handle, color: c.muted),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
       );
     }
+
+    List<Widget> divided(List<Widget> rows) => [
+      for (final (i, r) in rows.indexed) ...[
+        if (i > 0) Divider(key: ValueKey('divider-$i'), height: 1),
+        r,
+      ],
+    ];
 
     return ListenableBuilder(
       listenable: Listenable.merge([vm.saveSeeds, vm.decide, vm.setPaid]),
@@ -925,10 +1235,53 @@ class _TeamsTabState extends State<_TeamsTab> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
           children: [
             _DivisionPicker(viewModel: vm),
+            Row(
+              children: [
+                Expanded(
+                  child: StatTile(
+                    value: '${seeds.length}',
+                    of: '/${d.maxTeams}',
+                    label: 'Accepted',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: StatTile(
+                    value: '${waitlisted.length}',
+                    label: 'Waitlist',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: StatTile(
+                    value: '${applied.length}',
+                    label: 'Applied',
+                    highlight: vm.isManager && applied.isNotEmpty,
+                  ),
+                ),
+              ],
+            ),
+            if (vm.isManager && pending.isNotEmpty) ...[
+              _Section(
+                'Waiting',
+                trailing: applied.isEmpty
+                    ? null
+                    : Text(
+                        'Waiting on you',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: c.highlightInk,
+                        ),
+                      ),
+              ),
+              RowsCard(children: [for (final e in pending) _entryTile(e)]),
+            ],
             _Section(
               'Teams (${seeds.length} of ${d.maxTeams})',
               trailing: vm.isManager
                   ? TextButton.icon(
+                      style: TextButton.styleFrom(foregroundColor: c.accent),
                       onPressed: () async {
                         final i = await showInviteDialog(
                           context,
@@ -938,23 +1291,27 @@ class _TeamsTabState extends State<_TeamsTab> {
                         );
                         if (i != null) vm.invite.execute(i);
                       },
-                      icon: const Icon(Icons.person_add_alt),
+                      icon: const Icon(Icons.person_add_alt, size: 18),
                       label: const Text('Invite'),
                     )
                   : null,
             ),
             if (vm.isManager)
-              Text(
-                locked
-                    ? 'Seeds are set: the schedule is published. Republishing '
-                          'on the Schedule tab regenerates every game.'
-                    : 'Drag to seed: 1 is the strongest. Pools and brackets '
-                          'are built from this order.',
-                style: theme.textTheme.bodySmall,
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  locked
+                      ? 'Seeds are set: the schedule is published. '
+                            'Republishing on the Schedule tab regenerates '
+                            'every game.'
+                      : 'Drag to seed: 1 is the strongest. Pools and '
+                            'brackets are built from this order.',
+                  style: TextStyle(fontSize: 12.5, color: c.muted),
+                ),
               ),
             if (vm.isManager && fee != null)
               Padding(
-                padding: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: FilterChip(
@@ -969,36 +1326,51 @@ class _TeamsTabState extends State<_TeamsTab> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(
                   vm.isManager
-                      ? 'No teams yet. Accept applications below or invite '
+                      ? 'No teams yet. Accept applications above or invite '
                             'teams.'
                       : 'No teams accepted yet.',
+                  style: TextStyle(color: c.ink2, fontSize: 14),
+                ),
+              )
+            else if (vm.isManager && !locked && !_unpaidOnly)
+              Card(
+                child: ReorderableListView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  onReorder: (from, to) {
+                    final next = [...seeds];
+                    final id = next.removeAt(from);
+                    next.insert(to > from ? to - 1 : to, id);
+                    vm.saveSeeds.execute(next);
+                  },
+                  children: [
+                    for (final (i, id) in seeds.indexed)
+                      DecoratedBox(
+                        key: ValueKey(id),
+                        decoration: BoxDecoration(
+                          border: i == 0
+                              ? null
+                              : Border(top: BorderSide(color: c.border)),
+                        ),
+                        child: seedTile(id, i),
+                      ),
+                  ],
+                ),
+              )
+            else if (shown.isNotEmpty)
+              Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: divided([
+                    for (final (i, id) in shown.indexed) seedTile(id, i),
+                  ]),
                 ),
               ),
-            if (vm.isManager && !locked && !_unpaidOnly)
-              ReorderableListView(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                buildDefaultDragHandles: false,
-                onReorder: (from, to) {
-                  final next = [...seeds];
-                  final id = next.removeAt(from);
-                  next.insert(to > from ? to - 1 : to, id);
-                  vm.saveSeeds.execute(next);
-                },
-                children: [
-                  for (final (i, id) in seeds.indexed) seedTile(id, i),
-                ],
-              )
-            else
-              for (final (i, id) in shown.indexed) seedTile(id, i),
             if (vm.isManager) ...[
-              if (pending.isNotEmpty) ...[
-                const _Section('Waiting'),
-                for (final e in pending) _entryTile(e),
-              ],
               if (out.isNotEmpty) ...[
                 const _Section('Declined'),
-                for (final e in out) _entryTile(e),
+                RowsCard(children: [for (final e in out) _entryTile(e)]),
               ],
             ] else if (pending.isNotEmpty)
               Padding(
@@ -1007,7 +1379,7 @@ class _TeamsTabState extends State<_TeamsTab> {
                   '${pending.length} more '
                   '${pending.length == 1 ? 'team is' : 'teams are'} '
                   'waiting on the host.',
-                  style: theme.textTheme.bodySmall,
+                  style: TextStyle(fontSize: 12.5, color: c.muted),
                 ),
               ),
           ],
@@ -1029,9 +1401,25 @@ class _ScheduleTab extends StatelessWidget {
     final vm = viewModel;
     final d = vm.division;
     if (d == null) return _noDivisions(vm);
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final games = vm.games;
-    final upcoming = vm.myUpcoming;
+    final focus = vm.gameNeedingMe;
+    final upcoming = [
+      for (final g in vm.myUpcoming)
+        if (g.id != focus?.id) g,
+    ];
+    final league = vm.tournament?.isLeague == true;
+    // The games, a card per day.
+    final days = <List<GroupGame>>[];
+    for (final (i, g) in games.indexed) {
+      if (i == 0 ||
+          g.startsAt == null ||
+          !DateUtils.isSameDay(games[i - 1].startsAt, g.startsAt)) {
+        days.add([g]);
+      } else {
+        days.last.add(g);
+      }
+    }
     return ListenableBuilder(
       listenable: Listenable.merge([vm.publish, vm.seedBracket]),
       builder: (context, _) => ConstrainedContent(
@@ -1043,12 +1431,20 @@ class _ScheduleTab extends StatelessWidget {
               '${d.label} · ${d.settings.format.label} · '
               '${d.settings.scoreLabel} · ${d.settings.fields} '
               '${d.settings.fields == 1 ? 'field' : 'fields'}',
-              style: theme.textTheme.bodyMedium,
+              style: TextStyle(fontSize: 12.5, color: c.muted),
             ),
+            if (focus != null) ...[
+              const SizedBox(height: 12),
+              _YourGameCard(viewModel: vm, game: focus),
+            ],
             if (vm.isManager) _PublishCard(viewModel: vm),
             if (vm.canSeedBracket) ...[
               const SizedBox(height: 12),
               FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: c.highlight,
+                  foregroundColor: c.onHighlight,
+                ),
                 onPressed: vm.seedBracket.running
                     ? null
                     : vm.seedBracket.execute,
@@ -1058,44 +1454,55 @@ class _ScheduleTab extends StatelessWidget {
             ],
             if (upcoming.isNotEmpty) ...[
               const _Section('Your next games'),
-              for (final g in upcoming.take(3))
-                _HostedGameTile(viewModel: vm, game: g),
+              RowsCard(
+                children: [
+                  for (final g in upcoming.take(3))
+                    _HostedGameTile(viewModel: vm, game: g),
+                ],
+              ),
             ],
             if (games.isEmpty && !vm.isManager)
-              const Padding(
-                padding: EdgeInsets.only(top: 24),
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
                 child: Text(
                   'The schedule appears here once the host publishes it.',
+                  style: TextStyle(color: c.ink2, fontSize: 14),
                 ),
               ),
             if (games.isNotEmpty) const _Section('All games'),
-            for (final (i, g) in games.indexed) ...[
-              if (g.startsAt != null &&
-                  (i == 0 ||
-                      !DateUtils.isSameDay(games[i - 1].startsAt, g.startsAt)))
+            for (final day in days) ...[
+              if (day.first.startsAt case final at?)
                 Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 8),
+                  padding: const EdgeInsets.only(top: 6, bottom: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        vm.tournament?.isLeague == true
-                            ? '${g.stage == GameStage.pool ? 'Week ${g.round}' : 'Playoffs'} · ${gameDay(g.startsAt!)}'
-                            : gameDay(g.startsAt!),
-                        style: theme.textTheme.titleSmall,
+                        league
+                            ? '${day.first.stage == GameStage.pool ? 'Week ${day.first.round}' : 'Playoffs'} · ${gameDay(at)}'
+                            : gameDay(at),
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: c.ink2,
+                        ),
                       ),
-                      if (vm.tournament?.isLeague == true &&
-                          g.stage == GameStage.pool)
-                        if (byesIn(d.seeds, games, g.round) case final byes
-                            when byes.isNotEmpty)
+                      if (league && day.first.stage == GameStage.pool)
+                        if (byesIn(d.seeds, games, day.first.round)
+                            case final byes when byes.isNotEmpty)
                           Text(
                             'Bye: ${byes.map(vm.teamName).join(', ')}',
-                            style: theme.textTheme.bodySmall,
+                            style: TextStyle(fontSize: 12.5, color: c.muted),
                           ),
                     ],
                   ),
                 ),
-              _HostedGameTile(viewModel: vm, game: g),
+              RowsCard(
+                children: [
+                  for (final g in day) _HostedGameTile(viewModel: vm, game: g),
+                ],
+              ),
+              const SizedBox(height: 12),
             ],
           ],
         ),
@@ -1103,6 +1510,131 @@ class _ScheduleTab extends StatelessWidget {
     );
   }
 }
+
+/// The user's game that needs a score from them, up top with an amber
+/// edge: the two teams, where and when, and Report (or Confirm) score.
+class _YourGameCard extends StatelessWidget {
+  const _YourGameCard({required this.viewModel, required this.game});
+
+  final HostedTournamentViewModel viewModel;
+  final GroupGame game;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final vm = viewModel;
+    final g = game;
+    final confirm = vm.actionFor(g) == HostedGameAction.confirm;
+    final r = g.report;
+    final mine = vm.myTeamIn(g);
+    Widget side(String? team, bool a, int? score) {
+      final name = vm.slotLabel(g, a: a);
+      final me = team != null && team == mine;
+      return Row(
+        children: [
+          TeamMark(name: name, mine: me),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: me ? FontWeight.w800 : FontWeight.w600,
+                color: me ? c.ink : c.ink2,
+              ),
+            ),
+          ),
+          ScoreText(
+            score == null ? '–' : '$score',
+            size: 24,
+            color: me ? c.ink : c.ink2,
+          ),
+        ],
+      );
+    }
+
+    return Card(
+      shape: RoundedSuperellipseBorder(
+        borderRadius: BorderRadius.circular(cardRadius),
+        side: BorderSide(color: c.highlight, width: 2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: c.highlightSoft,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Eyebrow(
+                        confirm
+                            ? 'Your game · confirm the score'
+                            : 'Your game · needs a score',
+                        color: c.highlightInk,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  [
+                    'Field ${g.field}',
+                    if (g.startsAt != null) gameTime(g.startsAt),
+                  ].join(' · '),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: c.muted,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            side(g.teamA, true, confirm ? r?.scoreA : null),
+            const SizedBox(height: 8),
+            side(g.teamB, false, confirm ? r?.scoreB : null),
+            const SizedBox(height: 10),
+            Text(
+              [
+                'Game ${vm.gameNumber(g)}',
+                g.label,
+                if (vm.division case final d?) d.settings.scoreLabel,
+              ].join(' · '),
+              style: TextStyle(fontSize: 12, color: c.muted),
+            ),
+            const SizedBox(height: 12),
+            HighlightButton(
+              label: confirm ? 'Confirm score' : 'Report score',
+              icon: Icons.scoreboard_outlined,
+              onPressed: () => _openGame(context, vm, g.id),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void _openGame(BuildContext context, HostedTournamentViewModel vm, String id) =>
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => _GameSheet(viewModel: vm, gameId: id),
+    );
 
 /// Generate and publish (or regenerate) the selected division's games.
 class _PublishCard extends StatelessWidget {
@@ -1115,19 +1647,49 @@ class _PublishCard extends StatelessWidget {
     final vm = viewModel;
     final d = vm.division!;
     final (:plan, :problem) = vm.preview();
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final played = vm.games.any((g) => g.status != GameStatus.scheduled);
     final days = plan?.days ?? const <ScheduleDay>[];
+    final pools =
+        d.settings.format.hasPools &&
+        d.settings.format != TournamentFormat.roundRobin;
+    final ready = plan != null && !vm.isPublished;
+    final lastEnd = days.isEmpty ? null : days.last.endsAt;
+    Future<void> publish() async {
+      if (vm.isPublished &&
+          !await confirmDialog(
+            context,
+            title: 'Regenerate the schedule?',
+            message: played
+                ? 'Scores already entered are lost: every game is '
+                      'regenerated from the current seeds.'
+                : 'Every game is regenerated from the current seeds.',
+            confirmLabel: 'Regenerate',
+            destructive: played,
+          )) {
+        return;
+      }
+      vm.publish.execute();
+    }
+
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              vm.isPublished ? 'Schedule published' : 'Schedule',
-              style: theme.textTheme.titleSmall,
+              vm.isPublished
+                  ? 'Schedule published'
+                  : ready
+                  ? 'Schedule is ready to publish'
+                  : 'Schedule',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: c.ink,
+              ),
             ),
             const SizedBox(height: 4),
             if (plan == null)
@@ -1136,49 +1698,73 @@ class _PublishCard extends StatelessWidget {
                     (vm.tournament!.takesPlayers
                         ? 'Draft and save at least two teams first.'
                         : 'Accept at least two teams first.'),
+                style: TextStyle(fontSize: 13.5, color: c.ink2),
               )
-            else
+            else ...[
               Text(
-                '${d.seeds.length} teams · ${plan.games.length} games'
-                '${d.settings.format.hasPools && d.settings.format != TournamentFormat.roundRobin ? ' · ${d.settings.poolCount} pools' : ''}\n'
+                '${d.seeds.length} teams'
+                '${pools ? ' · ${d.settings.poolCount} pools' : ''}\n'
                 '${[for (final day in days) '${DateFormat('EEE').format(day.startsAt)} ${DateFormat.jm().format(day.startsAt)}–${DateFormat.jm().format(day.endsAt)}'].join(' · ')}',
+                style: TextStyle(fontSize: 13.5, color: c.ink2),
               ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: StatTile(
+                      value: '${plan.games.length}',
+                      label: 'Games',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: StatTile(
+                      value: '${d.settings.fields}',
+                      label: d.settings.fields == 1 ? 'Field' : 'Fields',
+                    ),
+                  ),
+                  if (lastEnd != null) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: StatTile(
+                        value: DateFormat('h:mm').format(lastEnd),
+                        label: 'Last finish',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
             if (!vm.tournament!.isLeague &&
                 d.seeds.length >= 2 &&
                 d.settings.format != suggestedFormat(d.seeds.length))
-              Text(
-                'Tip: for ${d.seeds.length} teams, '
-                '${suggestedFormat(d.seeds.length).label.toLowerCase()} '
-                'usually works best.',
-                style: theme.textTheme.bodySmall,
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Tip: for ${d.seeds.length} teams, '
+                  '${suggestedFormat(d.seeds.length).label.toLowerCase()} '
+                  'usually works best.',
+                  style: TextStyle(fontSize: 12.5, color: c.muted),
+                ),
               ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: plan == null || vm.publish.running
-                  ? null
-                  : () async {
-                      if (vm.isPublished &&
-                          !await confirmDialog(
-                            context,
-                            title: 'Regenerate the schedule?',
-                            message: played
-                                ? 'Scores already entered are lost: every '
-                                      'game is regenerated from the current '
-                                      'seeds.'
-                                : 'Every game is regenerated from the '
-                                      'current seeds.',
-                            confirmLabel: 'Regenerate',
-                            destructive: played,
-                          )) {
-                        return;
-                      }
-                      vm.publish.execute();
-                    },
-              icon: Icon(vm.isPublished ? Icons.refresh : Icons.publish),
-              label: Text(
-                vm.isPublished ? 'Regenerate schedule' : 'Publish schedule',
+            const SizedBox(height: 12),
+            if (vm.isPublished)
+              OutlinedButton.icon(
+                onPressed: plan == null || vm.publish.running ? null : publish,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Regenerate schedule'),
+              )
+            else
+              // Publishing is the host's to do: amber.
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: c.highlight,
+                  foregroundColor: c.onHighlight,
+                ),
+                onPressed: plan == null || vm.publish.running ? null : publish,
+                icon: const Icon(Icons.publish),
+                label: const Text('Publish schedule'),
               ),
-            ),
           ],
         ),
       ),
@@ -1197,25 +1783,20 @@ class _HostedGameTile extends StatelessWidget {
     final vm = viewModel;
     final g = game;
     final action = vm.actionFor(g);
-    return GameTile(
+    return HostedGameRow(
       game: g,
       number: vm.gameNumber(g),
       nameA: vm.slotLabel(g, a: true),
       nameB: vm.slotLabel(g, a: false),
-      highlight: action != null,
+      mine: vm.myTeamIn(g) != null,
       skipped: vm.isSkipped(g),
-      badge: switch (action) {
+      action: switch (action) {
         HostedGameAction.report => 'Report score',
         HostedGameAction.confirm => 'Confirm score',
-        HostedGameAction.awaiting => 'Waiting for the other captain',
-        null => null,
+        _ => null,
       },
-      onTap: () => showModalBottomSheet<void>(
-        context: context,
-        showDragHandle: true,
-        isScrollControlled: true,
-        builder: (_) => _GameSheet(viewModel: vm, gameId: g.id),
-      ),
+      waiting: action == HostedGameAction.awaiting,
+      onTap: () => _openGame(context, vm, g.id),
     );
   }
 }
@@ -1241,13 +1822,18 @@ class _GameSheet extends StatelessWidget {
       builder: (context, _) {
         final g = vm.games.where((x) => x.id == gameId).firstOrNull;
         if (g == null) return const SizedBox(height: 120);
-        final theme = Theme.of(context);
+        final c = AppColors.of(context);
         final nameA = vm.slotLabel(g, a: true);
         final nameB = vm.slotLabel(g, a: false);
         final r = g.report;
         final busy =
             vm.report.running || vm.confirm.running || vm.setFinalScore.running;
         final action = vm.actionFor(g);
+        final mine = vm.myTeamIn(g);
+        final amber = FilledButton.styleFrom(
+          backgroundColor: c.highlight,
+          foregroundColor: c.onHighlight,
+        );
 
         Future<void> enter({
           required String title,
@@ -1268,42 +1854,133 @@ class _GameSheet extends StatelessWidget {
           }
         }
 
+        // The score shown: final, else the one reported.
+        final shownA = g.isDone ? g.scoreA : r?.scoreA;
+        final shownB = g.isDone ? g.scoreB : r?.scoreB;
+        Widget side(String name, String? team, int? score) {
+          final me = team != null && team == mine;
+          final won = g.winner != null && g.winner == team;
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Row(
+              children: [
+                TeamMark(name: name, mine: me, size: 34),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: c.ink,
+                        ),
+                      ),
+                      if (me)
+                        Text(
+                          'Your team',
+                          style: TextStyle(fontSize: 12, color: c.muted),
+                        ),
+                    ],
+                  ),
+                ),
+                ScoreText(
+                  score == null ? '–' : '$score',
+                  size: 34,
+                  color: g.isDone && !won ? c.muted : c.ink,
+                ),
+              ],
+            ),
+          );
+        }
+
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   'Game ${vm.gameNumber(g)} · ${g.label}',
-                  style: theme.textTheme.titleLarge,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: c.ink,
+                  ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   [
                     if (g.startsAt != null) gameTime(g.startsAt),
                     'Field ${g.field}',
                     if (vm.division case final d?) d.settings.scoreLabel,
                   ].join(' · '),
+                  style: TextStyle(fontSize: 13, color: c.muted),
                 ),
-                const SizedBox(height: 16),
-                GameTile(game: g, nameA: nameA, nameB: nameB),
+                if (r != null && !g.isDone) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    decoration: BoxDecoration(
+                      color: action == HostedGameAction.confirm
+                          ? c.highlightSoft
+                          : c.field,
+                      borderRadius: BorderRadius.circular(controlRadius),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 18,
+                          color: action == HostedGameAction.confirm
+                              ? c.highlightInk
+                              : c.muted,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${vm.teamName(r.byTeamId)} reported $nameA '
+                            '${r.scoreA}, $nameB ${r.scoreB}.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: action == HostedGameAction.confirm
+                                  ? c.highlightInk
+                                  : c.ink2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Card(
+                  child: Column(
+                    children: [
+                      side(nameA, g.teamA, shownA),
+                      const Divider(height: 1),
+                      side(nameB, g.teamB, shownB),
+                    ],
+                  ),
+                ),
                 if (vm.isSkipped(g))
-                  const Text(
+                  _SheetNote(
                     "Not needed: the winners' bracket champion won the final.",
                   )
                 else if (!g.hasTeams)
-                  const Text('Teams are decided by earlier games.'),
-                if (r != null && !g.isDone) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    '${vm.teamName(r.byTeamId)} reported $nameA ${r.scoreA}, '
-                    '$nameB ${r.scoreB}.',
-                  ),
-                ],
+                  _SheetNote('Teams are decided by earlier games.')
+                else if (g.isDone)
+                  _SheetNote('Final.'),
                 const SizedBox(height: 16),
                 if (action == HostedGameAction.report)
                   FilledButton(
+                    style: amber,
                     onPressed: busy
                         ? null
                         : () => enter(
@@ -1317,6 +1994,7 @@ class _GameSheet extends StatelessWidget {
                   ),
                 if (action == HostedGameAction.confirm) ...[
                   FilledButton(
+                    style: amber,
                     onPressed: busy ? null : () => vm.confirm.execute(g),
                     child: Text('Confirm ${r!.scoreA}–${r.scoreB}'),
                   ),
@@ -1332,10 +2010,11 @@ class _GameSheet extends StatelessWidget {
                   ),
                 ],
                 if (action == HostedGameAction.awaiting)
-                  const Text('Waiting for the other captain to confirm.'),
+                  _SheetNote('Waiting for the other captain to confirm.'),
                 if (vm.canSetScore(g)) ...[
                   const SizedBox(height: 8),
                   TextButton(
+                    style: TextButton.styleFrom(foregroundColor: c.accent),
                     onPressed: busy
                         ? null
                         : () => enter(
@@ -1350,6 +2029,20 @@ class _GameSheet extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (action == HostedGameAction.report ||
+                    action == HostedGameAction.confirm)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      action == HostedGameAction.confirm
+                          ? "Once you confirm, it's final and the standings "
+                                "update. If it's wrong, send a different "
+                                'score back.'
+                          : 'The other captain confirms it before it counts.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12.5, color: c.muted),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1357,6 +2050,21 @@ class _GameSheet extends StatelessWidget {
       },
     );
   }
+}
+
+class _SheetNote extends StatelessWidget {
+  const _SheetNote(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 10),
+    child: Text(
+      text,
+      style: TextStyle(fontSize: 13.5, color: AppColors.of(context).ink2),
+    ),
+  );
 }
 
 // ---- Results ---------------------------------------------------------------
@@ -1371,9 +2079,10 @@ class _ResultsTab extends StatelessWidget {
     final vm = viewModel;
     final d = vm.division;
     if (d == null) return _noDivisions(vm);
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final places = vm.placements;
     final pools = vm.poolStandings;
+    final mine = vm.myTeamIds;
     final columns = <(GameStage, int), List<GroupGame>>{};
     for (final g in vm.bracketGames) {
       columns.putIfAbsent((g.stage, g.round), () => []).add(g);
@@ -1384,45 +2093,120 @@ class _ResultsTab extends StatelessWidget {
         children: [
           _DivisionPicker(viewModel: vm),
           if (vm.games.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 24),
-              child: Text('Results show up here once games are played.'),
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: Text(
+                'Results show up here once games are played.',
+                style: TextStyle(color: c.ink2, fontSize: 14),
+              ),
             ),
           if (places.isNotEmpty) ...[
             Card(
-              color: theme.colorScheme.primaryContainer,
-              child: ListTile(
-                leading: const Icon(Icons.emoji_events, size: 36),
-                title: Text(vm.teamName(places.first)),
-                subtitle: Text('${d.label} champion'),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: c.accentSoft,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.emoji_events_outlined,
+                        size: 26,
+                        color: c.accentInk,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${d.label} champion',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: c.muted,
+                            ),
+                          ),
+                          Text(
+                            vm.teamName(places.first),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.4,
+                              color: c.ink,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const _Section('Final standings'),
-            for (final (i, id) in places.indexed)
-              ListTile(
-                dense: true,
-                leading: Text(
-                  ordinal(i + 1),
-                  style: theme.textTheme.titleSmall,
-                ),
-                title: Text(vm.teamName(id)),
-                trailing: d.seedOf(id) == null
-                    ? null
-                    : Text('Seed ${d.seedOf(id)}'),
-              ),
+            RowsCard(
+              children: [
+                for (final (i, id) in places.indexed)
+                  Container(
+                    color: mine.contains(id) ? c.accentSoft : null,
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 44,
+                          child: ScoreText(
+                            ordinal(i + 1),
+                            size: 19,
+                            color: mine.contains(id) ? c.accentInk : c.ink,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            vm.teamName(id),
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: mine.contains(id) ? c.accentInk : c.ink,
+                            ),
+                          ),
+                        ),
+                        if (d.seedOf(id) case final seed?)
+                          Text(
+                            'Seed $seed',
+                            style: TextStyle(fontSize: 12.5, color: c.muted),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ],
           if (pools.isNotEmpty) ...[
             _Section(vm.tournament?.isLeague == true ? 'Standings' : 'Pools'),
             for (final e in pools.entries) ...[
               if (pools.length > 1)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8, bottom: 4),
+                  padding: const EdgeInsets.only(top: 4, bottom: 6),
                   child: Text(
                     'Pool ${e.key}',
-                    style: theme.textTheme.titleSmall,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: c.ink2,
+                    ),
                   ),
                 ),
-              StandingsTable(rows: e.value, nameOf: vm.teamName),
+              HostedStandingsTable(
+                rows: e.value,
+                nameOf: vm.teamName,
+                mine: mine,
+              ),
+              const SizedBox(height: 8),
             ],
           ],
           if (columns.isNotEmpty) ...[
@@ -1440,15 +2224,21 @@ class _ResultsTab extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(
+                            Eyebrow(
                               e.value.map((g) => g.label).toSet().length == 1
                                   ? e.value.first.label
                                   : 'Round ${e.key.$2}',
-                              style: theme.textTheme.titleSmall,
                             ),
                             const SizedBox(height: 8),
                             for (final g in e.value)
-                              _HostedGameTile(viewModel: vm, game: g),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: RowsCard(
+                                  children: [
+                                    _HostedGameTile(viewModel: vm, game: g),
+                                  ],
+                                ),
+                              ),
                           ],
                         ),
                       ),

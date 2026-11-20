@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../data/services/device_permissions.dart';
+import '../../core/themes/theme.dart';
 import '../view_models/device_access_viewmodel.dart';
 import 'settings_widgets.dart';
 
@@ -31,22 +32,30 @@ class DeviceAccessGroup extends StatelessWidget {
         children: [
           for (final a in DeviceAccess.values)
             ListTile(
-              leading: Icon(_icon(a)),
+              leading: SettingsIcon(_icon(a)),
               title: Text(a.label),
               subtitle: Text(
                 '${vm.statusOf(a)?.label ?? 'Checking…'} · ${a.purpose}',
               ),
               trailing: vm.statusOf(a) == AccessStatus.notAsked
-                  ? TextButton(
+                  ? OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.of(context).accent,
+                        visualDensity: VisualDensity.compact,
+                      ),
                       onPressed: () => vm.ask.execute(a),
                       child: const Text('Allow'),
                     )
                   : null,
             ),
           ListTile(
-            leading: const Icon(Icons.settings_outlined),
+            leading: const SettingsIcon(Icons.settings_outlined),
             title: const Text("Open your phone's settings"),
-            trailing: const Icon(Icons.open_in_new, size: 18),
+            trailing: Icon(
+              Icons.open_in_new,
+              size: 18,
+              color: AppColors.of(context).muted,
+            ),
             onTap: vm.openSettings.execute,
           ),
         ],

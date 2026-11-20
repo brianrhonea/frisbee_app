@@ -74,7 +74,7 @@ class _VoiceChannelViewState extends State<VoiceChannelView> {
                   CircleAvatar(
                     radius: 44,
                     backgroundColor: c.accentSoft,
-                    foregroundColor: c.accent,
+                    foregroundColor: c.accentInk,
                     child: const Icon(Icons.volume_up_rounded, size: 44),
                   ),
                   const SizedBox(height: 18),
@@ -100,7 +100,10 @@ class _VoiceChannelViewState extends State<VoiceChannelView> {
                     Text(
                       notice,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.orange.shade700),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: c.ink2,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 22),
@@ -115,8 +118,6 @@ class _VoiceChannelViewState extends State<VoiceChannelView> {
                   else
                     FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green.shade600,
-                        foregroundColor: Colors.white,
                         minimumSize: const Size(200, 48),
                       ),
                       onPressed: vm.join.running ? null : vm.join.execute,
@@ -162,7 +163,7 @@ class _VoiceChannelViewState extends State<VoiceChannelView> {
   );
 }
 
-/// A person in the channel, ringed in green while they talk.
+/// A person in the channel, ringed in turf while they talk.
 class _ParticipantTile extends StatelessWidget {
   const _ParticipantTile({required this.p});
 
@@ -176,9 +177,9 @@ class _ParticipantTile extends StatelessWidget {
       height: 140,
       decoration: BoxDecoration(
         color: c.card,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: p.isSpeaking ? Colors.green.shade500 : c.border,
+          color: p.isSpeaking ? c.accent : c.border,
           width: p.isSpeaking ? 2.5 : 1,
         ),
       ),
@@ -191,9 +192,7 @@ class _ParticipantTile extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: p.isSpeaking
-                    ? Colors.green.shade500
-                    : Colors.transparent,
+                color: p.isSpeaking ? c.accent : Colors.transparent,
                 width: 3,
               ),
             ),
@@ -204,7 +203,12 @@ class _ParticipantTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (!p.micOn) ...[
-                Icon(Icons.mic_off, size: 16, color: Colors.red.shade400),
+                Icon(
+                  Icons.mic_off,
+                  size: 16,
+                  color: c.muted,
+                  semanticLabel: 'Muted',
+                ),
                 const SizedBox(width: 4),
               ],
               ConstrainedBox(
@@ -250,8 +254,9 @@ class _CallControls extends StatelessWidget {
                 ? 'Mute'
                 : 'Unmute',
             style: IconButton.styleFrom(
-              backgroundColor: vm.micOn ? null : Colors.red.shade100,
-              foregroundColor: vm.micOn ? null : Colors.red.shade700,
+              fixedSize: const Size(56, 56),
+              backgroundColor: vm.micOn ? c.accentSoft : c.field,
+              foregroundColor: vm.micOn ? c.accentInk : c.ink,
             ),
             icon: Icon(vm.micOn ? Icons.mic : Icons.mic_off),
             onPressed: vm.canSpeak && !vm.toggleMic.running
@@ -259,12 +264,15 @@ class _CallControls extends StatelessWidget {
                 : null,
           ),
           const SizedBox(width: 20),
+          // Leaving, but in ink rather than red: red is kept for live
+          // games.
           IconButton.filled(
             iconSize: 26,
             tooltip: 'Disconnect',
             style: IconButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
-              foregroundColor: Colors.white,
+              fixedSize: const Size(56, 56),
+              backgroundColor: c.ink2,
+              foregroundColor: c.card,
             ),
             icon: const Icon(Icons.call_end),
             onPressed: vm.leave.execute,

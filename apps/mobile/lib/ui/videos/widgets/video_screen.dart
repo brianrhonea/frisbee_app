@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/team_video.dart';
 import '../../../routing/routes.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
@@ -120,7 +121,7 @@ class _VideoScreenState extends State<VideoScreen> {
                 ),
         );
       }
-      final theme = Theme.of(context);
+      final c = AppColors.of(context);
       final when = video.createdAt;
       final byline = [
         if (video.authorName.isNotEmpty) 'Shared by ${video.authorName}',
@@ -164,31 +165,58 @@ class _VideoScreenState extends State<VideoScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(video.title, style: theme.textTheme.titleLarge),
+                      Text(
+                        video.title,
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: c.ink,
+                        ),
+                      ),
                       if (byline.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             byline,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                            style: TextStyle(fontSize: 13, color: c.muted),
+                          ),
+                        ),
+                      if (video.isYouTube)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: OutlinedButton.icon(
+                            onPressed: () => launchUrl(
+                              Uri.parse(video.watchUrl),
+                              mode: LaunchMode.externalApplication,
                             ),
+                            style: OutlinedButton.styleFrom(
+                              shape: const StadiumBorder(),
+                              minimumSize: const Size(0, 36),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              textStyle: const TextStyle(
+                                fontFamily: appFont,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            icon: const Icon(Icons.open_in_new, size: 16),
+                            label: const Text('Open on YouTube'),
                           ),
                         ),
                       if (video.description.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 16),
-                          child: SelectableText(video.description),
-                        ),
-                      const SizedBox(height: 12),
-                      if (video.isYouTube)
-                        TextButton.icon(
-                          onPressed: () => launchUrl(
-                            Uri.parse(video.watchUrl),
-                            mode: LaunchMode.externalApplication,
+                          child: SelectableText(
+                            video.description,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.45,
+                              color: c.ink2,
+                            ),
                           ),
-                          icon: const Icon(Icons.open_in_new),
-                          label: const Text('Open on YouTube'),
                         ),
                     ],
                   ),

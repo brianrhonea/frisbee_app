@@ -10,8 +10,14 @@ import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
 import '../../teams/view_models/team_search_viewmodel.dart';
+import '../../tournaments/view_models/hosted_tournaments_viewmodel.dart';
+import '../../tournaments/widgets/hosted_tournament_screen.dart'
+    show hostedDates;
+import '../../tournaments/widgets/hosted_tournaments_list.dart'
+    show HostedStatusFilterBar;
 import '../view_models/explore_viewmodel.dart';
 import '../view_models/player_search_viewmodel.dart';
 import 'explore_cards.dart';
@@ -19,15 +25,19 @@ import '../../core/ui/app_search_field.dart';
 import '../../core/ui/skeleton.dart';
 import '../../shell/widgets/app_shell.dart' show ProfileButton, SearchField;
 
-/// Explore: search players, teams, groups and tournaments in one box; see
-/// upcoming tournaments, recent results and rankings; and jump to
-/// starting a team or group.
+/// Discover: one place to find things. Search players, teams, communities,
+/// tournaments and leagues in one box, narrowed by the filter chips; with
+/// no search, what's live now, the tournaments and leagues coming up (the
+/// old Events tab's "Find events", with its status filter and Host), recent
+/// results, a rankings preview and ways to jump in (Learn to play, start a
+/// team or community).
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({
     super.key,
     required this.viewModel,
     required this.players,
     this.explore,
+    this.events,
     this.initialQuery = '',
     this.initialFilter,
   });
@@ -37,6 +47,10 @@ class ExploreScreen extends StatefulWidget {
 
   /// Tournaments, results and rankings; null shows search alone.
   final ExploreViewModel? explore;
+
+  /// Every upcoming tournament and league, to filter by status and search
+  /// (what "Find events" listed); null shows Explore's preview instead.
+  final HostedTournamentsViewModel? events;
 
   /// Search text from the top bar's search field.
   final String initialQuery;
@@ -48,6 +62,12 @@ class ExploreScreen extends StatefulWidget {
   State<ExploreScreen> createState() => _ExploreScreenState();
 }
 
+/// The kinds of hosted event each event filter keeps.
+const _eventKinds = {
+  ExploreFilter.tournaments: {HostedType.tournament, HostedType.hat},
+  ExploreFilter.leagues: {HostedType.league},
+};
+
 class _ExploreScreenState extends State<ExploreScreen> {
   TeamSearchViewModel get vm => widget.viewModel;
   PlayerSearchViewModel get players => widget.players;
@@ -57,10 +77,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
   /// The picked chip; null for All.
   ExploreFilter? _only;
 
+  bool get _hasEvents => widget.explore != null || widget.events != null;
+
   void _search(String text) {
     vm.search.execute(text);
     players.search.execute(text);
+    widget.events?.setQuery(_ready(text) ? text.trim() : '');
   }
+
+  static bool _ready(String text) =>
+      text.trim().length >= TeamSearchViewModel.minQueryLength;
 
   @override
   void initState() {
@@ -93,183 +119,370 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _only = only;
     vm.setKind(switch (only) {
       ExploreFilter.teams => TeamKind.team,
-      ExploreFilter.groups => TeamKind.community,
+      ExploreFilter.groups || ExploreFilter.pickup => TeamKind.community,
       _ => null,
     });
+    widget.events?.setKindsFilter(_eventKinds[only]);
   }
 
   void _onChanged(String text) {
+    // Events are filtered here, so they follow the box at once; the
+    // searches wait for a pause in typing.
+    widget.events?.setQuery(_ready(text) ? text.trim() : '');
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () => _search(text));
   }
 
+  /// Whether the chip picked shows [f]'s results (All shows every kind).
+  bool _shows(ExploreFilter f) => _only == null || _only == f;
+
+  bool _showsKind(HostedType type) =>
+      _only == null || (_eventKinds[_only]?.contains(type) ?? false);
+
   @override
   Widget build(BuildContext context) {
     final mobile = ScreenSize.of(context).isMobile;
+    final host = TextButton.icon(
+      onPressed: () => context.push(Routes.hostEvent),
+      icon: const Icon(Icons.add),
+      label: const Text('Host'),
+    );
     return Scaffold(
       appBar: mobile
           ? AppBar(
               leading: ProfileButton.leading(context),
-              title: const Text('Explore'),
+              title: const Text('Discover'),
+              actions: [if (_hasEvents) host],
             )
           : null,
-      body: PageScroll(
+      body: ListenableBuilder(
+        listenable: Listenable.merge([
+          vm,
+          vm.search,
+          players.search,
+          _text,
+          ?widget.explore,
+          ?widget.events,
+        ]),
+        builder: (context, _) {
+          final searching = _ready(_text.text);
+          final top = [
+            _searchBox(),
+            if (searching) ..._results() else ..._browse(context),
+          ];
+          final side = [
+            if (widget.explore case final x? when !searching)
+              RankingsPreviewCard(viewModel: x),
+            _Shortcuts(),
+          ];
+          return PageScroll(
+            children: [
+              if (!mobile)
+                PageHeader(
+                  eyebrow: 'Discover',
+                  title: 'Find your next point.',
+                  subtitle:
+                      'Tournaments, leagues, pickup, teams, communities '
+                      'and players.',
+                  action: _hasEvents ? host : null,
+                ),
+              SideColumnLayout(
+                main: top,
+                side: side,
+                narrow: [...top, ...side],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// The search box and the filter chips under it.
+  Widget _searchBox() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      AppSearchField(
+        controller: _text,
+        hint: SearchField.hint,
+        onChanged: _onChanged,
+        onSubmitted: _search,
+      ),
+      const SizedBox(height: 10),
+      _FilterChips(
+        filters: [
+          ('All', null),
+          if (_hasEvents) ...[
+            ('Tournaments', ExploreFilter.tournaments),
+            ('Leagues', ExploreFilter.leagues),
+          ],
+          ('Pickup', ExploreFilter.pickup),
+          ('Teams', ExploreFilter.teams),
+          ('Communities', ExploreFilter.groups),
+          ('Players', ExploreFilter.players),
+        ],
+        selected: _only,
+        onSelect: (f) => setState(() => _applyFilter(f)),
+      ),
+    ],
+  );
+
+  /// With no search: what's live, what's coming up and recent results; for
+  /// a filter that needs a search, how to search it.
+  List<Widget> _browse(BuildContext context) {
+    final c = AppColors.of(context);
+    final x = widget.explore;
+    final events = widget.events;
+    final eventsShown =
+        _only == null ||
+        _only == ExploreFilter.tournaments ||
+        _only == ExploreFilter.leagues;
+    if (!_hasEvents || !eventsShown) {
+      final what = switch (_only) {
+        ExploreFilter.pickup => 'pickup communities',
+        ExploreFilter.teams => 'teams',
+        ExploreFilter.groups => 'communities, schools and clubs',
+        ExploreFilter.players => 'players by name or username',
+        _ => 'players, teams, communities and tournaments',
+      };
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            'Type at least ${TeamSearchViewModel.minQueryLength} letters '
+            'to search $what.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: c.muted),
+          ),
+        ),
+      ];
+    }
+    final live = [
+      for (final t in x?.upcoming ?? const <HostedTournament>[])
+        if (t.status == HostedStatus.live && _showsKind(t.type)) t,
+    ];
+    return [
+      if (live.isNotEmpty)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SectionHeader('Live now', leading: LiveDot()),
+            ...spaced([
+              for (final t in live) _LiveCard(tournament: t),
+            ], gap: 10),
+          ],
+        ),
+      if (events != null)
+        _ComingUp(viewModel: events)
+      else if (x != null)
+        UpcomingTournamentsCard(viewModel: x),
+      if (x != null && _only != ExploreFilter.leagues)
+        RecentResultsCard(viewModel: x),
+    ];
+  }
+
+  /// Search results, grouped by kind: tournaments, leagues, teams,
+  /// communities and players, as the chip picked allows.
+  List<Widget> _results() {
+    final events = widget.events;
+    final hosted = events != null
+        ? events.matches
+        : widget.explore?.matching(_text.text) ?? const <HostedTournament>[];
+    final tournaments = [
+      if (_hasEvents && _shows(ExploreFilter.tournaments))
+        for (final t in hosted)
+          if (t.type != HostedType.league) t,
+    ];
+    final leagues = [
+      if (_hasEvents && _shows(ExploreFilter.leagues))
+        for (final t in hosted)
+          if (t.type == HostedType.league) t,
+    ];
+    final teamsShown = _shows(ExploreFilter.teams);
+    final pickup = _only == ExploreFilter.pickup;
+    final groupsShown = _shows(ExploreFilter.groups) || pickup;
+    final teams = [
+      if (teamsShown)
+        for (final t in vm.results)
+          if (t.kind == TeamKind.team) t,
+    ];
+    final groups = [
+      if (groupsShown)
+        for (final t in vm.results)
+          if (pickup ? t.kind == TeamKind.community : t.kind.isGroupLike) t,
+    ];
+    final playersShown = _shows(ExploreFilter.players);
+    final people = playersShown ? players.results : const <PlayerProfile>[];
+
+    final searchesTeams = teamsShown || groupsShown;
+    final running =
+        (searchesTeams && vm.search.running) ||
+        (playersShown && players.search.running) ||
+        (events != null && !events.loaded);
+    final failed = (searchesTeams && vm.search.error)
+        ? vm.search.result
+        : (playersShown && players.search.error)
+        ? players.search.result
+        : null;
+    final nothing =
+        tournaments.isEmpty &&
+        leagues.isEmpty &&
+        teams.isEmpty &&
+        groups.isEmpty &&
+        people.isEmpty;
+    // From the lists shown, not the searches' own: a search can match only
+    // what the chip hides (schools and clubs under Pickup).
+    final noMatches =
+        nothing &&
+        !running &&
+        (!searchesTeams || vm.search.completed) &&
+        (!playersShown || players.search.completed);
+
+    Widget group(String title, List<Widget> rows) => SectionCard(
+      title: title,
+      child: Column(children: rows),
+    );
+
+    return [
+      if (running && nothing)
+        const SkeletonList(count: 4, padding: EdgeInsets.zero)
+      else if (failed != null && nothing)
+        ErrorView(error: failed)
+      else if (noMatches)
+        const EmptyView(
+          icon: Icons.search_off,
+          title: 'Nothing found',
+          message:
+              'Try another word from a name, username, city, school, team, '
+              'tournament or league.',
+        ),
+      if (tournaments.isNotEmpty)
+        group('Tournaments', [
+          for (final t in tournaments) TournamentTile(tournament: t),
+        ]),
+      if (leagues.isNotEmpty)
+        group('Leagues', [
+          for (final t in leagues) TournamentTile(tournament: t),
+        ]),
+      if (teams.isNotEmpty)
+        group('Teams', [
+          for (final t in teams) _ResultTile(listing: t, vm: vm),
+        ]),
+      if (groups.isNotEmpty)
+        group(pickup ? 'Pickup' : 'Communities', [
+          for (final t in groups) _ResultTile(listing: t, vm: vm),
+        ]),
+      if (people.isNotEmpty)
+        group('Players', [for (final p in people) PlayerTile(profile: p)]),
+    ];
+  }
+}
+
+/// A tournament or league being played now, on a navy scoreboard card.
+/// No running scores yet: its name, host, place and divisions.
+class _LiveCard extends StatelessWidget {
+  const _LiveCard({required this.tournament});
+
+  final HostedTournament tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final t = tournament;
+    final divisions = t.divisions.map((d) => d.label).join(', ');
+    return FeatureCard(
+      padding: const EdgeInsets.all(16),
+      onTap: () => context.push(Routes.tournament(t.id, tab: 'schedule')),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!mobile)
-            const PageHeader(
-              eyebrow: 'Explore',
-              title: 'Find your next point.',
-              subtitle: 'Players, teams, communities and tournaments.',
+          BoardLabel(
+            [
+              if (t.type != HostedType.tournament) t.type.label,
+              t.hostName,
+              if (t.location.isNotEmpty) t.location,
+            ].join(' · ').toUpperCase(),
+            live: true,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            t.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: c.onFeature,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
             ),
-          SideColumnLayout(
-            main: [
-              _searchCard(context),
-              if (widget.explore case final x?) ...[
-                UpcomingTournamentsCard(viewModel: x),
-                RecentResultsCard(viewModel: x),
-              ],
-            ],
-            side: [
-              if (widget.explore case final x?)
-                RankingsPreviewCard(viewModel: x),
-              _Shortcuts(),
-            ],
-            narrow: [
-              _searchCard(context),
-              if (widget.explore case final x?) ...[
-                UpcomingTournamentsCard(viewModel: x),
-                RankingsPreviewCard(viewModel: x),
-                RecentResultsCard(viewModel: x),
-              ],
-              _Shortcuts(),
-            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            [hostedDates(t), if (divisions.isNotEmpty) divisions].join(' · '),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: c.onFeatureMuted, fontSize: 12.5),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _searchCard(BuildContext context) {
-    final c = AppColors.of(context);
+/// Every upcoming tournament and league (what "Find events" listed), with
+/// its status filter, and a way to host one when there are none. Live ones
+/// are under "Live now" unless the Live status is picked.
+class _ComingUp extends StatelessWidget {
+  const _ComingUp({required this.viewModel});
+
+  final HostedTournamentsViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = viewModel;
+    final list = [
+      for (final t in vm.tournaments)
+        if (vm.statusFilter == HostedStatus.live ||
+            t.status != HostedStatus.live)
+          t,
+    ];
     return SectionCard(
-      title: 'Search',
+      title: 'Coming up',
+      action: CardLink(
+        label: 'See all',
+        onTap: () => context.push(Routes.tournaments),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AppSearchField(
-            controller: _text,
-            hint: SearchField.hint,
-            onChanged: _onChanged,
-            onSubmitted: _search,
-          ),
-          const SizedBox(height: 10),
-          ListenableBuilder(
-            listenable: Listenable.merge([
-              vm,
-              vm.search,
-              players.search,
-              _text,
-              ?widget.explore,
-            ]),
-            builder: (context, _) {
-              final only = _only;
-              final all = only == null;
-              final teamsShown =
-                  all ||
-                  only == ExploreFilter.teams ||
-                  only == ExploreFilter.groups;
-              final playersShown = all || only == ExploreFilter.players;
-              final tournamentsShown = all || only == ExploreFilter.tournaments;
-              final queryReady =
-                  _text.text.trim().length >=
-                  TeamSearchViewModel.minQueryLength;
-
-              final results = teamsShown ? vm.results : const <TeamListing>[];
-              final people = playersShown
-                  ? players.results
-                  : const <PlayerProfile>[];
-              final events = tournamentsShown && queryReady
-                  ? widget.explore?.matching(_text.text) ?? const []
-                  : const <HostedTournament>[];
-
-              final running =
-                  (teamsShown && vm.search.running) ||
-                  (playersShown && players.search.running);
-              final failed = (teamsShown && vm.search.error)
-                  ? vm.search.result
-                  : (playersShown && players.search.error)
-                  ? players.search.result
-                  : null;
-              final nothing =
-                  results.isEmpty && people.isEmpty && events.isEmpty;
-              final noMatches =
-                  nothing &&
-                  !running &&
-                  queryReady &&
-                  (!teamsShown || vm.noMatches) &&
-                  (!playersShown || players.noMatches);
-              final sections = [
-                results.isNotEmpty,
-                people.isNotEmpty,
-                events.isNotEmpty,
-              ].where((x) => x).length;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _FilterChips(
-                    filters: [
-                      ('All', null),
-                      ('Players', ExploreFilter.players),
-                      ('Teams', ExploreFilter.teams),
-                      ('Communities', ExploreFilter.groups),
-                      if (widget.explore != null)
-                        ('Tournaments', ExploreFilter.tournaments),
-                    ],
-                    selected: _only,
-                    onSelect: (f) => setState(() => _applyFilter(f)),
-                  ),
-                  const SizedBox(height: 8),
-                  if (running && nothing)
-                    const SkeletonList(count: 4, padding: EdgeInsets.zero)
-                  else if (failed != null && nothing)
-                    ErrorView(error: failed)
-                  else if (noMatches)
-                    const EmptyView(
-                      icon: Icons.search_off,
-                      title: 'Nothing found',
-                      message:
-                          'Try another word from a name, username, city, '
-                          'school, team or tournament.',
-                    )
-                  else if (nothing)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                        'Type at least ${TeamSearchViewModel.minQueryLength} '
-                        'letters to search players, teams, communities and '
-                        'tournaments.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: c.muted),
-                      ),
-                    ),
-                  if (people.isNotEmpty) ...[
-                    if (sections > 1) const _ResultsHeading('Players'),
-                    for (final p in people) PlayerTile(profile: p),
-                  ],
-                  if (results.isNotEmpty) ...[
-                    if (sections > 1)
-                      const _ResultsHeading('Teams and communities'),
-                    for (final t in results) _ResultTile(listing: t, vm: vm),
-                  ],
-                  if (events.isNotEmpty) ...[
-                    if (sections > 1) const _ResultsHeading('Tournaments'),
-                    for (final t in events) TournamentTile(tournament: t),
-                  ],
-                ],
-              );
-            },
-          ),
+          if (!vm.loaded)
+            const SkeletonList(count: 3, padding: EdgeInsets.zero)
+          else if (vm.error != null)
+            ErrorView(error: vm.error)
+          else ...[
+            if (vm.filtersByStatus) HostedStatusFilterBar(viewModel: vm),
+            if (list.isEmpty && list.length < vm.tournaments.length)
+              Text(
+                'Nothing else coming up yet.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: AppColors.of(context).muted,
+                ),
+              )
+            else if (list.isEmpty)
+              EmptyView(
+                icon: Icons.emoji_events_outlined,
+                title: 'No upcoming events',
+                message:
+                    'Teams and communities host tournaments, hat '
+                    'tournaments and leagues. Start one with Host.',
+                action: FilledButton(
+                  onPressed: () => context.push(Routes.hostEvent),
+                  child: const Text('Host an event'),
+                ),
+              ),
+            for (final t in list) TournamentTile(tournament: t),
+          ],
         ],
       ),
     );
@@ -391,18 +604,6 @@ class _ResultTile extends StatelessWidget {
       onTap: () => context.go(Routes.team(t.id)),
     );
   }
-}
-
-class _ResultsHeading extends StatelessWidget {
-  const _ResultsHeading(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 10, bottom: 2),
-    child: Eyebrow(text),
-  );
 }
 
 /// A player in search results; opens their profile.

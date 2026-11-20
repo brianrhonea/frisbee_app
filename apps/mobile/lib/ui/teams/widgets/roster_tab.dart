@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/roster_player.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/status_views.dart';
 import '../view_models/team_detail_viewmodel.dart';
 import 'player_dialog.dart';
@@ -50,6 +52,7 @@ class RosterTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final roster = viewModel.visibleRoster;
     final canEdit = viewModel.canEdit;
     final showStatus = viewModel.canSeeRosterStatus;
@@ -93,43 +96,87 @@ class RosterTab extends StatelessWidget {
                 padding: EdgeInsets.all(24),
                 child: Center(child: Text('Everyone has paid.')),
               ),
-            for (final (i, p) in roster.indexed) ...[
-              if (i > 0) const Divider(height: 1),
-              ListTile(
-                leading: CircleAvatar(child: Text(p.number?.toString() ?? '–')),
-                title: Text(p.name),
-                subtitle: showStatus
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(p.position.label),
-                            _PaidBadge(
-                              paid: p.paid,
-                              onTap: canEdit
-                                  ? () => viewModel.togglePaid(p)
-                                  : null,
-                            ),
-                          ],
-                        ),
-                      )
-                    : Text(p.position.label),
-                onTap: canEdit ? () => _edit(context, p) : null,
-                trailing: canEdit
-                    ? IconButton(
-                        tooltip: 'Remove',
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _delete(context, p),
-                      )
-                    : null,
+            if (roster.isNotEmpty)
+              Card(
+                margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    for (final (i, p) in roster.indexed) ...[
+                      if (i > 0) Divider(height: 1, color: c.border),
+                      _row(
+                        context,
+                        p,
+                        canEdit: canEdit,
+                        showStatus: showStatus,
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ],
           ],
         ),
       ),
+    );
+  }
+
+  /// A player: jersey number on navy, name, position (and paid status).
+  Widget _row(
+    BuildContext context,
+    RosterPlayer p, {
+    required bool canEdit,
+    required bool showStatus,
+  }) {
+    final c = AppColors.of(context);
+    return ListTile(
+      contentPadding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+      leading: Container(
+        width: 38,
+        height: 38,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: c.feature,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: ScoreText(
+          p.number?.toString() ?? '–',
+          size: 21,
+          color: c.onFeature,
+        ),
+      ),
+      title: Text(
+        p.name,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 15,
+          color: c.ink,
+        ),
+      ),
+      subtitle: showStatus
+          ? Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(p.position.label),
+                  _PaidBadge(
+                    paid: p.paid,
+                    onTap: canEdit ? () => viewModel.togglePaid(p) : null,
+                  ),
+                ],
+              ),
+            )
+          : Text(p.position.label),
+      onTap: canEdit ? () => _edit(context, p) : null,
+      trailing: canEdit
+          ? IconButton(
+              tooltip: 'Remove',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => _delete(context, p),
+            )
+          : null,
     );
   }
 }

@@ -65,6 +65,16 @@ class MeetingDetailViewModel extends ChangeNotifier {
 
   MeetingRsvp? get myRsvp => _meeting?.rsvpOf(uid);
 
+  /// The team's name, for the meeting's header.
+  String? get teamName => _team?.name;
+
+  /// The user hasn't answered and the meeting hasn't happened yet.
+  bool get needsRsvp {
+    final m = _meeting;
+    if (m == null || m.isEnded || myRsvp != null) return false;
+    return (m.endsAt ?? m.startsAt).isAfter(DateTime.now());
+  }
+
   /// Whether the user waits for an admin before joining.
   bool get needsApproval => switch ((_meeting, _team)) {
     (final m?, final t?) => m.needsApproval(t, uid),

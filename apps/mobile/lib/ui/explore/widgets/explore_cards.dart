@@ -7,6 +7,7 @@ import '../../../domain/models/ranking.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/skeleton.dart';
 import '../../tournaments/widgets/hosted_status_badge.dart';
 import '../../tournaments/widgets/hosted_tournament_screen.dart'
@@ -55,7 +56,8 @@ class UpcomingTournamentsCard extends StatelessWidget {
   }
 }
 
-/// A tournament in Explore: dates, place and divisions, with its status.
+/// A tournament or league in Discover: dates, place, host, divisions,
+/// whether it's invite only and its fee, with its status.
 class TournamentTile extends StatelessWidget {
   const TournamentTile({super.key, required this.tournament});
 
@@ -72,21 +74,18 @@ class TournamentTile extends StatelessWidget {
     final divisions = t.divisions.map((d) => d.label).join(', ');
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: c.accentSoft,
-          borderRadius: BorderRadius.circular(controlRadius),
-        ),
-        child: Icon(Icons.emoji_events_outlined, size: 20, color: c.ink),
-      ),
+      // When it starts, as on the schedule's rows.
+      leading: DateBadge(date: t.startsOn, size: 40),
       title: Row(
         children: [
           Flexible(
             child: Text(
               t.name,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                color: c.ink,
+              ),
             ),
           ),
           if (t.hostOfficial) ...[
@@ -102,6 +101,9 @@ class TournamentTile extends StatelessWidget {
             if (t.type != HostedType.tournament) t.type.label,
             t.hostName,
             if (divisions.isNotEmpty) divisions,
+            if (t.visibility == TournamentVisibility.inviteOnly) 'Invite only',
+            if (t.bidFee case final f?)
+              '${f.label} ${t.takesPlayers ? 'to play' : 'bid'}',
           ].join(' · '),
         ].join('\n'),
         maxLines: 2,
@@ -364,13 +366,10 @@ class PlayerRankingRow extends StatelessWidget {
             children: [
               SizedBox(
                 width: 30,
-                child: Text(
+                child: ScoreText(
                   '${p.rank}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontFeatures: figures,
-                    color: p.rank <= 3 ? c.ink : c.muted,
-                  ),
+                  size: 20,
+                  color: p.rank <= 3 ? c.ink : c.muted,
                 ),
               ),
               PersonAvatar(name: p.name, photoUrl: p.photoUrl, radius: 14),
@@ -409,14 +408,10 @@ class PlayerRankingRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               SizedBox(
-                width: 36,
-                child: Text(
-                  '${p.rating}',
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: figures,
-                  ),
+                width: 40,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: ScoreText('${p.rating}', size: 20),
                 ),
               ),
             ],
@@ -486,15 +481,13 @@ class RankingRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
           child: Row(
             children: [
+              // Rank and rating in the score face.
               SizedBox(
                 width: 30,
-                child: Text(
+                child: ScoreText(
                   '${t.rank}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                    color: t.rank <= 3 ? c.ink : c.muted,
-                  ),
+                  size: 20,
+                  color: mine ? c.accentInk : (t.rank <= 3 ? c.ink : c.muted),
                 ),
               ),
               Expanded(
@@ -515,14 +508,10 @@ class RankingRow extends StatelessWidget {
                 ),
               ),
               SizedBox(
-                width: 52,
-                child: Text(
-                  '${t.rating}',
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
+                width: 56,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: ScoreText('${t.rating}', size: 20),
                 ),
               ),
             ],

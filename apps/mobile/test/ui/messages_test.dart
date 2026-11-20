@@ -824,8 +824,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('TEAM CHATS'), findsOneWidget);
-      expect(find.text('DIRECT MESSAGES'), findsOneWidget);
+      expect(find.text('Team chats'), findsOneWidget);
+      expect(find.text('Direct messages'), findsOneWidget);
       expect(
         tester.getTopLeft(find.text('Northside Flyers')).dy,
         lessThan(tester.getTopLeft(find.text('Avery Jones')).dy),
@@ -837,7 +837,7 @@ void main() {
       expect(find.text('room rides'), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.text('TEAM CHATS'), findsOneWidget);
+      expect(find.text('Team chats'), findsOneWidget);
     });
   });
 
@@ -888,7 +888,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text('Avery'), findsNothing);
-    await tester.tap(find.text('Requests (1)'));
+    await tester.tap(find.text('Requests'));
     await tester.pump();
     expect(find.text('Avery'), findsOneWidget);
   });

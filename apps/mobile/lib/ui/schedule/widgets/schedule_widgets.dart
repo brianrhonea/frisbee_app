@@ -3,10 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../domain/models/schedule_entry.dart';
+import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
 import '../../calendar/widgets/add_to_calendar.dart';
 import '../../core/themes/theme.dart';
-import 'event_style.dart';
+import '../../core/ui/scoreboard.dart' show TeamDot;
+import 'rsvp_widgets.dart';
 
 /// Team events and personal events each get one color on schedules, so the
 /// two are easy to tell apart at a glance; other calendars have their own.
@@ -16,158 +18,169 @@ Color scheduleColor(BuildContext context, ScheduleEntry entry) {
   return entry.isPersonal ? c.personal : c.team;
 }
 
-/// Small pill saying whose schedule an event is on: "PERSONAL", or the team
-/// ("TEAM", or its name when [showTeamName]).
-class ScheduleTag extends StatelessWidget {
-  const ScheduleTag({
-    super.key,
-    required this.entry,
-    this.showTeamName = false,
-  });
-
-  final ScheduleEntry entry;
-  final bool showTeamName;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = scheduleColor(context, entry);
-    final team = entry.team;
-    final label = switch ((entry.calendar, team)) {
-      (final cal?, _) => cal.name.toUpperCase(),
-      (_, null) => 'PERSONAL',
-      (_, final t?) => showTeamName ? t.name.toUpperCase() : 'TEAM',
+/// Whose schedule an entry is on, for its meta line: the team's name,
+/// the calendar's, or "Personal".
+String scheduleOwner(ScheduleEntry entry) =>
+    switch ((entry.calendar, entry.team)) {
+      (final cal?, _) => cal.name,
+      (_, final t?) => t.name,
+      _ => 'Personal',
     };
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 120),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.6,
-          color: color,
-        ),
-      ),
-    );
-  }
-}
 
-/// "● Team  ● Personal" key for schedule colors.
-class ScheduleLegend extends StatelessWidget {
-  const ScheduleLegend({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = AppColors.of(context);
-    Widget item(Color color, String label) => Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 5),
-        Text(label, style: TextStyle(fontSize: 12, color: c.muted)),
-      ],
-    );
-    return Wrap(
-      spacing: 14,
-      children: [item(c.team, 'Team'), item(c.personal, 'Personal')],
-    );
-  }
-}
-
-/// One event on a schedule: type icon tinted by schedule, title, time and
-/// a team/personal tag. Opens the event over the current screen.
+/// One event on a schedule: its time on the left, then the title on a
+/// line of its own over a meta line (a dot in the schedule's colour, whose
+/// schedule it is and where), then the user's RSVP. An unanswered team
+/// event is tinted amber with "Needs RSVP". Opens the event.
 class ScheduleEventRow extends StatelessWidget {
   const ScheduleEventRow({
     super.key,
     required this.entry,
-    this.showTeamName = false,
     this.showDay = true,
     this.large = false,
+    this.rsvp,
+    this.needsRsvp = false,
     this.onCalendarChanged,
   });
 
   final ScheduleEntry entry;
-  final bool showTeamName;
 
   /// After an event on another calendar was edited from its sheet (those
   /// aren't live), e.g. to reload the schedule.
   final VoidCallback? onCalendarChanged;
 
-  /// Prefix the time with the weekday, for lists that span several days.
+  /// Prefix the place with the weekday, for lists that span several days.
   final bool showDay;
 
   /// Roomier layout with the location, for the Schedule tab.
   final bool large;
 
+  /// The user's answer, for team events and meetings.
+  final RsvpStatus? rsvp;
+
+  /// Unanswered and still ahead: marked as the user's to do.
+  final bool needsRsvp;
+
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final e = entry.event;
-    final color = scheduleColor(context, entry);
-    final tile = large ? 44.0 : 36.0;
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => entry.isOnCalendar
-          ? showCalendarEventSheet(context, entry, onChanged: onCalendarChanged)
-          : context.push(Routes.scheduleEvent(entry)),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 6, vertical: large ? 10 : 8),
-        child: Row(
-          children: [
-            Container(
-              width: tile,
-              height: tile,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(e.type.icon, size: large ? 22 : 20, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    e.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: large ? 15 : 14,
-                      color: c.ink,
+    final time = DateFormat.jm();
+    final end = e.endsAt;
+    final meta = [
+      if (showDay) DateFormat.E().format(e.startsAt),
+      if (large && e.location.isNotEmpty) e.location,
+    ].join(' · ');
+    final metaStyle = TextStyle(fontSize: 12, color: c.muted);
+    final todo = needsRsvp && rsvp == null;
+    return Material(
+      color: todo ? c.highlightSoft : Colors.transparent,
+      child: InkWell(
+        onTap: () => entry.isOnCalendar
+            ? showCalendarEventSheet(
+                context,
+                entry,
+                onChanged: onCalendarChanged,
+              )
+            : context.push(Routes.scheduleEvent(entry)),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: large ? 12 : 10,
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 62,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      time.format(e.startsAt),
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: c.ink,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    [
-                      if (showDay) DateFormat.E().format(e.startsAt),
-                      eventTimeRange(e),
-                      if (large && e.location.isNotEmpty) e.location,
-                    ].join(' · '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: c.muted),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      switch (end) {
+                        null => e.type.label,
+                        _ when DateUtils.isSameDay(e.startsAt, end) =>
+                          time.format(end),
+                        // Ends another day (overnight or multi-day).
+                        _ => '– ${DateFormat.MMMd().format(end)}',
+                      },
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: metaStyle,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            ScheduleTag(entry: entry, showTeamName: showTeamName),
-            Icon(Icons.chevron_right, size: 20, color: c.muted),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      e.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: large ? 15 : 14,
+                        color: c.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    // Whose it is gets most of the line; the place what's
+                    // left.
+                    LayoutBuilder(
+                      builder: (context, box) => Row(
+                        children: [
+                          TeamDot(color: scheduleColor(context, entry)),
+                          const SizedBox(width: 6),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: meta.isEmpty
+                                  ? box.maxWidth - 14
+                                  : (box.maxWidth - 14) * 0.7,
+                            ),
+                            child: Text(
+                              scheduleOwner(entry),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: metaStyle,
+                            ),
+                          ),
+                          if (meta.isNotEmpty)
+                            Expanded(
+                              child: Text(
+                                ' · $meta',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: metaStyle,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (rsvp != null || todo) ...[
+                const SizedBox(width: 8),
+                RsvpStatusPill(
+                  status: rsvp,
+                  type: e.type,
+                  needsRsvp: todo,
+                  strong: true,
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -175,8 +188,8 @@ class ScheduleEventRow extends StatelessWidget {
 }
 
 /// One day of a week strip: weekday, date, and up to three dots in the
-/// schedule colors of that day's events. Today is outlined; the [selected]
-/// day is filled.
+/// schedule colours of that day's events. Today is filled turf; the
+/// [selected] day (where a new event goes) is soft turf.
 class WeekDayCell extends StatelessWidget {
   const WeekDayCell({
     super.key,
@@ -198,66 +211,68 @@ class WeekDayCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final size = large ? 40.0 : 32.0;
-    final dot = large ? 7.0 : 6.0;
+    final dot = large ? 6.0 : 5.0;
     final weekday = DateFormat.E().format(day);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          children: [
-            Text(
-              large ? weekday.toUpperCase() : weekday.substring(0, 1),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.8,
-                color: isToday || selected ? c.accent : c.muted,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              width: size,
-              height: size,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: selected ? c.accent : null,
-                shape: BoxShape.circle,
-                border: isToday && !selected
-                    ? Border.all(color: c.accent, width: 2)
-                    : null,
-              ),
-              child: Text(
-                '${day.day}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: large ? 16 : 14,
-                  color: selected ? c.onAccent : c.ink,
+    final fill = isToday ? c.accent : (selected ? c.accentSoft : null);
+    final label = isToday ? c.onAccent : (selected ? c.accentInk : c.muted);
+    final number = isToday ? c.onAccent : (selected ? c.accentInk : c.ink);
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Material(
+        color: fill ?? Colors.transparent,
+        borderRadius: BorderRadius.circular(controlRadius),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(controlRadius),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              children: [
+                Text(
+                  large ? weekday.toUpperCase() : weekday.substring(0, 1),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isToday ? FontWeight.w700 : FontWeight.w600,
+                    letterSpacing: 0.4,
+                    color: label,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  '${day.day}',
+                  style: TextStyle(
+                    fontFamily: scoreFont,
+                    fontWeight: FontWeight.w800,
+                    fontSize: large ? 20 : 17,
+                    height: 1.1,
+                    color: number,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                SizedBox(
+                  height: dot,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      for (final e in entries.take(3))
+                        Container(
+                          width: dot,
+                          height: dot,
+                          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                          decoration: BoxDecoration(
+                            color: isToday
+                                ? c.onAccent
+                                : scheduleColor(context, e),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            SizedBox(
-              height: dot,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (final e in entries.take(3))
-                    Container(
-                      width: dot,
-                      height: dot,
-                      margin: const EdgeInsets.symmetric(horizontal: 1),
-                      decoration: BoxDecoration(
-                        color: scheduleColor(context, e),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -321,7 +336,7 @@ Future<void> showCalendarEventSheet(
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    Icon(Icons.circle, size: 10, color: cal.color.color),
+                    TeamDot(color: cal.color.color, size: 10),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(

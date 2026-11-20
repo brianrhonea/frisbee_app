@@ -50,7 +50,7 @@ class PlayDiagram extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _FieldFrame(
     builder: (size, horizontal) => ClipRRect(
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(8),
       child: CustomPaint(
         size: size,
         painter: FieldPainter(
@@ -192,7 +192,7 @@ class _PlayCanvasState extends State<PlayCanvas> {
                 onPanEnd: (_) => _onPanEnd(g),
                 onPanCancel: () => _onPanEnd(g),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   child: CustomPaint(
                     size: size,
                     painter: FieldPainter(

@@ -99,6 +99,26 @@ Branch: `feature/redesign` (from `feature/team-first`).
 | F19 | Visitors search Discover without signing up | web | product decision |
 | F20 | Clinic event type (shown as "Soon") | host chooser | later |
 
+| F21 | New teams start simple: sections off by default, role presets, one Host button (team-first item 6) | teams | shared + API + rules |
+| F22 | Team header: compact (actions row in header, no tall banner) | team page | app + web |
+| F23 | Roster: role on rows, O/D line grouping, "Edit lines", invites pending | roster | data model |
+| F24 | Posts: pinned posts, comment counts, inline "Post to the team" box | feed | API |
+| F25 | Roles: preset list + per-person permission switches | roles | rules |
+| F26 | Team join requests (communities have them today; teams don't) | teams | API + rules |
+| F27 | Community page: RSVP on the next pickup card, chat + organizers sections | community | app + web |
+| F28 | More: row subtitles, Manage group, Leave button | team More | app + web |
+
+| F29 | App Discover lists public team events (pickup games) via `/v1/public/events`, as the web does | discover | app |
+| F30 | Tournament extras: standalone bracket page, stepper score entry, week stepper for leagues, full-screen enter-a-team, form wizard with Save draft / Publish, Share | tournaments | app + web |
+
+| F31 | Playbook whiteboard mode: a switch on the playbook page between Plays and Whiteboard. Whiteboard = a blank field to sketch freely (pen, colours, players/disc/cones, eraser, undo, clear), for chalk talks; can be saved as a play (or as a whiteboard) or thrown away | playbook | app + web (+ data if saved) |
+
+Web parity follow-ups from the app restyle (do in W4 or sooner):
+- Live tournament days open on the Schedule tab (app 3a).
+- Host checklist title "Next steps"; host chooser "What are you hosting?" /
+  "Host as", order Tournament · League · Hat; Teams tab "Accept
+  applications above"; publish card shows games as a stat.
+
 Decisions (user, 2026-11-19):
 - Parity: each navigation change and new feature ships on app and web
   together; the restyle itself goes app first.
@@ -120,3 +140,26 @@ USA Ultimate membership.
 Restyle subtasks are per platform (each keeps its own design). Subtask 2
 and every F-slice include the website. The web restyle follows once the
 app restyle is done.
+
+## Waiting for you (decisions collected overnight)
+
+1. **Form error colour.** The playbook/video restyle (3g) turned the video
+   editor's link/file warnings and the >90% storage bar amber ("yours to
+   fix") instead of the theme's red. Every other form still shows field
+   errors in red. Pick one for the whole app: red for errors (red then
+   means "live" or "error"), or amber for anything you need to fix.
+   Same question for destructive confirm buttons (`confirmDialog(destructive:
+   true)`: delete post, clear notifications, discard workout), which are
+   are now solid ink (dark) instead of red, and event-type colours are turf
+   (field time) or neutral (other). Until decided: left as 3g did it.
+2. **Play diagram colours.** 3g changed defence players from red to navy
+   (so diagrams don't use the live red) and nudged offence blue and the
+   cone orange. Kept; say if you want the old red/blue.
+3. **App vs web: public pickup games.** The website's Discover lists
+   public team events (pickup games) from `/v1/public/events`; the app's
+   doesn't (F29 adds it to the app).
+
+4. **Team colours.** Team badges now show initials coloured by kind (team
+   blue, pickup community turf, school/club navy). The mockups give each
+   team its own colour, which needs a team colour field (owners pick one).
+   Add it? (backlog F32)

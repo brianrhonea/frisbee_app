@@ -303,7 +303,7 @@ void main() {
         expect(group, isNot(contains(s)));
       }
       expect(find.text('You: Member'), findsWidgets);
-      expect(find.textContaining('2 members · '), findsOneWidget);
+      expect(find.textContaining(' · 2 members'), findsOneWidget);
     });
 
     testWidgets('approval groups show Ask to join, then pending', (

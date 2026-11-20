@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/themes/theme.dart';
+
 typedef PullResult = ({String playerId, Duration hangTime, bool outOfBounds});
 
 /// Times a pull: pick the puller, start on release, stop when it's caught
@@ -92,6 +94,7 @@ class _PullTimerState extends State<_PullTimer> {
               child: Text(
                 '${seconds.toStringAsFixed(1)} s',
                 style: theme.textTheme.displayMedium?.copyWith(
+                  fontFamily: scoreFont,
                   fontWeight: FontWeight.w800,
                   fontFeatures: const [FontFeature.tabularFigures()],
                   color: running ? scheme.primary : null,
@@ -118,7 +121,6 @@ class _PullTimerState extends State<_PullTimer> {
                     child: FilledButton(
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(56),
-                        backgroundColor: Colors.green.shade600,
                       ),
                       onPressed: () => _finish(outOfBounds: false),
                       child: const Text(
@@ -129,11 +131,9 @@ class _PullTimerState extends State<_PullTimer> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(56),
-                        backgroundColor: scheme.error,
-                        foregroundColor: scheme.onError,
                       ),
                       onPressed: () => _finish(outOfBounds: true),
                       child: const Text(

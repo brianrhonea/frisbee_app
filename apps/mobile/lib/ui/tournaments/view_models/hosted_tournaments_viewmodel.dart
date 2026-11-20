@@ -72,6 +72,7 @@ class HostedTournamentsViewModel extends ChangeNotifier {
   String _query = '';
   HostedStatus? _status;
   HostedType? _type;
+  Set<HostedType>? _kinds;
 
   bool get loaded => _loaded || _error != null;
   Object? get error => _error;
@@ -81,16 +82,22 @@ class HostedTournamentsViewModel extends ChangeNotifier {
   /// The kind of event [tournaments] is narrowed to; null for all.
   HostedType? get typeFilter => _type;
 
+  /// The kinds of event Discover's filter keeps (Tournaments: tournaments
+  /// and hat tournaments; Leagues: leagues); null for every kind.
+  Set<HostedType>? get kindsFilter => _kinds;
+
+  void setKindsFilter(Set<HostedType>? kinds) {
+    _kinds = kinds;
+    notifyListeners();
+  }
+
   /// How many events of each kind there are, only for kinds some are.
   Map<HostedType, int> get typeCounts {
     final counts = <HostedType, int>{};
     for (final t in _list) {
       counts[t.type] = (counts[t.type] ?? 0) + 1;
     }
-    return {
-      for (final e in HostedType.values)
-        e: ?counts[e],
-    };
+    return {for (final e in HostedType.values) e: ?counts[e]};
   }
 
   /// Whether there's more than one kind to filter by.
@@ -111,10 +118,7 @@ class HostedTournamentsViewModel extends ChangeNotifier {
     for (final t in _matching) {
       counts[t.status] = (counts[t.status] ?? 0) + 1;
     }
-    return {
-      for (final s in HostedStatus.values)
-        s: ?counts[s],
-    };
+    return {for (final s in HostedStatus.values) s: ?counts[s]};
   }
 
   /// Whether there's more than one status to filter by.
@@ -131,6 +135,10 @@ class HostedTournamentsViewModel extends ChangeNotifier {
     ];
   }
 
+  /// Matching [query] (and the kinds filter), whatever their status:
+  /// Discover's search results.
+  List<HostedTournament> get matches => _matching;
+
   /// Matching [query] only.
   List<HostedTournament> get _matching {
     final q = _query.trim().toLowerCase();
@@ -138,6 +146,7 @@ class HostedTournamentsViewModel extends ChangeNotifier {
     return [
       for (final t in _list)
         if ((type == null || t.type == type) &&
+            (_kinds?.contains(t.type) ?? true) &&
             (q.isEmpty ||
                 '${t.name} ${t.hostName} ${t.location} ${t.type.label}'
                     .toLowerCase()

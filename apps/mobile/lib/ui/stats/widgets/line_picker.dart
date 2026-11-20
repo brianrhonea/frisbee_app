@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../domain/models/roster_player.dart';
 import '../../../domain/models/stats.dart';
+import '../../core/themes/theme.dart';
 import 'player_chooser.dart';
 
 typedef LineChoice = ({List<String> players, String? saveAs, Side? side});
@@ -91,7 +92,7 @@ class _LinePickerState extends State<_LinePicker> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = AppColors.of(context);
     final full = _picked.length == StatLine.size;
     return DraggableScrollableSheet(
       expand: false,
@@ -124,7 +125,8 @@ class _LinePickerState extends State<_LinePicker> {
                   Text('Saved lines', style: theme.textTheme.titleSmall),
                   const SizedBox(height: 8),
                   for (final l in widget.saved)
-                    Card.outlined(
+                    Card(
+                      margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
                         leading: const Icon(Icons.groups_outlined),
                         title: Text(l.name),
@@ -170,7 +172,8 @@ class _LinePickerState extends State<_LinePicker> {
                     Text(
                       '${_picked.length}/${StatLine.size}',
                       style: theme.textTheme.titleMedium?.copyWith(
-                        color: full ? Colors.green.shade600 : scheme.primary,
+                        fontFamily: scoreFont,
+                        color: full ? c.accent : c.muted,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

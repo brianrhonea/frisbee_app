@@ -91,6 +91,10 @@ class EventDetailViewModel extends ChangeNotifier {
   Object? get error => _error;
 
   String get uid => _auth.currentUser?.uid ?? '';
+
+  /// The team's name, for the event's header (null until it loads).
+  String? get teamName => _team?.name;
+
   bool get canEdit => _team?.has(uid, TeamPermission.manageEvents) ?? false;
 
   /// Group organizers turn a Tournament event into a bracket.
@@ -108,6 +112,13 @@ class EventDetailViewModel extends ChangeNotifier {
   late final Command0<void> deleteEvent;
 
   RsvpStatus? get myRsvp => _event?.rsvpOf(uid);
+
+  /// The user hasn't answered and the event hasn't happened yet.
+  bool get needsRsvp {
+    final e = _event;
+    if (e == null || myRsvp != null) return false;
+    return (e.endsAt ?? e.startsAt).isAfter(DateTime.now());
+  }
 
   /// Only members going may react or vote.
   bool get canRespond => myRsvp == RsvpStatus.going;

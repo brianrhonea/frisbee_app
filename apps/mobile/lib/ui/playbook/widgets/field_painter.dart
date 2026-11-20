@@ -110,8 +110,9 @@ class FieldPainter extends CustomPainter {
   );
 
   static Color _trailColor(ElementKind kind) => switch (kind) {
-    ElementKind.offense => const Color(0xFF90CAF9),
-    ElementKind.defense => const Color(0xFFEF9A9A),
+    // Lighter tints of the players' fills, so trails read on the grass.
+    ElementKind.offense => Color.lerp(FieldColors.offense, Colors.white, 0.55)!,
+    ElementKind.defense => Color.lerp(FieldColors.defense, Colors.white, 0.6)!,
     ElementKind.disc => FieldColors.throwLine,
     ElementKind.cone => FieldColors.cone,
   };
@@ -260,9 +261,10 @@ class FieldPainter extends CustomPainter {
       text: TextSpan(
         text: label,
         style: TextStyle(
+          fontFamily: appFont,
           color: Colors.white,
           fontSize: r * 1.0,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w800,
         ),
       ),
       textDirection: TextDirection.ltr,

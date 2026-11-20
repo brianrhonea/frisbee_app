@@ -29,6 +29,7 @@ import '../view_models/team_home_viewmodel.dart';
 import 'invite_members_dialog.dart';
 import 'join_team_dialog.dart';
 import 'team_form.dart';
+import 'team_initials.dart';
 import 'team_post_widgets.dart';
 import 'team_community_sheet.dart';
 import 'team_section_screen.dart';
@@ -61,9 +62,15 @@ class TeamHomeScreen extends StatefulWidget {
     required this.viewModel,
     this.section,
     this.more = false,
+    this.inTeamsTab = false,
   });
 
   final TeamHomeViewModel viewModel;
+
+  /// Opened in the Teams tab (`/teams/{id}`), where back is "All teams":
+  /// the list of the user's teams. Elsewhere (over a tournament) back
+  /// returns to the page below.
+  final bool inTeamsTab;
 
   /// The open section; null for the feed (the overview) or More.
   final TeamSection? section;
@@ -353,7 +360,9 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       ]),
       builder: (context, _) {
         final mobile = ScreenSize.of(context).isMobile;
-        final leading = backOr(context, Routes.teams);
+        final leading = widget.inTeamsTab
+            ? const _AllTeamsButton()
+            : backOr(context, Routes.teams);
         final summary = vm.summary;
         if (!vm.loaded || summary == null) {
           return Scaffold(
@@ -431,7 +440,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           );
         }
         return Scaffold(
-          appBar: appBar,
+          // The hero below has the name.
+          appBar: mobile ? AppBar(leading: leading, actions: [?menu]) : null,
           floatingActionButton: mobile && vm.canPost
               ? FloatingActionButton.extended(
                   onPressed: vm.savePost.running ? null : _editPost,
@@ -591,11 +601,13 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
               delegate: _TeamHeaderDelegate(
                 topPadding: MediaQuery.paddingOf(context).top,
                 summary: summary,
-                founded: team.createdAt?.year,
+                meta: _metaLine(vm, summary),
                 colors: AppColors.of(context),
-                surface: Theme.of(context).colorScheme.surface,
-                leading: backOr(context, Routes.teams) ?? const BackButton(),
+                leading: widget.inTeamsTab
+                    ? const _AllTeamsButton()
+                    : backOr(context, Routes.teams) ?? const BackButton(),
                 menu: menu,
+                actions: _headerActions(context, vm, summary),
                 tabs: _TeamTabs(
                   teamId: vm.teamId,
                   kind: summary.kind,
@@ -1049,7 +1061,8 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
   }
 }
 
-/// The banner, name, actions and section tabs at the top of the page.
+/// The badge, name, what it is, actions and section tabs at the top of the
+/// page (an outsider's phone view, and wide screens).
 class _Hero extends StatelessWidget {
   const _Hero({
     required this.viewModel,
@@ -1069,160 +1082,120 @@ class _Hero extends StatelessWidget {
     final vm = viewModel;
     final mobile = ScreenSize.of(context).isMobile;
     final teamId = vm.teamId;
-    final founded = vm.team?.createdAt?.year;
-    final banner = [
-      if (summary.city.isNotEmpty) summary.city,
-      if (summary.isOrganization)
-        'school or club'
-      else if (summary.isCommunity)
-        'pickup community'
-      else
-        '${summary.division.label} ${summary.level.label}',
-    ].join(' ').toUpperCase();
-    final count = vm.memberCount;
     final follow = _followOf(vm);
     final actions = <Widget>[
       ..._teamActions(context, vm, summary, follow: mobile ? null : follow),
       ?menu,
     ];
     return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: mobile ? 120 : 170,
-            child: CustomPaint(
-              painter: _BannerPainter(
-                base: c.feature,
-                accent: c.highlight,
-                light: c.featureHighlight,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Tag(banner, strong: true),
-                    const Spacer(),
-                    if (founded != null)
-                      Text(
-                        'EST. $founded',
-                        style: TextStyle(
-                          color: c.onFeature,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(mobile ? 14 : 20, 16, 14, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(mobile ? 16 : 20, 16, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 16,
+              runSpacing: 12,
               children: [
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 16,
-                  runSpacing: 12,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TeamBadge(
-                          size: mobile ? 48 : 58,
-                          community: summary.isCommunity,
-                        ),
-                        const SizedBox(width: 14),
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: mobile ? 240 : 420,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                summary.name,
-                                style: TextStyle(
-                                  fontSize: mobile ? 22 : 28,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.9,
-                                  height: 1.1,
-                                  color: c.ink,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                summary.subtitle,
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: c.muted,
-                                ),
-                              ),
-                              if (summary.official) ...[
-                                const SizedBox(height: 6),
-                                const OfficialBadge(
-                                  label: 'Official organizer',
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
+                    TeamInitials(
+                      name: summary.name,
+                      kind: summary.kind,
+                      size: mobile ? 64 : 72,
                     ),
-                    if (actions.isNotEmpty && !mobile)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
+                    const SizedBox(width: 14),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: mobile ? 240 : 420),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          for (var i = 0; i < actions.length; i++) ...[
-                            if (i > 0) const SizedBox(width: 8),
-                            actions[i],
+                          Text(
+                            summary.name,
+                            style: TextStyle(
+                              fontSize: mobile ? 22 : 28,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.4,
+                              height: 1.15,
+                              color: c.ink,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            _metaLine(vm, summary),
+                            style: TextStyle(fontSize: 13, color: c.muted),
+                          ),
+                          if (summary.official) ...[
+                            const SizedBox(height: 6),
+                            const OfficialBadge(label: 'Official organizer'),
                           ],
                         ],
                       ),
+                    ),
                   ],
                 ),
-                // Phones put the buttons below the name, side by side,
-                // with Follow on its own line.
-                if (follow != null && mobile) ...[
-                  const SizedBox(height: 14),
-                  Align(alignment: Alignment.centerLeft, child: follow),
-                ],
-                if (actions.isNotEmpty && mobile) ...[
-                  const SizedBox(height: 14),
+                if (actions.isNotEmpty && !mobile)
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       for (var i = 0; i < actions.length; i++) ...[
                         if (i > 0) const SizedBox(width: 8),
-                        Expanded(child: actions[i]),
+                        actions[i],
                       ],
                     ],
                   ),
-                ],
-                const SizedBox(height: 12),
-                _CountLine(viewModel: vm, summary: summary, count: count),
-                const SizedBox(height: 6),
-                if (vm.isMember)
-                  _TeamTabs(
-                    teamId: teamId,
-                    kind: summary.kind,
-                    league: vm.team?.isLeagueTeam ?? false,
-                    tournamentsTab: vm.tournamentsTab,
-                    selected: TeamTab.feed,
-                  )
-                else
-                  const SizedBox(height: 8),
               ],
             ),
-          ),
-        ],
+            // Phones put the buttons below the name, side by side,
+            // with Follow on its own line.
+            if (follow != null && mobile) ...[
+              const SizedBox(height: 14),
+              Align(alignment: Alignment.centerLeft, child: follow),
+            ],
+            if (actions.isNotEmpty && mobile) ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  for (var i = 0; i < actions.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 8),
+                    Expanded(child: actions[i]),
+                  ],
+                ],
+              ),
+            ],
+            if (vm.isMember) ...[
+              const SizedBox(height: 12),
+              _CountLine(viewModel: vm, summary: summary),
+              const SizedBox(height: 6),
+              _TeamTabs(
+                teamId: teamId,
+                kind: summary.kind,
+                league: vm.team?.isLeagueTeam ?? false,
+                tournamentsTab: vm.tournamentsTab,
+                selected: TeamTab.feed,
+              ),
+            ] else
+              const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// What the team is, where, how many are on it and when it started, e.g.
+/// "Mixed · Club · Denver · 24 members · Est. 2019".
+String _metaLine(TeamHomeViewModel vm, TeamListing summary) {
+  final count = vm.memberCount;
+  final founded = vm.team?.createdAt?.year;
+  return [
+    if (summary.subtitle.isNotEmpty) summary.subtitle,
+    if (vm.team != null) '$count ${count == 1 ? 'member' : 'members'}',
+    if (founded != null) 'Est. $founded',
+  ].join(' · ');
 }
 
 FollowControl? _followOf(TeamHomeViewModel vm) => switch (vm.follow) {
@@ -1230,28 +1203,25 @@ FollowControl? _followOf(TeamHomeViewModel vm) => switch (vm.follow) {
   null => null,
 };
 
-/// The buttons under the team's name: its community, [follow], Message and
-/// Invite (with a badge counting join requests).
-List<Widget> _teamActions(
+/// The team's community, as a chip that opens it.
+Widget? _communityChip(BuildContext context, TeamHomeViewModel vm) =>
+    switch (vm.team) {
+      final team? when team.inCommunity => ActionChip(
+        avatar: const Icon(Icons.account_balance_outlined, size: 18),
+        label: Text(team.orgName.isEmpty ? 'Community' : team.orgName),
+        tooltip: 'Open the community',
+        onPressed: () => context.push(Routes.team(team.orgId!)),
+      ),
+      _ => null,
+    };
+
+/// Invite (turf, with a badge counting join requests) and Message
+/// (outlined): the phone header's row.
+List<Widget> _headerActions(
   BuildContext context,
   TeamHomeViewModel vm,
-  TeamListing summary, {
-  Widget? follow,
-}) => [
-  if (vm.team case final team? when team.inCommunity)
-    ActionChip(
-      avatar: const Icon(Icons.account_balance_outlined, size: 18),
-      label: Text(team.orgName.isEmpty ? 'Community' : team.orgName),
-      tooltip: 'Open the community',
-      onPressed: () => context.push(Routes.team(team.orgId!)),
-    ),
-  ?follow,
-  if (vm.isMember)
-    OutlinedButton.icon(
-      onPressed: () => goWithinTeam(context, TeamSection.chat.route(vm.teamId)),
-      icon: const Icon(Icons.chat_bubble_outline, size: 17),
-      label: const Text('Message'),
-    ),
+  TeamListing summary,
+) => [
   if (vm.team case final team? when vm.canManageMembers)
     FilledButton.icon(
       onPressed: () => showInviteMembers(context, team),
@@ -1267,33 +1237,43 @@ List<Widget> _teamActions(
       ),
       label: Text(summary.isCommunity ? 'Invite members' : 'Invite players'),
     ),
+  if (vm.isMember)
+    OutlinedButton.icon(
+      onPressed: () => goWithinTeam(context, TeamSection.chat.route(vm.teamId)),
+      icon: const Icon(Icons.chat_bubble_outline, size: 17),
+      label: const Text('Message'),
+    ),
 ];
 
-/// How many members and upcoming events, and the user's role.
+/// The buttons under the team's name: its community, [follow], Invite and
+/// Message.
+List<Widget> _teamActions(
+  BuildContext context,
+  TeamHomeViewModel vm,
+  TeamListing summary, {
+  Widget? follow,
+}) => [
+  ?_communityChip(context, vm),
+  ?follow,
+  ..._headerActions(context, vm, summary),
+];
+
+/// How many upcoming events, and the user's role.
 class _CountLine extends StatelessWidget {
-  const _CountLine({
-    required this.viewModel,
-    required this.summary,
-    required this.count,
-  });
+  const _CountLine({required this.viewModel, required this.summary});
 
   final TeamHomeViewModel viewModel;
   final TeamListing summary;
-  final int count;
 
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
+    final upcoming = vm.upcomingEvents.length;
     return Row(
       children: [
         Expanded(
           child: Text(
-            vm.isMember
-                ? '$count ${count == 1 ? 'member' : 'members'}'
-                      ' · ${vm.upcomingEvents.length} upcoming'
-                : summary.isCommunity
-                ? 'Pickup community'
-                : 'Team',
+            '$upcoming upcoming',
             style: TextStyle(fontSize: 12, color: AppColors.of(context).muted),
           ),
         ),
@@ -1304,8 +1284,8 @@ class _CountLine extends StatelessWidget {
   }
 }
 
-/// The top of a phone's feed under the collapsing header: Follow, the
-/// action buttons, and the member count.
+/// The top of a phone's feed under the header: the team's community,
+/// Follow, and what's coming up.
 class _HeroDetails extends StatelessWidget {
   const _HeroDetails({required this.viewModel, required this.summary});
 
@@ -1316,210 +1296,173 @@ class _HeroDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = viewModel;
     final follow = _followOf(vm);
-    final actions = _teamActions(context, vm, summary);
+    final chip = _communityChip(context, vm);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (follow != null) ...[
-          Align(alignment: Alignment.centerLeft, child: follow),
-          const SizedBox(height: 12),
-        ],
-        if (actions.isNotEmpty) ...[
-          Row(
-            children: [
-              for (var i = 0; i < actions.length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                Expanded(child: actions[i]),
-              ],
-            ],
+        if (chip != null || follow != null) ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [?chip, ?follow],
           ),
           const SizedBox(height: 12),
         ],
-        _CountLine(viewModel: vm, summary: summary, count: vm.memberCount),
+        _CountLine(viewModel: vm, summary: summary),
       ],
     );
   }
 }
 
-/// A phone's team header. Open, it's the banner with the badge, name and
-/// subtitle below; scrolled (or on a tab other than the feed) it shrinks
-/// into a bar with back, a small badge, the name and the menu. The tabs
-/// stay pinned at its foot.
+/// Back to the Teams tab's list of the user's teams. With one team the
+/// tab opens it straight away, so this is the way to the list.
+class _AllTeamsButton extends StatelessWidget {
+  const _AllTeamsButton();
+
+  static const label = 'All teams';
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: label,
+    icon: const BackButtonIcon(),
+    onPressed: () => GoRouter.of(context).canPop()
+        ? Navigator.maybePop(context)
+        : context.go(Routes.teams),
+  );
+}
+
+/// A phone's team header: back, the badge, name and what the team is, and
+/// the menu; then Invite and Message; then the tabs. Scrolled (or on a tab
+/// other than the feed) the buttons fold away under the name, and the name
+/// and tabs stay pinned.
 class _TeamHeaderDelegate extends SliverPersistentHeaderDelegate {
   _TeamHeaderDelegate({
     required this.topPadding,
     required this.summary,
-    required this.founded,
+    required this.meta,
     required this.colors,
-    required this.surface,
     required this.leading,
     required this.menu,
+    required this.actions,
     required this.tabs,
   });
 
-  static const _bar = 56.0;
-  static const _banner = 120.0;
-  static const _identity = 76.0;
+  static const _identity = 64.0;
+  static const _actions = 52.0;
   static const _tabs = 44.0;
 
   final double topPadding;
   final TeamListing summary;
-  final int? founded;
+
+  /// E.g. "Mixed · Club · Denver · 24 members · Est. 2019".
+  final String meta;
   final AppColors colors;
-  final Color surface;
   final Widget leading;
   final Widget? menu;
+
+  /// Invite and Message; nothing folds when there are none.
+  final List<Widget> actions;
   final Widget tabs;
 
-  @override
-  double get minExtent => topPadding + _bar + _tabs;
+  double get _actionsHeight => actions.isEmpty ? 0 : _actions;
 
   @override
-  double get maxExtent => topPadding + _banner + _identity + _tabs;
+  double get minExtent => topPadding + _identity + _tabs;
+
+  @override
+  double get maxExtent => minExtent + _actionsHeight;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlaps) {
     final c = colors;
-    final t = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
-    final iconColor = Color.lerp(c.onFeature, c.ink, t)!;
-    final banner = [
-      if (summary.city.isNotEmpty) summary.city,
-      if (summary.isOrganization)
-        'school or club'
-      else if (summary.isCommunity)
-        'pickup community'
-      else
-        '${summary.division.label} ${summary.level.label}',
-    ].join(' ').toUpperCase();
+    final fold = _actionsHeight == 0
+        ? 1.0
+        : (shrinkOffset / _actionsHeight).clamp(0.0, 1.0);
     return Material(
-      color: surface,
+      color: c.card,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // The banner, shrinking and fading as the header collapses.
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: (topPadding + _banner) * (1 - t),
-            child: Opacity(
-              opacity: 1 - t,
-              child: CustomPaint(
-                painter: _BannerPainter(
-                  base: c.feature,
-                  accent: c.highlight,
-                  light: c.featureHighlight,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Flexible(child: Tag(banner, strong: true)),
-                      const Spacer(),
-                      if (founded != null)
-                        Text(
-                          'EST. $founded',
-                          style: TextStyle(
-                            color: c.onFeature,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // The badge and name under the banner, rising and fading out.
-          Positioned(
-            left: 16,
-            right: 16,
-            top: topPadding + _banner + 14 - shrinkOffset,
-            child: Opacity(
-              opacity: (1 - t * 1.8).clamp(0.0, 1.0),
-              child: Row(
-                children: [
-                  TeamBadge(size: 48, community: summary.isCommunity),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          summary.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.9,
-                            height: 1.1,
-                            color: c.ink,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          summary.subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12.5, color: c.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // The bar: back and menu always; the small badge and name fade in.
+          // Back, badge, name and menu: always there.
           Positioned(
             top: topPadding,
             left: 4,
             right: 4,
-            height: _bar,
-            child: IconButtonTheme(
-              data: IconButtonThemeData(
-                style: IconButton.styleFrom(foregroundColor: iconColor),
-              ),
-              child: IconTheme(
-                data: IconThemeData(color: iconColor),
-                child: Row(
-                  children: [
-                    leading,
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Opacity(
-                        opacity: ((t - 0.55) / 0.45).clamp(0.0, 1.0),
+            height: _identity,
+            child: Row(
+              children: [
+                leading,
+                const SizedBox(width: 4),
+                TeamInitials(name: summary.name, kind: summary.kind),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        summary.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.4,
+                          height: 1.15,
+                          color: c.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        meta,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.2,
+                          color: c.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (menu != null) menu! else const SizedBox(width: 12),
+              ],
+            ),
+          ),
+          // Invite and Message, sliding up under the name as it folds.
+          if (actions.isNotEmpty)
+            Positioned(
+              top: topPadding + _identity,
+              left: 0,
+              right: 0,
+              height: _actions * (1 - fold),
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.bottomCenter,
+                  minHeight: _actions,
+                  maxHeight: _actions,
+                  child: IgnorePointer(
+                    ignoring: fold > 0.5,
+                    child: Opacity(
+                      opacity: (1 - fold * 1.6).clamp(0.0, 1.0),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                         child: Row(
                           children: [
-                            TeamBadge(size: 30, community: summary.isCommunity),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                summary.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.4,
-                                  color: c.ink,
-                                ),
-                              ),
-                            ),
+                            for (var i = 0; i < actions.length; i++) ...[
+                              if (i > 0) const SizedBox(width: 8),
+                              Expanded(child: actions[i]),
+                            ],
                           ],
                         ),
                       ),
                     ),
-                    ?menu,
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
           Positioned(
             left: 16,
             right: 16,
@@ -1578,21 +1521,51 @@ class _MoreList extends StatelessWidget {
   final List<TeamSection> sections;
 
   @override
-  Widget build(BuildContext context) => ConstrainedContent(
-    maxWidth: 720,
-    child: ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      children: [
-        for (final s in sections)
-          ListTile(
-            leading: Icon(s.icon),
-            title: Text(s.label),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => goWithinTeam(context, s.route(teamId)),
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return ConstrainedContent(
+      maxWidth: 720,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+        children: [
+          // One card of rows, each with its icon on a soft turf tile.
+          Card(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (final (i, s) in sections.indexed) ...[
+                  if (i > 0) Divider(height: 1, color: c.border),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                    leading: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: c.accentSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(s.icon, size: 19, color: c.accentInk),
+                    ),
+                    title: Text(
+                      s.label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: c.ink,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: c.muted),
+                    onTap: () => goWithinTeam(context, s.route(teamId)),
+                  ),
+                ],
+              ],
+            ),
           ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 /// The top of a tab: the team's badge and name, then the tabs.
@@ -1623,7 +1596,7 @@ class _SectionHeader extends StatelessWidget {
             if (!mobile)
               Row(
                 children: [
-                  TeamBadge(size: 40, community: summary.isCommunity),
+                  TeamInitials(name: summary.name, kind: summary.kind),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -1632,15 +1605,15 @@ class _SectionHeader extends StatelessWidget {
                         Text(
                           summary.name,
                           style: TextStyle(
-                            fontSize: 20,
+                            fontSize: 22,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.5,
                             color: c.ink,
                           ),
                         ),
                         Text(
-                          summary.subtitle,
-                          style: TextStyle(fontSize: 12, color: c.muted),
+                          _metaLine(viewModel, summary),
+                          style: TextStyle(fontSize: 12.5, color: c.muted),
                         ),
                       ],
                     ),
@@ -1660,50 +1633,6 @@ class _SectionHeader extends StatelessWidget {
       ),
     );
   }
-}
-
-/// A placeholder team photo: dark green with arcs like a disc in flight.
-class _BannerPainter extends CustomPainter {
-  _BannerPainter({
-    required this.base,
-    required this.accent,
-    required this.light,
-  });
-
-  final Color base;
-  final Color accent;
-  final Color light;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [base, Color.lerp(base, light, 0.9)!],
-        ).createShader(rect),
-    );
-    final arc = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    for (var i = 0; i < 6; i++) {
-      arc.color = accent.withValues(alpha: 0.05 + i * 0.025);
-      final r = size.width * (0.18 + i * 0.09);
-      canvas.drawCircle(Offset(size.width * 0.92, size.height * 1.35), r, arc);
-    }
-    canvas.drawCircle(
-      Offset(size.width * 0.78, size.height * 0.32),
-      size.height * 0.11,
-      Paint()..color = accent.withValues(alpha: 0.85),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_BannerPainter old) =>
-      old.base != base || old.accent != accent || old.light != light;
 }
 
 /// The team's next event on a dark card.
@@ -1727,17 +1656,7 @@ class _UpNextCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Eyebrow(
-                  'Up next · ${e.type.label}',
-                  color: c.onFeatureMuted,
-                ),
-              ),
-              Icon(Icons.north_east, size: 15, color: c.highlight),
-            ],
-          ),
+          Eyebrow('Up next · ${e.type.label}', color: c.onFeatureMuted),
           const SizedBox(height: 12),
           Text(
             e.title,
@@ -1764,8 +1683,26 @@ class _UpNextCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: c.onFeatureMuted, fontSize: 12),
             ),
-          const SizedBox(height: 14),
-          HighlightButton(label: 'View details', onPressed: onOpen),
+          // Amber is only for what's the user's to do; opening the event
+          // is a plain link along the card's foot.
+          const SizedBox(height: 12),
+          Divider(height: 1, color: c.featureHighlight),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'View details',
+                  style: TextStyle(
+                    color: c.onFeature,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, size: 18, color: c.onFeature),
+            ],
+          ),
         ],
       ),
     );
@@ -1790,8 +1727,8 @@ class _EventRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           children: [
-            DateBadge(date: e.startsAt, size: 34),
-            const SizedBox(width: 10),
+            DateBadge(date: e.startsAt),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1801,8 +1738,8 @@ class _EventRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
                       color: c.ink,
                     ),
                   ),
@@ -1814,11 +1751,12 @@ class _EventRow extends StatelessWidget {
                     ].join(' · '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: c.muted),
+                    style: TextStyle(fontSize: 12, color: c.muted),
                   ),
                 ],
               ),
             ),
+            Icon(Icons.chevron_right, size: 18, color: c.muted),
           ],
         ),
       ),

@@ -49,6 +49,10 @@ import 'package:frisbee_app/data/repositories/post_comment/post_comment_reposito
 import 'package:frisbee_app/data/repositories/user_post/user_post_repository.dart';
 
 import 'package:frisbee_app/data/repositories/hosted_tournament/hosted_tournament_repository.dart';
+import 'package:frisbee_app/data/repositories/ranking/ranking_repository.dart';
+import 'package:frisbee_app/ui/explore/widgets/explore_screen.dart';
+import 'package:frisbee_app/ui/schedule/widgets/schedule_screen.dart';
+import 'package:frisbee_app/ui/teams/widgets/teams_screen.dart';
 import 'package:frisbee_app/domain/models/hosted_tournament.dart';
 import 'package:frisbee_app/ui/tournaments/widgets/hosted_tournament_screen.dart';
 import 'package:frisbee_app/utils/pending_removals.dart';
@@ -58,6 +62,7 @@ import '../testing/hosted_tournament_fakes.dart';
 import '../testing/group_tournament_fakes.dart';
 import '../testing/social_fakes.dart';
 import '../testing/meeting_fakes.dart';
+import 'explore_test.dart' show FakeRankingRepository;
 
 /// Event pages open over the current tab and back returns to it.
 void main() {
@@ -142,6 +147,7 @@ void main() {
           Provider<HostedTournamentRepository>.value(
             value: hosted = FakeHostedTournamentRepository(),
           ),
+          Provider<RankingRepository>.value(value: FakeRankingRepository()),
         ],
         child: MaterialApp.router(
           theme: AppTheme.light,
@@ -482,22 +488,141 @@ void main() {
     expect(sent.text, contains('/p/p1'));
   });
 
-  testWidgets('the Events tab has the schedule and events to find', (
+  Future<void> tapTab(WidgetTester tester, String label) async {
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text(label),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('Schedule is the calendar; events to find are on Discover', (
     tester,
   ) async {
     await pumpApp(tester);
-    await tapText(tester, 'Events');
-    expect(find.text('My schedule'), findsOneWidget);
+    hosted.tournaments['x1'] = HostedTournament(
+      id: 'x1',
+      hostId: 'h',
+      hostName: 'Austin Ultimate',
+      name: 'Lone Star Classic',
+      startsOn: DateTime.now().add(const Duration(days: 10)),
+      status: HostedStatus.registration,
+    );
+    hosted.tournaments['x2'] = HostedTournament(
+      id: 'x2',
+      hostId: 'h',
+      hostName: 'Austin Ultimate',
+      name: 'Winter League',
+      kind: HostedKind.league,
+      startsOn: DateTime.now().add(const Duration(days: 12)),
+      status: HostedStatus.registration,
+    );
+    await tapTab(tester, 'Schedule');
+    expect(find.byType(ScheduleScreen), findsOneWidget);
     expect(find.text('New event'), findsOneWidget);
+    // No switch to a second view any more.
+    expect(find.text('My schedule'), findsNothing);
+    expect(find.text('Find events'), findsNothing);
 
-    await tapText(tester, 'Find events');
-    expect(find.byTooltip('Next week'), findsNothing);
+    // Discover lists them, with Host, and its filters narrow them.
+    await tapTab(tester, 'Discover');
+    expect(find.byType(ExploreScreen), findsOneWidget);
     expect(find.text('Host'), findsOneWidget);
+    expect(find.text('Coming up'), findsOneWidget);
+    expect(find.text('Lone Star Classic'), findsOneWidget);
+    expect(find.text('Winter League'), findsOneWidget);
+    await tapText(tester, 'Leagues');
+    expect(find.text('Lone Star Classic'), findsNothing);
+    expect(find.text('Winter League'), findsOneWidget);
 
-    // Back on Home and returning, Events keeps its place.
-    await tapText(tester, 'Home');
-    await tapText(tester, 'Events');
-    expect(find.text('Host'), findsOneWidget);
+    // The old link to events to find opens Discover.
+    final router = GoRouter.of(tester.element(find.byType(ExploreScreen)));
+    router.go(Routes.schedule);
+    await tester.pumpAndSettle();
+    expect(find.byType(ScheduleScreen), findsOneWidget);
+    router.go('/schedule?view=find');
+    await tester.pumpAndSettle();
+    expect(find.byType(ScheduleScreen), findsNothing);
+    expect(find.byType(ExploreScreen), findsOneWidget);
+    expect(router.state.uri.path, Routes.explorePath);
+
+    // Old Explore links keep their search and filter; /discover works too.
+    router.go('/explore?only=leagues&q=winter');
+    await tester.pumpAndSettle();
+    final screen = tester.widget<ExploreScreen>(find.byType(ExploreScreen));
+    expect(screen.initialFilter, ExploreFilter.leagues);
+    expect(screen.initialQuery, 'winter');
+    router.go('/discover?only=teams');
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, Routes.explorePath);
+    expect(
+      tester.widget<ExploreScreen>(find.byType(ExploreScreen)).initialFilter,
+      ExploreFilter.teams,
+    );
+  });
+
+  testWidgets('with one team, the Teams tab opens it; back is All teams', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tapTab(tester, 'Teams');
+    expect(find.byType(TeamHomeScreen), findsOneWidget);
+    final router = GoRouter.of(tester.element(find.byType(TeamHomeScreen)));
+    expect(router.state.uri.path, Routes.team('t1'));
+
+    // Back (All teams) shows the list, and it stays there.
+    await tester.tap(find.byTooltip('All teams'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TeamsScreen), findsOneWidget);
+    expect(find.byType(TeamHomeScreen), findsNothing);
+    await tester.pump(const Duration(seconds: 1));
+    expect(router.state.uri.path, Routes.teams);
+
+    // Away and back by the tab: the team again.
+    await tapTab(tester, 'Home');
+    await tapTab(tester, 'Teams');
+    expect(find.byType(TeamHomeScreen), findsOneWidget);
+
+    // Tapping Teams again on the team also lands on it, not the list.
+    await tapTab(tester, 'Teams');
+    expect(find.byType(TeamHomeScreen), findsOneWidget);
+
+    // A link to the list (e.g. after leaving a team) shows the list.
+    router.go(Routes.teams);
+    await tester.pumpAndSettle();
+    expect(find.byType(TeamsScreen), findsOneWidget);
+    expect(find.byType(TeamHomeScreen), findsNothing);
+  });
+
+  testWidgets('with one team and an invitation, the Teams tab shows both', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    teams.invites[testUser.uid] = [
+      const TeamInvite(teamId: 't9', teamName: 'Mile High Masters'),
+    ];
+    await tapTab(tester, 'Teams');
+    expect(find.byType(TeamsScreen), findsOneWidget);
+    expect(find.byType(TeamHomeScreen), findsNothing);
+    expect(find.textContaining('Mile High Masters'), findsWidgets);
+  });
+
+  testWidgets('with two teams, the Teams tab shows the list', (tester) async {
+    await pumpApp(tester);
+    teams.teams['t2'] = Team(
+      id: 't2',
+      name: 'Southside Sliders',
+      division: Division.open,
+      level: CompetitionLevel.club,
+      ownerId: testUser.uid,
+      members: {testUser.uid: TeamRole.owner},
+    );
+    await tapTab(tester, 'Teams');
+    expect(find.byType(TeamsScreen), findsOneWidget);
+    expect(find.byType(TeamHomeScreen), findsNothing);
+    expect(find.text('Southside Sliders'), findsOneWidget);
   });
 
   testWidgets('the avatar opens the profile, which has no tab', (tester) async {
@@ -570,8 +695,10 @@ void main() {
     expect(find.byType(TeamHomeScreen), findsOneWidget);
     await tapText(tester, 'Team practice');
     expect(find.byType(EventDetailScreen), findsOneWidget);
-    await tester.pageBack();
+    // A popup over the team page (whose back is now "All teams").
+    await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
+    expect(find.byType(EventDetailScreen), findsNothing);
     expect(find.byType(TeamHomeScreen), findsOneWidget);
   });
 

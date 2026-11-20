@@ -6,7 +6,7 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
 import '../learn_content.dart';
 
-/// Learn to play: the rules of ultimate for beginners, from Explore and
+/// Learn to play: the rules of ultimate for beginners, from Discover and
 /// Settings. Static content ([learnSections]), so it has no view model.
 class LearnScreen extends StatefulWidget {
   const LearnScreen({super.key});
@@ -40,14 +40,21 @@ class _LearnScreenState extends State<LearnScreen> {
             title: 'Ultimate in five minutes',
             subtitle: learnIntro,
           ),
+          // The sections as a numbered list; each row jumps to its part.
           SectionCard(
             title: 'On this page',
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final (i, s) in learnSections.indexed)
-                  ActionChip(label: Text(s.title), onPressed: () => _jumpTo(i)),
+                for (final (i, s) in learnSections.indexed) ...[
+                  if (i > 0) Divider(height: 1, color: c.border),
+                  _SectionRow(
+                    number: i + 1,
+                    title: s.title,
+                    onTap: () => _jumpTo(i),
+                  ),
+                ],
               ],
             ),
           ),
@@ -70,7 +77,7 @@ class _LearnScreenState extends State<LearnScreen> {
                           child: const Text('Find a community'),
                         ),
                         OutlinedButton(
-                          onPressed: () => context.go(Routes.findEvents),
+                          onPressed: () => context.go(Routes.explore()),
                           child: const Text("See what's coming up"),
                         ),
                       ],
@@ -87,6 +94,64 @@ class _LearnScreenState extends State<LearnScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A numbered row in "On this page".
+class _SectionRow extends StatelessWidget {
+  const _SectionRow({
+    required this.number,
+    required this.title,
+    required this.onTap,
+  });
+
+  final int number;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: c.border2, width: 1.5),
+              ),
+              child: Text(
+                '$number',
+                style: TextStyle(
+                  fontFamily: scoreFont,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: c.ink2,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: c.ink,
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: c.muted),
+          ],
+        ),
       ),
     );
   }

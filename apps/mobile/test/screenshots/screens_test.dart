@@ -305,9 +305,11 @@ void main() {
     await pumpApp(tester);
     await capture(tester, '01-home');
     await go(tester, Routes.explorePath);
-    await capture(tester, '02-explore');
+    await capture(tester, '02-discover');
+    await go(tester, Routes.explore(query: 'mile'));
+    await capture(tester, '02b-discover-search');
     await go(tester, Routes.schedule);
-    await capture(tester, '03-events');
+    await capture(tester, '03-schedule');
     await go(tester, Routes.teams);
     await capture(tester, '04-teams');
     await go(tester, Routes.team('t1'));
@@ -317,7 +319,7 @@ void main() {
     await go(tester, Routes.teamSection('t1', 'more'));
     await capture(tester, '07-team-more');
     await go(tester, Routes.messages);
-    await capture(tester, '08-messages');
+    await capture(tester, '08-inbox');
     await go(tester, Routes.tournament('x9'));
     await capture(tester, '09-tournament');
   });

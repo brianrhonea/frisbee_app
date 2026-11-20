@@ -4,9 +4,11 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/hosted_tournament.dart';
 import '../../../domain/models/team.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../view_models/hosted_tournament_viewmodel.dart';
 import '../view_models/player_signups_viewmodel.dart';
+import 'tournament_parts.dart';
 
 /// Names a new team and picks its division, to reserve it a spot in an
 /// event that takes both players and teams.
@@ -172,11 +174,96 @@ class _ApplyDialogState extends State<_ApplyDialog> {
   @override
   Widget build(BuildContext context) {
     final t = team;
+    final c = AppColors.of(context);
     final fixed = widget.invite != null || widget.editing != null;
     final members = t == null
         ? const <String>[]
         : ([...t.members.keys]
             ..sort((a, b) => t.nameOf(a).compareTo(t.nameOf(b))));
+    Widget heading(String text, [String? note]) => Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: c.ink,
+            ),
+          ),
+          if (note != null) ...[
+            const SizedBox(width: 8),
+            Text(note, style: TextStyle(fontSize: 12.5, color: c.muted)),
+          ],
+        ],
+      ),
+    );
+    Widget teamRow(Team x) {
+      final on = x.id == t?.id;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: on ? c.accentSoft : c.card,
+          shape: RoundedSuperellipseBorder(
+            borderRadius: BorderRadius.circular(controlRadius),
+            side: BorderSide(
+              color: on ? c.accent : c.border,
+              width: on ? 2 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => setState(() {
+              team = x;
+              divisionId = _matching(x);
+              captains = {widget.uid};
+            }),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Row(
+                children: [
+                  TeamMark(name: x.name, mine: on, size: 34),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          x.name,
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: c.ink,
+                          ),
+                        ),
+                        Text(
+                          [
+                            '${x.level.label} '
+                                '${x.division.label.toLowerCase()}',
+                            if (x.city.isNotEmpty) x.city,
+                            '${x.members.length} '
+                                '${x.members.length == 1 ? 'player' : 'players'}',
+                          ].join(' · '),
+                          style: TextStyle(fontSize: 12, color: c.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    on ? Icons.check_circle : Icons.radio_button_unchecked,
+                    color: on ? c.accent : c.border2,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return AlertDialog(
       title: Text(
         widget.editing != null
@@ -186,46 +273,38 @@ class _ApplyDialogState extends State<_ApplyDialog> {
             : 'Apply to play',
       ),
       content: SizedBox(
-        width: 400,
+        width: 420,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!fixed)
-                DropdownButtonFormField<Team>(
-                  initialValue: team,
-                  decoration: const InputDecoration(labelText: 'Team'),
-                  items: [
-                    for (final x in widget.teams)
-                      DropdownMenuItem(value: x, child: Text(x.name)),
-                  ],
-                  onChanged: (v) => setState(() {
-                    team = v;
-                    divisionId = _matching(v);
-                    captains = {widget.uid};
-                  }),
-                ),
-              if (widget.editing == null)
-                DropdownButtonFormField<String>(
-                  initialValue: divisionId,
-                  decoration: const InputDecoration(labelText: 'Division'),
-                  items: [
+              if (!fixed) ...[
+                heading('Team'),
+                for (final x in widget.teams) teamRow(x),
+              ],
+              if (widget.editing == null) ...[
+                heading('Division'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
                     for (final d in widget.divisions)
-                      DropdownMenuItem(
-                        value: d.id,
-                        child: Text(
-                          d.isFull ? '${d.label} (full: waitlist)' : d.label,
+                      ChoiceChip(
+                        label: Text(
+                          d.isFull ? '${d.label} · full: waitlist' : d.label,
                         ),
+                        selected: d.id == divisionId,
+                        onSelected: (_) => setState(() => divisionId = d.id),
                       ),
                   ],
-                  onChanged: (v) => setState(() => divisionId = v),
                 ),
-              const SizedBox(height: 16),
+              ],
+              heading('Captains'),
               Text(
                 'Captains report and confirm scores '
                 '(up to ${TournamentEntry.maxCaptains}).',
-                style: Theme.of(context).textTheme.bodySmall,
+                style: TextStyle(fontSize: 12.5, color: c.muted),
               ),
               for (final uid in members)
                 CheckboxListTile(

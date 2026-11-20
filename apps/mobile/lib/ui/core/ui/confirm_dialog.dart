@@ -19,10 +19,12 @@ Future<bool> confirmDialog(
           child: const Text('Cancel'),
         ),
         FilledButton(
+          // A destructive confirm is solid ink, not red: red is only for
+          // live games. The label says what happens ("Delete post").
           style: destructive
               ? FilledButton.styleFrom(
-                  backgroundColor: scheme.error,
-                  foregroundColor: scheme.onError,
+                  backgroundColor: scheme.onSurface,
+                  foregroundColor: scheme.surface,
                 )
               : null,
           onPressed: () => Navigator.pop(context, true),

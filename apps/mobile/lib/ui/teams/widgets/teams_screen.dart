@@ -5,11 +5,14 @@ import '../../../domain/models/personal_details.dart';
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/scoreboard.dart' show SectionHeader;
 import '../../core/ui/status_views.dart';
-import '../../shell/widgets/app_shell.dart' show ProfileButton;
+import '../../shell/widgets/app_shell.dart' show ProfileButton, TeamsTabTap;
 import '../view_models/teams_viewmodel.dart';
 import 'join_team_dialog.dart';
+import 'team_initials.dart';
 
 class TeamsScreen extends StatefulWidget {
   const TeamsScreen({super.key, required this.viewModel});
@@ -29,6 +32,9 @@ class _TeamsScreenState extends State<TeamsScreen> {
     vm.joinTeam.addListener(_onJoin);
     vm.acceptInvite.addListener(_onAccept);
     vm.declineInvite.addListener(_onDecline);
+    vm.addListener(_openSingle);
+    TeamsTabTap.requests.addListener(_openSingle);
+    _openSingle();
   }
 
   @override
@@ -36,7 +42,24 @@ class _TeamsScreenState extends State<TeamsScreen> {
     vm.joinTeam.removeListener(_onJoin);
     vm.acceptInvite.removeListener(_onAccept);
     vm.declineInvite.removeListener(_onDecline);
+    vm.removeListener(_openSingle);
+    TeamsTabTap.requests.removeListener(_openSingle);
     super.dispose();
+  }
+
+  /// The Teams tab was tapped and the list is showing: with exactly one
+  /// team or community and no invitation waiting, opens it straight away
+  /// (back returns to this list). Waits for the teams and invitations to
+  /// load first.
+  void _openSingle() {
+    if (!TeamsTabTap.pending) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !TeamsTabTap.pending) return;
+      if (vm.loading || !vm.invitesLoaded) return;
+      TeamsTabTap.done();
+      if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
+      if (vm.single case final team?) context.go(Routes.team(team.id));
+    });
   }
 
   void _onAccept() {
@@ -108,12 +131,15 @@ class _TeamsScreenState extends State<TeamsScreen> {
           }
           final invites = [
             for (final i in vm.invites)
-              _InviteTile(
-                invite: i,
-                busy: vm.acceptInvite.running || vm.declineInvite.running,
-                onAccept: () => vm.acceptInvite.execute(i),
-                onDecline: () => vm.declineInvite.execute(i),
-                club: vm.isClubInvite(i),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _InviteTile(
+                  invite: i,
+                  busy: vm.acceptInvite.running || vm.declineInvite.running,
+                  onAccept: () => vm.acceptInvite.execute(i),
+                  onDecline: () => vm.declineInvite.execute(i),
+                  club: vm.isClubInvite(i),
+                ),
               ),
           ];
           if (vm.all.isEmpty && invites.isEmpty) {
@@ -146,27 +172,48 @@ class _TeamsScreenState extends State<TeamsScreen> {
           final communities = vm.communities;
           return ConstrainedContent(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               children: [
-                if (invites.isNotEmpty) ...[
-                  const _Heading('Invitations'),
-                  ...invites,
-                  const SizedBox(height: 8),
-                ],
+                ...invites,
+                if (invites.isNotEmpty) const SizedBox(height: 8),
                 if (teams.isNotEmpty) ...[
-                  const _Heading('Your teams'),
-                  for (final t in teams) _TeamCard(team: t, role: vm.roleIn(t)),
+                  _Heading('Your teams', count: teams.length),
+                  _Rows(
+                    children: [
+                      for (final t in teams)
+                        _TeamRow(team: t, role: vm.roleIn(t)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                 ],
                 if (communities.isNotEmpty) ...[
-                  if (teams.isNotEmpty) const SizedBox(height: 8),
-                  const _Heading('Communities'),
-                  for (final c in communities)
-                    _CommunityCard(
-                      community: c,
-                      role: vm.roleIn(c),
-                      isOn: vm.isOn,
-                    ),
+                  SectionHeader(
+                    'Communities',
+                    actionLabel: 'Find more',
+                    onAction: () =>
+                        context.go(Routes.explore(only: ExploreFilter.groups)),
+                  ),
+                  _Rows(
+                    children: [
+                      for (final c in communities)
+                        _CommunityBlock(
+                          community: c,
+                          role: vm.roleIn(c),
+                          isOn: vm.isOn,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                 ],
+                ListenableBuilder(
+                  listenable: vm.joinTeam,
+                  builder: (context, _) => _AddTiles(
+                    onJoin: vm.joinTeam.running ? null : _join,
+                    onFind: () =>
+                        context.go(Routes.explore(only: ExploreFilter.teams)),
+                    onStart: _create,
+                  ),
+                ),
               ],
             ),
           );
@@ -267,58 +314,193 @@ class _TeamsScreenState extends State<TeamsScreen> {
   }
 }
 
+/// A section title with how many rows it has.
 class _Heading extends StatelessWidget {
-  const _Heading(this.text);
+  const _Heading(this.text, {required this.count});
 
   final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
-    child: Text(text, style: Theme.of(context).textTheme.titleSmall),
-  );
-}
-
-class _TeamCard extends StatelessWidget {
-  const _TeamCard({required this.team, required this.role});
-
-  final Team team;
-  final TeamRole? role;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: ListTile(
-          leading: CircleAvatar(
-            child: team.isCommunity
-                ? const Icon(Icons.diversity_3_outlined)
-                : Text(team.name.isEmpty ? '?' : team.name[0].toUpperCase()),
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              header: true,
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                  color: c.ink,
+                ),
+              ),
+            ),
           ),
-          title: Text(team.name),
-          subtitle: Text(
-            [
-              TeamListing.of(team).subtitle,
-              if (team.inCommunity && team.orgName.isNotEmpty)
-                'Part of ${team.orgName}',
-            ].where((s) => s.isNotEmpty).join(' · '),
-          ),
-          trailing: role == null
-              ? null
-              : Chip(label: Text(role!.labelFor(team.kind))),
-          onTap: () => context.go(Routes.team(team.id)),
+          Text('$count', style: TextStyle(fontSize: 13, color: c.muted)),
+        ],
+      ),
+    );
+  }
+}
+
+/// One card of rows with hairlines between them.
+class _Rows extends StatelessWidget {
+  const _Rows({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, w) in children.indexed) ...[
+            if (i > 0) Divider(height: 1, thickness: 1, color: c.border),
+            w,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The user's role: turf for those who run the team, outlined otherwise.
+class _RolePill extends StatelessWidget {
+  const _RolePill(this.role, this.kind);
+
+  final TeamRole role;
+  final TeamKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final lead = role.canEdit;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: lead ? c.accentSoft : null,
+        border: lead ? null : Border.all(color: c.border2),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        role.labelFor(kind),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: lead ? FontWeight.w700 : FontWeight.w600,
+          color: lead ? c.accentInk : c.ink2,
         ),
       ),
     );
   }
 }
 
+/// A team or community row: its initials, name, role and what it is.
+class _Row extends StatelessWidget {
+  const _Row({
+    required this.name,
+    required this.kind,
+    required this.meta,
+    required this.role,
+    required this.onTap,
+  });
+
+  final String name;
+  final TeamKind kind;
+  final String meta;
+  final TeamRole? role;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            TeamInitials(name: name, kind: kind),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: c.ink,
+                          ),
+                        ),
+                      ),
+                      if (role case final r?) ...[
+                        const SizedBox(width: 6),
+                        _RolePill(r, kind),
+                      ],
+                    ],
+                  ),
+                  if (meta.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      meta,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12.5, color: c.muted),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right, size: 20, color: c.muted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _members(int n) => '$n ${n == 1 ? 'member' : 'members'}';
+
+class _TeamRow extends StatelessWidget {
+  const _TeamRow({required this.team, required this.role});
+
+  final Team team;
+  final TeamRole? role;
+
+  @override
+  Widget build(BuildContext context) => _Row(
+    name: team.name,
+    kind: team.kind,
+    role: role,
+    meta: [
+      TeamListing.of(team).subtitle,
+      if (team.members.isNotEmpty) _members(team.members.length),
+      if (team.inCommunity && team.orgName.isNotEmpty)
+        'Part of ${team.orgName}',
+    ].where((s) => s.isNotEmpty).join(' · '),
+    onTap: () => context.go(Routes.team(team.id)),
+  );
+}
+
 /// A community with its teams under it: shown when it has [_shownTeams] or
 /// fewer, folded behind "Show teams" when it has more.
-class _CommunityCard extends StatefulWidget {
-  const _CommunityCard({
+class _CommunityBlock extends StatefulWidget {
+  const _CommunityBlock({
     required this.community,
     required this.role,
     required this.isOn,
@@ -331,81 +513,163 @@ class _CommunityCard extends StatefulWidget {
   final bool Function(String teamId) isOn;
 
   @override
-  State<_CommunityCard> createState() => _CommunityCardState();
+  State<_CommunityBlock> createState() => _CommunityBlockState();
 }
 
 const _shownTeams = 3;
 
-class _CommunityCardState extends State<_CommunityCard> {
+class _CommunityBlockState extends State<_CommunityBlock> {
   late bool _open = widget.community.linkedTeams.length <= _shownTeams;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
     final c = widget.community;
     final teams = c.sortedLinkedTeams;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Card(
-        margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ListTile(
-              leading: CircleAvatar(
-                child: Icon(
-                  c.isOrganization
-                      ? Icons.account_balance_outlined
-                      : Icons.diversity_3_outlined,
-                ),
-              ),
-              title: Text(c.name),
-              subtitle: Text(
-                [
-                  TeamListing.of(c).subtitle,
-                  if (teams.isNotEmpty)
-                    '${teams.length} team${teams.length == 1 ? '' : 's'}',
-                ].where((s) => s.isNotEmpty).join(' · '),
-              ),
-              trailing: widget.role == null
-                  ? null
-                  : Chip(label: Text(widget.role!.labelFor(c.kind))),
-              onTap: () => context.go(Routes.team(c.id)),
-            ),
-            if (_open)
-              for (final t in teams)
-                ListTile(
-                  dense: true,
-                  contentPadding: const EdgeInsets.fromLTRB(72, 0, 16, 0),
-                  leading: const Icon(Icons.shield_outlined, size: 20),
-                  title: Text(t.name),
-                  subtitle: Text(t.division.label),
-                  trailing: widget.isOn(t.id)
-                      ? Text(
-                          "You're on it",
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.primary,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Row(
+          name: c.name,
+          kind: c.kind,
+          role: widget.role,
+          meta: [
+            TeamListing.of(c).subtitle,
+            if (teams.isNotEmpty)
+              '${teams.length} team${teams.length == 1 ? '' : 's'}',
+            if (c.members.isNotEmpty) _members(c.members.length),
+          ].where((s) => s.isNotEmpty).join(' · '),
+          onTap: () => context.go(Routes.team(c.id)),
+        ),
+        if (_open)
+          for (final t in teams)
+            InkWell(
+              onTap: () => context.go(Routes.team(t.id)),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(70, 6, 14, 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.shield_outlined, size: 18, color: colors.muted),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: colors.ink,
+                            ),
                           ),
-                        )
-                      : null,
-                  onTap: () => context.go(Routes.team(t.id)),
+                          Text(
+                            t.division.label,
+                            style: TextStyle(fontSize: 12, color: colors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.isOn(t.id))
+                      Text(
+                        "You're on it",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: colors.accent,
+                        ),
+                      ),
+                  ],
                 ),
-            if (teams.length > _shownTeams)
-              TextButton(
+              ),
+            ),
+        if (teams.length > _shownTeams)
+          Padding(
+            padding: const EdgeInsets.only(left: 58, bottom: 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
                 onPressed: () => setState(() => _open = !_open),
                 child: Text(
                   _open ? 'Hide teams' : 'Show ${teams.length} teams',
                 ),
               ),
-          ],
-        ),
-      ),
+            ),
+          ),
+        if (_open && teams.isNotEmpty && teams.length <= _shownTeams)
+          const SizedBox(height: 6),
+      ],
     );
   }
 }
 
-/// An invitation to join a team or group, with Accept and Decline.
+/// Join with a code, find a team, or start one: the add button's choices
+/// as three tiles under the lists.
+class _AddTiles extends StatelessWidget {
+  const _AddTiles({
+    required this.onJoin,
+    required this.onFind,
+    required this.onStart,
+  });
+
+  final VoidCallback? onJoin;
+  final VoidCallback onFind;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    Widget tile(IconData icon, String label, VoidCallback? onTap) => Expanded(
+      child: Card(
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            child: Column(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: c.accentSoft,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: 19, color: c.accentInk),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: c.ink,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        tile(Icons.vpn_key_outlined, 'Join with code', onJoin),
+        const SizedBox(width: 8),
+        tile(Icons.search, 'Find a team', onFind),
+        const SizedBox(width: 8),
+        tile(Icons.add, 'Start a team', onStart),
+      ],
+    );
+  }
+}
+
+/// An invitation to join a team or group, with Accept and Decline: the
+/// user's to do, so it's amber.
 class _InviteTile extends StatelessWidget {
   const _InviteTile({
     required this.invite,
@@ -425,45 +689,72 @@ class _InviteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final what = invite.kind.noun;
     final from = invite.invitedByName.isEmpty
         ? 'You were invited to join this $what.'
         : '${invite.invitedByName} invited you to join this $what.';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-        child: Row(
-          children: [
-            Icon(invite.isCommunity ? Icons.diversity_3 : Icons.groups),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    invite.teamName,
-                    style: Theme.of(context).textTheme.titleMedium,
+    final small = TextStyle(fontSize: 12, color: c.ink2);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      decoration: BoxDecoration(
+        color: c.highlightSoft,
+        border: Border.all(color: c.border),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          TeamInitials(name: invite.teamName, kind: invite.kind, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'INVITATION',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: c.highlightInk,
                   ),
-                  Text(from, style: Theme.of(context).textTheme.bodySmall),
-                  if (club)
-                    Text(
-                      clubTooYoungMessage,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  invite.teamName,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: c.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(from, style: small),
+                if (club) Text(clubTooYoungMessage, style: small),
+              ],
             ),
-            TextButton(
-              onPressed: busy ? null : onDecline,
-              child: const Text('Decline'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: c.ink2,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 44),
             ),
-            const SizedBox(width: 4),
-            FilledButton(
-              onPressed: busy ? null : onAccept,
-              child: const Text('Accept'),
+            onPressed: busy ? null : onDecline,
+            child: const Text('Decline'),
+          ),
+          const SizedBox(width: 4),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: c.highlight,
+              foregroundColor: c.onHighlight,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              minimumSize: const Size(0, 44),
             ),
-          ],
-        ),
+            onPressed: busy ? null : onAccept,
+            child: const Text('Accept'),
+          ),
+        ],
       ),
     );
   }

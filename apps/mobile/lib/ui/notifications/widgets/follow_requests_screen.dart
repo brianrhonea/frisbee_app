@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/follow.dart';
 import '../../../routing/open_link.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
-import '../../core/ui/layout.dart' show PersonAvatar;
+import '../../core/ui/layout.dart' show CountPill, PersonAvatar;
 import '../../profile/view_models/profile_viewmodel.dart';
 import '../../settings/widgets/settings_widgets.dart';
 
@@ -65,6 +66,13 @@ class _FollowRequestsScreenState extends State<FollowRequestsScreen> {
       ];
       return SettingsPage(
         title: 'Follow requests',
+        actions: [
+          if (requests.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(child: CountPill(requests.length)),
+            ),
+        ],
         children: [
           if (requests.isEmpty)
             Padding(
@@ -89,11 +97,31 @@ class _FollowRequestsScreenState extends State<FollowRequestsScreen> {
                 ],
               ),
             )
-          else
+          else ...[
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.lock_outline, size: 18, color: c.muted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${vm.isPrivate ?? false ? 'Your profile is private. ' : ''}'
+                      'Accepting lets them see your posts, teams and stats. '
+                      "Declining doesn't tell them.",
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: c.muted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             SettingsGroup(
-              footer:
-                  'Accepting lets them see your posts, teams and stats. '
-                  "Declining doesn't tell them.",
               children: [
                 for (final r in requests)
                   _RequestTile(
@@ -105,6 +133,19 @@ class _FollowRequestsScreenState extends State<FollowRequestsScreen> {
                   ),
               ],
             ),
+          ],
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Center(
+              child: TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: c.accent),
+                onPressed: () => context.push(Routes.settingsPrivacy),
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.chevron_right, size: 18),
+                label: const Text('Privacy settings'),
+              ),
+            ),
+          ),
         ],
       );
     },
@@ -128,23 +169,46 @@ class _RequestTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = request.name.isEmpty ? 'Someone' : request.name;
+    final c = AppColors.of(context);
     return ListTile(
       onTap: onOpen,
-      leading: PersonAvatar(name: name, photoUrl: request.photoUrl),
-      title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      contentPadding: const EdgeInsets.only(left: 14, right: 4),
+      minTileHeight: 68,
+      leading: PersonAvatar(name: name, photoUrl: request.photoUrl, radius: 22),
+      title: Text(
+        name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          color: c.ink,
+        ),
+      ),
       subtitle: switch (request.username) {
-        final u? => Text('@$u', maxLines: 1, overflow: TextOverflow.ellipsis),
+        final u? => Text(
+          '@$u',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 13, color: c.muted),
+        ),
         null => null,
       },
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          FilledButton(onPressed: onAccept, child: const Text('Accept')),
-          const SizedBox(width: 8),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            onPressed: onAccept,
+            child: const Text('Accept'),
+          ),
           IconButton(
             tooltip: 'Decline',
             onPressed: onDecline,
-            icon: const Icon(Icons.close),
+            icon: Icon(Icons.close, color: c.muted),
           ),
         ],
       ),

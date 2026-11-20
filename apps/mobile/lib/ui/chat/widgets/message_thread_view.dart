@@ -400,13 +400,12 @@ class _MessageActionsSheet extends StatelessWidget {
               title: Text("View $name's profile"),
               onTap: () => pick(const _Profile()),
             ),
+          // Destructive, but neutral: red is kept for live games, and the
+          // confirm dialog says what deleting does.
           if (canDelete)
             ListTile(
-              leading: Icon(Icons.delete_outline, color: Colors.red.shade400),
-              title: Text(
-                'Delete message',
-                style: TextStyle(color: Colors.red.shade400),
-              ),
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Delete message'),
               onTap: () => pick(const _Delete()),
             ),
         ],
@@ -973,8 +972,8 @@ class _ReactionChips extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
+        spacing: 6,
+        runSpacing: 6,
         children: [
           for (final r in counts)
             Semantics(
@@ -985,7 +984,7 @@ class _ReactionChips extends StatelessWidget {
               child: Material(
                 color: r.mine ? c.accentSoft : c.card,
                 shape: StadiumBorder(
-                  side: BorderSide(color: r.mine ? c.accent : c.border),
+                  side: BorderSide(color: r.mine ? c.accent : c.border2),
                 ),
                 child: InkWell(
                   customBorder: const StadiumBorder(),
@@ -994,12 +993,16 @@ class _ReactionChips extends StatelessWidget {
                       : () => onReact!(message, r.emoji),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 2,
+                      horizontal: 9,
+                      vertical: 3,
                     ),
                     child: Text(
                       r.count > 1 ? '${r.emoji} ${r.count}' : r.emoji,
-                      style: TextStyle(fontSize: 13, color: c.ink),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: r.mine ? c.accentInk : c.ink2,
+                      ),
                     ),
                   ),
                 ),
@@ -1125,7 +1128,7 @@ class _FeedRow extends StatelessWidget {
                     child: Text(
                       name,
                       style: TextStyle(
-                        fontSize: 14.5,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: nameColor ?? c.ink,
                       ),
@@ -1135,11 +1138,11 @@ class _FeedRow extends StatelessWidget {
                 if (vm.usernameOf(m.authorId) case final handle?)
                   Text(
                     '@$handle',
-                    style: TextStyle(fontSize: 12.5, color: c.muted),
+                    style: TextStyle(fontSize: 12, color: c.muted),
                   ),
                 Text(
                   time == null ? 'Sending…' : _stamp(time),
-                  style: TextStyle(fontSize: 11.5, color: c.muted),
+                  style: TextStyle(fontSize: 12, color: c.muted),
                 ),
               ],
             ),
@@ -1149,8 +1152,8 @@ class _FeedRow extends StatelessWidget {
             text: m.text,
             style: TextStyle(
               color: time == null ? c.muted : c.ink,
-              fontSize: 14.5,
-              height: 1.375,
+              fontSize: 15,
+              height: 1.4,
             ),
           ),
         _Attachments(message: m, viewModel: vm, videoPlayer: videoPlayer),
@@ -1252,7 +1255,7 @@ class _BubbleRow extends StatelessWidget {
     final fill = mine ? c.accent : c.card;
     final ink = mine ? c.onAccent : c.ink;
     const big = Radius.circular(18);
-    const small = Radius.circular(5);
+    const small = Radius.circular(6);
     // Square the corners on the side the run continues.
     final radius = BorderRadius.only(
       topLeft: !mine && !startsRun ? small : big,
@@ -1287,15 +1290,15 @@ class _BubbleRow extends StatelessWidget {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 13,
-                          vertical: 8,
+                          horizontal: 12,
+                          vertical: 10,
                         ),
                         child: _MessageText(
                           text: m.text,
                           style: TextStyle(
                             color: sending ? ink.withValues(alpha: 0.7) : ink,
                             fontSize: 15,
-                            height: 1.3,
+                            height: 1.4,
                           ),
                         ),
                       ),
@@ -1781,9 +1784,12 @@ class _ReplyBar extends StatelessWidget {
     final c = AppColors.of(context);
     final name = message.authorName.isEmpty ? 'Someone' : message.authorName;
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(10, 4, 2, 4),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: c.border)),
+        color: c.field,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: c.accent, width: 3)),
       ),
       child: Row(
         children: [
@@ -1862,89 +1868,61 @@ class _Composer extends StatelessWidget {
         final sending = vm.send.running;
         final wide = !ScreenSize.of(context).isMobile;
         final attach = vm.canAttach
-            ? PopupMenuButton<_AttachKind>(
-                tooltip: 'Upload a photo, video or file',
-                enabled:
-                    !sending &&
-                    !vm.pickFiles.running &&
-                    !vm.recordVideo.running,
-                icon: Icon(Icons.add_circle, color: c.muted),
-                onSelected: (k) => switch (k) {
-                  _AttachKind.camera => vm.takePhoto.execute(),
-                  _AttachKind.video => vm.recordVideo.execute(),
-                  _AttachKind.photo => vm.pickFiles.execute(true),
-                  _AttachKind.file => vm.pickFiles.execute(false),
-                },
-                itemBuilder: (_) => [
-                  if (vm.canUseCamera)
-                    const PopupMenuItem(
-                      value: _AttachKind.camera,
-                      child: ListTile(
-                        leading: Icon(Icons.photo_camera_outlined),
-                        title: Text('Take photo'),
-                      ),
-                    ),
-                  if (vm.canUseCamera)
-                    const PopupMenuItem(
-                      value: _AttachKind.video,
-                      child: ListTile(
-                        leading: Icon(Icons.videocam_outlined),
-                        title: Text('Record video'),
-                      ),
-                    ),
-                  const PopupMenuItem(
-                    value: _AttachKind.photo,
-                    child: ListTile(
-                      leading: Icon(Icons.photo_outlined),
-                      title: Text('Photo'),
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: _AttachKind.file,
-                    child: ListTile(
-                      leading: Icon(Icons.insert_drive_file_outlined),
-                      title: Text('File'),
-                    ),
-                  ),
-                ],
+            ? Container(
+                width: 44,
+                height: 44,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: c.card,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: c.border2),
+                ),
+                child: _attachMenu(context, c, vm, sending),
               )
-            : const SizedBox(width: 12);
-        return Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, wide ? 20 : 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: c.background,
-              border: Border.all(color: c.border),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (vm.drafts.isNotEmpty)
-                  Container(
-                    height: 88,
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        for (final d in vm.drafts)
-                          _DraftChip(
-                            draft: d,
-                            onRemove: sending ? null : () => vm.removeDraft(d),
-                          ),
-                      ],
-                    ),
+            : const SizedBox.shrink();
+        return Container(
+          decoration: BoxDecoration(
+            color: c.card,
+            border: Border(top: BorderSide(color: c.border)),
+          ),
+          padding: EdgeInsets.fromLTRB(12, 8, 12, wide ? 16 : 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (vm.drafts.isNotEmpty)
+                SizedBox(
+                  height: 84,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final d in vm.drafts)
+                        _DraftChip(
+                          draft: d,
+                          onRemove: sending ? null : () => vm.removeDraft(d),
+                        ),
+                    ],
                   ),
-                if (vm.drafts.isNotEmpty) Divider(height: 1, color: c.border),
-                if (vm.replyingTo case final reply?)
-                  _ReplyBar(message: reply, onCancel: vm.cancelReply),
-                if (sending) const LinearProgressIndicator(minHeight: 2),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    attach,
-                    Expanded(
+                ),
+              if (vm.replyingTo case final reply?)
+                _ReplyBar(message: reply, onCancel: vm.cancelReply),
+              if (sending)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  attach,
+                  Expanded(
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      alignment: Alignment.centerLeft,
+                      decoration: BoxDecoration(
+                        color: c.field,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
                       child: Focus(
                         // Enter sends; Shift+Enter adds a line.
                         onKeyEvent: (_, event) {
@@ -1977,9 +1955,10 @@ class _Composer extends StatelessWidget {
                                 state,
                                 undoController,
                               ),
-                          style: TextStyle(fontSize: 14.5, color: c.ink),
+                          style: TextStyle(fontSize: 15, color: c.ink),
                           decoration: InputDecoration(
                             hintText: hintText,
+                            hintStyle: TextStyle(fontSize: 15, color: c.muted),
                             counterText: '',
                             isDense: true,
                             filled: false,
@@ -1988,36 +1967,94 @@ class _Composer extends StatelessWidget {
                             focusedBorder: InputBorder.none,
                             disabledBorder: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(
-                              vertical: 14,
+                              vertical: 12,
                             ),
                           ),
                         ),
                       ),
                     ),
-                    // Always shown: touch screens of any size (tablets
-                    // included) may have no Enter key to send with.
-                    ValueListenableBuilder(
-                      valueListenable: controller,
-                      builder: (context, value, _) {
-                        final empty =
-                            value.text.trim().isEmpty && vm.drafts.isEmpty;
-                        return IconButton(
-                          tooltip: 'Send',
-                          color: c.accent,
-                          icon: const Icon(Icons.send_rounded, size: 22),
-                          onPressed: sending || empty ? null : onSend,
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Always shown: touch screens of any size (tablets
+                  // included) may have no Enter key to send with.
+                  ValueListenableBuilder(
+                    valueListenable: controller,
+                    builder: (context, value, _) {
+                      final empty =
+                          value.text.trim().isEmpty && vm.drafts.isEmpty;
+                      return IconButton.filled(
+                        tooltip: 'Send',
+                        style: IconButton.styleFrom(
+                          fixedSize: const Size(44, 44),
+                          backgroundColor: c.accent,
+                          foregroundColor: c.onAccent,
+                          disabledBackgroundColor: c.field,
+                          disabledForegroundColor: c.muted,
+                        ),
+                        icon: const Icon(Icons.send_rounded, size: 20),
+                        onPressed: sending || empty ? null : onSend,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
     );
   }
+
+  /// The attach button's menu: camera (where there is one), photo, file.
+  Widget _attachMenu(
+    BuildContext context,
+    AppColors c,
+    MessageThreadViewModel vm,
+    bool sending,
+  ) => PopupMenuButton<_AttachKind>(
+    tooltip: 'Upload a photo, video or file',
+    enabled: !sending && !vm.pickFiles.running && !vm.recordVideo.running,
+    padding: EdgeInsets.zero,
+    icon: Icon(Icons.add, color: c.ink2),
+    onSelected: (k) => switch (k) {
+      _AttachKind.camera => vm.takePhoto.execute(),
+      _AttachKind.video => vm.recordVideo.execute(),
+      _AttachKind.photo => vm.pickFiles.execute(true),
+      _AttachKind.file => vm.pickFiles.execute(false),
+    },
+    itemBuilder: (_) => [
+      if (vm.canUseCamera)
+        const PopupMenuItem(
+          value: _AttachKind.camera,
+          child: ListTile(
+            leading: Icon(Icons.photo_camera_outlined),
+            title: Text('Take photo'),
+          ),
+        ),
+      if (vm.canUseCamera)
+        const PopupMenuItem(
+          value: _AttachKind.video,
+          child: ListTile(
+            leading: Icon(Icons.videocam_outlined),
+            title: Text('Record video'),
+          ),
+        ),
+      const PopupMenuItem(
+        value: _AttachKind.photo,
+        child: ListTile(
+          leading: Icon(Icons.photo_outlined),
+          title: Text('Photo'),
+        ),
+      ),
+      const PopupMenuItem(
+        value: _AttachKind.file,
+        child: ListTile(
+          leading: Icon(Icons.insert_drive_file_outlined),
+          title: Text('File'),
+        ),
+      ),
+    ],
+  );
 }
 
 class _DraftChip extends StatelessWidget {

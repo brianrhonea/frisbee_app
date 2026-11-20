@@ -5,12 +5,17 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/group_tournament.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart' show DateBadge;
 import '../../core/ui/status_views.dart';
 import '../../follow/view_models/follow_viewmodel.dart';
 import '../../follow/widgets/follow_button.dart';
+import '../../tournaments/widgets/tournament_parts.dart'
+    show RowsCard, StatTile;
 import '../view_models/group_tournament_viewmodel.dart';
+import 'hat_parts.dart';
 import 'tournament_widgets.dart';
 
 enum _Menu { edit, delete }
@@ -169,7 +174,7 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
                     ],
                   ),
               ],
-              bottom: TabBar(tabs: tabs, isScrollable: true),
+              bottom: SegmentedTabBar(tabs: tabs),
             ),
             body: TabBarView(
               children: [
@@ -186,78 +191,190 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
   }
 
   Widget _schedule(BuildContext context, GroupTournament t) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final champ = vm.championId;
     final mine = vm.myTeam;
     final upcoming = vm.myUpcoming;
+    final played = vm.games.where((g) => g.isDone).length;
     return ConstrainedContent(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
-          Text(
-            tournamentWhen(t.settings.startsAt),
-            style: theme.textTheme.titleSmall,
+          // The name is in the app bar; the hero says when and how.
+          Row(
+            children: [
+              DateBadge(date: t.settings.startsAt, size: 52),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tournamentWhen(t.settings.startsAt),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: c.accent,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      tournamentSummary(t),
+                      style: TextStyle(fontSize: 13, color: c.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          Text(tournamentSummary(t), style: theme.textTheme.bodySmall),
+          if (vm.isScheduled) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: StatTile(value: '${t.teams.length}', label: 'Teams'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: StatTile(value: '${vm.games.length}', label: 'Games'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: StatTile(
+                    value: '$played',
+                    of: '/${vm.games.length}',
+                    label: 'Final',
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (champ != null) ...[
             const SizedBox(height: 12),
-            Card(
-              color: Colors.amber.shade100,
-              child: ListTile(
-                leading: const Icon(Icons.emoji_events, color: Colors.amber),
-                title: Text('${vm.teamName(champ)} wins!'),
-                textColor: Colors.black87,
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: c.accentSoft,
+                borderRadius: BorderRadius.circular(cardRadius),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.emoji_events, color: c.accentInk, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '${vm.teamName(champ)} wins!',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: c.accentInk,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
           if (mine != null) ...[
             const SizedBox(height: 12),
-            Card.outlined(
+            Card(
               margin: EdgeInsets.zero,
-              child: ListTile(
-                leading: const Icon(Icons.shield_outlined),
-                title: Text("You're on ${mine.name}"),
-                subtitle: Text(
-                  [
-                    if (mine.captainId == vm.uid)
-                      "You're the captain: report your scores"
-                    else if (mine.captainId case final c?)
-                      'Captain: ${mine.nameOf(c)}',
-                    if (upcoming.isNotEmpty)
-                      'Next: ${gameTime(upcoming.first.startsAt)}, field '
-                          '${upcoming.first.field}',
-                  ].join('\n'),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: c.accentSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.shield_outlined,
+                        size: 20,
+                        color: c.accentInk,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "You're on ${mine.name}",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: c.ink,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            [
+                              if (mine.captainId == vm.uid)
+                                "You're the captain: report your scores"
+                              else if (mine.captainId case final id?)
+                                'Captain: ${mine.nameOf(id)}',
+                              if (upcoming.isNotEmpty)
+                                'Next: ${gameTime(upcoming.first.startsAt)}, '
+                                    'field ${upcoming.first.field}',
+                            ].join('\n'),
+                            style: TextStyle(fontSize: 13, color: c.ink2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ],
           if (vm.canSeedBracket) ...[
             const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: vm.seedBracket.running ? null : vm.seedBracket.execute,
-              icon: const Icon(Icons.account_tree_outlined),
-              label: const Text('Pools are done: seed the bracket'),
+            NeedsYouPanel(
+              eyebrow: 'Needs you · organizer',
+              title: 'Every pool game is final',
+              action: AmberButton(
+                onPressed: vm.seedBracket.running
+                    ? null
+                    : vm.seedBracket.execute,
+                icon: Icons.account_tree_outlined,
+                label: 'Pools are done: seed the bracket',
+              ),
             ),
           ],
-          const SizedBox(height: 16),
-          if (!vm.isScheduled)
-            Text(
-              vm.isOrganizer
-                  ? 'No schedule yet. Open Setup to make teams and publish it.'
-                  : 'The schedule will appear here once organizers publish it.',
-              style: theme.textTheme.bodyMedium,
-            ),
-          for (final (i, g) in vm.games.indexed) ...[
-            if (t.settings.laterDays.isNotEmpty &&
-                g.startsAt != null &&
-                (i == 0 ||
-                    !DateUtils.isSameDay(vm.games[i - 1].startsAt, g.startsAt)))
-              Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 8),
-                child: Text(
-                  gameDay(g.startsAt!),
-                  style: theme.textTheme.titleSmall,
+          if (!vm.isScheduled) ...[
+            const SizedBox(height: 14),
+            if (vm.isOrganizer)
+              NeedsYouPanel(
+                eyebrow: 'Needs you · organizer',
+                title:
+                    'No schedule yet. Open Setup to make teams and '
+                    'publish it.',
+                action: AmberButton(
+                  onPressed: () => _onMenu(_Menu.edit),
+                  icon: Icons.groups_outlined,
+                  label: 'Open setup',
                 ),
+              )
+            else
+              NotePanel(
+                icon: Icons.schedule,
+                title:
+                    'The schedule will appear here once organizers publish '
+                    'it.',
+              ),
+          ],
+          for (final (i, g) in vm.games.indexed) ...[
+            if (i == 0 ||
+                (t.settings.laterDays.isNotEmpty &&
+                    g.startsAt != null &&
+                    !DateUtils.isSameDay(vm.games[i - 1].startsAt, g.startsAt)))
+              HatHeading(
+                g.startsAt != null ? gameDay(g.startsAt!) : 'Schedule',
+                top: i == 0 ? 18 : 12,
               ),
             _gameTile(g),
           ],
@@ -267,22 +384,22 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
   }
 
   Widget _standings(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final pools = vm.poolStandings;
     return ConstrainedContent(
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
-          if (pools.isEmpty) const Text('No pool games yet.'),
-          for (final e in pools.entries) ...[
-            if (pools.length > 1)
-              Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 4),
-                child: Text(
-                  'Pool ${e.key}',
-                  style: theme.textTheme.titleMedium,
-                ),
+          if (pools.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                'No pool games yet.',
+                style: TextStyle(color: c.muted),
               ),
+            ),
+          for (final e in pools.entries) ...[
+            if (pools.length > 1) HatHeading('Pool ${e.key}', top: 8),
             StandingsTable(rows: e.value, nameOf: vm.teamName),
             const SizedBox(height: 16),
           ],
@@ -290,7 +407,7 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
             Text(
               'The bracket is seeded from these standings once every pool '
               'game is final.',
-              style: theme.textTheme.bodySmall,
+              style: TextStyle(fontSize: 12.5, color: c.muted),
             ),
         ],
       ),
@@ -298,13 +415,15 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
   }
 
   Widget _bracket(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final columns = <(GameStage, int), List<GroupGame>>{};
     for (final g in vm.bracketGames) {
       columns.putIfAbsent((g.stage, g.round), () => []).add(g);
     }
     if (columns.isEmpty) {
-      return const Center(child: Text('No bracket games yet.'));
+      return Center(
+        child: Text('No bracket games yet.', style: TextStyle(color: c.muted)),
+      );
     }
     String title((GameStage, int) key, List<GroupGame> games) =>
         switch (key.$1) {
@@ -332,7 +451,11 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
                   children: [
                     Text(
                       title(e.key, e.value),
-                      style: theme.textTheme.titleSmall,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: c.ink,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     for (final g in e.value) _gameTile(g),
@@ -346,27 +469,47 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
   }
 
   Widget _teams(BuildContext context, GroupTournament t) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     return ConstrainedContent(
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
           for (final team in t.teams)
             Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              color: team.id == vm.myTeam?.id
-                  ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
-                  : null,
+              margin: const EdgeInsets.only(bottom: 10),
+              color: team.id == vm.myTeam?.id ? c.accentSoft : null,
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(team.name, style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            team.name,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: c.ink,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${team.playerIds.length}',
+                          style: TextStyle(
+                            fontFamily: scoreFont,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            color: c.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     for (final uid in team.playerIds)
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        padding: const EdgeInsets.symmetric(vertical: 3),
                         child: Row(
                           children: [
                             Icon(
@@ -374,12 +517,24 @@ class _GroupTournamentScreenState extends State<GroupTournamentScreen> {
                                   ? Icons.star
                                   : Icons.person_outline,
                               size: 18,
+                              color: uid == team.captainId ? c.accent : c.muted,
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              team.nameOf(uid) +
-                                  (uid == team.captainId ? ' (captain)' : '') +
-                                  (uid == vm.uid ? ' · you' : ''),
+                            Expanded(
+                              child: Text(
+                                team.nameOf(uid) +
+                                    (uid == team.captainId
+                                        ? ' (captain)'
+                                        : '') +
+                                    (uid == vm.uid ? ' · you' : ''),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: uid == vm.uid
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: c.ink,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -445,17 +600,36 @@ class _GameSheet extends StatelessWidget {
           }
         }
 
+        final c = AppColors.of(context);
+        // Reporting and confirming are the captain's to do: amber.
+        final todo = FilledButton.styleFrom(
+          backgroundColor: c.highlight,
+          foregroundColor: c.onHighlight,
+          minimumSize: const Size.fromHeight(50),
+          textStyle: const TextStyle(
+            fontFamily: appFont,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        );
+        final note = TextStyle(fontSize: 13.5, color: c.ink2);
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   'Game ${vm.gameNumber(g)} · ${g.label}',
-                  style: theme.textTheme.titleLarge,
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: c.ink,
+                  ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   [
                     if (g.startsAt != null) gameTime(g.startsAt),
@@ -463,23 +637,25 @@ class _GameSheet extends StatelessWidget {
                     if (vm.tournament case final t?)
                       'to ${t.settings.scoreCap}',
                   ].join(' · '),
-                  style: theme.textTheme.bodyMedium,
+                  style: TextStyle(fontSize: 13, color: c.muted),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 GameTile(game: g, nameA: nameA, nameB: nameB),
                 if (vm.isSkipped(g))
-                  const Text(
+                  Text(
                     "Not needed: the winners' bracket champion won the final.",
+                    style: note,
                   )
                 else if (!g.hasTeams)
-                  const Text('Teams are decided by earlier games.'),
+                  Text('Teams are decided by earlier games.', style: note),
                 if (r != null && !g.isDone) ...[
                   const SizedBox(height: 8),
-                  Text(reported(r)),
+                  Text(reported(r), style: note),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 if (action == GameAction.report)
                   FilledButton(
+                    style: todo,
                     onPressed: busy
                         ? null
                         : () => enter(
@@ -493,6 +669,7 @@ class _GameSheet extends StatelessWidget {
                   ),
                 if (action == GameAction.confirm) ...[
                   FilledButton(
+                    style: todo,
                     onPressed: busy ? null : () => vm.confirm.execute(g),
                     child: Text('Confirm ${r!.scoreA}–${r.scoreB}'),
                   ),
@@ -511,7 +688,10 @@ class _GameSheet extends StatelessWidget {
                   ),
                 ],
                 if (action == GameAction.awaiting) ...[
-                  const Text('Waiting for the other captain to confirm.'),
+                  Text(
+                    'Waiting for the other captain to confirm.',
+                    style: note,
+                  ),
                   const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: busy
@@ -590,25 +770,76 @@ class _PublicTournament extends StatelessWidget {
       TournamentStatus.done => 'Finished',
     };
     final follow = this.follow;
+    final c = AppColors.of(context);
+    Widget fact(IconData icon, String title, [String? subtitle]) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: c.accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: c.ink,
+                  ),
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12.5, color: c.muted),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
     return ConstrainedContent(
       maxWidth: 640,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
-          Text(listing.name, style: theme.textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.event_outlined),
-            title: Text(when),
+          Row(
+            children: [
+              DateBadge(date: listing.startsAt, size: 52),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hat tournament',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: c.accent,
+                      ),
+                    ),
+                    Text(
+                      listing.name,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontSize: 22,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.account_tree_outlined),
-            title: Text(listing.format.label),
-            subtitle: Text(status),
+          const SizedBox(height: 14),
+          RowsCard(
+            children: [
+              fact(Icons.event_outlined, when),
+              fact(Icons.account_tree_outlined, listing.format.label, status),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
           if (follow != null)
             Align(
               alignment: Alignment.centerLeft,
@@ -618,9 +849,7 @@ class _PublicTournament extends StatelessWidget {
           Text(
             'Follow to see its updates on Home. To play, join the community and '
             'sign up there.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            style: TextStyle(fontSize: 13.5, color: c.muted),
           ),
           const SizedBox(height: 12),
           Align(

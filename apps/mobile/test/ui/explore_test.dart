@@ -11,7 +11,9 @@ import 'package:frisbee_app/ui/explore/view_models/explore_viewmodel.dart';
 import 'package:frisbee_app/ui/explore/view_models/player_search_viewmodel.dart';
 import 'package:frisbee_app/ui/explore/widgets/explore_screen.dart';
 import 'package:frisbee_app/ui/explore/widgets/rankings_screen.dart';
+import 'package:frisbee_app/ui/core/ui/layout.dart' show SectionCard;
 import 'package:frisbee_app/ui/teams/view_models/team_search_viewmodel.dart';
+import 'package:frisbee_app/ui/tournaments/view_models/hosted_tournaments_viewmodel.dart';
 
 import '../testing/fakes.dart';
 import '../testing/hosted_tournament_fakes.dart';
@@ -426,7 +428,7 @@ void main() {
   testWidgets(
     'the filter chips sit in one row that scrolls, selected chip in view',
     (tester) async {
-      // A narrow phone: five chips are wider than the screen.
+      // A narrow phone: seven chips are wider than the screen.
       tester.view.physicalSize = const Size(320, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -453,7 +455,22 @@ void main() {
       await tester.pumpAndSettle();
 
       final chips = find.byType(ChoiceChip);
-      expect(chips, findsNWidgets(5));
+      expect(chips, findsNWidgets(7));
+      expect(
+        [
+          for (final e in chips.evaluate())
+            ((e.widget as ChoiceChip).label as Text).data,
+        ],
+        [
+          'All',
+          'Tournaments',
+          'Leagues',
+          'Pickup',
+          'Teams',
+          'Communities',
+          'Players',
+        ],
+      );
       final rows = {
         for (final e in chips.evaluate())
           tester.getTopLeft(find.byWidget(e.widget)).dy,
@@ -479,11 +496,209 @@ void main() {
           .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Communities'))
           .onSelected!(true);
       await tester.pumpAndSettle();
-      final groups = tester.getRect(find.widgetWithText(ChoiceChip, 'Communities'));
+      final groups = tester.getRect(
+        find.widgetWithText(ChoiceChip, 'Communities'),
+      );
       expect(groups.left, greaterThanOrEqualTo(0));
       expect(groups.right, lessThanOrEqualTo(320));
     },
   );
+
+  group('Discover', () {
+    HostedTournament event(
+      String id,
+      String name, {
+      HostedType type = HostedType.tournament,
+      HostedStatus status = HostedStatus.registration,
+      int inDays = 10,
+    }) => HostedTournament(
+      id: id,
+      hostId: 'h',
+      hostName: 'Austin Ultimate',
+      name: name,
+      kind: type == HostedType.league
+          ? HostedKind.league
+          : HostedKind.tournament,
+      entryType: type == HostedType.hat
+          ? TournamentEntryType.players
+          : TournamentEntryType.teams,
+      location: 'Austin',
+      startsOn: DateTime.now().add(Duration(days: inDays)),
+      status: status,
+    );
+
+    /// Picks the chip [label] (by its callback: the row scrolls, so it
+    /// may be off the screen to tap).
+    Future<void> pick(WidgetTester tester, String label) async {
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label))
+          .onSelected!(true);
+      await tester.pump();
+    }
+
+    Future<void> pumpDiscover(
+      WidgetTester tester, {
+      required FakeHostedTournamentRepository tournaments,
+      FakeTeamRepository? teams,
+    }) async {
+      tester.view.physicalSize = const Size(390, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final teamSearch = TeamSearchViewModel(
+        teamRepository: teams ?? FakeTeamRepository(),
+        authRepository: FakeAuthRepository(user: testUser),
+      );
+      final players = PlayerSearchViewModel(
+        profileRepository: FakeProfileRepository(),
+      );
+      final events = HostedTournamentsViewModel(
+        tournamentRepository: tournaments,
+        authRepository: FakeAuthRepository(user: testUser),
+      );
+      addTearDown(teamSearch.dispose);
+      addTearDown(players.dispose);
+      addTearDown(events.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ExploreScreen(
+            viewModel: teamSearch,
+            players: players,
+            explore: build(tournaments: tournaments),
+            events: events,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('has what Find events had: live now, coming up and Host', (
+      tester,
+    ) async {
+      final tournaments = FakeHostedTournamentRepository()
+        ..tournaments.addAll({
+          'live': event(
+            'live',
+            'Mile High Open',
+            status: HostedStatus.live,
+            inDays: 0,
+          ),
+          'a': event('a', 'Lone Star Classic'),
+          'hat': event('hat', 'Snowmelt Hat', type: HostedType.hat),
+          'l': event('l', 'Winter League', type: HostedType.league),
+        });
+      await pumpDiscover(tester, tournaments: tournaments);
+
+      expect(find.text('Discover'), findsOneWidget);
+      expect(find.text('Host'), findsOneWidget);
+      // Live ones on a scoreboard card, not again under Coming up.
+      expect(find.text('Live now'), findsOneWidget);
+      expect(find.text('Mile High Open'), findsOneWidget);
+      expect(find.text('Coming up'), findsOneWidget);
+      for (final name in [
+        'Lone Star Classic',
+        'Snowmelt Hat',
+        'Winter League',
+      ]) {
+        expect(find.text(name), findsOneWidget, reason: name);
+      }
+      // The status filter Find events had.
+      expect(find.textContaining('Registration open'), findsWidgets);
+
+      // Tournaments: tournaments and hats; Leagues: leagues.
+      await pick(tester, 'Tournaments');
+      await tester.pumpAndSettle();
+      expect(find.text('Snowmelt Hat'), findsOneWidget);
+      expect(find.text('Winter League'), findsNothing);
+      await pick(tester, 'Leagues');
+      await tester.pumpAndSettle();
+      expect(find.text('Winter League'), findsOneWidget);
+      expect(find.text('Lone Star Classic'), findsNothing);
+      expect(find.text('Mile High Open'), findsNothing);
+
+      // Teams need a search: a hint, no events.
+      await pick(tester, 'Teams');
+      await tester.pumpAndSettle();
+      expect(find.text('Coming up'), findsNothing);
+      expect(find.textContaining('letters to search teams'), findsOneWidget);
+    });
+
+    testWidgets('search results are grouped by kind', (tester) async {
+      final tournaments = FakeHostedTournamentRepository()
+        ..tournaments.addAll({
+          'a': event('a', 'Austin Classic'),
+          'l': event('l', 'Austin League', type: HostedType.league),
+        });
+      final teams = FakeTeamRepository()
+        ..listings['t'] = const TeamListing(
+          id: 't',
+          name: 'Austin Flyers',
+          division: Division.mixed,
+          level: CompetitionLevel.club,
+        )
+        ..listings['p'] = const TeamListing(
+          id: 'p',
+          name: 'Austin Pickup',
+          division: Division.mixed,
+          level: CompetitionLevel.club,
+          kind: TeamKind.community,
+        )
+        ..listings['s'] = const TeamListing(
+          id: 's',
+          name: 'Austin School',
+          division: Division.mixed,
+          level: CompetitionLevel.club,
+          kind: TeamKind.organization,
+        );
+      await pumpDiscover(tester, tournaments: tournaments, teams: teams);
+      await tester.enterText(find.byType(TextField), 'austin');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      for (final heading in [
+        'Tournaments',
+        'Leagues',
+        'Teams',
+        'Communities',
+      ]) {
+        expect(
+          find.descendant(
+            of: find.byType(SectionCard),
+            matching: find.text(heading),
+          ),
+          findsOneWidget,
+          reason: heading,
+        );
+      }
+      expect(find.text('Austin Classic'), findsOneWidget);
+      expect(find.text('Austin League'), findsOneWidget);
+      expect(find.text('Austin Flyers'), findsOneWidget);
+      expect(find.text('Austin Pickup'), findsOneWidget);
+      expect(find.text('Austin School'), findsOneWidget);
+      // Not while searching.
+      expect(find.text('Coming up'), findsNothing);
+
+      // Pickup: pickup communities only; Communities: schools and clubs too.
+      await pick(tester, 'Pickup');
+      await tester.pumpAndSettle();
+      expect(find.text('Austin Pickup'), findsOneWidget);
+      expect(find.text('Austin School'), findsNothing);
+      expect(find.text('Austin Flyers'), findsNothing);
+      expect(find.text('Austin Classic'), findsNothing);
+      await pick(tester, 'Communities');
+      await tester.pumpAndSettle();
+      expect(find.text('Austin Pickup'), findsOneWidget);
+      expect(find.text('Austin School'), findsOneWidget);
+      expect(find.text('Austin League'), findsNothing);
+
+      // Under Pickup, a search that only finds a school says so.
+      await pick(tester, 'Pickup');
+      await tester.enterText(find.byType(TextField), 'school');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(find.text('Austin School'), findsNothing);
+      expect(find.text('Nothing found'), findsOneWidget);
+    });
+  });
 
   test('a players link opens on players', () async {
     final vm = build(kind: RankingKind.players, rankingsPage: true);

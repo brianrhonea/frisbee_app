@@ -109,7 +109,11 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
               const SizedBox(height: 16),
               Text(
                 'Or invite someone on Stall 10',
-                style: Theme.of(context).textTheme.titleSmall,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: c.ink,
+                ),
               ),
               const SizedBox(height: 8),
             ],
@@ -191,7 +195,11 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> {
                                   avatar: Icon(Icons.check, size: 16),
                                   label: Text('Invited'),
                                 )
-                              : FilledButton.tonal(
+                              : OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: c.accent,
+                                    side: BorderSide(color: c.accent),
+                                  ),
                                   onPressed: vm.invite.running
                                       ? null
                                       : () => vm.invite.execute(p),
@@ -285,15 +293,20 @@ class _LinkCard extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           decoration: BoxDecoration(
-            color: c.accentSoft,
-            borderRadius: BorderRadius.circular(12),
+            color: c.card,
+            border: Border.all(color: c.border),
+            borderRadius: BorderRadius.circular(cardRadius),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Invite link',
-                style: TextStyle(fontWeight: FontWeight.w700, color: c.ink),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: c.ink,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
@@ -324,44 +337,60 @@ class _LinkCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: link == null
-                        ? Text(
-                            busy
-                                ? 'Making a link…'
-                                : viewModel.createLink.error
-                                ? "Couldn't make a link. Copy or share to "
-                                      'try again.'
-                                : 'Copy or share to make a link.',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: viewModel.createLink.error
-                                  ? Theme.of(context).colorScheme.error
-                                  : c.muted,
-                            ),
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SelectableText(
-                                link.toString(),
-                                maxLines: 1,
-                                style: TextStyle(fontSize: 12.5, color: c.ink),
-                              ),
-                              if (expires != null)
-                                Text(
-                                  'Works until '
-                                  '${DateFormat('MMM d, h:mm a').format(expires)}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: c.muted,
-                                  ),
-                                ),
-                            ],
-                          ),
+              // The link on its own line (a phone's dialog is too narrow
+              // to share it with the buttons), then Copy, QR and Share.
+              if (link == null)
+                Text(
+                  busy
+                      ? 'Making a link…'
+                      : viewModel.createLink.error
+                      ? "Couldn't make a link. Copy or share to try again."
+                      : 'Copy or share to make a link.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: viewModel.createLink.error
+                        ? Theme.of(context).colorScheme.error
+                        : c.muted,
                   ),
+                )
+              else ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.field,
+                    borderRadius: BorderRadius.circular(controlRadius),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.link, size: 16, color: c.muted),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SelectableText(
+                          link.toString(),
+                          maxLines: 1,
+                          style: TextStyle(fontSize: 13, color: c.ink),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (expires != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Works until '
+                      '${DateFormat('MMM d, h:mm a').format(expires)}',
+                      style: TextStyle(fontSize: 12, color: c.muted),
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
                   IconButton(
                     tooltip: 'Copy link',
                     onPressed: busy ? null : () => _copy(context),
@@ -372,6 +401,7 @@ class _LinkCard extends StatelessWidget {
                     onPressed: busy ? null : () => _qr(context),
                     icon: const Icon(Icons.qr_code_2, size: 20),
                   ),
+                  const SizedBox(width: 4),
                   FilledButton.icon(
                     onPressed: busy ? null : () => _share(context),
                     icon: const Icon(Icons.ios_share, size: 18),
@@ -472,14 +502,27 @@ class _JoinRequestsCard extends StatelessWidget {
         }
         final busy =
             vm.approveJoinRequest.running || vm.declineJoinRequest.running;
-        return Padding(
-          padding: const EdgeInsets.only(top: 12),
+        final c = AppColors.of(context);
+        // Requests wait on the admin: amber, unlike the rest of the dialog.
+        return Container(
+          margin: const EdgeInsets.only(top: 12),
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 4),
+          decoration: BoxDecoration(
+            color: c.highlightSoft,
+            border: Border.all(color: c.highlight.withValues(alpha: 0.45)),
+            borderRadius: BorderRadius.circular(cardRadius),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
                 'Requests (${requests.length})',
-                style: Theme.of(context).textTheme.titleSmall,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
+                  color: c.highlightInk,
+                ),
               ),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 132),
@@ -490,13 +533,19 @@ class _JoinRequestsCard extends StatelessWidget {
                       ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        leading: PersonAvatar(
-                          name: r.name.isEmpty ? '?' : r.name,
+                        title: Text(
+                          r.name.isEmpty ? 'Someone' : r.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: c.ink,
+                          ),
                         ),
-                        title: Text(r.name.isEmpty ? 'Someone' : r.name),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Icon-only: the dialog is narrow on a phone.
                             IconButton(
                               tooltip: 'Decline',
                               icon: const Icon(Icons.close),
@@ -504,7 +553,11 @@ class _JoinRequestsCard extends StatelessWidget {
                                   ? null
                                   : () => vm.declineJoinRequest.execute(r.uid),
                             ),
-                            FilledButton.tonal(
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: c.highlight,
+                                foregroundColor: c.onHighlight,
+                              ),
                               onPressed: busy
                                   ? null
                                   : () => vm.approveJoinRequest.execute(r),

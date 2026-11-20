@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/outbox.dart';
+import '../../core/themes/theme.dart';
 import '../view_models/outbox_viewmodel.dart';
 
 /// A strip across the top of the app while offline, or while anything
@@ -64,14 +65,12 @@ class _OfflineBannerState extends State<OfflineBanner> {
     builder: (context, _) {
       final vm = widget.viewModel;
       if (!vm.showBanner) return widget.child;
-      final scheme = Theme.of(context).colorScheme;
+      final c = AppColors.of(context);
       final failed = vm.online && vm.waitingCount == 0;
-      final background = failed
-          ? scheme.errorContainer
-          : scheme.surfaceContainerHighest;
-      final foreground = failed
-          ? scheme.onErrorContainer
-          : scheme.onSurfaceVariant;
+      // Turned down: the user's to sort out, so amber. Offline or
+      // waiting: a quiet field-coloured strip.
+      final background = failed ? c.highlightSoft : c.field;
+      final foreground = failed ? c.highlightInk : c.ink2;
       return Column(
         children: [
           Material(
@@ -173,7 +172,10 @@ class OutboxSheet extends StatelessWidget {
                                 : '${job.files.length} attachments',
                         ].join(' · '),
                         style: job.state == OutboxState.failed
-                            ? TextStyle(color: theme.colorScheme.error)
+                            ? TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.of(context).highlightInk,
+                              )
                             : null,
                       ),
                       trailing: job.state == OutboxState.sending

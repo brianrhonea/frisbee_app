@@ -11,7 +11,9 @@ import '../../../domain/models/workout_route.dart';
 import '../../../routing/open_link.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/linkified_text.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/tap_outside_unfocus.dart';
 import '../../core/ui/user_avatar.dart';
 import '../../schedule/widgets/event_style.dart';
@@ -69,7 +71,7 @@ class UserPostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = AppColors.of(context);
     final repostOf = post.repostOf;
     final subtitle = [
       switch (post.kind) {
@@ -88,7 +90,7 @@ class UserPostCard extends StatelessWidget {
       child: InkWell(
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 4, 6),
+          padding: const EdgeInsets.fromLTRB(14, 12, 4, 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -119,14 +121,16 @@ class UserPostCard extends StatelessWidget {
                             post.authorName.isEmpty
                                 ? 'Someone'
                                 : post.authorName,
-                            style: theme.textTheme.titleSmall,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: c.ink,
+                            ),
                           ),
                         ),
                         Text(
                           subtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
+                          style: TextStyle(fontSize: 12.5, color: c.muted),
                         ),
                       ],
                     ),
@@ -413,15 +417,13 @@ class _PostFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = AppColors.of(context);
     final target = actions.target(post);
     if (target == null) return const SizedBox(height: 8);
     final liked = actions.isLiked(post);
     final reposted = actions.isReposted(post);
     final canRepost = actions.canRepost(post) && onRepost != null;
-    final muted = TextButton.styleFrom(
-      foregroundColor: scheme.onSurfaceVariant,
-    );
+    final muted = TextButton.styleFrom(foregroundColor: c.muted);
     // Where the row is narrow (phones, inside a card), drop the words and
     // keep the counts. Measured from the row's own width: the screen's
     // left the words in on 411 dp phones, overflowing the card.
@@ -437,9 +439,8 @@ class _PostFooter extends StatelessWidget {
               TextButton.icon(
                 onPressed: () => actions.toggleLike.execute(post),
                 style: TextButton.styleFrom(
-                  foregroundColor: liked
-                      ? Colors.red.shade400
-                      : scheme.onSurfaceVariant,
+                  // Turf, not red: red is only for live games.
+                  foregroundColor: liked ? c.accent : c.muted,
                 ),
                 icon: Icon(
                   liked ? Icons.favorite : Icons.favorite_border,
@@ -455,9 +456,7 @@ class _PostFooter extends StatelessWidget {
                 // Your own posts show how often they were reposted.
                 onPressed: canRepost ? onRepost : null,
                 style: TextButton.styleFrom(
-                  foregroundColor: reposted
-                      ? scheme.primary
-                      : scheme.onSurfaceVariant,
+                  foregroundColor: reposted ? c.accent : c.muted,
                 ),
                 icon: Icon(reposted ? Icons.repeat_on : Icons.repeat, size: 20),
                 label: Text(
@@ -488,7 +487,7 @@ class _PostFooter extends StatelessWidget {
               IconButton(
                 tooltip: 'Send',
                 onPressed: () => showSendPost(context, target),
-                color: scheme.onSurfaceVariant,
+                color: c.muted,
                 icon: const Icon(Icons.send_outlined, size: 20),
               ),
             ],
@@ -813,13 +812,12 @@ class WorkoutSummary extends StatelessWidget {
         ),
       if (workout.effort case final e?) ('Effort', '$e/10'),
     ];
-    final muted = theme.textTheme.labelSmall?.copyWith(
-      color: scheme.onSurfaceVariant,
-    );
+    final c = AppColors.of(context);
+    final muted = TextStyle(fontSize: 11.5, color: c.muted);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.outlineVariant),
+        border: Border.all(color: c.border),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -833,37 +831,44 @@ class WorkoutSummary extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        workoutIcon(workout.activity),
-                        size: 16,
-                        color: scheme.primary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        workout.activity.label,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: scheme.primary,
+                  // The activity in a small chip, then its numbers in the
+                  // score face.
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(8, 3, 10, 3),
+                    decoration: BoxDecoration(
+                      color: c.field,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          workoutIcon(workout.activity),
+                          size: 14,
+                          color: c.ink2,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 5),
+                        Text(
+                          workout.activity.label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: c.ink2,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Wrap(
-                    spacing: 18,
-                    runSpacing: 6,
+                    spacing: 20,
+                    runSpacing: 8,
                     children: [
                       for (final (label, value) in stats)
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              value,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+                            ScoreText(value, size: 22),
                             Text(label, style: muted),
                           ],
                         ),

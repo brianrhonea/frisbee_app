@@ -130,7 +130,9 @@ class WorkoutRecorder extends ChangeNotifier {
     if (_state != RecorderState.ready) return;
     _stopListening();
     _state = RecorderState.idle;
-    notifyListeners();
+    // Called from a page's dispose, while the widget tree is locked:
+    // tell listeners on the next microtask instead of mid-teardown.
+    Future.microtask(notifyListeners);
   }
 
   void start() {

@@ -4,7 +4,7 @@ import '../themes/theme.dart';
 
 /// The one search box: same height, icon and clear button on every page.
 /// [hint] says what it searches, e.g. "Search messages" for a page's own
-/// list; the app-wide search (Explore) says "Search Stall 10".
+/// list; the app-wide search (Discover) says "Search Stall 10".
 class AppSearchField extends StatefulWidget {
   const AppSearchField({
     super.key,

@@ -102,6 +102,7 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
         }
         final name = _name ??= TextEditingController(text: room.name);
         final busy = vm.save.running || vm.delete.running;
+        final c = AppColors.of(context);
         return Scaffold(
           appBar: AppBar(
             title: Text(
@@ -111,21 +112,31 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
                   ? 'Voice channel settings'
                   : 'Channel settings',
             ),
-            actions: [
-              if (vm.canDelete)
-                IconButton(
-                  tooltip: 'Delete room',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: busy ? null : () => _confirmDelete(room),
-                ),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilledButton(
-                  onPressed: busy || !vm.canSave ? null : vm.save.execute,
-                  child: Text(vm.isNew ? 'Create' : 'Save'),
+          ),
+          bottomNavigationBar: DecoratedBox(
+            decoration: BoxDecoration(
+              color: c.card,
+              border: Border(top: BorderSide(color: c.border)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Center(
+                heightFactor: 1,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      onPressed: busy || !vm.canSave ? null : vm.save.execute,
+                      child: Text(vm.isNew ? 'Create' : 'Save'),
+                    ),
+                  ),
                 ),
               ),
-            ],
+            ),
           ),
           body: ConstrainedContent(
             maxWidth: 720,
@@ -134,25 +145,37 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
               children: [
                 if (busy) const LinearProgressIndicator(),
                 if (vm.isNew) ...[
-                  SegmentedButton<ChatRoomKind>(
-                    segments: const [
-                      ButtonSegment(
-                        value: ChatRoomKind.text,
-                        icon: Icon(Icons.tag),
-                        label: Text('Text'),
-                      ),
-                      ButtonSegment(
-                        value: ChatRoomKind.voice,
-                        icon: Icon(Icons.volume_up_rounded),
-                        label: Text('Voice'),
-                      ),
+                  _FieldLabel('Type'),
+                  Row(
+                    children: [
+                      for (final (kind, icon, label, about) in const [
+                        (
+                          ChatRoomKind.text,
+                          Icons.tag,
+                          'Text',
+                          'Messages, photos, files',
+                        ),
+                        (
+                          ChatRoomKind.voice,
+                          Icons.volume_up_rounded,
+                          'Voice',
+                          'Drop-in audio',
+                        ),
+                      ]) ...[
+                        if (kind != ChatRoomKind.text) const SizedBox(width: 8),
+                        Expanded(
+                          child: _KindCard(
+                            icon: icon,
+                            label: label,
+                            about: about,
+                            selected: room.kind == kind,
+                            onTap: busy ? null : () => vm.setKind(kind),
+                          ),
+                        ),
+                      ],
                     ],
-                    selected: {room.kind},
-                    onSelectionChanged: busy
-                        ? null
-                        : (k) => vm.setKind(k.first),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 18),
                 ],
                 TextField(
                   controller: name,
@@ -182,7 +205,7 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
                     onChanged: busy ? null : vm.setFolder,
                   ),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 _SectionTitle(
                   title: 'Access by role',
                   subtitle: room.isVoice
@@ -190,13 +213,17 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
                             'them talk too. The owner can always do both.'
                       : 'The owner can always read and post in every room.',
                 ),
-                for (final id in vm.audiences)
-                  ChatAccessRow(
-                    title: vm.audienceLabel(id),
-                    value: room.roleAccess(id),
-                    onChanged: (a) => vm.setRoleAccess(id, a),
-                  ),
-                const SizedBox(height: 24),
+                _RowsCard(
+                  children: [
+                    for (final id in vm.audiences)
+                      ChatAccessRow(
+                        title: vm.audienceLabel(id),
+                        value: room.roleAccess(id),
+                        onChanged: (a) => vm.setRoleAccess(id, a),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 22),
                 _SectionTitle(
                   title: 'People',
                   subtitle:
@@ -208,24 +235,169 @@ class _ChatRoomSettingsScreenState extends State<ChatRoomSettingsScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
                       'No other members yet.',
-                      style: TextStyle(color: AppColors.of(context).muted),
+                      style: TextStyle(color: c.muted),
                     ),
+                  )
+                else
+                  _RowsCard(
+                    children: [
+                      for (final m in vm.members)
+                        ChatAccessRow(
+                          title: m.name,
+                          subtitle: switch (vm.accessByRole(m.uid)) {
+                            ChatAccess.none => vm.rolesLabel(m.uid),
+                            final a =>
+                              '${vm.rolesLabel(m.uid)} · ${a.label} by role',
+                          },
+                          value: room.userAccess(m.uid),
+                          onChanged: (a) => vm.setUserAccess(m.uid, a),
+                        ),
+                    ],
                   ),
-                for (final m in vm.members)
-                  ChatAccessRow(
-                    title: m.name,
-                    subtitle: switch (vm.accessByRole(m.uid)) {
-                      ChatAccess.none => vm.rolesLabel(m.uid),
-                      final a => '${vm.rolesLabel(m.uid)} · ${a.label} by role',
-                    },
-                    value: room.userAccess(m.uid),
-                    onChanged: (a) => vm.setUserAccess(m.uid, a),
+                if (vm.canDelete) ...[
+                  const SizedBox(height: 22),
+                  // Destructive, but neutral: red is kept for live games,
+                  // and the confirm dialog says what's lost.
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                      foregroundColor: c.ink,
+                      backgroundColor: c.card,
+                      side: BorderSide(color: c.border2),
+                    ),
+                    onPressed: busy ? null : () => _confirmDelete(room),
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    label: const Text('Delete room'),
                   ),
+                ],
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// A small bold label above a field, e.g. "Type".
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: AppColors.of(context).ink2,
+      ),
+    ),
+  );
+}
+
+/// Text or Voice, as a card to pick when making a room.
+class _KindCard extends StatelessWidget {
+  const _KindCard({
+    required this.icon,
+    required this.label,
+    required this.about,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String about;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final ink = selected ? c.accentInk : c.ink;
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: selected,
+      button: true,
+      label: '$label room. $about',
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? c.accentSoft : c.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: selected ? c.accent : c.border2,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: InkWell(
+          customBorder: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 22, color: ink),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  about,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: selected ? c.accentInk : c.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// [children] in one card, with lines between.
+class _RowsCard extends StatelessWidget {
+  const _RowsCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: c.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, child) in children.indexed) ...[
+            if (i > 0) Divider(height: 1, color: c.border),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: child,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -246,10 +418,13 @@ class _SectionTitle extends StatelessWidget {
         children: [
           Text(
             title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: c.ink,
+            ),
           ),
+          const SizedBox(height: 2),
           Text(subtitle, style: TextStyle(color: c.muted, fontSize: 13)),
         ],
       ),
@@ -257,7 +432,8 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-/// A row with a None / Read / Read & write picker.
+/// A row with a None / Read / Read & write picker: a segmented control on
+/// the field colour, the picked one raised on a card in turf.
 class ChatAccessRow extends StatelessWidget {
   const ChatAccessRow({
     super.key,
@@ -275,23 +451,74 @@ class ChatAccessRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final picker = SegmentedButton<ChatAccess>(
-      showSelectedIcon: false,
-      style: const ButtonStyle(visualDensity: VisualDensity.compact),
-      segments: const [
-        ButtonSegment(value: ChatAccess.none, label: Text('None')),
-        ButtonSegment(value: ChatAccess.read, label: Text('Read')),
-        ButtonSegment(value: ChatAccess.write, label: Text('Read & write')),
-      ],
-      selected: {value},
-      onSelectionChanged: (s) => onChanged(s.first),
+    final picker = Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          for (final (a, label, flex) in const [
+            (ChatAccess.none, 'None', 10),
+            (ChatAccess.read, 'Read', 10),
+            (ChatAccess.write, 'Read & write', 14),
+          ])
+            Expanded(
+              flex: flex,
+              child: Semantics(
+                inMutuallyExclusiveGroup: true,
+                checked: a == value,
+                button: true,
+                label: '$title: $label',
+                excludeSemantics: true,
+                child: Material(
+                  color: a == value ? c.card : Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: a == value
+                        ? BorderSide(color: c.border2)
+                        : BorderSide.none,
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => onChanged(a),
+                    child: SizedBox(
+                      height: 34,
+                      child: Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            label,
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: a == value
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                              color: a == value ? c.accent : c.muted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
     final label = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: TextStyle(fontWeight: FontWeight.w600, color: c.ink),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: c.ink,
+          ),
         ),
         if (subtitle != null)
           Text(subtitle!, style: TextStyle(fontSize: 12, color: c.muted)),
@@ -302,14 +529,14 @@ class ChatAccessRow extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) => constraints.maxWidth < 480
             ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [label, const SizedBox(height: 6), picker],
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [label, const SizedBox(height: 8), picker],
               )
             : Row(
                 children: [
                   Expanded(child: label),
                   const SizedBox(width: 12),
-                  picker,
+                  SizedBox(width: 300, child: picker),
                 ],
               ),
       ),

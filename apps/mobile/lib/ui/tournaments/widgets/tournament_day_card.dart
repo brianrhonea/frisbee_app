@@ -9,6 +9,7 @@ import '../../../domain/tournament_engine/tournament_day.dart';
 import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/scoreboard.dart';
 
 /// A team's tournament day, on Home and the team page in place of "Up
 /// next": its next game (opponent, time, field), its record and pool
@@ -61,49 +62,47 @@ class TournamentDayCard extends StatelessWidget {
 
     return FeatureCard(
       onTap: open,
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               if (when == 'Live') ...[
-                Icon(Icons.circle, size: 9, color: c.highlight),
-                const SizedBox(width: 6),
+                const LiveDot(),
+                const SizedBox(width: 8),
               ],
               Expanded(
-                child: Eyebrow(
-                  [when, if (showTeam) day.team.name].join(' · '),
-                  color: c.onFeatureMuted,
+                child: Text(
+                  [when, if (showTeam) day.team.name].join(' · ').toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: c.onFeature,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                  ),
                 ),
               ),
-              Icon(Icons.emoji_events_outlined, size: 16, color: c.highlight),
+              if (record.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(
+                  record,
+                  style: TextStyle(
+                    color: c.onFeatureMuted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             t.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: c.onFeature,
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (next != null)
-            Text(
-              d.phase == TournamentDayPhase.tomorrow
-                  ? 'First game'
-                  : 'Next game',
-              style: TextStyle(
-                color: c.onFeatureMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          Text(
-            headline,
             style: TextStyle(
               color: c.onFeature,
               fontWeight: FontWeight.w800,
@@ -111,40 +110,54 @@ class TournamentDayCard extends StatelessWidget {
               letterSpacing: -0.4,
             ),
           ),
-          if (detail != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              detail,
-              style: TextStyle(
-                color: c.onFeature,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: c.featureHighlight,
+              borderRadius: BorderRadius.circular(controlRadius),
             ),
-          ],
-          if (record.isNotEmpty || last != null) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 12,
-              runSpacing: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (record.isNotEmpty)
+                if (next != null)
                   Text(
-                    record,
+                    (d.phase == TournamentDayPhase.tomorrow
+                            ? 'First game'
+                            : 'Next game')
+                        .toUpperCase(),
                     style: TextStyle(
-                      color: c.highlight,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
+                      color: c.onFeatureMuted,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
                     ),
                   ),
-                if (last != null)
+                Text(
+                  headline,
+                  style: TextStyle(
+                    color: c.onFeature,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 17,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                if (detail != null)
                   Text(
-                    'Last: ${last.won ? 'W' : 'L'} '
-                    '${last.scoreFor}–${last.scoreAgainst} vs '
-                    '${day.nameOf(last.opponent)}',
-                    style: TextStyle(color: c.onFeatureMuted, fontSize: 12.5),
+                    detail,
+                    style: TextStyle(color: c.onFeatureMuted, fontSize: 13),
                   ),
               ],
+            ),
+          ),
+          if (last != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Last: ${last.won ? 'W' : 'L'} '
+              '${last.scoreFor}–${last.scoreAgainst} vs '
+              '${day.nameOf(last.opponent)}',
+              style: TextStyle(color: c.onFeatureMuted, fontSize: 12.5),
             ),
           ],
           if (day.isCaptain &&
@@ -157,28 +170,39 @@ class TournamentDayCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (action != null)
-                Expanded(
-                  child: HighlightButton(
-                    label: d.scoreDueKind == ScoreDueKind.confirm
-                        ? 'Confirm score'
-                        : 'Report score',
-                    onPressed: () => context.push(
-                      Routes.tournament(
-                        t.id,
-                        division: day.divisionId,
-                        game: action.id,
-                      ),
+              if (action != null) ...[
+                HighlightButton(
+                  label: d.scoreDueKind == ScoreDueKind.confirm
+                      ? 'Confirm score'
+                      : 'Report score',
+                  onPressed: () => context.push(
+                    Routes.tournament(
+                      t.id,
+                      division: day.divisionId,
+                      game: action.id,
                     ),
                   ),
                 ),
-              if (action != null) const SizedBox(width: 8),
-              TextButton(
-                style: TextButton.styleFrom(foregroundColor: c.onFeature),
+                const SizedBox(height: 8),
+              ],
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: c.featureHighlight,
+                  foregroundColor: c.onFeature,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                ),
                 onPressed: () => open(tab: 'schedule'),
-                child: const Text('Schedule & standings'),
+                child: const Text(
+                  'Schedule & standings',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

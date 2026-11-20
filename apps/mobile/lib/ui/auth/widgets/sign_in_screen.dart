@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/username.dart';
 import '../../../routing/routes.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
 import '../view_models/sign_in_viewmodel.dart';
 import 'auth_layout.dart';
@@ -72,6 +73,11 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
+  /// Google and Apple: full width, 48 high.
+  static final _social = ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size.fromHeight(48)),
+  );
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     vm.signIn.execute((email: _email.text, password: _password.text));
@@ -98,12 +104,49 @@ class _SignInScreenState extends State<SignInScreen> {
         ]),
         builder: (context, _) {
           final busy = vm.busy;
+          final c = AppColors.of(context);
           return Form(
             key: _formKey,
             child: AutofillGroup(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (vm.showGoogle)
+                    OutlinedButton.icon(
+                      style: _social,
+                      onPressed: busy ? null : vm.signInWithGoogle.execute,
+                      icon: const Icon(Icons.g_mobiledata, size: 28),
+                      label: const Text('Continue with Google'),
+                    ),
+                  if (vm.showApple) ...[
+                    if (vm.showGoogle) const SizedBox(height: 10),
+                    FilledButton.icon(
+                      style: _social.copyWith(
+                        backgroundColor: WidgetStatePropertyAll(c.ink),
+                        foregroundColor: WidgetStatePropertyAll(c.background),
+                      ),
+                      onPressed: busy ? null : vm.signInWithApple.execute,
+                      icon: const Icon(Icons.apple),
+                      label: const Text('Continue with Apple'),
+                    ),
+                  ],
+                  if (vm.showGoogle || vm.showApple) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'or',
+                            style: TextStyle(fontSize: 13, color: c.muted),
+                          ),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   TextFormField(
                     controller: _email,
                     decoration: const InputDecoration(
@@ -132,6 +175,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
+                      style: TextButton.styleFrom(foregroundColor: c.accent),
                       onPressed: busy ? null : _forgotPassword,
                       child: const Text('Forgot password?'),
                     ),
@@ -145,38 +189,27 @@ class _SignInScreenState extends State<SignInScreen> {
                           )
                         : const Text('Sign in'),
                   ),
-                  if (vm.showGoogle || vm.showApple) ...[
-                    const SizedBox(height: 16),
-                    const Row(
-                      children: [
-                        Expanded(child: Divider()),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8),
-                          child: Text('or'),
-                        ),
-                        Expanded(child: Divider()),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (vm.showGoogle)
-                    OutlinedButton.icon(
-                      onPressed: busy ? null : vm.signInWithGoogle.execute,
-                      icon: const Icon(Icons.g_mobiledata, size: 28),
-                      label: const Text('Continue with Google'),
-                    ),
-                  if (vm.showApple) ...[
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: busy ? null : vm.signInWithApple.execute,
-                      icon: const Icon(Icons.apple),
-                      label: const Text('Continue with Apple'),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   TextButton(
                     onPressed: busy ? null : () => context.go(Routes.signUp),
-                    child: const Text("Don't have an account? Sign up"),
+                    child: Text.rich(
+                      TextSpan(
+                        text: "Don't have an account? ",
+                        style: TextStyle(
+                          color: c.muted,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: 'Sign up',
+                            style: TextStyle(
+                              color: c.accent,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),

@@ -14,7 +14,6 @@ import '../ui/auth/widgets/choose_username_screen.dart';
 import '../ui/auth/widgets/sign_in_screen.dart';
 import '../ui/auth/widgets/sign_up_screen.dart';
 import '../ui/core/ui/view_model_host.dart';
-import '../ui/events/widgets/events_tabs.dart';
 import '../ui/home/view_models/home_viewmodel.dart';
 import '../ui/home/widgets/home_screen.dart';
 import '../ui/posts/view_models/post_detail_viewmodel.dart';
@@ -30,7 +29,6 @@ import '../ui/schedule/view_models/schedule_viewmodel.dart';
 import '../ui/schedule/widgets/schedule_screen.dart';
 import '../ui/shell/widgets/app_shell.dart';
 import '../ui/tournaments/view_models/hosted_tournaments_viewmodel.dart';
-import '../ui/tournaments/widgets/hosted_tournaments_list.dart';
 import '../ui/teams/view_models/team_home_viewmodel.dart';
 import '../ui/teams/view_models/team_search_viewmodel.dart';
 import '../ui/teams/widgets/team_home_screen.dart';
@@ -74,7 +72,9 @@ Widget chooseUsernamePage() => ViewModelHost(
   builder: (_, vm) => ChooseUsernameScreen(viewModel: vm),
 );
 
-/// Explore, with its search and filter from `?q=` and `?only=`.
+/// Discover, with its search and filter from `?q=` and `?only=`: search,
+/// what's live, tournaments and leagues coming up (what the Events tab's
+/// "Find events" was), results and rankings.
 Widget explorePage(GoRouterState state) => ViewModelHost(
   create: (c) =>
       TeamSearchViewModel(teamRepository: c.read(), authRepository: c.read()),
@@ -82,14 +82,21 @@ Widget explorePage(GoRouterState state) => ViewModelHost(
     create: (c) => PlayerSearchViewModel(profileRepository: c.read()),
     builder: (_, players) => ViewModelHost(
       create: (c) => exploreViewModel(c),
-      builder: (_, explore) => ExploreScreen(
-        viewModel: vm,
-        players: players,
-        explore: explore,
-        initialQuery: state.uri.queryParameters['q'] ?? '',
-        initialFilter: ExploreFilter.values
-            .where((f) => f.name == state.uri.queryParameters['only'])
-            .firstOrNull,
+      builder: (_, explore) => ViewModelHost(
+        create: (c) => HostedTournamentsViewModel(
+          tournamentRepository: c.read(),
+          authRepository: c.read(),
+        ),
+        builder: (_, events) => ExploreScreen(
+          viewModel: vm,
+          players: players,
+          explore: explore,
+          events: events,
+          initialQuery: state.uri.queryParameters['q'] ?? '',
+          initialFilter: ExploreFilter.values
+              .where((f) => f.name == state.uri.queryParameters['only'])
+              .firstOrNull,
+        ),
       ),
     ),
   ),
@@ -187,6 +194,7 @@ Widget teamPage(GoRouterState state) {
       viewModel: vm,
       section: TeamSection.fromPath(state.uri.queryParameters['section']),
       more: state.uri.queryParameters['section'] == TeamTab.morePath,
+      inTeamsTab: state.uri.path.startsWith('${Routes.teams}/'),
     ),
   );
 }
@@ -236,40 +244,16 @@ Widget postPage(GoRouterState state) {
   );
 }
 
-/// The Events tab: the user's schedule, or tournaments and leagues to find
-/// (`?view=find`), under the same tabs.
-Widget eventsPage(GoRouterState state) {
-  final view = EventsView.fromQuery(state.uri.queryParameters['view']);
-  final tabs = EventsTabs(selected: view);
-  return switch (view) {
-    EventsView.schedule => ViewModelHost(
-      key: const ValueKey('events-schedule'),
-      create: (c) => ScheduleViewModel(
-        authRepository: c.read(),
-        teamRepository: c.read(),
-        eventRepository: c.read(),
-        meetingRepository: c.read<MeetingRepository>(),
-        calendarRepository: c.read<CalendarRepository>(),
-      ),
-      builder: (context, vm) => ScheduleScreen(
-        viewModel: vm,
-        title: 'Events',
-        leading: ProfileButton.leading(context),
-        bottom: tabs,
-      ),
-    ),
-    EventsView.find => ViewModelHost(
-      key: const ValueKey('events-find'),
-      create: (c) => HostedTournamentsViewModel(
-        tournamentRepository: c.read(),
-        authRepository: c.read(),
-      ),
-      builder: (context, vm) => FindTournamentsScreen(
-        viewModel: vm,
-        title: 'Events',
-        leading: ProfileButton.leading(context),
-        bottom: tabs,
-      ),
-    ),
-  };
-}
+/// The Schedule tab: the user's own calendar, a week at a time.
+Widget schedulePage() => ViewModelHost(
+  key: const ValueKey('schedule'),
+  create: (c) => ScheduleViewModel(
+    authRepository: c.read(),
+    teamRepository: c.read(),
+    eventRepository: c.read(),
+    meetingRepository: c.read<MeetingRepository>(),
+    calendarRepository: c.read<CalendarRepository>(),
+  ),
+  builder: (context, vm) =>
+      ScheduleScreen(viewModel: vm, leading: ProfileButton.leading(context)),
+);

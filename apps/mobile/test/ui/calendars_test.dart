@@ -492,7 +492,7 @@ void main() {
           home: Scaffold(body: ScheduleEventRow(entry: entry, large: true)),
         ),
       );
-      expect(find.text('MY CALENDAR'), findsOneWidget);
+      expect(find.text('My calendar'), findsOneWidget);
       await tester.tap(find.text('Track'));
       await tester.pumpAndSettle();
       expect(
@@ -538,6 +538,9 @@ void main() {
         find.text('Get a subscription link'),
         200,
       );
+      // scrollUntilVisible stops once it's built, which may be just below.
+      await tester.ensureVisible(find.text('Get a subscription link'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Get a subscription link'));
       await tester.pumpAndSettle();
       expect(

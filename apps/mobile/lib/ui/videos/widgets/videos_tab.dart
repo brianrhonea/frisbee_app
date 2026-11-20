@@ -6,6 +6,7 @@ import '../../../domain/models/team_video.dart';
 import '../../../domain/models/video_folder.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -141,35 +142,55 @@ class _VideosTabState extends State<VideosTab> {
     }
   }
 
-  Widget _grid(BuildContext context, List<TeamVideo> videos) =>
-      GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 420,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          mainAxisExtent: 300,
+  Widget _list(BuildContext context, List<TeamVideo> videos) {
+    final c = AppColors.of(context);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+      children: [
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Material(
+              color: c.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(cardRadius),
+                side: BorderSide(color: c.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  for (final (i, v) in videos.indexed) ...[
+                    if (i > 0) Divider(height: 1, color: c.border),
+                    VideoCard(
+                      video: v,
+                      // Inside a folder, every row would say the same thing.
+                      folderName: vm.filter is AllVideos
+                          ? vm.folderOf(v)?.name
+                          : null,
+                      onOpen: () => context.push(Routes.video(vm.teamId, v.id)),
+                      onEdit: vm.canEdit
+                          ? () =>
+                                context.push(Routes.editVideo(vm.teamId, v.id))
+                          : null,
+                      onMove: vm.canEdit && vm.folders.isNotEmpty
+                          ? () => _move(v)
+                          : null,
+                      onDelete: vm.canEdit ? () => _delete(v) : null,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ),
-        itemCount: videos.length,
-        itemBuilder: (context, i) {
-          final v = videos[i];
-          return VideoCard(
-            video: v,
-            // Inside a folder, every card would say the same thing.
-            folderName: vm.filter is AllVideos ? vm.folderOf(v)?.name : null,
-            onOpen: () => context.push(Routes.video(vm.teamId, v.id)),
-            onEdit: vm.canEdit
-                ? () => context.push(Routes.editVideo(vm.teamId, v.id))
-                : null,
-            onMove: vm.canEdit && vm.folders.isNotEmpty ? () => _move(v) : null,
-            onDelete: vm.canEdit ? () => _delete(v) : null,
-          );
-        },
-      );
+      ],
+    );
+  }
 
   Widget _videos(BuildContext context) {
     final videos = vm.visibleVideos;
-    if (videos.isNotEmpty) return _grid(context, videos);
+    if (videos.isNotEmpty) return _list(context, videos);
     if (vm.videos.isEmpty) {
       return EmptyView(
         icon: Icons.video_library_outlined,
@@ -197,15 +218,23 @@ class _VideosTabState extends State<VideosTab> {
     if (vm.error != null && vm.videos.isEmpty) {
       return ErrorView(error: vm.error);
     }
+    final current = vm.currentFolder;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (vm.canEdit && vm.videos.isNotEmpty)
           _StorageUsed(bytes: vm.usedBytes),
         if (vm.canEdit || vm.folders.isNotEmpty)
-          _FolderBar(
-            viewModel: vm,
-            onNew: vm.canEdit ? _newFolder : null,
+          _FolderBar(viewModel: vm, onNew: vm.canEdit ? _newFolder : null),
+        if (vm.videos.isNotEmpty || current != null)
+          _ListHeader(
+            title: switch (vm.filter) {
+              AllVideos() => 'All videos',
+              UnsortedVideos() => 'Unsorted',
+              InFolder() => current?.name ?? 'Folder',
+            },
+            count: vm.visibleVideos.length,
+            folder: current,
             onRename: vm.canEdit ? _renameFolder : null,
             onDelete: vm.canEdit ? _deleteFolder : null,
           ),
@@ -308,87 +337,145 @@ class _FolderNameDialogState extends State<_FolderNameDialog> {
 enum _FolderAction { rename, delete }
 
 /// Chips to show all videos, one folder, or unsorted ones; admins also
-/// add, rename and delete folders here.
+/// add folders here.
 class _FolderBar extends StatelessWidget {
-  const _FolderBar({
-    required this.viewModel,
-    this.onNew,
-    this.onRename,
-    this.onDelete,
-  });
+  const _FolderBar({required this.viewModel, this.onNew});
 
   final TeamVideosViewModel viewModel;
   final VoidCallback? onNew;
-  final void Function(VideoFolder)? onRename;
-  final void Function(VideoFolder)? onDelete;
 
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final current = vm.currentFolder;
+    final c = AppColors.of(context);
     Widget chip(VideoFilter f, String label, {IconData? icon}) => Padding(
       padding: const EdgeInsets.only(right: 8),
       child: ChoiceChip(
-        avatar: icon == null ? null : Icon(icon, size: 18),
+        avatar: icon == null
+            ? null
+            : Icon(
+                icon,
+                size: 18,
+                color: vm.filter == f ? c.onChipOn : c.accent,
+              ),
         label: Text('$label (${vm.countIn(f)})'),
         selected: vm.filter == f,
+        showCheckmark: false,
         onSelected: (_) => vm.filter = f,
       ),
     );
     final unsorted = vm.countIn(const UnsortedVideos());
     return SizedBox(
-      height: 56,
-      child: Row(
-        children: [
-          Expanded(
-            // Not a ListView: every chip is built, so a team's few folders
-            // all stay findable and focusable while scrolled off.
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-              child: Row(
-                children: [
-                  chip(const AllVideos(), 'All'),
-                  for (final f in vm.folders)
-                    chip(InFolder(f.id), f.name, icon: Icons.folder_outlined),
-                  if (vm.folders.isNotEmpty &&
-                      (unsorted > 0 || vm.filter is UnsortedVideos))
-                    chip(const UnsortedVideos(), 'Unsorted'),
-                  if (onNew != null)
-                    ActionChip(
-                      avatar: const Icon(
-                        Icons.create_new_folder_outlined,
-                        size: 18,
-                      ),
-                      label: const Text('New folder'),
-                      onPressed: onNew,
-                    ),
-                ],
+      height: 60,
+      // Not a ListView: every chip is built, so a team's few folders
+      // all stay findable and focusable while scrolled off.
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: Row(
+          children: [
+            chip(const AllVideos(), 'All'),
+            for (final f in vm.folders)
+              chip(InFolder(f.id), f.name, icon: Icons.folder_outlined),
+            if (vm.folders.isNotEmpty &&
+                (unsorted > 0 || vm.filter is UnsortedVideos))
+              chip(const UnsortedVideos(), 'Unsorted'),
+            if (onNew != null)
+              ActionChip(
+                avatar: Icon(
+                  Icons.create_new_folder_outlined,
+                  size: 18,
+                  color: c.accent,
+                ),
+                label: Text('New folder', style: TextStyle(color: c.accent)),
+                side: BorderSide(color: c.border2),
+                onPressed: onNew,
               ),
-            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The heading over the list: "All videos", the folder's name or
+/// "Unsorted", its count, and for admins the open folder's options.
+class _ListHeader extends StatelessWidget {
+  const _ListHeader({
+    required this.title,
+    required this.count,
+    this.folder,
+    this.onRename,
+    this.onDelete,
+  });
+
+  final String title;
+  final int count;
+  final VideoFolder? folder;
+  final void Function(VideoFolder)? onRename;
+  final void Function(VideoFolder)? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final current = folder;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720, minHeight: 40),
+          child: Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                      color: c.ink,
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Text(
+                  count == 1 ? '1 video' : '$count videos',
+                  style: TextStyle(fontSize: 13, color: c.muted),
+                ),
+              ),
+              if (current != null && (onRename != null || onDelete != null))
+                PopupMenuButton<_FolderAction>(
+                  tooltip: 'Folder options',
+                  icon: Icon(Icons.more_vert, color: c.ink2),
+                  onSelected: (a) => switch (a) {
+                    _FolderAction.rename => onRename?.call(current),
+                    _FolderAction.delete => onDelete?.call(current),
+                  },
+                  itemBuilder: (_) => [
+                    if (onRename != null)
+                      PopupMenuItem(
+                        value: _FolderAction.rename,
+                        child: Text('Rename "${current.name}"'),
+                      ),
+                    if (onDelete != null)
+                      PopupMenuItem(
+                        value: _FolderAction.delete,
+                        child: Text('Delete "${current.name}"'),
+                      ),
+                  ],
+                )
+              else
+                const SizedBox(width: 8),
+            ],
           ),
-          if (current != null && (onRename != null || onDelete != null))
-            PopupMenuButton<_FolderAction>(
-              tooltip: 'Folder options',
-              icon: const Icon(Icons.more_vert),
-              onSelected: (a) => switch (a) {
-                _FolderAction.rename => onRename?.call(current),
-                _FolderAction.delete => onDelete?.call(current),
-              },
-              itemBuilder: (_) => [
-                if (onRename != null)
-                  PopupMenuItem(
-                    value: _FolderAction.rename,
-                    child: Text('Rename "${current.name}"'),
-                  ),
-                if (onDelete != null)
-                  PopupMenuItem(
-                    value: _FolderAction.delete,
-                    child: Text('Delete "${current.name}"'),
-                  ),
-              ],
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -402,7 +489,7 @@ class _StorageUsed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final fraction = (bytes / TeamVideo.teamQuotaBytes).clamp(0.0, 1.0);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -412,14 +499,18 @@ class _StorageUsed extends StatelessWidget {
           Text(
             'Uploads: ${TeamVideo.formatBytes(bytes)} of '
             '${TeamVideo.formatBytes(TeamVideo.teamQuotaBytes)} used',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            style: TextStyle(fontSize: 12, color: c.muted),
           ),
-          const SizedBox(height: 4),
-          LinearProgressIndicator(
-            value: fraction,
-            color: fraction > 0.9 ? theme.colorScheme.error : null,
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: fraction,
+              minHeight: 6,
+              backgroundColor: c.field,
+              // Nearly full is the admin's to deal with: amber.
+              color: fraction > 0.9 ? c.highlight : c.accent,
+            ),
           ),
         ],
       ),
@@ -429,7 +520,7 @@ class _StorageUsed extends StatelessWidget {
 
 enum _VideoAction { edit, move, delete }
 
-/// A video's thumbnail, title, description and who shared it.
+/// A video's row: its thumbnail, title, description and who shared it.
 class VideoCard extends StatelessWidget {
   const VideoCard({
     super.key,
@@ -452,99 +543,103 @@ class VideoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = AppColors.of(context);
     final when = video.createdAt;
     final byline = [
       ?folderName,
       if (video.authorName.isNotEmpty) video.authorName,
       if (when != null) DateFormat.yMMMd().format(when),
     ].join(' · ');
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onOpen,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    final hasMenu = onEdit != null || onMove != null || onDelete != null;
+    return InkWell(
+      onTap: onOpen,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(12, 12, hasMenu ? 0 : 12, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (video.file case final f?)
-                    _FileThumbnail(file: f)
-                  else
-                    VideoThumbnail(youtubeId: video.youtubeId),
-                  const Center(child: _PlayBadge()),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 0, 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 128,
+                height: 72,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            video.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall,
-                          ),
-                          if (video.description.isNotEmpty)
-                            Text(
-                              video.description,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          const Spacer(),
-                          Text(
-                            byline,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (onEdit != null || onMove != null || onDelete != null)
-                      PopupMenuButton<_VideoAction>(
-                        tooltip: 'Video options',
-                        onSelected: (a) => switch (a) {
-                          _VideoAction.edit => onEdit?.call(),
-                          _VideoAction.move => onMove?.call(),
-                          _VideoAction.delete => onDelete?.call(),
-                        },
-                        itemBuilder: (_) => [
-                          if (onEdit != null)
-                            const PopupMenuItem(
-                              value: _VideoAction.edit,
-                              child: Text('Edit'),
-                            ),
-                          if (onMove != null)
-                            const PopupMenuItem(
-                              value: _VideoAction.move,
-                              child: Text('Move to folder'),
-                            ),
-                          if (onDelete != null)
-                            const PopupMenuItem(
-                              value: _VideoAction.delete,
-                              child: Text('Remove'),
-                            ),
-                        ],
-                      ),
+                    if (video.file case final f?)
+                      _FileThumbnail(file: f)
+                    else ...[
+                      VideoThumbnail(youtubeId: video.youtubeId),
+                      const Center(child: _PlayBadge()),
+                    ],
                   ],
                 ),
               ),
             ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    video.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                      color: c.ink,
+                    ),
+                  ),
+                  if (video.description.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      video.description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: c.ink2),
+                    ),
+                  ],
+                  if (byline.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      byline,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: c.muted),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (hasMenu)
+              PopupMenuButton<_VideoAction>(
+                tooltip: 'Video options',
+                icon: Icon(Icons.more_vert, color: c.muted),
+                onSelected: (a) => switch (a) {
+                  _VideoAction.edit => onEdit?.call(),
+                  _VideoAction.move => onMove?.call(),
+                  _VideoAction.delete => onDelete?.call(),
+                },
+                itemBuilder: (_) => [
+                  if (onEdit != null)
+                    const PopupMenuItem(
+                      value: _VideoAction.edit,
+                      child: Text('Edit'),
+                    ),
+                  if (onMove != null)
+                    const PopupMenuItem(
+                      value: _VideoAction.move,
+                      child: Text('Move to folder'),
+                    ),
+                  if (onDelete != null)
+                    const PopupMenuItem(
+                      value: _VideoAction.delete,
+                      child: Text('Remove'),
+                    ),
+                ],
+              ),
           ],
         ),
       ),
@@ -552,6 +647,8 @@ class VideoCard extends StatelessWidget {
   }
 }
 
+/// A small play button over a thumbnail photo (white on a dark scrim,
+/// like the video it covers).
 class _PlayBadge extends StatelessWidget {
   const _PlayBadge();
 
@@ -559,8 +656,8 @@ class _PlayBadge extends StatelessWidget {
   Widget build(BuildContext context) => const DecoratedBox(
     decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
     child: Padding(
-      padding: EdgeInsets.all(8),
-      child: Icon(Icons.play_arrow, color: Colors.white, size: 36),
+      padding: EdgeInsets.all(4),
+      child: Icon(Icons.play_arrow, color: Colors.white, size: 24),
     ),
   );
 }
@@ -573,19 +670,36 @@ class _FileThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return ColoredBox(
-      color: scheme.secondaryContainer,
-      child: Align(
-        alignment: Alignment.bottomRight,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Chip(
-            visualDensity: VisualDensity.compact,
-            avatar: const Icon(Icons.movie_outlined, size: 16),
-            label: Text('${file.format} · ${TeamVideo.formatBytes(file.size)}'),
+    final c = AppColors.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: c.field,
+        border: Border.all(color: c.border),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Stack(
+        children: [
+          Center(child: Icon(Icons.movie_outlined, color: c.muted, size: 26)),
+          Positioned(
+            right: 6,
+            bottom: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: c.feature,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '${file.format} · ${TeamVideo.formatBytes(file.size)}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: c.onFeature,
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

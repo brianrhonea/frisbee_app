@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../domain/models/play.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -183,9 +184,7 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
                   appBar: AppBar(
                     title: GestureDetector(
                       onTap: editable ? _editDetails : null,
-                      child: Text(
-                        vm.play.name.isEmpty ? 'Untitled play' : vm.play.name,
-                      ),
+                      child: _PlayTitle(play: vm.play),
                     ),
                     actions: [
                       IconButton(
@@ -212,6 +211,13 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              minimumSize: const Size(0, 36),
+                              tapTargetSize: MaterialTapTargetSize.padded,
+                            ),
                             onPressed: vm.save.running || !vm.dirty
                                 ? null
                                 : vm.save.execute,
@@ -222,7 +228,9 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Icon(Icons.save_outlined),
+                                // Text only, like the mockup, so the
+                                // play's name keeps more of the bar.
+                                : null,
                             label: const Text('Save'),
                           ),
                         ),
@@ -235,7 +243,7 @@ class _PlayEditorScreenState extends State<PlayEditorScreen>
                         if (editable && !_timeline) _Toolbar(viewModel: vm),
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                             child: _timeline
                                 ? AnimatedBuilder(
                                     animation: _anim,
@@ -314,64 +322,215 @@ class _DiagramAction<T extends Intent> extends Action<T> {
   }
 }
 
+/// The play's name over its category and number of steps.
+class _PlayTitle extends StatelessWidget {
+  const _PlayTitle({required this.play});
+
+  final Play play;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final n = play.steps.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          play.name.isEmpty ? 'Untitled play' : play.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+            color: c.ink,
+          ),
+        ),
+        Text(
+          [
+            play.category.label,
+            if (n > 0) n == 1 ? '1 step' : '$n steps',
+          ].join(' · '),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 12, color: c.muted),
+        ),
+      ],
+    );
+  }
+}
+
+/// A bar under the app bar or over the bottom edge: card fill with a
+/// hairline between it and the field.
+class _Bar extends StatelessWidget {
+  const _Bar({required this.child, this.top = false});
+
+  final Widget child;
+
+  /// True for a bar at the bottom (the line goes on top).
+  final bool top;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final line = BorderSide(color: c.border);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: c.card,
+        border: Border(
+          top: top ? line : BorderSide.none,
+          bottom: top ? BorderSide.none : line,
+        ),
+      ),
+      child: Material(type: MaterialType.transparency, child: child),
+    );
+  }
+}
+
+/// A square tool button: icon over a short label, turf when selected.
+class _ToolTile extends StatelessWidget {
+  const _ToolTile({
+    required this.icon,
+    required this.label,
+    required this.tooltip,
+    required this.onPressed,
+    this.selected = false,
+    this.iconColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool selected;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final enabled = onPressed != null;
+    final fg = selected ? c.accentInk : (enabled ? c.ink2 : c.muted);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Tooltip(
+        message: tooltip,
+        excludeFromSemantics: true,
+        child: Semantics(
+          button: true,
+          selected: selected,
+          enabled: enabled,
+          label: tooltip,
+          onTap: onPressed,
+          excludeSemantics: true,
+          child: Opacity(
+            opacity: enabled ? 1 : 0.45,
+            child: Material(
+              color: selected ? c.accentSoft : c.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(controlRadius),
+                side: BorderSide(
+                  color: selected ? c.accent : c.border,
+                  width: selected ? 2 : 1,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onPressed,
+                child: SizedBox(
+                  width: 54,
+                  height: 54,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, size: 20, color: iconColor ?? fg),
+                      const SizedBox(height: 3),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w600,
+                          color: fg,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Toolbar extends StatelessWidget {
   const _Toolbar({required this.viewModel});
 
   final PlayEditorViewModel viewModel;
 
   static const _tools = [
-    (EditorTool.select, Icons.near_me_outlined, 'Select / move'),
-    (EditorTool.offense, Icons.circle, 'Offense player'),
-    (EditorTool.defense, Icons.circle, 'Defense player'),
-    (EditorTool.disc, Icons.album_outlined, 'Disc'),
-    (EditorTool.cone, Icons.change_history, 'Cone'),
-    (EditorTool.cut, Icons.trending_up, 'Draw cut'),
-    (EditorTool.throw_, Icons.more_horiz, 'Draw throw'),
-    (EditorTool.erase, Icons.auto_fix_normal_outlined, 'Erase'),
+    (EditorTool.select, Icons.near_me_outlined, 'Select', 'Select / move'),
+    (EditorTool.offense, Icons.circle, 'Offense', 'Offense player'),
+    (EditorTool.defense, Icons.circle, 'Defense', 'Defense player'),
+    (EditorTool.disc, Icons.album_outlined, 'Disc', 'Disc'),
+    (EditorTool.cone, Icons.change_history, 'Cone', 'Cone'),
+    (EditorTool.cut, Icons.trending_up, 'Cut', 'Draw cut'),
+    (EditorTool.throw_, Icons.more_horiz, 'Throw', 'Draw throw'),
+    (EditorTool.erase, Icons.auto_fix_normal_outlined, 'Erase', 'Erase'),
   ];
 
+  /// The field's own colours, so the buttons match what they place.
   Color? _iconColor(EditorTool t) => switch (t) {
-    EditorTool.offense => Colors.blue,
-    EditorTool.defense => Colors.red,
-    EditorTool.cone => Colors.orange,
+    EditorTool.offense => FieldColors.offense,
+    EditorTool.defense => FieldColors.defense,
+    EditorTool.cone => FieldColors.cone,
     _ => null,
   };
 
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
+    final c = AppColors.of(context);
     if (!vm.editingSetup) return _StepToolbar(viewModel: vm);
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainer,
+    return _Bar(
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
-            for (final (tool, icon, label) in _tools)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: IconButton(
-                  tooltip: label,
-                  isSelected: vm.tool == tool,
-                  style: IconButton.styleFrom(
-                    backgroundColor: vm.tool == tool
-                        ? Theme.of(context).colorScheme.secondaryContainer
-                        : null,
-                  ),
-                  icon: Icon(icon, color: _iconColor(tool)),
-                  onPressed: () => vm.setTool(tool),
-                ),
+            for (final (tool, icon, label, tooltip) in _tools)
+              _ToolTile(
+                icon: icon,
+                label: label,
+                tooltip: tooltip,
+                selected: vm.tool == tool,
+                // Navy defense needs a light ring to show on a dark card.
+                iconColor:
+                    tool == EditorTool.defense &&
+                        Theme.of(context).brightness == Brightness.dark
+                    ? Color.lerp(FieldColors.defense, Colors.white, 0.45)
+                    : _iconColor(tool),
+                onPressed: () => vm.setTool(tool),
               ),
-            const SizedBox(height: 32, child: VerticalDivider()),
-            IconButton(
+            SizedBox(
+              height: 36,
+              child: VerticalDivider(width: 16, color: c.border2),
+            ),
+            _ToolTile(
+              icon: Icons.delete_outline,
+              label: 'Delete',
               tooltip: 'Delete selected',
-              icon: const Icon(Icons.delete_outline),
               onPressed: vm.selectedId == null ? null : vm.deleteSelected,
             ),
-            IconButton(
+            _ToolTile(
+              icon: Icons.layers_clear_outlined,
+              label: 'Clear',
               tooltip: 'Clear field',
-              icon: const Icon(Icons.layers_clear_outlined),
               onPressed: vm.play.elements.isEmpty && vm.play.arrows.isEmpty
                   ? null
                   : vm.clearDiagram,
@@ -392,45 +551,44 @@ class _StepToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final selected = vm.selectedId;
-    Widget tool(EditorTool t, IconData icon, String label) => IconButton(
-      tooltip: label,
-      isSelected: vm.tool == t,
-      style: IconButton.styleFrom(
-        backgroundColor: vm.tool == t
-            ? theme.colorScheme.secondaryContainer
-            : null,
-      ),
-      icon: Icon(icon),
-      onPressed: () => vm.setTool(t),
-    );
-    return Material(
-      color: theme.colorScheme.surfaceContainer,
+    return _Bar(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
-            tool(EditorTool.select, Icons.open_with, 'Record movement'),
-            tool(
-              EditorTool.erase,
-              Icons.auto_fix_normal_outlined,
-              'Erase movement',
+            _ToolTile(
+              icon: Icons.open_with,
+              label: 'Move',
+              tooltip: 'Record movement',
+              selected: vm.tool == EditorTool.select,
+              onPressed: () => vm.setTool(EditorTool.select),
+            ),
+            _ToolTile(
+              icon: Icons.auto_fix_normal_outlined,
+              label: 'Erase',
+              tooltip: 'Erase movement',
+              selected: vm.tool == EditorTool.erase,
+              onPressed: () => vm.setTool(EditorTool.erase),
             ),
             if (vm.movesInStep(selected))
-              TextButton.icon(
-                onPressed: () => vm.clearMovement(selected!),
-                icon: const Icon(Icons.restart_alt),
-                label: const Text('Reset move'),
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: TextButton.icon(
+                  onPressed: () => vm.clearMovement(selected!),
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('Reset move'),
+                ),
               ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 vm.tool == EditorTool.erase
                     ? 'Tap a player to remove their movement in this step.'
                     : 'Drag players to record cuts. Drag the disc to throw.',
-                style: theme.textTheme.bodySmall,
-                maxLines: 2,
+                style: TextStyle(fontSize: 12, height: 1.35, color: c.muted),
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -441,7 +599,70 @@ class _StepToolbar extends StatelessWidget {
   }
 }
 
-/// Step chips, playback controls and the current step's caption.
+/// One step's tile in the timeline: "Setup" or the step's number.
+class _StepTile extends StatelessWidget {
+  const _StepTile({
+    required this.index,
+    required this.selected,
+    required this.done,
+    required this.onTap,
+  });
+
+  final int index;
+  final bool selected;
+
+  /// Already played (shown soft turf), for the viewer's progress.
+  final bool done;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final setup = index == 0;
+    final (Color bg, Color fg, BorderSide side) = selected
+        ? (c.accent, c.onAccent, BorderSide.none)
+        : done
+        ? (c.accentSoft, c.accentInk, BorderSide.none)
+        : (c.card, c.ink2, BorderSide(color: c.border2));
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: setup ? 'Setup' : 'Step $index',
+        onTap: onTap,
+        excludeSemantics: true,
+        child: Material(
+          color: bg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: side,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              height: 40,
+              width: setup ? 62 : 44,
+              child: Center(
+                child: Text(
+                  setup ? 'Setup' : '$index',
+                  style: TextStyle(
+                    fontSize: setup ? 12 : 15,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                    color: fg,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Step tiles, playback controls and the current step's caption.
 class _Timeline extends StatelessWidget {
   const _Timeline({
     required this.viewModel,
@@ -474,18 +695,26 @@ class _Timeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = viewModel;
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final n = vm.stepCount;
     final t = time;
     // Step being played, or the selected one.
     final active = t == null ? vm.step : (t == 0 ? 0 : t.ceil().clamp(1, n));
+    final captionStep = t == null
+        ? vm.step
+        : (n == 0 ? 0 : t.floor().clamp(0, n - 1) + 1);
     final caption = t == null
         ? vm.stepNote
         : (n == 0 ? '' : vm.play.steps[t.floor().clamp(0, n - 1)].note);
-    return Material(
-      color: theme.colorScheme.surfaceContainerLow,
+    final label = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: c.ink2,
+    );
+    return _Bar(
+      top: true,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -495,8 +724,17 @@ class _Timeline extends StatelessWidget {
                 IconButton.filled(
                   tooltip: playing ? 'Pause' : 'Play',
                   onPressed: n == 0 ? null : onPlay,
+                  iconSize: 26,
+                  style: IconButton.styleFrom(
+                    backgroundColor: c.accent,
+                    foregroundColor: c.onAccent,
+                    disabledBackgroundColor: c.field,
+                    disabledForegroundColor: c.muted,
+                    minimumSize: const Size(48, 48),
+                  ),
                   icon: Icon(playing ? Icons.pause : Icons.play_arrow),
                 ),
+                const SizedBox(width: 8),
                 PopupMenuButton<double>(
                   tooltip: 'Playback speed',
                   initialValue: speed,
@@ -505,76 +743,144 @@ class _Timeline extends StatelessWidget {
                     for (final s in _speeds)
                       PopupMenuItem(value: s, child: Text('${_fmt(s)}×')),
                   ],
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Container(
+                    height: 40,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: c.card,
+                      border: Border.all(color: c.border2),
+                      borderRadius: BorderRadius.circular(controlRadius),
+                    ),
                     child: Text(
                       '${_fmt(speed)}×',
-                      style: theme.textTheme.labelLarge,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: c.ink,
+                      ),
                     ),
                   ),
                 ),
                 Expanded(
                   child: n == 0
-                      ? Text(
-                          editable
-                              ? 'Add a step to animate this play.'
-                              : 'This play has no animation.',
-                          style: theme.textTheme.bodySmall,
+                      ? Padding(
+                          padding: const EdgeInsets.only(left: 12),
+                          child: Text(
+                            editable
+                                ? 'Add a step to animate this play.'
+                                : 'This play has no animation.',
+                            style: TextStyle(fontSize: 12, color: c.muted),
+                          ),
                         )
                       : Slider(
                           value: (t ?? vm.step.toDouble()).clamp(0, n * 1.0),
                           max: n.toDouble(),
+                          activeColor: c.accent,
+                          inactiveColor: c.border2,
                           onChanged: onScrub,
                         ),
                 ),
+                if (n > 0)
+                  Text(
+                    '$active / $n',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: c.muted,
+                    ),
+                  ),
               ],
             ),
+            const SizedBox(height: 6),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
                   for (var i = 0; i <= n; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: ChoiceChip(
-                        label: Text(i == 0 ? 'Setup' : 'Step $i'),
-                        selected: active == i,
-                        onSelected: (_) => onStep(i),
-                      ),
+                    _StepTile(
+                      index: i,
+                      selected: active == i,
+                      done: !editable && i < active,
+                      onTap: () => onStep(i),
                     ),
                   if (editable && n < PlayEditorViewModel.maxSteps)
-                    ActionChip(
-                      avatar: const Icon(Icons.add, size: 18),
-                      label: const Text('Add step'),
+                    OutlinedButton.icon(
                       onPressed: onAddStep,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: c.accent,
+                        backgroundColor: Colors.transparent,
+                        side: BorderSide(color: c.accent),
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        textStyle: const TextStyle(
+                          fontFamily: appFont,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add step'),
                     ),
                 ],
               ),
             ),
-            if (editable && t == null && vm.step > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Row(
+            if (editable && t == null && vm.step > 0) ...[
+              const SizedBox(height: 10),
+              Text('Step ${vm.step} note', style: label),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: _StepNoteField(
+                      key: ValueKey('note-${vm.play.steps[vm.step - 1].id}'),
+                      initial: vm.stepNote,
+                      onChanged: vm.setStepNote,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Delete step',
+                    color: c.muted,
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => vm.deleteStep(vm.step),
+                  ),
+                ],
+              ),
+            ] else if (caption.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                decoration: BoxDecoration(
+                  color: c.background,
+                  border: Border.all(color: c.border),
+                  borderRadius: BorderRadius.circular(cardRadius),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: _StepNoteField(
-                        key: ValueKey('note-${vm.play.steps[vm.step - 1].id}'),
-                        initial: vm.stepNote,
-                        onChanged: vm.setStepNote,
+                    Text(
+                      'STEP $captionStep NOTE',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                        color: c.muted,
                       ),
                     ),
-                    IconButton(
-                      tooltip: 'Delete step',
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => vm.deleteStep(vm.step),
+                    const SizedBox(height: 4),
+                    Text(
+                      caption,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.45,
+                        color: c.ink2,
+                      ),
                     ),
                   ],
                 ),
-              )
-            else if (caption.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-                child: Text(caption, style: theme.textTheme.bodyMedium),
               ),
           ],
         ),

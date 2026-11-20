@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/team_video.dart';
+import '../../core/themes/theme.dart';
 import '../../videos/widgets/synced_video_player.dart';
 import '../../videos/widgets/youtube_player_view.dart';
 import '../view_models/watch_together_viewmodel.dart';
@@ -126,21 +127,25 @@ class _Tag extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      color: Colors.black54,
-      borderRadius: BorderRadius.circular(6),
+      color: AppColors.of(context).feature.withValues(alpha: 0.85),
+      borderRadius: BorderRadius.circular(999),
     ),
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
+          Icon(icon, size: 14, color: AppColors.of(context).onFeature),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
               text,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
+              style: TextStyle(
+                color: AppColors.of(context).onFeature,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

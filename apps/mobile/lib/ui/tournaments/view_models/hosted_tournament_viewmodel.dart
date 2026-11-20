@@ -1098,6 +1098,17 @@ class HostedTournamentViewModel extends ChangeNotifier {
         : HostedGameAction.confirm;
   }
 
+  /// The user's first game that waits on them for a score (to report or
+  /// to confirm), for the "your game" card on the schedule.
+  GroupGame? get gameNeedingMe => myUpcoming
+      .where(
+        (g) => switch (actionFor(g)) {
+          HostedGameAction.report || HostedGameAction.confirm => true,
+          _ => false,
+        },
+      )
+      .firstOrNull;
+
   bool canSetScore(GroupGame g) =>
       isManager && g.hasTeams && !laterGamesPlayed(g, _games);
 

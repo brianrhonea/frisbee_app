@@ -127,48 +127,71 @@ class _RolesScreenState extends State<RolesScreen> {
                             'Carpool, then give them to members on the '
                             'Members tab.',
                       ),
-                    for (final (i, r) in vm.roles.indexed)
-                      _RoleTile(
-                        role: r,
-                        summary: vm.summaryOf(r),
-                        members: vm.memberCount(r.id),
-                        // Who has a copy of a community role follows the
-                        // community.
-                        from: team.orgRoles.containsKey(r.id)
-                            ? team.orgName
-                            : null,
-                        menu: vm.isOwner
-                            ? PopupMenuButton<String>(
-                                tooltip: 'Role options',
-                                onSelected: (a) => switch (a) {
-                                  'edit' => _edit(r),
-                                  'up' => vm.shift.execute((id: r.id, by: -1)),
-                                  'down' => vm.shift.execute((id: r.id, by: 1)),
-                                  _ => _delete(r),
-                                },
-                                itemBuilder: (_) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Edit'),
-                                  ),
-                                  if (i > 0)
-                                    const PopupMenuItem(
-                                      value: 'up',
-                                      child: Text('Move up'),
-                                    ),
-                                  if (i < vm.roles.length - 1)
-                                    const PopupMenuItem(
-                                      value: 'down',
-                                      child: Text('Move down'),
-                                    ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Delete'),
-                                  ),
-                                ],
-                              )
-                            : null,
+                    if (vm.roles.isNotEmpty) ...[
+                      _ListHeading(
+                        title: 'Custom roles',
+                        trailing:
+                            '${vm.roles.length} of ${CustomRole.maxRoles}',
                       ),
+                      Card(
+                        margin: EdgeInsets.zero,
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          children: [
+                            for (final (i, r) in vm.roles.indexed) ...[
+                              if (i > 0) const Divider(height: 1),
+                              _RoleTile(
+                                role: r,
+                                summary: vm.summaryOf(r),
+                                members: vm.memberCount(r.id),
+                                // Who has a copy of a community role follows the
+                                // community.
+                                from: team.orgRoles.containsKey(r.id)
+                                    ? team.orgName
+                                    : null,
+                                menu: vm.isOwner
+                                    ? PopupMenuButton<String>(
+                                        tooltip: 'Role options',
+                                        onSelected: (a) => switch (a) {
+                                          'edit' => _edit(r),
+                                          'up' => vm.shift.execute((
+                                            id: r.id,
+                                            by: -1,
+                                          )),
+                                          'down' => vm.shift.execute((
+                                            id: r.id,
+                                            by: 1,
+                                          )),
+                                          _ => _delete(r),
+                                        },
+                                        itemBuilder: (_) => [
+                                          const PopupMenuItem(
+                                            value: 'edit',
+                                            child: Text('Edit'),
+                                          ),
+                                          if (i > 0)
+                                            const PopupMenuItem(
+                                              value: 'up',
+                                              child: Text('Move up'),
+                                            ),
+                                          if (i < vm.roles.length - 1)
+                                            const PopupMenuItem(
+                                              value: 'down',
+                                              child: Text('Move down'),
+                                            ),
+                                          const PopupMenuItem(
+                                            value: 'delete',
+                                            child: Text('Delete'),
+                                          ),
+                                        ],
+                                      )
+                                    : null,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -218,24 +241,55 @@ class _RoleTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    return Card.outlined(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: RoleDot(color: role.color, size: 16),
-        title: Text(
-          role.name,
-          style: TextStyle(fontWeight: FontWeight.w700, color: c.ink),
-        ),
-        subtitle: Text(
-          [
-            summary,
-            '$members ${members == 1 ? 'member' : 'members'}',
-            if (from case final f?)
-              'given out by ${f.isEmpty ? 'the community' : f}',
-          ].join(' · '),
-          style: TextStyle(color: c.muted),
-        ),
-        trailing: menu,
+    return ListTile(
+      contentPadding: const EdgeInsets.fromLTRB(16, 2, 4, 2),
+      leading: RoleDot(color: role.color, size: 12),
+      title: Text(
+        role.name,
+        style: TextStyle(fontWeight: FontWeight.w700, color: c.ink),
+      ),
+      subtitle: Text(
+        [
+          summary,
+          '$members ${members == 1 ? 'member' : 'members'}',
+          if (from case final f?)
+            'given out by ${f.isEmpty ? 'the community' : f}',
+        ].join(' · '),
+        style: TextStyle(color: c.muted, fontSize: 12.5),
+      ),
+      trailing: menu,
+    );
+  }
+}
+
+/// A list's title on the page with a small note on the right, e.g.
+/// "Custom roles · 3 of 50".
+class _ListHeading extends StatelessWidget {
+  const _ListHeading({required this.title, required this.trailing});
+
+  final String title;
+  final String trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
+                color: c.ink,
+              ),
+            ),
+          ),
+          Text(trailing, style: TextStyle(fontSize: 12.5, color: c.muted)),
+        ],
       ),
     );
   }

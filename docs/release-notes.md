@@ -10,6 +10,26 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.36
+
+**Find your way faster**
+- The tabs are now Home, Discover, Schedule, Teams and Inbox.
+  **Discover** is one place to find tournaments, leagues, pickup,
+  teams, communities and players.
+- If you're on one team, the Teams tab opens it straight away.
+- Your feed has three tabs: Your teams, Following and Everyone.
+
+**Every screen in the new look**
+- Team pages have a compact header with the team's initials, and
+  Invite and Message buttons up top.
+- RSVP shows how many are going on each answer; events you haven't
+  answered say "Needs RSVP".
+- Tournament days open on the schedule, with live games in navy.
+- Inbox shows team chats above direct messages.
+- Settings are grouped into cards, with a Light / Dark / System switch.
+- Delete and leave buttons are no longer red; red now only means a
+  live game.
+
 ## 0.0.35
 
 **A new look**

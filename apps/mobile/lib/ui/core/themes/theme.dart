@@ -290,6 +290,19 @@ abstract final class AppTheme {
         ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(color: c.accent),
+      // On: turf track, white thumb. Off: outlined track on the card.
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? c.onAccent : c.border2,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? c.accent : c.field,
+        ),
+        trackOutlineColor: WidgetStateProperty.resolveWith(
+          (s) =>
+              s.contains(WidgetState.selected) ? Colors.transparent : c.border2,
+        ),
+      ),
     );
   }
 
@@ -420,11 +433,13 @@ class AppColors extends ThemeExtension<AppColors> {
 
   final Color onSidebar;
   final Color onSidebarMuted;
+
   /// Scoreboard navy: anything live or today (scoreboard cards,
   /// live headers).
   final Color feature;
 
   final Color onFeature;
+
   /// Secondary text on [feature].
   final Color onFeatureMuted;
 
@@ -435,17 +450,19 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color positive;
 
   final Color positiveSoft;
+
   /// A selected filter chip.
   final Color chipOn;
 
   final Color onChipOn;
+
   /// Marks team events vs the user's personal events on schedules.
   final Color team;
 
   final Color personal;
+
   /// Team badge fill (white initials), the same in both modes.
   final Color badge;
-
 
   static const light = AppColors(
     background: Color(0xFFF5F6F1),
@@ -573,10 +590,12 @@ abstract final class FieldColors {
   static const grass = Color(0xFF2E7D4F);
   static const endzone = Color(0xFF256B43);
   static const lines = Color(0xE6FFFFFF);
-  static const offense = Color(0xFF1E88E5);
-  static const defense = Color(0xFFE53935);
+  // Team blue for offense and scoreboard navy for defense: distinct, and
+  // no red (red is only for live games).
+  static const offense = Color(0xFF2F78C8);
+  static const defense = Color(0xFF14213A);
   static const disc = Color(0xFFFFFFFF);
-  static const cone = Color(0xFFFF9800);
+  static const cone = Color(0xFFFF8A1F);
   static const cut = Color(0xFFFFFFFF);
   static const throwLine = Color(0xFFFFEB3B);
   static const selection = Color(0xFFFFEB3B);

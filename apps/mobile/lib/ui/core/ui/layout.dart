@@ -504,6 +504,8 @@ class DateBadge extends StatelessWidget {
         children: [
           Text(
             DateFormat.MMM().format(date).toUpperCase(),
+            softWrap: false,
+            overflow: TextOverflow.clip,
             style: TextStyle(
               fontSize: size * 0.2,
               fontWeight: FontWeight.w700,
@@ -513,6 +515,8 @@ class DateBadge extends StatelessWidget {
           ),
           Text(
             DateFormat('dd').format(date),
+            softWrap: false,
+            overflow: TextOverflow.clip,
             style: TextStyle(
               fontFamily: scoreFont,
               fontSize: size * 0.5,
@@ -577,14 +581,50 @@ class PersonAvatar extends StatelessWidget {
 /// A team's mark: a rounded dark green square with a mountain-like crest
 /// (or a people icon for community groups).
 class TeamBadge extends StatelessWidget {
-  const TeamBadge({super.key, this.size = 40, this.community = false});
+  const TeamBadge({
+    super.key,
+    this.size = 40,
+    this.community = false,
+    this.name,
+  });
 
   final double size;
   final bool community;
 
+  /// When given, the team's initials in the condensed face instead of an
+  /// icon: a team-blue rounded square for a team, a turf circle for a
+  /// community.
+  final String? name;
+
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
+    final initials = name;
+    if (initials != null) {
+      return Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: community ? c.accent : c.badge,
+          borderRadius: BorderRadius.circular(
+            community ? size / 2 : size * 0.27,
+          ),
+        ),
+        child: Text(
+          initialsOf(initials),
+          maxLines: 1,
+          softWrap: false,
+          style: TextStyle(
+            fontFamily: scoreFont,
+            fontWeight: FontWeight.w800,
+            fontSize: size * 0.45,
+            height: 1,
+            color: community ? c.onAccent : Colors.white,
+          ),
+        ),
+      );
+    }
     return Container(
       width: size,
       height: size,
@@ -687,7 +727,7 @@ class UnderlineTabs extends StatelessWidget {
                     border: Border(
                       bottom: BorderSide(
                         color: i == selected ? c.accent : Colors.transparent,
-                        width: 2,
+                        width: 3,
                       ),
                     ),
                   ),
@@ -698,7 +738,7 @@ class UnderlineTabs extends StatelessWidget {
                       fontWeight: i == selected
                           ? FontWeight.w700
                           : FontWeight.w500,
-                      color: i == selected ? c.accent : c.muted,
+                      color: i == selected ? c.ink : c.muted,
                     ),
                   ),
                 ),

@@ -13,6 +13,7 @@ import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/layout.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/tone.dart';
 import '../../core/ui/status_views.dart';
 import '../../follow/widgets/follow_button.dart';
@@ -358,8 +359,10 @@ class _Hero extends StatelessWidget {
               children: [
                 _Banner(
                   url: vm.headerUrl,
+                  // A soft turf band: navy is only for live or today, amber
+                  // only for what's the user's to do.
                   fallback: Container(
-                    color: c.feature,
+                    color: c.accentSoft,
                     padding: EdgeInsets.symmetric(horizontal: mobile ? 16 : 24),
                     child: Row(
                       children: [
@@ -370,7 +373,7 @@ class _Hero extends StatelessWidget {
                             children: [
                               Eyebrow(
                                 'Chase the next point.',
-                                color: c.highlight,
+                                color: c.accentInk,
                               ),
                               const SizedBox(height: 6),
                               FittedBox(
@@ -379,10 +382,12 @@ class _Hero extends StatelessWidget {
                                 child: Text(
                                   'ALWAYS IN PLAY.',
                                   style: TextStyle(
-                                    color: c.onFeature,
-                                    fontSize: mobile ? 24 : 32,
+                                    fontFamily: scoreFont,
+                                    fontStyle: FontStyle.italic,
+                                    color: c.accentInk,
+                                    fontSize: mobile ? 28 : 36,
                                     fontWeight: FontWeight.w800,
-                                    letterSpacing: -1,
+                                    letterSpacing: -0.3,
                                   ),
                                 ),
                               ),
@@ -393,10 +398,10 @@ class _Hero extends StatelessWidget {
                           Text(
                             '$number',
                             style: TextStyle(
-                              color: c.onFeature.withValues(alpha: 0.22),
-                              fontSize: mobile ? 64 : 88,
+                              fontFamily: scoreFont,
+                              color: c.accentInk.withValues(alpha: 0.25),
+                              fontSize: mobile ? 72 : 96,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: -3,
                               height: 1,
                             ),
                           ),
@@ -428,7 +433,7 @@ class _Hero extends StatelessWidget {
                           Text(
                             vm.name,
                             style: TextStyle(
-                              fontSize: mobile ? 20 : 24,
+                              fontSize: mobile ? 22 : 26,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.7,
                               color: c.ink,
@@ -490,15 +495,33 @@ class _Hero extends StatelessWidget {
                     onTap: vm.isMe
                         ? () => context.push(Routes.following)
                         : null,
-                    child: Text(
-                      '${vm.followers} '
-                      '${vm.followers == 1 ? 'follower' : 'followers'}'
-                      ' · ${vm.following} following',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: c.ink,
+                    // The counts bold, the words muted.
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${vm.followers}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: c.ink,
+                            ),
+                          ),
+                          TextSpan(
+                            text:
+                                ' ${vm.followers == 1 ? 'follower' : 'followers'}'
+                                ' · ',
+                          ),
+                          TextSpan(
+                            text: '${vm.following}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: c.ink,
+                            ),
+                          ),
+                          const TextSpan(text: ' following'),
+                        ],
                       ),
+                      style: TextStyle(fontSize: 13, color: c.muted),
                     ),
                   ),
                 ],
@@ -723,7 +746,13 @@ class _NumbersCard extends StatelessWidget {
             .map((x) => x.name)
             .toSet(),
     };
-    final menuStyle = TextStyle(fontSize: 12, color: c.muted);
+    // The app font named: a dropdown's style replaces the theme's whole.
+    final menuStyle = TextStyle(
+      fontFamily: appFont,
+      fontSize: 12.5,
+      fontWeight: FontWeight.w600,
+      color: c.accent,
+    );
     return SectionCard(
       title: 'By the numbers',
       action: Row(
@@ -792,8 +821,12 @@ class _NumbersCard extends StatelessWidget {
               children: [
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final columns = constraints.maxWidth >= 420 ? 3 : 2;
-                    final width = constraints.maxWidth / columns;
+                    // Tiles of three (two on the narrowest cards), the
+                    // number in the score face over its label.
+                    const gap = 8.0;
+                    final columns = constraints.maxWidth >= 240 ? 3 : 2;
+                    final width =
+                        (constraints.maxWidth - gap * (columns - 1)) / columns;
                     final blocks = [
                       ('${t.assists}', 'Assists', _avg(t.perGame(t.assists))),
                       ('${t.goals}', 'Goals', _avg(t.perGame(t.goals))),
@@ -811,20 +844,38 @@ class _NumbersCard extends StatelessWidget {
                       ),
                     ];
                     return Wrap(
-                      runSpacing: 18,
+                      spacing: gap,
+                      runSpacing: gap,
                       children: [
                         for (final (value, label, note) in blocks)
-                          SizedBox(
+                          Container(
                             width: width,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: c.card,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: c.border),
+                            ),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                StatBlock(value: value, label: label),
+                                ScoreText(value, size: 28),
+                                const SizedBox(height: 2),
+                                Text(
+                                  label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 12, color: c.ink2),
+                                ),
                                 if (note.isNotEmpty)
                                   Text(
                                     note,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 10.5,
                                       color: c.muted,
                                     ),
                                   ),
@@ -950,15 +1001,19 @@ class _GameCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.trending_up, size: 15, color: c.ink),
+              Icon(Icons.trending_up, size: 15, color: c.muted),
               const SizedBox(width: 6),
               Expanded(
                 child: Eyebrow(
                   'Match day · ${DateFormat.MMMd().format(g.date)}',
-                  color: c.ink,
                 ),
               ),
-              Tag('$result ${g.ourScore}–${g.theirScore}', strong: g.won),
+              // The result in the score face; a win in turf.
+              ScoreText(
+                '$result ${g.ourScore}–${g.theirScore}',
+                size: 20,
+                color: g.won ? c.accent : c.ink2,
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -1186,19 +1241,28 @@ class _ClaimCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final suggested = claim.players.first;
-    return FeatureCard(
+    // The user's to do: a plain card with an amber mark and button.
+    return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Eyebrow(
-            'Link your stats · ${claim.team.name}',
-            color: c.onFeatureMuted,
+          Row(
+            children: [
+              TeamDot(color: c.highlight),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Eyebrow(
+                  'Link your stats · ${claim.team.name}',
+                  color: c.highlightInk,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
             'Which player on the roster is you?',
             style: TextStyle(
-              color: c.onFeature,
+              color: c.ink,
               fontWeight: FontWeight.w800,
               fontSize: 15,
             ),
@@ -1207,7 +1271,7 @@ class _ClaimCard extends StatelessWidget {
           Text(
             'Games your team tracks count toward your profile once you '
             'pick your spot.',
-            style: TextStyle(color: c.onFeatureMuted, fontSize: 12),
+            style: TextStyle(color: c.muted, fontSize: 12.5),
           ),
           const SizedBox(height: 12),
           HighlightButton(
@@ -1219,7 +1283,6 @@ class _ClaimCard extends StatelessWidget {
           if (claim.players.length > 1)
             Center(
               child: TextButton(
-                style: TextButton.styleFrom(foregroundColor: c.onFeature),
                 onPressed: viewModel.claim.running
                     ? null
                     : () async {

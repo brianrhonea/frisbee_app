@@ -8,6 +8,7 @@ import '../../../routing/routes.dart';
 import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart' show SectionCard;
 import '../../core/ui/status_views.dart';
 import '../view_models/discord_import_viewmodel.dart';
 import 'roles_screen.dart';
@@ -96,35 +97,47 @@ class _DiscordImportScreenState extends State<DiscordImportScreen> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     if (busy) const LinearProgressIndicator(),
-                    Text(
-                      'Copy your Discord server\'s roles, categories and text '
-                      'channels. In Discord, open Server Settings → Server '
-                      'Template, create a template, and paste its link '
-                      'here. Members and messages aren\'t copied: give '
-                      'people their roles on the Members tab.',
-                      style: TextStyle(color: c.muted),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _link,
-                      enabled: !busy,
-                      decoration: const InputDecoration(
-                        labelText: 'Server template link',
-                        hintText: 'https://discord.new/…',
-                        prefixIcon: Icon(Icons.link),
-                      ),
-                      onChanged: vm.setLink,
-                      onSubmitted: (_) {
-                        if (vm.canPreview) vm.preview.execute();
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: FilledButton.tonalIcon(
-                        onPressed: vm.canPreview ? vm.preview.execute : null,
-                        icon: const Icon(Icons.preview_outlined),
-                        label: const Text('Preview'),
+                    // Step one in a card: the server's template link.
+                    SectionCard(
+                      title: 'Connect your server',
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Copy your Discord server\'s roles, categories and text '
+                            'channels. In Discord, open Server Settings → Server '
+                            'Template, create a template, and paste its link '
+                            'here. Members and messages aren\'t copied: give '
+                            'people their roles on the Members tab.',
+                            style: TextStyle(color: c.muted, fontSize: 13),
+                          ),
+                          const SizedBox(height: 14),
+                          TextField(
+                            controller: _link,
+                            enabled: !busy,
+                            decoration: const InputDecoration(
+                              labelText: 'Server template link',
+                              hintText: 'https://discord.new/…',
+                              prefixIcon: Icon(Icons.link),
+                            ),
+                            onChanged: vm.setLink,
+                            onSubmitted: (_) {
+                              if (vm.canPreview) vm.preview.execute();
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: OutlinedButton.icon(
+                              onPressed: vm.canPreview
+                                  ? vm.preview.execute
+                                  : null,
+                              icon: const Icon(Icons.preview_outlined),
+                              label: const Text('Preview'),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     if (vm.preview.error) ...[
@@ -145,7 +158,11 @@ class _DiscordImportScreenState extends State<DiscordImportScreen> {
                       if (vm.split != null)
                         Text(
                           'Community chat',
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: c.ink,
+                          ),
                         ),
                       _Preview(
                         plan: plan,
@@ -205,12 +222,19 @@ class _Preview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final c = AppColors.of(context);
     final folderNames = {for (final f in import.folders) f.id: f.name};
     Widget heading(String text) => Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 4),
-      child: Text(text, style: theme.textTheme.titleMedium),
+      padding: const EdgeInsets.only(top: 16, bottom: 4),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.2,
+          color: c.ink,
+        ),
+      ),
     );
     Widget note(String text) => Padding(
       padding: const EdgeInsets.only(top: 4),
@@ -223,7 +247,15 @@ class _Preview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(plan.serverName, style: theme.textTheme.titleLarge),
+        Text(
+          plan.serverName,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+            color: c.ink,
+          ),
+        ),
         heading('Roles (${newRoles.length} new)'),
         if (newRoles.isEmpty) note('No new roles.'),
         for (final r in newRoles)
@@ -297,7 +329,14 @@ class _TeamSorting extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Where rooms go', style: theme.textTheme.titleMedium),
+        Text(
+          'Where rooms go',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: c.ink,
+          ),
+        ),
         note(
           "Rooms only one team's roles can read go to that team's chat; "
           'the rest stay in the community. Change any of them here.',

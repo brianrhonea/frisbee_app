@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../routing/routes.dart';
 import '../../../utils/command.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/back_or.dart';
 import '../../core/ui/error_message.dart';
 import '../../core/ui/status_views.dart';
@@ -205,7 +206,7 @@ class _Preview extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: ColoredBox(
-              color: Colors.black87,
+              color: AppColors.of(context).feature,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -221,9 +222,11 @@ class _Preview extends StatelessWidget {
                             photoUrl: vm.myPhotoUrl,
                           ),
                           const SizedBox(height: 12),
-                          const Text(
+                          Text(
                             'Camera is off',
-                            style: TextStyle(color: Colors.white70),
+                            style: TextStyle(
+                              color: AppColors.of(context).onFeatureMuted,
+                            ),
                           ),
                         ],
                       ),
@@ -268,7 +271,7 @@ class _Preview extends StatelessWidget {
                 Icon(
                   Icons.info_outline,
                   size: 18,
-                  color: Theme.of(context).colorScheme.error,
+                  color: AppColors.of(context).highlightInk,
                 ),
                 const SizedBox(width: 8),
                 Expanded(child: Text(notice)),
@@ -367,7 +370,7 @@ class _GetIn extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
                   "An admin didn't let you in.",
-                  style: TextStyle(color: theme.colorScheme.error),
+                  style: TextStyle(color: AppColors.of(context).ink2),
                   textAlign: TextAlign.center,
                 ),
               ),

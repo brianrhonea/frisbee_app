@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/hosted_tournament.dart';
+import '../../core/themes/theme.dart';
+import '../../core/ui/scoreboard.dart';
 import '../../core/ui/tone.dart';
 
-/// Each status's color, so a list reads at a glance.
+/// Each status's color, so a list reads at a glance. Amber is kept for
+/// what's the user's to do, so no status is amber.
 extension HostedStatusTone on HostedStatus {
   Tone get tone => switch (this) {
     HostedStatus.draft => Tone.grey,
-    HostedStatus.registration => Tone.blue,
-    HostedStatus.seeding => Tone.amber,
-    HostedStatus.scheduled => Tone.purple,
+    HostedStatus.registration => Tone.green,
+    HostedStatus.seeding => Tone.teal,
+    HostedStatus.scheduled => Tone.blue,
     HostedStatus.live => Tone.red,
-    HostedStatus.finished => Tone.green,
+    HostedStatus.finished => Tone.purple,
   };
 
   IconData get icon => switch (this) {
@@ -24,13 +27,33 @@ extension HostedStatusTone on HostedStatus {
   };
 }
 
-/// A tournament's status as a colored tag.
+/// A tournament's status as a small pill: red with its dot when live,
+/// turf while registration is open, grey otherwise.
 class HostedStatusBadge extends StatelessWidget {
   const HostedStatusBadge({super.key, required this.status});
 
   final HostedStatus status;
 
   @override
-  Widget build(BuildContext context) =>
-      ToneTag(label: status.label, tone: status.tone, icon: status.icon);
+  Widget build(BuildContext context) {
+    if (status == HostedStatus.live) return LivePill(label: status.label);
+    final c = AppColors.of(context);
+    final open = status == HostedStatus.registration;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: open ? c.accentSoft : c.field,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        status.label,
+        maxLines: 1,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: open ? c.accentInk : c.ink2,
+        ),
+      ),
+    );
+  }
 }

@@ -142,7 +142,7 @@ GoRouter router(
       redirect: (_, state) => Routes.post(state.pathParameters['postId']!),
     ),
     // A profile opened from a conversation or chat room, over it, so back
-    // returns there (the Explore tab's /players/:uid would switch tabs).
+    // returns there (the Discover tab's /players/:uid would switch tabs).
     GoRoute(
       path: '/people/:uid',
       redirect: (_, state) =>
@@ -648,12 +648,22 @@ GoRouter router(
         StatefulShellBranch(
           routes: [GoRoute(path: Routes.home, builder: (_, _) => homePage())],
         ),
-        // Explore: search and player profiles.
+        // Discover: search, tournaments and leagues to find, rankings and
+        // player profiles.
         StatefulShellBranch(
           routes: [
             GoRoute(
               path: Routes.explorePath,
               builder: (_, state) => explorePage(state),
+            ),
+            GoRoute(
+              path: Routes.discoverPath,
+              redirect: (_, state) => Uri(
+                path: Routes.explorePath,
+                queryParameters: state.uri.queryParameters.isEmpty
+                    ? null
+                    : state.uri.queryParameters,
+              ).toString(),
             ),
             GoRoute(
               path: Routes.rankingsPath,
@@ -670,12 +680,17 @@ GoRouter router(
             ),
           ],
         ),
-        // Events: the user's schedule, and tournaments and leagues to find.
+        // Schedule: the user's own calendar. Events to find are on
+        // Discover now; the old `?view=find` opens it.
         StatefulShellBranch(
           routes: [
             GoRoute(
               path: Routes.schedule,
-              builder: (_, state) => eventsPage(state),
+              redirect: (_, state) =>
+                  state.uri.queryParameters['view'] == 'find'
+                  ? Routes.explore()
+                  : null,
+              builder: (_, _) => schedulePage(),
             ),
           ],
         ),
@@ -711,7 +726,7 @@ GoRouter router(
                 ),
                 GoRoute(
                   path: 'search',
-                  // Finding teams and groups is Explore's job now; old links
+                  // Finding teams and groups is Discover's job now; old links
                   // land there.
                   redirect: (_, _) => Routes.explore(only: ExploreFilter.teams),
                   builder: (_, _) => const SizedBox.shrink(),
@@ -897,7 +912,7 @@ GoRouter router(
             ),
           ],
         ),
-        // Messages: private conversations. Team chats are on team pages.
+        // Inbox: private conversations and team chats.
         StatefulShellBranch(
           routes: [
             GoRoute(

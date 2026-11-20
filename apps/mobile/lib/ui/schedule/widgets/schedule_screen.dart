@@ -8,6 +8,7 @@ import '../../../domain/models/schedule_entry.dart';
 import '../../../routing/routes.dart';
 import '../../../utils/result.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/scoreboard.dart' show TeamDot;
 import '../../core/ui/status_views.dart';
 import '../view_models/schedule_viewmodel.dart';
 import 'event_editor_screen.dart';
@@ -106,17 +107,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     child: const Text('Today'),
                   ),
           ),
+          // In the header rather than floating, so it never covers events.
+          Padding(
+            padding: const EdgeInsets.only(left: 4, right: 12),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+              ),
+              onPressed: () async {
+                final id = await showEventEditor(context, day: vm.selectedDay);
+                // Other calendars aren't live.
+                if (id != null) await vm.refreshCalendars();
+              },
+              icon: const Icon(Icons.add, size: 20),
+              label: const Text('New event'),
+            ),
+          ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'new-schedule-event',
-        onPressed: () async {
-          final id = await showEventEditor(context, day: vm.selectedDay);
-          // Other calendars aren't live.
-          if (id != null) await vm.refreshCalendars();
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New event'),
       ),
       body: ListenableBuilder(
         listenable: vm,
@@ -128,7 +136,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _WeekHeader(viewModel: vm, onPickDay: _pickDay),
-                const Divider(height: 1),
                 Expanded(
                   // Team and personal events are live; pulling down
                   // reloads the other calendars and invites.
@@ -136,7 +143,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     onRefresh: vm.refreshCalendars,
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -178,7 +185,7 @@ class _WeekHeader extends StatelessWidget {
         '${DateFormat.MMMd().format(days.first)} – '
         '${DateFormat.MMMd().format(days.last)}';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -195,7 +202,11 @@ class _WeekHeader extends StatelessWidget {
                     Text(
                       range,
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: c.ink,
+                      ),
                     ),
                     Text(
                       vm.weekCount == 1 ? '1 event' : '${vm.weekCount} events',
@@ -211,43 +222,102 @@ class _WeekHeader extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              for (var i = 0; i < days.length; i++)
-                Expanded(
-                  child: WeekDayCell(
-                    day: days[i],
-                    entries: vm.eventsOn(days[i]),
-                    isToday: days[i] == vm.today,
-                    selected: days[i] == vm.selectedDay,
-                    large: true,
-                    onTap: () => onPickDay(i),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              SegmentedButton<ScheduleFilter>(
-                segments: [
-                  for (final f in ScheduleFilter.values)
-                    ButtonSegment(value: f, label: Text(f.label)),
+          const SizedBox(height: 6),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              child: Row(
+                children: [
+                  for (var i = 0; i < days.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    Expanded(
+                      child: WeekDayCell(
+                        day: days[i],
+                        entries: vm.eventsOn(days[i]),
+                        isToday: days[i] == vm.today,
+                        selected: days[i] == vm.selectedDay,
+                        large: true,
+                        onTap: () => onPickDay(i),
+                      ),
+                    ),
+                  ],
                 ],
-                selected: {vm.filter},
-                showSelectedIcon: false,
-                onSelectionChanged: (s) => vm.setFilter(s.first),
               ),
-              const ScheduleLegend(),
-            ],
+            ),
           ),
+          const SizedBox(height: 12),
+          _FilterTabs(selected: vm.filter, onSelect: vm.setFilter),
         ],
       ),
+    );
+  }
+}
+
+/// All / Team / Personal as a segmented track, each with its schedule
+/// colour's dot.
+class _FilterTabs extends StatelessWidget {
+  const _FilterTabs({required this.selected, required this.onSelect});
+
+  final ScheduleFilter selected;
+  final ValueChanged<ScheduleFilter> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    Widget tab(ScheduleFilter f) {
+      final on = f == selected;
+      final dot = switch (f) {
+        ScheduleFilter.all => null,
+        ScheduleFilter.team => c.team,
+        ScheduleFilter.personal => c.personal,
+      };
+      return Expanded(
+        child: Semantics(
+          selected: on,
+          button: true,
+          child: Material(
+            color: on ? c.card : Colors.transparent,
+            borderRadius: BorderRadius.circular(controlRadius - 2),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(controlRadius - 2),
+              onTap: () => onSelect(f),
+              child: SizedBox(
+                height: 38,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (dot != null) ...[
+                      TeamDot(color: dot),
+                      const SizedBox(width: 6),
+                    ],
+                    Flexible(
+                      child: Text(
+                        f.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: on ? FontWeight.w700 : FontWeight.w600,
+                          color: on ? c.ink : c.muted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: c.field,
+        borderRadius: BorderRadius.circular(controlRadius),
+      ),
+      child: Row(children: [for (final f in ScheduleFilter.values) tab(f)]),
     );
   }
 }
@@ -282,26 +352,36 @@ class _DaySection extends StatelessWidget {
                 DateFormat('EEEE, MMM d').format(day).toUpperCase(),
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   letterSpacing: 0.8,
-                  color: selected || isToday ? c.accent : c.muted,
+                  color: selected && !isToday ? c.accentInk : c.ink2,
                 ),
               ),
               if (isToday) ...[
                 const SizedBox(width: 8),
-                Text(
-                  'TODAY',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                    color: c.accent,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.feature,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'TODAY',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                      color: c.onFeature,
+                    ),
                   ),
                 ),
               ],
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Card(
             child: events.isEmpty
                 ? Padding(
@@ -311,25 +391,25 @@ class _DaySection extends StatelessWidget {
                       style: TextStyle(color: c.muted),
                     ),
                   )
-                : Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(
-                      children: [
-                        for (final e in events)
-                          _SwipeToDelete(
-                            entry: e,
-                            enabled: vm.canDelete(e),
-                            onSwiped: onSwiped,
-                            child: ScheduleEventRow(
-                              entry: e,
-                              showTeamName: vm.teams.length > 1,
-                              showDay: false,
-                              large: true,
-                              onCalendarChanged: vm.refreshCalendars,
-                            ),
+                : Column(
+                    children: [
+                      for (var i = 0; i < events.length; i++) ...[
+                        if (i > 0) const Divider(height: 1),
+                        _SwipeToDelete(
+                          entry: events[i],
+                          enabled: vm.canDelete(events[i]),
+                          onSwiped: onSwiped,
+                          child: ScheduleEventRow(
+                            entry: events[i],
+                            showDay: false,
+                            large: true,
+                            rsvp: vm.myRsvp(events[i]),
+                            needsRsvp: vm.needsRsvp(events[i]),
+                            onCalendarChanged: vm.refreshCalendars,
                           ),
+                        ),
                       ],
-                    ),
+                    ],
                   ),
           ),
         ],
@@ -356,29 +436,24 @@ class _SwipeToDelete extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!enabled) return child;
-    final scheme = Theme.of(context).colorScheme;
+    final c = AppColors.of(context);
     return Dismissible(
       key: ValueKey(entry.key),
       direction: DismissDirection.startToEnd,
       onDismissed: (_) => onSwiped(entry),
+      // Neutral, not red: red is only for live games.
       background: Container(
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: scheme.error,
-          borderRadius: BorderRadius.circular(12),
-        ),
+        color: c.field,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.delete_outline, color: scheme.onError),
+            Icon(Icons.delete_outline, color: c.ink2),
             const SizedBox(width: 8),
             Text(
               'Delete',
-              style: TextStyle(
-                color: scheme.onError,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(color: c.ink2, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -423,7 +498,7 @@ class _InviteCardState extends State<_InviteCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.circle, size: 12, color: i.color.color),
+                TeamDot(color: i.color.color, size: 12),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

@@ -86,7 +86,7 @@ class TeamPostCard extends StatelessWidget {
                         author,
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          fontSize: 13.5,
+                          fontSize: 14,
                           color: c.ink,
                         ),
                       ),
@@ -97,7 +97,7 @@ class TeamPostCard extends StatelessWidget {
                             byline,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 11.5, color: c.muted),
+                            style: TextStyle(fontSize: 12, color: c.muted),
                           ),
                         ),
                     ],
@@ -161,7 +161,7 @@ class TeamPostCard extends StatelessWidget {
                     LinkifiedText(
                       post.body,
                       style: TextStyle(
-                        fontSize: 13.5,
+                        fontSize: 14,
                         height: 1.45,
                         color: c.ink,
                       ),

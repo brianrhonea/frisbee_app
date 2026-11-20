@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/person_name.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/error_message.dart';
+import '../../core/ui/layout.dart' show Eyebrow, PersonAvatar;
 import '../view_models/choose_username_viewmodel.dart';
 import 'auth_layout.dart';
 import 'username_field.dart';
@@ -152,6 +154,8 @@ class _ChooseUsernameScreenState extends State<ChooseUsernameScreen> {
                               'you like.'
                         : 'Letters, numbers, _ and . People find you by it.',
                   ),
+                const SizedBox(height: 16),
+                _Preview(first: _first, last: _last, username: _username),
                 const SizedBox(height: 20),
                 FilledButton(
                   onPressed: busy ? null : _submit,
@@ -164,6 +168,9 @@ class _ChooseUsernameScreenState extends State<ChooseUsernameScreen> {
                 ),
                 const SizedBox(height: 8),
                 TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.of(context).muted,
+                  ),
                   onPressed: busy ? null : vm.signOut.execute,
                   child: const Text('Sign out'),
                 ),
@@ -181,4 +188,66 @@ class _ChooseUsernameScreenState extends State<ChooseUsernameScreen> {
     required bool isFocused,
     required int? maxLength,
   }) => null;
+}
+
+/// "How teammates see you": the name and @username as they type them.
+class _Preview extends StatelessWidget {
+  const _Preview({
+    required this.first,
+    required this.last,
+    required this.username,
+  });
+
+  final TextEditingController first;
+  final TextEditingController last;
+  final TextEditingController username;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([first, last, username]),
+    builder: (context, _) {
+      final c = AppColors.of(context);
+      final name = PersonName.join(first.text, last.text);
+      final handle = username.text.trim();
+      if (name.isEmpty && handle.isEmpty) return const SizedBox.shrink();
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              PersonAvatar(name: name.isEmpty ? handle : name, radius: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Eyebrow('How teammates see you'),
+                    const SizedBox(height: 2),
+                    if (name.isNotEmpty)
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: c.ink,
+                        ),
+                      ),
+                    if (handle.isNotEmpty)
+                      Text(
+                        '@$handle',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, color: c.muted),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }

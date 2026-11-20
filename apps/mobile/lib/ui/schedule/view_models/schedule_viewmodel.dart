@@ -10,6 +10,7 @@ import '../../../data/repositories/meeting/meeting_repository.dart';
 import '../../../data/repositories/team/team_repository.dart';
 import '../../../domain/models/schedule_entry.dart';
 import '../../../domain/models/team.dart';
+import '../../../domain/models/team_event.dart';
 import '../../../utils/command.dart';
 import '../../../utils/result.dart';
 import 'my_schedule.dart';
@@ -227,6 +228,21 @@ class ScheduleViewModel extends ChangeNotifier {
 
   /// Number of events this week that pass the filter.
   int get weekCount => days.fold(0, (n, d) => n + eventsOn(d).length);
+
+  /// The user's answer to a team event or meeting; null for personal and
+  /// calendar events, which have no RSVPs.
+  RsvpStatus? myRsvp(ScheduleEntry e) {
+    final uid = _uid;
+    if (e.team == null || uid == null) return null;
+    return e.event.rsvpOf(uid);
+  }
+
+  /// A team event or meeting the user hasn't answered that is still ahead.
+  bool needsRsvp(ScheduleEntry e) {
+    if (e.team == null || _uid == null || myRsvp(e) != null) return false;
+    final end = e.event.endsAt ?? e.event.startsAt;
+    return end.isAfter(_clock());
+  }
 
   @override
   void dispose() {

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../../../domain/models/team_video.dart';
+import '../../core/themes/theme.dart';
 
 /// Builds the player for a video; tests swap in a stand-in, since the real
 /// players need a platform web view.
@@ -90,10 +91,10 @@ class VideoThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final c = AppColors.of(context);
     final placeholder = ColoredBox(
-      color: scheme.surfaceContainerHighest,
-      child: Icon(Icons.smart_display_outlined, color: scheme.outline),
+      color: c.field,
+      child: Icon(Icons.smart_display_outlined, color: c.muted),
     );
     return Image.network(
       TeamVideo.thumbnailUrlOf(youtubeId),

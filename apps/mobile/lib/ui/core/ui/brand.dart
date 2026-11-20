@@ -6,7 +6,7 @@ const appName = 'Stall 10';
 
 /// Matches `version:` in pubspec.yaml (checked by test/version_test.dart).
 /// The log of versions is in docs/CHANGELOG.md.
-const appVersion = '0.0.35';
+const appVersion = '0.0.36';
 
 /// The app icon: a "10" whose "0" is a flying disc. Drawn, with every
 /// platform's launcher icon, by tool/brand/stall10_logo.py.
@@ -51,17 +51,22 @@ class AppWordmark extends StatelessWidget {
       children: [
         if (logo) ...[AppLogo(size: size), SizedBox(width: size * 0.32)],
         // The condensed italic "STALL 10", as on the website.
-        Text(
-          appName.toUpperCase(),
-          semanticsLabel: appName,
-          style: TextStyle(
-            fontFamily: scoreFont,
-            fontWeight: FontWeight.w800,
-            fontStyle: FontStyle.italic,
-            fontSize: size * 0.95,
-            height: 1,
-            letterSpacing: 0.2,
-            color: color ?? c.ink,
+        Flexible(
+          child: Text(
+            appName.toUpperCase(),
+            semanticsLabel: appName,
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.fade,
+            style: TextStyle(
+              fontFamily: scoreFont,
+              fontWeight: FontWeight.w800,
+              fontStyle: FontStyle.italic,
+              fontSize: size * 0.95,
+              height: 1,
+              letterSpacing: 0.2,
+              color: color ?? c.ink,
+            ),
           ),
         ),
       ],

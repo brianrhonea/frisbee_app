@@ -4,11 +4,15 @@ import 'package:intl/intl.dart';
 
 import '../../../domain/models/team_event.dart';
 import '../../../routing/routes.dart';
+import '../../core/themes/theme.dart';
+import '../../core/ui/layout.dart' show DateBadge;
+import '../../core/ui/scoreboard.dart' show TeamDot;
 import '../../core/ui/status_views.dart';
 import '../../teams/view_models/team_detail_viewmodel.dart';
 import 'event_detail_screen.dart';
 import 'event_editor_screen.dart';
 import 'event_style.dart';
+import 'rsvp_widgets.dart';
 
 /// Opens [e] over the current page: an event's details and RSVP in a
 /// popup, a meeting on its own page.
@@ -96,21 +100,24 @@ class _TeamEventsTabState extends State<TeamEventsTab> {
     final upcoming = vm.upcomingEvents;
     final past = vm.pastEvents;
     return Scaffold(
-      floatingActionButton: vm.canEdit
-          ? FloatingActionButton.extended(
-              heroTag: 'new-event',
-              onPressed: _add,
-              icon: const Icon(Icons.add),
-              label: const Text('New'),
-            )
-          : null,
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
+              // In the list rather than floating, so it never covers an
+              // event.
+              if (vm.canEdit)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: _add,
+                    icon: const Icon(Icons.add),
+                    label: const Text('New'),
+                  ),
+                ),
               if (upcoming.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
@@ -158,13 +165,14 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, 16, 4, 6),
+    padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
     child: Text(
       text.toUpperCase(),
-      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-        letterSpacing: 1,
-        fontWeight: FontWeight.w700,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      style: TextStyle(
+        fontSize: 12,
+        letterSpacing: 0.8,
+        fontWeight: FontWeight.w800,
+        color: AppColors.of(context).muted,
       ),
     ),
   );
@@ -187,10 +195,7 @@ class TeamEventCard extends StatelessWidget {
   Widget build(BuildContext context) => Card(
     margin: const EdgeInsets.only(bottom: 8),
     clipBehavior: Clip.antiAlias,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: TeamEventTile(event: event, uid: uid, onTap: onTap),
-    ),
+    child: TeamEventTile(event: event, uid: uid, onTap: onTap),
   );
 }
 
@@ -214,80 +219,95 @@ class TeamEventTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final c = AppColors.of(context);
     final e = event;
-    final color = e.type.color(scheme);
     final mine = e.rsvpOf(uid);
     final going = e.responders(RsvpStatus.going).length;
-    return ListTile(
+    final upcoming = (e.endsAt ?? e.startsAt).isAfter(DateTime.now());
+    return InkWell(
       onTap: onTap,
-      leading: Container(
-        width: 52,
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
           children: [
-            Text(
-              DateFormat.MMM().format(e.startsAt).toUpperCase(),
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
+            DateBadge(date: e.startsAt, size: 46),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      TeamDot(color: c.team, size: 7),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          e.type.label.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: c.team,
+                          ),
+                        ),
+                      ),
+                      if (e.isPublic && showResponses) ...[
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message: 'Shown on the public team page',
+                          child: Icon(Icons.public, size: 14, color: c.muted),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    e.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: c.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      DateFormat.E().format(e.startsAt),
+                      eventTimeRange(e),
+                      if (e.location.isNotEmpty) e.location,
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5, color: c.muted),
+                  ),
+                ],
               ),
             ),
-            Text(
-              '${e.startsAt.day}',
-              style: theme.textTheme.titleMedium?.copyWith(height: 1.1),
-            ),
+            if (showResponses) ...[
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  RsvpStatusPill(
+                    status: mine,
+                    type: e.type,
+                    needsRsvp: upcoming,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$going going',
+                    style: TextStyle(fontSize: 12, color: c.muted),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
-      title: Row(
-        children: [
-          Icon(e.type.icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(e.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-          if (e.isPublic && showResponses)
-            Tooltip(
-              message: 'Shown on the public team page',
-              child: Icon(Icons.public, size: 16, color: scheme.outline),
-            ),
-        ],
-      ),
-      subtitle: Text(
-        [
-          DateFormat.E().format(e.startsAt),
-          eventTimeRange(e),
-          if (e.location.isNotEmpty) e.location,
-        ].join(' · '),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: !showResponses
-          ? null
-          : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (mine != null)
-                  Icon(mine.icon, size: 20, color: mine.color(scheme))
-                else
-                  Text(
-                    'RSVP',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: scheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                Text('$going going', style: theme.textTheme.bodySmall),
-              ],
-            ),
     );
   }
 }

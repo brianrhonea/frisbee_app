@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../../domain/models/team.dart';
 import '../../../routing/routes.dart';
+import '../../core/themes/theme.dart';
 import '../../core/ui/confirm_dialog.dart';
+import '../../core/ui/layout.dart';
 import '../../core/ui/status_views.dart';
 import '../../core/ui/view_model_host.dart';
 import '../view_models/invite_code_viewmodel.dart';
@@ -20,6 +22,7 @@ class MembersTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final team = viewModel.team!;
     final members = team.members.entries.toList()
       ..sort((a, b) {
@@ -61,34 +64,64 @@ class MembersTab extends StatelessWidget {
             const SizedBox(height: 16),
           ],
           _RolesHelp(team: team, isOwner: viewModel.isOwner),
-          const SizedBox(height: 16),
-          Text(
-            '${members.length} member${members.length == 1 ? '' : 's'}',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          for (final m in members)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              onTap: () => context.push(Routes.player(m.key)),
-              leading: CircleAvatar(
-                child: Text(team.nameOf(m.key)[0].toUpperCase()),
-              ),
-              title: Text(
-                team.nameOf(m.key) + (m.key == viewModel.uid ? ' (you)' : ''),
-              ),
-              subtitle: _MemberRoles(team: team, uid: m.key, tier: m.value),
-              trailing: viewModel.canManage(m.key)
-                  ? _MemberMenu(
-                      viewModel: viewModel,
-                      uid: m.key,
-                      name: team.nameOf(m.key),
-                      role: m.value,
-                      team: team,
-                      statKeeper: team.isStatKeeper(m.key),
-                    )
-                  : null,
+          const SizedBox(height: 18),
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 8),
+            child: Eyebrow(
+              '${members.length} member${members.length == 1 ? '' : 's'}',
             ),
+          ),
+          Card(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (final (i, m) in members.indexed) ...[
+                  if (i > 0) Divider(height: 1, color: c.border),
+                  ListTile(
+                    contentPadding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
+                    onTap: () => context.push(Routes.player(m.key)),
+                    leading: PersonAvatar(name: team.nameOf(m.key), radius: 18),
+                    title: Text.rich(
+                      TextSpan(
+                        text: team.nameOf(m.key),
+                        children: [
+                          if (m.key == viewModel.uid)
+                            TextSpan(
+                              text: ' (you)',
+                              style: TextStyle(
+                                color: c.muted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                        ],
+                      ),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: c.ink,
+                      ),
+                    ),
+                    subtitle: _MemberRoles(
+                      team: team,
+                      uid: m.key,
+                      tier: m.value,
+                    ),
+                    trailing: viewModel.canManage(m.key)
+                        ? _MemberMenu(
+                            viewModel: viewModel,
+                            uid: m.key,
+                            name: team.nameOf(m.key),
+                            role: m.value,
+                            team: team,
+                            statKeeper: team.isStatKeeper(m.key),
+                          )
+                        : null,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -103,50 +136,65 @@ class _JoinRequests extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final c = AppColors.of(context);
     final requests = viewModel.joinRequests;
-    return Card(
-      color: theme.colorScheme.secondaryContainer,
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${requests.length} '
-              '${requests.length == 1 ? 'person wants' : 'people want'} '
-              'to join',
-              style: theme.textTheme.titleSmall,
+    // Requests are the admin's to act on: the one amber card on the tab.
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 6),
+      decoration: BoxDecoration(
+        color: c.highlightSoft,
+        borderRadius: BorderRadius.circular(cardRadius),
+        border: Border.all(color: c.highlight.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${requests.length} '
+            '${requests.length == 1 ? 'person wants' : 'people want'} '
+            'to join',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+              color: c.highlightInk,
             ),
-            for (final r in requests)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  child: Text(r.name.isEmpty ? '?' : r.name[0].toUpperCase()),
-                ),
-                title: Text(r.name.isEmpty ? 'Someone' : r.name),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'Decline',
-                      icon: const Icon(Icons.close),
-                      onPressed: viewModel.declineJoinRequest.running
-                          ? null
-                          : () => viewModel.declineJoinRequest.execute(r.uid),
-                    ),
-                    FilledButton.tonal(
-                      onPressed: viewModel.approveJoinRequest.running
-                          ? null
-                          : () => viewModel.approveJoinRequest.execute(r),
-                      child: const Text('Approve'),
-                    ),
-                  ],
-                ),
+          ),
+          for (final r in requests)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: PersonAvatar(
+                name: r.name.isEmpty ? '?' : r.name,
+                radius: 18,
               ),
-          ],
-        ),
+              title: Text(
+                r.name.isEmpty ? 'Someone' : r.name,
+                style: TextStyle(fontWeight: FontWeight.w700, color: c.ink),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton(
+                    onPressed: viewModel.declineJoinRequest.running
+                        ? null
+                        : () => viewModel.declineJoinRequest.execute(r.uid),
+                    child: const Text('Decline'),
+                  ),
+                  const SizedBox(width: 4),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: c.highlight,
+                      foregroundColor: c.onHighlight,
+                    ),
+                    onPressed: viewModel.approveJoinRequest.running
+                        ? null
+                        : () => viewModel.approveJoinRequest.execute(r),
+                    child: const Text('Approve'),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -170,13 +218,20 @@ class _MemberRoles extends StatelessWidget {
     final label = team.isStatKeeper(uid)
         ? '${team.roleLabel(tier)} · Stats'
         : team.roleLabel(tier);
-    if (roles.isEmpty) return Text(label);
+    // Staff tiers (owner, coach, captain) and stat keepers stand out as a
+    // tag; a plain player or member is just text.
+    final Widget tierLabel = tier == TeamRole.player && !team.isStatKeeper(uid)
+        ? Text(label)
+        : Tag(label);
+    if (roles.isEmpty) {
+      return Align(alignment: Alignment.centerLeft, child: tierLabel);
+    }
     return Wrap(
       spacing: 10,
       runSpacing: 2,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text(label),
+        tierLabel,
         for (final r in roles)
           Row(
             mainAxisSize: MainAxisSize.min,
