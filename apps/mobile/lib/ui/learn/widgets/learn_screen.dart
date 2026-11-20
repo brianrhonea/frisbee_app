@@ -67,7 +67,7 @@ class _LearnScreenState extends State<LearnScreen> {
                       children: [
                         FilledButton.tonal(
                           onPressed: () => context.go(Routes.explore()),
-                          child: const Text('Find a group'),
+                          child: const Text('Find a community'),
                         ),
                         OutlinedButton(
                           onPressed: () => context.go(Routes.findEvents),

@@ -78,7 +78,7 @@ void main() {
       });
       final back = TeamListing.fromMap('g1', map);
       expect(back.sameAs(g), isTrue);
-      expect(back.subtitle, 'Community group · Denver');
+      expect(back.subtitle, 'Pickup community · Denver');
 
       expect(g.toEditableMap().containsKey('kind'), isFalse);
       expect(g.toEditableMap()['requiresApproval'], isFalse);

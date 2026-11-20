@@ -8,7 +8,7 @@ import { ClubAgeNote } from "./ClubAge";
 
 const kindCopy = {
   team: { title: "Create a team", name: "Team name", hint: "A club, college or league team with a roster, schedule and playbook." },
-  community: { title: "Start a group", name: "Group name", hint: "A pickup group or league anyone can find and join." },
+  community: { title: "Start a pickup community", name: "Community name", hint: "A pickup game or league anyone can find and join." },
   organization: { title: "Start a school or club community", name: "Community name", hint: "A school or club with teams of its own." },
 } as const;
 type Kind = keyof typeof kindCopy;

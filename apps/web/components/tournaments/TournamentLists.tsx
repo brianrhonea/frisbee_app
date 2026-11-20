@@ -256,7 +256,7 @@ export function HostedTournamentsSection({ teamId, kind, manager, member }: { te
 const sections = [
   { key: "official", title: "Official organizer", blurb: "Events you run for an official organizer like Stall 10 carry its verified badge." },
   { key: "organization", title: "Your schools and clubs", blurb: "Host for everyone in the school or club, across its teams." },
-  { key: "community", title: "Your community groups", blurb: "Pickup and hat events for the group to sign up to." },
+  { key: "community", title: "Your pickup communities", blurb: "Pickup and hat events for the community to sign up to." },
   { key: "team", title: "Your teams", blurb: "Host as a team, for example your own tournament." },
 ] as const;
 
@@ -281,7 +281,7 @@ export function HostEvent() {
       </div>
       {hosts.length === 0 ? (
         <div className="card">
-          <h2 className="card-title">Start a group to host</h2>
+          <h2 className="card-title">Start a community to host</h2>
           <p className="muted">
             Events are run by a team, group or school or club, so they have organizers, a page and followers. Ask to manage
             events on one you&apos;re in, or start one.

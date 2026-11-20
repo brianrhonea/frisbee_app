@@ -10,6 +10,25 @@ Firebase project; App Store builds come from `main` and use production.
 
 ---
 
+## 0.0.30
+
+**Clearer names**
+- Community groups are now called **pickup communities**, and the app
+  says "community" for them and for schools and clubs everywhere. Group
+  messages are still group messages.
+- In a team's Stats, **Track a tournament** keeps stats for every game
+  you play at one tournament (it used to say "New tournament", which was
+  easy to mix up with hosting one).
+
+**Inviting**
+- The invite dialog has a **QR code** button: show it and people next to
+  you join by pointing their phone's camera at it.
+
+**Messages**
+- Press and hold a message to see when it was sent.
+
+---
+
 ## 0.0.29
 
 **Privacy**

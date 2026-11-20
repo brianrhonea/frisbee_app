@@ -7,7 +7,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Explore",
-  description: "Search for ultimate players, teams, pickup groups and tournaments on Stall 10.",
+  description: "Search for ultimate players, teams, communities and tournaments on Stall 10.",
 };
 
 type Props = { searchParams: Promise<{ q?: string | string[]; only?: string | string[] }> };
@@ -26,9 +26,9 @@ export default async function ExplorePage({ searchParams }: Props) {
     <div className="page">
       <div className="page-head">
         <h1>Explore</h1>
-        <p>Find your next point. Players, teams, pickup groups and tournaments.</p>
+        <p>Find your next point. Players, teams, communities and tournaments.</p>
       </div>
-      <MembersOnly next={next} what="Sign up free or log in to search for players, teams, pickup groups and tournaments.">
+      <MembersOnly next={next} what="Sign up free or log in to search for players, teams, communities and tournaments.">
         <Explore initialQuery={q} initialFilter={only} />
       </MembersOnly>
       <ForVisitors>

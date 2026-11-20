@@ -72,7 +72,7 @@ export function TeamRosterView({ publicRoster = null, youth = false }: { publicR
       <div className="card hub-empty">
         <p>
           {kind !== "team"
-            ? "Only members see who's in this group."
+            ? "Only members see who's in this community."
             : youth
               ? youthRosterNote
               : "Only members see this team's roster."}{" "}

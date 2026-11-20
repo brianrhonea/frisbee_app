@@ -307,7 +307,7 @@ class _MemberMenu extends StatelessWidget {
               context,
               title: 'Make $name the owner?',
               message: _isGroup
-                  ? 'They get full control of the group. You become a '
+                  ? 'They get full control of the community. You become a '
                         "member and can't undo this yourself."
                   : 'They get full control of the team. You become a '
                         "player and can't undo this yourself.",
@@ -321,7 +321,7 @@ class _MemberMenu extends StatelessWidget {
               context,
               title: 'Remove $name?',
               message:
-                  'They will lose access to this ${_isGroup ? 'group' : 'team'}.',
+                  'They will lose access to this ${_isGroup ? 'community' : 'team'}.',
               confirmLabel: 'Remove',
               destructive: true,
             )) {
@@ -350,7 +350,7 @@ class _MemberMenu extends StatelessWidget {
         if (vm.canRemove(uid))
           PopupMenuItem(
             value: 'remove',
-            child: Text('Remove from ${_isGroup ? 'group' : 'team'}'),
+            child: Text('Remove from ${_isGroup ? 'community' : 'team'}'),
           ),
       ],
     );

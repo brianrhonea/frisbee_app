@@ -1134,7 +1134,7 @@ extension on TeamKind {
 
   String get pluralLabel => switch (this) {
     TeamKind.team => 'Teams',
-    TeamKind.community => 'Groups',
+    TeamKind.community => 'Pickup communities',
     TeamKind.organization => 'Schools & clubs',
   };
 }

@@ -214,8 +214,8 @@ const learnSections = <LearnSection>[
           'practice throwing.',
       '**Learn two throws:** the backhand (the classic frisbee throw) and '
           'the forehand or "flick". You\'ll pick up the rest by playing.',
-      '**Find a game:** pickup and league groups welcome beginners. Search '
-          'Explore for groups and teams near you, or see what\'s coming up '
+      '**Find a game:** pickup communities and leagues welcome beginners. Search '
+          'Explore for communities and teams near you, or see what\'s coming up '
           'in Events.',
     ]),
   ]),

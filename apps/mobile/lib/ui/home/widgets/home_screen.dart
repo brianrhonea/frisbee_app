@@ -362,7 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
         else
           _FeedNote(
             text: posts.isEmpty
-                ? 'No team posts yet. News your teams and groups post shows '
+                ? 'No team posts yet. News your teams and communities post shows '
                       'up here.'
                 : "You're all caught up.",
           ),
@@ -378,8 +378,8 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           for (final (value, icon, label) in [
             ('join', Icons.group_add_outlined, 'Join with a code'),
-            ('create', Icons.add, 'Create a team or group'),
-            ('find', Icons.search, 'Find a group'),
+            ('create', Icons.add, 'Create a team or community'),
+            ('find', Icons.search, 'Find a community'),
           ])
             SimpleDialogOption(
               onPressed: () => Navigator.pop(context, value),
@@ -609,7 +609,7 @@ class _JoinCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Get the schedule, playbook and stats your team shares. Ask a '
-            'coach for the invite code, find a pickup group, or start your '
+            'coach for the invite code, find a pickup community, or start your '
             'own.',
             style: TextStyle(color: c.onFeatureMuted, fontSize: 13),
           ),
@@ -628,7 +628,7 @@ class _JoinCard extends StatelessWidget {
                 label: const Text('Join with code'),
               ),
               for (final (label, icon, onTap) in [
-                ('Find a group', Icons.search, onFind),
+                ('Find a community', Icons.search, onFind),
                 ('Create team', Icons.add, onCreate),
               ])
                 OutlinedButton.icon(

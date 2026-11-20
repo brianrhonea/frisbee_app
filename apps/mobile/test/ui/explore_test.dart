@@ -476,10 +476,10 @@ void main() {
       );
       // (Picked by its callback: it's partly off the screen to tap.)
       tester
-          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Groups'))
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Communities'))
           .onSelected!(true);
       await tester.pumpAndSettle();
-      final groups = tester.getRect(find.widgetWithText(ChoiceChip, 'Groups'));
+      final groups = tester.getRect(find.widgetWithText(ChoiceChip, 'Communities'));
       expect(groups.left, greaterThanOrEqualTo(0));
       expect(groups.right, lessThanOrEqualTo(320));
     },

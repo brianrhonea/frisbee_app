@@ -1328,6 +1328,9 @@ dialog.dialog:has(.invite-dialog) { width: min(100% - 32px, 560px); }
   flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line);
   background: var(--field); color: var(--ink); font: inherit; font-size: 0.9rem;
 }
+.invite-qr { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 4px; }
+.invite-qr-code { width: 220px; height: 220px; padding: 10px; background: #ffffff; border-radius: 12px; border: 1px solid var(--line); }
+.invite-qr-code svg { display: block; width: 100%; height: 100%; }
 .invite-ttl { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 0.9rem; }
 .invite-ttl select { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; }
 .invite-code-card {

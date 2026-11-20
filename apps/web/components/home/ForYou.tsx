@@ -92,7 +92,7 @@ export function TeamsFeed({ uid }: { uid: string }) {
   if ((teams.data ?? []).length === 0) return <JoinCard />;
   return (
     <div className="card">
-      <p className="muted small">No team posts yet. News your teams and groups post shows up here.</p>
+      <p className="muted small">No team posts yet. News your teams and communities post shows up here.</p>
     </div>
   );
 }
@@ -103,7 +103,7 @@ function JoinCard() {
     <div className="card promo-card join-card">
       <small>No team yet</small>
       <b>Join your team.</b>
-      <p>Get the schedule, playbook and stats your team shares. Ask a coach for the invite code, find a pickup group, or start your own.</p>
+      <p>Get the schedule, playbook and stats your team shares. Ask a coach for the invite code, find a pickup community, or start your own.</p>
       <div className="join-card-actions">
         <StartOrJoinButton className="btn btn-amber btn-small" join>
           Join with code
@@ -135,7 +135,7 @@ export function onboardingSteps({ needsUsername, onTeam, followsAnything }: { ne
   return [
     { id: "username", label: "Pick a username", done: !needsUsername },
     { id: "join", label: "Join or create a team", done: onTeam },
-    { id: "find", label: "Find a team or group near you", done: onTeam },
+    { id: "find", label: "Find a team or community near you", done: onTeam },
     { id: "follow", label: "Follow people", done: followsAnything },
   ];
 }

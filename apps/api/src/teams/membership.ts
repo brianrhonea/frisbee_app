@@ -169,7 +169,7 @@ export class MembershipService {
       if (isMember(team, caller.uid)) return;
       if (!isGroup(team)) throw new ApiError("permission_denied", "Join a team with an invite code or link.");
       if (team.requiresApproval === true) {
-        throw new ApiError("failed_precondition", "This group needs approval. Ask to join instead.");
+        throw new ApiError("failed_precondition", "This community needs approval. Ask to join instead.");
       }
       tx.update(p.team(teamId), addMember(team, caller.uid, name));
     });

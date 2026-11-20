@@ -13,7 +13,7 @@ export default function Events() {
     <div className="page">
       <div className="page-head">
         <h1>Events</h1>
-        <p>What&apos;s coming up for public teams and groups.</p>
+        <p>What&apos;s coming up for public teams and communities.</p>
         <ScheduleLink />
       </div>
       <UpcomingEvents />

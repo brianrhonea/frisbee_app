@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:frisbee_app/domain/models/direct_message.dart';
 import 'package:frisbee_app/domain/models/invite_code.dart';
@@ -358,6 +359,31 @@ void main() {
       await tester.pump();
       expect(find.text('Requests (1)'), findsNothing);
       expect(teams.teams['g1']!.roleOf('ann'), TeamRole.player);
+    });
+
+    testWidgets('QR code shows the invite link to scan', (tester) async {
+      final g = makeGroup(members: {testUser.uid: TeamRole.owner});
+      teams.teams['g1'] = g;
+      final vm = InviteMembersViewModel(
+        team: g,
+        teamRepository: teams,
+        directMessageRepository: FakeDirectMessageRepository(),
+        authRepository: auth,
+      );
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(body: InviteMembersDialog(viewModel: vm)),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.byTooltip('QR code'));
+      await tester.pumpAndSettle();
+      expect(find.text('Scan to join ${g.name}'), findsOneWidget);
+      expect(find.byType(QrImageView), findsOneWidget);
+      final dialog = tester.widget<InviteQrDialog>(find.byType(InviteQrDialog));
+      expect(dialog.link.toString(), 'https://dev.stall10.app/g/g1');
     });
 
     test('the team page counts join requests for its Invite badge', () async {

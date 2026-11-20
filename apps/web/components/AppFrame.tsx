@@ -156,7 +156,7 @@ export function AppFrame({ children, footer }: { children: ReactNode; footer: Re
             <input
               type="search"
               name="q"
-              placeholder={user === null ? "Search teams and groups" : "Search players, teams and upcoming events"}
+              placeholder={user === null ? "Search teams and communities" : "Search players, teams and upcoming events"}
               aria-label="Search Stall 10"
               enterKeyHint="search"
             />

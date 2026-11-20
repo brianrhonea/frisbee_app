@@ -36,7 +36,7 @@ export function CommunityTeams() {
   if (!user) {
     return (
       <div className="card hub-empty">
-        <p>Log in to see this group&apos;s teams. It&apos;s free.</p>
+        <p>Log in to see this community&apos;s teams. It&apos;s free.</p>
         <div className="home-actions">
           <Link className="btn btn-primary btn-small" href={`/sign-in?next=${encodeURIComponent(`/teams/${teamId}/teams`)}`}>
             Log in

@@ -256,7 +256,7 @@ export function MembersOnlySection({ what }: { what: string }) {
   return (
     <div className="card hub-empty">
       <p>
-        Only members see this {kind === "team" ? "team" : "group"}&apos;s {what}.
+        Only members see this {kind === "team" ? "team" : "community"}&apos;s {what}.
       </p>
       {viewer.state === "visitor" && (
         <Link className="btn btn-primary btn-small" href={`/sign-in?next=${encodeURIComponent(path + query)}`}>

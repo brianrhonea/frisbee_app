@@ -1,9 +1,14 @@
 # Stall 10 user guide
 
 Stall 10 keeps your ultimate team in one place: schedule, roster, playbook,
-stats, chat and pickup groups. This guide covers
-version 0.0.12. What changed in each version is in
+stats, chat, pickup communities and tournaments. This guide covers
+version 0.0.30 of the app; the website at stall10.app does the same
+things with its own layout. What changed in each version is in
 [release-notes.md](release-notes.md).
+
+**Words we use:** a **team** is a roster that competes. A **community**
+is anything else people belong to: a **pickup community** (open pickup,
+hat tournaments) or a **school or club** (holds several teams).
 
 ## Getting started
 
@@ -26,22 +31,26 @@ version 0.0.12. What changed in each version is in
    - The app asks once whether to send you **notifications**, and again
      when you join a team or follow someone.
 2. **Join or create a team.** On Home or the Teams tab:
+   - **Invite link or QR code**: tap a link someone sent you (in
+     Messages, WhatsApp, email or a Stall 10 message), or point your
+     phone's camera at the QR code they show you. It opens Stall 10 and
+     shows the team; tap **Join**. Links expire (1 hour to 30 days, the
+     sender picks).
    - **Join with code**: enter the 6-character invite code your team admin
-     shows you. Codes change every 30 seconds, so enter it while they have
+     reads out. Codes change every 30 seconds, so enter it while they have
      it up. You join as a player.
-   - **Invite link**: tap a link someone sent you (in Messages, WhatsApp,
-     email or a Stall 10 message). It opens Stall 10 and shows the team;
-     tap **Join**. Links expire (1 hour to 30 days, the sender picks).
    - **Club teams are for players 16 and over.** To join one, or start
      one, you need to be 16 that day, with your date of birth in
-     **About you**. Other levels and groups are open to
+     **About you**. Other levels and communities are open to
      everyone. Anyone can be invited to a club team; accepting checks
      your age, and the invite waits until you can.
-   - **Create team**: you become its owner. Show the invite code or share
-     an invite link from the team's **Members** page.
+   - **Create team**: you become its owner. Tap **Invite** on the team's
+     page to share a link or show its QR code; the code to read out is on
+     **Roster → Members**.
    Sign in later with your email **or** your @username.
-3. **Profile** is the last tab. **Edit profile** changes what others
-   see; the **gear** at the top right opens [Settings](#settings).
+3. **Your profile** opens from your picture in the top corner (it has no
+   tab). **Edit profile** changes what others see; the **gear** at the
+   top right opens [Settings](#settings).
 
 ## Roles
 
@@ -64,7 +73,7 @@ RSVP, chat where rooms let them, and play back plays. Only the owner
 creates roles, transfers the team or deletes it.
 
 Teams from before custom roles had Coach and Captain. They become custom
-roles named Coach and Captain (Organizer in groups), with every
+roles named Coach and Captain (Organizer in communities), with every
 permission, the first time the owner opens the team, and chat rooms that
 were open to them stay open.
 
@@ -79,42 +88,48 @@ passes to another member, preferring one with Manage team.
 
 ## The tabs
 
+Five tabs, in this order on the app's bottom bar and the website's
+sidebar: **Home**, **Explore**, **Events**, **Teams** and **Messages**.
+Your profile and settings open from your picture in the top corner, and
+notifications from the 🔔 beside it.
+
 ### Home
 
-Home has the week, your team, then your **feed**. On a wide screen,
-your events and playbook sit beside the feed.
+- **The feed**, in three tabs: **For you** (you, your teams and
+  communities, and everything you follow), **Community** (everyone's
+  public posts) and **Your teams** (your teams' posts). Newest first;
+  pull down or tap Home again for the latest.
+- **Post box** at the top: type and tap **Post**. **Photos +**, **Workout**
+  and **Record** open inside the box. If you run a team, the **To** chip
+  posts to that team instead.
+- **Your teams** strip under the post box, with **New / Join**.
+- **Up next**: your next team or personal event.
+- **Get started** (new accounts): pick a username, join or create a
+  team, find a team, follow people.
+- **Needs you**: join requests waiting for you to approve.
 
-- **This week**: the next seven days. Dots under each day show events:
-  **blue for team**, **purple for personal**. Each event has a TEAM or
-  PERSONAL tag (or the team's name if you're on several teams). Tap a day or
-  **Full schedule** to open the Schedule tab.
-- **My team**: your team at a glance. If you're on several teams, switch
-  with the chips.
-- **Feed**: posts from you, your teams and groups, and everything you
-  follow, newest first. Tap **Share an update or workout** to post. See
-  [Following and posts](#following-and-posts).
-- **Playbook** (wide screens): a preview of your team's plays. Tap one to
-  open it.
-- **Coming up** (wide screens): your next team and personal events.
+### Explore
 
-### Search
-
-The search box at the top of Home (phones) or of every page (tablets and
-computers) searches **players** (by name or @username), **teams** and
-**pickup groups**. Results open in **Explore**, where chips narrow them to
-one kind. Explore also has shortcuts to starting a team or group.
+Search **players** (by name or @username), **teams**, **communities**
+and **tournaments**; chips narrow results to one kind. Explore also has
+**Rankings**, **Learn to play**, and shortcuts to starting a team or
+community or hosting a tournament.
 
 On a computer, press **Ctrl K** (**⌘K** on a Mac) anywhere for the
 **command menu**: type to jump to a section or one of your teams, start a
 post or message, record a workout, or search everything. Arrow keys
-move, Enter opens, Esc closes. **Ctrl 1–5** switch between Home,
-Explore, Team, Messages and Profile.
+move, Enter opens, Esc closes. **Ctrl 1–5** switch between the five tabs.
+
+### Events
+
+**My schedule** (your week; see [Schedule](#schedule)) and **Find
+events**: tournaments and leagues anyone can find, by type.
 
 ### Following and posts
 
-- **Follow** a person, team, community group or group tournament from its
+- **Follow** a person, team, community or hat tournament from its
   page. Their posts then show up in your Home
-  feed. Posts from your own teams and groups are always there.
+  feed. Posts from your own teams and communities are always there.
 - Tap the **bell** next to **Following** to be notified when they post. To
   turn every post notification off, use **Posts you follow** in
   notification settings.
@@ -199,11 +214,11 @@ many conversations have something new.
 - On a computer, conversations are listed on the left with the open one
   on the right. On a phone, a conversation opens full screen; the back
   arrow returns to Messages.
-- Press and hold a message to react, reply, copy or delete it. On a
-  phone, swipe a message's bubble to the right to reply, and drag the
-  conversation to the left to see every message's time (you can keep
-  scrolling while you do). On a computer,
-  point at a message to see its time.
+- Press and hold a message to see when it was sent, and to react, reply,
+  copy or delete it. On a phone, swipe a message's bubble to the right to
+  reply, and drag the conversation to the left to see every message's
+  time (you can keep scrolling while you do). On a computer, point at a
+  message to see its time.
 - **Seen** shows under your last message once the other person has read
   it. Turn **Read receipts** off in Settings → Privacy; then they don't
   see yours and you don't see theirs.
@@ -226,16 +241,20 @@ even if you close the app in between, and it's never posted twice.
 
 ### Teams
 
-Your teams. Tap one to open its home page: the team at a glance, what's
-**Up next**, and the team's **Posts**. Owners, coaches and captains tap
-**New post** to share news (tryouts, fees, field changes). Each post is
-**Public** or for members only; admins can edit or delete posts.
+Your teams and communities in one list, your own first. The **+** joins
+with a code, finds a team, or starts a team or community.
 
-Members get a tab bar under the team name: **Home** (the above), then
-one tab for each part of the team. Switching tabs keeps you on the team
-page; back takes you out of the team. The tabs:
+Every team and community page has the same tabs under its name:
+**Feed**, **Schedule**, **Chat**, **Roster** and **More** (a school or
+club also has **Teams**). Switching tabs keeps you on the page; back
+takes you out. The header has **Invite** (for people who manage
+members, with a count of waiting join requests) and the ⋮ menu.
 
-- **Team Events**: the team calendar. Open an event to RSVP **Going**,
+- **Feed**: the team at a glance, what's **Up next**, and its posts.
+  Owners, coaches and captains tap **New post** to share news (tryouts,
+  fees, field changes). Each post is **Public** or for members only;
+  admins can edit or delete posts.
+- **Schedule**: the team calendar. Open an event to RSVP **Going**,
   **Maybe** or **Can't go**. Once you're going, you can react and vote in
   the event's poll. Admins can make an event **Public** to show it on the
   team's public page; RSVPs and polls stay private.
@@ -248,41 +267,47 @@ page; back takes you out of the team. The tabs:
   On a computer, rooms are listed on the left and the open room is on the
   right. On a phone, tap a room to slide it open; the 💬 button at the top
   left opens your room list, and tapping the open room takes you back.
-- **Roster**: players with number and position. Admins also see and mark
-  who's paid, and can filter to **Unpaid only**.
-- **Playbook**: the team's plays. Admins draw plays on the field and add
-  animation steps (drag a player to record a cut, the disc to record a
-  throw); everyone can play them back.
-- **Stats**: tournaments and games. Stat keepers track points live (lines,
-  O/D, pull timer, subs, timeouts); everyone can view stat sheets and
-  season stats.
-- **Members**: who's on the team and their roles. Admins tap **Show
-  code** for the invite code: a new one every 30 seconds, each working for
-  45, with a countdown. **Hide** stops it. **Invite** players: pick how
-  long the link works (1 hour, 1 day, 7 days or 30 days; 7 days unless you
-  change it), then copy or **Share** it to any app, or search for someone
-  on Stall 10 to send them an in-app invite plus the link in a message.
-  Anyone with a live link can join as a player. A group's link opens its
-  page, where people join or ask to, and doesn't expire.
+- **Roster**: **Players** (number and position; admins also see and mark
+  who's paid, and can filter to **Unpaid only**) and **Members** (who's
+  on the team and their roles). Admins tap **Show code** on Members for
+  the code to read out: a new one every 30 seconds, each working for 45,
+  with a countdown. **Hide** stops it.
+- **More**: Playbook, Videos, Stats and Tournaments.
+  - **Playbook**: the team's plays. Admins draw plays on the field and
+    add animation steps (drag a player to record a cut, the disc to
+    record a throw); everyone can play them back.
+  - **Stats**: games, and **Track a tournament** to keep stats for every
+    game you play at one tournament (its roster and saved lines). Stat
+    keepers track points live (lines, O/D, pull timer, subs, timeouts);
+    everyone can view stat sheets and season stats.
 
-**Find a team**: tap 🔍 at the top of the Teams tab (or search from Home)
+**Inviting**: tap **Invite**. Pick how long the link works (1 hour, 1
+day, 7 days or 30 days; 7 days unless you change it), then copy it,
+**Share** it to any app, or tap the **QR code** button for people next
+to you to scan. Or search for someone on Stall 10 to send them an in-app
+invite plus the link in a message. Anyone with a live link can join as a
+player. A community's link opens its page, where people join or ask to,
+and doesn't expire.
+
+**Find a team**: tap 🔍 at the top of the Teams tab (or use Explore)
 and type part of a team's name or city. Tap a team to see its public page: name, division and
 city, plus any public events and posts. Members, rosters and chat stay
 private. Tap **Join** and enter the invite code an admin shows you.
 
-### Community groups
+### Pickup communities
 
-A community group is an open pickup community: no roster or stats, just
-**Events**, **Chat**, **Tournaments** and **Members**. In a group, roles
-are **Owner**, **Organizer** (like a captain: runs events and
-tournaments) and **Member**.
+A pickup community is open to anyone: no roster or stats, just
+**Schedule**, **Chat**, **Tournaments** and **Members**. Its roles are
+**Owner**, **Organizer** (like a captain: runs events and tournaments)
+and **Member**.
 
-- **Start one**: Teams tab → **New** → **Community group**. Add a
+- **Start one**: Teams tab → **+** → **Pickup community**. Add a
   description and a location (search an address, then tap the map to
   fine-tune). Turn on **Approve new members** to review who joins.
-- **Find one**: tap 🔍 in the Teams tab and choose **Groups**. Open a group
+- **Find one**: search in **Explore** and choose **Communities**. Open one
   to see its description and map, then tap **Join** (or **Ask to join**,
-  if it needs approval). Organizers approve requests on the Members page.
+  if it needs approval). Organizers approve requests from **Invite** or
+  the Members page.
 - **Pickup** events work like any team event. For **Tournament** events
   the RSVPs are **Attending**, **Planning to attend** and **Not able to
   make it :(**.
@@ -292,7 +317,7 @@ RSVPs, listed under **Hat tournaments** in the Tournaments section):
 
 1. Post a Tournament event so people can RSVP. On the event, tap **Set up
    tournament** (or **New tournament** on the Tournaments page). Every
-   tournament shows on the group schedule: one set up without an event
+   tournament shows on the community schedule: one set up without an event
    gets a Tournament event when you save, and a linked event's title and
    times follow the tournament's. The event then has a **View** button
    for the tournament.
@@ -306,7 +331,7 @@ RSVPs, listed under **Hat tournaments** in the Tournaments section):
 4. Check the **schedule preview**. Games are split evenly over the days,
    in bracket order. It warns if games run past the ideal end. Tap
    **Publish schedule**. Teams can still be empty at this point. The first
-   time you publish, Stall 10 offers to **post it to the group feed** with
+   time you publish, Stall 10 offers to **post it to the community feed** with
    the dates, format and how to sign up filled in. The post is public, so
    people who haven't joined yet see it too; edit it before posting.
 5. Add players, now or any time before play: **Import RSVPs** brings in
@@ -327,7 +352,7 @@ seed the bracket** when every pool game is final.
 
 ### Hosting a tournament
 
-Any team, community group or school/club can host a tournament for other
+Any team or community (pickup or school/club) can host a tournament for other
 teams, from its **Tournaments** section. People with **Manage events**
 run it.
 
@@ -356,7 +381,7 @@ run it.
 8. **News**: **Post update** puts a public post on your page, tagged
    with the tournament, so its followers see it.
 
-**Playing in one**: find tournaments in **Explore → Find a tournament**.
+**Playing in one**: find tournaments in **Events → Find events** (or **Explore → Find a tournament or league**).
 A team's owner or captain taps **Apply with a team**, picks the division
 and up to 4 captains (they report scores), or **Accept invite** if
 invited. The Overview tab shows your status and whether your bid fee is
@@ -392,7 +417,7 @@ with a men's team and a women's team. Start one from Teams → **New** →
 
 ### Schedule
 
-Your whole week in one place: your calendars plus every team you're on.
+**Events → My schedule**: your whole week in one place, your calendars plus every team you're on.
 
 - Use the arrows to move between weeks, and **Today** to come back.
 - Tap a day in the strip to jump to it.
@@ -433,13 +458,13 @@ calendar** and can make more, each with a name and color.
   so keep it private; **Reset link** if it gets out, or **Turn off**.
 
 Event types: Practice, Game, Tournament, Scrimmage, Workout, Social, Other
-(in groups: Pickup, Tournament, Social, Other).
+(in pickup communities: Pickup, Tournament, Social, Other).
 Events on My calendar are private unless you invite people to it.
 
 ### Videos
 
 Videos shared with your team, like meeting recordings or game film. Open
-your team and tap **Videos**.
+your team and tap **More → Videos**.
 
 - **Watch:** tap a video to play it in the app. For YouTube videos,
   **Open on YouTube** plays it on YouTube instead.
@@ -476,7 +501,7 @@ your team and tap **Videos**.
 Video meetings for your team. They show on the schedule with a 🎥 icon,
 but only to the people invited.
 
-- **Schedule one** (owners, coaches and captains): on the team's Events
+- **Schedule one** (owners, coaches and captains): on the team's Schedule
   tab tap **New** → **Meeting**. Give it a title, time and agenda, then
   pick who's invited: whole roles (Admins are always in), particular
   people, or both. Turn on **Require admin approval to join** to let people

@@ -118,7 +118,7 @@ class _TeamFormState extends State<TeamForm> {
               labelText: _isOrg
                   ? 'School or club name'
                   : _isGroup
-                  ? 'Group name'
+                  ? 'Community name'
                   : 'Team name',
             ),
             textCapitalization: TextCapitalization.words,

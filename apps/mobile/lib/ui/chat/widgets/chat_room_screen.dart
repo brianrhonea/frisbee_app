@@ -122,7 +122,7 @@ class ChatRoomView extends StatelessWidget {
                   ?team?.name,
                   room.isGeneral
                       ? ((team?.isCommunity ?? false)
-                            ? 'Group chat'
+                            ? 'Community chat'
                             : 'Team chat')
                       : room.name,
                 ].join(' · ')

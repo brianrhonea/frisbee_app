@@ -845,7 +845,7 @@ void main() {
     await tester.tap(find.text('Join or create'));
     await tester.pumpAndSettle();
     // Every way onto a team: a code, creating one, or finding a group.
-    expect(find.text('Create a team or group'), findsOneWidget);
+    expect(find.text('Create a team or community'), findsOneWidget);
     await tester.tap(find.text('Join with a code'));
     await tester.pumpAndSettle();
     expect(find.text('Invite code'), findsOneWidget);

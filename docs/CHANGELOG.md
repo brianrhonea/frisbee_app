@@ -13,6 +13,7 @@ Plain-language notes for testers are in
 
 | Version | Date       | Branch                                  | Commits             |
 |---------|------------|-----------------------------------------|---------------------|
+| 0.0.30  | 2026-11-19 | `fix/ui-wording`                        |                     |
 | 0.0.29  | 2026-11-17 | `fix/private-posts`                     |                     |
 | 0.0.28  | 2026-11-16 | `feature/offline-queue`                 |                     |
 | 0.0.26  | 2026-11-16 | `feature/web-parity`                    |                     |
@@ -42,6 +43,33 @@ Plain-language notes for testers are in
 | 0.0.2   | 2026-10-29 | `feature/stats-mockup`                  | `7556460`           |
 | 0.0.1   | 2026-10-28 | `feature/team-calendar-animated-plays`  | `fd59d92`           |
 | 0.0.0   | 2026-10-28 | `development` (MVP baseline)            | `090e7b4`–`04d4109` |
+
+## 0.0.30 — Wording, QR invites, message times (UI review release 1)
+
+The first of the UI review's releases (web 0.40.0, api 0.31.1). No data,
+rules or function changes.
+
+- One name for communities in every user-facing string: `TeamKind.community`
+  is labelled **Pickup community** (was "Community group") and its noun
+  is "community" (was "group"), so a pickup community and a school or club
+  both read as "community" in sentences. Group messages (group DMs) keep
+  "group". Explore's filter chip is **Communities** (the `groups` filter
+  and `?only=groups` keep their names). The shared `teamKindLabels`
+  (name-taken message) and the website's `kindLabels` match.
+- Stats wording: **Track a tournament** (was New tournament), **Track
+  stats** on the Stats tab's button (was Game / tournament), the list is
+  **Tournament stats**. The data is still `statsTournaments`; only labels
+  changed, so "tournament" in Stats no longer reads like a hosted one.
+- Invite dialog: a **QR code** button beside Copy opens
+  `InviteQrDialog` (`qr_flutter`), the invite link dark on white for a
+  phone camera. The website has the same button (`qrcode`).
+- A message's long-press sheet shows when it was sent, so times aren't
+  only behind the drag-left gesture.
+- `docs/user-guide.md` rewritten for the five tabs, the team hub, the
+  community names, QR invites and stats wording.
+- Tests: `invites_test` (QR code), `messages_test` (time in the sheet),
+  and the renamed strings in `stats_*`, `explore`, `groups`,
+  `host_event` and `group_tournaments` tests.
 
 ## 0.0.29 — Private profiles' posts stay private (S1)
 

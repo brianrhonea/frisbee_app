@@ -71,7 +71,7 @@ export function MyTeams() {
       <div className="stack">
         <div className="card">
           <p className="muted small">
-            No teams yet. <Link href="/explore">Find a team or group</Link>, or start one below.
+            No teams yet. <Link href="/explore">Find a team or community</Link>, or start one below.
           </p>
         </div>
         <StartOrJoin />

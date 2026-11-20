@@ -62,7 +62,7 @@ export function SideTeams() {
     <nav className="side-teams" aria-label="Your spaces">
       <div className="side-label-row">
         <h2 className="side-label">Your spaces</h2>
-        <StartOrJoinButton className="side-add" label="Create or join a team or group">
+        <StartOrJoinButton className="side-add" label="Create or join a team or community">
           <NavIcon name="plus" size={16} />
         </StartOrJoinButton>
       </div>

@@ -364,7 +364,7 @@ class TeamHomeViewModel extends ChangeNotifier {
     final me = _auth.currentUser;
     final listing = summary;
     if (me == null) return Result.error(Exception('Not signed in'));
-    if (listing == null) return Result.error(Exception('Group not found'));
+    if (listing == null) return Result.error(Exception('Community not found'));
     if (listing.requiresApproval) return _teams.requestToJoin(teamId, me);
     final result = await _teams.joinGroup(teamId, me);
     if (result is Ok) _watchTeam();

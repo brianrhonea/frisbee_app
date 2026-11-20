@@ -28,7 +28,7 @@ export function NeedsYou({ uid }: { uid: string }) {
       </h2>
       <ul className="needs-you-list">
         {groups.map((g) => (
-          <Requests key={g.id} teamId={g.id} name={g.name ?? "Group"} onCount={onCount} />
+          <Requests key={g.id} teamId={g.id} name={g.name ?? "Community"} onCount={onCount} />
         ))}
       </ul>
     </section>

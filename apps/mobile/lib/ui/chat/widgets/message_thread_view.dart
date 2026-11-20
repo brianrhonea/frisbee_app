@@ -312,8 +312,9 @@ class _RowActions {
   final _TimeReveal reveal;
 }
 
-/// Long-press on a message: a row of quick reactions, then Reply, Copy
-/// and Delete.
+/// Long-press on a message: when it was sent, a row of quick reactions,
+/// then Reply, Copy and Delete. The time is here too so it isn't only
+/// behind the drag-left gesture.
 class _MessageActionsSheet extends StatelessWidget {
   const _MessageActionsSheet({
     required this.message,
@@ -343,6 +344,15 @@ class _MessageActionsSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (message.createdAt case final sent?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                _FeedRow._stamp(sent),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, color: c.muted),
+              ),
+            ),
           if (canReact)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),

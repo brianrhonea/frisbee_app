@@ -616,7 +616,7 @@ class _PublicTournament extends StatelessWidget {
             ),
           const SizedBox(height: 16),
           Text(
-            'Follow to see its updates on Home. To play, join the group and '
+            'Follow to see its updates on Home. To play, join the community and '
             'sign up there.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -628,7 +628,7 @@ class _PublicTournament extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: onOpenGroup,
               icon: const Icon(Icons.diversity_3_outlined),
-              label: const Text('Open the group'),
+              label: const Text('Open the community'),
             ),
           ),
         ],

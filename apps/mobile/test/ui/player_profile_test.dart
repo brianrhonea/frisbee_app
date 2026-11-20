@@ -247,11 +247,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('All 3'), findsOneWidget);
     expect(find.text('Teams 2'), findsOneWidget);
-    expect(find.text('Groups 1'), findsOneWidget);
+    expect(find.text('Pickup communities 1'), findsOneWidget);
     expect(find.text('Team'), findsNWidgets(2));
     expect(find.text('Group'), findsOneWidget);
 
-    await tester.tap(find.text('Groups 1'));
+    await tester.tap(find.text('Pickup communities 1'));
     await tester.pumpAndSettle();
     expect(find.text('Denver Pickup'), findsOneWidget);
     expect(find.text('Riptide'), findsNothing);

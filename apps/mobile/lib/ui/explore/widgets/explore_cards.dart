@@ -41,7 +41,7 @@ class UpcomingTournamentsCard extends StatelessWidget {
                 const SkeletonList(count: 3, padding: EdgeInsets.zero)
               else if (list.isEmpty)
                 Text(
-                  'Nothing coming up yet. Groups and clubs host tournaments '
+                  'Nothing coming up yet. Communities and clubs host tournaments '
                   'and leagues from their Tournaments tab.',
                   style: TextStyle(fontSize: 12.5, color: c.muted),
                 )

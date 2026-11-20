@@ -941,6 +941,15 @@ void main() {
 
     await tester.longPress(find.text('Pickup at 6?').first);
     await tester.pumpAndSettle();
+    // The sheet says when it was sent, so the time isn't only behind the
+    // drag-left gesture.
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.textContaining(RegExp(r'\d:\d\d\s[AP]M')),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('😂'));
     await tester.pumpAndSettle();
     expect(vm.messages.single.reactionOf(testUser.uid), '😂');

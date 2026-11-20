@@ -127,7 +127,7 @@ export function NewStatsForm({
 
   return (
     <form className="card settings-form st-new" onSubmit={submit}>
-      <h3 className="card-title">{tournament ? "New tournament" : "New game"}</h3>
+      <h3 className="card-title">{tournament ? "Track a tournament" : "New game"}</h3>
       <label className="field">
         <span>Link to schedule event</span>
         <select value={eventId} onChange={(e) => link(e.target.value)}>

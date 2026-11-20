@@ -102,6 +102,6 @@ const divisionLabels: Record<Division, string> = {
 
 const teamKindLabels: Record<TeamKind, string> = {
   team: "Team",
-  community: "Community group",
+  community: "Pickup community",
   organization: "School or club",
 };

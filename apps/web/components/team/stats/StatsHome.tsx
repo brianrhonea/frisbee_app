@@ -109,7 +109,7 @@ export function StatsHome() {
               New game
             </button>
             <button type="button" className="btn btn-small" onClick={() => setAdding("tournament")}>
-              New tournament
+              Track a tournament
             </button>
           </>
         )}
@@ -162,9 +162,9 @@ export function StatsHome() {
         )}
       </section>
 
-      <h3 className="section-title">Tournaments</h3>
+      <h3 className="section-title">Tournament stats</h3>
       {tournaments.data.length === 0 ? (
-        <p className="empty">No tournaments yet.</p>
+        <p className="empty">No tournaments tracked yet.</p>
       ) : (
         <ul className="game-list">
           {tournaments.data.map((t) => {

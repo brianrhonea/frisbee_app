@@ -196,8 +196,8 @@ export function LearnGuide() {
               &ldquo;flick&rdquo;. You&apos;ll pick up the rest by playing.
             </li>
             <li>
-              <b>Find a game:</b> pickup and league groups welcome beginners.{" "}
-              <Link href="/teams#find">Search for groups and teams near you</Link>, or{" "}
+              <b>Find a game:</b> pickup communities and leagues welcome beginners.{" "}
+              <Link href="/teams#find">Search for communities and teams near you</Link>, or{" "}
               <Link href="/events">see what&apos;s coming up</Link>.
             </li>
           </ul>

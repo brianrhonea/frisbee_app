@@ -103,13 +103,13 @@ enum TeamRole {
 /// join by holding the roles each team asks for.
 enum TeamKind {
   team('Team', 'team'),
-  community('Community group', 'group'),
+  community('Pickup community', 'community'),
   organization('School or club', 'community');
 
   const TeamKind(this.label, this.noun);
   final String label;
 
-  /// What the app calls one in a sentence: "team", "group", "community".
+  /// What the app calls one in a sentence: "team" or "community".
   final String noun;
 
   /// Joined like a group (openly or with approval) and has a description

@@ -45,10 +45,10 @@ const gameKeys = ["order", "stage", "round", "label", "pool", "field", "startsAt
 /** Writes per transaction when a schedule is too big for one. */
 const chunk = 400;
 
-const noTeam = () => new ApiError("not_found", "That group doesn't exist.");
+const noTeam = () => new ApiError("not_found", "That community doesn't exist.");
 const noTournament = () => new ApiError("not_found", "That tournament doesn't exist.");
 const noGame = () => new ApiError("not_found", "That game doesn't exist.");
-const notOrganizer = () => new ApiError("permission_denied", "Only the group's organizers can run its tournaments.");
+const notOrganizer = () => new ApiError("permission_denied", "Only the community's organizers can run its tournaments.");
 const notPlaying = () => new ApiError("permission_denied", "Only people playing in it can move teams on.");
 
 /**
@@ -96,7 +96,7 @@ function tournamentFields(team: Data, d: Draft, status: GroupTournamentStatus): 
   const participantIds = teams.flatMap((t) => t.playerIds);
   // participantIds.toSet().difference(team().memberIds.toSet()).size() == 0
   const outsider = participantIds.find((u) => !members.has(u));
-  if (outsider) throw new ApiError("failed_precondition", "Everyone on a team has to be in the group.");
+  if (outsider) throw new ApiError("failed_precondition", "Everyone on a team has to be in the community.");
   const captains = Object.fromEntries(teams.flatMap((t) => (t.captainId ? [[t.id, t.captainId]] : [])));
   const s = d.settings;
   return {

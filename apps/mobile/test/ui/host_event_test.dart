@@ -124,7 +124,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining("You don't run"), findsOneWidget);
     expect(find.text('Start a school or club'), findsOneWidget);
-    expect(find.text('Start a community group'), findsOneWidget);
+    expect(find.text('Start a pickup community'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     vm.dispose();
   });

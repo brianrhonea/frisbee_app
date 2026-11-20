@@ -539,10 +539,10 @@ class TournamentEditorViewModel extends ChangeNotifier {
         '${s.format.label} · ${_teamList.length} teams · '
             '${s.playersOnField}v${s.playersOnField} · games to ${s.scoreCap}.',
         if (e != null)
-          'Want to play? Join the group, then RSVP Attending on '
+          'Want to play? Join the community, then RSVP Attending on '
               '"${e.title}" in Events. Teams are picked from who signs up.'
         else
-          'Want to play? Join the group and watch Events for sign-up.',
+          'Want to play? Join the community and watch Events for sign-up.',
       ].join('\n\n'),
       location: _group?.location?.address ?? '',
       isPublic: true,

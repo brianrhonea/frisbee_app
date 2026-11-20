@@ -786,7 +786,7 @@ class _SchedulePicker extends StatelessWidget {
               : vm.isOrganization
               ? 'Choose below who in the community sees it and can RSVP.'
               : vm.isCommunity
-              ? 'Everyone in the group will see this event and can RSVP.'
+              ? 'Everyone in the community will see this event and can RSVP.'
               : 'Everyone on the team will see this event and can RSVP.',
           style: Theme.of(context).textTheme.bodySmall,
         ),

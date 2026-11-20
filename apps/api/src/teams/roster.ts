@@ -64,7 +64,7 @@ export class RosterService {
     const kind = kinds.find((k) => k === team.kind) ?? "team";
     const isMember = Array.isArray(team.memberIds) && team.memberIds.includes(caller.uid);
     if (kind !== "team" && team.requiresApproval === true && !isMember) {
-      throw new ApiError("permission_denied", "Only members see who's in this group.");
+      throw new ApiError("permission_denied", "Only members see who's in this community.");
     }
     // A youth team's roster is its members' (and its school or club's
     // admins'), and so is a team's in a youth division of a league, whatever

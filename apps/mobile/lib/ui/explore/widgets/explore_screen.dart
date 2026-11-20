@@ -119,7 +119,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             const PageHeader(
               eyebrow: 'Explore',
               title: 'Find your next point.',
-              subtitle: 'Players, teams, pickup groups and tournaments.',
+              subtitle: 'Players, teams, communities and tournaments.',
             ),
           SideColumnLayout(
             main: [
@@ -222,7 +222,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       ('All', null),
                       ('Players', ExploreFilter.players),
                       ('Teams', ExploreFilter.teams),
-                      ('Groups', ExploreFilter.groups),
+                      ('Communities', ExploreFilter.groups),
                       if (widget.explore != null)
                         ('Tournaments', ExploreFilter.tournaments),
                     ],
@@ -247,7 +247,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       child: Text(
                         'Type at least ${TeamSearchViewModel.minQueryLength} '
-                        'letters to search players, teams, groups and '
+                        'letters to search players, teams, communities and '
                         'tournaments.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: c.muted),
@@ -258,7 +258,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     for (final p in people) PlayerTile(profile: p),
                   ],
                   if (results.isNotEmpty) ...[
-                    if (sections > 1) const _ResultsHeading('Teams and groups'),
+                    if (sections > 1)
+                      const _ResultsHeading('Teams and communities'),
                     for (final t in results) _ResultTile(listing: t, vm: vm),
                   ],
                   if (events.isNotEmpty) ...[
@@ -385,7 +386,7 @@ class _ResultTile extends StatelessWidget {
             : t.subtitle,
       ),
       trailing: vm.isMine(t.id)
-          ? Tag(t.isCommunity ? 'Your group' : 'Your team')
+          ? Tag(t.isCommunity ? 'Your community' : 'Your team')
           : const Icon(Icons.chevron_right),
       onTap: () => context.go(Routes.team(t.id)),
     );
@@ -453,7 +454,7 @@ class _Shortcuts extends StatelessWidget {
       (
         Icons.sports_score_outlined,
         'Host a league or tournament',
-        'Run it from your group or school or club',
+        'Run it from your team or community',
         () => context.push(Routes.hostEvent),
       ),
       (
@@ -464,7 +465,7 @@ class _Shortcuts extends StatelessWidget {
       ),
       (
         Icons.diversity_3_outlined,
-        'Start a pickup group',
+        'Start a pickup community',
         'Open sign-ups, pickup and tournaments',
         () => context.go(Routes.createGroup),
       ),

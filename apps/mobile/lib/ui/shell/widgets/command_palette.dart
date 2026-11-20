@@ -68,8 +68,8 @@ List<PaletteCommand> paletteCommands({
     PaletteCommand(
       label: t.name,
       icon: Icons.groups_outlined,
-      group: t.isCommunity ? 'Your groups' : 'Your teams',
-      keywords: 'team group club',
+      group: t.isCommunity ? 'Your communities' : 'Your teams',
+      keywords: 'team group community club',
       team: t,
       run: (c) => c.go(Routes.team(t.id)),
     ),
@@ -117,7 +117,7 @@ List<PaletteCommand> paletteCommands({
     run: (c) => c.go(Routes.createTeam),
   ),
   PaletteCommand(
-    label: 'Start a pickup group',
+    label: 'Start a pickup community',
     icon: Icons.diversity_3_outlined,
     keywords: 'create new community',
     run: (c) => c.go(Routes.createGroup),

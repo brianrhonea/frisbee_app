@@ -30,7 +30,7 @@ export const levelLabels: Record<string, string> = {
 
 const kindLabels: Record<string, string> = {
   team: "Team",
-  community: "Community group",
+  community: "Pickup community",
   organization: "School or club",
 };
 

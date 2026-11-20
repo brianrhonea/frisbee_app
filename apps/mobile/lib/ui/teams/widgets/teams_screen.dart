@@ -119,10 +119,10 @@ class _TeamsScreenState extends State<TeamsScreen> {
           if (vm.all.isEmpty && invites.isEmpty) {
             return EmptyView(
               icon: Icons.groups_outlined,
-              title: 'No teams or groups yet',
+              title: 'No teams or communities yet',
               message:
-                  'Create a team or community group, join a team with an '
-                  'invite code, or search for teams and groups near you.',
+                  'Create a team or community, join a team with an '
+                  'invite code, or search for teams and communities near you.',
               action: Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -136,7 +136,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
                     onPressed: () =>
                         context.go(Routes.explore(only: ExploreFilter.groups)),
                     icon: const Icon(Icons.search),
-                    label: const Text('Find a group'),
+                    label: const Text('Find a community'),
                   ),
                 ],
               ),
@@ -200,7 +200,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
               leading: const Icon(Icons.add_circle_outline),
               title: const Text('Start one'),
               subtitle: const Text(
-                'A team, a community group, or a school or club',
+                'A team, a pickup community, or a school or club',
               ),
               onTap: () => Navigator.pop(context, 'create'),
             ),
@@ -238,7 +238,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.diversity_3_outlined),
-              title: const Text('Community group'),
+              title: const Text('Pickup community'),
               subtitle: const Text(
                 'Open to anyone, with pickup events and tournaments',
               ),

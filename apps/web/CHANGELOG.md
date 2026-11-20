@@ -4,6 +4,24 @@ The website's version is `version` in `apps/web/package.json`, shown in
 the site's footer. Bump it with every change to the site and add an entry
 here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 
+## 0.40.0 — 2026-11-19
+
+UI review release 1, with app 0.0.30. Works with API 0.31.1.
+
+**Changed**
+- One name for communities: "Pickup community" (was "Community group")
+  and "community" (was "group") in every page, dialog and placeholder,
+  with the app's words. Explore's chip is **Communities** (`?only=groups`
+  still works). Group messages keep "group".
+- Stats: **Track a tournament** (was New tournament) and **Tournament
+  stats** for the list, as in the app.
+- The static About and account-deletion pages say pickup communities.
+
+**Added**
+- The invite dialog's **QR code** button shows the link as a QR code to
+  scan (the `qrcode` package, rendered to an inline SVG, dark on white in
+  both themes).
+
 ## 0.39.1 — 2026-11-17
 
 List caps (security review S4).

@@ -273,7 +273,7 @@ function TransferOwnership() {
   const others = (team.memberIds ?? []).filter((u) => u !== viewer.uid);
   return (
     <section className="card settings-form danger-zone">
-      <h2 className="card-title">Hand over the {kind === "team" ? "team" : "group"}</h2>
+      <h2 className="card-title">Hand over the {kind === "team" ? "team" : "community"}</h2>
       <p className="muted small">The new owner gets full control; you stay on as a coach. Owners can&apos;t leave until they hand it over.</p>
       <div className="form-row">
         <label>
@@ -315,7 +315,7 @@ function DeleteTeam() {
   // As the rules ask: the owner removes everyone else, or hands it on, first.
   const others = Math.max(0, (viewer.state === "member" ? (viewer.team.memberIds?.length ?? 1) : 1) - 1);
   const { act, busy, error } = useAct();
-  const noun = kind === "team" ? "team" : kind === "organization" ? "community" : "group";
+  const noun = kind === "team" ? "team" : "community";
   const matches = typed.trim().toLowerCase() === name.trim().toLowerCase();
   return (
     <section className="card settings-form danger-zone">

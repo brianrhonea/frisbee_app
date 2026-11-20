@@ -23,7 +23,7 @@ const chips: Array<[string, ExploreFilter | null]> = [
   ["All", null],
   ["Players", "players"],
   ["Teams", "teams"],
-  ["Groups", "groups"],
+  ["Communities", "groups"],
   ["Tournaments", "tournaments"],
 ];
 
@@ -197,7 +197,7 @@ function SearchCard({
         )}
         {teams.length > 0 && (
           <>
-            {sections > 1 && <h3 className="explore-heading">Teams and groups</h3>}
+            {sections > 1 && <h3 className="explore-heading">Teams and communities</h3>}
             <div className="stack explore-list">
               {teams.map((t) => {
                 const group = (t.kind ?? "team") !== "team";
@@ -249,7 +249,7 @@ function UpcomingCard({ list, error }: { list: Array<Doc<TournamentDoc>> | undef
           Loading…
         </p>
       ) : shown.length === 0 ? (
-        <p className="muted small">Nothing coming up yet. Groups and clubs host tournaments and leagues from their Tournaments tab.</p>
+        <p className="muted small">Nothing coming up yet. Communities and clubs host tournaments and leagues from their Tournaments tab.</p>
       ) : (
         <div className="stack explore-list">
           {shown.map((t) => (
@@ -414,9 +414,9 @@ function RankingsPreview({ mine }: { mine: MyTeam[] }) {
 const shortcuts = [
   { href: "/learn", title: "Learn to play", sub: "The rules of ultimate in five minutes" },
   { href: "/tournaments", title: "Find a tournament or league", sub: "Apply with your team, sign up to play, or follow results" },
-  { href: "/tournaments/host", title: "Host a league or tournament", sub: "Run it from your group or school or club" },
+  { href: "/tournaments/host", title: "Host a league or tournament", sub: "Run it from your team or community" },
   { href: "/teams/new", title: "Start a team", sub: "Roster, playbook, stats and chat" },
-  { href: "/teams/new?kind=community", title: "Start a pickup group", sub: "Open sign-ups, pickup and tournaments" },
+  { href: "/teams/new?kind=community", title: "Start a pickup community", sub: "Open sign-ups, pickup and tournaments" },
 ];
 
 /** Shortcuts (Jump in). */

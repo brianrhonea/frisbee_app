@@ -496,6 +496,19 @@ everything the app does on the website alone, styled like the website
     storage "user post photos"), the app's `home_test`, `privacy_test`,
     `post_actions_test` and `community_feed_api_test`, the API's
     `post_editor`/`posts` tests and the functions' `follows/privacy`.
+20. UI review release 1 (app 0.0.30, web 0.40.0, api 0.31.1): [x] one
+    name for communities on both, "Pickup community" for the kind
+    (`TeamKind.community`, shared `teamKindLabels`, website `kindLabels`)
+    and "community" in sentences for it and a school or club (group
+    messages stay "group"; Explore's chip is Communities, `?only=groups`
+    unchanged); the API's errors match. [x] Stats says **Track a
+    tournament** and **Tournament stats** on both. [x] A **QR code**
+    button in the invite dialog on both (app `qr_flutter`, website
+    `qrcode`). App only (design): a message's long-press sheet shows
+    when it was sent (the website shows it on hover). Tests: app
+    `test/ui/invites_test.dart` (QR), `test/ui/messages_test.dart`; the
+    website's side is checked by hand. Community *types* (§5) are still
+    to come.
 
 Out of scope: payments, meeting recording, USA Ultimate data.
 

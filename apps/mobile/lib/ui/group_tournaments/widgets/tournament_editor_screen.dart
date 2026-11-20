@@ -95,9 +95,9 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
   Future<void> _offerPost() async {
     final post = await confirmDialog(
       context,
-      title: 'Tell the group?',
+      title: 'Tell the community?',
       message:
-          'Post ${vm.name.trim()} to the group feed so people see it and '
+          'Post ${vm.name.trim()} to the community feed so people see it and '
           'sign up. You can edit the post first.',
       confirmLabel: 'Write post',
     );
@@ -118,7 +118,7 @@ class _TournamentEditorScreenState extends State<TournamentEditorScreen> {
     if (vm.announce.error) {
       showErrorSnackBar(context, vm.announce.result);
     } else {
-      showSnackBar(context, 'Posted to the group feed');
+      showSnackBar(context, 'Posted to the community feed');
     }
     vm.announce.clearResult();
   }

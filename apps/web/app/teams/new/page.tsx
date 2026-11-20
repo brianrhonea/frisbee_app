@@ -11,7 +11,7 @@ export default function NewTeamPage() {
       <header className="page-head">
         <h1>Create</h1>
       </header>
-      <MembersOnly next="/teams/new" what="Sign up free or log in to create a team or group.">
+      <MembersOnly next="/teams/new" what="Sign up free or log in to create a team or community.">
         <Suspense>
           <CreateTeam />
         </Suspense>

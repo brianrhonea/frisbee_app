@@ -645,12 +645,12 @@ function PublicTournament({ teamId, listing, back, visitorNext }: { teamId: stri
             <div>
               <FollowButton type="tournament" targetId={listing.tournamentId} groupId={teamId} />
             </div>
-            <p className="muted small">Follow to see its updates on Home. To play, join the group and sign up there.</p>
+            <p className="muted small">Follow to see its updates on Home. To play, join the community and sign up there.</p>
           </>
         )}
         <div>
           <Link className="btn btn-small" href={`/teams/${encodeURIComponent(teamId)}`}>
-            Open the group
+            Open the community
           </Link>
         </div>
       </div>

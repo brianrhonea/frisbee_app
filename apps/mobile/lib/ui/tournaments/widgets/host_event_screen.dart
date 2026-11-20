@@ -147,7 +147,7 @@ class _WhoCanHost extends StatelessWidget {
             'verified badge.',
           ),
           line(Icons.apartment_outlined, 'A school or club'),
-          line(Icons.diversity_3_outlined, 'A community group'),
+          line(Icons.diversity_3_outlined, 'A pickup community'),
           line(Icons.groups_outlined, 'A team'),
         ],
       ),
@@ -254,7 +254,7 @@ class _StartHost extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: () => context.go(Routes.createGroup),
             icon: const Icon(Icons.diversity_3_outlined),
-            label: const Text('Start a community group'),
+            label: const Text('Start a pickup community'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(

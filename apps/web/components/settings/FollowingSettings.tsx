@@ -20,7 +20,7 @@ interface Follow {
 
 const tabs = [
   ["user", "Players"],
-  ["team", "Teams and groups"],
+  ["team", "Teams and communities"],
   ["tournament", "Tournaments"],
 ] as const;
 

@@ -82,8 +82,8 @@ export function TeamFinder() {
       <input
         className="search-input"
         type="search"
-        placeholder="Search teams, pickup groups, schools and clubs"
-        aria-label="Search teams and groups by name"
+        placeholder="Search teams, pickup communities, schools and clubs"
+        aria-label="Search teams and communities by name"
         maxLength={teamSearchMaxLength}
         value={query}
         onChange={(e) => onChange(e.target.value)}

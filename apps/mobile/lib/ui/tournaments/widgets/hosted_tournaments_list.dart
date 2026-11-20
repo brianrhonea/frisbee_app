@@ -237,7 +237,7 @@ class FindTournamentsScreen extends StatelessWidget {
                     icon: Icons.emoji_events_outlined,
                     title: 'No upcoming events',
                     message:
-                        'Groups and schools or clubs host tournaments, hat '
+                        'Teams and communities host tournaments, hat '
                         'tournaments and leagues. Start one with Host.',
                     action: FilledButton(
                       onPressed: () => context.push(Routes.hostEvent),

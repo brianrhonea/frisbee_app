@@ -64,7 +64,8 @@ class _DeleteAccountDialogState extends State<DeleteAccountDialog> {
       builder: (context, _) {
         final running = vm.deleteAccount.running;
         // Closing the Google or Apple window just stops; it isn't an error.
-        final failed = vm.deleteAccount.error &&
+        final failed =
+            vm.deleteAccount.error &&
             !isSignInCancelled(vm.deleteAccount.result);
         final error = failed ? vm.deleteAccount.result : null;
         return AlertDialog(
@@ -87,7 +88,7 @@ class _DeleteAccountDialogState extends State<DeleteAccountDialog> {
                         'meetings and direct messages, with their photos '
                         'and files',
                     'Your RSVPs, reactions, poll votes and join requests',
-                    'Your place on every team and group. Teams you own '
+                    'Your place on every team and community. Teams you own '
                         'pass to a coach or captain (or another member); a '
                         'team with nobody else on it is deleted.',
                   ])

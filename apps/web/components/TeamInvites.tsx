@@ -25,7 +25,7 @@ function ClubInviteNote({ teamId }: { teamId: string }) {
 }
 
 /** What the app calls each kind in a sentence (TeamKind.noun). */
-const nouns: Record<string, string> = { team: "team", community: "group", organization: "community" };
+const nouns: Record<string, string> = { team: "team", community: "community", organization: "community" };
 
 /**
  * The member's invitations to teams and groups, newest first, with Accept

@@ -8,7 +8,7 @@ import { searchTagsFor, useMyProfile } from "./useMyProfile";
 
 const sections = [
   ["stats", "Stats", "Your season totals and career table"],
-  ["teams", "Teams", "The teams and groups you're on"],
+  ["teams", "Teams", "The teams and communities you're on"],
   ["games", "Recent games", "Your lines from recent games"],
 ] as const;
 

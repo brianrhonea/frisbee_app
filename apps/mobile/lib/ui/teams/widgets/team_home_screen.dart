@@ -730,7 +730,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     final c = AppColors.of(context);
     final upcoming = vm.upcomingEvents.length;
     return SectionCard(
-      title: summary.isCommunity ? 'About the group' : 'About the team',
+      title: summary.isCommunity ? 'About the community' : 'About the team',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -811,7 +811,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       title: summary.isOrganization
           ? 'Community details'
           : summary.isCommunity
-          ? 'Group details'
+          ? 'Community details'
           : 'Club details',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -844,7 +844,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           Text(
             summary.isCommunity
                 ? (summary.requiresApproval
-                      ? "The group's admins approve new members."
+                      ? "The community's admins approve new members."
                       : 'Open to new players. Join any time.')
                 : 'Joining takes an invite code from a coach or captain.',
             style: TextStyle(fontSize: 11.5, color: c.muted),
@@ -958,7 +958,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
     if (vm.isPrivateToMe) {
       return const [
         _Note(
-          'This is a private group. Its location, events and posts are '
+          'This is a private community. Its location, events and posts are '
           'only visible to members.',
         ),
       ];
@@ -967,7 +967,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
       return vm.upcomingEvents.isEmpty
           ? [
               _Note(
-                "This ${vm.isGroup ? 'group' : 'team'} hasn't shared "
+                "This ${vm.isGroup ? 'community' : 'team'} hasn't shared "
                 'anything publicly yet.',
               ),
             ]
@@ -981,7 +981,7 @@ class _TeamHomeScreenState extends State<TeamHomeScreen> {
           children: [
             Expanded(
               child: Text(
-                vm.isGroup ? 'From the group' : 'From the team',
+                vm.isGroup ? 'From the community' : 'From the team',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
@@ -1044,7 +1044,7 @@ class _Hero extends StatelessWidget {
       if (summary.isOrganization)
         'school or club'
       else if (summary.isCommunity)
-        'pickup group'
+        'pickup community'
       else
         '${summary.division.label} ${summary.level.label}',
     ].join(' ').toUpperCase();
@@ -1260,7 +1260,7 @@ class _CountLine extends StatelessWidget {
                 ? '$count ${count == 1 ? 'member' : 'members'}'
                       ' · ${vm.upcomingEvents.length} upcoming'
                 : summary.isCommunity
-                ? 'Community group'
+                ? 'Pickup community'
                 : 'Team',
             style: TextStyle(fontSize: 12, color: AppColors.of(context).muted),
           ),
@@ -1355,7 +1355,7 @@ class _TeamHeaderDelegate extends SliverPersistentHeaderDelegate {
       if (summary.isOrganization)
         'school or club'
       else if (summary.isCommunity)
-        'pickup group'
+        'pickup community'
       else
         '${summary.division.label} ${summary.level.label}',
     ].join(' ').toUpperCase();
@@ -1807,7 +1807,7 @@ class _MembersCard extends StatelessWidget {
       });
     final count = members.length;
     return SectionCard(
-      title: team.isCommunity ? 'Meet the group' : 'Meet the sideline',
+      title: team.isCommunity ? 'Meet the community' : 'Meet the sideline',
       action: CardLink(
         label: 'All $count ${team.isCommunity ? 'members' : 'players'}',
         onTap: () => goWithinTeam(context, TeamSection.members.route(team.id)),

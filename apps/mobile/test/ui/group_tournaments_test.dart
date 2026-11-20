@@ -600,7 +600,7 @@ void main() {
     await tester.tap(find.text('Publish schedule'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Tell the group?'), findsOneWidget);
+    expect(find.text('Tell the community?'), findsOneWidget);
     await tester.tap(find.text('Write post'));
     await tester.pumpAndSettle();
     expect(find.text('New post'), findsOneWidget);

@@ -35,7 +35,7 @@ typedef FeedPostDraft = ({String teamId, PostDraft draft});
 enum OnboardingStep {
   username('Pick a username'),
   join('Join or create a team'),
-  find('Find a team or group near you'),
+  find('Find a team or community near you'),
   follow('Follow people');
 
   const OnboardingStep(this.label);

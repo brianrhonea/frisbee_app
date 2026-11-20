@@ -81,12 +81,12 @@ class _FollowingScreenState extends State<FollowingScreen> {
               icon: Icons.people_outline,
               title: 'Not following anyone yet',
               message:
-                  'Follow people, teams, groups and tournaments to see '
+                  'Follow people, teams, communities and tournaments to see '
                   'their posts on Home.',
               action: FilledButton.icon(
                 onPressed: () => context.go(Routes.explore()),
                 icon: const Icon(Icons.search),
-                label: const Text('Find teams and groups'),
+                label: const Text('Find teams and communities'),
               ),
             )
           : ConstrainedContent(

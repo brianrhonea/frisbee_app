@@ -74,7 +74,7 @@ export function UpcomingAside() {
         <div className="card promo-card">
           <small>New to Stall 10?</small>
           <b>Good people. Great ultimate.</b>
-          <p>Follow players, join teams and groups, and keep up with your season.</p>
+          <p>Follow players, join teams and communities, and keep up with your season.</p>
           <Link className="btn btn-amber btn-small" href="/sign-up">
             Sign up free <NavIcon name="external" size={14} />
           </Link>

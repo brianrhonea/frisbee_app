@@ -15,7 +15,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: { default: "Stall 10", template: "%s — Stall 10" },
-  description: "Ultimate frisbee teams, leagues and tournaments. Find players, teams and pickup groups near you.",
+  description: "Ultimate frisbee teams, leagues and tournaments. Find players, teams and pickup communities near you.",
   icons: { icon: "/favicon.png" },
   openGraph: { siteName: "Stall 10", images: ["/logo.png"] },
 };

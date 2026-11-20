@@ -32,8 +32,10 @@ class StatsTab extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.create_new_folder_outlined),
-              title: const Text('New tournament'),
-              subtitle: const Text('A folder for its games, roster and lines'),
+              title: const Text('Track a tournament'),
+              subtitle: const Text(
+                'Stats for every game you play at one tournament',
+              ),
               onTap: () => Navigator.pop(context, EventType.tournament),
             ),
             ListTile(
@@ -112,7 +114,7 @@ class StatsTab extends StatelessWidget {
                 heroTag: 'new-stats',
                 onPressed: () => _add(context),
                 icon: const Icon(Icons.add),
-                label: const Text('Game / tournament'),
+                label: const Text('Track stats'),
               )
             : null,
         body: Align(
@@ -128,10 +130,10 @@ class StatsTab extends StatelessWidget {
                 ),
                 _SeasonCard(viewModel: vm),
                 const SizedBox(height: 20),
-                Text('Tournaments', style: theme.textTheme.titleMedium),
+                Text('Tournament stats', style: theme.textTheme.titleMedium),
                 const SizedBox(height: 8),
                 if (vm.tournaments.isEmpty)
-                  const Text('No tournaments yet.')
+                  const Text('No tournaments tracked yet.')
                 else
                   for (final t in vm.tournaments)
                     _TournamentFolder(
@@ -511,7 +513,7 @@ class _NewDialogState extends State<_NewDialog> {
     final theme = Theme.of(context);
     final lines = widget.linesFor(_event);
     return AlertDialog(
-      title: Text(widget.tournament ? 'New tournament' : 'New game'),
+      title: Text(widget.tournament ? 'Track a tournament' : 'New game'),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(

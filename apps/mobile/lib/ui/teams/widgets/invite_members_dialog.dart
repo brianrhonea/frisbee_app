@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../domain/models/invite_code.dart';
@@ -242,6 +243,20 @@ class _LinkCard extends StatelessWidget {
     if (context.mounted) showSnackBar(context, 'Link copied');
   }
 
+  /// The link as a QR code, big enough to scan from across a huddle.
+  Future<void> _qr(BuildContext context) async {
+    final link = await _link(context);
+    if (link == null || !context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => InviteQrDialog(
+        link: link,
+        teamName: viewModel.team.name,
+        expiresAt: viewModel.linkExpiresAt,
+      ),
+    );
+  }
+
   Future<void> _share(BuildContext context) async {
     final link = await _link(context);
     if (link == null || !context.mounted) return;
@@ -284,7 +299,7 @@ class _LinkCard extends StatelessWidget {
               Text(
                 viewModel.linkExpires
                     ? 'Anyone with it can join as a player until it expires.'
-                    : 'Anyone with it can find and join the group.',
+                    : 'Anyone with it can find and join the community.',
                 style: TextStyle(fontSize: 12, color: c.muted),
               ),
               if (viewModel.linkExpires) ...[
@@ -352,6 +367,11 @@ class _LinkCard extends StatelessWidget {
                     onPressed: busy ? null : () => _copy(context),
                     icon: const Icon(Icons.copy, size: 18),
                   ),
+                  IconButton(
+                    tooltip: 'QR code',
+                    onPressed: busy ? null : () => _qr(context),
+                    icon: const Icon(Icons.qr_code_2, size: 20),
+                  ),
                   FilledButton.icon(
                     onPressed: busy ? null : () => _share(context),
                     icon: const Icon(Icons.ios_share, size: 18),
@@ -363,6 +383,68 @@ class _LinkCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// [link] as a QR code to scan with a phone's camera, which opens the
+/// invite like tapping the link. Always dark on white, in either theme, so
+/// cameras read it.
+class InviteQrDialog extends StatelessWidget {
+  const InviteQrDialog({
+    super.key,
+    required this.link,
+    required this.teamName,
+    this.expiresAt,
+  });
+
+  final Uri link;
+  final String teamName;
+  final DateTime? expiresAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return AlertDialog(
+      title: Text('Scan to join $teamName'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            // A fixed size: the dialog measures its content, and the QR
+            // view's LayoutBuilder can't be measured.
+            child: SizedBox.square(
+              dimension: 240,
+              child: QrImageView(
+                data: link.toString(),
+                size: 240,
+                backgroundColor: Colors.white,
+                semanticsLabel: 'QR code for the invite link',
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            expiresAt == null
+                ? 'Point a phone camera at the code.'
+                : 'Point a phone camera at the code. Works until '
+                      '${DateFormat('MMM d, h:mm a').format(expiresAt!)}.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: c.muted),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Done'),
+        ),
+      ],
     );
   }
 }

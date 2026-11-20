@@ -176,7 +176,7 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
 
   if (viewer.state === "loading") return <Loading />;
   if (!member && privateGroup) {
-    return <EmptyState>Only members see this group&apos;s events.</EmptyState>;
+    return <EmptyState>Only members see this community&apos;s events.</EmptyState>;
   }
   // Signed out: a youth team's card only.
   if (youth && viewer.state === "visitor") return <EmptyState>{youthVisitorNote}</EmptyState>;
@@ -254,7 +254,7 @@ export function TeamSchedule({ publicEvents }: { publicEvents: PublicEvent[] }) 
         )}
         {!member && (
           <p className="muted small">
-            {viewer.state === "visitor" ? "Members see the full schedule." : `Only ${kind === "team" ? "the team's" : "the group's"} public events show here.`}
+            {viewer.state === "visitor" ? "Members see the full schedule." : `Only ${kind === "team" ? "the team's" : "the community's"} public events show here.`}
           </p>
         )}
       </div>

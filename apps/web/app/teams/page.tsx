@@ -6,7 +6,7 @@ import { TeamInvites } from "@/components/TeamInvites";
 
 export const metadata: Metadata = {
   title: "Teams",
-  description: "Your ultimate teams, pickup groups and schools or clubs on Stall 10, and any team's public page.",
+  description: "Your ultimate teams, pickup communities and schools or clubs on Stall 10, and any team's public page.",
 };
 
 /**
@@ -19,7 +19,7 @@ export default function Teams() {
     <div className="page">
       <header className="page-head">
         <h1>Teams</h1>
-        <p>Your teams, pickup groups and schools or clubs, and any team&apos;s public page.</p>
+        <p>Your teams, pickup communities and schools or clubs, and any team&apos;s public page.</p>
       </header>
       <div className="stack">
         <TeamInvites />

@@ -7,6 +7,14 @@ entry here; `pnpm test` fails without one (`scripts/check-versions.mjs`).
 The running version is in `GET /health` and in every response's
 `x-stall10-api-version` header.
 
+## 0.31.1 — 2026-11-19
+
+**Changed**
+- Error messages say "community" where they said "group" (hat
+  tournaments, joining one that needs approval, its events and roster),
+  matching the app 0.0.30 and website 0.40.0 wording. Group messages
+  keep "group".
+
 ## 0.31.0 — 2026-11-17
 
 Private profiles' posts (security review S1).

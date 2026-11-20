@@ -53,7 +53,7 @@ export function TeamFeed({ publicPosts, publicEvents }: { publicPosts: PublicTea
         ) : live.error ? (
           <ErrorNote>{live.error}</ErrorNote>
         ) : hidden ? (
-          <EmptyState>Only members see this group&apos;s posts and events.</EmptyState>
+          <EmptyState>Only members see this community&apos;s posts and events.</EmptyState>
         ) : youthHidden ? (
           <EmptyState>{youthVisitorNote}</EmptyState>
         ) : outsiderYouth && outsider.posts.error ? (

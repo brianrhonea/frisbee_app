@@ -385,7 +385,7 @@ function Editor({
       setPublishedTeams(teamsKey);
       setPlan(p);
       const page = `/teams/${encodeURIComponent(teamId)}/tournaments/${encodeURIComponent(saved)}`;
-      if (first && window.confirm(`Tell the group? Post ${name.trim()} to the group feed so people see it and sign up. You can edit the post first.`)) {
+      if (first && window.confirm(`Tell the community? Post ${name.trim()} to the community feed so people see it and sign up. You can edit the post first.`)) {
         setAnnounce({ page, id: saved });
       } else router.push(page);
     } catch (e) {
@@ -776,8 +776,8 @@ function Announcement({
       last ? `${day(s.startsAt)} to ${day(last)}, starting at ${gameTime(s.startsAt)}.` : `${day(s.startsAt)}, starting at ${gameTime(s.startsAt)}.`,
       `${groupTournamentFormatInfo[s.format].label} · ${teamCount} teams · ${s.playersOnField}v${s.playersOnField} · games to ${s.scoreCap}.`,
       event
-        ? `Want to play? Join the group, then RSVP Attending on "${event.title ?? "the event"}" in Events. Teams are picked from who signs up.`
-        : "Want to play? Join the group and watch Events for sign-up.",
+        ? `Want to play? Join the community, then RSVP Attending on "${event.title ?? "the event"}" in Events. Teams are picked from who signs up.`
+        : "Want to play? Join the community and watch Events for sign-up.",
     ].join("\n\n"),
   );
   const [location, setLocation] = useState((group as TeamDoc & { location?: { address?: string } }).location?.address ?? "");
@@ -800,8 +800,8 @@ function Announcement({
 
   return (
     <form className="card settings-form" onSubmit={(e) => void post(e)}>
-      <h2 className="card-title">Tell the group</h2>
-      <p className="muted small">Published. This post goes to the group feed, public so people who haven&apos;t joined see it too.</p>
+      <h2 className="card-title">Tell the community</h2>
+      <p className="muted small">Published. This post goes to the community feed, public so people who haven&apos;t joined see it too.</p>
       <label>
         Title
         <input value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} />
